@@ -81,20 +81,30 @@ cmake --build build
 ctest --test-dir build          # 13/13: transport+protocol foundation + decode
 ```
 
-To consume it from your own CMake project, add the package and link the
-`depz_sensor_sdk` target — it exports its `include/` directory:
+To consume it from your own CMake project, pull it in with FetchContent and link
+the namespaced target `depz::sensor_sdk_c` — this builds the library only, never
+the test suite:
 
 ```cmake
-add_subdirectory(path/to/depz-sensor-sdk-c)
-target_link_libraries(my_app PRIVATE depz_sensor_sdk)
+include(FetchContent)
+FetchContent_Declare(
+  depz_sensor_sdk_c
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
+  GIT_TAG        v0.1.2
+  SOURCE_SUBDIR  packages/depz-sensor-sdk-c
+)
+FetchContent_MakeAvailable(depz_sensor_sdk_c)
+target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
 ```c
 #include <depz_sensor_sdk.h>
 ```
 
-There is no `install` step wired up; vendor the source or `add_subdirectory` it.
-The `docs/` reference is regenerated with `make docs` (see [below](#testing)).
+The library also ships an installable CMake package
+(`find_package(depz-sensor-sdk-c CONFIG)`) plus Conan and vcpkg recipes — see
+the [README](../README.md#install) for those. The `docs/` reference is
+regenerated with `make docs` (see [below](#testing)).
 
 ## Mental model
 
