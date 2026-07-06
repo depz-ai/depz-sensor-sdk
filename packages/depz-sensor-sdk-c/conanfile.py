@@ -6,10 +6,10 @@ import os
 
 class DepzSensorSdkCConan(ConanFile):
     name = "depz-sensor-sdk-c"
-    version = "0.1.0"
+    version = "0.1.2"
     license = "MIT"
     author = "DEPZ AI"
-    url = "https://github.com/depz-ai/depz-sensor-sdk-and-viewer"
+    url = "https://github.com/depz-ai/depz-sensor-sdk"
     description = (
         "Contract-first C11 decode/codec SDK for the DEPZ USB sensor line "
         "(SR04, VL53L8CX/CH, BNO086): CRCs, packet framing, USB identity, "

@@ -19,7 +19,7 @@ left to the host application.
 - **Identity**: [`SensorType`](#sensortype), [`to_string`](#to_string), [`DeviceMode`](#devicemode), [`Identity`](#identity), [`parse_software_name`](#parse_software_name)
 - **USB identity**: [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`PID_VL53L8`](#pid_vl53l8), [`PID_BNO086`](#pid_bno086), [`DEV_USB_VID`](#dev_usb_vid), [`DEV_USB_PID`](#dev_usb_pid), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortInfo`](#portinfo), [`order_by_serial`](#order_by_serial)
 - **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
-- **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init)
+- **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
 - **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **Bootloader / firmware**: [`FWDEPZ_HEADER_SIZE`](#fwdepz_header_size), [`FWDEPZ_MAGIC`](#fwdepz_magic), [`BlCmd`](#blcmd), [`BlRpt`](#blrpt), [`BlStatus`](#blstatus), [`FlashInfo`](#flashinfo), [`pack_write_page`](#pack_write_page), [`pack_read_page`](#pack_read_page), [`FwDepzErrorKind`](#fwdepzerrorkind), [`FwDepzError`](#fwdepzerror), [`FwDepzImage`](#fwdepzimage)
 - **Datasets**: [`SCHEMA_PREFIX`](#schema_prefix), [`TimeSync`](#timesync), [`DeviceMeta`](#devicemeta), [`Record`](#record), [`Reader`](#reader)
@@ -913,6 +913,88 @@ MotionConfig motion_config_init(int resolution);
 
 Build the default motion-indicator configuration for `resolution`
 (RESOLUTION_4X4 or RESOLUTION_8X8), matching uld.motion_indicator_init.
+
+### CNH_PER_HEADER_WORDS
+
+```cpp
+inline constexpr int CNH_PER_HEADER_WORDS = 5;
+```
+
+Persistent-data header / buffer layout constants (plugin_cnh.c).
+
+### CNH_PER_BUFFER_HEADER_WORDS
+
+```cpp
+inline constexpr int CNH_PER_BUFFER_HEADER_WORDS = 2;
+```
+
+CNH_PER_BUFFER_HEADER_BYTES / 4
+
+### CNH_PER_HEADER_BUFFER_INFO_IDX
+
+```cpp
+inline constexpr int CNH_PER_HEADER_BUFFER_INFO_IDX = 1;
+```
+
+### CNH_PER_HEADER_FLAGS_IDX
+
+```cpp
+inline constexpr int CNH_PER_HEADER_FLAGS_IDX = 3;
+```
+
+### CNH_BUFFER_INFO_WORDS_MASK
+
+```cpp
+inline constexpr std::uint32_t CNH_BUFFER_INFO_WORDS_MASK = 0xFFFF;
+```
+
+### CNH_MI_STATE_PING
+
+```cpp
+inline constexpr int CNH_MI_STATE_PING = 0;
+```
+
+### CnhAggregate
+
+```cpp
+struct CnhAggregate {
+    std::vector<std::int32_t> hist_raw;
+    std::vector<std::int8_t> hist_scaler;
+    std::vector<double> hist;
+    std::int32_t ambient_raw = 0;
+    std::int8_t ambient_scaler = 0;
+    double ambient = 0.0;
+};
+```
+
+One decoded CNH aggregate. `hist_raw[i] / 2**hist_scaler[i]` is the float bin
+value; `ambient = ambient_raw / 2**ambient_scaler`. hist_raw / hist_scaler are
+length == feature_length.
+
+### CnhFrame
+
+```cpp
+struct CnhFrame {
+    std::uint32_t ref_residual_word = 0;
+    double ref_residual = 0.0;
+    std::vector<CnhAggregate> aggregates;  // len == nb_of_aggregates
+};
+```
+
+A decoded CNH data block. `ref_residual_word` is the raw u32 at byte offset 8;
+`ref_residual = ref_residual_word / 2048.0`.
+
+### decode_cnh
+
+```cpp
+CnhFrame decode_cnh(int nb_of_aggregates, int feature_length, byte_span raw);
+```
+
+Decode a captured CNH data block (`raw`, byte-swapped exactly like the standard
+ranging blocks) into per-aggregate histograms. `nb_of_aggregates` and
+`feature_length` come from the CNH config used on the device (see CnhConfig /
+MotionConfig). Faithful port of cnh.decode / _decode_aggregate for the fixed
+cnh_cfg (ping-pong + variance disabled).
 
 ## BNO086 (IMU)
 

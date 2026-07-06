@@ -78,8 +78,8 @@ subdir with `SOURCE_SUBDIR`. Tests are automatically off when consumed this way.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
-  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-and-viewer.git
-  GIT_TAG        cpp-v0.1.0
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
+  GIT_TAG        v0.1.2
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -108,11 +108,16 @@ conan create packages/depz-sensor-sdk-cpp
 ```
 
 Then consume with `find_package(depz-sensor-sdk-cpp)` and link
-`depz::sensor_sdk_cpp` (via `CMakeDeps`/`CMakeToolchain`).
+`depz::sensor_sdk_cpp` (via `CMakeDeps`/`CMakeToolchain`). Submission to Conan
+Center is in review
+([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
+until it merges, use the in-repo recipe as above.
 
 ### vcpkg
 
-A port lives in `vcpkg/` (`vcpkg.json` + `portfile.cmake`). Add it as an
+Submission to the vcpkg registry is in review
+([microsoft/vcpkg#52770](https://github.com/microsoft/vcpkg/pull/52770)); until
+it merges, use the in-repo port (`vcpkg/`) as an
 [overlay port](https://learn.microsoft.com/vcpkg/concepts/overlay-ports):
 
 ```bash
@@ -124,7 +129,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `cpp-v0.1.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.1.2`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test

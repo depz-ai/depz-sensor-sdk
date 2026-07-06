@@ -71,12 +71,18 @@ cmake --build build
 ctest --test-dir build          # 6 golden-vector suites
 ```
 
-The build produces the static library `depz_sensor_sdk` and the CMake alias
-`depz::sensor_sdk`. In your own tree:
+The build produces a static library exposed as the CMake target
+`depz::sensor_sdk_cpp` (the alias `depz::sensor_sdk` is kept for backwards
+compatibility). Pull it into your own tree with FetchContent:
 
 ```cmake
-add_subdirectory(depz-sensor-sdk-cpp)
-target_link_libraries(my_app PRIVATE depz::sensor_sdk)
+include(FetchContent)
+FetchContent_Declare(depz-sensor-sdk-cpp
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
+  GIT_TAG        v0.1.2
+  SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
+FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
+target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
 The public headers are under `include/depz/`; include what you use
