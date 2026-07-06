@@ -1,0 +1,28 @@
+{
+  "schema": "depz.vectors.manifest/1",
+  "comment": "Every shipping SDK must consume every vector file. check_vector_manifest.py enforces this in CI.",
+  "files": [
+    "bno086_reports.json",
+    "bno086_shtp.json",
+    "common_commands.json",
+    "crc.json",
+    "framing_decode.json",
+    "framing_encode.json",
+    "fwdepz.json",
+    "identity.json",
+    "sr04.json",
+    "usb_ids.json",
+    "vl53l8_advanced.json",
+    "vl53l8_cnh.json"
+  ],
+  "consumers": {
+    "python": {
+      "status": "shipping",
+      "runner": "packages/depz-sensor-sdk-python/tests/"
+    },
+    "ts": {
+      "status": "shipping",
+      "runner": "packages/depz-sensor-sdk-ts/test/"
+    }
+  }
+}

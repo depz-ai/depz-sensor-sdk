@@ -1,0 +1,86 @@
+{
+  "schema": "depz.vectors.identity/1",
+  "comment": "GET_NAME_ACTIVE_SOFTWARE string classification (contract 02 §4). `raw` is the wire bytes after the echoed-cmd byte; strip trailing 0x00/0xFF before parsing.",
+  "cases": [
+    {
+      "name": "APP_usonic_SR04_v0.95",
+      "raw": "4150505f75736f6e69635f535230345f76302e3935",
+      "expect": {
+        "mode": "app",
+        "sensor_type": "sr04",
+        "software_name": "APP_usonic_SR04_v0.95",
+        "version": "0.95"
+      }
+    },
+    {
+      "name": "APP_BNO086_v0.95",
+      "raw": "4150505f424e4f3038365f76302e3935",
+      "expect": {
+        "mode": "app",
+        "sensor_type": "bno086",
+        "software_name": "APP_BNO086_v0.95",
+        "version": "0.95"
+      }
+    },
+    {
+      "name": "APP_VL53L8_v0.9",
+      "raw": "4150505f564c35334c385f76302e39",
+      "expect": {
+        "mode": "app",
+        "sensor_type": "vl53l8",
+        "software_name": "APP_VL53L8_v0.9",
+        "version": "0.9"
+      }
+    },
+    {
+      "name": "BOOTDEPZ_v1.1",
+      "raw": "424f4f544445505a5f76312e31",
+      "expect": {
+        "mode": "bootloader",
+        "sensor_type": null,
+        "software_name": "BOOTDEPZ_v1.1",
+        "version": "1.1"
+      }
+    },
+    {
+      "name": "APP_NEWSENSOR_v1.2",
+      "raw": "4150505f4e455753454e534f525f76312e32",
+      "expect": {
+        "mode": "app",
+        "sensor_type": "unknown",
+        "software_name": "APP_NEWSENSOR_v1.2",
+        "version": "1.2"
+      }
+    },
+    {
+      "name": "HELLO",
+      "raw": "48454c4c4f",
+      "expect": {
+        "mode": "unknown",
+        "sensor_type": null,
+        "software_name": "HELLO",
+        "version": ""
+      }
+    },
+    {
+      "name": "APP_usonic_SR04_v0.95",
+      "raw": "4150505f75736f6e69635f535230345f76302e39350000ff",
+      "expect": {
+        "mode": "app",
+        "sensor_type": "sr04",
+        "software_name": "APP_usonic_SR04_v0.95",
+        "version": "0.95"
+      }
+    },
+    {
+      "name": "BOOTDEPZ_v1.1",
+      "raw": "424f4f544445505a5f76312e31ffffffff",
+      "expect": {
+        "mode": "bootloader",
+        "sensor_type": null,
+        "software_name": "BOOTDEPZ_v1.1",
+        "version": "1.1"
+      }
+    }
+  ]
+}

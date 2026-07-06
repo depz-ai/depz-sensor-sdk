@@ -1,0 +1,72 @@
+{
+  "schema": "depz.vectors.sr04/1",
+  "comment": "SR04 codecs (contract 03). RPT_DATA source cmds are 0x36/0x37 (ERRATA E3); echo_time_us 0xFFFF = timeout sentinel. distance_mm = echo_us*343/2000 (formula-only, no float vectors).",
+  "encode": [
+    {
+      "name": "set_sample_period_20hz_default",
+      "kind": "set_sample_period",
+      "period_us": 50000,
+      "payload": "50c30000"
+    },
+    {
+      "name": "set_sample_period_max_u32",
+      "kind": "set_sample_period",
+      "period_us": 4294967295,
+      "payload": "ffffffff"
+    },
+    {
+      "name": "set_echo_decay_default",
+      "kind": "set_echo_decay",
+      "decay_us": 5000,
+      "payload": "8813"
+    }
+  ],
+  "decode": [
+    {
+      "name": "data_loop_sample",
+      "report": 145,
+      "payload": "373d1ea10600000000c716",
+      "expect": {
+        "source_cmd": 55,
+        "timestamp_us": 111222333,
+        "echo_time_us": 5831
+      }
+    },
+    {
+      "name": "data_single_shot",
+      "report": 145,
+      "payload": "362a000000000000008804",
+      "expect": {
+        "source_cmd": 54,
+        "timestamp_us": 42,
+        "echo_time_us": 1160
+      }
+    },
+    {
+      "name": "data_timeout_sentinel_0xffff",
+      "report": 145,
+      "payload": "37ff0fa5d4e8000000ffff",
+      "expect": {
+        "source_cmd": 55,
+        "timestamp_us": 999999999999,
+        "echo_time_us": 65535
+      }
+    },
+    {
+      "name": "sample_period",
+      "report": 146,
+      "payload": "50c30000",
+      "expect": {
+        "period_us": 50000
+      }
+    },
+    {
+      "name": "echo_decay_clamped_min",
+      "report": 147,
+      "payload": "a00f",
+      "expect": {
+        "decay_us": 4000
+      }
+    }
+  ]
+}

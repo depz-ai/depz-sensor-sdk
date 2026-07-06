@@ -1,0 +1,111 @@
+{
+  "schema": "depz.vectors.common_commands/1",
+  "comment": "Payload codecs for contract 02. sync_time math: offset = ((T2-T1)+(T3-T4))/2 truncated toward zero, rtt = (T4-T1)-(T3-T2); temperature raw int16 in 0.1 degC.",
+  "encode": [
+    {
+      "name": "sync_time_request",
+      "kind": "sync_time_request",
+      "pc_timestamp_us": 1720000000123456,
+      "payload": "406205b5541c0600"
+    },
+    {
+      "name": "set_payload_crc_type_crc16",
+      "kind": "set_payload_crc_type",
+      "crc_type": 2,
+      "payload": "02"
+    },
+    {
+      "name": "sync_pin_out_both_idle_high",
+      "kind": "sync_pin_config",
+      "pin": 3,
+      "mode": 4,
+      "polarity": 1,
+      "payload": "030401"
+    }
+  ],
+  "decode": [
+    {
+      "name": "status_solicited_ok",
+      "report": 128,
+      "payload": "0900",
+      "expect": {
+        "cmd": 9,
+        "status": 0
+      }
+    },
+    {
+      "name": "status_unsolicited_hw_fault",
+      "report": 128,
+      "payload": "0009",
+      "expect": {
+        "cmd": 0,
+        "status": 9
+      }
+    },
+    {
+      "name": "text_strips_trailing_nul_ff",
+      "report": 129,
+      "payload": "044150505f75736f6e69635f535230345f76302e39350000ffff",
+      "expect": {
+        "cmd": 4,
+        "text": "APP_usonic_SR04_v0.95"
+      }
+    },
+    {
+      "name": "temperature_negative",
+      "report": 131,
+      "payload": "15cd5b0700000000c9ff",
+      "expect": {
+        "timestamp_us": 123456789,
+        "raw_decidegrees": -55
+      }
+    },
+    {
+      "name": "sequence_error",
+      "report": 132,
+      "payload": "f003",
+      "expect": {
+        "expected_seq": 240,
+        "received_seq": 3
+      }
+    }
+  ],
+  "sync_time_math": [
+    {
+      "name": "device_ahead",
+      "t1": 1000000,
+      "t2": 5000000,
+      "t3": 5000100,
+      "t4": 1000300,
+      "offset_us": 3999900,
+      "rtt_us": 200
+    },
+    {
+      "name": "device_behind",
+      "t1": 9000000,
+      "t2": 2000000,
+      "t3": 2000050,
+      "t4": 9000250,
+      "offset_us": -7000100,
+      "rtt_us": 200
+    },
+    {
+      "name": "odd_sum_truncates_toward_zero",
+      "t1": 100,
+      "t2": 200,
+      "t3": 205,
+      "t4": 304,
+      "offset_us": 0,
+      "rtt_us": 199
+    },
+    {
+      "name": "odd_negative_sum_truncates_toward_zero",
+      "t1": 200,
+      "t2": 100,
+      "t3": 105,
+      "t4": 405,
+      "offset_us": -200,
+      "rtt_us": 200
+    }
+  ]
+}

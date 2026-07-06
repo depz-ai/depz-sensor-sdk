@@ -1,0 +1,220 @@
+{
+  "schema": "depz.vectors.usb_ids/1",
+  "comment": "DEPZ USB identity table + serial-ordering logic (contract 02 §4). is_known_depz_usb: dev-default (0483:56DC) OR vid==1BCF and (pid mapped OR pid in 60536..65535). PID→model values mirror the DEPZ catalog (admin Sensor Reference at depz.ai/cameradmin; website src/data/products). Ordering: sort by USB iSerial ascending, None/empty last, tie-break by port path.",
+  "vid": 7119,
+  "dev_vid": 1155,
+  "dev_pid": 22236,
+  "pid_range": [
+    60536,
+    65535
+  ],
+  "identity": [
+    {
+      "vid": 7119,
+      "pid": 60536,
+      "known": true,
+      "model": "sr04"
+    },
+    {
+      "vid": 7119,
+      "pid": 60736,
+      "known": true,
+      "model": "vl53l8ch"
+    },
+    {
+      "vid": 7119,
+      "pid": 60737,
+      "known": true,
+      "model": "vl53l0x"
+    },
+    {
+      "vid": 7119,
+      "pid": 60738,
+      "known": true,
+      "model": "vl53l1cb"
+    },
+    {
+      "vid": 7119,
+      "pid": 60739,
+      "known": true,
+      "model": "vl53l1cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60740,
+      "known": true,
+      "model": "vl53l3cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60741,
+      "known": true,
+      "model": "vl53l4cd"
+    },
+    {
+      "vid": 7119,
+      "pid": 60742,
+      "known": true,
+      "model": "vl53l4cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60743,
+      "known": true,
+      "model": "vl53l4ed"
+    },
+    {
+      "vid": 7119,
+      "pid": 60744,
+      "known": true,
+      "model": "vl53l5cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60745,
+      "known": true,
+      "model": "vl53l7cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60746,
+      "known": true,
+      "model": "vl53l7ch"
+    },
+    {
+      "vid": 7119,
+      "pid": 60747,
+      "known": true,
+      "model": "vl53l8cx"
+    },
+    {
+      "vid": 7119,
+      "pid": 60936,
+      "known": true,
+      "model": "bno086"
+    },
+    {
+      "vid": 7119,
+      "pid": 60937,
+      "known": true,
+      "model": "bno085"
+    },
+    {
+      "vid": 7119,
+      "pid": 60938,
+      "known": true,
+      "model": "bno055"
+    },
+    {
+      "vid": 7119,
+      "pid": 60748,
+      "known": true,
+      "model": null
+    },
+    {
+      "vid": 7119,
+      "pid": 60535,
+      "known": false,
+      "model": null
+    },
+    {
+      "vid": 7119,
+      "pid": 4660,
+      "known": false,
+      "model": null
+    },
+    {
+      "vid": 1155,
+      "pid": 22236,
+      "known": true,
+      "model": "dev"
+    },
+    {
+      "vid": 1155,
+      "pid": 0,
+      "known": false,
+      "model": null
+    },
+    {
+      "vid": 9025,
+      "pid": 67,
+      "known": false,
+      "model": null
+    }
+  ],
+  "serial_ordering": [
+    {
+      "name": "by_serial_ascending",
+      "ports": [
+        {
+          "port": "/dev/ttyACM2",
+          "serial": "SN000009"
+        },
+        {
+          "port": "/dev/ttyACM0",
+          "serial": "SN000005"
+        },
+        {
+          "port": "/dev/ttyACM1",
+          "serial": "SN000007"
+        }
+      ],
+      "order": [
+        "/dev/ttyACM0",
+        "/dev/ttyACM1",
+        "/dev/ttyACM2"
+      ]
+    },
+    {
+      "name": "none_serial_sorts_last",
+      "ports": [
+        {
+          "port": "/dev/ttyACM1",
+          "serial": null
+        },
+        {
+          "port": "/dev/ttyACM0",
+          "serial": "SN000005"
+        }
+      ],
+      "order": [
+        "/dev/ttyACM0",
+        "/dev/ttyACM1"
+      ]
+    },
+    {
+      "name": "empty_serial_sorts_last",
+      "ports": [
+        {
+          "port": "/dev/ttyB",
+          "serial": ""
+        },
+        {
+          "port": "/dev/ttyA",
+          "serial": "SN1"
+        }
+      ],
+      "order": [
+        "/dev/ttyA",
+        "/dev/ttyB"
+      ]
+    },
+    {
+      "name": "tiebreak_by_port_path",
+      "ports": [
+        {
+          "port": "/dev/ttyB",
+          "serial": null
+        },
+        {
+          "port": "/dev/ttyA",
+          "serial": null
+        }
+      ],
+      "order": [
+        "/dev/ttyA",
+        "/dev/ttyB"
+      ]
+    }
+  ]
+}

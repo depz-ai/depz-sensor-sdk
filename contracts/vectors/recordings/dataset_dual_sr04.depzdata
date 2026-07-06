@@ -1,0 +1,11 @@
+{"schema": "depz.dataset/1", "created_utc": "2026-07-05T13:44:09Z", "devices": {"d0": {"time_sync": {"offset_us": -8524738852, "rtt_us": 13}, "serial": "SN0042", "software_name": "APP_usonic_SR04_v0.95", "sensor_type": "sr04"}, "d1": {"time_sync": {"offset_us": -3525739108, "rtt_us": 9}, "serial": "SN0042", "software_name": "APP_usonic_SR04_v0.95", "sensor_type": "sr04"}}, "note": "dual fake SR04 fixture"}
+{"d": "d0", "t": 8525788852, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d1", "t": 8525789108, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d0", "t": 8525838852, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d1", "t": 8525839108, "k": "sr04", "v": {"echo_us": 5831, "source": "once"}}
+{"d": "d0", "t": 8525888852, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d1", "t": 8525889108, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d0", "t": 8525938852, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d1", "t": 8525939108, "k": "sr04", "v": {"echo_us": 5831, "source": "once"}}
+{"d": "d0", "t": 8525988852, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}
+{"d": "d1", "t": 8525989108, "k": "sr04", "v": {"echo_us": 5831, "source": "loop"}}

@@ -1,0 +1,725 @@
+{
+  "schema": "depz.vectors.bno086_reports/1",
+  "comment": "SH-2 input-report decoding (contract 05 §5). Raw ints are authoritative; scaled value = raw / 2**q (q_points table; rv accuracy Q12 rad, gyro-integrated angular velocity Q10 rad/s). timestamp_us = capture − base_delta·100 + delay·100 (0xFB timebase, 0xFA rebase adds). Channel-5 gyro-integrated RV is dense 7×i16, optionally 0xFB+i32+u16-prefixed.",
+  "q_points": {
+    "0x01": 8,
+    "0x04": 8,
+    "0x06": 8,
+    "0x02": 9,
+    "0x07": 9,
+    "0x03": 4,
+    "0x0F": 4,
+    "0x05": 14,
+    "0x08": 14,
+    "0x09": 14,
+    "0x28": 14,
+    "0x29": 14,
+    "0x2A": 14,
+    "0x0A": 20,
+    "0x0B": 8,
+    "0x0C": 8,
+    "0x0D": 4,
+    "0x0E": 7,
+    "0x14": 0,
+    "0x15": 0,
+    "0x16": 0
+  },
+  "rv_accuracy_q": 12,
+  "gyro_rv_angvel_q": 10,
+  "input_cargos": [
+    {
+      "name": "accelerometer_1g_z",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb780000000101030000000000d909",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 1988000,
+            "seq": 1,
+            "accuracy": 3,
+            "delay_us": 0,
+            "x_raw": 0,
+            "y_raw": 0,
+            "z_raw": 2521
+          }
+        }
+      ]
+    },
+    {
+      "name": "linear_accel_negative",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000402020000ff8000ffff",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 4,
+            "timestamp_us": 2000000,
+            "seq": 2,
+            "accuracy": 2,
+            "delay_us": 0,
+            "x_raw": -256,
+            "y_raw": 128,
+            "z_raw": -1
+          }
+        }
+      ]
+    },
+    {
+      "name": "gravity",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb0a000000060303000c00e7ffce09",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 6,
+            "timestamp_us": 1999000,
+            "seq": 3,
+            "accuracy": 3,
+            "delay_us": 0,
+            "x_raw": 12,
+            "y_raw": -25,
+            "z_raw": 2510
+          }
+        }
+      ]
+    },
+    {
+      "name": "gyroscope_q9",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb0500000002040200000200fe0100",
+      "expect": [
+        {
+          "type": "Gyroscope",
+          "fields": {
+            "sensor_id": 2,
+            "timestamp_us": 1999500,
+            "seq": 4,
+            "accuracy": 2,
+            "delay_us": 0,
+            "x_raw": 512,
+            "y_raw": -512,
+            "z_raw": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "magnetometer_q4",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb0000000003050100a000c0fe2003",
+      "expect": [
+        {
+          "type": "Magnetometer",
+          "fields": {
+            "sensor_id": 3,
+            "timestamp_us": 2000000,
+            "seq": 5,
+            "accuracy": 1,
+            "delay_us": 0,
+            "x_raw": 160,
+            "y_raw": -320,
+            "z_raw": 800
+          }
+        }
+      ]
+    },
+    {
+      "name": "uncal_gyro_with_bias",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000070600000002000000fe0a00f6ff0500",
+      "expect": [
+        {
+          "type": "UncalibratedGyroscope",
+          "fields": {
+            "sensor_id": 7,
+            "timestamp_us": 2000000,
+            "seq": 6,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 512,
+            "y_raw": 0,
+            "z_raw": -512,
+            "bias_x_raw": 10,
+            "bias_y_raw": -10,
+            "bias_z_raw": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "uncal_mag_with_bias",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000f070000a00060ff50000800f8ff0400",
+      "expect": [
+        {
+          "type": "UncalibratedMagnetometer",
+          "fields": {
+            "sensor_id": 15,
+            "timestamp_us": 2000000,
+            "seq": 7,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 160,
+            "y_raw": -160,
+            "z_raw": 80,
+            "bias_x_raw": 8,
+            "bias_y_raw": -8,
+            "bias_z_raw": 4
+          }
+        }
+      ]
+    },
+    {
+      "name": "rotation_vector_q14_acc_q12",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb7800000005080311640038ff2c01803e3200",
+      "expect": [
+        {
+          "type": "RotationVector",
+          "fields": {
+            "sensor_id": 5,
+            "timestamp_us": 1989700,
+            "seq": 8,
+            "accuracy": 3,
+            "delay_us": 1700,
+            "i_raw": 100,
+            "j_raw": -200,
+            "k_raw": 300,
+            "real_raw": 16000,
+            "accuracy_raw": 50
+          }
+        }
+      ]
+    },
+    {
+      "name": "game_rv_no_accuracy_field",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000809000000c0000000000100",
+      "expect": [
+        {
+          "type": "RotationVector",
+          "fields": {
+            "sensor_id": 8,
+            "timestamp_us": 2000000,
+            "seq": 9,
+            "accuracy": 0,
+            "delay_us": 0,
+            "i_raw": -16384,
+            "j_raw": 0,
+            "k_raw": 0,
+            "real_raw": 1,
+            "accuracy_raw": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "geomag_rv",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000090a020001000200030000400010",
+      "expect": [
+        {
+          "type": "RotationVector",
+          "fields": {
+            "sensor_id": 9,
+            "timestamp_us": 2000000,
+            "seq": 10,
+            "accuracy": 2,
+            "delay_us": 0,
+            "i_raw": 1,
+            "j_raw": 2,
+            "k_raw": 3,
+            "real_raw": 16384,
+            "accuracy_raw": 4096
+          }
+        }
+      ]
+    },
+    {
+      "name": "arvr_stabilized_rv",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000280b0300050006000700ac3f1400",
+      "expect": [
+        {
+          "type": "RotationVector",
+          "fields": {
+            "sensor_id": 40,
+            "timestamp_us": 2000000,
+            "seq": 11,
+            "accuracy": 3,
+            "delay_us": 0,
+            "i_raw": 5,
+            "j_raw": 6,
+            "k_raw": 7,
+            "real_raw": 16300,
+            "accuracy_raw": 20
+          }
+        }
+      ]
+    },
+    {
+      "name": "arvr_stabilized_game_rv",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000290c0000080009000a00483f",
+      "expect": [
+        {
+          "type": "RotationVector",
+          "fields": {
+            "sensor_id": 41,
+            "timestamp_us": 2000000,
+            "seq": 12,
+            "accuracy": 0,
+            "delay_us": 0,
+            "i_raw": 8,
+            "j_raw": 9,
+            "k_raw": 10,
+            "real_raw": 16200,
+            "accuracy_raw": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "pressure_q20",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000a0d000000c0503f",
+      "expect": [
+        {
+          "type": "ScalarReport",
+          "fields": {
+            "sensor_id": 10,
+            "timestamp_us": 2000000,
+            "seq": 13,
+            "accuracy": 0,
+            "delay_us": 0,
+            "value_raw": 1062256640
+          }
+        }
+      ]
+    },
+    {
+      "name": "ambient_light_q8",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000b0e000000400100",
+      "expect": [
+        {
+          "type": "ScalarReport",
+          "fields": {
+            "sensor_id": 11,
+            "timestamp_us": 2000000,
+            "seq": 14,
+            "accuracy": 0,
+            "delay_us": 0,
+            "value_raw": 81920
+          }
+        }
+      ]
+    },
+    {
+      "name": "humidity_q8",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000c0f0000002d",
+      "expect": [
+        {
+          "type": "ScalarReport",
+          "fields": {
+            "sensor_id": 12,
+            "timestamp_us": 2000000,
+            "seq": 15,
+            "accuracy": 0,
+            "delay_us": 0,
+            "value_raw": 11520
+          }
+        }
+      ]
+    },
+    {
+      "name": "proximity_q4",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000d1000005000",
+      "expect": [
+        {
+          "type": "ScalarReport",
+          "fields": {
+            "sensor_id": 13,
+            "timestamp_us": 2000000,
+            "seq": 16,
+            "accuracy": 0,
+            "delay_us": 0,
+            "value_raw": 80
+          }
+        }
+      ]
+    },
+    {
+      "name": "temperature_q7",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000000e110000800c",
+      "expect": [
+        {
+          "type": "ScalarReport",
+          "fields": {
+            "sensor_id": 14,
+            "timestamp_us": 2000000,
+            "seq": 17,
+            "accuracy": 0,
+            "delay_us": 0,
+            "value_raw": 3200
+          }
+        }
+      ]
+    },
+    {
+      "name": "tap_detector_double",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000001012000044",
+      "expect": [
+        {
+          "type": "TapDetector",
+          "fields": {
+            "sensor_id": 16,
+            "timestamp_us": 2000000,
+            "seq": 18,
+            "accuracy": 0,
+            "delay_us": 0,
+            "flags": 68
+          }
+        }
+      ]
+    },
+    {
+      "name": "step_counter_latency_u32_steps_u16",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000001113000090d00300d2040000",
+      "expect": [
+        {
+          "type": "StepCounter",
+          "fields": {
+            "sensor_id": 17,
+            "timestamp_us": 2000000,
+            "seq": 19,
+            "accuracy": 0,
+            "delay_us": 0,
+            "latency_us": 250000,
+            "steps": 1234
+          }
+        }
+      ]
+    },
+    {
+      "name": "step_detector",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000001814000048e80100",
+      "expect": [
+        {
+          "type": "StepDetector",
+          "fields": {
+            "sensor_id": 24,
+            "timestamp_us": 2000000,
+            "seq": 20,
+            "accuracy": 0,
+            "delay_us": 0,
+            "latency_us": 125000
+          }
+        }
+      ]
+    },
+    {
+      "name": "significant_motion",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000121500000100",
+      "expect": [
+        {
+          "type": "SignificantMotion",
+          "fields": {
+            "sensor_id": 18,
+            "timestamp_us": 2000000,
+            "seq": 21,
+            "accuracy": 0,
+            "delay_us": 0,
+            "motion": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "stability_classifier_on_table",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000131600000100",
+      "expect": [
+        {
+          "type": "StabilityClassifier",
+          "fields": {
+            "sensor_id": 19,
+            "timestamp_us": 2000000,
+            "seq": 22,
+            "accuracy": 0,
+            "delay_us": 0,
+            "classification": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "shake_detector_y_axis",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000191700000200",
+      "expect": [
+        {
+          "type": "ShakeDetector",
+          "fields": {
+            "sensor_id": 25,
+            "timestamp_us": 2000000,
+            "seq": 23,
+            "accuracy": 0,
+            "delay_us": 0,
+            "flags": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "activity_classifier",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb000000001e18000081060102030405064608090a",
+      "expect": [
+        {
+          "type": "PersonalActivityClassifier",
+          "fields": {
+            "sensor_id": 30,
+            "timestamp_us": 2000000,
+            "seq": 24,
+            "accuracy": 0,
+            "delay_us": 0,
+            "page_number": 1,
+            "end_of_sequence": 1,
+            "most_likely_state": 6,
+            "confidences": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              70,
+              8,
+              9,
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "raw_accelerometer",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb0000000014190000001000f00040000006120f00",
+      "expect": [
+        {
+          "type": "RawSensor",
+          "fields": {
+            "sensor_id": 20,
+            "timestamp_us": 2000000,
+            "seq": 25,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 4096,
+            "y_raw": -4096,
+            "z_raw": 16384,
+            "sensor_timestamp_us": 987654,
+            "temperature_raw": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "raw_gyroscope_with_temp",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000151a000064009cff3200170034120f00",
+      "expect": [
+        {
+          "type": "RawSensor",
+          "fields": {
+            "sensor_id": 21,
+            "timestamp_us": 2000000,
+            "seq": 26,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 100,
+            "y_raw": -100,
+            "z_raw": 50,
+            "sensor_timestamp_us": 987700,
+            "temperature_raw": 23
+          }
+        }
+      ]
+    },
+    {
+      "name": "raw_magnetometer",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000161b00002c01d4fe9600000098120f00",
+      "expect": [
+        {
+          "type": "RawSensor",
+          "fields": {
+            "sensor_id": 22,
+            "timestamp_us": 2000000,
+            "seq": 27,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 300,
+            "y_raw": -300,
+            "z_raw": 150,
+            "sensor_timestamp_us": 987800,
+            "temperature_raw": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "batch_timebase_plus_two_reports_delay",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb78000000011e0300000100000000011f0311000000010000",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 1988000,
+            "seq": 30,
+            "accuracy": 3,
+            "delay_us": 0,
+            "x_raw": 256,
+            "y_raw": 0,
+            "z_raw": 0
+          }
+        },
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 1989700,
+            "seq": 31,
+            "accuracy": 3,
+            "delay_us": 1700,
+            "x_raw": 0,
+            "y_raw": 256,
+            "z_raw": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "timestamp_rebase_0xfa",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb7800000001200000010000000000fa3200000001210000020000000000",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 1988000,
+            "seq": 32,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 1,
+            "y_raw": 0,
+            "z_raw": 0
+          }
+        },
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 1993000,
+            "seq": 33,
+            "accuracy": 0,
+            "delay_us": 0,
+            "x_raw": 2,
+            "y_raw": 0,
+            "z_raw": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "delay_upper_bits_in_status",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb00000000012205ff030000000000",
+      "expect": [
+        {
+          "type": "Acceleration",
+          "fields": {
+            "sensor_id": 1,
+            "timestamp_us": 2051100,
+            "seq": 34,
+            "accuracy": 1,
+            "delay_us": 51100,
+            "x_raw": 3,
+            "y_raw": 0,
+            "z_raw": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "unknown_report_id_stops_parse",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb0000000077dead",
+      "expect": [
+        {
+          "type": "UnknownReport",
+          "fields": {
+            "sensor_id": 119,
+            "timestamp_us": 2000000,
+            "data": "77dead"
+          }
+        }
+      ]
+    }
+  ],
+  "gyro_rv": [
+    {
+      "name": "dense_14_bytes",
+      "capture_timestamp_us": 2000000,
+      "cargo": "0100020003000040000200fe0004",
+      "expect": {
+        "type": "GyroIntegratedRV",
+        "fields": {
+          "sensor_id": 42,
+          "timestamp_us": 2000000,
+          "i_raw": 1,
+          "j_raw": 2,
+          "k_raw": 3,
+          "real_raw": 16384,
+          "vx_raw": 512,
+          "vy_raw": -512,
+          "vz_raw": 1024
+        }
+      }
+    },
+    {
+      "name": "timebase_prefixed",
+      "capture_timestamp_us": 2000000,
+      "cargo": "fb280000000300fffffefffdff803e000000006400",
+      "expect": {
+        "type": "GyroIntegratedRV",
+        "fields": {
+          "sensor_id": 42,
+          "timestamp_us": 1996300,
+          "i_raw": -1,
+          "j_raw": -2,
+          "k_raw": -3,
+          "real_raw": 16000,
+          "vx_raw": 0,
+          "vy_raw": 0,
+          "vz_raw": 100
+        }
+      }
+    }
+  ]
+}

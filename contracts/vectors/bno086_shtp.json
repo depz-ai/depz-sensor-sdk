@@ -1,0 +1,336 @@
+{
+  "schema": "depz.vectors.bno086_shtp/1",
+  "comment": "SHTP framing + SH-2 control encodes (contract 05 §3, §6). Header: len u16 LE (bit15 = continuation), channel u8, seq u8; a first fragment advertises the TOTAL cargo length, continuations the remaining length. TX seq counters are per channel. Reassembly cases: feed `frames` in order; `cargos` lists completed cargos (header-less payloads) with the first fragment's seq; `discarded` counts abandoned partials/orphan continuations.",
+  "header": [
+    {
+      "name": "control_min",
+      "length": 6,
+      "channel": 2,
+      "seq": 0,
+      "continuation": false,
+      "bytes": "06000200"
+    },
+    {
+      "name": "input_typical",
+      "length": 19,
+      "channel": 3,
+      "seq": 128,
+      "continuation": false,
+      "bytes": "13000380"
+    },
+    {
+      "name": "continuation_bit15",
+      "length": 300,
+      "channel": 3,
+      "seq": 129,
+      "continuation": true,
+      "bytes": "2c810381"
+    },
+    {
+      "name": "max_length_15bit",
+      "length": 32767,
+      "channel": 5,
+      "seq": 255,
+      "continuation": true,
+      "bytes": "ffff05ff"
+    }
+  ],
+  "tx_seq": [
+    {
+      "channel": 2,
+      "payload": "fe01",
+      "frame": "06000200fe01"
+    },
+    {
+      "channel": 2,
+      "payload": "fe02",
+      "frame": "06000201fe02"
+    },
+    {
+      "channel": 3,
+      "payload": "aa",
+      "frame": "05000300aa"
+    },
+    {
+      "channel": 2,
+      "payload": "fe03",
+      "frame": "06000202fe03"
+    },
+    {
+      "channel": 3,
+      "payload": "bb",
+      "frame": "05000301bb"
+    }
+  ],
+  "reassembly": [
+    {
+      "name": "single_frame",
+      "frames": [
+        "14000203f8000102030405060708090a0b0c0d0e"
+      ],
+      "expect": {
+        "cargos": [
+          {
+            "channel": 2,
+            "seq": 3,
+            "payload": "f8000102030405060708090a0b0c0d0e"
+          }
+        ],
+        "discarded": 0
+      }
+    },
+    {
+      "name": "two_frames_ch2",
+      "frames": [
+        "68000207000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b",
+        "2c8002083c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263"
+      ],
+      "expect": {
+        "cargos": [
+          {
+            "channel": 2,
+            "seq": 7,
+            "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263"
+          }
+        ],
+        "discarded": 0
+      }
+    },
+    {
+      "name": "three_frames_ch3",
+      "frames": [
+        "9a0003c8000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b",
+        "5e8003c93c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071727374757677",
+        "228003ca78797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495"
+      ],
+      "expect": {
+        "cargos": [
+          {
+            "channel": 3,
+            "seq": 200,
+            "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495"
+          }
+        ],
+        "discarded": 0
+      }
+    },
+    {
+      "name": "interleaved_channels_independent",
+      "frames": [
+        "9a0003c8000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b",
+        "12000500000102030405060708090a0b0c0d",
+        "5e8003c93c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071727374757677",
+        "228003ca78797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495"
+      ],
+      "expect": {
+        "cargos": [
+          {
+            "channel": 5,
+            "seq": 0,
+            "payload": "000102030405060708090a0b0c0d"
+          },
+          {
+            "channel": 3,
+            "seq": 200,
+            "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495"
+          }
+        ],
+        "discarded": 0
+      }
+    },
+    {
+      "name": "non_continuation_discards_partial",
+      "frames": [
+        "9a0003c8000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b",
+        "0e00030900010203040506070809"
+      ],
+      "expect": {
+        "cargos": [
+          {
+            "channel": 3,
+            "seq": 9,
+            "payload": "00010203040506070809"
+          }
+        ],
+        "discarded": 1
+      }
+    },
+    {
+      "name": "orphan_continuation_dropped",
+      "frames": [
+        "5e8003c93c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f7071727374757677"
+      ],
+      "expect": {
+        "cargos": [],
+        "discarded": 1
+      }
+    }
+  ],
+  "control_encode": [
+    {
+      "name": "set_feature_rv_100hz",
+      "kind": "set_feature",
+      "sensor_id": 5,
+      "interval_us": 10000,
+      "batch_us": 0,
+      "sensitivity": 0,
+      "flags": 0,
+      "cfg_word": 0,
+      "payload": "fd05000000102700000000000000000000"
+    },
+    {
+      "name": "set_feature_accel_batch_sensitivity",
+      "kind": "set_feature",
+      "sensor_id": 1,
+      "interval_us": 2500,
+      "batch_us": 40000,
+      "sensitivity": 25,
+      "flags": 1,
+      "cfg_word": 0,
+      "payload": "fd01011900c4090000409c000000000000"
+    },
+    {
+      "name": "set_feature_disable",
+      "kind": "set_feature",
+      "sensor_id": 5,
+      "interval_us": 0,
+      "batch_us": 0,
+      "sensitivity": 0,
+      "flags": 0,
+      "cfg_word": 0,
+      "payload": "fd05000000000000000000000000000000"
+    },
+    {
+      "name": "get_feature_request_gyro",
+      "kind": "get_feature_request",
+      "sensor_id": 2,
+      "payload": "fe02"
+    },
+    {
+      "name": "product_id_request",
+      "kind": "product_id_request",
+      "payload": "f900"
+    },
+    {
+      "name": "tare_now_all_axes_rv",
+      "kind": "command_request",
+      "seq": 0,
+      "command": 3,
+      "params": "000700",
+      "payload": "f20003000700000000000000"
+    },
+    {
+      "name": "tare_z_gaming_basis",
+      "kind": "command_request",
+      "seq": 1,
+      "command": 3,
+      "params": "000401",
+      "payload": "f20103000401000000000000"
+    },
+    {
+      "name": "persist_tare",
+      "kind": "command_request",
+      "seq": 2,
+      "command": 3,
+      "params": "01",
+      "payload": "f20203010000000000000000"
+    },
+    {
+      "name": "set_reorientation_identity_w1",
+      "kind": "command_request",
+      "seq": 3,
+      "command": 3,
+      "params": "020000000000000040",
+      "payload": "f20303020000000000000040"
+    },
+    {
+      "name": "me_cal_enable_accel_gyro_mag",
+      "kind": "command_request",
+      "seq": 4,
+      "command": 7,
+      "params": "0101010000",
+      "payload": "f20407010101000000000000"
+    },
+    {
+      "name": "dcd_save_now",
+      "kind": "command_request",
+      "seq": 5,
+      "command": 6,
+      "params": "",
+      "payload": "f20506000000000000000000"
+    },
+    {
+      "name": "periodic_dcd_disable",
+      "kind": "command_request",
+      "seq": 6,
+      "command": 9,
+      "params": "01",
+      "payload": "f20609010000000000000000"
+    },
+    {
+      "name": "frs_read_request_system_orientation",
+      "kind": "frs_read_request",
+      "frs_type": 11582,
+      "offset_words": 0,
+      "block_words": 0,
+      "payload": "f40000003e2d0000"
+    },
+    {
+      "name": "frs_write_request_4_words",
+      "kind": "frs_write_request",
+      "frs_type": 11582,
+      "length_words": 4,
+      "payload": "f70004003e2d"
+    },
+    {
+      "name": "frs_write_data_two_words_at_2",
+      "kind": "frs_write_data",
+      "offset_words": 2,
+      "words": [
+        287454020,
+        1432778632
+      ],
+      "payload": "f60002004433221188776655"
+    },
+    {
+      "name": "get_oscillator_type",
+      "kind": "command_request",
+      "seq": 7,
+      "command": 10,
+      "params": "",
+      "payload": "f2070a000000000000000000"
+    },
+    {
+      "name": "clear_dcd_and_reset",
+      "kind": "command_request",
+      "seq": 8,
+      "command": 11,
+      "params": "",
+      "payload": "f2080b000000000000000000"
+    },
+    {
+      "name": "get_errors_all_severities",
+      "kind": "command_request",
+      "seq": 9,
+      "command": 1,
+      "params": "00",
+      "payload": "f20901000000000000000000"
+    },
+    {
+      "name": "get_counts_rotation_vector",
+      "kind": "command_request",
+      "seq": 10,
+      "command": 2,
+      "params": "0005",
+      "payload": "f20a02000500000000000000"
+    },
+    {
+      "name": "clear_counts_rotation_vector",
+      "kind": "command_request",
+      "seq": 11,
+      "command": 2,
+      "params": "0105",
+      "payload": "f20b02010500000000000000"
+    }
+  ]
+}
