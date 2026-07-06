@@ -78,7 +78,7 @@ subdir with `SOURCE_SUBDIR`. Tests are automatically off when consumed this way.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
-  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-public.git
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
   GIT_TAG        v0.1.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)

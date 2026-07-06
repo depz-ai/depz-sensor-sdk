@@ -7,7 +7,7 @@
 #   vcpkg_from_github(... REF v0.1.0 SHA512 0 ...)  # then read the error
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO depz-ai/depz-sensor-sdk-public
+    REPO depz-ai/depz-sensor-sdk
     REF "cpp-v${VERSION}"
     # TODO(release): replace with the real archive SHA512 for tag v0.1.0.
     SHA512 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

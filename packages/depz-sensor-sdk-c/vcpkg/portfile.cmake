@@ -5,7 +5,7 @@
 #   or `vcpkg x-add-version` / the CI helper. Do NOT ship with SHA512 "0".
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
-    REPO depz-ai/depz-sensor-sdk-public
+    REPO depz-ai/depz-sensor-sdk
     REF v0.1.0
     SHA512 0
     HEAD_REF main
