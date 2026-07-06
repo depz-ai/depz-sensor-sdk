@@ -78,8 +78,8 @@ subdir with `SOURCE_SUBDIR`. Tests are automatically off when consumed this way.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
-  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-and-viewer.git
-  GIT_TAG        cpp-v0.1.0
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-native.git
+  GIT_TAG        v0.1.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -124,7 +124,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `cpp-v0.1.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.1.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test
