@@ -107,8 +107,8 @@ at it. Pulling us in this way builds the library only — never our test suite.
 include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
-  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.0
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-and-viewer.git
+  GIT_TAG        c-v0.1.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -156,7 +156,7 @@ Add `depz-sensor-sdk-c` to your manifest (`vcpkg.json`) or install directly:
 vcpkg install depz-sensor-sdk-c
 ```
 
-The port (`vcpkg/`) fetches the `v0.1.0` tag; the `SHA512` in
+The port (`vcpkg/`) fetches the `c-v0.1.0` tag; the `SHA512` in
 `vcpkg/portfile.cmake` is a `0` placeholder to be filled at release (the first
 `vcpkg install` prints the correct hash).
 

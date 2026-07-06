@@ -9,8 +9,8 @@ class DepzSensorSdkCppConan(ConanFile):
     version = "0.1.0"
     license = "MIT"
     author = "DEPZ"
-    url = "https://github.com/depz-ai/depz-sensor-sdk"
-    homepage = "https://github.com/depz-ai/depz-sensor-sdk"
+    url = "https://github.com/depz-ai/depz-sensor-sdk-and-viewer"
+    homepage = "https://github.com/depz-ai/depz-sensor-sdk-and-viewer"
     description = (
         "C++17 decode-layer SDK for the DEPZ USB sensor line: framed-protocol "
         "parser and per-sensor wire codecs (SR04, VL53L8CX/CH, BNO086). "
