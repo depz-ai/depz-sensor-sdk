@@ -1,4 +1,4 @@
-# depz-sensor-sdk-native
+# depz-sensor-sdk-public
 
 Public distribution mirror of the **C and C++** SDKs for the DEPZ USB sensor line
 (SR04, VL53L8CX/CH ToF, BNO086 IMU). Source-of-truth development happens in the

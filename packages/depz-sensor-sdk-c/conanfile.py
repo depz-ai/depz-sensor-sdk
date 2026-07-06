@@ -9,7 +9,7 @@ class DepzSensorSdkCConan(ConanFile):
     version = "0.1.0"
     license = "MIT"
     author = "DEPZ AI"
-    url = "https://github.com/depz-ai/depz-sensor-sdk-native"
+    url = "https://github.com/depz-ai/depz-sensor-sdk-public"
     description = (
         "Contract-first C11 decode/codec SDK for the DEPZ USB sensor line "
         "(SR04, VL53L8CX/CH, BNO086): CRCs, packet framing, USB identity, "

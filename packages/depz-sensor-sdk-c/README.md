@@ -107,7 +107,7 @@ at it. Pulling us in this way builds the library only — never our test suite.
 include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
-  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-native.git
+  GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk-public.git
   GIT_TAG        v0.1.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
