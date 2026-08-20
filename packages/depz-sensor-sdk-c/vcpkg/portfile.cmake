@@ -1,13 +1,14 @@
-# NOTE (fill at release):
-#   REF must point at the C-SDK release tag `v0.1.1`.
-#   SHA512 is the placeholder "0"; replace it with the real hash, e.g.
-#     vcpkg install depz-sensor-sdk-c   # first run prints the actual SHA512
-#   or `vcpkg x-add-version` / the CI helper. Do NOT ship with SHA512 "0".
+# vcpkg port for depz-sensor-sdk-c.
+#
+# Sources come from the public mirror (depz-ai/depz-sensor-sdk), tag v${VERSION}.
+# On release (docs/RELEASING.md): run sync-mirror for the new version first,
+# then refresh SHA512 with the hash of the new mirror tarball:
+#   curl -fsSL https://github.com/depz-ai/depz-sensor-sdk/archive/refs/tags/v<X.Y.Z>.tar.gz | sha512sum
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO depz-ai/depz-sensor-sdk
-    REF v0.1.2
-    SHA512 a55df8ece752f5288df0fc1c5db09b5caccf4a300e37adbe29a40434252fec7cfea901eb78236f878e838e10b30c1cf766ca1187c0afea574bcb356c998b06d8
+    REF "v${VERSION}"
+    SHA512 9f03b60bd3f0d0b1b595b35084ec7b907ad5479656b3860abac5596145d2dce41ca137a694ff9f29bcf5b53135742716d0c41a398bbc62ac0111709282db97d0
     HEAD_REF main
 )
 
