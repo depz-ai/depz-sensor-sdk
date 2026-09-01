@@ -8,6 +8,7 @@ const char *depz_sensor_type_str(depz_sensor_type t)
     case DEPZ_SENSOR_SR04:    return "sr04";
     case DEPZ_SENSOR_VL53L8:  return "vl53l8";
     case DEPZ_SENSOR_BNO086:  return "bno086";
+    case DEPZ_SENSOR_VL53L4:  return "vl53l4";
     case DEPZ_SENSOR_UNKNOWN: return "unknown";
     default:                  return NULL; /* DEPZ_SENSOR_NONE */
     }
@@ -76,6 +77,8 @@ void depz_parse_software_name(const char *name, depz_identity *out)
             out->sensor_type = DEPZ_SENSOR_SR04;
         else if (strstr(name, "VL53L8"))
             out->sensor_type = DEPZ_SENSOR_VL53L8;
+        else if (strstr(name, "VL53L4"))
+            out->sensor_type = DEPZ_SENSOR_VL53L4;
         else if (strstr(name, "BNO086"))
             out->sensor_type = DEPZ_SENSOR_BNO086;
         else

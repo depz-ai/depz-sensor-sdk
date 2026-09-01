@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(depz_sensor_sdk_cpp VERSION 0.1.3 LANGUAGES CXX)
+project(depz_sensor_sdk_cpp VERSION 0.1.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,6 +35,7 @@ add_library(depz_sensor_sdk
   src/sr04.cpp
   src/fwdepz.cpp
   src/vl53l8.cpp
+  src/vl53l4.cpp
   src/bno086.cpp
   src/dataset.cpp
 )
@@ -125,6 +126,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   add_test(NAME vl53l8_frame    COMMAND depz_test_vectors vl53l8_frame)
   add_test(NAME vl53l8_advanced COMMAND depz_test_vectors vl53l8_advanced)
   add_test(NAME vl53l8_cnh       COMMAND depz_test_vectors vl53l8_cnh)
+  add_test(NAME vl53l4          COMMAND depz_test_vectors vl53l4)
   add_test(NAME bno086_shtp     COMMAND depz_test_vectors bno086_shtp)
   add_test(NAME bno086_reports  COMMAND depz_test_vectors bno086_reports)
   add_test(NAME dataset         COMMAND depz_test_vectors dataset)

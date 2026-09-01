@@ -15,7 +15,7 @@ static const struct { int pid; const char *model; } DEPZ_PID_MODEL[] = {
     { 0xED42,          "vl53l1cb" }, /* 60738 */
     { 0xED43,          "vl53l1cx" }, /* 60739 */
     { 0xED44,          "vl53l3cx" }, /* 60740 */
-    { 0xED45,          "vl53l4cd" }, /* 60741 */
+    { DEPZ_PID_VL53L4CD, "vl53l4cd" }, /* 0xED45 60741 */
     { 0xED46,          "vl53l4cx" }, /* 60742 */
     { 0xED47,          "vl53l4ed" }, /* 60743 */
     { 0xED48,          "vl53l5cx" }, /* 60744 */

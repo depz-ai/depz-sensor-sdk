@@ -8,9 +8,9 @@ SAME shape as the Python SDK's ``docs/api.md``:
 
 - ``docs/api.md`` — the full reference: a title, a Contents index, one
   ``## <Domain>`` section per header banner (Discovery / Transport / Common
-  protocol / SR04 / VL53L8 / BNO086 / Bootloader / Datasets), and per-symbol
-  ``### name`` + a fenced ```c signature``` block + the doc text;
-- ``docs/{sr04,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused reference per
+  protocol / SR04 / VL53L4 / VL53L8 / BNO086 / Bootloader / Datasets), and
+  per-symbol ``### name`` + a fenced ```c signature``` block + the doc text;
+- ``docs/{sr04,vl53l4cd,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused reference per
   sensor, carrying only that sensor's own symbols (the shared surface stays in
   the root). The one VL53L8 ToF domain is split by symbol into the CX base and
   the CH superset, exactly like the Python generator splits the ToF class.
@@ -33,13 +33,14 @@ DOCS = HERE / "docs"
 # from the header banner it lives under (see _domain_for_banner).
 DOMAIN_ORDER = [
     "discovery", "transport", "common", "sr04",
-    "vl53l8", "bno086", "bootloader", "dataset",
+    "vl53l4", "vl53l8", "bno086", "bootloader", "dataset",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery",
     "transport": "Transport",
     "common": "Common protocol",
     "sr04": "SR04",
+    "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
     "bno086": "BNO086 (IMU)",
     "bootloader": "Bootloader / firmware update",
@@ -67,6 +68,8 @@ def _domain_for_banner(title: str, current: str) -> str:
         return "sr04"
     if ".fwdepz" in t or "Bootloader" in t:
         return "bootloader"
+    if "VL53L4" in t:
+        return "vl53l4"
     if "VL53L8" in t:
         return "vl53l8"
     if "BNO086" in t:
@@ -282,6 +285,9 @@ def _sensor_targets(by_domain: dict[str, list[dict]]):
     targets = []
     if by_domain.get("sr04"):
         targets.append(("sr04", "SR04", by_domain["sr04"], []))
+    if by_domain.get("vl53l4"):
+        targets.append(("vl53l4cd", "VL53L4CD (ToF, single-zone)",
+                        by_domain["vl53l4"], []))
     if by_domain.get("vl53l8"):
         tof = by_domain["vl53l8"]
         cx = [s for s in tof if s["name"] not in VL53L8CH_SYMBOLS]
@@ -323,8 +329,9 @@ def main() -> None:
         "this file.",
         "",
         "Each sensor also has a focused reference with just its own symbols:",
-        "[SR04](sr04/api.md) · [VL53L8CX](vl53l8cx/api.md) · "
-        "[VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).",
+        "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
+        "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[BNO086](bno086/api.md).",
         "",
     ]
     DOCS.mkdir(parents=True, exist_ok=True)

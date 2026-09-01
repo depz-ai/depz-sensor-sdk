@@ -10,7 +10,7 @@ declaration together with its ``//`` doc-comment, and writes:
   same shape as the Python SDK's ``docs/api.md`` (title, a Contents index
   of ``## Domain`` sections, then ``### name`` + a fenced ``cpp`` signature
   + the doc-comment);
-- ``docs/{sr04,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused reference
+- ``docs/{sr04,vl53l4cd,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused reference
   per sensor, so each sensor has a full intro/guide/api set. The shared
   surface (transport, common protocol, identity, …) stays only in the root
   reference. The single ``vl53l8`` domain is TWO sensors — the CX base and
@@ -48,6 +48,7 @@ FILE_DOMAIN = [
     ("usb_ids.hpp", "usb_ids"),
     ("sr04.hpp", "sr04"),
     ("fwdepz.hpp", "bootloader"),
+    ("vl53l4.hpp", "vl53l4"),
     ("vl53l8.hpp", "vl53l8"),
     ("bno086.hpp", "bno086"),
     ("dataset.hpp", "dataset"),
@@ -55,7 +56,7 @@ FILE_DOMAIN = [
 
 DOMAIN_ORDER = [
     "transport", "common", "identity", "usb_ids", "sr04",
-    "vl53l8", "bno086", "bootloader", "dataset",
+    "vl53l4", "vl53l8", "bno086", "bootloader", "dataset",
 ]
 DOMAIN_TITLE = {
     "transport": "Transport (framing & CRC)",
@@ -63,6 +64,7 @@ DOMAIN_TITLE = {
     "identity": "Identity",
     "usb_ids": "USB identity",
     "sr04": "SR04",
+    "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
     "bno086": "BNO086 (IMU)",
     "bootloader": "Bootloader / firmware",
@@ -499,6 +501,9 @@ def sensor_targets(groups):
     if "sr04" in by:
         _t, m = by["sr04"]
         targets.append(("sr04", "SR04", m, []))
+    if "vl53l4" in by:
+        _t, m = by["vl53l4"]
+        targets.append(("vl53l4cd", "VL53L4CD (ToF, single-zone)", m, []))
     if "vl53l8" in by:
         _t, m = by["vl53l8"]
         cx = [s for s in m if s.name not in VL53L8CH_SYMBOLS]
@@ -534,8 +539,9 @@ def main() -> None:
         "to regenerate. Edit the doc-comments in the headers, not this file.",
         "",
         "Each sensor also has a focused reference with just its own symbols:",
-        "[SR04](sr04/api.md) · [VL53L8CX](vl53l8cx/api.md) · "
-        "[VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).",
+        "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
+        "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[BNO086](bno086/api.md).",
         "",
         "This SDK is the *decode layer* — pure codecs, no I/O. Everything here",
         "takes bytes and returns typed values; opening ports and streaming is",

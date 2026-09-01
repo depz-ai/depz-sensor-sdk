@@ -6,7 +6,7 @@ import os
 
 class DepzSensorSdkCConan(ConanFile):
     name = "depz-sensor-sdk-c"
-    version = "0.1.3"
+    version = "0.1.4"
     license = "MIT"
     author = "DEPZ AI"
     url = "https://github.com/depz-ai/depz-sensor-sdk"

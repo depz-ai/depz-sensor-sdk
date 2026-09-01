@@ -14,6 +14,7 @@ namespace depz {
 inline constexpr std::uint16_t DEPZ_USB_VID = 0x1BCF;  // 7119
 inline constexpr std::uint16_t PID_SR04 = 0xEC78;      // 60536
 inline constexpr std::uint16_t PID_VL53L8 = 0xED40;    // 60736
+inline constexpr std::uint16_t PID_VL53L4CD = 0xED45;  // 60741
 inline constexpr std::uint16_t PID_BNO086 = 0xEE08;    // 60936
 
 // Dev / unprogrammed default (STMicroelectronics) that dev units carry.

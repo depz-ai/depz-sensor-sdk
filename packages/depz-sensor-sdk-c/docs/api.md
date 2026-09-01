@@ -6,14 +6,15 @@ Auto-generated from the public header `include/depz_sensor_sdk.h`
 this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
 
 ## Contents
 
-- **Discovery**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_SR04`](#depz_pid_sr04), [`DEPZ_PID_VL53L8`](#depz_pid_vl53l8), [`DEPZ_PID_BNO086`](#depz_pid_bno086), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`DEPZ_DEV_USB_VID`](#depz_dev_usb_vid), [`DEPZ_DEV_USB_PID`](#depz_dev_usb_pid), [`depz_is_known_depz_usb`](#depz_is_known_depz_usb), [`depz_usb_model_hint`](#depz_usb_model_hint), [`depz_sensor_type`](#depz_sensor_type), [`depz_identity`](#depz_identity), [`depz_sensor_type_str`](#depz_sensor_type_str), [`depz_strip_device_string`](#depz_strip_device_string), [`depz_parse_software_name`](#depz_parse_software_name)
+- **Discovery**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_SR04`](#depz_pid_sr04), [`DEPZ_PID_VL53L8`](#depz_pid_vl53l8), [`DEPZ_PID_VL53L4CD`](#depz_pid_vl53l4cd), [`DEPZ_PID_BNO086`](#depz_pid_bno086), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`DEPZ_DEV_USB_VID`](#depz_dev_usb_vid), [`DEPZ_DEV_USB_PID`](#depz_dev_usb_pid), [`depz_is_known_depz_usb`](#depz_is_known_depz_usb), [`depz_usb_model_hint`](#depz_usb_model_hint), [`depz_sensor_type`](#depz_sensor_type), [`depz_identity`](#depz_identity), [`depz_sensor_type_str`](#depz_sensor_type_str), [`depz_strip_device_string`](#depz_strip_device_string), [`depz_parse_software_name`](#depz_parse_software_name)
 - **Transport**: [`depz_crc8_maxim`](#depz_crc8_maxim), [`depz_crc16_modbus`](#depz_crc16_modbus), [`depz_crc32_iso_hdlc`](#depz_crc32_iso_hdlc), [`depz_crc16_ccitt_false`](#depz_crc16_ccitt_false), [`DEPZ_MAGIC0`](#depz_magic0), [`DEPZ_MAGIC1`](#depz_magic1), [`DEPZ_HEADER_SIZE`](#depz_header_size), [`DEPZ_MAX_PAYLOAD`](#depz_max_payload), [`depz_crc_type`](#depz_crc_type), [`DEPZ_MAX_FRAME`](#depz_max_frame), [`depz_build_packet`](#depz_build_packet), [`depz_event_type`](#depz_event_type), [`depz_event`](#depz_event), [`depz_event_cb`](#depz_event_cb), [`depz_parser`](#depz_parser), [`depz_parser_init`](#depz_parser_init), [`depz_parser_free`](#depz_parser_free), [`depz_parser_feed`](#depz_parser_feed)
 - **Common protocol**: [`depz_cmd`](#depz_cmd), [`depz_rpt`](#depz_rpt), [`depz_status`](#depz_status), [`depz_sync_pin_mode`](#depz_sync_pin_mode), [`depz_status_report`](#depz_status_report), [`depz_text_report`](#depz_text_report), [`depz_sync_time_report`](#depz_sync_time_report), [`depz_temperature_report`](#depz_temperature_report), [`depz_sequence_error_report`](#depz_sequence_error_report), [`depz_sync_pin_config`](#depz_sync_pin_config), [`depz_pack_sync_time`](#depz_pack_sync_time), [`depz_pack_set_payload_crc_type`](#depz_pack_set_payload_crc_type), [`depz_pack_sync_pin_config`](#depz_pack_sync_pin_config), [`depz_unpack_status`](#depz_unpack_status), [`depz_unpack_text`](#depz_unpack_text), [`depz_unpack_sync_time`](#depz_unpack_sync_time), [`depz_unpack_temperature`](#depz_unpack_temperature), [`depz_unpack_sequence_error`](#depz_unpack_sequence_error), [`depz_unpack_sync_pin_config`](#depz_unpack_sync_pin_config), [`depz_sync_time_offset_rtt`](#depz_sync_time_offset_rtt)
 - **SR04**: [`depz_sr04_cmd`](#depz_sr04_cmd), [`depz_sr04_rpt`](#depz_sr04_rpt), [`DEPZ_SR04_ECHO_TIMEOUT`](#depz_sr04_echo_timeout), [`DEPZ_SR04_ECHO_DECAY_MIN_US`](#depz_sr04_echo_decay_min_us), [`DEPZ_SR04_ECHO_DECAY_MAX_US`](#depz_sr04_echo_decay_max_us), [`depz_sr04_data`](#depz_sr04_data), [`depz_sr04_pack_sample_period`](#depz_sr04_pack_sample_period), [`depz_sr04_pack_echo_decay`](#depz_sr04_pack_echo_decay), [`depz_sr04_unpack_data`](#depz_sr04_unpack_data), [`depz_sr04_unpack_sample_period`](#depz_sr04_unpack_sample_period), [`depz_sr04_unpack_echo_decay`](#depz_sr04_unpack_echo_decay), [`depz_sr04_distance_mm`](#depz_sr04_distance_mm)
+- **VL53L4CD (ToF)**: [`depz_vl53l4_cmd`](#depz_vl53l4_cmd), [`depz_vl53l4_rpt`](#depz_vl53l4_rpt), [`DEPZ_VL53L4_XFER_MAX`](#depz_vl53l4_xfer_max), [`DEPZ_VL53L4_XSHUT_OFF`](#depz_vl53l4_xshut_off), [`DEPZ_VL53L4_XSHUT_ON`](#depz_vl53l4_xshut_on), [`DEPZ_VL53L4_XSHUT_RESET`](#depz_vl53l4_xshut_reset), [`DEPZ_VL53L4_SF_INT_ACT_HIGH`](#depz_vl53l4_sf_int_act_high), [`DEPZ_VL53L4_RESULT_BLOCK_ADDR`](#depz_vl53l4_result_block_addr), [`DEPZ_VL53L4_RESULT_BLOCK_LEN`](#depz_vl53l4_result_block_len), [`DEPZ_VL53L4_MODEL_ID`](#depz_vl53l4_model_id), [`DEPZ_VL53L4_CONFIG_ADDR`](#depz_vl53l4_config_addr), [`DEPZ_VL53L4_CONFIG_FMP_BYTE`](#depz_vl53l4_config_fmp_byte), [`depz_vl53l4_pack_read_reg`](#depz_vl53l4_pack_read_reg), [`depz_vl53l4_pack_write_reg`](#depz_vl53l4_pack_write_reg), [`depz_vl53l4_pack_xshut`](#depz_vl53l4_pack_xshut), [`depz_vl53l4_pack_start_stream`](#depz_vl53l4_pack_start_stream), [`depz_vl53l4_pack_set_i2c_speed`](#depz_vl53l4_pack_set_i2c_speed), [`depz_vl53l4_reg_data`](#depz_vl53l4_reg_data), [`depz_vl53l4_unpack_reg_data`](#depz_vl53l4_unpack_reg_data), [`depz_vl53l4_info`](#depz_vl53l4_info), [`depz_vl53l4_unpack_info`](#depz_vl53l4_unpack_info), [`depz_vl53l4_stream`](#depz_vl53l4_stream), [`depz_vl53l4_unpack_stream`](#depz_vl53l4_unpack_stream), [`depz_vl53l4_result`](#depz_vl53l4_result), [`depz_vl53l4_parse_result_block`](#depz_vl53l4_parse_result_block), [`depz_vl53l4_range_timing_registers`](#depz_vl53l4_range_timing_registers), [`depz_vl53l4_decode_range_timing`](#depz_vl53l4_decode_range_timing), [`depz_vl53l4_offset_raw`](#depz_vl53l4_offset_raw), [`depz_vl53l4_decode_offset`](#depz_vl53l4_decode_offset), [`depz_vl53l4_xtalk_raw`](#depz_vl53l4_xtalk_raw), [`depz_vl53l4_decode_xtalk`](#depz_vl53l4_decode_xtalk), [`depz_vl53l4_signal_threshold_raw`](#depz_vl53l4_signal_threshold_raw), [`depz_vl53l4_decode_signal_threshold`](#depz_vl53l4_decode_signal_threshold), [`depz_vl53l4_sigma_threshold_raw`](#depz_vl53l4_sigma_threshold_raw), [`depz_vl53l4_decode_sigma_threshold`](#depz_vl53l4_decode_sigma_threshold), [`depz_vl53l4_config_block`](#depz_vl53l4_config_block)
 - **VL53L8 (ToF)**: [`depz_vl53l8_variant`](#depz_vl53l8_variant), [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_read_reg`](#depz_vl53l8_pack_read_reg), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reg_data`](#depz_vl53l8_reg_data), [`depz_vl53l8_unpack_reg_data`](#depz_vl53l8_unpack_reg_data), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`DEPZ_VL53L8_CNH_MAX_AGGREGATES`](#depz_vl53l8_cnh_max_aggregates), [`DEPZ_VL53L8_CNH_MAX_FEATURE`](#depz_vl53l8_cnh_max_feature), [`depz_vl53l8ch_cnh_config`](#depz_vl53l8ch_cnh_config), [`depz_vl53l8ch_cnh_frame`](#depz_vl53l8ch_cnh_frame), [`depz_vl53l8ch_decode_cnh`](#depz_vl53l8ch_decode_cnh), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
 - **BNO086 (IMU)**: [`DEPZ_SHTP_HEADER_SIZE`](#depz_shtp_header_size), [`DEPZ_SHTP_LENGTH_MASK`](#depz_shtp_length_mask), [`DEPZ_SHTP_CONTINUATION`](#depz_shtp_continuation), [`DEPZ_SHTP_NUM_CHANNELS`](#depz_shtp_num_channels), [`DEPZ_SHTP_MAX_TX_FRAME`](#depz_shtp_max_tx_frame), [`depz_shtp_channel_id`](#depz_shtp_channel_id), [`depz_shtp_header`](#depz_shtp_header), [`depz_shtp_pack_header`](#depz_shtp_pack_header), [`depz_shtp_unpack_header`](#depz_shtp_unpack_header), [`depz_shtp_rx_channel`](#depz_shtp_rx_channel), [`depz_shtp_layer`](#depz_shtp_layer), [`depz_shtp_init`](#depz_shtp_init), [`depz_shtp_free`](#depz_shtp_free), [`depz_shtp_next_frame`](#depz_shtp_next_frame), [`depz_shtp_cargo`](#depz_shtp_cargo), [`depz_shtp_feed`](#depz_shtp_feed), [`depz_bno_pack_set_feature`](#depz_bno_pack_set_feature), [`depz_bno_pack_get_feature_request`](#depz_bno_pack_get_feature_request), [`depz_bno_pack_product_id_request`](#depz_bno_pack_product_id_request), [`depz_bno_pack_command_request`](#depz_bno_pack_command_request), [`depz_bno_pack_frs_read_request`](#depz_bno_pack_frs_read_request), [`depz_bno_pack_frs_write_request`](#depz_bno_pack_frs_write_request), [`depz_bno_pack_frs_write_data`](#depz_bno_pack_frs_write_data), [`DEPZ_BNO_BASE_TIMESTAMP_REF`](#depz_bno_base_timestamp_ref), [`DEPZ_BNO_TIMESTAMP_REBASE`](#depz_bno_timestamp_rebase), [`depz_bno_report_type`](#depz_bno_report_type), [`depz_bno_report_type_str`](#depz_bno_report_type_str), [`depz_bno_report`](#depz_bno_report), [`depz_bno_parse_input_cargo`](#depz_bno_parse_input_cargo), [`depz_bno_parse_gyro_rv`](#depz_bno_parse_gyro_rv)
 - **Bootloader / firmware update**: [`DEPZ_FWDEPZ_HEADER_SIZE`](#depz_fwdepz_header_size), [`depz_fwdepz_result`](#depz_fwdepz_result), [`depz_fwdepz_image`](#depz_fwdepz_image), [`depz_fwdepz_parse`](#depz_fwdepz_parse), [`depz_bl_cmd`](#depz_bl_cmd), [`depz_flash_info`](#depz_flash_info), [`depz_bl_pack_write_page`](#depz_bl_pack_write_page), [`depz_bl_pack_read_page`](#depz_bl_pack_read_page), [`depz_bl_unpack_flash_info`](#depz_bl_unpack_flash_info)
@@ -44,6 +45,14 @@ Each sensor also has a focused reference with just its own symbols:
 ```
 
 60736
+
+### DEPZ_PID_VL53L4CD
+
+```c
+#define DEPZ_PID_VL53L4CD 0xED45u
+```
+
+60741
 
 ### DEPZ_PID_BNO086
 
@@ -107,7 +116,8 @@ typedef enum {
                             * (the APP_* name reports "VL53L8" for either);
                             * the CX/CH split is DEPZ_VL53L8_VARIANT_*. */
     DEPZ_SENSOR_BNO086,
-    DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize */
+    DEPZ_SENSOR_VL53L4,    /* VL53L4CD single-zone ToF (contract 10) */
+    DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize; must stay last */
 } depz_sensor_type;
 ```
 
@@ -576,6 +586,335 @@ bool depz_sr04_distance_mm(uint16_t echo_time_us, double air_temp_c, bool have_t
 
 Round-trip echo time -> distance in mm; returns false for the timeout
 sentinel. Default 343 m/s; if air_temp_c is finite, c = 331.3 + 0.606*T.
+
+## VL53L4CD (ToF)
+
+### depz_vl53l4_cmd
+
+```c
+typedef enum {
+    DEPZ_VL53L4_CMD_READ_REG      = 0x32,
+    DEPZ_VL53L4_CMD_WRITE_REG     = 0x33,
+    DEPZ_VL53L4_CMD_XSHUT         = 0x34,
+    DEPZ_VL53L4_CMD_START_STREAM  = 0x35,
+    DEPZ_VL53L4_CMD_STOP_STREAM   = 0x36,
+    DEPZ_VL53L4_CMD_GET_INFO      = 0x37,
+    DEPZ_VL53L4_CMD_SET_I2C_SPEED = 0x38
+} depz_vl53l4_cmd;
+```
+
+### depz_vl53l4_rpt
+
+```c
+typedef enum {
+    DEPZ_VL53L4_RPT_REG_DATA = 0x91,
+    DEPZ_VL53L4_RPT_INFO     = 0x92,
+    DEPZ_VL53L4_RPT_STREAM   = 0x93
+} depz_vl53l4_rpt;
+```
+
+### DEPZ_VL53L4_XFER_MAX
+
+```c
+#define DEPZ_VL53L4_XFER_MAX 253u
+```
+
+Max read length / write data length per transfer (STM32 I2C NBYTES is
+8-bit; a write spends two bytes on the register address; the firmware
+applies one number to both directions). addr + len must be <= 0x10000.
+
+### DEPZ_VL53L4_XSHUT_OFF
+
+```c
+#define DEPZ_VL53L4_XSHUT_OFF   0u
+```
+
+VL53_XSHUT actions. RESET is answered after the boot handshake.
+
+### DEPZ_VL53L4_XSHUT_ON
+
+```c
+#define DEPZ_VL53L4_XSHUT_ON    1u
+```
+
+### DEPZ_VL53L4_XSHUT_RESET
+
+```c
+#define DEPZ_VL53L4_XSHUT_RESET 2u
+```
+
+### DEPZ_VL53L4_SF_INT_ACT_HIGH
+
+```c
+#define DEPZ_VL53L4_SF_INT_ACT_HIGH 0x02u
+```
+
+VL53_START_STREAM flags bit 1: INT active high (mirrors bit 4 of
+GPIO_HV_MUX__CTRL 0x0030). Clear (default) = INT active low.
+
+### DEPZ_VL53L4_RESULT_BLOCK_ADDR
+
+```c
+#define DEPZ_VL53L4_RESULT_BLOCK_ADDR 0x0089u
+```
+
+The usual stream configuration: the whole result block in one read.
+
+### DEPZ_VL53L4_RESULT_BLOCK_LEN
+
+```c
+#define DEPZ_VL53L4_RESULT_BLOCK_LEN  17u
+```
+
+### DEPZ_VL53L4_MODEL_ID
+
+```c
+#define DEPZ_VL53L4_MODEL_ID 0xEBAAu
+```
+
+IDENTIFICATION__MODEL_ID (0x010F) expected value.
+
+### DEPZ_VL53L4_CONFIG_ADDR
+
+```c
+#define DEPZ_VL53L4_CONFIG_ADDR 0x2Du
+```
+
+First register of the 91-byte init configuration block (0x2D..0x87).
+
+### DEPZ_VL53L4_CONFIG_FMP_BYTE
+
+```c
+#define DEPZ_VL53L4_CONFIG_FMP_BYTE 0x12u
+```
+
+Byte 0 of the config block is always forced to 0x12 (I2C Fast Mode Plus
+pad, never cleared) — what VL53L4CD_I2C_FAST_MODE_PLUS does in the C ULD.
+
+### depz_vl53l4_pack_read_reg
+
+```c
+size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out);
+```
+
+Encoders (return payload length written).
+/* 4 B */
+
+### depz_vl53l4_pack_write_reg
+
+```c
+size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data, size_t data_len, uint8_t *out);
+```
+
+VL53_WRITE_REG payload: addr u16 + data. Returns 2 + data_len, or 0 when
+data_len is outside 1..DEPZ_VL53L4_XFER_MAX.
+
+### depz_vl53l4_pack_xshut
+
+```c
+size_t depz_vl53l4_pack_xshut(uint8_t action, uint8_t *out);
+```
+
+/* 1 B */
+
+### depz_vl53l4_pack_start_stream
+
+```c
+size_t depz_vl53l4_pack_start_stream(uint16_t addr, uint16_t len, uint8_t flags, uint8_t *out);
+```
+
+/* 5 B */
+
+### depz_vl53l4_pack_set_i2c_speed
+
+```c
+size_t depz_vl53l4_pack_set_i2c_speed(uint16_t khz, uint8_t *out);
+```
+
+/* 2 B */
+
+### depz_vl53l4_reg_data
+
+```c
+typedef struct {
+    uint8_t  cmd;
+    uint64_t timestamp_us; /* MCU uptime at I2C-read completion */
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_vl53l4_reg_data;
+```
+
+RPT_VL53_REG_DATA payload: echoed opcode, u64 timestamp, register bytes.
+
+### depz_vl53l4_unpack_reg_data
+
+```c
+int depz_vl53l4_unpack_reg_data(const uint8_t *payload, size_t len, depz_vl53l4_reg_data *out);
+```
+
+/* needs >= 9 B */
+
+### depz_vl53l4_info
+
+```c
+typedef struct {
+    uint32_t int_edges;
+    uint32_t slots_skipped;
+    uint32_t i2c_errors;
+    uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
+    uint16_t model_id;       /* expected DEPZ_VL53L4_MODEL_ID (0xEBAA) */
+    uint8_t  fw_status;      /* expected 0x03 (booted) */
+    uint8_t  initialized;    /* 1 = MODEL_ID matched on this read */
+    uint8_t  xshut_level;
+    uint8_t  int_level;
+    uint16_t i2c_khz;
+} depz_vl53l4_info;
+```
+
+RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters are
+free-running and wrap silently; watch increments, not absolute values.
+
+### depz_vl53l4_unpack_info
+
+```c
+int depz_vl53l4_unpack_info(const uint8_t *payload, size_t len, depz_vl53l4_info *out);
+```
+
+### depz_vl53l4_stream
+
+```c
+typedef struct {
+    uint64_t timestamp_us; /* MCU uptime at the INT edge (the sensor event) */
+    uint16_t addr;
+    uint16_t len;
+    const uint8_t *data;   /* points into the report payload (len bytes) */
+} depz_vl53l4_stream;
+```
+
+RPT_VL53_STREAM — one streamed register block. `addr`/`len` echo the
+stream configuration so each report is self-describing.
+
+### depz_vl53l4_unpack_stream
+
+```c
+int depz_vl53l4_unpack_stream(const uint8_t *payload, size_t len, depz_vl53l4_stream *out);
+```
+
+### depz_vl53l4_result
+
+```c
+typedef struct {
+    int range_status;          /* 0 = valid; raw >= 24 passes through unmapped */
+    int distance_mm;
+    int ambient_rate_kcps;
+    int ambient_per_spad_kcps;
+    int signal_rate_kcps;
+    int signal_per_spad_kcps;
+    int number_of_spad;
+    int sigma_mm;
+    int stream_count;          /* RESULT__STREAM_COUNT, wraps at 255 */
+} depz_vl53l4_result;
+```
+
+VL53L4CD_ResultsData_t plus the sensor's own frame counter.
+
+### depz_vl53l4_parse_result_block
+
+```c
+int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len, depz_vl53l4_result *out);
+```
+
+Decode the streamed 17-byte 0x0089..0x0099 block exactly as
+VL53L4CD_GetResult() decodes the same registers read one by one. Register
+contents are big-endian words (the bridge passes them through untouched).
+Returns 0 on success, -1 when len < 15.
+
+### depz_vl53l4_range_timing_registers
+
+```c
+int depz_vl53l4_range_timing_registers(uint32_t budget_ms, uint32_t inter_ms, uint16_t osc_frequency, uint16_t clock_pll, uint16_t *range_config_a, uint16_t *range_config_b, uint32_t *intermeasurement_raw);
+```
+
+### depz_vl53l4_decode_range_timing
+
+```c
+int depz_vl53l4_decode_range_timing(uint32_t intermeasurement_raw, uint16_t clock_pll, uint16_t osc_frequency, uint16_t range_config_a, uint32_t *budget_ms, uint32_t *inter_ms);
+```
+
+### depz_vl53l4_offset_raw
+
+```c
+uint16_t depz_vl53l4_offset_raw(int32_t mm);
+```
+
+Tuning word codecs (register word <-> user units).
+/* RANGE_OFFSET_MM: mm*4 */
+
+### depz_vl53l4_decode_offset
+
+```c
+int32_t depz_vl53l4_decode_offset(uint16_t raw);
+```
+
+/* -> signed millimetres */
+
+### depz_vl53l4_xtalk_raw
+
+```c
+uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps);
+```
+
+/* XTALK_PLANE_OFFSET: kcps*512 */
+
+### depz_vl53l4_decode_xtalk
+
+```c
+uint16_t depz_vl53l4_decode_xtalk(uint16_t raw);
+```
+
+/* lround(raw/512.0) */
+
+### depz_vl53l4_signal_threshold_raw
+
+```c
+uint16_t depz_vl53l4_signal_threshold_raw(uint16_t kcps);
+```
+
+/* kcps/8 */
+
+### depz_vl53l4_decode_signal_threshold
+
+```c
+uint16_t depz_vl53l4_decode_signal_threshold(uint16_t raw);
+```
+
+/* raw*8 */
+
+### depz_vl53l4_sigma_threshold_raw
+
+```c
+int depz_vl53l4_sigma_threshold_raw(uint16_t mm, uint16_t *raw);
+```
+
+RANGE_CONFIG__SIGMA_THRESH: mm*4. Returns 0 on success, -1 when mm > 16383.
+
+### depz_vl53l4_decode_sigma_threshold
+
+```c
+uint16_t depz_vl53l4_decode_sigma_threshold(uint16_t raw);
+```
+
+/* raw/4 */
+
+### depz_vl53l4_config_block
+
+```c
+size_t depz_vl53l4_config_block(uint8_t *out);
+```
+
+Write the 91-byte block sensor_init() sends at DEPZ_VL53L4_CONFIG_ADDR: the
+ST default configuration with byte 0 forced to DEPZ_VL53L4_CONFIG_FMP_BYTE
+(I2C Fast Mode Plus). Returns 91.
 
 ## VL53L8 (ToF)
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.1.3 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.1.4 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -39,6 +39,7 @@ add_library(depz_sensor_sdk
   # sensor-decode layer (contract-first, verifiable):
   src/vl53l8_decode.c
   src/vl53l8_advanced.c
+  src/vl53l4.c
   src/bno086_shtp.c
   src/bno086_reports.c
   src/dataset.c
@@ -126,14 +127,17 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
     DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
 
   # One CTest per consumed vector / replay target: the transport+protocol
-  # foundation (8) plus the sensor-decode layer (6) across the four sensors
-  # (SR04, VL53L8CX, VL53L8CH, BNO086). The vl53l8_* targets cover the CX/CH-
-  # shared decode plus the CH-only CNH decode: vl53l8_advanced = shared DCI
-  # codecs, vl53l8_replay = a CH device capture through the shared frame decoder,
-  # vl53l8_cnh = CH compact-network-histogram decode (live-capture golden vector).
+  # foundation (8) plus the sensor-decode layer (7) across the five sensors
+  # (SR04, VL53L8CX, VL53L8CH, VL53L4CD, BNO086). The vl53l8_* targets cover
+  # the CX/CH-shared decode plus the CH-only CNH decode: vl53l8_advanced =
+  # shared DCI codecs, vl53l8_replay = a CH device capture through the shared
+  # frame decoder, vl53l8_cnh = CH compact-network-histogram decode
+  # (live-capture golden vector). vl53l4 = the VL53L4CD wire codecs + host-ULD
+  # math (contract 10).
   foreach(stem
       crc usb_ids identity common_commands sr04 framing_encode framing_decode fwdepz
-      vl53l8_advanced bno086_shtp bno086_reports vl53l8_replay vl53l8_cnh dataset)
+      vl53l8_advanced vl53l4 bno086_shtp bno086_reports vl53l8_replay vl53l8_cnh
+      dataset)
     add_test(NAME vec_${stem} COMMAND test_vectors ${stem})
   endforeach()
 endif()

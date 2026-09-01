@@ -9,6 +9,7 @@ namespace depz {
 enum class SensorType {
     Sr04,
     Vl53l8,
+    Vl53l4,
     Bno086,
     Unknown,
 };

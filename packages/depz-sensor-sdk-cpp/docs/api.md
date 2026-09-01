@@ -6,7 +6,7 @@ declarations and `//` doc-comments) by `scripts/gen_api_md.py` — run
 to regenerate. Edit the doc-comments in the headers, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
 
 This SDK is the *decode layer* — pure codecs, no I/O. Everything here
 takes bytes and returns typed values; opening ports and streaming is
@@ -17,8 +17,9 @@ left to the host application.
 - **Transport (framing & CRC)**: [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`MAGIC0`](#magic0), [`MAGIC1`](#magic1), [`CrcType`](#crctype), [`payload_crc_bytes`](#payload_crc_bytes), [`build_packet`](#build_packet), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false)
 - **Common protocol**: [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`UNSOLICITED`](#unsolicited), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`SyncPinConfig`](#syncpinconfig), [`pack_sync_time`](#pack_sync_time), [`pack_set_payload_crc_type`](#pack_set_payload_crc_type), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string)
 - **Identity**: [`SensorType`](#sensortype), [`to_string`](#to_string), [`DeviceMode`](#devicemode), [`Identity`](#identity), [`parse_software_name`](#parse_software_name)
-- **USB identity**: [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`PID_VL53L8`](#pid_vl53l8), [`PID_BNO086`](#pid_bno086), [`DEV_USB_VID`](#dev_usb_vid), [`DEV_USB_PID`](#dev_usb_pid), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortInfo`](#portinfo), [`order_by_serial`](#order_by_serial)
+- **USB identity**: [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`PID_VL53L8`](#pid_vl53l8), [`PID_VL53L4CD`](#pid_vl53l4cd), [`PID_BNO086`](#pid_bno086), [`DEV_USB_VID`](#dev_usb_vid), [`DEV_USB_PID`](#dev_usb_pid), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortInfo`](#portinfo), [`order_by_serial`](#order_by_serial)
 - **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
+- **VL53L4CD (ToF)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`MODEL_ID`](#model_id), [`CONFIG_ADDR`](#config_addr), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Result`](#vl53l4result), [`parse_result_block`](#parse_result_block), [`RangeTimingRegs`](#rangetimingregs), [`range_timing_registers`](#range_timing_registers), [`RangeTiming`](#rangetiming), [`decode_range_timing`](#decode_range_timing), [`offset_raw`](#offset_raw), [`decode_offset`](#decode_offset), [`xtalk_raw`](#xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold), [`default_configuration`](#default_configuration), [`config_block`](#config_block)
 - **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
 - **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **Bootloader / firmware**: [`FWDEPZ_HEADER_SIZE`](#fwdepz_header_size), [`FWDEPZ_MAGIC`](#fwdepz_magic), [`BlCmd`](#blcmd), [`BlRpt`](#blrpt), [`BlStatus`](#blstatus), [`FlashInfo`](#flashinfo), [`pack_write_page`](#pack_write_page), [`pack_read_page`](#pack_read_page), [`FwDepzErrorKind`](#fwdepzerrorkind), [`FwDepzError`](#fwdepzerror), [`FwDepzImage`](#fwdepzimage)
@@ -406,6 +407,7 @@ Decode an ASCII device string, dropping trailing NUL/0xFF filler.
 enum class SensorType {
     Sr04,
     Vl53l8,
+    Vl53l4,
     Bno086,
     Unknown,
 };
@@ -478,6 +480,14 @@ inline constexpr std::uint16_t PID_VL53L8 = 0xED40;
 ```
 
 60736
+
+### PID_VL53L4CD
+
+```cpp
+inline constexpr std::uint16_t PID_VL53L4CD = 0xED45;
+```
+
+60741
 
 ### PID_BNO086
 
@@ -659,6 +669,392 @@ std::optional<double> distance_mm_from_echo(std::uint16_t echo_time_us, std::opt
 
 Round-trip echo time -> distance in mm; nullopt for the timeout sentinel.
 Default speed of sound 343 m/s; with air_temp_c uses c = 331.3 + 0.606*T.
+
+## VL53L4CD (ToF)
+
+### Vl53l4Cmd
+
+```cpp
+enum class Vl53l4Cmd : std::uint8_t {
+    ReadReg = 0x32,      // addr u16, len u16 -> RPT_VL53_REG_DATA
+    WriteReg = 0x33,     // addr u16, data[1..253]
+    Xshut = 0x34,        // action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET)
+    StartStream = 0x35,  // addr u16, len u16, flags u8
+    StopStream = 0x36,
+    GetInfo = 0x37,      // -> RPT_VL53_INFO
+    SetI2cSpeed = 0x38,  // khz u16 (clamped to the nearest nominal step)
+};
+```
+
+Bridge commands (0x32..0x38; 0x30/0x31 are the common sync pins).
+
+### Vl53l4Rpt
+
+```cpp
+enum class Vl53l4Rpt : std::uint8_t {
+    RegData = 0x91,  // RPT_VL53_REG_DATA
+    Info = 0x92,     // RPT_VL53_INFO
+    Stream = 0x93,   // RPT_VL53_STREAM
+};
+```
+
+Bridge reports.
+
+### XFER_MAX
+
+```cpp
+inline constexpr std::uint16_t XFER_MAX = 253;
+```
+
+Max read len / write data length per transfer (STM32 I2C NBYTES is 8-bit; a
+write spends two bytes on the register address; the firmware applies the
+same limit to both directions).
+
+### XSHUT_OFF
+
+```cpp
+inline constexpr std::uint8_t XSHUT_OFF = 0;
+```
+
+VL53_XSHUT actions.
+
+### XSHUT_ON
+
+```cpp
+inline constexpr std::uint8_t XSHUT_ON = 1;
+```
+
+### XSHUT_RESET
+
+```cpp
+inline constexpr std::uint8_t XSHUT_RESET = 2;
+```
+
+answered after the boot handshake
+
+### SF_INT_ACT_HIGH
+
+```cpp
+inline constexpr std::uint8_t SF_INT_ACT_HIGH = 0x02;
+```
+
+VL53_START_STREAM flags bit 1: INT active high, mirroring bit 4 of
+GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
+
+### RESULT_BLOCK_ADDR
+
+```cpp
+inline constexpr std::uint16_t RESULT_BLOCK_ADDR = 0x0089;
+```
+
+The block the MCU streams: RESULT__RANGE_STATUS (0x0089) .. 0x0099 — every
+field of the ULD results struct in one read.
+
+### RESULT_BLOCK_LEN
+
+```cpp
+inline constexpr std::uint16_t RESULT_BLOCK_LEN = 17;
+```
+
+### MODEL_ID
+
+```cpp
+inline constexpr std::uint16_t MODEL_ID = 0xEBAA;
+```
+
+IDENTIFICATION__MODEL_ID (0x010F..0x0110) expected value.
+
+### CONFIG_ADDR
+
+```cpp
+inline constexpr std::uint16_t CONFIG_ADDR = 0x2D;
+```
+
+First register of the 91-byte init configuration block (0x2D..0x87).
+
+### CONFIG_FMP_BYTE
+
+```cpp
+inline constexpr std::uint8_t CONFIG_FMP_BYTE = 0x12;
+```
+
+config_block() forces byte 0 (register 0x2D) to this value: I2C Fast Mode
+Plus pad, set unconditionally and never cleared.
+
+### pack_read_reg
+
+```cpp
+bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
+```
+
+VL53_READ_REG payload: addr u16, len u16 (both little-endian).
+
+### pack_write_reg
+
+```cpp
+bytes pack_write_reg(std::uint16_t addr, byte_span data);
+```
+
+VL53_WRITE_REG payload: addr u16 then the raw register data (1..XFER_MAX).
+
+### pack_xshut
+
+```cpp
+bytes pack_xshut(std::uint8_t action);
+```
+
+VL53_XSHUT payload: action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET).
+
+### pack_start_stream
+
+```cpp
+bytes pack_start_stream(std::uint16_t addr, std::uint16_t len, std::uint8_t flags);
+```
+
+VL53_START_STREAM payload: addr u16, len u16, flags u8 (SF_INT_ACT_HIGH).
+
+### pack_set_i2c_speed
+
+```cpp
+bytes pack_set_i2c_speed(std::uint16_t khz);
+```
+
+VL53_SET_I2C_SPEED payload: khz u16 (firmware clamps to the nearest step).
+
+### RegData
+
+```cpp
+struct RegData {
+    std::uint8_t cmd = 0;
+    std::uint64_t timestamp_us = 0;
+    bytes data;
+};
+```
+
+RPT_VL53_REG_DATA — one I2C read result. `cmd` echoes 0x32; `timestamp_us`
+is MCU uptime at I2C-read completion.
+
+#### RegData.unpack
+
+```cpp
+static std::optional<RegData> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_REG_DATA payload (9+N bytes); nullopt when too short.
+
+### Vl53l4Info
+
+```cpp
+struct Vl53l4Info {
+    std::uint32_t int_edges = 0;
+    std::uint32_t slots_skipped = 0;
+    std::uint32_t i2c_errors = 0;
+    std::uint8_t last_i2c_error = 0;  // 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR
+    std::uint16_t model_id = 0;  // expected MODEL_ID (0xEBAA)
+    std::uint8_t fw_status = 0;  // expected 0x03 (booted)
+    std::uint8_t initialized = 0;  // 1 = MODEL_ID matched on this read
+    std::uint8_t xshut_level = 0;
+    std::uint8_t int_level = 0;
+    std::uint16_t i2c_khz = 0;
+};
+```
+
+RPT_VL53_INFO — bridge diagnostics (21-byte little-endian payload).
+Counters are free-running and wrap silently; watch increments, not absolute
+values. Not a data path: safe to request while streaming.
+
+#### Vl53l4Info.unpack
+
+```cpp
+static std::optional<Vl53l4Info> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_INFO payload; nullopt when shorter than 21 bytes.
+
+### StreamData
+
+```cpp
+struct StreamData {
+    std::uint64_t timestamp_us = 0;
+    std::uint16_t addr = 0;
+    std::uint16_t len = 0;
+    bytes data;  // payload[12..12+len]
+};
+```
+
+RPT_VL53_STREAM — one streamed register block. `timestamp_us` is MCU uptime
+at the INT edge (the sensor event); `addr`/`len` echo the stream
+configuration so each report is self-describing.
+
+#### StreamData.unpack
+
+```cpp
+static std::optional<StreamData> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_STREAM payload (12+len bytes); nullopt when too short.
+
+### Vl53l4Result
+
+```cpp
+struct Vl53l4Result {
+    int range_status = 0;  // 0 = valid; raw >= 24 passes through unmapped
+    int distance_mm = 0;
+    int ambient_rate_kcps = 0;
+    int ambient_per_spad_kcps = 0;
+    int signal_rate_kcps = 0;
+    int signal_per_spad_kcps = 0;
+    int number_of_spad = 0;
+    int sigma_mm = 0;
+    int stream_count = 0;  // sensor frame counter, wraps at 255
+};
+```
+
+VL53L4CD_ResultsData_t plus the sensor's own frame counter. Rates are kcps,
+distances/sigma are millimetres; everything is integer math per the vectors.
+
+### parse_result_block
+
+```cpp
+std::optional<Vl53l4Result> parse_result_block(byte_span raw);
+```
+
+Decode the streamed RESULT_BLOCK_ADDR block exactly as VL53L4CD_GetResult()
+decodes the same registers read one by one (big-endian words, x8 rates,
+/4 sigma, per-SPAD rate x256/raw_spads with zero SPADs -> 0). Returns
+nullopt when raw is shorter than 15 bytes.
+
+### RangeTimingRegs
+
+```cpp
+struct RangeTimingRegs {
+    std::uint16_t range_config_a = 0;
+    std::uint16_t range_config_b = 0;
+    std::uint32_t intermeasurement_raw = 0;
+};
+```
+
+The register words SetRangeTiming programs: RANGE_CONFIG_A (0x005E),
+RANGE_CONFIG_B (0x0061) and the INTERMEASUREMENT_MS (0x006C) raw dword.
+
+### range_timing_registers
+
+```cpp
+std::optional<RangeTimingRegs> range_timing_registers(std::uint32_t budget_ms, std::uint32_t inter_ms, std::uint16_t osc_frequency, std::uint16_t clock_pll);
+```
+
+SetRangeTiming register math. `osc_frequency` is the word read from 0x0006;
+`clock_pll` the word from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
+mode). budget 10..200 ms; inter_ms == 0 selects continuous mode, a value
+greater than the budget selects autonomous low power. Returns nullopt when
+osc_frequency is 0, the budget is out of range, or 0 < inter_ms <= budget.
+Bit-exact with the ULD (32-bit truncations, 1.055 PLL factor).
+
+### RangeTiming
+
+```cpp
+struct RangeTiming {
+    std::uint32_t timing_budget_ms = 0;
+    std::uint32_t inter_measurement_ms = 0;
+};
+```
+
+GetRangeTiming result: the user-facing milliseconds.
+
+### decode_range_timing
+
+```cpp
+std::optional<RangeTiming> decode_range_timing(std::uint32_t intermeasurement_raw, std::uint16_t clock_pll, std::uint16_t osc_frequency, std::uint16_t range_config_a);
+```
+
+GetRangeTiming register math from the raw register reads (INTERMEASUREMENT_MS
+dword, RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word, RANGE_CONFIG_A word).
+Returns nullopt when osc_frequency reads 0. Bit-exact with the ULD (32-bit
+truncations, 1.065 PLL factor).
+
+### offset_raw
+
+```cpp
+std::uint16_t offset_raw(int offset_mm);
+```
+
+RANGE_OFFSET_MM (0x001E) word for SetOffset (offset x4; INNER/OUTER zeroed
+alongside).
+
+### decode_offset
+
+```cpp
+int decode_offset(std::uint16_t raw_word);
+```
+
+GetOffset: RANGE_OFFSET_MM word -> signed millimetres.
+
+### xtalk_raw
+
+```cpp
+std::uint16_t xtalk_raw(int xtalk_kcps);
+```
+
+XTALK_PLANE_OFFSET_KCPS (0x0016) word for SetXtalk (kcps x512).
+
+### decode_xtalk
+
+```cpp
+int decode_xtalk(std::uint16_t raw_word);
+```
+
+GetXtalk: XTALK_PLANE_OFFSET_KCPS word -> kcps (std::lround(raw / 512.0)).
+
+### signal_threshold_raw
+
+```cpp
+std::uint16_t signal_threshold_raw(int signal_kcps);
+```
+
+MIN_COUNT_RATE_RTN_LIMIT_MCPS (0x0066) word for SetSignalThreshold (kcps /8).
+
+### decode_signal_threshold
+
+```cpp
+int decode_signal_threshold(std::uint16_t raw_word);
+```
+
+GetSignalThreshold: register word -> kcps.
+
+### sigma_threshold_raw
+
+```cpp
+std::optional<std::uint16_t> sigma_threshold_raw(int sigma_mm);
+```
+
+RANGE_CONFIG__SIGMA_THRESH (0x0064) word for SetSigmaThreshold (mm x4);
+nullopt when sigma_mm > 16383 (the word would overflow).
+
+### decode_sigma_threshold
+
+```cpp
+int decode_sigma_threshold(std::uint16_t raw_word);
+```
+
+GetSigmaThreshold: register word -> millimetres.
+
+### default_configuration
+
+```cpp
+const std::array<std::uint8_t, 91>& default_configuration();
+```
+
+The stock ST VL53L4CD_DEFAULT_CONFIGURATION[] table — 91 bytes for
+registers 0x2D..0x87 (ULD 2.2.3), untouched.
+
+### config_block
+
+```cpp
+bytes config_block();
+```
+
+The 91-byte block sensor_init writes at CONFIG_ADDR: the ST default
+configuration with byte 0 forced to CONFIG_FMP_BYTE (I2C Fast Mode Plus).
 
 ## VL53L8 (ToF)
 

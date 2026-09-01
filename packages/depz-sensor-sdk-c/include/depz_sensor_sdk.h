@@ -11,6 +11,7 @@
  *   - firmware-name identity parsing (contract 02 §4.1)
  *   - common command/report codecs (contract 02)
  *   - SR04 codecs (contract 03)
+ *   - VL53L4CD register-bridge + host-ULD codecs (contract 10)
  *   - .fwdepz container parse/validate (contract 06 §2)
  *
  * Sensor host-logic (VL53L8 ULD, BNO086 SH-2/SHTP) is intentionally out of
@@ -120,6 +121,7 @@ int depz_parser_feed(depz_parser *p, const uint8_t *data, size_t len,
 #define DEPZ_USB_VID   0x1BCFu /* 7119  — production VID for all DEPZ sensors */
 #define DEPZ_PID_SR04  0xEC78u /* 60536 */
 #define DEPZ_PID_VL53L8 0xED40u /* 60736 */
+#define DEPZ_PID_VL53L4CD 0xED45u /* 60741 */
 #define DEPZ_PID_BNO086 0xEE08u /* 60936 */
 #define DEPZ_PID_RANGE_LO 60536u
 #define DEPZ_PID_RANGE_HI 65535u
@@ -142,7 +144,8 @@ typedef enum {
                             * (the APP_* name reports "VL53L8" for either);
                             * the CX/CH split is DEPZ_VL53L8_VARIANT_*. */
     DEPZ_SENSOR_BNO086,
-    DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize */
+    DEPZ_SENSOR_VL53L4,    /* VL53L4CD single-zone ToF (contract 10) */
+    DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize; must stay last */
 } depz_sensor_type;
 
 typedef struct {
@@ -563,6 +566,177 @@ void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
  */
 int depz_vl53l8_motion_cfg_default_pack(int resolution,
                                         uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE]);
+
+/* ======================================================================== */
+/* VL53L4CD register bridge + host-ULD codecs (contract 10)                   */
+/*                                                                            */
+/* Single-zone ToF behind a thin I2C register bridge. The MCU owns nothing    */
+/* but the I2C bus, XSHUT/INT and one streaming FSM; the ST ULD 2.2.3         */
+/* (STSW-IMG026) semantics run on the host as plain register access. This     */
+/* section carries the wire codecs (commands 0x32..0x38, reports 0x91..0x93)  */
+/* plus the pure host-ULD math: the 17-byte result-block decode, the          */
+/* SetRangeTiming/GetRangeTiming register math, the tuning word codecs and    */
+/* the 91-byte init configuration block. All of it is frozen byte-exact in    */
+/* contracts/vectors/vl53l4.json.                                             */
+/* ======================================================================== */
+
+typedef enum {
+    DEPZ_VL53L4_CMD_READ_REG      = 0x32,
+    DEPZ_VL53L4_CMD_WRITE_REG     = 0x33,
+    DEPZ_VL53L4_CMD_XSHUT         = 0x34,
+    DEPZ_VL53L4_CMD_START_STREAM  = 0x35,
+    DEPZ_VL53L4_CMD_STOP_STREAM   = 0x36,
+    DEPZ_VL53L4_CMD_GET_INFO      = 0x37,
+    DEPZ_VL53L4_CMD_SET_I2C_SPEED = 0x38
+} depz_vl53l4_cmd;
+
+typedef enum {
+    DEPZ_VL53L4_RPT_REG_DATA = 0x91,
+    DEPZ_VL53L4_RPT_INFO     = 0x92,
+    DEPZ_VL53L4_RPT_STREAM   = 0x93
+} depz_vl53l4_rpt;
+
+/* Max read length / write data length per transfer (STM32 I2C NBYTES is
+ * 8-bit; a write spends two bytes on the register address; the firmware
+ * applies one number to both directions). addr + len must be <= 0x10000. */
+#define DEPZ_VL53L4_XFER_MAX 253u
+
+/* VL53_XSHUT actions. RESET is answered after the boot handshake. */
+#define DEPZ_VL53L4_XSHUT_OFF   0u
+#define DEPZ_VL53L4_XSHUT_ON    1u
+#define DEPZ_VL53L4_XSHUT_RESET 2u
+
+/* VL53_START_STREAM flags bit 1: INT active high (mirrors bit 4 of
+ * GPIO_HV_MUX__CTRL 0x0030). Clear (default) = INT active low. */
+#define DEPZ_VL53L4_SF_INT_ACT_HIGH 0x02u
+
+/* The usual stream configuration: the whole result block in one read. */
+#define DEPZ_VL53L4_RESULT_BLOCK_ADDR 0x0089u
+#define DEPZ_VL53L4_RESULT_BLOCK_LEN  17u
+/* IDENTIFICATION__MODEL_ID (0x010F) expected value. */
+#define DEPZ_VL53L4_MODEL_ID 0xEBAAu
+/* First register of the 91-byte init configuration block (0x2D..0x87). */
+#define DEPZ_VL53L4_CONFIG_ADDR 0x2Du
+/* Byte 0 of the config block is always forced to 0x12 (I2C Fast Mode Plus
+ * pad, never cleared) — what VL53L4CD_I2C_FAST_MODE_PLUS does in the C ULD. */
+#define DEPZ_VL53L4_CONFIG_FMP_BYTE 0x12u
+
+/* Encoders (return payload length written). */
+size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out); /* 4 B */
+/* VL53_WRITE_REG payload: addr u16 + data. Returns 2 + data_len, or 0 when
+ * data_len is outside 1..DEPZ_VL53L4_XFER_MAX. */
+size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data,
+                                  size_t data_len, uint8_t *out);
+size_t depz_vl53l4_pack_xshut(uint8_t action, uint8_t *out); /* 1 B */
+size_t depz_vl53l4_pack_start_stream(uint16_t addr, uint16_t len, uint8_t flags,
+                                     uint8_t *out); /* 5 B */
+size_t depz_vl53l4_pack_set_i2c_speed(uint16_t khz, uint8_t *out); /* 2 B */
+
+/* RPT_VL53_REG_DATA payload: echoed opcode, u64 timestamp, register bytes. */
+typedef struct {
+    uint8_t  cmd;
+    uint64_t timestamp_us; /* MCU uptime at I2C-read completion */
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_vl53l4_reg_data;
+int depz_vl53l4_unpack_reg_data(const uint8_t *payload, size_t len,
+                                depz_vl53l4_reg_data *out); /* needs >= 9 B */
+
+/* RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters are
+ * free-running and wrap silently; watch increments, not absolute values. */
+typedef struct {
+    uint32_t int_edges;
+    uint32_t slots_skipped;
+    uint32_t i2c_errors;
+    uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
+    uint16_t model_id;       /* expected DEPZ_VL53L4_MODEL_ID (0xEBAA) */
+    uint8_t  fw_status;      /* expected 0x03 (booted) */
+    uint8_t  initialized;    /* 1 = MODEL_ID matched on this read */
+    uint8_t  xshut_level;
+    uint8_t  int_level;
+    uint16_t i2c_khz;
+} depz_vl53l4_info;
+int depz_vl53l4_unpack_info(const uint8_t *payload, size_t len,
+                            depz_vl53l4_info *out);
+
+/* RPT_VL53_STREAM — one streamed register block. `addr`/`len` echo the
+ * stream configuration so each report is self-describing. */
+typedef struct {
+    uint64_t timestamp_us; /* MCU uptime at the INT edge (the sensor event) */
+    uint16_t addr;
+    uint16_t len;
+    const uint8_t *data;   /* points into the report payload (len bytes) */
+} depz_vl53l4_stream;
+int depz_vl53l4_unpack_stream(const uint8_t *payload, size_t len,
+                              depz_vl53l4_stream *out);
+
+/* VL53L4CD_ResultsData_t plus the sensor's own frame counter. */
+typedef struct {
+    int range_status;          /* 0 = valid; raw >= 24 passes through unmapped */
+    int distance_mm;
+    int ambient_rate_kcps;
+    int ambient_per_spad_kcps;
+    int signal_rate_kcps;
+    int signal_per_spad_kcps;
+    int number_of_spad;
+    int sigma_mm;
+    int stream_count;          /* RESULT__STREAM_COUNT, wraps at 255 */
+} depz_vl53l4_result;
+
+/*
+ * Decode the streamed 17-byte 0x0089..0x0099 block exactly as
+ * VL53L4CD_GetResult() decodes the same registers read one by one. Register
+ * contents are big-endian words (the bridge passes them through untouched).
+ * Returns 0 on success, -1 when len < 15.
+ */
+int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len,
+                                   depz_vl53l4_result *out);
+
+/*
+ * SetRangeTiming register math -> RANGE_CONFIG_A (0x005E), RANGE_CONFIG_B
+ * (0x0061) and the INTERMEASUREMENT_MS (0x006C) raw dword. `osc_frequency` is
+ * the word read from 0x0006; `clock_pll` is the word read from
+ * RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
+ * inter_ms > 0). inter_ms == 0 selects continuous mode; a value greater than
+ * the budget selects autonomous low power. Returns 0 on success, -1 when
+ * osc_frequency == 0, budget_ms outside 10..200, or 0 < inter_ms <= budget_ms.
+ */
+int depz_vl53l4_range_timing_registers(uint32_t budget_ms, uint32_t inter_ms,
+                                       uint16_t osc_frequency, uint16_t clock_pll,
+                                       uint16_t *range_config_a,
+                                       uint16_t *range_config_b,
+                                       uint32_t *intermeasurement_raw);
+
+/*
+ * GetRangeTiming register math -> (budget_ms, inter_ms) from the raw register
+ * reads: the INTERMEASUREMENT_MS dword, the RESULT__OSC_CALIBRATE_VAL word,
+ * the 0x0006 word and the RANGE_CONFIG_A word. Returns 0 on success, -1 when
+ * osc_frequency == 0.
+ */
+int depz_vl53l4_decode_range_timing(uint32_t intermeasurement_raw,
+                                    uint16_t clock_pll, uint16_t osc_frequency,
+                                    uint16_t range_config_a,
+                                    uint32_t *budget_ms, uint32_t *inter_ms);
+
+/* Tuning word codecs (register word <-> user units). */
+uint16_t depz_vl53l4_offset_raw(int32_t mm);       /* RANGE_OFFSET_MM: mm*4 */
+int32_t  depz_vl53l4_decode_offset(uint16_t raw);  /* -> signed millimetres */
+uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps);     /* XTALK_PLANE_OFFSET: kcps*512 */
+uint16_t depz_vl53l4_decode_xtalk(uint16_t raw);   /* lround(raw/512.0) */
+uint16_t depz_vl53l4_signal_threshold_raw(uint16_t kcps);    /* kcps/8 */
+uint16_t depz_vl53l4_decode_signal_threshold(uint16_t raw);  /* raw*8 */
+/* RANGE_CONFIG__SIGMA_THRESH: mm*4. Returns 0 on success, -1 when mm > 16383. */
+int      depz_vl53l4_sigma_threshold_raw(uint16_t mm, uint16_t *raw);
+uint16_t depz_vl53l4_decode_sigma_threshold(uint16_t raw);   /* raw/4 */
+
+/* VL53L4CD_DEFAULT_CONFIGURATION[] — the stock ST 91-byte block for registers
+ * 0x2D..0x87 (byte 0 as shipped, i.e. NOT the FM+ override). */
+extern const uint8_t DEPZ_VL53L4_DEFAULT_CONFIGURATION[91];
+
+/* Write the 91-byte block sensor_init() sends at DEPZ_VL53L4_CONFIG_ADDR: the
+ * ST default configuration with byte 0 forced to DEPZ_VL53L4_CONFIG_FMP_BYTE
+ * (I2C Fast Mode Plus). Returns 91. */
+size_t depz_vl53l4_config_block(uint8_t *out);
 
 /* ======================================================================== */
 /* BNO086 SHTP framing (contract 05 §3) + SH-2 control encoders (§6)          */

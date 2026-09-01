@@ -13,7 +13,8 @@ const std::unordered_map<std::uint16_t, std::string>& pid_model_map() {
         {PID_SR04, "sr04"},         // 0xEC78
         {PID_VL53L8, "vl53l8ch"},   // 0xED40
         {0xED41, "vl53l0x"},   {0xED42, "vl53l1cb"}, {0xED43, "vl53l1cx"},
-        {0xED44, "vl53l3cx"},  {0xED45, "vl53l4cd"}, {0xED46, "vl53l4cx"},
+        {0xED44, "vl53l3cx"},  {PID_VL53L4CD, "vl53l4cd"},  // 0xED45
+        {0xED46, "vl53l4cx"},
         {0xED47, "vl53l4ed"},  {0xED48, "vl53l5cx"}, {0xED49, "vl53l7cx"},
         {0xED4A, "vl53l7ch"},  {0xED4B, "vl53l8cx"},  // 0xED4B hw-verified
         {PID_BNO086, "bno086"},     // 0xEE08

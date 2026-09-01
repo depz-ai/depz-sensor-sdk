@@ -1,4 +1,5 @@
-// Vector-driven parity test runner: loads contracts/vectors/*.json and asserts
+// Vector-driven parity test runner: loads contracts/vectors/*.json (including
+// vl53l4.json) and asserts
 // the C++ SDK is byte-exact with the golden vectors.
 #include <algorithm>
 #include <cstdint>

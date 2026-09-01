@@ -7,6 +7,8 @@ its own **introduction** and **user guide**:
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
+- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
+  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
 - **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
   [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
 - **VL53L8CH** (ToF superset + CNH histograms) —
@@ -46,9 +48,12 @@ It is the C counterpart of the Python SDK's protocol core. The entire public
 surface is one header, [`include/depz_sensor_sdk.h`](../include/depz_sensor_sdk.h),
 and the [API reference](api.md) is generated straight from its doc-comments.
 
-Four sensors across three firmware philosophies — mirrored from the firmware:
+Five sensors across three firmware philosophies — mirrored from the firmware:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance.
+- **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD math
+  (result-block decode, range timing, tuning words) runs **on the host** over
+  plain register reads/writes.
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI register bridge; the ranging
   frames are reassembled and decoded **on the host**. CX is the base ToF imager;
   CH is its superset, adding Compact-Network-Histogram (CNH) output.
@@ -78,7 +83,7 @@ Build the static library and run the vector suite with CMake:
 ```sh
 cmake -B build -S .
 cmake --build build
-ctest --test-dir build          # 13/13: transport+protocol foundation + decode
+ctest --test-dir build          # 15/15: transport+protocol foundation + decode
 ```
 
 To consume it from your own CMake project, pull it in with FetchContent and link
@@ -90,7 +95,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -118,10 +123,10 @@ your serial read()  ──►  depz_parser_feed(&parser, bytes, n, on_event, ctx
                          on_event(ev): switch (ev->cmd)
                                    │
               ┌────────────────────┼─────────────────────┐
-        common report          SR04 data            VL53L8 chunk / BNO SHTP
+        common report        SR04 / VL53L4 data     VL53L8 chunk / BNO SHTP
     depz_unpack_status(…)   depz_sr04_unpack_data   depz_vl53l8_reasm_feed(…)
-    depz_unpack_sync_time   (…)                      → depz_vl53l8_decode_frame
-    …                                                depz_shtp_feed → depz_bno_*
+    depz_unpack_sync_time   depz_vl53l4_unpack_      → depz_vl53l8_decode_frame
+    …                       stream(…)               depz_shtp_feed → depz_bno_*
 
 your serial write()  ◄──  depz_build_packet(cmd, payload, …)
                                    ▲
@@ -201,6 +206,9 @@ the per-sensor guide:
 
 - **[SR04](sr04/guide.md)** — sample-period / echo-decay config codecs, the
   `depz_sr04_data` measurement, and `depz_sr04_distance_mm()` (echo → mm).
+- **[VL53L4CD](vl53l4cd/guide.md)** — the I2C register-bridge codecs
+  (`depz_vl53l4_pack_read_reg` / `_write_reg`, stream + info decode) and the
+  host-ULD math (`depz_vl53l4_parse_result_block`, range timing, tuning words).
 - **[VL53L8CX](vl53l8cx/guide.md)** — the register-bridge streaming path: chunk
   parse (`depz_vl53l8_unpack_chunk`), frame reassembly
   (`depz_vl53l8_reassembler`), the ranging-frame decoder
@@ -245,12 +253,12 @@ rather than faked:
 ## Testing
 
 The suite is one CTest per consumed vector / replay target — the
-transport+protocol foundation plus the sensor-decode layer across the four
-sensors (13 tests). A real VL53L8CX capture is replayed end-to-end through the
+transport+protocol foundation plus the sensor-decode layer across the five
+sensors (15 tests). A real VL53L8CX capture is replayed end-to-end through the
 shared decode path (`vec_vl53l8_replay`). No hardware required:
 
 ```sh
-ctest --test-dir build            # 13/13
+ctest --test-dir build            # 15/15
 ```
 
 Regenerate this documentation's API reference after changing the header's

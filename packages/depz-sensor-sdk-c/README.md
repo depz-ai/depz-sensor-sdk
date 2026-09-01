@@ -28,14 +28,15 @@ Full docs live in [`docs/`](docs/):
 - **[API reference](docs/api.md)** — every public symbol, generated from the
   header's doc-comments by `scripts/gen_api_md.py` (`make docs`).
 
-## The four sensors
+## The five sensors
 
-The DEPZ line exposes **four** user-facing sensors. Note that the ToF is *two*
+The DEPZ line exposes **five** user-facing sensors. Note that VL53L8 is *two*
 distinct sensors sharing one frame format:
 
 | Sensor       | What it is                                | USB PID        | SDK coverage today |
 |--------------|-------------------------------------------|----------------|--------------------|
 | **SR04**     | Ultrasonic range finder                   | `0xEC78`       | Full codecs (commands, reports, echo→distance) |
+| **VL53L4CD** | Single-zone ToF                           | `0xED45`       | Register bridge, result decode, timing/tuning math |
 | **VL53L8CX** | Base multi-zone ToF (4×4 / 8×8)           | dev-default\* | Shared frame decode + advanced DCI codecs |
 | **VL53L8CH** | VL53L8CX **+ CNH** compact-network-histograms | `0xED40`   | Shared frame decode + advanced DCI codecs; **CNH histogram decode not yet implemented** |
 | **BNO086**   | 9-axis IMU / sensor-hub (SH-2 over SHTP)  | `0xEE08`       | SHTP framing + SH-2 control encoders + input-report parsers |
@@ -96,7 +97,7 @@ sensors.
 
 The library exports a namespaced target **`depz::sensor_sdk_c`** and ships an
 installable CMake package (`find_package(depz-sensor-sdk-c CONFIG)`), a Conan 2
-recipe, and a vcpkg port. Version **0.1.3**, MIT.
+recipe, and a vcpkg port. Version **0.1.4**, MIT.
 
 ### CMake FetchContent
 
@@ -108,7 +109,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -125,7 +126,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(depz-sensor-sdk-c 0.1.3 CONFIG REQUIRED)
+find_package(depz-sensor-sdk-c 0.1.4 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
@@ -144,7 +145,7 @@ uint8_t crc = depz_crc8_maxim(data, sizeof data);
 conan create packages/depz-sensor-sdk-c            # build & test-package locally
 ```
 
-In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.1.3`.
+In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.1.4`.
 The recipe sets the CMake target name to `depz::sensor_sdk_c` for CMakeDeps
 consumers. Submission to Conan Center is in review
 ([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
@@ -160,7 +161,7 @@ it merges, use the in-repo port (`vcpkg/`) as an overlay:
 vcpkg install depz-sensor-sdk-c --overlay-ports=packages/depz-sensor-sdk-c/vcpkg
 ```
 
-The port fetches the `v0.1.3` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
+The port fetches the `v0.1.4` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
 `0` placeholder to be filled at release (the first `vcpkg install` prints the
 correct hash).
 

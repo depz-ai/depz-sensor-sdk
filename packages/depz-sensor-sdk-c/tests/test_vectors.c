@@ -642,6 +642,223 @@ static void test_vl53l8_advanced(void)
 }
 
 /* ======================================================================== */
+/* vl53l4.json — VL53L4CD wire codecs + host-ULD math (contract 10).         */
+/* Consumes every section: encode / decode / result_block / timing.encode /  */
+/* timing.decode / tuning (both directions) / config_block.                  */
+/* ======================================================================== */
+static void test_vl53l4(void)
+{
+    json_value *root = load_vectors("vl53l4");
+    if (!root) { g_fail++; return; }
+
+    /* encode: command payloads 0x32..0x38 */
+    const json_value *enc = json_obj_get(root, "encode");
+    for (size_t i = 0; i < json_arr_size(enc); i++) {
+        const json_value *c = json_arr_get(enc, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        const char *kind = json_as_str(json_obj_get(c, "kind"));
+        const char *want = json_as_str(json_obj_get(c, "payload"));
+        uint8_t out[2 + DEPZ_VL53L4_XFER_MAX]; size_t n = 0;
+        if (strcmp(kind, "read_reg") == 0) {
+            n = depz_vl53l4_pack_read_reg(
+                (uint16_t)json_as_int(json_obj_get(c, "addr")),
+                (uint16_t)json_as_int(json_obj_get(c, "len")), out);
+        } else if (strcmp(kind, "write_reg") == 0) {
+            uint8_t *data; size_t dn = hex_decode(json_as_str(json_obj_get(c, "data")), &data);
+            n = depz_vl53l4_pack_write_reg(
+                (uint16_t)json_as_int(json_obj_get(c, "addr")), data, dn, out);
+            free(data);
+        } else if (strcmp(kind, "xshut") == 0) {
+            n = depz_vl53l4_pack_xshut(
+                (uint8_t)json_as_int(json_obj_get(c, "action")), out);
+        } else if (strcmp(kind, "start_stream") == 0) {
+            n = depz_vl53l4_pack_start_stream(
+                (uint16_t)json_as_int(json_obj_get(c, "addr")),
+                (uint16_t)json_as_int(json_obj_get(c, "len")),
+                (uint8_t)json_as_int(json_obj_get(c, "flags")), out);
+        } else if (strcmp(kind, "set_i2c_speed") == 0) {
+            n = depz_vl53l4_pack_set_i2c_speed(
+                (uint16_t)json_as_int(json_obj_get(c, "khz")), out);
+        } else { CHECK(0, "unknown vl53l4 encode kind %s", kind); continue; }
+        check_payload(name, out, n, want);
+    }
+
+    /* decode: RPT_VL53_REG_DATA / _INFO / _STREAM */
+    const json_value *dec = json_obj_get(root, "decode");
+    for (size_t i = 0; i < json_arr_size(dec); i++) {
+        const json_value *c = json_arr_get(dec, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        int rpt = (int)json_as_int(json_obj_get(c, "report"));
+        uint8_t *p; size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
+        const json_value *e = json_obj_get(c, "expect");
+
+        if (rpt == DEPZ_VL53L4_RPT_REG_DATA) {
+            depz_vl53l4_reg_data r;
+            CHECK(depz_vl53l4_unpack_reg_data(p, n, &r) == 0, "vl53l4 reg_data decode %s", name);
+            CHECK(r.cmd == json_as_int(json_obj_get(e, "cmd")) &&
+                  (int64_t)r.timestamp_us == json_as_int(json_obj_get(e, "timestamp_us")),
+                  "vl53l4 reg_data fields %s: cmd=%u ts=%llu", name,
+                  r.cmd, (unsigned long long)r.timestamp_us);
+            char buf[512];
+            hex_encode(r.data, r.data_len, buf);
+            CHECK(strcmp(buf, json_as_str(json_obj_get(e, "data"))) == 0,
+                  "vl53l4 reg_data data %s: got %s", name, buf);
+        } else if (rpt == DEPZ_VL53L4_RPT_INFO) {
+            depz_vl53l4_info r;
+            CHECK(depz_vl53l4_unpack_info(p, n, &r) == 0, "vl53l4 info decode %s", name);
+            CHECK((int64_t)r.int_edges == json_as_int(json_obj_get(e, "int_edges")) &&
+                  (int64_t)r.slots_skipped == json_as_int(json_obj_get(e, "slots_skipped")) &&
+                  (int64_t)r.i2c_errors == json_as_int(json_obj_get(e, "i2c_errors")) &&
+                  r.last_i2c_error == json_as_int(json_obj_get(e, "last_i2c_error")) &&
+                  r.model_id == json_as_int(json_obj_get(e, "model_id")) &&
+                  r.fw_status == json_as_int(json_obj_get(e, "fw_status")) &&
+                  r.initialized == json_as_int(json_obj_get(e, "initialized")) &&
+                  r.xshut_level == json_as_int(json_obj_get(e, "xshut_level")) &&
+                  r.int_level == json_as_int(json_obj_get(e, "int_level")) &&
+                  r.i2c_khz == json_as_int(json_obj_get(e, "i2c_khz")),
+                  "vl53l4 info fields %s", name);
+        } else if (rpt == DEPZ_VL53L4_RPT_STREAM) {
+            depz_vl53l4_stream r;
+            CHECK(depz_vl53l4_unpack_stream(p, n, &r) == 0, "vl53l4 stream decode %s", name);
+            CHECK((int64_t)r.timestamp_us == json_as_int(json_obj_get(e, "timestamp_us")) &&
+                  r.addr == json_as_int(json_obj_get(e, "addr")) &&
+                  r.len == json_as_int(json_obj_get(e, "len")),
+                  "vl53l4 stream fields %s: ts=%llu addr=%u len=%u", name,
+                  (unsigned long long)r.timestamp_us, r.addr, r.len);
+            char buf[512];
+            hex_encode(r.data, r.len, buf);
+            CHECK(strcmp(buf, json_as_str(json_obj_get(e, "data"))) == 0,
+                  "vl53l4 stream data %s: got %s", name, buf);
+        } else {
+            CHECK(0, "unknown vl53l4 decode report 0x%02x (%s)", rpt, name);
+        }
+        free(p);
+    }
+
+    /* result_block: 17-byte 0x0089 block -> VL53L4CD_ResultsData_t */
+    const json_value *rb = json_obj_get(root, "result_block");
+    for (size_t i = 0; i < json_arr_size(rb); i++) {
+        const json_value *c = json_arr_get(rb, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
+        const json_value *e = json_obj_get(c, "expect");
+        depz_vl53l4_result r;
+        CHECK(depz_vl53l4_parse_result_block(raw, n, &r) == 0,
+              "vl53l4 result_block %s parse", name);
+        CHECK((int64_t)r.range_status == json_as_int(json_obj_get(e, "range_status")),
+              "vl53l4 %s range_status: got %d", name, r.range_status);
+        CHECK((int64_t)r.distance_mm == json_as_int(json_obj_get(e, "distance_mm")),
+              "vl53l4 %s distance_mm: got %d", name, r.distance_mm);
+        CHECK((int64_t)r.ambient_rate_kcps == json_as_int(json_obj_get(e, "ambient_rate_kcps")),
+              "vl53l4 %s ambient_rate_kcps: got %d", name, r.ambient_rate_kcps);
+        CHECK((int64_t)r.ambient_per_spad_kcps == json_as_int(json_obj_get(e, "ambient_per_spad_kcps")),
+              "vl53l4 %s ambient_per_spad_kcps: got %d", name, r.ambient_per_spad_kcps);
+        CHECK((int64_t)r.signal_rate_kcps == json_as_int(json_obj_get(e, "signal_rate_kcps")),
+              "vl53l4 %s signal_rate_kcps: got %d", name, r.signal_rate_kcps);
+        CHECK((int64_t)r.signal_per_spad_kcps == json_as_int(json_obj_get(e, "signal_per_spad_kcps")),
+              "vl53l4 %s signal_per_spad_kcps: got %d", name, r.signal_per_spad_kcps);
+        CHECK((int64_t)r.number_of_spad == json_as_int(json_obj_get(e, "number_of_spad")),
+              "vl53l4 %s number_of_spad: got %d", name, r.number_of_spad);
+        CHECK((int64_t)r.sigma_mm == json_as_int(json_obj_get(e, "sigma_mm")),
+              "vl53l4 %s sigma_mm: got %d", name, r.sigma_mm);
+        CHECK((int64_t)r.stream_count == json_as_int(json_obj_get(e, "stream_count")),
+              "vl53l4 %s stream_count: got %d", name, r.stream_count);
+        free(raw);
+    }
+
+    /* timing.encode / timing.decode: SetRangeTiming / GetRangeTiming math */
+    const json_value *timing = json_obj_get(root, "timing");
+    const json_value *tenc = json_obj_get(timing, "encode");
+    for (size_t i = 0; i < json_arr_size(tenc); i++) {
+        const json_value *c = json_arr_get(tenc, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        uint16_t a = 0, b = 0; uint32_t inter_raw = 0;
+        int rc = depz_vl53l4_range_timing_registers(
+            (uint32_t)json_as_int(json_obj_get(c, "timing_budget_ms")),
+            (uint32_t)json_as_int(json_obj_get(c, "inter_measurement_ms")),
+            (uint16_t)json_as_int(json_obj_get(c, "osc_frequency")),
+            (uint16_t)json_as_int(json_obj_get(c, "clock_pll")),
+            &a, &b, &inter_raw);
+        CHECK(rc == 0, "vl53l4 timing encode %s rc=%d", name, rc);
+        CHECK((int64_t)a == json_as_int(json_obj_get(c, "range_config_a")),
+              "vl53l4 timing %s range_config_a: got %u", name, a);
+        CHECK((int64_t)b == json_as_int(json_obj_get(c, "range_config_b")),
+              "vl53l4 timing %s range_config_b: got %u", name, b);
+        CHECK((int64_t)inter_raw == json_as_int(json_obj_get(c, "intermeasurement_raw")),
+              "vl53l4 timing %s intermeasurement_raw: got %u", name, inter_raw);
+    }
+    const json_value *tdec = json_obj_get(timing, "decode");
+    for (size_t i = 0; i < json_arr_size(tdec); i++) {
+        const json_value *c = json_arr_get(tdec, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        uint32_t budget = 0, inter = 0;
+        int rc = depz_vl53l4_decode_range_timing(
+            (uint32_t)json_as_int(json_obj_get(c, "intermeasurement_raw")),
+            (uint16_t)json_as_int(json_obj_get(c, "clock_pll")),
+            (uint16_t)json_as_int(json_obj_get(c, "osc_frequency")),
+            (uint16_t)json_as_int(json_obj_get(c, "range_config_a")),
+            &budget, &inter);
+        CHECK(rc == 0, "vl53l4 timing decode %s rc=%d", name, rc);
+        CHECK((int64_t)budget == json_as_int(json_obj_get(c, "timing_budget_ms")),
+              "vl53l4 timing %s timing_budget_ms: got %u", name, budget);
+        CHECK((int64_t)inter == json_as_int(json_obj_get(c, "inter_measurement_ms")),
+              "vl53l4 timing %s inter_measurement_ms: got %u", name, inter);
+    }
+
+    /* tuning: word codecs, both directions */
+    const json_value *tun = json_obj_get(root, "tuning");
+    for (size_t i = 0; i < json_arr_size(tun); i++) {
+        const json_value *c = json_arr_get(tun, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        const char *kind = json_as_str(json_obj_get(c, "kind"));
+        int64_t value = json_as_int(json_obj_get(c, "value"));
+        int64_t raw = json_as_int(json_obj_get(c, "raw"));
+        if (strcmp(kind, "offset") == 0) {
+            CHECK((int64_t)depz_vl53l4_offset_raw((int32_t)value) == raw,
+                  "vl53l4 tuning %s raw: got %u", name, depz_vl53l4_offset_raw((int32_t)value));
+            CHECK((int64_t)depz_vl53l4_decode_offset((uint16_t)raw) == value,
+                  "vl53l4 tuning %s decode: got %d", name, depz_vl53l4_decode_offset((uint16_t)raw));
+        } else if (strcmp(kind, "xtalk") == 0) {
+            CHECK((int64_t)depz_vl53l4_xtalk_raw((uint16_t)value) == raw,
+                  "vl53l4 tuning %s raw: got %u", name, depz_vl53l4_xtalk_raw((uint16_t)value));
+            CHECK((int64_t)depz_vl53l4_decode_xtalk((uint16_t)raw) == value,
+                  "vl53l4 tuning %s decode: got %u", name, depz_vl53l4_decode_xtalk((uint16_t)raw));
+        } else if (strcmp(kind, "signal_threshold") == 0) {
+            CHECK((int64_t)depz_vl53l4_signal_threshold_raw((uint16_t)value) == raw,
+                  "vl53l4 tuning %s raw: got %u", name,
+                  depz_vl53l4_signal_threshold_raw((uint16_t)value));
+            CHECK((int64_t)depz_vl53l4_decode_signal_threshold((uint16_t)raw) == value,
+                  "vl53l4 tuning %s decode: got %u", name,
+                  depz_vl53l4_decode_signal_threshold((uint16_t)raw));
+        } else if (strcmp(kind, "sigma_threshold") == 0) {
+            uint16_t r = 0;
+            CHECK(depz_vl53l4_sigma_threshold_raw((uint16_t)value, &r) == 0 &&
+                  (int64_t)r == raw,
+                  "vl53l4 tuning %s raw: got %u", name, r);
+            CHECK((int64_t)depz_vl53l4_decode_sigma_threshold((uint16_t)raw) == value,
+                  "vl53l4 tuning %s decode: got %u", name,
+                  depz_vl53l4_decode_sigma_threshold((uint16_t)raw));
+        } else {
+            CHECK(0, "unknown vl53l4 tuning kind %s", kind);
+        }
+    }
+
+    /* config_block: the 91-byte init block with byte 0 forced to 0x12 */
+    const json_value *cb = json_obj_get(root, "config_block");
+    CHECK((int64_t)DEPZ_VL53L4_CONFIG_ADDR == json_as_int(json_obj_get(cb, "addr")),
+          "vl53l4 config_block addr");
+    {
+        uint8_t out[91];
+        size_t n = depz_vl53l4_config_block(out);
+        CHECK(n == sizeof(out), "vl53l4 config_block length: got %zu", n);
+        check_payload("config_block", out, n, json_as_str(json_obj_get(cb, "data")));
+        CHECK(out[0] == DEPZ_VL53L4_CONFIG_FMP_BYTE, "vl53l4 config_block fmp byte");
+    }
+
+    json_free(root);
+}
+
+/* ======================================================================== */
 /* bno086_shtp.json                                                          */
 /* ======================================================================== */
 static void test_bno086_shtp(void)
@@ -1140,6 +1357,7 @@ int main(int argc, char **argv)
     else if (strcmp(stem, "framing_decode") == 0)  test_framing_decode();
     else if (strcmp(stem, "fwdepz") == 0)          test_fwdepz();
     else if (strcmp(stem, "vl53l8_advanced") == 0) test_vl53l8_advanced();
+    else if (strcmp(stem, "vl53l4") == 0)          test_vl53l4();
     else if (strcmp(stem, "bno086_shtp") == 0)     test_bno086_shtp();
     else if (strcmp(stem, "bno086_reports") == 0)  test_bno086_reports();
     else if (strcmp(stem, "vl53l8_replay") == 0)   test_vl53l8_replay();

@@ -10,6 +10,8 @@ entire public surface is one header: `include/depz_sensor_sdk.h`.
 and API reference:
 
 - **[SR04](sr04/introduction.md)** — ultrasonic ranging: one distance per ping.
+- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one precise
+  optical distance.
 - **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
 - **[BNO086](bno086/introduction.md)** — 9-axis IMU: orientation and motion.
@@ -34,7 +36,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -53,9 +55,9 @@ the [README](../README.md#install).
 ## Where to next
 
 - **Your sensor's pages** — [SR04](sr04/introduction.md) ·
-  [VL53L8CX](vl53l8cx/introduction.md) · [VL53L8CH](vl53l8ch/introduction.md) ·
-  [BNO086](bno086/introduction.md): introduction, hands-on guide, and the
-  sensor's own API reference.
+  [VL53L4CD](vl53l4cd/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [BNO086](bno086/introduction.md):
+  introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](guide.md)** — the SDK-wide walkthrough: build, the transport/decode
   mental model, identity & discovery, per-sensor decode, extension points.
 - **[API Reference](api.md)** — the whole public surface, generated from the

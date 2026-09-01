@@ -6,11 +6,13 @@ library. Pure codecs, **no I/O / no transport**: you feed it bytes, it gives you
 decoded frames. Byte-for-byte identical to the Python / TypeScript / Java
 reference SDKs via the shared golden test vectors in `contracts/vectors`.
 
-## The four sensors
+## The five sensors
 
-The DEPZ line is **four** user-facing sensors that share one framed protocol:
+The DEPZ line is **five** user-facing sensors that share one framed protocol:
 
 - **HC-SR04** — ultrasonic distance (`depz/sr04.hpp`).
+- **VL53L4CD** — single-zone ToF register-bridge codecs and ULD math
+  (`depz/vl53l4.hpp`).
 - **VL53L8CX** — 8×8 multizone Time-of-Flight, the **base** ToF die (ST ULD
   2.1.0). This is the dev-default part and carries no dedicated production USB
   PID (dev units enumerate under the STMicroelectronics dev vid/pid).
@@ -34,6 +36,7 @@ This SDK is the **verifiable decode layer**. Covered:
   firmware-name identity parsing (`depz/identity.hpp`), USB id hints
   (`depz/usb_ids.hpp`).
 - SR04: full wire codecs (`depz/sr04.hpp`).
+- VL53L4CD: register-bridge codecs, result decode, timing/tuning math and init block (`depz/vl53l4.hpp`).
 - **VL53L8 (CX + CH)**: frame-chunk reassembly, the shared results-frame decoder
   (raw per-zone arrays), and the advanced-feature DCI codecs (xtalk margin,
   detection thresholds, motion indicator) — `depz/vl53l8.hpp`.
@@ -79,7 +82,7 @@ subdir with `SOURCE_SUBDIR`. Tests are automatically off when consumed this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -129,7 +132,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.1.3`; fill in the archive `SHA512`
+> The portfile references release tag `v0.1.4`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test

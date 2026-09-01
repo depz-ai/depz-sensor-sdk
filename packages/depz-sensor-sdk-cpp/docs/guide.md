@@ -8,6 +8,8 @@ firmware containers, dataset replay). Each sensor then has its own
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
+- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
+  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
 - **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
   [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
 - **VL53L8CH** (ToF superset + CNH histograms) —
@@ -38,25 +40,28 @@ from the header doc-comments so it never drifts from the code.
 
 This is the **decode layer** — pure codecs, **no I/O and no transport**. You
 own the serial port (or a recording, or a socket); the SDK turns bytes into
-typed values and typed values back into bytes. Each of the four sensors speaks
+typed values and typed values back into bytes. Each of the five sensors speaks
 one shared framed protocol (`A5 C3` header + optional payload CRC), and this
 library gives you:
 
 - a byte-exact frame parser and packet builder (`depz/framing.hpp`,
   `depz/crc.hpp`), and
-- one header of wire codecs per sensor — `depz/sr04.hpp`, `depz/vl53l8.hpp`
-  (CX **and** CH), `depz/bno086.hpp` — plus the cross-sensor pieces
+- one header of wire codecs per sensor — `depz/sr04.hpp`, `depz/vl53l4.hpp`,
+  `depz/vl53l8.hpp` (CX **and** CH), `depz/bno086.hpp` — plus the cross-sensor
+  pieces
   (`depz/common.hpp`, `depz/identity.hpp`, `depz/usb_ids.hpp`,
   `depz/fwdepz.hpp`, `depz/dataset.hpp`).
 
-Everything lives in namespace `depz` (ToF under `depz::vl53l8`, IMU under
-`depz::bno086`, datasets under `depz::dataset`). It targets **C++17** and is
+Everything lives in namespace `depz` (ToF under `depz::vl53l4` /
+`depz::vl53l8`, IMU under `depz::bno086`, datasets under `depz::dataset`). It targets **C++17** and is
 byte-for-byte identical to the Python / TypeScript / Java reference SDKs via the
 shared golden vectors in `contracts/vectors`.
 
-The three firmware philosophies mirror the firmware itself:
+The firmware philosophies mirror the firmware itself:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance.
+- **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD math and
+  the single-zone result-block decode run on the host (`depz::vl53l4`).
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the ST results
   frame is reassembled and decoded on the host (`depz::vl53l8`). CX is the base
   ToF imager; CH is its superset, adding Compact-Network-Histogram output.
@@ -68,7 +73,7 @@ The three firmware philosophies mirror the firmware itself:
 ```bash
 cmake -B build -S .
 cmake --build build
-ctest --test-dir build          # 6 golden-vector suites
+ctest --test-dir build          # golden-vector suites
 ```
 
 The build produces a static library exposed as the CMake target
@@ -79,7 +84,7 @@ compatibility). Pull it into your own tree with FetchContent:
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -286,8 +291,9 @@ intentionally **not** implemented, rather than faked:
   stream. The shared results-frame path already serves CH ranging; only the CNH
   codec is a documented stub in `depz/vl53l8.hpp`.
 - **Live ULD init / register-bridge driver** — the firmware download and DCI
-  read/write handshakes that bring a ToF part up on real hardware. See the
-  reference Python `vl53l8/uld.py`.
+  read/write handshakes that bring a ToF part up on real hardware (and, for
+  the VL53L4CD, the `sensor_init`/calibration loops driven over
+  `ReadReg`/`WriteReg`). See the reference Python `vl53l8/uld.py`.
 
 ## Testing without hardware
 

@@ -10,6 +10,8 @@ reference SDKs via the shared golden test vectors.
 and API reference:
 
 - **[SR04](sr04/introduction.md)** — ultrasonic ranging: one distance per ping.
+- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one precise
+  optical distance per measurement.
 - **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
 - **[BNO086](bno086/introduction.md)** — 9-axis IMU: orientation and motion.
@@ -30,7 +32,7 @@ compatibility). Pull it into your own tree with FetchContent:
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.3
+  GIT_TAG        v0.1.4
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -38,11 +40,13 @@ target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
 
 The public headers live under `include/depz/` — include what you use
 (`#include "depz/sr04.hpp"`); everything is in namespace `depz` (ToF under
-`depz::vl53l8`, IMU under `depz::bno086`, datasets under `depz::dataset`).
+`depz::vl53l4` / `depz::vl53l8`, IMU under `depz::bno086`, datasets under
+`depz::dataset`).
 
 ## Where to next
 
 - **Your sensor's pages** — [SR04](sr04/introduction.md) ·
+  [VL53L4CD](vl53l4cd/introduction.md) ·
   [VL53L8CX](vl53l8cx/introduction.md) · [VL53L8CH](vl53l8ch/introduction.md) ·
   [BNO086](bno086/introduction.md): introduction, hands-on guide, and the
   sensor's own API reference.
