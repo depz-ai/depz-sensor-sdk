@@ -1,0 +1,45 @@
+[project]
+name = "depz-sensor-sdk"
+version = "0.1.4"
+description = "Python SDK for the DEPZ USB sensor line — HC-SR04 ultrasonic, VL53L8CX/CH 8x8 ToF, BNO086 IMU."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "DEPZ" }]
+keywords = ["depz", "sensor", "usb", "cdc", "vl53l8", "bno086", "hc-sr04", "tof", "imu", "ultrasonic"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "pyserial>=3.5",
+    "numpy>=1.24",
+]
+
+[project.urls]
+Homepage = "https://github.com/depz-ai/depz-sensor-sdk"
+Repository = "https://github.com/depz-ai/depz-sensor-sdk"
+Issues = "https://github.com/depz-ai/depz-sensor-sdk/issues"
+
+[project.scripts]
+depz-sensor = "depz_sensor_sdk.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["depz_sensor_sdk*"]
+
+[tool.setuptools.package-data]
+"depz_sensor_sdk.vl53l8" = ["data/cx/*.bin", "data/ch/*.bin"]

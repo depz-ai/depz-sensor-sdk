@@ -1,0 +1,6 @@
+depz-sensor-sdk bundles VL53L8CX/CH sensor-firmware and configuration blobs
+(depz_sensor_sdk/vl53l8/data/{cx,ch}/*.bin) that are © STMicroelectronics,
+distributed under the BSD-3-Clause license (from the ST VL53L8CX ULD).
+The VL53L8 host-side ULD port and its advanced plugins (detection thresholds,
+xtalk, motion indicator) are derived from the ST VL53L8CX ULD (BSD-3-Clause,
+stm32duino/VL53L8CX). All other code is © DEPZ, MIT.

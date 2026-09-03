@@ -113,7 +113,7 @@ install(FILES
 if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   enable_testing()
 
-  # Golden vectors live in the monorepo's contracts/ directory.
+  # Golden vectors live in the repository's contracts/ directory.
   set(DEPZ_VECTORS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../contracts/vectors"
       CACHE PATH "Path to contracts/vectors")
 

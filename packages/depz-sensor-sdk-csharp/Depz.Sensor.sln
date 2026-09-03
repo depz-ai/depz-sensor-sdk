@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A595CD2B-DDFC-477D-AFE8-87491A6209B4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Depz.Sensor", "src\Depz.Sensor\Depz.Sensor.csproj", "{F882EE84-BD4B-4146-B876-7196714AFB12}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ABA6E185-5153-4C6F-B392-45E7929AE93C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Depz.Sensor.Tests", "tests\Depz.Sensor.Tests\Depz.Sensor.Tests.csproj", "{2FB1716E-27DD-4F28-AA6C-D7D623179B06}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F882EE84-BD4B-4146-B876-7196714AFB12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F882EE84-BD4B-4146-B876-7196714AFB12}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F882EE84-BD4B-4146-B876-7196714AFB12}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F882EE84-BD4B-4146-B876-7196714AFB12}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FB1716E-27DD-4F28-AA6C-D7D623179B06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FB1716E-27DD-4F28-AA6C-D7D623179B06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FB1716E-27DD-4F28-AA6C-D7D623179B06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FB1716E-27DD-4F28-AA6C-D7D623179B06}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F882EE84-BD4B-4146-B876-7196714AFB12} = {A595CD2B-DDFC-477D-AFE8-87491A6209B4}
+		{2FB1716E-27DD-4F28-AA6C-D7D623179B06} = {ABA6E185-5153-4C6F-B392-45E7929AE93C}
+	EndGlobalSection
+EndGlobal

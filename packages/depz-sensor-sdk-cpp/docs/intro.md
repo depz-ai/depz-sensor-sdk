@@ -56,3 +56,5 @@ The public headers live under `include/depz/` — include what you use
   the header doc-comments.
 - **Docs for LLMs** — the sensor SDK documentation as raw Markdown:
   [/llms-full.txt](/llms-full.txt).
+- **Source & license** — the SDKs are open source (MIT):
+  [github.com/depz-ai/depz-sensor-sdk](https://github.com/depz-ai/depz-sensor-sdk).

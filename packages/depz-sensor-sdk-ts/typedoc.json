@@ -1,0 +1,23 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/transport/webserial.ts",
+    "src/transport/node.ts"
+  ],
+  "out": "docs/api",
+  "readme": "none",
+  "plugin": ["typedoc-plugin-markdown"],
+  "githubPages": false,
+  "sourceLinkTemplate": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/{path}#L{line}",
+  "hideGenerator": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "sort": ["source-order"],
+  "outputFileStrategy": "members",
+  "hidePageHeader": true,
+  "hideBreadcrumbs": true,
+  "useCodeBlocks": true,
+  "expandObjects": true,
+  "parametersFormat": "table"
+}

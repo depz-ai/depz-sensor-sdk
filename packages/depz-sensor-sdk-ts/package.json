@@ -1,0 +1,80 @@
+{
+  "name": "@depz/sensor-sdk",
+  "version": "0.1.4",
+  "description": "TypeScript SDK for the DEPZ USB sensor line (SR04, VL53L4CD, VL53L8CX/CH, BNO086) — WebSerial + Node",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "keywords": [
+    "depz",
+    "sensor",
+    "usb",
+    "webserial",
+    "serialport",
+    "vl53l8",
+    "vl53l4cd",
+    "bno086",
+    "hc-sr04",
+    "tof",
+    "imu"
+  ],
+  "homepage": "https://github.com/depz-ai/depz-sensor-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/depz-ai/depz-sensor-sdk.git",
+    "directory": "packages/depz-sensor-sdk-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/depz-ai/depz-sensor-sdk/issues"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./web": {
+      "types": "./dist/transport/webserial.d.ts",
+      "import": "./dist/transport/webserial.js"
+    },
+    "./node": {
+      "types": "./dist/transport/node.d.ts",
+      "import": "./dist/transport/node.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "docs": "npm run docs:root && npm run docs:sensors",
+    "docs:root": "typedoc --out docs/.api-md && node scripts/merge-api-md.mjs docs/.api-md docs/api.md",
+    "docs:sensors": "node scripts/gen-sensor-api-md.mjs",
+    "docs:json": "typedoc --json docs/api.json --out docs/.api-json && node -e \"require('node:fs').rmSync('docs/.api-json',{recursive:true,force:true})\""
+  },
+  "peerDependencies": {
+    "serialport": ""
+  },
+  "peerDependenciesMeta": {
+    "serialport": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "serialport": "^12.0.0",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.12.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}

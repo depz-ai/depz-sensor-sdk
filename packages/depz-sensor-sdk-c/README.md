@@ -101,7 +101,7 @@ recipe, and a vcpkg port. Version **0.1.4**, MIT.
 
 ### CMake FetchContent
 
-Because the SDK lives in a subdirectory of the monorepo, point `SOURCE_SUBDIR`
+Because the SDK lives in a subdirectory of the repository, point `SOURCE_SUBDIR`
 at it. Pulling us in this way builds the library only — never our test suite.
 
 ```cmake
@@ -169,4 +169,9 @@ correct hash).
 
 | Option | Default | Effect |
 |--------|---------|--------|
-| `DEPZ_SENSOR_SDK_C_BUILD_TESTS` | `ON` standalone / `OFF` as a subproject | Build the golden-vector CTest suite (needs the monorepo's `contracts/vectors/`). |
+| `DEPZ_SENSOR_SDK_C_BUILD_TESTS` | `ON` standalone / `OFF` as a subproject | Build the golden-vector CTest suite (needs the repository's `contracts/vectors/`). |
+
+## License
+
+MIT. Open source — source, byte-level protocol contracts and issue tracker:
+<https://github.com/depz-ai/depz-sensor-sdk>.

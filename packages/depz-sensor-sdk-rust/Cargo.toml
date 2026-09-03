@@ -1,0 +1,19 @@
+[package]
+name = "depz-sensor-sdk"
+version = "0.1.4"
+edition = "2021"
+description = "Contract-first Rust SDK for the DEPZ USB sensor line (SR04, VL53L4CD ToF, VL53L8CX/CH ToF, BNO086 IMU) — transport, protocol codecs, and sensor decode."
+license = "MIT"
+repository = "https://github.com/depz-ai/depz-sensor-sdk"
+homepage = "https://github.com/depz-ai/depz-sensor-sdk"
+readme = "README.md"
+keywords = ["depz", "sensor", "vl53l8", "bno086", "tof"]
+categories = ["embedded", "hardware-support", "parser-implementations"]
+exclude = ["tests", "docs", "scripts"]
+
+[lib]
+name = "depz_sensor_sdk"
+path = "src/lib.rs"
+
+[dev-dependencies]
+serde_json = "1"

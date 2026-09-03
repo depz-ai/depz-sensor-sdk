@@ -75,7 +75,7 @@ compatibility). It is pure C++17 with no external dependencies.
 
 ### CMake FetchContent
 
-The SDK lives in a subdirectory of the monorepo, so point FetchContent at that
+The SDK lives in a subdirectory of the repository, so point FetchContent at that
 subdir with `SOURCE_SUBDIR`. Tests are automatically off when consumed this way.
 
 ```cmake
@@ -151,3 +151,6 @@ FetchContent).
 
 MIT. Bundled/derived VL53L8 advanced-DCI codecs are © STMicroelectronics
 (BSD-3-Clause).
+
+Open source — source, byte-level protocol contracts and issue tracker:
+<https://github.com/depz-ai/depz-sensor-sdk>.

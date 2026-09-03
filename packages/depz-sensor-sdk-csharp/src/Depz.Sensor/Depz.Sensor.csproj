@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Depz.Sensor</RootNamespace>
+    <AssemblyName>Depz.Sensor</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Ship XML docs for IntelliSense; don't fail the build on undocumented members. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- NuGet package metadata -->
+    <PackageId>Depz.Sensor</PackageId>
+    <Version>0.1.4</Version>
+    <Authors>DEPZ</Authors>
+    <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU) — transport, protocol codecs, and sensor decode.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/depz-ai/depz-sensor-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/depz-ai/depz-sensor-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>depz;sensor;usb;vl53l8;vl53l4cd;bno086;hc-sr04;tof;imu</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

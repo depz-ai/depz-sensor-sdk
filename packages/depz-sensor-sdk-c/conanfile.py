@@ -48,7 +48,7 @@ class DepzSensorSdkCConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Consumers must never build our monorepo-vector test suite.
+        # Consumers must never build our golden-vector test suite.
         tc.cache_variables["DEPZ_SENSOR_SDK_C_BUILD_TESTS"] = False
         tc.generate()
         deps = CMakeDeps(self)
