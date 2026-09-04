@@ -12,12 +12,11 @@ capture.
 
 ## Code changes
 
-The SDK is contract-first: the seven language implementations are kept in
-byte-for-byte lockstep by shared golden test vectors and a cross-language
-parity gate, and releases land here as integrated, tested snapshots. Because
-of that, pull requests are not merged directly — the maintainers take patches
-through the integration pipeline (all seven SDKs + vector regeneration +
-hardware QA) and ship them in the next release, with credit.
+The seven language implementations are kept in lockstep, and releases land
+here as integrated, tested snapshots. Because of that, pull requests are not
+merged directly — the maintainers take patches through the integration
+pipeline (all seven SDKs + hardware QA) and ship them in the next release,
+with credit.
 
 The practical route: open an issue describing the change first. For small
 fixes a patch attached to the issue (or a PR used as a reference) is perfect;

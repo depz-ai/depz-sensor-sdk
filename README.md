@@ -48,13 +48,6 @@ FetchContent_MakeAvailable(depz_sensor_sdk)
 | `packages/depz-sensor-sdk-java/` | Java SDK (`io.github.depz-ai:depz-sensor-sdk`) |
 | `packages/depz-sensor-sdk-csharp/` | C# SDK (`Depz.Sensor`) |
 
-## Contract-first
-
-All seven SDKs are developed contract-first: a byte-level protocol
-specification and shared golden test vectors keep the implementations in
-lockstep, verified byte-for-byte by a cross-language parity gate — so behavior
-is identical no matter which language you pick.
-
 ## Documentation
 
 Full guides and API references for every language and sensor:
