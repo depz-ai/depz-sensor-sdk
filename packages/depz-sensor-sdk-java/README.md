@@ -109,5 +109,5 @@ The harness prints `TOTAL: N/N vector cases passed` and `ALL VECTORS PASSED`.
 
 ## License
 
-MIT. Open source — source, byte-level protocol contracts and issue tracker:
+MIT. Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

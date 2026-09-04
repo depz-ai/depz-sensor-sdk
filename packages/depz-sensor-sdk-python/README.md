@@ -50,5 +50,5 @@ See `docs/guide.md` for the full guide and `docs/api.md` for the API reference.
 MIT. Bundled VL53L8 sensor-firmware blobs are © STMicroelectronics
 (BSD-3-Clause); see `NOTICE`.
 
-Open source — source, byte-level protocol contracts and issue tracker:
+Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

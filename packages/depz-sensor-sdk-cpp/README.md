@@ -152,5 +152,5 @@ FetchContent).
 MIT. Bundled/derived VL53L8 advanced-DCI codecs are © STMicroelectronics
 (BSD-3-Clause).
 
-Open source — source, byte-level protocol contracts and issue tracker:
+Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

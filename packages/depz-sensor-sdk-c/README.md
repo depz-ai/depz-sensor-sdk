@@ -169,9 +169,9 @@ correct hash).
 
 | Option | Default | Effect |
 |--------|---------|--------|
-| `DEPZ_SENSOR_SDK_C_BUILD_TESTS` | `ON` standalone / `OFF` as a subproject | Build the golden-vector CTest suite (needs the repository's `contracts/vectors/`). |
+| `DEPZ_SENSOR_SDK_C_BUILD_TESTS` | `ON` standalone / `OFF` as a subproject | Build the golden-vector CTest suite (needs the golden-vector tree from the development checkout; auto-skipped when absent). |
 
 ## License
 
-MIT. Open source — source, byte-level protocol contracts and issue tracker:
+MIT. Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

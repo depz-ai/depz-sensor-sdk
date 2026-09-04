@@ -110,12 +110,19 @@ install(FILES
   DESTINATION ${DEPZ_SENSOR_SDK_C_INSTALL_CMAKEDIR})
 
 # --- Tests ----------------------------------------------------------------
+# Golden vectors live in the development tree's contracts/ directory and are
+# not shipped with the packaged sources — skip the tests gracefully without them.
+if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
+  set(DEPZ_VECTORS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../contracts/vectors"
+      CACHE PATH "Path to the golden-vector tree")
+  if(NOT EXISTS "${DEPZ_VECTORS_DIR}")
+    message(STATUS "depz-sensor-sdk-c: golden vectors not found at ${DEPZ_VECTORS_DIR}; tests skipped (set DEPZ_VECTORS_DIR to enable)")
+    set(DEPZ_SENSOR_SDK_C_BUILD_TESTS OFF)
+  endif()
+endif()
+
 if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   enable_testing()
-
-  # Golden vectors live in the repository's contracts/ directory.
-  set(DEPZ_VECTORS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../contracts/vectors"
-      CACHE PATH "Path to contracts/vectors")
 
   add_executable(test_vectors
     tests/test_vectors.c

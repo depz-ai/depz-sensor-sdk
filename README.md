@@ -40,7 +40,6 @@ FetchContent_MakeAvailable(depz_sensor_sdk)
 
 | Path | What |
 |------|------|
-| `contracts/` | **Language-neutral protocol contracts + golden test vectors** — the byte-level source of truth every SDK verifies against |
 | `packages/depz-sensor-sdk-python/` | Python SDK (`depz_sensor_sdk`) — sync API + background reader thread, discovery, CLI, recording/datasets |
 | `packages/depz-sensor-sdk-ts/` | TypeScript SDK (`@depz/sensor-sdk`) — WebSerial (browser) + serialport (Node), pure ESM |
 | `packages/depz-sensor-sdk-c/` | C SDK — decode/encode, CMake / Conan / vcpkg |
@@ -51,11 +50,10 @@ FetchContent_MakeAvailable(depz_sensor_sdk)
 
 ## Contract-first
 
-The protocol lives in `contracts/` as byte-level specifications
-(framing, common commands, one contract per sensor, firmware errata) plus
-golden test vectors in `contracts/vectors/`. All seven SDKs decode the same
-vectors byte-for-byte — a parity gate keeps them in lockstep, so behavior is
-identical no matter which language you pick.
+All seven SDKs are developed contract-first: a byte-level protocol
+specification and shared golden test vectors keep the implementations in
+lockstep, verified byte-for-byte by a cross-language parity gate — so behavior
+is identical no matter which language you pick.
 
 ## Documentation
 

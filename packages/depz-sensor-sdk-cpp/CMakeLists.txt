@@ -103,12 +103,19 @@ if(PYTHON3)
 endif()
 
 # ---- tests -----------------------------------------------------------------
+# Golden vectors live in the development tree's contracts/ directory and are
+# not shipped with the packaged sources — skip the tests gracefully without them.
+if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
+  set(DEPZ_VECTORS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../contracts/vectors"
+      CACHE PATH "Path to the golden-vector tree")
+  if(NOT EXISTS "${DEPZ_VECTORS_DIR}")
+    message(STATUS "depz-sensor-sdk-cpp: golden vectors not found at ${DEPZ_VECTORS_DIR}; tests skipped (set DEPZ_VECTORS_DIR to enable)")
+    set(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS OFF)
+  endif()
+endif()
+
 if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   enable_testing()
-
-  # Resolve the shared golden-vectors directory (packages/../../contracts/vectors).
-  set(DEPZ_VECTORS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../contracts/vectors"
-      CACHE PATH "Path to contracts/vectors golden vectors")
 
   add_executable(depz_test_vectors tests/test_vectors.cpp)
   target_link_libraries(depz_test_vectors PRIVATE depz_sensor_sdk)

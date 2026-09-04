@@ -87,5 +87,5 @@ Everything else in the table above is fully implemented and covered.
 
 ## License
 
-MIT. Open source — source, byte-level protocol contracts and issue tracker:
+MIT. Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.
