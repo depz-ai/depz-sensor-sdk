@@ -50,11 +50,11 @@ from .uld import (
     parse_result_block,
 )
 
-#: Slice length for close-aware blocking waits (see Vl53l8Cx.get_frame).
+#: Slice length for close-aware blocking waits (see Vl53l8cx.get_frame).
 _CLOSE_POLL_S = 0.05
 
 __all__ = [
-    "Vl53l4Cd",
+    "Vl53l4cd",
     "Vl53l4Measurement",
     "Vl53l4Info",
     "Vl53l4cdError",
@@ -115,7 +115,7 @@ class Vl53l4Measurement:
 class _BridgePlatform:
     """ULD `platform` object mapped onto the firmware register bridge."""
 
-    def __init__(self, dev: "Vl53l4Cd"):
+    def __init__(self, dev: "Vl53l4cd"):
         self._dev = dev
         self.last_timestamp_us = 0  # MCU timestamp of the latest register read
 
@@ -159,7 +159,7 @@ class _BridgePlatform:
         time.sleep(ms / 1000.0)
 
 
-class Vl53l4Cd(DeviceBase):
+class Vl53l4cd(DeviceBase):
     """VL53L4CD single-zone ToF device.
 
     `init()` runs the ULD boot sequence (no firmware blob — the sensor carries

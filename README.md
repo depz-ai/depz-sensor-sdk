@@ -31,7 +31,7 @@ vcpkg overlay ports; see the package READMEs):
 include(FetchContent)
 FetchContent_Declare(depz_sensor_sdk
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.1.4
+  GIT_TAG        v0.3.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c)   # or packages/depz-sensor-sdk-cpp
 FetchContent_MakeAvailable(depz_sensor_sdk)
 ```

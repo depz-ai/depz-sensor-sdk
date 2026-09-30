@@ -4,7 +4,7 @@ The public API for the VL53L8CH (ToF + CNH) sensor. Transport, framing,
 identity/discovery, firmware-container and dataset symbols shared
 across sensors live in the [top-level API reference](../api.md).
 
-`Vl53l8Ch` is the VL53L8CX superset: it shares one results-frame
+`Vl53l8ch` is the VL53L8CX superset: it shares one results-frame
 decoder, framing and advanced-DCI codec set with the CX base — only
 the Compact-Network-Histogram (CNH) additions are listed here. For
 the frame decoder, reassembler, `Variant`, resolution and the
@@ -15,9 +15,81 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L8CH (ToF + CNH)**: [`CNH_DATA_IDX`](#cnh_data_idx)
+- **VL53L8CH (ToF + CNH)**: [`CnhDecodeConfig`](#cnhdecodeconfig), [`CnhAggregate`](#cnhaggregate), [`CnhData`](#cnhdata), [`CnhError`](#cnherror), [`decode_cnh`](#decode_cnh), [`CNH_DATA_IDX`](#cnh_data_idx)
 
 ## VL53L8CH (ToF + CNH)
+
+### CnhDecodeConfig
+
+```rust
+pub struct CnhDecodeConfig {
+    /// Number of CNH aggregates (`cfg.nb_of_aggregates`).
+    pub nb_of_aggregates: usize,
+    /// CNH bins per aggregate (`cfg.feature_length`).
+    pub feature_length: usize,
+}
+```
+
+Minimal config needed to decode a captured CNH block: the aggregate count and
+per-aggregate feature (bin) length the sensor was configured with. These must
+match the `CnhConfig` used when programming the device (see the Python
+`CnhConfig.nb_of_aggregates` / `feature_length`).
+
+### CnhAggregate
+
+```rust
+pub struct CnhAggregate {
+    /// Per-bin integer mantissa (`FEAT_INT`), length == `feature_length`.
+    pub hist_raw: Vec<i32>,
+    /// Per-bin power-of-two scaler (`FEAT_FRAC`), length == `feature_length`.
+    pub hist_scaler: Vec<i8>,
+}
+```
+
+One decoded CNH aggregate. The real histogram value for bin `i` is
+`hist_raw[i] as f64 / 2f64.powi(hist_scaler[i] as i32)`.
+
+### CnhData
+
+```rust
+pub struct CnhData {
+    /// Reference residual word, u32 at byte offset 8 (`words[2]`). Real value is
+    /// `ref_residual_word as f64 / 2048.0` (11 fractional bits).
+    pub ref_residual_word: u32,
+    /// Per-aggregate histograms, length == `nb_of_aggregates`.
+    pub aggregates: Vec<CnhAggregate>,
+}
+```
+
+Result of [`decode_cnh`].
+
+### CnhError
+
+```rust
+pub enum CnhError {
+    /// `raw` is too short for the header or the computed block extends past it.
+    Truncated,
+    /// `nb_of_aggregates` or `feature_length` is zero.
+    EmptyConfig,
+}
+```
+
+CNH decode failure.
+
+### decode_cnh
+
+```rust
+pub fn decode_cnh(cfg: &CnhDecodeConfig, raw: &[u8]) -> Result<CnhData, CnhError>
+```
+
+Decode a captured CNH data block (`raw` bytes, byte-swapped exactly like the
+standard ranging blocks — i.e. [`crate::vl53l8::decode::Vl53l8Results::cnh_raw`])
+into per-aggregate integer histograms plus the reference-residual word.
+
+Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
+DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
+device reports a single buffer and the ping/pong selection resolves to the
+sole buffer.
 
 ### CNH_DATA_IDX
 
@@ -25,6 +97,6 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 pub const CNH_DATA_IDX: u16 = 0xc048;
 ```
 
-CNH (compact network histogram) output block id — **CH-only**. The DEPZ
-decode surfaces this block's raw bytes ([`Vl53l8Results::cnh_raw`]); the full
-histogram unpack is a not-yet-implemented CH extension point (see below).
+CNH (compact network histogram) output block id — **CH-only**. The frame
+decode copies this block's raw bytes into [`Vl53l8Results::cnh_raw`];
+[`super::cnh::decode_cnh`] unpacks them into per-aggregate histograms.

@@ -13,8 +13,8 @@ import {
   StatusError,
   SyncPinMode,
   SyncPinPolarity,
-  Vl53l8Ch,
-  Vl53l8Cx,
+  Vl53l8ch,
+  Vl53l8cx,
   syncTimeAll,
   type DeviceEvent,
   type Sr04Measurement,
@@ -83,8 +83,8 @@ describe("DepzDevice core", () => {
     const fCx = new FakeTof({ variant: "cx" });
     const fCh = new FakeTof({ variant: "ch" });
     const fImu = new FakeBno086();
-    const cx = new Vl53l8Cx(fCx.transport, { timeoutMs: 1000 });
-    const ch = new Vl53l8Ch(fCh.transport, { timeoutMs: 1000 });
+    const cx = new Vl53l8cx(fCx.transport, { timeoutMs: 1000 });
+    const ch = new Vl53l8ch(fCh.transport, { timeoutMs: 1000 });
     const imu = new Bno086(fImu.transport, { timeoutMs: 1000 });
     await cx.open();
     await ch.open();
@@ -99,8 +99,8 @@ describe("DepzDevice core", () => {
         expect(result.get(d)!.rttUs >= 0n).toBe(true);
       }
       // The two ToF classes are distinct instances on the shared clock.
-      expect(cx).toBeInstanceOf(Vl53l8Cx);
-      expect(ch).toBeInstanceOf(Vl53l8Ch);
+      expect(cx).toBeInstanceOf(Vl53l8cx);
+      expect(ch).toBeInstanceOf(Vl53l8ch);
       expect(result.get(cx)).not.toBe(result.get(ch));
     } finally {
       await cx.close();

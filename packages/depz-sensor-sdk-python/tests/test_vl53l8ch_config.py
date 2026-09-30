@@ -14,12 +14,12 @@ from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.vl53l8 import (
     RESOLUTION_8X8,
     CnhConfig,
-    Vl53l8Ch,
-    Vl53l8Cx,
+    Vl53l8ch,
+    Vl53l8cx,
 )
 
 
-def _dev(cls=Vl53l8Ch):
+def _dev(cls=Vl53l8ch):
     a, _b = LoopbackLink.pair()
     return cls(a, timeout=0.2)
 
@@ -28,15 +28,15 @@ def _dev(cls=Vl53l8Ch):
 
 
 def test_configure_cnh_is_ch_only():
-    assert hasattr(Vl53l8Ch, "configure_cnh")
-    assert not hasattr(Vl53l8Cx, "configure_cnh")
-    assert Vl53l8Cx._VARIANT == "cx"
-    assert Vl53l8Ch._VARIANT == "ch"
+    assert hasattr(Vl53l8ch, "configure_cnh")
+    assert not hasattr(Vl53l8cx, "configure_cnh")
+    assert Vl53l8cx._VARIANT == "cx"
+    assert Vl53l8ch._VARIANT == "ch"
 
 
 def test_cx_instance_has_no_configure_cnh():
     a, _b = LoopbackLink.pair()
-    cx = Vl53l8Cx(a, timeout=0.2)
+    cx = Vl53l8cx(a, timeout=0.2)
     try:
         assert not hasattr(cx, "configure_cnh")
     finally:
@@ -47,19 +47,19 @@ def test_cx_instance_has_no_configure_cnh():
 
 
 def test_ch_init_rejects_cx_variant():
-    dev = _dev(Vl53l8Ch)
+    dev = _dev(Vl53l8ch)
     try:
         with pytest.raises(DepzError):
-            dev.init("cx")  # Vl53l8Ch loads the 'ch' blob only
+            dev.init("cx")  # Vl53l8ch loads the 'ch' blob only
     finally:
         dev.close()
 
 
 def test_cx_init_rejects_ch_variant():
-    dev = _dev(Vl53l8Cx)
+    dev = _dev(Vl53l8cx)
     try:
         with pytest.raises(DepzError):
-            dev.init("ch")  # Vl53l8Cx loads the 'cx' blob only
+            dev.init("ch")  # Vl53l8cx loads the 'cx' blob only
     finally:
         dev.close()
 
@@ -68,7 +68,7 @@ def test_cx_init_rejects_ch_variant():
 
 
 def test_ch_inherits_frequency_guard():
-    dev = _dev(Vl53l8Ch)
+    dev = _dev(Vl53l8ch)
     try:
         with pytest.raises(ValueError):
             dev.set_ranging_frequency_hz(1)  # inherited < 2 Hz guard
@@ -77,7 +77,7 @@ def test_ch_inherits_frequency_guard():
 
 
 def test_ch_inherits_config_while_ranging_guard():
-    dev = _dev(Vl53l8Ch)
+    dev = _dev(Vl53l8ch)
     try:
         dev._ranging = True  # pretend the stream owns the register bank
         with pytest.raises(DepzError):
@@ -89,7 +89,7 @@ def test_ch_inherits_config_while_ranging_guard():
 
 
 def test_ch_inherits_uld_before_init_guard():
-    dev = _dev(Vl53l8Ch)
+    dev = _dev(Vl53l8ch)
     try:
         with pytest.raises(DepzError):
             _ = dev.uld  # inherited: init() not called

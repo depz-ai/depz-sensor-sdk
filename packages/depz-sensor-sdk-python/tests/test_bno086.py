@@ -244,6 +244,7 @@ def test_get_metadata(rig):
     fake, dev = rig
     md = dev.get_metadata(SensorId.ACCELEROMETER)
     assert md.revision == 4
+    assert md.power_ma_q10 == 0x0800  # 2 mA
     assert md.min_period_us == 2500
     assert md.max_period_us == 100000
     assert md.q_point_1 == 8

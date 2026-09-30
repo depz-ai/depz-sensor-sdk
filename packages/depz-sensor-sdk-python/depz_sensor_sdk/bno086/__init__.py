@@ -97,11 +97,13 @@ __all__ = [
 RATE_LOW_FACTOR = 0.9
 RATE_HIGH_FACTOR = 2.1
 
-#: Re-reads allowed when `enable()`'s verify sees a stale "disabled" response
-#: left over from a preceding `disable()`. One round trip is enough to pass the
-#: in-flight response; two leaves margin without turning a genuine refusal into
-#: a long stall.
-_VERIFY_STALE_RETRIES = 2
+#: Re-reads allowed when `enable()`'s verify sees a "disabled" response: a
+#: stale one left over from a preceding `disable()`, or the hub answering
+#: before it applied the new rate — the lab BNO085 (SH-2 3.2.13) does that for
+#: one or two read-backs right after Set Feature (~8 ms each, capture
+#: 2026-09-29). Five leaves margin without turning a genuine refusal into a
+#: long stall.
+_VERIFY_STALE_RETRIES = 5
 
 _EXECUTABLE_RESET_COMPLETE = 0x01
 
@@ -414,12 +416,15 @@ class Bno086(DeviceBase):
         flight when this read registers, and would otherwise be reported as
         "granted 0 Hz" for a sensor that is in fact streaming.
 
+        The hub may also answer before it applied the rate just set: the lab
+        BNO085 reports interval 0 for one or two read-backs right after Set
+        Feature.
+
         We just asked for a non-zero interval, so a response claiming the
-        sensor is disabled is either stale or a genuine refusal. Re-read a
-        bounded number of times: a stale one is followed by the real answer
-        within one round trip, while a genuine refusal survives the retries and
-        still reaches the caller's warning path (contract 05 §7: warn, never
-        raise).
+        sensor is disabled is stale, early or a genuine refusal. Re-read a
+        bounded number of times: the real answer follows within a round trip or
+        two, while a genuine refusal survives the retries and still reaches the
+        caller's warning path (contract 05 §7: warn, never raise).
         """
         resp = self.get_feature(sensor, timeout=timeout)
         for _ in range(_VERIFY_STALE_RETRIES):

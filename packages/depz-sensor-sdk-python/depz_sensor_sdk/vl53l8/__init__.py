@@ -57,8 +57,8 @@ from .uld import (  # noqa: E402
 
 __all__ = [
     "Vl53l8",
-    "Vl53l8Cx",
-    "Vl53l8Ch",
+    "Vl53l8cx",
+    "Vl53l8ch",
     "Vl53l8Frame",
     "CnhConfig",
     "Vl53l8cxError",
@@ -104,13 +104,13 @@ class Vl53l8Frame:
 class _BridgePlatform:
     """ULD `platform` object mapped onto the firmware register bridge."""
 
-    def __init__(self, dev: "Vl53l8Cx"):
+    def __init__(self, dev: "Vl53l8cx"):
         self._dev = dev
 
     def rd_multi(self, addr: int, size: int) -> bytes:
         out = bytearray()
         while size > 0:
-            n = min(size, CHUNK_SIZE)
+            n = min(size, self._dev._READ_CHUNK)
             rep: RegData = self._dev.request(
                 Vl53l8Cmd.READ_REG,
                 pack_read_reg(addr, n),
@@ -127,7 +127,7 @@ class _BridgePlatform:
     def wr_multi(self, addr: int, data: bytes) -> None:
         done = 0
         while done < len(data):
-            chunk = data[done : done + CHUNK_SIZE]
+            chunk = data[done : done + self._dev._WRITE_CHUNK]
             self._dev.request(
                 Vl53l8Cmd.WRITE_REG,
                 pack_write_reg(addr, chunk),
@@ -136,7 +136,7 @@ class _BridgePlatform:
             )
             addr += len(chunk)
             done += len(chunk)
-            if self._dev._write_progress is not None and len(data) > CHUNK_SIZE:
+            if self._dev._write_progress is not None and len(data) > self._dev._WRITE_CHUNK:
                 self._dev._write_progress(done, len(data))
 
     def sleep_ms(self, ms: int) -> None:
@@ -145,18 +145,23 @@ class _BridgePlatform:
         time.sleep(ms / 1000.0)
 
 
-class Vl53l8Cx(DeviceBase):
+class Vl53l8cx(DeviceBase):
     """VL53L8CX ToF device: `init()` downloads the ~84 KB sensor firmware
     (~1 s over the CDC link), then configure and `start_ranging()`.
 
     This is the base class for both silicon variants. The VL53L8CH superset
-    (compact-network-histogram output) lives in `Vl53l8Ch`, which inherits
+    (compact-network-histogram output) lives in `Vl53l8ch`, which inherits
     every method here. All configuration methods require `init()` first and
     must not be called while ranging (the ULD talks to the current register
     bank; the stream owns it — contract 04)."""
 
     #: Sensor-firmware blob variant this class loads (uld.VARIANT_DATA_DIR key).
     _VARIANT = "cx"
+    #: Register-bridge transfer limits (the I2C L5/L7 board reads less per call).
+    _READ_CHUNK = CHUNK_SIZE
+    _WRITE_CHUNK = CHUNK_SIZE
+    #: Lowest ranging frequency that actually streams on this sensor.
+    _MIN_RANGING_HZ = MIN_RANGING_FREQUENCY_HZ
 
     def _init_subclass_state(self) -> None:
         self._uld: VL53L8CX | None = None
@@ -201,15 +206,15 @@ class Vl53l8Cx(DeviceBase):
     ) -> None:
         """Initialize the sensor: firmware blob download + default config.
 
-        The blob variant is fixed by the class (`Vl53l8Cx` → 'cx',
-        `Vl53l8Ch` → 'ch'); `variant` is accepted only for backward
+        The blob variant is fixed by the class (`Vl53l8cx` → 'cx',
+        `Vl53l8ch` → 'ch'); `variant` is accepted only for backward
         compatibility and must match the class variant when given. `progress`
         receives phase strings; `write_progress(done, total)` tracks the big
         blob writes."""
         if variant is not None and variant != self._VARIANT:
             raise DepzError(
                 f"{type(self).__name__} loads the '{self._VARIANT}' firmware "
-                f"blob; use Vl53l8Ch for 'ch'"
+                f"blob; use Vl53l8ch for 'ch'"
             )
         with self._uld_lock:
             self._write_progress = write_progress
@@ -245,9 +250,9 @@ class Vl53l8Cx(DeviceBase):
 
         Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
         enters its ranging loop and streams nothing (contract 04)."""
-        if hz < MIN_RANGING_FREQUENCY_HZ:
+        if hz < self._MIN_RANGING_HZ:
             raise ValueError(
-                f"ranging frequency must be >= {MIN_RANGING_FREQUENCY_HZ} Hz: below that "
+                f"ranging frequency must be >= {self._MIN_RANGING_HZ} Hz: below that "
                 "the sensor never enters its ranging loop and streams nothing (contract 04)"
             )
         self._require_not_ranging()
@@ -496,7 +501,26 @@ class Vl53l8Cx(DeviceBase):
         )
 
 
-class Vl53l8Ch(Vl53l8Cx):
+class CnhMixin:
+    """Compact-Network-Histogram (CNH) output, shared by every CH-firmware
+    class (VL53L8CH here, VL53L7CH in `vl53l7`). Mix in before the device
+    base class."""
+
+    def configure_cnh(self, config: CnhConfig) -> None:
+        """Arm the CNH histogram block for the next start_ranging(). CH only —
+        this method does not exist on Vl53l8cx."""
+        self._require_not_ranging()
+        self.uld.dci_write_data(cnh_module.MI_CFG_DEV_IDX, config.pack())
+        self._cnh_config = config
+
+    @property
+    def cnh_config(self) -> CnhConfig | None:
+        """The CNH config armed by :meth:`configure_cnh`, or ``None``.
+        Recorders read this to persist decode parameters next to raw blocks."""
+        return self._cnh_config
+
+
+class Vl53l8ch(CnhMixin, Vl53l8cx):
     """VL53L8CH device: the VL53L8CX superset. Inherits every CX method and
     adds Compact-Network-Histogram (CNH) output. `init()` downloads the CH
     firmware blob (VL53LMZ ULD 2.0.16). CNH is the reason to run CH firmware:
@@ -504,14 +528,7 @@ class Vl53l8Ch(Vl53l8Cx):
 
     _VARIANT = "ch"
 
-    def configure_cnh(self, config: CnhConfig) -> None:
-        """Arm the CNH histogram block for the next start_ranging(). CH only —
-        this method does not exist on Vl53l8Cx."""
-        self._require_not_ranging()
-        self.uld.dci_write_data(cnh_module.MI_CFG_DEV_IDX, config.pack())
-        self._cnh_config = config
-
 
 # Backward-compatible alias: the old flat `Vl53l8` name maps to the CX base
-# class (the historic default). New code should pick Vl53l8Cx / Vl53l8Ch.
-Vl53l8 = Vl53l8Cx
+# class (the historic default). New code should pick Vl53l8cx / Vl53l8ch.
+Vl53l8 = Vl53l8cx

@@ -150,6 +150,24 @@ public static final int STATUS_INVALID_PARAM = 127
 public static final int STATUS_CORRUPTED_FRAME = 2
 ```
 
+#### Vl53l8Uld.CNH_DATA_IDX *(field)*
+
+```java
+public static final int CNH_DATA_IDX = 0xc048
+```
+
+VL53LMZ CNH data output block (VL53L8CH / VL53L7CH).
+
+#### Vl53l8Uld.RESOLUTION_FROM_FRAME *(field)*
+
+```java
+public static final int RESOLUTION_FROM_FRAME = -1
+```
+
+`resolution` argument of `parseFrame(byte[], int, int, int)`:
+take the zone count from the zone-scaled ambient block (index 0x54D0,
+always sized to the resolution) and trim to it.
+
 #### Vl53l8Uld.DIST_MM *(field)*
 
 ```java
@@ -238,6 +256,20 @@ The live ULD init/config register-bridge driver is intentionally not
 ported to Java — it is hardware-dependent and out of the decode scope.
 Applies to both VL53L8CX and VL53L8CH.
 
+#### Vl53l8Uld.CNH_MAX_AGGREGATES *(field)*
+
+```java
+public static final int CNH_MAX_AGGREGATES = 64
+```
+
+decodeCnh() bounds — the same limits as the other SDKs.
+
+#### Vl53l8Uld.CNH_MAX_FEATURE_LENGTH *(field)*
+
+```java
+public static final int CNH_MAX_FEATURE_LENGTH = 255
+```
+
 #### Vl53l8Uld.decodeCnh
 
 ```java
@@ -247,11 +279,12 @@ public static CnhResult decodeCnh(int nbOfAggregates, int featureLength, byte[] 
 Decode a captured CNH data block (`raw`, byte-swapped exactly like the
 standard ranging blocks) into per-aggregate histograms, for the fixed
 cnh_cfg (ping-pong + variance disabled). Faithful port of the ST CNH plugin
-/ Python `cnh.decode`. Replaces the former `cnhHistogramDecodeStubbed`.
+/ Python `cnh.decode`.
 
 - `nbOfAggregates` — number of CNH aggregates (from the CNH config)
 - `featureLength` — CNH bins per aggregate (from the CNH config)
 - `raw` — captured CNH block bytes
+shorter than those counts imply (as the C / C++ / Rust / C# decoders)
 
 #### Vl53l8Uld.swapBuffer
 
@@ -290,6 +323,20 @@ Parse one raw results frame (`dataReadSize` bytes). `footerIdOff`
 is variant-specific (cx = 12, ch = 4); prefer the
 `parseFrame(byte[], int, Variant)` overload. Shared by VL53L8CX and
 VL53L8CH. Throws on a header/footer id mismatch.
+
+#### Vl53l8Uld.parseFrame
+
+```java
+public static Results parseFrame(byte[] raw, int dataReadSize, int footerIdOff, int resolution)
+```
+
+Parse one raw results frame and trim every per-zone array to
+`resolution` zones (x `NB_TARGET_PER_ZONE` for per-target
+arrays). Needed on VL53L5/L7 (contract 11 §3): blocks above index 0x6C90
+keep their declared 64-entry size even in 4x4, the sensor fills the first
+`resolution` entries and zero-pads the rest. `resolution`:
+`0` = no trim (VL53L8 behaviour), `16`/`64` = explicit,
+`RESOLUTION_FROM_FRAME` = the size of the zone-scaled ambient block.
 
 #### Vl53l8Uld.xtalkMarginToRaw
 
@@ -463,7 +510,8 @@ public int siliconTempDegc = 0
 public byte[] cnhRaw
 ```
 
-Raw CNH (compact-histogram) block bytes, VL53L8CH only; `null`
+Raw CNH (compact-histogram) block bytes (VL53L8CH / VL53L7CH, block
+`CNH_DATA_IDX`, word-swapped like every block); `null`
 when absent (always on CX). Decode with `decodeCnh`.
 
 #### Vl53l8Uld.Results.resolution

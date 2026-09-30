@@ -33,7 +33,7 @@ class FakeBno086:
     ADVERTISEMENT = bytes.fromhex("000101020a")  # opaque channel-0 blob
     FRS_RECORDS: dict[int, list[int]] = {
         0x2D3E: [0x10000000, 0, 0, 0x40000000],  # system orientation (Q30)
-        0xE302: [0x00040404, 0x00500000, 0x4000, (0x0800 << 16) | 4,
+        0xE302: [0x00040404, 0x00500000, 0x4000, (4 << 16) | 0x0800,
                  2500, 0x01190032, 0x00001000, (0x0011 << 16) | 8,
                  0, 100000],  # accelerometer metadata rev 4
     }

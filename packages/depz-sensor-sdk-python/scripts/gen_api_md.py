@@ -47,17 +47,23 @@ SCAN_MODULES = [
     "depz_sensor_sdk.protocol",
     "depz_sensor_sdk.vl53l4",
     "depz_sensor_sdk.vl53l8",
+    "depz_sensor_sdk.vl53l7",
+    "depz_sensor_sdk.vl53lx",
     "depz_sensor_sdk.bno086",
+    "depz_sensor_sdk.bno055",
 ]
 
 # Domain (subpackage / top-level module) → section title, in reading order.
 DOMAIN_ORDER = [
-    "discovery", "device", "sr04", "vl53l4", "vl53l8", "bno086",
+    "discovery", "device", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "bootloader", "dataset", "transport", "protocol", "errors",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery", "device": "Device core", "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)", "vl53l8": "VL53L8 (ToF)", "bno086": "BNO086 (IMU)",
+    "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
+    "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
+    "bno055": "BNO055 (IMU)",
     "bootloader": "Bootloader / firmware update", "dataset": "Datasets (record & replay)",
     "transport": "Transport", "protocol": "Protocol codecs", "errors": "Errors",
     "depz_sensor_sdk": "Top level",
@@ -69,7 +75,21 @@ DOMAIN_TITLE = {
 # /…) stays only in the root api.md. The VL53L8 ToF domain is one Python module
 # but TWO sensors — the CX base and the CH superset (CNH) — so it is split by
 # class: CH-specific symbols land in vl53l8ch, everything else in vl53l8cx.
-VL53L8CH_SYMBOLS = {"Vl53l8Ch", "CnhConfig"}
+VL53L8CH_SYMBOLS = {"Vl53l8ch", "CnhConfig"}
+
+# The L5/L7 module is three sensors on one class tree (contract 11): the L7CX
+# base carries everything, L5CX and L7CH add one class each.
+VL53L7_OWN = {"vl53l5cx": {"Vl53l5cx"}, "vl53l7ch": {"Vl53l7ch", "CnhConfig"}}
+
+# The 1D family is one class tree too (contract 12): each product page gets
+# its own class plus the whole family surface, so it reads on its own.
+VL53LX_PRODUCTS = {
+    "vl53l0x": ("Vl53l0x", "VL53L0X (ToF)"),
+    "vl53l1cx": ("Vl53l1cx", "VL53L1CX (ToF)"),
+    "vl53l1cb": ("Vl53l1cb", "VL53L1CB (ToF)"),
+    "vl53l3cx": ("Vl53l3cx", "VL53L3CX (ToF)"),
+    "vl53l4cx": ("Vl53l4cx", "VL53L4CX (ToF)"),
+}
 
 
 def _sensor_api_targets(groups):
@@ -77,6 +97,11 @@ def _sensor_api_targets(groups):
     per-sensor ``api.md``. The single ``vl53l8`` domain is split by class into
     the CX base and the CH superset; the other sensors map one-to-one."""
     by = {domain: (title, members) for domain, title, members in groups}
+    everywhere = {n: o for _d, _t, members in groups for n, o in members}
+
+    def pick(*names):  # symbols a sensor page needs that live in a shared module
+        return [(n, everywhere[n]) for n in names if n in everywhere]
+
     targets: list[tuple[str, str, list, list[str]]] = []
     if "sr04" in by:
         title, members = by["sr04"]
@@ -91,16 +116,54 @@ def _sensor_api_targets(groups):
         targets.append(("vl53l8cx", "VL53L8CX (ToF)", cx, []))
         targets.append((
             "vl53l8ch", "VL53L8CH (ToF + CNH)", ch,
-            ["`Vl53l8Ch` is a superset of the VL53L8CX and inherits its entire",
+            ["`Vl53l8ch` is a superset of the VL53L8CX and inherits its entire",
              "configuration and ranging surface — only the CH-specific additions",
              "(Compact-Network-Histogram output) are listed here. For init,",
              "resolution, frequency, the advanced ULD features and the frame,",
              "see the [VL53L8CX API reference](../vl53l8cx/api.md).",
              ""],
         ))
+    if "vl53l7" in by:
+        _title, members = by["vl53l7"]
+        own = set().union(*VL53L7_OWN.values())
+        base = [(n, o) for n, o in members if n not in own] + pick(
+            "Vl53l7Info", "PinAction", "I2cError")
+        targets.append(("vl53l7cx", "VL53L7CX (ToF)", base, [
+            "`Vl53l7cx` subclasses `Vl53l8cx`: init, resolution, frequency, the",
+            "advanced ULD features and the frame are documented in the",
+            "[VL53L8CX API reference](../vl53l8cx/api.md). Only what the L5/L7",
+            "board adds is listed here.",
+            ""]))
+        for folder, title, parent in (
+            ("vl53l5cx", "VL53L5CX (ToF)", "VL53L7CX"),
+            ("vl53l7ch", "VL53L7CH (ToF + CNH)", "VL53L7CX"),
+        ):
+            mine = [(n, o) for n, o in members if n in VL53L7_OWN[folder]]
+            if folder == "vl53l7ch":
+                mine += pick("CnhConfig")
+            targets.append((folder, title, mine, [
+                f"This class subclasses the {parent} and inherits its whole surface —",
+                f"see the [{parent} API reference](../vl53l7cx/api.md) (and, for",
+                "everything shared with the VL53L8, the",
+                "[VL53L8CX API reference](../vl53l8cx/api.md)).",
+                ""]))
+    if "vl53lx" in by:
+        _title, members = by["vl53lx"]
+        classes = {c for c, _t in VL53LX_PRODUCTS.values()}
+        family = [(n, o) for n, o in members if n not in classes] + pick("Vl53lxInfo")
+        for folder, (cls, title) in VL53LX_PRODUCTS.items():
+            mine = [(n, o) for n, o in members if n == cls]
+            targets.append((folder, title, mine + family, [
+                f"`{cls}` fixes the product on the family class `Vl53lx`; the family",
+                "surface (`Vl53lx`, `Vl53lxMeasurement`, constants) follows it and",
+                "is identical on every VL53L0X / L1CX / L1CB / L3CX / L4CX page.",
+                ""]))
     if "bno086" in by:
         title, members = by["bno086"]
         targets.append(("bno086", title, members, []))
+    if "bno055" in by:
+        title, members = by["bno055"]
+        targets.append(("bno055", title, members + pick("Bno055Info"), []))
     return targets
 
 
@@ -607,7 +670,12 @@ def main() -> None:
         "Each sensor also has a focused reference with just its own symbols:",
         "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · "
-        "[VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).",
+        "[VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
+        "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
+        "[VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · "
+        "[VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · "
+        "[VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · "
+        "[BNO055](bno055/api.md).",
         "",
     ]
     n_syms = sum(len(m) for _, _, m in groups)

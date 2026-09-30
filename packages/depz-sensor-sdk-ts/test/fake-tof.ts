@@ -1,6 +1,6 @@
 /**
  * Minimal in-process fake VL53L8 firmware over a LoopbackTransport pair —
- * enough to let a real `Vl53l8Cx` / `Vl53l8Ch` `open()`, `syncTime()`,
+ * enough to let a real `Vl53l8cx` / `Vl53l8ch` `open()`, `syncTime()`,
  * `identify()` and `getSerialNumber()` in multi-device tests (recorder /
  * syncTimeAll). It answers only the shared common commands (identity, sync,
  * temperature); it does NOT emulate the ULD register bridge or frame streaming
@@ -20,7 +20,7 @@ import {
 } from "../src/index.js";
 
 export class FakeTof {
-  /** Host-side transport: hand this to Vl53l8Cx / Vl53l8Ch. */
+  /** Host-side transport: hand this to Vl53l8cx / Vl53l8ch. */
   readonly transport: LoopbackTransport;
   /** Device-side transport. */
   readonly side: LoopbackTransport;

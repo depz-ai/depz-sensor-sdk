@@ -1,16 +1,16 @@
 """VL53L8CH ToF — 8x8 depth frames PLUS Compact-Network-Histogram (CNH) output.
 
-Vl53l8Ch inherits the whole Vl53l8Cx surface; the only addition is configure_cnh().
+Vl53l8ch inherits the whole Vl53l8cx surface; the only addition is configure_cnh().
 Run: python vl53l8ch_minimal.py [port]
 """
 
 import sys
 
 from depz_sensor_sdk import CnhConfig, open_device
-from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8Ch, cnh
+from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8ch, cnh
 
 dev = open_device(sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyACM0")
-assert isinstance(dev, Vl53l8Ch), f"expected VL53L8CH, got {type(dev).__name__}"
+assert isinstance(dev, Vl53l8ch), f"expected VL53L8CH, got {type(dev).__name__}"
 
 dev.init(progress=print)  # ~25 s: downloads the CH sensor firmware (variant fixed by class)
 dev.set_resolution(RESOLUTION_8X8)
@@ -21,7 +21,7 @@ cfg = CnhConfig()
 cfg.init_config(start_bin=10, num_bins=20, sub_sample=2)
 cfg.create_agg_map(RESOLUTION_8X8, 0, 0, 2, 2, 4, 4)  # 16 aggregates
 assert cfg.required_memory() <= 6160, "CNH config exceeds the device buffer"
-dev.configure_cnh(cfg)  # arm the histogram block before ranging (Vl53l8Ch only)
+dev.configure_cnh(cfg)  # arm the histogram block before ranging (Vl53l8ch only)
 
 dev.start_ranging()
 try:

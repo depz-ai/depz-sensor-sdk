@@ -6,7 +6,7 @@ import os
 
 class DepzSensorSdkCConan(ConanFile):
     name = "depz-sensor-sdk-c"
-    version = "0.1.4"
+    version = "0.3.0"
     license = "MIT"
     author = "DEPZ AI"
     url = "https://github.com/depz-ai/depz-sensor-sdk"
@@ -50,6 +50,7 @@ class DepzSensorSdkCConan(ConanFile):
         tc = CMakeToolchain(self)
         # Consumers must never build our golden-vector test suite.
         tc.cache_variables["DEPZ_SENSOR_SDK_C_BUILD_TESTS"] = False
+        tc.cache_variables["DEPZ_SENSOR_SDK_C_BUILD_EXAMPLES"] = False
         tc.generate()
         deps = CMakeDeps(self)
         deps.generate()
@@ -66,9 +67,15 @@ class DepzSensorSdkCConan(ConanFile):
              os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
-        self.cpp_info.libs = ["depz_sensor_sdk"]
+        self.cpp_info.libs = ["depz_sensor_sdk_c"]
+        # The live-hardware layer: threads everywhere, plus the OS's port
+        # enumeration API.
         if self.settings.os in ("Linux", "FreeBSD"):
-            self.cpp_info.system_libs = ["m"]
+            self.cpp_info.system_libs = ["m", "pthread"]
+        elif self.settings.os == "Windows":
+            self.cpp_info.system_libs = ["setupapi", "cfgmgr32"]
+        elif self.settings.os == "Macos":
+            self.cpp_info.frameworks = ["IOKit", "CoreFoundation"]
         # Match the installed CMake package so find_package() consumers and
         # Conan CMakeDeps consumers see the same namespaced target.
         self.cpp_info.set_property("cmake_file_name", "depz-sensor-sdk-c")

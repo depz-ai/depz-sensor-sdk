@@ -6,9 +6,8 @@
 //! `software_name` is `APP_VL53L8_v0.9` and it streams frames with the ULD
 //! 2.1.0 footer geometry, so it decodes under [`Variant::Cx`]. The same shared
 //! frame layout serves both ToF variants; only the footer-id offset is
-//! variant-specific, so this path is exactly what a CH device exercises too.
-//! (CNH histogram decode — the CH-only extension — is not exercised here; it is
-//! not yet implemented.)
+//! variant-specific, so this path is exactly what a CH device exercises too
+//! (with [`Variant::Ch`]). CNH histogram decode is covered by `vl53l8_cnh.rs`.
 
 use std::path::PathBuf;
 

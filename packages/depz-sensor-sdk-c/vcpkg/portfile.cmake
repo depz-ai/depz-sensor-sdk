@@ -17,6 +17,7 @@ vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}/packages/depz-sensor-sdk-c"
     OPTIONS
         -DDEPZ_SENSOR_SDK_C_BUILD_TESTS=OFF
+        -DDEPZ_SENSOR_SDK_C_BUILD_EXAMPLES=OFF
 )
 
 vcpkg_cmake_install()

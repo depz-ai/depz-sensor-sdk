@@ -637,7 +637,10 @@ export interface SensorMetadata {
 export function sensorMetadataFromWords(words: number[]): SensorMetadata {
   const w = [...words];
   while (w.length < 10) w.push(0);
-  const revision = w[3]! & 0xffff;
+  // Word 3 is `power_mA u16 (Q10) | revision u16 << 16`: on the lab BNO085
+  // every record reads revision 4 in the high half while the low half follows
+  // the sensor's supply (accelerometer 0.13 mA, the gyro-driven outputs 5.3 mA).
+  const revision = (w[3]! >>> 16) & 0xffff;
   return {
     meVersion: w[0]! & 0xff,
     mhVersion: (w[0]! >>> 8) & 0xff,
@@ -645,7 +648,7 @@ export function sensorMetadataFromWords(words: number[]): SensorMetadata {
     rangeRaw: w[1]!,
     resolutionRaw: w[2]!,
     revision,
-    powerMaQ10: (w[3]! >>> 16) & 0xffff,
+    powerMaQ10: w[3]! & 0xffff,
     minPeriodUs: w[4]!,
     fifoMax: w[5]! & 0xffff,
     fifoReserved: (w[5]! >>> 16) & 0xffff,

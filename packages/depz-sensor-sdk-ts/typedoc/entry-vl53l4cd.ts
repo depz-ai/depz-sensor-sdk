@@ -1,7 +1,7 @@
 /**
  * TypeDoc entry point for the per-sensor `docs/vl53l4cd/api.md`.
  *
- * The VL53L4CD single-zone ToF surface: the `Vl53l4Cd` device class, the
+ * The VL53L4CD single-zone ToF surface: the `Vl53l4cd` device class, the
  * host-side ULD driver (`VL53L4CD` + codecs from `sensors/vl53l4/uld`), and
  * the register-bridge wire codecs (`protocol/vl53l4`, re-exported under the
  * same `Vl53l4*`-prefixed names `src/index.ts` uses) — so TypeDoc documents

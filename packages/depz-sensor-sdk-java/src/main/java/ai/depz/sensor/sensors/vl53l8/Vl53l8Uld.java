@@ -67,6 +67,15 @@ public final class Vl53l8Uld {
     private static final int DISTANCE_IDX = 0xdf44;
     private static final int REFLECTANCE_EST_PC_IDX = 0xe044;
     private static final int TARGET_STATUS_IDX = 0xe084;
+    /** VL53LMZ CNH data output block (VL53L8CH / VL53L7CH). */
+    public static final int CNH_DATA_IDX = 0xc048;
+
+    /**
+     * {@code resolution} argument of {@link #parseFrame(byte[], int, int, int)}:
+     * take the zone count from the zone-scaled ambient block (index 0x54D0,
+     * always sized to the resolution) and trim to it.
+     */
+    public static final int RESOLUTION_FROM_FRAME = -1;
 
     // Detection-threshold measurement selectors + scale factors (plugin source).
     public static final int DIST_MM = 1;
@@ -114,6 +123,9 @@ public final class Vl53l8Uld {
     // | zero-invalid | store-ref-residual). Do not "simplify" the offset math.
 
     /** persistent-data header layout (plugin_cnh.c). */
+    /** decodeCnh() bounds — the same limits as the other SDKs. */
+    public static final int CNH_MAX_AGGREGATES = 64;
+    public static final int CNH_MAX_FEATURE_LENGTH = 255;
     private static final int CNH_PER_HEADER_WORDS = 5;          // CNH_PER_HEADER_BYTES / 4
     private static final int CNH_PER_BUFFER_HEADER_WORDS = 2;   // CNH_PER_BUFFER_HEADER_BYTES / 4
     private static final int CNH_PER_HEADER_BUFFER_INFO_IDX = 1;
@@ -152,13 +164,33 @@ public final class Vl53l8Uld {
      * Decode a captured CNH data block ({@code raw}, byte-swapped exactly like the
      * standard ranging blocks) into per-aggregate histograms, for the fixed
      * cnh_cfg (ping-pong + variance disabled). Faithful port of the ST CNH plugin
-     * / Python {@code cnh.decode}. Replaces the former {@code cnhHistogramDecodeStubbed}.
+     * / Python {@code cnh.decode}.
      *
      * @param nbOfAggregates number of CNH aggregates (from the CNH config)
      * @param featureLength  CNH bins per aggregate (from the CNH config)
      * @param raw            captured CNH block bytes
+     * @throws IllegalArgumentException counts outside 1..64 / 1..255, or a block
+     *         shorter than those counts imply (as the C / C++ / Rust / C# decoders)
      */
     public static CnhResult decodeCnh(int nbOfAggregates, int featureLength, byte[] raw) {
+        if (nbOfAggregates <= 0 || nbOfAggregates > CNH_MAX_AGGREGATES
+                || featureLength <= 0 || featureLength > CNH_MAX_FEATURE_LENGTH) {
+            throw new IllegalArgumentException("decodeCnh: aggregates / feature length out of range");
+        }
+        if (raw.length < CNH_PER_HEADER_WORDS * 4) {
+            throw new IllegalArgumentException("decodeCnh: block shorter than the CNH header");
+        }
+        {
+            long aggXFeat = (long) nbOfAggregates * featureLength;
+            int ppSize = (int) (u32le(raw, CNH_PER_HEADER_BUFFER_INFO_IDX * 4) & BUFFER_INFO_WORDS_MASK);
+            int localPp = i32le(raw, 0) == MI_STATE_PING ? 0 : 1;
+            long base = CNH_PER_HEADER_WORDS + (localPp == 1 ? ppSize : 0);
+            long end = (base + CNH_PER_BUFFER_HEADER_WORDS) * 4 + aggXFeat * 4
+                    + ((3 + aggXFeat) / 4) * 4 + (long) nbOfAggregates * 5;
+            if (end > raw.length) {
+                throw new IllegalArgumentException("decodeCnh: block shorter than the config implies");
+            }
+        }
         // ref_residual_word = uint32 at word offset 2 (byte offset 8).
         long refResidualWord = u32le(raw, 2 * 4);
         CnhAggregate[] aggregates = new CnhAggregate[nbOfAggregates];
@@ -225,7 +257,8 @@ public final class Vl53l8Uld {
         public int[] reflectance = new int[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
         public int siliconTempDegc = 0;
         /**
-         * Raw CNH (compact-histogram) block bytes, VL53L8CH only; {@code null}
+         * Raw CNH (compact-histogram) block bytes (VL53L8CH / VL53L7CH, block
+         * {@link #CNH_DATA_IDX}, word-swapped like every block); {@code null}
          * when absent (always on CX). Decode with {@link #decodeCnh}.
          */
         public byte[] cnhRaw = null;
@@ -274,8 +307,22 @@ public final class Vl53l8Uld {
      * VL53L8CH. Throws on a header/footer id mismatch.
      */
     public static Results parseFrame(byte[] raw, int dataReadSize, int footerIdOff) {
+        return parseFrame(raw, dataReadSize, footerIdOff, 0);
+    }
+
+    /**
+     * Parse one raw results frame and trim every per-zone array to
+     * {@code resolution} zones (x {@link #NB_TARGET_PER_ZONE} for per-target
+     * arrays). Needed on VL53L5/L7 (contract 11 §3): blocks above index 0x6C90
+     * keep their declared 64-entry size even in 4x4, the sensor fills the first
+     * {@code resolution} entries and zero-pads the rest. {@code resolution}:
+     * {@code 0} = no trim (VL53L8 behaviour), {@code 16}/{@code 64} = explicit,
+     * {@link #RESOLUTION_FROM_FRAME} = the size of the zone-scaled ambient block.
+     */
+    public static Results parseFrame(byte[] raw, int dataReadSize, int footerIdOff, int resolution) {
         byte[] buf = swapBuffer(raw);
         Results r = new Results();
+        int ambientZones = 0;
 
         int i = 16;
         while (i + 4 <= dataReadSize) {
@@ -306,6 +353,7 @@ public final class Vl53l8Uld {
                 r.signalPerSpad = u32slice(buf, i + 4, msize);
             } else if (bhIdx == AMBIENT_RATE_IDX) {
                 r.ambientPerSpad = u32slice(buf, i + 4, msize);
+                ambientZones = r.ambientPerSpad.length;
             } else if (bhIdx == SPAD_COUNT_IDX) {
                 r.nbSpadsEnabled = u32slice(buf, i + 4, msize);
             } else if (bhIdx == RANGE_SIGMA_MM_IDX) {
@@ -316,8 +364,23 @@ public final class Vl53l8Uld {
                 r.rangeSigmaMm = out;
             } else if (bhIdx == REFLECTANCE_EST_PC_IDX) {
                 r.reflectance = u8slice(buf, i + 4, msize);
+            } else if (bhIdx == CNH_DATA_IDX) {
+                r.cnhRaw = java.util.Arrays.copyOfRange(buf, i + 4, i + 4 + msize);
             }
             i += msize + 4;
+        }
+
+        int n = resolution == RESOLUTION_FROM_FRAME ? ambientZones : resolution;
+        if (n > 0) {
+            int nt = n * NB_TARGET_PER_ZONE;
+            r.ambientPerSpad = trim(r.ambientPerSpad, n);
+            r.nbSpadsEnabled = trim(r.nbSpadsEnabled, n);
+            r.nbTargetDetected = trim(r.nbTargetDetected, n);
+            r.distanceMm = trim(r.distanceMm, nt);
+            r.targetStatus = trim(r.targetStatus, nt);
+            r.signalPerSpad = trim(r.signalPerSpad, nt);
+            r.rangeSigmaMm = trim(r.rangeSigmaMm, nt);
+            r.reflectance = trim(r.reflectance, nt);
         }
 
         // Fixed-point scaling (per ST GetRangingData). Floor division for signed mm.
@@ -490,6 +553,20 @@ public final class Vl53l8Uld {
             super("VL53L8CX code " + code + " " + where);
             this.code = code;
         }
+    }
+
+    // ── trim helpers (drop entries past the zone count) ─────────────────────
+
+    private static int[] trim(int[] a, int n) {
+        return a.length > n ? java.util.Arrays.copyOf(a, n) : a;
+    }
+
+    private static long[] trim(long[] a, int n) {
+        return a.length > n ? java.util.Arrays.copyOf(a, n) : a;
+    }
+
+    private static double[] trim(double[] a, int n) {
+        return a.length > n ? java.util.Arrays.copyOf(a, n) : a;
     }
 
     // ── LE helpers ───────────────────────────────────────────────────────────

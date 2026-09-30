@@ -41,8 +41,8 @@ public class SerialOrderingTests
 // this same path serves both (see Vl53l8Variant / Vl53l8FrameDecoder.ForVariant).
 // This fixture was captured on CX silicon (dev-default; probe "APP_VL53L8_v0.9",
 // ULD 2.1.0 → frame-id footer offset 12, the decoder default). CH would differ
-// only in that footer offset; the CH-only CNH histogram block is a separate,
-// not-yet-decoded extension point (Vl53l8Cnh) and is not exercised here.
+// only in that footer offset (4, VL53LMZ firmware); the CH-only CNH histogram
+// decode (Vl53l8Cnh) is covered by the vl53l8_cnh.json vector test.
 
 public class Vl53l8ReplayTests
 {

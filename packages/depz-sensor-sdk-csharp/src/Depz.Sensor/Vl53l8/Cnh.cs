@@ -36,7 +36,7 @@ public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8C
 /// VL53L8<b>CH</b>-specific CNH (Compact Network Histogram) decode.
 ///
 /// CNH is what the VL53L8CH firmware adds on top of the CX base: a per-aggregate
-/// distance histogram captured in poll-mode alongside the normal ranging frame.
+/// distance histogram carried alongside the normal ranging frame.
 /// The shared results-frame decode (<see cref="Vl53l8FrameDecoder"/>) and the
 /// advanced DCI codecs (<see cref="Vl53l8Advanced"/> / <see cref="MotionConfig"/>)
 /// already serve both CX and CH; this is the CH-only histogram parse.

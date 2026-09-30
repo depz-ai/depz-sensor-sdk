@@ -3,10 +3,10 @@
 import sys
 
 from depz_sensor_sdk import open_device
-from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8Cx
+from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8cx
 
 dev = open_device(sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyACM0")
-assert isinstance(dev, Vl53l8Cx), f"expected VL53L8CX, got {type(dev).__name__}"
+assert isinstance(dev, Vl53l8cx), f"expected VL53L8CX, got {type(dev).__name__}"
 
 dev.init(progress=print)  # ~25 s: downloads the sensor firmware (variant fixed by class)
 dev.set_resolution(RESOLUTION_8X8)

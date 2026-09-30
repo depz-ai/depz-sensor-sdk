@@ -6,11 +6,12 @@
  * the device — one 17-byte result block per RPT_VL53_STREAM, no reassembly
  * needed.
  *
- * Mirrors the Python reference `depz_sensor_sdk.vl53l4.Vl53l4Cd`.
+ * Mirrors the Python reference `depz_sensor_sdk.vl53l4.Vl53l4cd`.
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
 import { DepzError, DepzTimeoutError } from "../../errors.js";
+import { chunkedRead, chunkedWrite } from "../reg-bridge.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   Vl53l4Cmd,
@@ -94,7 +95,7 @@ export interface Vl53l4Options extends DeviceOptions {
  * (contract 10). Measurements stream via callbacks (`onMeasurement`) and/or
  * the pull iterator (`measurements()`).
  */
-export class Vl53l4Cd extends DepzDevice {
+export class Vl53l4cd extends DepzDevice {
   private readonly uldDriver: VL53L4CD;
   private measureCbs: Array<(m: Vl53l4Measurement) => void> = [];
   private measureQueues: StreamQueue<Vl53l4Measurement>[] = [];
@@ -107,41 +108,29 @@ export class Vl53l4Cd extends DepzDevice {
 
   /** ULD `platform` object mapped onto the firmware register bridge. */
   private readonly platform: Vl53l4Platform = {
-    rdMulti: async (addr: number, size: number): Promise<Uint8Array> => {
-      const out = new Uint8Array(size);
-      let off = 0;
-      while (size > 0) {
-        const n = Math.min(size, XFER_MAX);
-        const rep = await this.request<Vl53l4RegData>(Vl53l4Cmd.ReadReg, packReadReg(addr, n), {
-          matcher: DepzDevice.expectReport(Vl53l4Rpt.RegData, unpackRegData),
-          timeoutMs: 2000,
-        });
-        if (rep.data.length !== n) {
-          throw new DepzError(
-            `READ_REG 0x${addr.toString(16).toUpperCase().padStart(4, "0")}: ` +
-              `expected ${n}, got ${rep.data.length}`,
-          );
-        }
-        this.lastRegTimestampUs = rep.timestampUs;
-        out.set(rep.data, off);
-        off += n;
-        addr += n;
-        size -= n;
-      }
-      return out;
-    },
-    wrMulti: async (addr: number, data: Uint8Array): Promise<void> => {
-      let done = 0;
-      while (done < data.length) {
-        const chunk = data.subarray(done, done + XFER_MAX);
-        await this.request(Vl53l4Cmd.WriteReg, packWriteReg(addr, chunk), {
-          okCompletes: true,
-          timeoutMs: 2000,
-        });
-        addr += chunk.length;
-        done += chunk.length;
-      }
-    },
+    rdMulti: (addr: number, size: number): Promise<Uint8Array> =>
+      chunkedRead(addr, size, {
+        chunkSize: XFER_MAX,
+        readChunk: async (a, n) => {
+          const rep = await this.request<Vl53l4RegData>(Vl53l4Cmd.ReadReg, packReadReg(a, n), {
+            matcher: DepzDevice.expectReport(Vl53l4Rpt.RegData, unpackRegData),
+            timeoutMs: 2000,
+          });
+          return { data: rep.data, timestampUs: rep.timestampUs };
+        },
+        onTimestamp: (ts) => {
+          this.lastRegTimestampUs = ts;
+        },
+      }),
+    wrMulti: (addr: number, data: Uint8Array): Promise<void> =>
+      chunkedWrite(addr, data, {
+        chunkSize: XFER_MAX,
+        writeChunk: (a, chunk) =>
+          this.request(Vl53l4Cmd.WriteReg, packWriteReg(a, chunk), {
+            okCompletes: true,
+            timeoutMs: 2000,
+          }),
+      }),
     setI2cSpeed: async (khz: number): Promise<void> => {
       await this.request(Vl53l4Cmd.SetI2cSpeed, packSetI2cSpeed(khz), { okCompletes: true });
     },

@@ -1,6 +1,6 @@
 # VL53L8CX — user guide
 
-Hands-on guide to `Vl53l8Cx`, the base ToF sensor. For what the sensor is, CX
+Hands-on guide to `Vl53l8cx`, the base ToF sensor. For what the sensor is, CX
 vs CH, and the concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md). The **VL53L8CH** superset (CNH
 histograms) has its [own guide](../vl53l8ch/guide.md) — it inherits everything
@@ -20,15 +20,15 @@ below.
 
 ```python
 from depz_sensor_sdk import open_device
-from depz_sensor_sdk.vl53l8 import Vl53l8Cx, RESOLUTION_8X8
+from depz_sensor_sdk.vl53l8 import Vl53l8cx, RESOLUTION_8X8
 
-dev = open_device("/dev/ttyACM0")   # returns a Vl53l8Cx (or Vl53l8Ch)
-assert isinstance(dev, Vl53l8Cx)
+dev = open_device("/dev/ttyACM0")   # returns a Vl53l8cx (or Vl53l8ch)
+assert isinstance(dev, Vl53l8cx)
 dev.init(progress=print)            # tens of seconds: downloads the FW blob
 ```
 
 `init()` downloads the ~84 KB sensor firmware and applies the default config.
-The blob variant is fixed by the class (`Vl53l8Cx` → cx, `Vl53l8Ch` → ch), so
+The blob variant is fixed by the class (`Vl53l8cx` → cx, `Vl53l8ch` → ch), so
 you don't pass a variant. Pass `write_progress=lambda done, total: ...` to
 track the big blob writes.
 
@@ -36,10 +36,10 @@ track the big blob writes.
 
 ```python
 from depz_sensor_sdk import open_device
-from depz_sensor_sdk.vl53l8 import Vl53l8Cx, RESOLUTION_8X8
+from depz_sensor_sdk.vl53l8 import Vl53l8cx, RESOLUTION_8X8
 
 with open_device("/dev/ttyACM0") as dev:
-    assert isinstance(dev, Vl53l8Cx)
+    assert isinstance(dev, Vl53l8cx)
     dev.init(progress=print)
     dev.set_resolution(RESOLUTION_8X8)
     dev.set_ranging_frequency_hz(15)     # must be >= 2 Hz
@@ -159,5 +159,5 @@ save/restore route is the `get_caldata_xtalk` / `set_caldata_xtalk` blob.
 - **Integration time only bites in autonomous mode** — it has no effect in
   continuous ranging.
 - **Callbacks run on the reader thread** — hand heavy work to a queue.
-- **CNH is CH-only** — `configure_cnh()` does not exist on `Vl53l8Cx`; see the
+- **CNH is CH-only** — `configure_cnh()` does not exist on `Vl53l8cx`; see the
   [VL53L8CH guide](../vl53l8ch/guide.md).

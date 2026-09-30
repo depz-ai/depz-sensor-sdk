@@ -4,7 +4,7 @@ The **VL53L4CD** is a STMicroelectronics single-zone Time-of-Flight ranging
 sensor: one laser distance per measurement, up to ~1.3 m, with millimetre
 resolution and a per-sample quality estimate. On the DEPZ sensor line the MCU
 is a thin I2C **register bridge** (contract 10) — the full ST ULD 2.2.3
-driver runs **on the host**, inside `depz_sensor_sdk.vl53l4` (`Vl53l4Cd`).
+driver runs **on the host**, inside `depz_sensor_sdk.vl53l4` (`Vl53l4cd`).
 
 ## What it does
 
@@ -52,4 +52,4 @@ orientation use the BNO086.
 
 - [VL53L4CD user guide](guide.md) — hello-world, configuration, streaming,
   calibration, gotchas.
-- [API reference](api.md) — `Vl53l4Cd`, `Vl53l4Measurement`, `Vl53l4Info`.
+- [API reference](api.md) — `Vl53l4cd`, `Vl53l4Measurement`, `Vl53l4Info`.

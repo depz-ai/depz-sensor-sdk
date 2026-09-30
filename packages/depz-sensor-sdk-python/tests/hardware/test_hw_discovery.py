@@ -61,7 +61,17 @@ def test_probe_reports_correct_sensor_type(hw_inventory):
         "sr04": SensorType.SR04,
         "vl53l8cx": SensorType.VL53L8,
         "vl53l8ch": SensorType.VL53L8,
+        "vl53l4cd": SensorType.VL53L4,
+        "vl53l5cx": SensorType.VL53L7,
+        "vl53l7cx": SensorType.VL53L7,
+        "vl53l7ch": SensorType.VL53L7,
+        "vl53l0x": SensorType.VL53LX,
+        "vl53l1cx": SensorType.VL53LX,
+        "vl53l1cb": SensorType.VL53LX,
+        "vl53l3cx": SensorType.VL53LX,
+        "vl53l4cx": SensorType.VL53LX,
         "bno086": SensorType.BNO086,
+        "bno055": SensorType.BNO055,
     }
     for dev in hw_inventory:
         with port_lease(dev.resolve_port()):

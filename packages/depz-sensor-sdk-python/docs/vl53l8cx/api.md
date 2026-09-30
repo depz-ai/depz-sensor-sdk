@@ -23,7 +23,7 @@ VL53L8CX ToF device: `init()` downloads the ~84 KB sensor firmware
 (~1 s over the CDC link), then configure and `start_ranging()`.
 
 This is the base class for both silicon variants. The VL53L8CH superset
-(compact-network-histogram output) lives in `Vl53l8Ch`, which inherits
+(compact-network-histogram output) lives in `Vl53l8ch`, which inherits
 every method here. All configuration methods require `init()` first and
 must not be called while ranging (the ULD talks to the current register
 bank; the stream owns it — contract 04).
@@ -50,8 +50,8 @@ init(self, variant: str | None = None, *, progress: Optional[Callable[[str], Non
 
 Initialize the sensor: firmware blob download + default config.
 
-The blob variant is fixed by the class (`Vl53l8Cx` → 'cx',
-`Vl53l8Ch` → 'ch'); `variant` is accepted only for backward
+The blob variant is fixed by the class (`Vl53l8cx` → 'cx',
+`Vl53l8ch` → 'ch'); `variant` is accepted only for backward
 compatibility and must match the class variant when given. `progress`
 receives phase strings; `write_progress(done, total)` tracks the big
 blob writes.

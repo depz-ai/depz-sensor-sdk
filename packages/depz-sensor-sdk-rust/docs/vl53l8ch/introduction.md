@@ -24,27 +24,30 @@ photon return counts binned by range. That exposes the raw return structure the
 single-distance pipeline collapses — multiple returns in one zone, partial
 occlusion, glass/edge effects, material signatures.
 
-In this crate CNH support is **surfaced, not yet decoded** — truthfully an
-extension point:
+In this crate CNH is decoded end to end, verified against the live-VL53L8CH
+golden vector `contracts/vectors/vl53l8_cnh.json`:
 
 - **`Vl53l8Results::cnh_raw`** — when a CH frame carries a CNH output block
-  (block id [`CNH_DATA_IDX`](api.md) = `0xC048`), `parse_frame` captures its raw
-  bytes into `cnh_raw: Option<Vec<u8>>` rather than fabricate a per-zone
-  histogram it cannot verify. It is `None` on CX frames and on CH frames without
-  a CNH block.
-- **CNH histogram decode** (raw block → per-aggregate, per-bin histograms) and
-  the **live ULD init/config** that arms CNH over the wire are documented,
-  not-yet-implemented extension points. See
-  [What it is not](../guide.md#what-it-is-not).
+  (block id [`CNH_DATA_IDX`](api.md#cnh_data_idx) = `0xC048`), `parse_frame`
+  copies its raw bytes into `cnh_raw: Option<Vec<u8>>`. It is `None` on CX
+  frames and on CH frames without a CNH block.
+- **[`decode_cnh`](api.md#decode_cnh)** — unpacks that raw block into
+  per-aggregate histograms ([`CnhData`](api.md#cnhdata)), given the aggregate
+  count and bins per aggregate ([`CnhDecodeConfig`](api.md#cnhdecodeconfig))
+  the sensor runs. The block itself does not record them.
 
-## Same decoder, both variants
+Arming a CNH configuration on the board is not done from this crate (see
+[What it is not](../guide.md#what-it-is-not)); the Python or TypeScript SDK
+drives the board.
 
-The DEPZ decode selects only the frame-tail footer-id geometry by
-[`Variant`](../vl53l8cx/api.md), and the DEPZ firmware streams ULD-2.1.0-footer
-frames on **both** CX and CH silicon — so a CH capture decodes with
-`Variant::Cx` geometry through the exact CX path. The only CH-specific symbol in
-the public surface is `CNH_DATA_IDX`; everything else lives in the shared
-[VL53L8CX API reference](../vl53l8cx/api.md).
+## Frame decode: the CH footer sits at size−4
+
+The results-frame blocks are the same as on the CX, and one `parse_frame`
+serves both. The one difference is where the frame-id footer sits: the
+VL53L8CH firmware (VL53LMZ 2.0.16) puts it 4 bytes from the frame end, the
+VL53L8CX firmware (ULD 2.1.0) 12 bytes. [`Variant`](../vl53l8cx/api.md)
+selects it — decode CH frames with `Variant::Ch`; `Variant::Cx` fails the
+header/footer check on them.
 
 ## When to use CH over CX
 
@@ -54,7 +57,8 @@ depth imaging the [CX](../vl53l8cx/introduction.md) is identical and simpler.
 
 ## See also
 
-- [VL53L8CH user guide](guide.md) — surfacing the CNH block, the extension point.
+- [VL53L8CH user guide](guide.md) — decoding CH frames and their CNH histograms.
 - [VL53L8CX docs](../vl53l8cx/introduction.md) — the base sensor CH shares.
-- [API reference](api.md) — `CNH_DATA_IDX` (the CH surface is otherwise the
+- [API reference](api.md) — `decode_cnh`, `CnhDecodeConfig`, `CnhData`,
+  `CnhAggregate`, `CnhError`, `CNH_DATA_IDX` (the shared frame decode is in the
   [CX reference](../vl53l8cx/api.md)).

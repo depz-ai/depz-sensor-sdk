@@ -9,7 +9,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L8CX (ToF)**: [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`xtalk_margin_to_raw`](#xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`default_motion_config`](#default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`pack_detection_thresholds`](#pack_detection_thresholds), [`CnhDecodeConfig`](#cnhdecodeconfig), [`CnhAggregate`](#cnhaggregate), [`CnhData`](#cnhdata), [`CnhError`](#cnherror), [`decode_cnh`](#decode_cnh), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
+- **VL53L8CX (ToF)**: [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`xtalk_margin_to_raw`](#xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`default_motion_config`](#default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`pack_detection_thresholds`](#pack_detection_thresholds), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
 
 ## VL53L8CX (ToF)
 
@@ -189,77 +189,90 @@ Pack up to 64 detection thresholds into their DCI blocks. Entries beyond
 the supplied list are zero-filled. Each entry's low/high are multiplied by
 its measurement's fixed-point scale.
 
-### CnhDecodeConfig
+### Vl53l8Cmd
 
 ```rust
-pub struct CnhDecodeConfig {
-    /// Number of CNH aggregates (`cfg.nb_of_aggregates`).
-    pub nb_of_aggregates: usize,
-    /// CNH bins per aggregate (`cfg.feature_length`).
-    pub feature_length: usize,
+pub enum Vl53l8Cmd {
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    StartStream = 0x35,
+    StopStream = 0x36,
 }
 ```
 
-Minimal config needed to decode a captured CNH block: the aggregate count and
-per-aggregate feature (bin) length the sensor was configured with. These must
-match the `CnhConfig` used when programming the device (see the Python
-`CnhConfig.nb_of_aggregates` / `feature_length`).
+VL53L8 host→device command opcodes (0x34 is unused on VL53L8).
 
-### CnhAggregate
+### Vl53l8Rpt
 
 ```rust
-pub struct CnhAggregate {
-    /// Per-bin integer mantissa (`FEAT_INT`), length == `feature_length`.
-    pub hist_raw: Vec<i32>,
-    /// Per-bin power-of-two scaler (`FEAT_FRAC`), length == `feature_length`.
-    pub hist_scaler: Vec<i8>,
+pub enum Vl53l8Rpt {
+    RegData = 0x91,
+    Vl53Frame = 0x93,
 }
 ```
 
-One decoded CNH aggregate. The real histogram value for bin `i` is
-`hist_raw[i] as f64 / 2f64.powi(hist_scaler[i] as i32)`.
+VL53L8 device→host report opcodes.
 
-### CnhData
+### READ_MAX_LEN
 
 ```rust
-pub struct CnhData {
-    /// Reference residual word, u32 at byte offset 8 (`words[2]`). Real value is
-    /// `ref_residual_word as f64 / 2048.0` (11 fractional bits).
-    pub ref_residual_word: u32,
-    /// Per-aggregate histograms, length == `nb_of_aggregates`.
-    pub aggregates: Vec<CnhAggregate>,
+pub const READ_MAX_LEN: usize = 2295;
+```
+
+Largest `VL53_READ_REG` `len` on VL53L8: the MCU transport buffer (2304 B)
+minus the 9-byte `RPT_VL53_REG_DATA` header.
+
+### CHUNK_SIZE
+
+```rust
+pub const CHUNK_SIZE: usize = 2048;
+```
+
+Transfer size the VL53L8 host splits reads/writes at.
+
+### pack_read_reg
+
+```rust
+pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian).
+
+### pack_write_reg
+
+```rust
+pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8>
+```
+
+`VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes.
+
+### pack_start_stream
+
+```rust
+pub fn pack_start_stream(frame_size: u16) -> [u8; 2]
+```
+
+`VL53_START_STREAM` payload: `frame_size u16`.
+
+### RegData
+
+```rust
+pub struct RegData {
+    /// Echoed `VL53_READ_REG` opcode (0x32).
+    pub cmd: u8,
+    pub timestamp_us: u64,
+    /// Raw register bytes (big-endian sensor contents, passed through).
+    pub data: Vec<u8>,
 }
 ```
 
-Result of [`decode_cnh`].
+A decoded `RPT_VL53_REG_DATA` report (one register read).
 
-### CnhError
-
-```rust
-pub enum CnhError {
-    /// `raw` is too short for the header or the computed block extends past it.
-    Truncated,
-    /// `nb_of_aggregates` or `feature_length` is zero.
-    EmptyConfig,
-}
-```
-
-CNH decode failure.
-
-### decode_cnh
+#### RegData::unpack
 
 ```rust
-pub fn decode_cnh(cfg: &CnhDecodeConfig, raw: &[u8]) -> Result<CnhData, CnhError>
+pub fn unpack(payload: &[u8]) -> Result<RegData, CodecError>
 ```
-
-Decode a captured CNH data block (`raw` bytes, byte-swapped exactly like the
-standard ranging blocks — i.e. [`crate::vl53l8::decode::Vl53l8Results::cnh_raw`])
-into per-aggregate integer histograms plus the reference-residual word.
-
-Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
-DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
-device reports a single buffer and the ping/pong selection resolves to the
-sole buffer.
 
 ### RESOLUTION_4X4
 
@@ -285,8 +298,16 @@ pub const NB_TARGET_PER_ZONE: usize = 1;
 pub enum Variant {
     /// Base VL53L8CX (dev default), or any device on ULD 2.1.0 footer geometry.
     Cx,
-    /// VL53L8CH on ULD 2.0.16 footer geometry.
+    /// VL53L8CH (VL53LMZ 2.0.16 firmware): footer id at `size-4`.
     Ch,
+    /// VL53L5CX / VL53L7CX / VL53L7CH (contract 11): footer id at `size-4`,
+    /// and every per-zone array trimmed to the frame's resolution. On these
+    /// parts the per-target blocks (index ≥ 0x6C90) keep 64 entries even in
+    /// 4×4 — the sensor fills the first `resolution` and zero-pads the rest.
+    /// The resolution is read from the frame itself: the ambient-rate block
+    /// (0x54D0, index range sized to the resolution by the vl53lmz 2.0.16
+    /// output-list rule) holds exactly one entry per zone.
+    L7,
 }
 ```
 
@@ -294,11 +315,11 @@ ToF silicon/firmware variant. Both the base **VL53L8CX** and the
 **VL53L8CH** (CX + CNH + production PID 0xED40) share one results-frame
 layout; only the frame-tail geometry differs for decoding, and that is all
 this enum selects. The footer-id offset is `size-12` (ULD 2.1.0, selected by
-[`Variant::Cx`]) or `size-4` (ULD 2.0.16, selected by [`Variant::Ch`]).
+[`Variant::Cx`]) or `size-4` (VL53LMZ 2.0.16, selected by [`Variant::Ch`]).
 
-Note the geometry tracks the *ULD version the firmware embeds*, not the
-silicon: the DEPZ firmware streams 2.1.0-footer frames on both CX and CH
-devices, so a CH capture still decodes with [`Variant::Cx`] geometry.
+The geometry follows the firmware each part runs: the VL53L8CX firmware
+embeds ULD 2.1.0 (`size-12`), the VL53L8CH firmware VL53LMZ 2.0.16
+(`size-4`), so decode CH frames with [`Variant::Ch`].
 
 ### Vl53l8Error
 

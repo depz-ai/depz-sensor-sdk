@@ -32,11 +32,12 @@ Two silicon/firmware variants share the **same results-frame layout**, so this
 crate decodes both through one module with a [`Variant`](api.md) selector — no
 duplicated CH path:
 
-- **`Variant::Cx`** — the base ranging sensor (this page). Also the geometry for
-  any device streaming ULD 2.1.0 footer frames (the DEPZ firmware default).
+- **`Variant::Cx`** — the base ranging sensor (this page): ULD 2.1.0 firmware,
+  footer id at `size-12`.
 - **`Variant::Ch`** — the VL53L8CH, a superset that additionally emits **Compact
   Network Histograms (CNH)** and carries its own production USB PID `0xED40`.
-  See the [VL53L8CH docs](../vl53l8ch/introduction.md).
+  Its VL53LMZ 2.0.16 firmware keeps the footer id at `size-4`. See the
+  [VL53L8CH docs](../vl53l8ch/introduction.md).
 
 The only variant-specific step in the whole decode is the frame-tail footer-id
 offset (`size-12` for CX / ULD 2.1.0 vs `size-4` for CH / ULD 2.0.16); the
@@ -66,9 +67,10 @@ return histograms (multi-return analysis, material work).
   valid, 255 = no target.
 - **Resolution follows the frame** — arrays are sized to the zones actually
   present ([`Vl53l8Results::resolution`](api.md), 16 or 64), row-major.
-- **Extension points** — live ULD init/config (firmware download + the DCI
-  register bridge) is out of scope, and CNH decode is a CH-only extension point;
-  see [What it is not](../guide.md#what-it-is-not).
+- **Out of scope** — live ULD init/config (firmware download + the DCI
+  register bridge); see [What it is not](../guide.md#what-it-is-not). CNH
+  histograms are CH-only and decoded by `decode_cnh` — see the
+  [VL53L8CH guide](../vl53l8ch/guide.md).
 
 ## See also
 

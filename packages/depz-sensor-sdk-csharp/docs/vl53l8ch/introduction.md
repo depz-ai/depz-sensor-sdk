@@ -28,32 +28,31 @@ single-distance pipeline collapses — multiple returns in one zone, partial
 occlusion, glass/edge effects, material signatures.
 
 - **The shared decode already serves CH.** Select the CH footer offset with
-  `Vl53l8FrameDecoder.ForVariant(Vl53l8Variant.Ch)` (frame-id echo 4 bytes from
-  the end, vs 12 for CX — `Vl53l8FrameDecoder.FooterIdOffsetCh`).
-- **`Vl53l8Cnh`** — the CH-only histogram-decode extension point.
-  `Vl53l8Cnh.Variant` is always `Vl53l8Variant.Ch`.
+  `Vl53l8FrameDecoder.ForVariant(Vl53l8Variant.Ch)`: the VL53L8CH firmware
+  (VL53LMZ 2.0.16) echoes the frame id 4 bytes from the end, the VL53L8CX
+  firmware (ULD 2.1.0) 12 bytes (`FooterIdOffsetCh` / `FooterIdOffsetCx`). The
+  decoder copies the raw CNH block into `Vl53l8Frame.CnhRaw`.
+- **`Vl53l8Cnh.DecodeHistogram`** — unpacks that raw block into a
+  `Vl53l8CnhResult`: one `Vl53l8CnhAggregate` histogram per aggregate plus the
+  reference-residual word. It needs the aggregate count and bins per aggregate
+  the sensor runs (`Vl53l8CnhConfig`); the block itself does not record them.
+  Verified against the live-VL53L8CH golden vector
+  `contracts/vectors/vl53l8_cnh.json`.
 
-## Extension point: CNH decode is not yet implemented
-
-`Vl53l8Cnh.DecodeHistogram` is **deliberately stubbed, not faked** — it throws
-`NotSupportedException` rather than return fabricated data. There is no golden
-CNH vector to verify a port against yet, so a fabricated decoder would be
-untrustworthy. The shared CX/CH results-frame decode and the advanced DCI codecs
-are fully implemented and golden-vector-backed; CNH is the one CH-specific piece
-still pending. Wire the real histogram parse into `Vl53l8Cnh` once a capture plus
-a reference decode exist.
+Arming a CNH configuration on the board is not done from this SDK — the Python
+or TypeScript SDK drives the board.
 
 ## When to use CH over CX
 
 Reach for CH only when you need the raw return histograms — multi-return
 analysis, material/reflectivity work, glass and edge disambiguation. For plain
-depth imaging the [CX](../vl53l8cx/introduction.md) decode is identical and
-already complete.
+depth imaging the [CX](../vl53l8cx/introduction.md) decode is identical.
 
 ## See also
 
-- [VL53L8CH user guide](guide.md) — selecting the CH decoder, the CNH extension
-  point, gotchas.
+- [VL53L8CH user guide](guide.md) — selecting the CH decoder, decoding the CNH
+  histograms, gotchas.
 - [VL53L8CX docs](../vl53l8cx/introduction.md) — the base sensor CH shares.
-- [API reference](api.md) — `Vl53l8Cnh` (the shared CX surface is documented in
+- [API reference](api.md) — `Vl53l8Cnh`, `Vl53l8CnhConfig`, `Vl53l8CnhResult`,
+  `Vl53l8CnhAggregate` (the shared CX surface is documented in
   the [VL53L8CX API reference](../vl53l8cx/api.md)).

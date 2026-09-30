@@ -8,72 +8,87 @@ signatures see the [API reference](api.md).
 decode, the results fields and scaling, the grid, the `Variant` selector, and
 every advanced DCI codec work exactly as in the
 [VL53L8CX user guide](../vl53l8cx/guide.md) — read that first. This page covers
-**only the CNH addition** (which is, today, an extension point).
+**only what CH adds**: the CH footer offset and the CNH decode.
+
+This crate does not drive the board: arming a CNH configuration is done with
+the Python or TypeScript SDK. Keep the configuration's aggregate count and bins
+per aggregate — the decode needs them.
 
 ## Contents
 
-- [Decode CH frames the CX way](#decode-ch-frames-the-cx-way)
-- [Surfacing the CNH block](#surfacing-the-cnh-block)
-- [The CNH extension point](#the-cnh-extension-point)
+- [Decode CH frames with `Variant::Ch`](#decode-ch-frames-with-variantch)
+- [Decode the CNH histograms](#decode-the-cnh-histograms)
 - [Gotchas](#gotchas)
 
-## Decode CH frames the CX way
+## Decode CH frames with `Variant::Ch`
 
 There is no separate CH decoder. Reassemble and decode a CH frame with the same
 [`FrameReassembler`](../vl53l8cx/api.md) and [`parse_frame`](../vl53l8cx/api.md)
-as the CX — and, because the DEPZ firmware streams ULD-2.1.0-footer frames on
-both silicons, with `Variant::Cx` geometry:
+as the CX. The one difference: the VL53L8CH firmware (VL53LMZ 2.0.16) keeps the
+frame-id footer 4 bytes from the end, where the VL53L8CX firmware (ULD 2.1.0)
+keeps it 12 bytes from the end — so pass `Variant::Ch`:
 
 ```rust
 use depz_sensor_sdk::vl53l8::{parse_frame, Variant};
 
-let res = parse_frame(&completed_frame, Variant::Cx)?;   // CH capture, CX footer geometry
+let res = parse_frame(&completed_frame, Variant::Ch)?;   // footer id at size-4
 // res.distance_mm / target_status / … exactly as on the VL53L8CX
-```
-
-Everything in the [CX results table](../vl53l8cx/guide.md#the-results-fields-and-scaling)
-applies unchanged.
-
-## Surfacing the CNH block
-
-When a CH frame carries a Compact-Network-Histogram output block (block id
-[`CNH_DATA_IDX`](api.md) = `0xC048`), `parse_frame` captures its raw bytes into
-the one CH-specific field, [`Vl53l8Results::cnh_raw`](../vl53l8cx/api.md):
-
-```rust
-let res = parse_frame(&completed_frame, Variant::Cx)?;
-match &res.cnh_raw {
-    Some(block) => println!("CNH block present: {} bytes (raw)", block.len()),
-    None => {}   // CX frame, or a CH frame without a CNH block
+if let Some(block) = &res.cnh_raw {
+    println!("CNH block: {} bytes", block.len());
 }
 ```
 
-So the normal depth image and the raw histogram block travel together in one
-`Vl53l8Results` — the per-zone arrays are fully decoded; the CNH block is
-handed back verbatim.
+Everything in the [CX results table](../vl53l8cx/guide.md#the-results-fields-and-scaling)
+applies unchanged. The one CH-specific field is
+[`Vl53l8Results::cnh_raw`](../vl53l8cx/api.md): the raw bytes of the CNH output
+block (block id [`CNH_DATA_IDX`](api.md#cnh_data_idx) = `0xC048`), or `None`
+when the frame has no CNH block.
 
-## The CNH extension point
+## Decode the CNH histograms
 
-Decoding `cnh_raw` into per-aggregate, per-bin distance histograms is a
-**CH-only feature that is not yet implemented** in this crate. The SDK
-surfaces the raw block rather than fabricate a decode it cannot verify against a
-golden vector — mirroring the live-ULD register bridge, which is likewise left
-as a documented stub (see [What it is not](../guide.md#what-it-is-not)).
+[`decode_cnh`](api.md#decode_cnh) turns the raw CNH block — `cnh_raw` from a
+decoded frame, or the bytes of the board's CNH read — into one histogram per
+aggregate. It needs the aggregate count and bins per aggregate of the CNH
+configuration the sensor runs:
 
-Practically, that means: this crate gets you the raw CNH bytes and the full
-per-zone depth frame; turning the bytes into histograms (and arming CNH over the
-wire in the first place) is host/firmware work above this decode layer.
+```rust
+use depz_sensor_sdk::vl53l8::{decode_cnh, CnhDecodeConfig, Vl53l8Results};
+
+fn print_cnh(res: &Vl53l8Results) -> Result<(), Box<dyn std::error::Error>> {
+    // The configuration the sensor runs: 16 aggregates of 20 bins each.
+    let cfg = CnhDecodeConfig { nb_of_aggregates: 16, feature_length: 20 };
+    let Some(raw) = &res.cnh_raw else { return Ok(()) };   // no CNH block
+    let cnh = decode_cnh(&cfg, raw)?;                       // CnhError on a short block
+    for (i, agg) in cnh.aggregates.iter().enumerate() {
+        let hist: Vec<f64> = agg
+            .hist_raw
+            .iter()
+            .zip(&agg.hist_scaler)
+            .map(|(&v, &s)| v as f64 / 2f64.powi(s as i32))   // raw / 2^scaler
+            .collect();
+        println!("aggregate {i}: {hist:?}");
+    }
+    let ref_residual = cnh.ref_residual_word as f64 / 2048.0;   // 11 fractional bits
+    println!("ref residual {ref_residual}");
+    Ok(())
+}
+```
+
+Each [`CnhAggregate`](api.md#cnhaggregate) holds `feature_length` bins as an
+integer `hist_raw` plus a power-of-two `hist_scaler`; the bin value is
+`hist_raw / 2^hist_scaler`. `decode_cnh` returns `CnhError::EmptyConfig` for a
+zero aggregate count or bin count, and `CnhError::Truncated` when the block is
+shorter than the layout the config implies.
 
 ## Gotchas
 
-- **No CH-specific decoder to call** — reassemble and `parse_frame` exactly as
-  for the [CX](../vl53l8cx/guide.md); the CH path is the CX path.
-- **Use `Variant::Cx` for DEPZ CH captures** — the firmware embeds the ULD 2.1.0
-  footer on both silicons; `Variant::Ch` is for genuine ULD-2.0.16 footer
-  frames.
-- **`cnh_raw` is raw, not decoded** — it is `Option<Vec<u8>>`; per-zone
-  histograms are an extension point. It is `None` on CX frames and on CH frames
-  without a CNH block.
+- **Use `Variant::Ch` for VL53L8CH frames** — its footer id sits at `size-4`.
+  `Variant::Cx` (`size-12`) fails the header/footer check with
+  `Vl53l8Error::CorruptedFrame` on them.
+- **Pass the configuration the sensor runs** — `decode_cnh` needs the same
+  `nb_of_aggregates` / `feature_length`; the block does not record them, and a
+  wrong pair decodes to wrong bins or `Truncated`.
+- **`cnh_raw` is `None`** on CX frames and on CH frames without a CNH block.
 - **Everything else is inherited** — the CX gotchas (reassemble before decode,
   raw fixed-point scaling, resolution from the frame, no live init/config) apply
   here too; see the [CX guide](../vl53l8cx/guide.md#gotchas).

@@ -6,38 +6,59 @@ description: Mental model, installation, discovery, multi-sensor recording, and 
 # @depz/sensor-sdk — overview
 
 TypeScript SDK for the DEPZ USB sensor line — **SR04** ultrasonic,
-**VL53L4CD** single-zone time-of-flight, **VL53L8CX/CH** 8×8 time-of-flight,
-**BNO086** 9-axis IMU. One codebase runs
+**VL53L4CD** and the **VL53L0X / L1CX / L1CB / L3CX / L4CX** single-zone
+time-of-flight family, **VL53L8CX/CH** and **VL53L5CX / L7CX / L7CH** 8×8
+time-of-flight, **BNO086** and **BNO055** 9-axis IMUs. One codebase runs
 in the **browser** (Web Serial) and in **Node** (via the optional `serialport`
 peer dependency).
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md). Each sensor
-also has its own pages (the 8×8 ToF is two parts — the `Vl53l8Cx` base and the
-`Vl53l8Ch` CNH superset):
+also has its own pages (the SPI 8×8 ToF is two parts — the `Vl53l8cx` base and
+the `Vl53l8ch` CNH superset; the I2C 8×8 board is three — `Vl53l5cx`,
+`Vl53l7cx`, `Vl53l7ch`):
 
 - SR04 — [introduction](sr04/introduction.md) · [guide](sr04/guide.md) · [api](sr04/api.md)
 - VL53L4CD — [introduction](vl53l4cd/introduction.md) · [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
 - VL53L8CX — [introduction](vl53l8cx/introduction.md) · [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
 - VL53L8CH — [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) · [api](vl53l8ch/api.md)
+- VL53L5CX — [introduction](vl53l5cx/introduction.md) · [guide](vl53l5cx/guide.md) · [api](vl53l5cx/api.md)
+- VL53L7CX — [introduction](vl53l7cx/introduction.md) · [guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)
+- VL53L7CH — [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) · [api](vl53l7ch/api.md)
+- VL53L0X — [introduction](vl53l0x/introduction.md) · [guide](vl53l0x/guide.md) · [api](vl53l0x/api.md)
+- VL53L1CX — [introduction](vl53l1cx/introduction.md) · [guide](vl53l1cx/guide.md) · [api](vl53l1cx/api.md)
+- VL53L1CB — [introduction](vl53l1cb/introduction.md) · [guide](vl53l1cb/guide.md) · [api](vl53l1cb/api.md)
+- VL53L3CX — [introduction](vl53l3cx/introduction.md) · [guide](vl53l3cx/guide.md) · [api](vl53l3cx/api.md)
+- VL53L4CX — [introduction](vl53l4cx/introduction.md) · [guide](vl53l4cx/guide.md) · [api](vl53l4cx/api.md)
 - BNO086 — [introduction](bno086/introduction.md) · [guide](bno086/guide.md) · [api](bno086/api.md)
+- BNO055 — [introduction](bno055/introduction.md) · [guide](bno055/guide.md) · [api](bno055/api.md)
 
 ## What it is
 
 Each sensor is a USB CDC-ACM device speaking one shared framed protocol
 (`A5 C3` header + CRC). The SDK gives you a typed object per sensor with a
 background read pump; you configure it and consume a stream of decoded,
-timestamped results. Five sensor classes across three philosophies baked into
-the firmware and mirrored here (the three ToF classes share one philosophy):
+timestamped results. The sensor classes follow a few philosophies baked into
+the firmware and reflected here (every ToF class shares one: the sensor
+driver runs on the host):
 
 - **SR04** — the device does the ranging; you get `echoTimeUs` → distance.
 - **VL53L4CD** — the device is a thin I2C register bridge; the full ST ULD
   2.2.3 driver runs **here on the host** (`sensors/vl53l4/uld.ts`). One
   laser distance per sample, INT-driven streaming.
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
-  driver runs **here on the host** (`sensors/vl53l8/uld.ts`). `Vl53l8Ch` is the
-  `Vl53l8Cx` superset, adding Compact-Network-Histogram output.
+  driver runs **here on the host** (`sensors/vl53l8/uld.ts`). `Vl53l8ch` is the
+  `Vl53l8cx` superset, adding Compact-Network-Histogram output.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — the same ULD family as the VL53L8 on
+  an I2C bridge (`sensors/vl53l7`); the classes subclass `Vl53l8cx`, and
+  `Vl53l7ch` adds streamed CNH.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C bridge firmware that knows
+  no sensor; every ST driver (ULD, ULP, the histogram Bare Driver) runs
+  **here on the host** (`sensors/vl53lx`). One class per product on the family
+  class `Vl53lx`.
 - **BNO086** — the device is an SHTP pass-through; the full SH-2 stack runs
   **here on the host** (`sensors/bno086`).
+- **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
+  and the host configures it with register writes (`sensors/bno055`).
 
 ## Installation
 
@@ -51,24 +72,24 @@ npm install serialport            # Node only; optional peer dependency
   user gesture with `navigator.serial.requestPort()` — the SDK never opens the
   picker itself.
 - **Node**: import from `@depz/sensor-sdk/node`. Requires `serialport`. On
-  Linux the user must be able to open the port (group `dialout`), and
-  `ModemManager` can grab CDC-ACM devices — disable it or add a udev rule if a
-  device is present but every open times out.
+  Linux the user must be able to open the port (group `dialout`).
 - The root import `@depz/sensor-sdk` is browser-safe (no Node/serialport
   references) and carries the protocol, sensor classes, dataset, and codecs.
 
 ## Mental model
 
 ```
-openDevice(target)  ──►  Sr04 | Vl53l4Cd | Vl53l8Cx | Vl53l8Ch | Bno086   (a DepzDevice)
+openDevice(target)  ──►  Sr04 | Vl53l4cd | Vl53l8cx/ch | Vl53l5cx | Vl53l7cx/ch
+                          | Vl53l0x…Vl53l4cx | Bno086 | Bno055       (a DepzDevice)
                           │
                  background read pump
                           │
         ┌─────────────────┼──────────────────┐
    request/reply       callbacks         async iterators
   (correlated by      (onMeasurement/     (measurements()/
-   echoed cmd byte)    onFrame/onReport)   frames()/reports();
-                                           bounded, drop-oldest)
+   echoed cmd byte)    onFrame/onReport/   frames()/reports()/
+                       onSample)           samples(); bounded,
+                                           drop-oldest)
 ```
 
 - **One read pump per device** drains the transport, parses frames, and
@@ -114,9 +135,12 @@ button.addEventListener("click", async () => {
 });
 ```
 
-`openDevice()` returns the correct subclass (`Sr04` / `Vl53l4Cd` / `Vl53l8Cx` /
-`Vl53l8Ch` / `Bno086`); narrow it with `instanceof`. No candidate throws
-`NoDepzDeviceError`.
+`openDevice()` returns the correct subclass (`Sr04` / `Vl53l4cd` / `Vl53l8cx` /
+`Vl53l8ch` / `Vl53l5cx` / `Vl53l7cx` / `Vl53l7ch` / `Vl53l0x` / `Vl53l1cx` /
+`Vl53l1cb` / `Vl53l3cx` / `Vl53l4cx` / `Bno086` / `Bno055`); narrow it with
+`instanceof`. Boards that share one firmware (the three I2C 8×8 boards, the
+five 1D-family boards) are told apart by their USB id, then by the device
+name stamped on the board. No candidate throws `NoDepzDeviceError`.
 
 ## Common device features
 
@@ -169,13 +193,16 @@ including a real VL53L8 capture replayed end-to-end.
 
 ## Gotchas
 
-- **VL53L8 `init()` takes a few seconds** (~25 s over some CDC stacks) — it
-  downloads the 84 KB sensor firmware every power-up. Show progress; it is not
-  a hang.
+- **8×8 ToF `init()` takes seconds** — it downloads the 84 KB sensor firmware
+  every power-up (VL53L8: a few seconds, ~25 s over some CDC stacks; the I2C
+  L5/L7 board: ~1.4 s). Show progress; it is not a hang.
 - **VL53L8 ranging must be ≥ 2 Hz** — below that the sensor never enters its
-  ranging loop and streams nothing.
-- **VL53L8 config while ranging throws** — the stream owns the register bank;
-  `stopRanging()`, reconfigure, `startRanging()`.
+  ranging loop and streams nothing. The L5/L7 range down to 1 Hz.
+- **ToF config while ranging throws** — the stream owns the register bank (or
+  the bus); `stopRanging()`, reconfigure, `startRanging()`. On the 1D family
+  call `configure()` before every run.
+- **BNO055 settings take in CONFIG mode** — use the typed setters or
+  `configure()`; page-1 access throws while a stream runs.
 - **Callbacks run on the read-pump context** — don't block them; hand heavy
   work to a queue or use the async iterators.
 - **BNO086 correlation is at the SH-2 layer**, not the transport (the bridge

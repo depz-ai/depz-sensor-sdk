@@ -14,13 +14,13 @@ import {
   RESOLUTION_4X4,
   RESOLUTION_8X8,
   Vl53l8,
-  Vl53l8Cx,
+  Vl53l8cx,
   zoneGrid,
 } from "../src/index.js";
 import { makeDriver } from "./fake-vl53l8.js";
 
-function cx(): Vl53l8Cx {
-  return new Vl53l8Cx(new LoopbackTransport());
+function cx(): Vl53l8cx {
+  return new Vl53l8cx(new LoopbackTransport());
 }
 
 // ── pure helpers / constants ──────────────────────────────────────────────────
@@ -83,7 +83,7 @@ describe("vl53l8cx config guards", () => {
 
 describe("vl53l8cx class wiring", () => {
   it("Vl53l8 aliases the CX base class", () => {
-    expect(Vl53l8).toBe(Vl53l8Cx);
+    expect(Vl53l8).toBe(Vl53l8cx);
     expect(cx()).toBeInstanceOf(Vl53l8);
   });
 
@@ -95,7 +95,7 @@ describe("vl53l8cx class wiring", () => {
 // ── advanced facade delegation (through the fake ULD platform) ─────────────────
 
 describe("vl53l8cx facade → ULD delegation", () => {
-  function withFakeUld(dev: Vl53l8Cx): ReturnType<typeof makeDriver>["p"] {
+  function withFakeUld(dev: Vl53l8cx): ReturnType<typeof makeDriver>["p"] {
     const { drv, p } = makeDriver();
     (dev as unknown as { uldDriver: unknown }).uldDriver = drv;
     return p;

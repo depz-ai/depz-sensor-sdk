@@ -3,7 +3,7 @@
 import pytest
 
 from _support import port_lease
-from depz_sensor_sdk import Vl53l4Cd
+from depz_sensor_sdk import Vl53l4cd
 
 pytestmark = [pytest.mark.hardware, pytest.mark.hardware_vl53l4, pytest.mark.timeout(120)]
 
@@ -11,7 +11,7 @@ pytestmark = [pytest.mark.hardware, pytest.mark.hardware_vl53l4, pytest.mark.tim
 @pytest.fixture
 def vl53l4(vl53l4_info):
     with port_lease(vl53l4_info.resolve_port()):
-        dev = Vl53l4Cd(vl53l4_info.resolve_port())
+        dev = Vl53l4cd(vl53l4_info.resolve_port())
         try:
             yield dev
         finally:

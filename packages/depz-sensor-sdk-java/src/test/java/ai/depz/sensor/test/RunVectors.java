@@ -7,11 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import ai.depz.sensor.protocol.Bno055;
 import ai.depz.sensor.protocol.Common;
 import ai.depz.sensor.protocol.FwDepz;
 import ai.depz.sensor.protocol.Identity;
 import ai.depz.sensor.protocol.Sr04;
 import ai.depz.sensor.protocol.Vl53l4;
+import ai.depz.sensor.protocol.Vl53l7;
+import ai.depz.sensor.protocol.Vl53lx;
 import ai.depz.sensor.transport.CrcError;
 import ai.depz.sensor.transport.CrcType;
 import ai.depz.sensor.transport.Crc;
@@ -22,8 +25,12 @@ import ai.depz.sensor.transport.PacketParser;
 import ai.depz.sensor.transport.Trash;
 import ai.depz.sensor.usb.UsbIds;
 import ai.depz.sensor.sensors.vl53l4.Vl53l4Uld;
+import ai.depz.sensor.sensors.vl53l7.Vl53l7Uld;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxDecode;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxProducts;
 import ai.depz.sensor.sensors.vl53l8.FrameReassembler;
 import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld;
+import ai.depz.sensor.sensors.bno055.Bno055Regs;
 import ai.depz.sensor.sensors.bno086.Shtp;
 import ai.depz.sensor.sensors.bno086.Sh2;
 import ai.depz.sensor.sensors.bno086.Reports;
@@ -61,8 +68,12 @@ public final class RunVectors {
         vl53l8AdvancedVectors();
         vl53l8CnhVectors();
         vl53l8ReplayVector();
+        vl53l7Vectors();
+        vl53l7ReplayVectors();
+        vl53lxVectors();
         bno086ShtpVectors();
         bno086ReportsVectors();
+        bno055Vectors();
         datasetVector();
 
         System.out.println();
@@ -671,6 +682,22 @@ public final class RunVectors {
 
         Vl53l8Uld.CnhResult res = Vl53l8Uld.decodeCnh(nbAgg, feat, raw);
 
+        // A block shorter than the config implies is refused, not indexed past.
+        boolean threw = false;
+        try {
+            Vl53l8Uld.decodeCnh(nbAgg, feat, java.util.Arrays.copyOf(raw, raw.length - 1));
+        } catch (IllegalArgumentException e) {
+            threw = true;
+        }
+        check("vl53l8.cnh.truncated_block_refused", threw);
+        threw = false;
+        try {
+            Vl53l8Uld.decodeCnh(0, feat, raw);
+        } catch (IllegalArgumentException e) {
+            threw = true;
+        }
+        check("vl53l8.cnh.zero_aggregates_refused", threw);
+
         Map<String, Object> expected = obj(root.get("expected"));
         check("vl53l8.cnh.ref_residual_word",
             res.refResidualWord == lng(expected.get("ref_residual_word")));
@@ -698,7 +725,8 @@ public final class RunVectors {
     // APP_VL53L8_v0.9); the results-frame path it exercises is shared with
     // VL53L8CH (FrameReassembler + Vl53l8Uld.parseFrame).
     // Its firmware emits the ULD-2.1.0 footer layout (offset 12), so the decode
-    // uses that offset; only CNH (CH-only, not decoded here) would differ.
+    // uses that offset. VL53L8CH frames (VL53LMZ firmware) put it at size-4
+    // (Variant.CH); their CNH block is covered by vl53l8CnhVectors.
 
     private static void vl53l8ReplayVector() throws Exception {
         System.out.println("[recordings/vl53l8_8x8_15hz_3s]");
@@ -757,6 +785,400 @@ public final class RunVectors {
                 && intArrEquals(got.nbTargetDetected, arr(want.get("nb_target_detected")));
             check("vl53l8.replay.frame[" + i + "]", ok);
         }
+    }
+
+    // ── vl53l7.json (VL53L5CX/L7CX/L7CH I2C bridge, contract 11) ─────────────
+
+    private static void vl53l7Vectors() throws Exception {
+        System.out.println("[vl53l7.json]");
+        Map<String, Object> root = load("vl53l7.json");
+        for (Object eo : arr(root.get("encode"))) {
+            Map<String, Object> c = obj(eo);
+            String name = (String) c.get("name");
+            String kind = (String) c.get("kind");
+            byte[] got;
+            switch (kind) {
+                case "read_reg":
+                    got = Vl53l7.packReadReg(intOf(c.get("addr")), intOf(c.get("len")));
+                    break;
+                case "write_reg":
+                    got = Vl53l7.packWriteReg(intOf(c.get("addr")), hex((String) c.get("data")));
+                    break;
+                case "pin_ctrl":
+                    got = Vl53l7.packPinCtrl(intOf(c.get("action")));
+                    break;
+                case "set_i2c_speed":
+                    got = Vl53l7.packSetI2cSpeed(intOf(c.get("khz")));
+                    break;
+                default:
+                    throw new RuntimeException("unknown vl53l7 encode kind " + kind);
+            }
+            check("vl53l7.encode:" + name, hex(got).equals(c.get("payload")));
+        }
+        check("vl53l7.encode:pin_action_enum",
+            Vl53l7.PinAction.LPN_OFF.value == 0 && Vl53l7.PinAction.LPN_ON.value == 1
+                && Vl53l7.PinAction.I2C_RST.value == 2 && Vl53l7.PinAction.SOFT_CYCLE.value == 3);
+        check("vl53l7.limits",
+            Vl53l7.READ_MAX_LEN == 1536 && Vl53l7.WRITE_MAX_LEN == 2048
+                && Vl53l7.STREAM_CHUNK_MAX == 1536 && Vl53l7.INFO_SIZE == 20);
+
+        for (Object do_ : arr(root.get("decode"))) {
+            Map<String, Object> c = obj(do_);
+            String name = (String) c.get("name");
+            int report = intOf(c.get("report"));
+            if (report != Vl53l7.Vl53l7Rpt.VL53_INFO.value) {
+                throw new RuntimeException("unknown vl53l7 report " + report);
+            }
+            Vl53l7.Vl53l7Info i = Vl53l7.Vl53l7Info.unpack(hex((String) c.get("payload")));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = i.intEdges() == lng(ex.get("int_edges"))
+                && i.framesDropped() == lng(ex.get("frames_dropped"))
+                && i.i2cErrors() == lng(ex.get("i2c_errors"))
+                && i.lastI2cError() == intOf(ex.get("last_i2c_error"))
+                && i.lpnLevel() == intOf(ex.get("lpn_level"))
+                && i.intLevel() == intOf(ex.get("int_level"))
+                && i.i2cKhz() == intOf(ex.get("i2c_khz"))
+                && i.frameSize() == intOf(ex.get("frame_size"))
+                && i.streaming() == (Boolean) ex.get("streaming");
+            check("vl53l7.decode:" + name, ok);
+        }
+        boolean rejected = false;
+        try {
+            Vl53l7.Vl53l7Info.unpack(new byte[Vl53l7.INFO_SIZE - 1]);
+        } catch (IllegalArgumentException e) {
+            rejected = true;
+        }
+        check("vl53l7.decode:info_rejects_short_payload", rejected);
+
+        for (Object mo : arr(root.get("model"))) {
+            Map<String, Object> c = obj(mo);
+            String name = (String) c.get("name");
+            Vl53l7Uld.Model m = Vl53l7Uld.resolveModel(
+                (String) c.get("usb_model"), (String) c.get("device_name"));
+            check("vl53l7.model:" + name, m.label.equals(c.get("expect")));
+        }
+    }
+
+    // ── vl53lx.json (VL53L 1D family on APP_VL53L0_4, contract 12) ───────────
+
+    private static int[][] pairs(Object o) {
+        List<Object> l = arr(o);
+        int[][] out = new int[l.size()][];
+        for (int i = 0; i < l.size(); i++) {
+            List<Object> p = arr(l.get(i));
+            out[i] = new int[] {intOf(p.get(0)), intOf(p.get(1))};
+        }
+        return out;
+    }
+
+    private static boolean dieMatches(Vl53l4Uld.Results r, Map<String, Object> ex) {
+        return r.rangeStatus() == intOf(ex.get("range_status"))
+            && r.distanceMm() == intOf(ex.get("distance_mm"))
+            && r.sigmaMm() == intOf(ex.get("sigma_mm"))
+            && r.signalRateKcps() == intOf(ex.get("signal_rate_kcps"))
+            && r.ambientRateKcps() == intOf(ex.get("ambient_rate_kcps"))
+            && r.signalPerSpadKcps() == intOf(ex.get("signal_per_spad_kcps"))
+            && r.ambientPerSpadKcps() == intOf(ex.get("ambient_per_spad_kcps"))
+            && r.numberOfSpad() == intOf(ex.get("number_of_spad"))
+            && r.streamCount() == intOf(ex.get("stream_count"))
+            && ex.size() == 9;
+    }
+
+    private static void vl53lxVectors() throws Exception {
+        System.out.println("[vl53lx.json]");
+        Map<String, Object> root = load("vl53lx.json");
+
+        // encode
+        for (Object eo : arr(root.get("encode"))) {
+            Map<String, Object> c = obj(eo);
+            String name = (String) c.get("name");
+            String kind = (String) c.get("kind");
+            byte[] got;
+            switch (kind) {
+                case "set_addr_width":
+                    got = Vl53lx.packSetAddrWidth(intOf(c.get("width")));
+                    break;
+                case "read_reg":
+                    got = Vl53lx.packReadReg(intOf(c.get("addr")), intOf(c.get("len")));
+                    break;
+                case "write_reg":
+                    got = Vl53lx.packWriteReg(intOf(c.get("addr")), hex((String) c.get("data")));
+                    break;
+                case "xshut":
+                    got = Vl53lx.packXshut(intOf(c.get("action")));
+                    break;
+                case "set_i2c_speed":
+                    got = Vl53lx.packSetI2cSpeed(intOf(c.get("khz")));
+                    break;
+                case "start_stream":
+                    got = Vl53lx.packStartStream(intOf(c.get("addr")), intOf(c.get("len")),
+                        pairs(c.get("clear")), intOf(c.get("flags")));
+                    break;
+                default:
+                    throw new RuntimeException("unknown vl53lx encode kind " + kind);
+            }
+            check("vl53lx.encode:" + name, hex(got).equals(c.get("payload")));
+        }
+        boolean fiveRefused = false;
+        try {
+            Vl53lx.packStartStream(0x0089, 17, new int[][] {
+                {0x86, 1}, {0x86, 1}, {0x86, 1}, {0x86, 1}, {0x86, 1}}, 0);
+        } catch (IllegalArgumentException e) {
+            fiveRefused = true;
+        }
+        check("vl53lx.encode:start_stream_refuses_five_clear_steps", fiveRefused);
+        boolean widthRefused = false;
+        try {
+            Vl53lx.packSetAddrWidth(3);
+        } catch (IllegalArgumentException e) {
+            widthRefused = true;
+        }
+        check("vl53lx.encode:set_addr_width_refuses_3", widthRefused);
+        check("vl53lx.cmd_ids",
+            Vl53lx.Vl53lxCmd.SET_ADDR_WIDTH.value == 0x39 && Vl53lx.Vl53lxCmd.START_STREAM.value == 0x35
+                && Vl53lx.Vl53lxRpt.INFO.value == 0x92 && Vl53lx.INFO_SIZE == 23
+                && Vl53lx.CLEAR_STEPS_MAX == 4);
+
+        // decode
+        for (Object do_ : arr(root.get("decode"))) {
+            Map<String, Object> c = obj(do_);
+            String name = (String) c.get("name");
+            int report = intOf(c.get("report"));
+            if (report != Vl53lx.Vl53lxRpt.INFO.value) {
+                throw new RuntimeException("unknown vl53lx report " + report);
+            }
+            Vl53lx.Vl53lxInfo i = Vl53lx.Vl53lxInfo.unpack(hex((String) c.get("payload")));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = i.intEdges() == lng(ex.get("int_edges"))
+                && i.slotsSkipped() == lng(ex.get("slots_skipped"))
+                && i.i2cErrors() == lng(ex.get("i2c_errors"))
+                && i.lastI2cError() == intOf(ex.get("last_i2c_error"))
+                && i.xshutLevel() == intOf(ex.get("xshut_level"))
+                && i.intLevel() == intOf(ex.get("int_level"))
+                && i.i2cKhz() == intOf(ex.get("i2c_khz"))
+                && i.addrWidth() == intOf(ex.get("addr_width"))
+                && i.nClear() == intOf(ex.get("n_clear"))
+                && i.framesDropped() == lng(ex.get("frames_dropped"))
+                && ex.size() == 10;
+            check("vl53lx.decode:" + name, ok);
+        }
+        boolean shortRejected = false;
+        try {
+            Vl53lx.Vl53lxInfo.unpack(new byte[Vl53lx.INFO_SIZE - 1]);
+        } catch (IllegalArgumentException e) {
+            shortRejected = true;
+        }
+        check("vl53lx.decode:info_rejects_short_payload", shortRejected);
+
+        // products
+        List<Object> rows = arr(root.get("products"));
+        List<String> order = new ArrayList<>();
+        for (Object ro : rows) {
+            order.add((String) obj(ro).get("product"));
+        }
+        check("vl53lx.products:order", order.equals(Vl53lxProducts.PRODUCTS)
+            && order.equals(new ArrayList<>(Vl53lxProducts.TABLE.keySet())));
+        for (Object ro : rows) {
+            Map<String, Object> r = obj(ro);
+            String pname = (String) r.get("product");
+            Vl53lxProducts.Product p = Vl53lxProducts.product(pname);
+            Vl53lxProducts.Bridge b = p.bridge((String) r.get("default_driver"));
+            int[][] want = pairs(r.get("clear_steps"));
+            boolean ok = p.modelId() == intOf(r.get("model_id"))
+                && p.reachMm() == intOf(r.get("reach_mm"))
+                && p.driverKinds().equals(arr(r.get("driver_kinds")))
+                && p.defaultDriver().equals(r.get("default_driver"))
+                && b.addrWidth() == intOf(r.get("addr_width"))
+                && b.maxKhz() == intOf(r.get("max_khz"))
+                && java.util.Arrays.deepEquals(b.clearSteps(), want);
+            check("vl53lx.products:" + pname, ok);
+        }
+
+        // model (class + board-name product)
+        for (Object mo : arr(root.get("model"))) {
+            Map<String, Object> c = obj(mo);
+            String name = (String) c.get("name");
+            String dev = (String) c.get("device_name");
+            Vl53lxProducts.SensorClass cls = Vl53lxProducts.resolveClass((String) c.get("usb_model"), dev);
+            boolean ok = cls.className.equals(c.get("expect_class"))
+                && Objects.equals(Vl53lxProducts.productFromBoardName(dev), c.get("expect_product"));
+            check("vl53lx.model:" + name, ok);
+        }
+
+        // die_block (l4 variant must also equal contract 10's decode)
+        for (Object bo : arr(root.get("die_block"))) {
+            Map<String, Object> c = obj(bo);
+            String name = (String) c.get("name");
+            String variant = (String) c.get("variant");
+            byte[] raw = hex((String) c.get("raw"));
+            Vl53l4Uld.Results r = Vl53lxDecode.decodeDieBlock(raw, variant);
+            boolean ok = dieMatches(r, obj(c.get("expect")));
+            if ("l4".equals(variant)) {
+                ok = ok && r.equals(Vl53l4Uld.parseResultBlock(raw));
+            }
+            check("vl53lx.die_block:" + name, ok);
+        }
+
+        // l0x_raw
+        for (Object bo : arr(root.get("l0x_raw"))) {
+            Map<String, Object> c = obj(bo);
+            String name = (String) c.get("name");
+            Vl53lxDecode.L0xRaw r = Vl53lxDecode.decodeL0xRaw(hex((String) c.get("raw")));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = r.distanceRaw() == intOf(ex.get("distance_raw"))
+                && r.deviceRangeStatus() == intOf(ex.get("device_range_status"))
+                && r.signalRateMcps1616() == intOf(ex.get("signal_rate_mcps_1616"))
+                && r.ambientRateMcps1616() == intOf(ex.get("ambient_rate_mcps_1616"))
+                && r.effectiveSpadCount88() == intOf(ex.get("effective_spad_count_88"))
+                && ex.size() == 5;
+            check("vl53lx.l0x_raw:" + name, ok);
+        }
+
+        // histogram_raw
+        for (Object bo : arr(root.get("histogram_raw"))) {
+            Map<String, Object> c = obj(bo);
+            String name = (String) c.get("name");
+            byte[] raw = hex((String) c.get("raw"));
+            byte[] before = raw.clone();
+            Vl53lxDecode.HistogramRaw r = Vl53lxDecode.decodeHistogramRaw(raw);
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = r.interruptStatus() == intOf(ex.get("interrupt_status"))
+                && r.rangeStatus() == intOf(ex.get("range_status"))
+                && r.reportStatus() == intOf(ex.get("report_status"))
+                && r.streamCount() == intOf(ex.get("stream_count"))
+                && r.dssActualEffectiveSpads() == intOf(ex.get("dss_actual_effective_spads"))
+                && r.referencePhase() == intOf(ex.get("reference_phase"))
+                && r.vcselStart() == intOf(ex.get("vcsel_start"))
+                && intArrEquals(r.bins(), arr(ex.get("bins")))
+                && ex.size() == 8
+                && java.util.Arrays.equals(raw, before);
+            check("vl53lx.histogram_raw:" + name, ok);
+        }
+    }
+
+    // ── vl53l5cx_* / vl53l7ch_* recording replay (framing + reassembler + decoder)
+    // Full-stack captures from live APP_VL53L7_v0.53 boards (contract 11 §5).
+    // Decode-only: the rx side goes through framing -> reassembly -> L5/L7 frame
+    // parse (footer at size - 4, per-zone arrays trimmed to the resolution).
+
+    private static void vl53l7ReplayVectors() throws Exception {
+        vl53l7ReplayVector("vl53l5cx_8x8_15hz_3s", Vl53l7Uld.RESOLUTION_8X8, false);
+        // 4x4 pins the L5/L7 output-list rule: per-target blocks stay 64 entries
+        // on the wire and the parser trims them to the 16 real zones.
+        vl53l7ReplayVector("vl53l5cx_4x4_15hz", Vl53l7Uld.RESOLUTION_4X4, false);
+        vl53l7ReplayVector("vl53l7ch_8x8_15hz_3s", Vl53l7Uld.RESOLUTION_8X8, false);
+        // 3156-byte CNH frames arrive chunked (1536-byte RPT_VL53_FRAMEs).
+        vl53l7ReplayVector("vl53l7ch_cnh_8x8_15hz", Vl53l7Uld.RESOLUTION_8X8, true);
+    }
+
+    private static void vl53l7ReplayVector(String stem, int resolution, boolean withCnh) throws Exception {
+        System.out.println("[recordings/" + stem + "]");
+        Map<String, Object> expected =
+            obj(Json.parse(Files.readString(vectorsDir.resolve("recordings/" + stem + ".expected.json"))));
+        List<Object> wantFrames = arr(expected.get("frames"));
+
+        String rec = Files.readString(vectorsDir.resolve("recordings/" + stem + ".depzrec"));
+        PacketParser parser = new PacketParser();
+        FrameReassembler reasm = new FrameReassembler();
+        List<Vl53l8Uld.Results> decoded = new ArrayList<>();
+        List<Vl53l8Uld.Results> inferred = new ArrayList<>();
+        List<Long> timestamps = new ArrayList<>();
+        String softwareName = null;
+        String deviceName = null;
+        int parseErrors = 0;
+
+        for (String line : rec.split("\n")) {
+            if (line.isBlank()) {
+                continue;
+            }
+            Object parsedLine = Json.parse(line);
+            if (!(parsedLine instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> ev = obj(parsedLine);
+            if (!"rx".equals(ev.get("dir"))) {
+                continue;
+            }
+            for (Event e : parser.feed(hex((String) ev.get("data")))) {
+                if (!(e instanceof Packet pkt)) {
+                    continue;
+                }
+                if (pkt.cmd() == Common.Rpt.TEXT.value) {
+                    Common.TextReport t = Common.TextReport.unpack(pkt.payload());
+                    if (t.cmd() == Common.Cmd.GET_NAME_ACTIVE_SOFTWARE.value && softwareName == null) {
+                        softwareName = t.text();
+                    } else if (t.cmd() == Common.Cmd.GET_DEVICE_NAME.value && deviceName == null) {
+                        deviceName = t.text();
+                    }
+                    continue;
+                }
+                if (pkt.cmd() != Vl53l7.Vl53l7Rpt.VL53_FRAME.value) {
+                    continue;
+                }
+                FrameReassembler.CompletedFrame done =
+                    reasm.feed(FrameReassembler.unpackFrameChunk(pkt.payload()));
+                if (done == null) {
+                    continue;
+                }
+                try {
+                    decoded.add(Vl53l7Uld.parseFrame(done.frame(), done.frame().length, resolution));
+                    inferred.add(Vl53l7Uld.parseFrame(done.frame(), done.frame().length));
+                    timestamps.add(done.timestampUs());
+                } catch (Vl53l8Uld.Vl53l8Error err) {
+                    parseErrors++;
+                }
+            }
+        }
+
+        String p = "vl53l7.replay." + stem;
+        Identity ident = softwareName == null ? null : Identity.parseSoftwareName(softwareName);
+        check(p + ".identity", ident != null
+            && ident.sensorType() == Identity.SensorType.VL53L7
+            && ident.softwareName().equals(expected.get("software_name")));
+        // The class comes from the recorded device name: the firmware name alone
+        // (APP_VL53L7_*) cannot tell L5CX / L7CX / L7CH apart.
+        check(p + ".model", deviceName != null
+            && Vl53l7Uld.resolveModel(null, deviceName).label
+                .equals(((String) expected.get("class")).toLowerCase()));
+        check(p + ".parse_errors", parseErrors == 0);
+        // The capture may stream frames past the sidecar; match the first N.
+        check(p + ".count", decoded.size() >= wantFrames.size());
+        int n = Math.min(decoded.size(), wantFrames.size());
+        int framePass = 0;
+        for (int i = 0; i < n; i++) {
+            Map<String, Object> want = obj(wantFrames.get(i));
+            Vl53l8Uld.Results got = decoded.get(i);
+            boolean ok = intOf(want.get("resolution")) == resolution
+                && vl53l7FrameMatches(got, timestamps.get(i), want, withCnh)
+                && vl53l7FrameMatches(inferred.get(i), timestamps.get(i), want, withCnh);
+            check(p + ".frame[" + i + "]", ok);
+            if (ok) {
+                framePass++;
+            }
+        }
+        System.out.printf("  frames: %d/%d exact match%n", framePass, wantFrames.size());
+    }
+
+    private static boolean vl53l7FrameMatches(
+            Vl53l8Uld.Results got, long timestampUs, Map<String, Object> want, boolean withCnh) {
+        boolean ok = timestampUs == lng(want.get("timestamp_us"))
+            && got.resolution() == intOf(want.get("resolution"))
+            && got.siliconTempDegc == intOf(want.get("silicon_temp_degc"))
+            && intArrEquals(got.distanceMm, arr(want.get("distance_mm")))
+            && intArrEquals(got.targetStatus, arr(want.get("target_status")))
+            && intArrEquals(got.nbTargetDetected, arr(want.get("nb_target_detected")));
+        int nt = got.resolution() * Vl53l8Uld.NB_TARGET_PER_ZONE;
+        ok &= got.ambientPerSpad.length == got.resolution()
+            && got.nbSpadsEnabled.length == got.resolution()
+            && got.signalPerSpad.length == nt
+            && got.rangeSigmaMm.length == nt
+            && got.reflectance.length == nt;
+        if (withCnh) {
+            ok &= got.cnhRaw != null && hex(got.cnhRaw).equals(want.get("cnh_raw"));
+        } else {
+            ok &= got.cnhRaw == null && !want.containsKey("cnh_raw");
+        }
+        return ok;
     }
 
     // ── bno086_shtp.json ──────────────────────────────────────────────────────
@@ -910,6 +1332,281 @@ public final class RunVectors {
     }
 
     // ── comparison helpers ────────────────────────────────────────────────────
+
+    // ── bno055.json (BNO055 register bridge, contract 13) ────────────────────
+
+    /** Nullable channel vs JSON: both null, or equal integer lists. */
+    private static boolean chanEquals(int[] got, Object want) {
+        if (got == null || want == null) {
+            return got == null && want == null;
+        }
+        return intArrEquals(got, arr(want));
+    }
+
+    private static boolean nullableIntEquals(Integer got, Object want) {
+        if (got == null || want == null) {
+            return got == null && want == null;
+        }
+        return got == intOf(want);
+    }
+
+    private static void bno055Vectors() throws Exception {
+        System.out.println("[bno055.json]");
+        Map<String, Object> root = load("bno055.json");
+
+        // encode
+        for (Object eo : arr(root.get("encode"))) {
+            Map<String, Object> c = obj(eo);
+            String name = (String) c.get("name");
+            String kind = (String) c.get("kind");
+            byte[] got;
+            switch (kind) {
+                case "read_reg":
+                    got = Bno055.packReadReg(intOf(c.get("addr")), intOf(c.get("len")));
+                    break;
+                case "write_reg":
+                    got = Bno055.packWriteReg(intOf(c.get("addr")), hex((String) c.get("data")));
+                    break;
+                case "start_stream":
+                    got = Bno055.packStartStream(intOf(c.get("trigger")), intOf(c.get("addr")),
+                        intOf(c.get("len")), intOf(c.get("period_ms")));
+                    break;
+                case "reset":
+                case "stop_stream":
+                case "get_info":
+                    got = new byte[0];
+                    break;
+                default:
+                    throw new RuntimeException("unknown bno055 encode kind " + kind);
+            }
+            check("bno055.encode:" + name, hex(got).equals(c.get("payload")));
+        }
+        check("bno055.cmd_ids",
+            Bno055.Bno055Cmd.READ_REG.value == 0x32 && Bno055.Bno055Cmd.WRITE_REG.value == 0x33
+                && Bno055.Bno055Cmd.RESET.value == 0x34 && Bno055.Bno055Cmd.START_STREAM.value == 0x35
+                && Bno055.Bno055Cmd.STOP_STREAM.value == 0x36 && Bno055.Bno055Cmd.GET_INFO.value == 0x37
+                && Bno055.Bno055Rpt.REG_DATA.value == 0x91 && Bno055.Bno055Rpt.INFO.value == 0x92
+                && Bno055.Bno055Rpt.STREAM.value == 0x93 && Bno055.INFO_SIZE == 38);
+
+        // decode
+        for (Object do_ : arr(root.get("decode"))) {
+            Map<String, Object> c = obj(do_);
+            String name = (String) c.get("name");
+            int report = intOf(c.get("report"));
+            byte[] raw = hex((String) c.get("payload"));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok;
+            if (report == Bno055.Bno055Rpt.INFO.value) {
+                Bno055.Bno055Info i = Bno055.Bno055Info.unpack(raw);
+                ok = i.i2cAddr() == intOf(ex.get("i2c_addr"))
+                    && i.chipId() == intOf(ex.get("chip_id"))
+                    && i.accId() == intOf(ex.get("acc_id"))
+                    && i.magId() == intOf(ex.get("mag_id"))
+                    && i.gyrId() == intOf(ex.get("gyr_id"))
+                    && i.swRev() == intOf(ex.get("sw_rev"))
+                    && i.blRev() == intOf(ex.get("bl_rev"))
+                    && i.initialized() == intOf(ex.get("initialized"))
+                    && i.intLevel() == intOf(ex.get("int_level"))
+                    && i.intEdges() == lng(ex.get("int_edges"))
+                    && i.readMinUs() == intOf(ex.get("read_min_us"))
+                    && i.readMaxUs() == intOf(ex.get("read_max_us"))
+                    && i.readAvgUs() == intOf(ex.get("read_avg_us"))
+                    && i.txDropped() == lng(ex.get("tx_dropped"))
+                    && i.i2cErrors() == lng(ex.get("i2c_errors"))
+                    && i.slotsSkipped() == lng(ex.get("slots_skipped"))
+                    && i.busRecoveries() == intOf(ex.get("bus_recoveries"))
+                    && i.lastI2cError() == intOf(ex.get("last_i2c_error"))
+                    && i.sensorResets() == intOf(ex.get("sensor_resets"))
+                    && i.loopMaxUs() == intOf(ex.get("loop_max_us"))
+                    && ex.size() == 20;
+            } else if (report == Bno055.Bno055Rpt.REG_DATA.value) {
+                Bno055.RegData r = Bno055.RegData.unpack(raw);
+                ok = r.cmd() == intOf(ex.get("cmd"))
+                    && r.timestampUs() == lng(ex.get("timestamp_us"))
+                    && hex(r.data()).equals(ex.get("data"))
+                    && ex.size() == 3;
+            } else if (report == Bno055.Bno055Rpt.STREAM.value) {
+                Bno055.StreamData s = Bno055.StreamData.unpack(raw);
+                ok = s.timestampUs() == lng(ex.get("timestamp_us"))
+                    && s.addr() == intOf(ex.get("addr"))
+                    && s.len() == intOf(ex.get("len"))
+                    && hex(s.data()).equals(ex.get("data"))
+                    && ex.size() == 4;
+            } else {
+                throw new RuntimeException("unknown bno055 report " + report);
+            }
+            check("bno055.decode:" + name, ok);
+        }
+        boolean shortRejected = false;
+        try {
+            Bno055.Bno055Info.unpack(new byte[Bno055.INFO_SIZE - 1]);
+        } catch (IllegalArgumentException e) {
+            shortRejected = true;
+        }
+        check("bno055.decode:info_rejects_short_payload", shortRejected);
+
+        // units
+        for (Object uo : arr(root.get("units"))) {
+            Map<String, Object> c = obj(uo);
+            int sel = intOf(c.get("unit_sel"));
+            Bno055Regs.Units u = Bno055Regs.Units.unpack(sel);
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = u.accelMg() == (Boolean) ex.get("accel_mg")
+                && u.gyroRps() == (Boolean) ex.get("gyro_rps")
+                && u.eulerRad() == (Boolean) ex.get("euler_rad")
+                && u.tempF() == (Boolean) ex.get("temp_f")
+                && u.android() == (Boolean) ex.get("android")
+                && ex.size() == 5
+                && u.pack() == intOf(c.get("repack"));
+            check(String.format("bno055.units:0x%02x", sel), ok);
+        }
+        Bno055Regs.Units si = Bno055Regs.Units.DEFAULT;
+        Bno055Regs.Units all = Bno055Regs.Units.unpack(0x97);
+        check("bno055.units:lsb",
+            si.pack() == 0 && si.accelLsb() == 100.0 && si.gyroLsb() == 16.0
+                && si.eulerLsb() == 16.0 && si.tempLsb() == 1.0
+                && all.accelLsb() == 1.0 && all.gyroLsb() == 900.0
+                && all.eulerLsb() == 900.0 && all.tempLsb() == 0.5
+                && Bno055Regs.MAG_LSB == 16.0 && Bno055Regs.QUAT_LSB == 16384.0
+                && Bno055Regs.FUSION_ACCEL_LSB == 100.0);
+
+        // calib_stat
+        for (Object co : arr(root.get("calib_stat"))) {
+            Map<String, Object> c = obj(co);
+            int value = intOf(c.get("value"));
+            Bno055Regs.CalibStatus s = Bno055Regs.CalibStatus.unpack(value);
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = s.system() == intOf(ex.get("system"))
+                && s.gyro() == intOf(ex.get("gyro"))
+                && s.accel() == intOf(ex.get("accel"))
+                && s.mag() == intOf(ex.get("mag"))
+                && ex.size() == 4
+                && s.fullyCalibrated() == (Boolean) c.get("fully_calibrated")
+                && s.pack() == value;
+            check(String.format("bno055.calib_stat:0x%02x", value), ok);
+        }
+
+        // calibration_profile
+        for (Object po : arr(root.get("calibration_profile"))) {
+            Map<String, Object> c = obj(po);
+            String name = (String) c.get("name");
+            byte[] bytes = hex((String) c.get("bytes"));
+            Bno055Regs.CalibrationProfile p = Bno055Regs.CalibrationProfile.unpack(bytes);
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = intArrEquals(p.accelOffset(), arr(ex.get("accel_offset")))
+                && intArrEquals(p.magOffset(), arr(ex.get("mag_offset")))
+                && intArrEquals(p.gyroOffset(), arr(ex.get("gyro_offset")))
+                && p.accelRadius() == intOf(ex.get("accel_radius"))
+                && p.magRadius() == intOf(ex.get("mag_radius"))
+                && ex.size() == 5
+                && hex(p.pack()).equals(c.get("bytes"));
+            check("bno055.calibration_profile:" + name, ok);
+        }
+        boolean profileShort = false;
+        try {
+            Bno055Regs.CalibrationProfile.unpack(new byte[Bno055Regs.CALIB_PROFILE_LEN - 1]);
+        } catch (IllegalArgumentException e) {
+            profileShort = true;
+        }
+        check("bno055.calibration_profile:rejects_21_bytes", profileShort);
+
+        // axis_remap (+ placements P0..P7)
+        List<String> names = new ArrayList<>();
+        for (Object ao : arr(root.get("axis_remap"))) {
+            Map<String, Object> c = obj(ao);
+            String name = (String) c.get("name");
+            names.add(name);
+            Bno055Regs.AxisRemap a = Bno055Regs.AxisRemap.unpack(intOf(c.get("config")), intOf(c.get("sign")));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = a.x() == intOf(ex.get("x"))
+                && a.y() == intOf(ex.get("y"))
+                && a.z() == intOf(ex.get("z"))
+                && a.xNegative() == (Boolean) ex.get("x_negative")
+                && a.yNegative() == (Boolean) ex.get("y_negative")
+                && a.zNegative() == (Boolean) ex.get("z_negative")
+                && ex.size() == 6
+                && intArrEquals(a.pack(), arr(c.get("repack")))
+                && Bno055Regs.AxisRemap.placement(name).equals(a)
+                && Bno055Regs.AxisRemap.placement(name.toLowerCase(java.util.Locale.ROOT)).equals(a);
+            check("bno055.axis_remap:" + name, ok);
+        }
+        check("bno055.axis_remap:placement_table",
+            names.equals(new ArrayList<>(Bno055Regs.PLACEMENTS.keySet()))
+                && Bno055Regs.AxisRemap.placement("P1").equals(Bno055Regs.AxisRemap.DEFAULT));
+        boolean unknownPlacement = false;
+        try {
+            Bno055Regs.AxisRemap.placement("P8");
+        } catch (IllegalArgumentException e) {
+            unknownPlacement = true;
+        }
+        check("bno055.axis_remap:refuses_P8", unknownPlacement);
+        for (Object ao : arr(root.get("axis_remap_invalid"))) {
+            Map<String, Object> c = obj(ao);
+            boolean refused = false;
+            try {
+                new Bno055Regs.AxisRemap(intOf(c.get("x")), intOf(c.get("y")), intOf(c.get("z")),
+                    false, false, false).pack();
+            } catch (IllegalArgumentException e) {
+                refused = true;
+            }
+            check("bno055.axis_remap_invalid:" + c.get("name"), refused);
+        }
+
+        // sensor_config (mag bit 7 is not a field: repack is value & 0x7F)
+        Map<String, Object> sc = obj(root.get("sensor_config"));
+        for (Object ao : arr(sc.get("accel"))) {
+            Map<String, Object> c = obj(ao);
+            int value = intOf(c.get("value"));
+            Map<String, Object> ex = obj(c.get("expect"));
+            Bno055Regs.AccelConfig a = Bno055Regs.AccelConfig.unpack(value);
+            Bno055Regs.AccelConfig want = new Bno055Regs.AccelConfig(
+                intOf(ex.get("range")), intOf(ex.get("bandwidth")), intOf(ex.get("power")));
+            check(String.format("bno055.sensor_config.accel:0x%02x", value),
+                a.equals(want) && ex.size() == 3 && want.pack() == value);
+        }
+        for (Object go : arr(sc.get("gyro"))) {
+            Map<String, Object> c = obj(go);
+            String bytes = (String) c.get("bytes");
+            Map<String, Object> ex = obj(c.get("expect"));
+            Bno055Regs.GyroConfig g = Bno055Regs.GyroConfig.unpack(hex(bytes));
+            Bno055Regs.GyroConfig want = new Bno055Regs.GyroConfig(
+                intOf(ex.get("range")), intOf(ex.get("bandwidth")), intOf(ex.get("power")));
+            check("bno055.sensor_config.gyro:" + bytes,
+                g.equals(want) && ex.size() == 3 && hex(want.pack()).equals(bytes));
+        }
+        for (Object mo : arr(sc.get("mag"))) {
+            Map<String, Object> c = obj(mo);
+            int value = intOf(c.get("value"));
+            Map<String, Object> ex = obj(c.get("expect"));
+            Bno055Regs.MagConfig m = Bno055Regs.MagConfig.unpack(value);
+            Bno055Regs.MagConfig want = new Bno055Regs.MagConfig(
+                intOf(ex.get("rate")), intOf(ex.get("mode")), intOf(ex.get("power")));
+            check(String.format("bno055.sensor_config.mag:0x%02x", value),
+                m.equals(want) && ex.size() == 3 && want.pack() == (value & 0x7F));
+        }
+
+        // blocks
+        for (Object bo : arr(root.get("blocks"))) {
+            Map<String, Object> c = obj(bo);
+            String name = (String) c.get("name");
+            Bno055Regs.RawBlock b = Bno055Regs.decodeBlock(intOf(c.get("addr")), hex((String) c.get("data")));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok = chanEquals(b.accel(), ex.get("accel"))
+                && chanEquals(b.mag(), ex.get("mag"))
+                && chanEquals(b.gyro(), ex.get("gyro"))
+                && chanEquals(b.euler(), ex.get("euler"))
+                && chanEquals(b.quaternion(), ex.get("quaternion"))
+                && chanEquals(b.linearAccel(), ex.get("linear_accel"))
+                && chanEquals(b.gravity(), ex.get("gravity"))
+                && nullableIntEquals(b.temperature(), ex.get("temperature"))
+                && nullableIntEquals(b.calibStat(), ex.get("calib_stat"))
+                && ex.size() == 9;
+            check("bno055.blocks:" + name, ok);
+        }
+        check("bno055.blocks:full_block_is_46",
+            Bno055Regs.FULL_BLOCK_ADDR == 0x08 && Bno055Regs.FULL_BLOCK_LEN == 46
+                && Bno055Regs.QUAT_BLOCK_ADDR == 0x20 && Bno055Regs.QUAT_BLOCK_LEN == 8);
+    }
 
     private static boolean intArrEquals(int[] got, List<Object> want) {
         if (got.length != want.size()) {

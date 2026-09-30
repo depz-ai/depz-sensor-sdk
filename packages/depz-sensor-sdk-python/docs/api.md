@@ -6,20 +6,23 @@ Auto-generated from the package's public surface (the union of
 docstrings in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
 
 ## Contents
 
 - **Discovery**: [`DeviceInfo`](#deviceinfo), [`list_depz_devices`](#list_depz_devices), [`probe_port`](#probe_port), [`open_device`](#open_device)
 - **Device core**: [`DeviceBase`](#devicebase), [`TimeSync`](#timesync), [`LinkStats`](#linkstats), [`StreamQueue`](#streamqueue), [`host_now_us`](#host_now_us), [`sync_time_all`](#sync_time_all), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`StreamIterator`](#streamiterator)
 - **SR04**: [`Sr04`](#sr04), [`Sr04Measurement`](#sr04measurement)
-- **VL53L4CD (ToF)**: [`Vl53l4Cd`](#vl53l4cd), [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdError`](#vl53l4cderror), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`RANGE_STATUS_NAMES`](#range_status_names), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
-- **VL53L8 (ToF)**: [`Vl53l8`](#vl53l8), [`Vl53l8Ch`](#vl53l8ch), [`Vl53l8Frame`](#vl53l8frame), [`CnhConfig`](#cnhconfig), [`Vl53l8cxError`](#vl53l8cxerror), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8)
+- **VL53L4CD (ToF)**: [`Vl53l4cd`](#vl53l4cd), [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdError`](#vl53l4cderror), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`RANGE_STATUS_NAMES`](#range_status_names), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
+- **VL53L8 (ToF)**: [`Vl53l8`](#vl53l8), [`Vl53l8ch`](#vl53l8ch), [`Vl53l8Frame`](#vl53l8frame), [`CnhConfig`](#cnhconfig), [`Vl53l8cxError`](#vl53l8cxerror), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8)
+- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l5cx`](#vl53l5cx), [`Vl53l7cx`](#vl53l7cx), [`Vl53l7ch`](#vl53l7ch)
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lx`](#vl53lx), [`Vl53l0x`](#vl53l0x), [`Vl53l1cx`](#vl53l1cx), [`Vl53l1cb`](#vl53l1cb), [`Vl53l3cx`](#vl53l3cx), [`Vl53l4cx`](#vl53l4cx), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Target`](#target), [`Vl53Error`](#vl53error), [`ProtocolError`](#protocolerror), [`PRODUCTS`](#products), [`DRIVER_KINDS`](#driver_kinds), [`PLOTTABLE_STATUSES`](#plottable_statuses), [`primary_target`](#primary_target), [`plot_distances`](#plot_distances)
 - **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
+- **BNO055 (IMU)**: [`Bno055`](#bno055), [`Bno055Sample`](#bno055sample), [`OprMode`](#oprmode), [`Units`](#units), [`AxisRemap`](#axisremap), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`SystemStatus`](#systemstatus), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`PLACEMENTS`](#placements), [`SIC_IDENTITY`](#sic_identity), [`I2C_ERROR_NAMES`](#i2c_error_names)
 - **Bootloader / firmware update**: [`BootloaderDevice`](#bootloaderdevice), [`update_firmware`](#update_firmware), [`find_bootloader_port`](#find_bootloader_port)
 - **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord)
 - **Transport**: [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`build_packet`](#build_packet), [`payload_crc_bytes`](#payload_crc_bytes), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`Link`](#link), [`LoopbackLink`](#loopbacklink)
-- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name)
+- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror)
 - **Errors**: [`DepzError`](#depzerror), [`DepzTimeoutError`](#depztimeouterror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`DeviceLostError`](#devicelosterror), [`LinkClosedError`](#linkclosederror), [`NoDepzDeviceError`](#nodepzdeviceerror)
 - **Top level**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`__version__`](#__version__)
 - **Usb_Ids**: [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint)
@@ -659,10 +662,10 @@ Distance with temperature-compensated speed of sound.
 
 ## VL53L4CD (ToF)
 
-### Vl53l4Cd
+### Vl53l4cd
 
 ```python
-class Vl53l4Cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
 ```
 
 VL53L4CD single-zone ToF device.
@@ -673,16 +676,16 @@ not be called while ranging: the INT-driven stream owns the register bank
 (contract 10). Measurements stream via callbacks (`on_measurement`) and/or
 the pull iterator (`measurements()`).
 
-#### Vl53l4Cd.uld *(property)*
+#### Vl53l4cd.uld *(property)*
 
 The underlying ULD driver (escape hatch for raw register access).
 
-#### Vl53l4Cd.initialized *(property)*
+#### Vl53l4cd.initialized *(property)*
 
 True after a successful init(). Cleared by reset_sensor() and
 xshut() — a power-cycled sensor holds none of the ULD configuration.
 
-#### Vl53l4Cd.is_alive
+#### Vl53l4cd.is_alive
 
 ```python
 is_alive(self) -> bool
@@ -690,7 +693,7 @@ is_alive(self) -> bool
 
 True when the sensor answers with the VL53L4CD model id (0xEBAA).
 
-#### Vl53l4Cd.init
+#### Vl53l4cd.init
 
 ```python
 init(self, bus_khz: int = 1000) -> None
@@ -700,7 +703,7 @@ Initialise the sensor: default configuration block + VHV calibration
 (ULD sensor_init). Takes well under a second; the bus is left at
 `bus_khz` (one of I2C_KHZ_STEPS).
 
-#### Vl53l4Cd.xshut
+#### Vl53l4cd.xshut
 
 ```python
 xshut(self, action: int) -> None
@@ -710,7 +713,7 @@ Drive the XSHUT pin: XSHUT_OFF / XSHUT_ON / XSHUT_RESET. OFF and
 RESET stop any active stream on the bridge; a power-cycled sensor
 needs init() again.
 
-#### Vl53l4Cd.reset_sensor
+#### Vl53l4cd.reset_sensor
 
 ```python
 reset_sensor(self) -> None
@@ -719,7 +722,7 @@ reset_sensor(self) -> None
 Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD
 configuration is wiped — call init() again.
 
-#### Vl53l4Cd.bridge_info
+#### Vl53l4cd.bridge_info
 
 ```python
 bridge_info(self) -> depz_sensor_sdk.protocol.vl53l4.Vl53l4Info
@@ -729,7 +732,7 @@ RPT_VL53_INFO: sensor identity, pin levels and bridge counters.
 Counters are free-running (wrap silently) — watch increments. Safe to
 call while streaming.
 
-#### Vl53l4Cd.set_i2c_speed_khz
+#### Vl53l4cd.set_i2c_speed_khz
 
 ```python
 set_i2c_speed_khz(self, khz: int) -> None
@@ -739,7 +742,7 @@ Re-time the bridge's I2C bus to the nominal step nearest `khz`
 (I2C_KHZ_STEPS). Not while ranging — re-timing refuses a transfer in
 flight (ERR_BUSY). Read back the programmed step via bridge_info().
 
-#### Vl53l4Cd.get_range_timing
+#### Vl53l4cd.get_range_timing
 
 ```python
 get_range_timing(self) -> tuple[int, int]
@@ -748,7 +751,7 @@ get_range_timing(self) -> tuple[int, int]
 → (timing_budget_ms, inter_measurement_ms). inter_measurement 0
 means continuous mode.
 
-#### Vl53l4Cd.set_range_timing
+#### Vl53l4cd.set_range_timing
 
 ```python
 set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int = 0) -> None
@@ -758,7 +761,7 @@ Set the timing budget (10–200 ms) and inter-measurement period.
 `inter_measurement_ms=0` selects continuous ranging; a value larger
 than the budget selects autonomous low-power mode. Not while ranging.
 
-#### Vl53l4Cd.get_offset_mm
+#### Vl53l4cd.get_offset_mm
 
 ```python
 get_offset_mm(self) -> int
@@ -766,7 +769,7 @@ get_offset_mm(self) -> int
 
 Configured ranging offset in mm (signed).
 
-#### Vl53l4Cd.set_offset_mm
+#### Vl53l4cd.set_offset_mm
 
 ```python
 set_offset_mm(self, offset_mm: int) -> None
@@ -774,7 +777,7 @@ set_offset_mm(self, offset_mm: int) -> None
 
 Set the ranging offset correction in mm. Not while ranging.
 
-#### Vl53l4Cd.get_xtalk_kcps
+#### Vl53l4cd.get_xtalk_kcps
 
 ```python
 get_xtalk_kcps(self) -> int
@@ -782,7 +785,7 @@ get_xtalk_kcps(self) -> int
 
 Configured crosstalk compensation in kcps (0 = disabled).
 
-#### Vl53l4Cd.set_xtalk_kcps
+#### Vl53l4cd.set_xtalk_kcps
 
 ```python
 set_xtalk_kcps(self, xtalk_kcps: int) -> None
@@ -790,7 +793,7 @@ set_xtalk_kcps(self, xtalk_kcps: int) -> None
 
 Set the crosstalk compensation in kcps. Not while ranging.
 
-#### Vl53l4Cd.get_detection_thresholds
+#### Vl53l4cd.get_detection_thresholds
 
 ```python
 get_detection_thresholds(self) -> tuple[int, int, int]
@@ -799,7 +802,7 @@ get_detection_thresholds(self) -> tuple[int, int, int]
 → (distance_low_mm, distance_high_mm, window). Window is one of
 WINDOW_BELOW / WINDOW_ABOVE / WINDOW_OUT / WINDOW_IN.
 
-#### Vl53l4Cd.set_detection_thresholds
+#### Vl53l4cd.set_detection_thresholds
 
 ```python
 set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
@@ -808,13 +811,13 @@ set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, wind
 Program the distance-window interrupt (INT only fires when the
 window condition holds). Not while ranging.
 
-#### Vl53l4Cd.get_signal_threshold_kcps
+#### Vl53l4cd.get_signal_threshold_kcps
 
 ```python
 get_signal_threshold_kcps(self) -> int
 ```
 
-#### Vl53l4Cd.set_signal_threshold_kcps
+#### Vl53l4cd.set_signal_threshold_kcps
 
 ```python
 set_signal_threshold_kcps(self, signal_kcps: int) -> None
@@ -823,13 +826,13 @@ set_signal_threshold_kcps(self, signal_kcps: int) -> None
 Discard measurements whose return signal is below `signal_kcps`.
 Not while ranging.
 
-#### Vl53l4Cd.get_sigma_threshold_mm
+#### Vl53l4cd.get_sigma_threshold_mm
 
 ```python
 get_sigma_threshold_mm(self) -> int
 ```
 
-#### Vl53l4Cd.set_sigma_threshold_mm
+#### Vl53l4cd.set_sigma_threshold_mm
 
 ```python
 set_sigma_threshold_mm(self, sigma_mm: int) -> None
@@ -838,7 +841,7 @@ set_sigma_threshold_mm(self, sigma_mm: int) -> None
 Discard measurements whose sigma exceeds `sigma_mm` (≤ 16383).
 Not while ranging.
 
-#### Vl53l4Cd.start_temperature_update
+#### Vl53l4cd.start_temperature_update
 
 ```python
 start_temperature_update(self) -> None
@@ -847,7 +850,7 @@ start_temperature_update(self) -> None
 Re-run VHV calibration; recommended after a >8 °C ambient change.
 Not while ranging (runs a short ranging burst internally).
 
-#### Vl53l4Cd.calibrate_offset
+#### Vl53l4cd.calibrate_offset
 
 ```python
 calibrate_offset(self, target_dist_mm: int, nb_samples: int = 20) -> int
@@ -856,7 +859,7 @@ calibrate_offset(self, target_dist_mm: int, nb_samples: int = 20) -> int
 Offset calibration against a target at `target_dist_mm` (10–1000).
 Blocks for the sample burst; returns the offset now programmed.
 
-#### Vl53l4Cd.calibrate_xtalk
+#### Vl53l4cd.calibrate_xtalk
 
 ```python
 calibrate_xtalk(self, target_dist_mm: int, nb_samples: int = 20) -> int
@@ -865,7 +868,7 @@ calibrate_xtalk(self, target_dist_mm: int, nb_samples: int = 20) -> int
 Crosstalk calibration against a target at `target_dist_mm` (10–5000).
 Blocks for the sample burst; returns the xtalk now programmed (kcps).
 
-#### Vl53l4Cd.start_ranging
+#### Vl53l4cd.start_ranging
 
 ```python
 start_ranging(self) -> None
@@ -874,15 +877,15 @@ start_ranging(self) -> None
 Start the sensor's ranging loop and arm the MCU stream: one
 RPT_VL53_STREAM per INT edge carrying the 17-byte result block.
 
-#### Vl53l4Cd.stop_ranging
+#### Vl53l4cd.stop_ranging
 
 ```python
 stop_ranging(self) -> None
 ```
 
-#### Vl53l4Cd.ranging *(property)*
+#### Vl53l4cd.ranging *(property)*
 
-#### Vl53l4Cd.measure_once
+#### Vl53l4cd.measure_once
 
 ```python
 measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53l4.Vl53l4Measurement
@@ -891,7 +894,7 @@ measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53l4.Vl53l4Measure
 Single poll-mode measurement: start ranging, wait for data-ready,
 read the result block, stop. Raises while the stream is running.
 
-#### Vl53l4Cd.on_measurement
+#### Vl53l4cd.on_measurement
 
 ```python
 on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53l4.Vl53l4Measurement], NoneType]) -> Callable[[], NoneType]
@@ -900,7 +903,7 @@ on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53l4.Vl53l4Measurement], No
 Subscribe to streamed measurements (reader-thread context; don't
 block). Returns an unsubscribe function.
 
-#### Vl53l4Cd.measurements
+#### Vl53l4cd.measurements
 
 ```python
 measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
@@ -909,7 +912,7 @@ measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
 Blocking iterator over measurements (bounded, drop-oldest;
 `dropped_count` on the returned iterator). Subscribes immediately.
 
-#### Vl53l4Cd.get_measurement
+#### Vl53l4cd.get_measurement
 
 ```python
 get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l4.Vl53l4Measurement
@@ -920,24 +923,24 @@ Convenience: wait for the next streamed measurement.
 Raises `DepzTimeoutError` when nothing arrives within `timeout`, and
 `LinkClosedError` as soon as the device is closed while waiting.
 
-#### Vl53l4Cd.stream_parse_errors *(property)*
+#### Vl53l4cd.stream_parse_errors *(property)*
 
 Stream reports dropped because the result block failed to decode
 (short block from a reconfigured stream, corrupt read).
 
-#### Vl53l4Cd.stream_dropped_counts *(property)*
+#### Vl53l4cd.stream_dropped_counts *(property)*
 
-#### Vl53l4Cd.close
+#### Vl53l4cd.close
 
 ```python
 close(self) -> None
 ```
 
-#### Vl53l4Cd.port *(property)*
+#### Vl53l4cd.port *(property)*
 
-#### Vl53l4Cd.closed *(property)*
+#### Vl53l4cd.closed *(property)*
 
-#### Vl53l4Cd.on_event
+#### Vl53l4cd.on_event
 
 ```python
 on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
@@ -946,7 +949,7 @@ on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> 
 Subscribe to unsolicited/diagnostic events (reader-thread context;
 do not block). Returns an unsubscribe function.
 
-#### Vl53l4Cd.events
+#### Vl53l4cd.events
 
 ```python
 events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
@@ -955,7 +958,7 @@ events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
 Pull-style event stream (bounded, drop-oldest). Subscribes
 immediately — events emitted after this call are never missed.
 
-#### Vl53l4Cd.send
+#### Vl53l4cd.send
 
 ```python
 send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
@@ -963,7 +966,7 @@ send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transpor
 
 Fire-and-forget packet (escape hatch; prefer `request`).
 
-#### Vl53l4Cd.request
+#### Vl53l4cd.request
 
 ```python
 request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
@@ -978,7 +981,7 @@ Exactly one of the completion paths must be configured:
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
 ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
 
-#### Vl53l4Cd.expect_report
+#### Vl53l4cd.expect_report
 
 ```python
 expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -986,7 +989,7 @@ expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_
 
 Matcher for a typed report identified by its report ID alone.
 
-#### Vl53l4Cd.expect_text
+#### Vl53l4cd.expect_text
 
 ```python
 expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -994,25 +997,25 @@ expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Pac
 
 Matcher for RPT_TEXT echoing `request_cmd`.
 
-#### Vl53l4Cd.get_device_name
+#### Vl53l4cd.get_device_name
 
 ```python
 get_device_name(self) -> str
 ```
 
-#### Vl53l4Cd.get_software_name
+#### Vl53l4cd.get_software_name
 
 ```python
 get_software_name(self) -> str
 ```
 
-#### Vl53l4Cd.get_serial_number
+#### Vl53l4cd.get_serial_number
 
 ```python
 get_serial_number(self) -> str
 ```
 
-#### Vl53l4Cd.read_mcu_temperature
+#### Vl53l4cd.read_mcu_temperature
 
 ```python
 read_mcu_temperature(self) -> float
@@ -1020,7 +1023,7 @@ read_mcu_temperature(self) -> float
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
-#### Vl53l4Cd.sync_time
+#### Vl53l4cd.sync_time
 
 ```python
 sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
@@ -1028,9 +1031,9 @@ sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
-#### Vl53l4Cd.time_sync *(property)*
+#### Vl53l4cd.time_sync *(property)*
 
-#### Vl53l4Cd.to_host_time_us
+#### Vl53l4cd.to_host_time_us
 
 ```python
 to_host_time_us(self, device_timestamp_us: int) -> int
@@ -1038,13 +1041,13 @@ to_host_time_us(self, device_timestamp_us: int) -> int
 
 Device µs → host monotonic µs (requires a prior `sync_time`).
 
-#### Vl53l4Cd.get_report_payload_crc
+#### Vl53l4cd.get_report_payload_crc
 
 ```python
 get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
 ```
 
-#### Vl53l4Cd.set_report_payload_crc
+#### Vl53l4cd.set_report_payload_crc
 
 ```python
 set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
@@ -1052,19 +1055,19 @@ set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
-#### Vl53l4Cd.get_sync_pin
+#### Vl53l4cd.get_sync_pin
 
 ```python
 get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
 ```
 
-#### Vl53l4Cd.set_sync_pin
+#### Vl53l4cd.set_sync_pin
 
 ```python
 set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
 ```
 
-#### Vl53l4Cd.reset
+#### Vl53l4cd.reset
 
 ```python
 reset(self) -> None
@@ -1072,7 +1075,7 @@ reset(self) -> None
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
-#### Vl53l4Cd.enter_bootloader_mode
+#### Vl53l4cd.enter_bootloader_mode
 
 ```python
 enter_bootloader_mode(self) -> None
@@ -1262,7 +1265,7 @@ VL53L8CX ToF device: `init()` downloads the ~84 KB sensor firmware
 (~1 s over the CDC link), then configure and `start_ranging()`.
 
 This is the base class for both silicon variants. The VL53L8CH superset
-(compact-network-histogram output) lives in `Vl53l8Ch`, which inherits
+(compact-network-histogram output) lives in `Vl53l8ch`, which inherits
 every method here. All configuration methods require `init()` first and
 must not be called while ranging (the ULD talks to the current register
 bank; the stream owns it — contract 04).
@@ -1289,8 +1292,8 @@ init(self, variant: str | None = None, *, progress: Optional[Callable[[str], Non
 
 Initialize the sensor: firmware blob download + default config.
 
-The blob variant is fixed by the class (`Vl53l8Cx` → 'cx',
-`Vl53l8Ch` → 'ch'); `variant` is accepted only for backward
+The blob variant is fixed by the class (`Vl53l8cx` → 'cx',
+`Vl53l8ch` → 'ch'); `variant` is accepted only for backward
 compatibility and must match the class variant when given. `progress`
 receives phase strings; `write_progress(done, total)` tracks the big
 blob writes.
@@ -1708,10 +1711,10 @@ Ask the device to reboot into the resident bootloader and close
 this connection. Re-discovery/flash flow lives in the bootloader
 module (contract 06).
 
-### Vl53l8Ch
+### Vl53l8ch
 
 ```python
-class Vl53l8Ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
 ```
 
 VL53L8CH device: the VL53L8CX superset. Inherits every CX method and
@@ -1719,30 +1722,35 @@ adds Compact-Network-Histogram (CNH) output. `init()` downloads the CH
 firmware blob (VL53LMZ ULD 2.0.16). CNH is the reason to run CH firmware:
 each frame can additionally carry a per-aggregate distance histogram.
 
-#### Vl53l8Ch.configure_cnh
+#### Vl53l8ch.configure_cnh
 
 ```python
 configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
 ```
 
 Arm the CNH histogram block for the next start_ranging(). CH only —
-this method does not exist on Vl53l8Cx.
+this method does not exist on Vl53l8cx.
 
-#### Vl53l8Ch.uld *(property)*
+#### Vl53l8ch.cnh_config *(property)*
+
+The CNH config armed by :meth:`configure_cnh`, or ``None``.
+Recorders read this to persist decode parameters next to raw blocks.
+
+#### Vl53l8ch.uld *(property)*
 
 The underlying ULD driver (escape hatch for advanced DCI access).
 
-#### Vl53l8Ch.variant *(property)*
+#### Vl53l8ch.variant *(property)*
 
 'cx' | 'ch' (valid after init()).
 
-#### Vl53l8Ch.is_alive
+#### Vl53l8ch.is_alive
 
 ```python
 is_alive(self) -> bool
 ```
 
-#### Vl53l8Ch.init
+#### Vl53l8ch.init
 
 ```python
 init(self, variant: str | None = None, *, progress: Optional[Callable[[str], NoneType]] = None, write_progress: Optional[Callable[[int, int], NoneType]] = None) -> None
@@ -1750,13 +1758,13 @@ init(self, variant: str | None = None, *, progress: Optional[Callable[[str], Non
 
 Initialize the sensor: firmware blob download + default config.
 
-The blob variant is fixed by the class (`Vl53l8Cx` → 'cx',
-`Vl53l8Ch` → 'ch'); `variant` is accepted only for backward
+The blob variant is fixed by the class (`Vl53l8cx` → 'cx',
+`Vl53l8ch` → 'ch'); `variant` is accepted only for backward
 compatibility and must match the class variant when given. `progress`
 receives phase strings; `write_progress(done, total)` tracks the big
 blob writes.
 
-#### Vl53l8Ch.get_resolution
+#### Vl53l8ch.get_resolution
 
 ```python
 get_resolution(self) -> int
@@ -1764,7 +1772,7 @@ get_resolution(self) -> int
 
 Active zone count: 16 (4×4) or 64 (8×8).
 
-#### Vl53l8Ch.set_resolution
+#### Vl53l8ch.set_resolution
 
 ```python
 set_resolution(self, zones: int) -> None
@@ -1773,7 +1781,7 @@ set_resolution(self, zones: int) -> None
 Select the zone grid: RESOLUTION_4X4 (16) or RESOLUTION_8X8 (64).
 Not while ranging.
 
-#### Vl53l8Ch.get_ranging_frequency_hz
+#### Vl53l8ch.get_ranging_frequency_hz
 
 ```python
 get_ranging_frequency_hz(self) -> int
@@ -1781,7 +1789,7 @@ get_ranging_frequency_hz(self) -> int
 
 Configured ranging frequency in Hz.
 
-#### Vl53l8Ch.set_ranging_frequency_hz
+#### Vl53l8ch.set_ranging_frequency_hz
 
 ```python
 set_ranging_frequency_hz(self, hz: int) -> None
@@ -1792,7 +1800,7 @@ Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
 Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
 enters its ranging loop and streams nothing (contract 04).
 
-#### Vl53l8Ch.get_ranging_mode
+#### Vl53l8ch.get_ranging_mode
 
 ```python
 get_ranging_mode(self) -> int
@@ -1800,7 +1808,7 @@ get_ranging_mode(self) -> int
 
 RANGING_MODE_CONTINUOUS or RANGING_MODE_AUTONOMOUS.
 
-#### Vl53l8Ch.set_ranging_mode
+#### Vl53l8ch.set_ranging_mode
 
 ```python
 set_ranging_mode(self, mode: int) -> None
@@ -1809,7 +1817,7 @@ set_ranging_mode(self, mode: int) -> None
 Set CONTINUOUS (free-running) or AUTONOMOUS (integrate-then-idle)
 ranging. Not while ranging.
 
-#### Vl53l8Ch.get_integration_time_ms
+#### Vl53l8ch.get_integration_time_ms
 
 ```python
 get_integration_time_ms(self) -> int
@@ -1817,7 +1825,7 @@ get_integration_time_ms(self) -> int
 
 Configured integration time in ms.
 
-#### Vl53l8Ch.set_integration_time_ms
+#### Vl53l8ch.set_integration_time_ms
 
 ```python
 set_integration_time_ms(self, ms: int) -> None
@@ -1826,7 +1834,7 @@ set_integration_time_ms(self, ms: int) -> None
 Set the integration time, 2–1000 ms. Autonomous mode only (no
 effect in continuous ranging). Not while ranging.
 
-#### Vl53l8Ch.get_sharpener_percent
+#### Vl53l8ch.get_sharpener_percent
 
 ```python
 get_sharpener_percent(self) -> int
@@ -1834,7 +1842,7 @@ get_sharpener_percent(self) -> int
 
 Configured edge-sharpener strength, 0–99 %.
 
-#### Vl53l8Ch.set_sharpener_percent
+#### Vl53l8ch.set_sharpener_percent
 
 ```python
 set_sharpener_percent(self, pct: int) -> None
@@ -1842,7 +1850,7 @@ set_sharpener_percent(self, pct: int) -> None
 
 Set the edge sharpener, 0–99 % (0 disables). Not while ranging.
 
-#### Vl53l8Ch.get_target_order
+#### Vl53l8ch.get_target_order
 
 ```python
 get_target_order(self) -> int
@@ -1850,7 +1858,7 @@ get_target_order(self) -> int
 
 TARGET_ORDER_CLOSEST or TARGET_ORDER_STRONGEST.
 
-#### Vl53l8Ch.set_target_order
+#### Vl53l8ch.set_target_order
 
 ```python
 set_target_order(self, order: int) -> None
@@ -1859,7 +1867,7 @@ set_target_order(self, order: int) -> None
 Order multi-target zones by CLOSEST or STRONGEST return. Not while
 ranging.
 
-#### Vl53l8Ch.get_power_mode
+#### Vl53l8ch.get_power_mode
 
 ```python
 get_power_mode(self) -> int
@@ -1867,7 +1875,7 @@ get_power_mode(self) -> int
 
 POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants).
 
-#### Vl53l8Ch.set_power_mode
+#### Vl53l8ch.set_power_mode
 
 ```python
 set_power_mode(self, mode: int) -> None
@@ -1876,19 +1884,19 @@ set_power_mode(self, mode: int) -> None
 Enter sleep / wake / deep-sleep. Not while ranging. Waking from
 DEEP_SLEEP re-downloads the firmware blob (init()).
 
-#### Vl53l8Ch.get_xtalk_margin
+#### Vl53l8ch.get_xtalk_margin
 
 ```python
 get_xtalk_margin(self) -> float
 ```
 
-#### Vl53l8Ch.set_xtalk_margin
+#### Vl53l8ch.set_xtalk_margin
 
 ```python
 set_xtalk_margin(self, margin_kcps: float) -> None
 ```
 
-#### Vl53l8Ch.calibrate_xtalk
+#### Vl53l8ch.calibrate_xtalk
 
 ```python
 calibrate_xtalk(self, reflectance_percent: int, nb_samples: int, distance_mm: int) -> None
@@ -1899,7 +1907,7 @@ Run on-device crosstalk calibration against a flat target at
 `nb_samples` (1..16). The result is captured into the xtalk buffer;
 read it back with get_caldata_xtalk(). Blocks several seconds.
 
-#### Vl53l8Ch.get_caldata_xtalk
+#### Vl53l8ch.get_caldata_xtalk
 
 ```python
 get_caldata_xtalk(self) -> bytes
@@ -1907,7 +1915,7 @@ get_caldata_xtalk(self) -> bytes
 
 Read back the 776-byte xtalk calibration blob (save/restore).
 
-#### Vl53l8Ch.set_caldata_xtalk
+#### Vl53l8ch.set_caldata_xtalk
 
 ```python
 set_caldata_xtalk(self, blob: bytes) -> None
@@ -1915,25 +1923,25 @@ set_caldata_xtalk(self, blob: bytes) -> None
 
 Restore a previously saved 776-byte xtalk calibration blob.
 
-#### Vl53l8Ch.get_detection_thresholds_enable
+#### Vl53l8ch.get_detection_thresholds_enable
 
 ```python
 get_detection_thresholds_enable(self) -> int
 ```
 
-#### Vl53l8Ch.set_detection_thresholds_enable
+#### Vl53l8ch.set_detection_thresholds_enable
 
 ```python
 set_detection_thresholds_enable(self, enabled: bool) -> None
 ```
 
-#### Vl53l8Ch.get_detection_thresholds
+#### Vl53l8ch.get_detection_thresholds
 
 ```python
 get_detection_thresholds(self) -> list[dict]
 ```
 
-#### Vl53l8Ch.set_detection_thresholds
+#### Vl53l8ch.set_detection_thresholds
 
 ```python
 set_detection_thresholds(self, thresholds: list[dict]) -> None
@@ -1943,13 +1951,13 @@ Program the 64 detection thresholds (interrupt-on-threshold). Each
 entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
 operation (see uld THRESH_* constants).
 
-#### Vl53l8Ch.set_detection_thresholds_auto_stop
+#### Vl53l8ch.set_detection_thresholds_auto_stop
 
 ```python
 set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 ```
 
-#### Vl53l8Ch.configure_motion_indicator
+#### Vl53l8ch.configure_motion_indicator
 
 ```python
 configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
@@ -1959,7 +1967,7 @@ Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
 
-#### Vl53l8Ch.start_ranging
+#### Vl53l8ch.start_ranging
 
 ```python
 start_ranging(self) -> None
@@ -1967,15 +1975,15 @@ start_ranging(self) -> None
 
 Configure the output list, start the sensor and the MCU stream.
 
-#### Vl53l8Ch.stop_ranging
+#### Vl53l8ch.stop_ranging
 
 ```python
 stop_ranging(self) -> None
 ```
 
-#### Vl53l8Ch.ranging *(property)*
+#### Vl53l8ch.ranging *(property)*
 
-#### Vl53l8Ch.on_frame
+#### Vl53l8ch.on_frame
 
 ```python
 on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> Callable[[], NoneType]
@@ -1983,7 +1991,7 @@ on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> 
 
 Subscribe to parsed frames (reader-thread context; don't block).
 
-#### Vl53l8Ch.frames
+#### Vl53l8ch.frames
 
 ```python
 frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
@@ -1992,16 +2000,16 @@ frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
 Blocking iterator over parsed frames (bounded, drop-oldest).
 Subscribes immediately — call before or after start_ranging().
 
-#### Vl53l8Ch.frame_parse_errors *(property)*
+#### Vl53l8ch.frame_parse_errors *(property)*
 
 Frames dropped because ULD parsing failed (corrupt frame, bad size).
 Distinct from reassembler gap discards (`reassembler_discards`).
 
-#### Vl53l8Ch.reassembler_discards *(property)*
+#### Vl53l8ch.reassembler_discards *(property)*
 
 Chunked frames discarded by the reassembler (gaps / offset errors).
 
-#### Vl53l8Ch.get_frame
+#### Vl53l8ch.get_frame
 
 ```python
 get_frame(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l8.Vl53l8Frame
@@ -2014,17 +2022,17 @@ Raises `DepzTimeoutError` when no frame arrives within `timeout`, and
 a caller blocked here is released by `close()` instead of sitting out
 the full timeout on a link that can never deliver again.
 
-#### Vl53l8Ch.close
+#### Vl53l8ch.close
 
 ```python
 close(self) -> None
 ```
 
-#### Vl53l8Ch.port *(property)*
+#### Vl53l8ch.port *(property)*
 
-#### Vl53l8Ch.closed *(property)*
+#### Vl53l8ch.closed *(property)*
 
-#### Vl53l8Ch.on_event
+#### Vl53l8ch.on_event
 
 ```python
 on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
@@ -2033,7 +2041,7 @@ on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> 
 Subscribe to unsolicited/diagnostic events (reader-thread context;
 do not block). Returns an unsubscribe function.
 
-#### Vl53l8Ch.events
+#### Vl53l8ch.events
 
 ```python
 events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
@@ -2042,7 +2050,7 @@ events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
 Pull-style event stream (bounded, drop-oldest). Subscribes
 immediately — events emitted after this call are never missed.
 
-#### Vl53l8Ch.send
+#### Vl53l8ch.send
 
 ```python
 send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
@@ -2050,7 +2058,7 @@ send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transpor
 
 Fire-and-forget packet (escape hatch; prefer `request`).
 
-#### Vl53l8Ch.request
+#### Vl53l8ch.request
 
 ```python
 request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
@@ -2065,7 +2073,7 @@ Exactly one of the completion paths must be configured:
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
 ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
 
-#### Vl53l8Ch.expect_report
+#### Vl53l8ch.expect_report
 
 ```python
 expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -2073,7 +2081,7 @@ expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_
 
 Matcher for a typed report identified by its report ID alone.
 
-#### Vl53l8Ch.expect_text
+#### Vl53l8ch.expect_text
 
 ```python
 expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -2081,25 +2089,25 @@ expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Pac
 
 Matcher for RPT_TEXT echoing `request_cmd`.
 
-#### Vl53l8Ch.get_device_name
+#### Vl53l8ch.get_device_name
 
 ```python
 get_device_name(self) -> str
 ```
 
-#### Vl53l8Ch.get_software_name
+#### Vl53l8ch.get_software_name
 
 ```python
 get_software_name(self) -> str
 ```
 
-#### Vl53l8Ch.get_serial_number
+#### Vl53l8ch.get_serial_number
 
 ```python
 get_serial_number(self) -> str
 ```
 
-#### Vl53l8Ch.read_mcu_temperature
+#### Vl53l8ch.read_mcu_temperature
 
 ```python
 read_mcu_temperature(self) -> float
@@ -2107,7 +2115,7 @@ read_mcu_temperature(self) -> float
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
-#### Vl53l8Ch.sync_time
+#### Vl53l8ch.sync_time
 
 ```python
 sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
@@ -2115,9 +2123,9 @@ sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
-#### Vl53l8Ch.time_sync *(property)*
+#### Vl53l8ch.time_sync *(property)*
 
-#### Vl53l8Ch.to_host_time_us
+#### Vl53l8ch.to_host_time_us
 
 ```python
 to_host_time_us(self, device_timestamp_us: int) -> int
@@ -2125,13 +2133,13 @@ to_host_time_us(self, device_timestamp_us: int) -> int
 
 Device µs → host monotonic µs (requires a prior `sync_time`).
 
-#### Vl53l8Ch.get_report_payload_crc
+#### Vl53l8ch.get_report_payload_crc
 
 ```python
 get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
 ```
 
-#### Vl53l8Ch.set_report_payload_crc
+#### Vl53l8ch.set_report_payload_crc
 
 ```python
 set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
@@ -2139,19 +2147,19 @@ set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
-#### Vl53l8Ch.get_sync_pin
+#### Vl53l8ch.get_sync_pin
 
 ```python
 get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
 ```
 
-#### Vl53l8Ch.set_sync_pin
+#### Vl53l8ch.set_sync_pin
 
 ```python
 set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
 ```
 
-#### Vl53l8Ch.reset
+#### Vl53l8ch.reset
 
 ```python
 reset(self) -> None
@@ -2159,7 +2167,7 @@ reset(self) -> None
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
-#### Vl53l8Ch.enter_bootloader_mode
+#### Vl53l8ch.enter_bootloader_mode
 
 ```python
 enter_bootloader_mode(self) -> None
@@ -2304,6 +2312,4637 @@ by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
 Base 0 means to interpret the base from the string as an integer literal.
 >>> int('0b100', base=0)
 4
+
+## VL53L5CX / VL53L7CX / VL53L7CH (ToF)
+
+### Vl53l5cx
+
+```python
+class Vl53l5cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L5CX ToF device (8×8 zones, 63° field of view). Same board, blob
+and API as `Vl53l7cx`; the sensor reports module type MZ.
+
+#### Vl53l5cx.init
+
+```python
+init(self, variant=None, *, progress=None, write_progress=None) -> None
+```
+
+Initialize the sensor: firmware blob download + default config.
+
+Refuses non-L5/L7 silicon. After the sensor firmware runs, its
+`module_type` tells L5 (MZ) from L7 (MZEVO); a mismatch with this
+class (a board labelled L7 carrying an L5, or vice versa) is reported
+as a warning — ranging still works, since the blob is shared.
+
+#### Vl53l5cx.module_type *(property)*
+
+Sensor module type read at init(): MODULE_TYPE_MZ (0) = VL53L5CX,
+MODULE_TYPE_MZEVO (1) = VL53L7CX/CH. None before init().
+
+#### Vl53l5cx.get_bridge_info
+
+```python
+get_bridge_info(self) -> depz_sensor_sdk.protocol.vl53l7.Vl53l7Info
+```
+
+Bridge counters and pin levels (never touches the sensor). Read it
+before and after a run, not during one: each call takes the bus from
+the stream and can itself cost a frame.
+
+#### Vl53l5cx.set_i2c_speed_khz
+
+```python
+set_i2c_speed_khz(self, khz: int) -> int
+```
+
+Set the sensor-bus SCL frequency; the board snaps to the nearest of
+100, 200, 400, 500 … 1000 kHz. Returns the value now in effect. Raises
+`BusyError` mid-transfer — stop ranging first.
+
+#### Vl53l5cx.pin_ctrl
+
+```python
+pin_ctrl(self, action: int) -> None
+```
+
+Drive the sensor's LPn / I2C_RST pins (`PinAction`). LPN_OFF and
+SOFT_CYCLE drop the sensor's state: run `init()` again afterwards.
+
+#### Vl53l5cx.xtalk_calibration_failed *(property)*
+
+True when the last calibrate_xtalk() found nothing to calibrate (ST
+XTALK_FAILED: "coverglass too good") — the sensor keeps its default
+xtalk data.
+
+#### Vl53l5cx.uld *(property)*
+
+The underlying ULD driver (escape hatch for advanced DCI access).
+
+#### Vl53l5cx.variant *(property)*
+
+'cx' | 'ch' (valid after init()).
+
+#### Vl53l5cx.is_alive
+
+```python
+is_alive(self) -> bool
+```
+
+#### Vl53l5cx.get_resolution
+
+```python
+get_resolution(self) -> int
+```
+
+Active zone count: 16 (4×4) or 64 (8×8).
+
+#### Vl53l5cx.set_resolution
+
+```python
+set_resolution(self, zones: int) -> None
+```
+
+Select the zone grid: RESOLUTION_4X4 (16) or RESOLUTION_8X8 (64).
+Not while ranging.
+
+#### Vl53l5cx.get_ranging_frequency_hz
+
+```python
+get_ranging_frequency_hz(self) -> int
+```
+
+Configured ranging frequency in Hz.
+
+#### Vl53l5cx.set_ranging_frequency_hz
+
+```python
+set_ranging_frequency_hz(self, hz: int) -> None
+```
+
+Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+
+Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
+enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l5cx.get_ranging_mode
+
+```python
+get_ranging_mode(self) -> int
+```
+
+RANGING_MODE_CONTINUOUS or RANGING_MODE_AUTONOMOUS.
+
+#### Vl53l5cx.set_ranging_mode
+
+```python
+set_ranging_mode(self, mode: int) -> None
+```
+
+Set CONTINUOUS (free-running) or AUTONOMOUS (integrate-then-idle)
+ranging. Not while ranging.
+
+#### Vl53l5cx.get_integration_time_ms
+
+```python
+get_integration_time_ms(self) -> int
+```
+
+Configured integration time in ms.
+
+#### Vl53l5cx.set_integration_time_ms
+
+```python
+set_integration_time_ms(self, ms: int) -> None
+```
+
+Set the integration time, 2–1000 ms. Autonomous mode only (no
+effect in continuous ranging). Not while ranging.
+
+#### Vl53l5cx.get_sharpener_percent
+
+```python
+get_sharpener_percent(self) -> int
+```
+
+Configured edge-sharpener strength, 0–99 %.
+
+#### Vl53l5cx.set_sharpener_percent
+
+```python
+set_sharpener_percent(self, pct: int) -> None
+```
+
+Set the edge sharpener, 0–99 % (0 disables). Not while ranging.
+
+#### Vl53l5cx.get_target_order
+
+```python
+get_target_order(self) -> int
+```
+
+TARGET_ORDER_CLOSEST or TARGET_ORDER_STRONGEST.
+
+#### Vl53l5cx.set_target_order
+
+```python
+set_target_order(self, order: int) -> None
+```
+
+Order multi-target zones by CLOSEST or STRONGEST return. Not while
+ranging.
+
+#### Vl53l5cx.get_power_mode
+
+```python
+get_power_mode(self) -> int
+```
+
+POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants).
+
+#### Vl53l5cx.set_power_mode
+
+```python
+set_power_mode(self, mode: int) -> None
+```
+
+Enter sleep / wake / deep-sleep. Not while ranging. Waking from
+DEEP_SLEEP re-downloads the firmware blob (init()).
+
+#### Vl53l5cx.get_xtalk_margin
+
+```python
+get_xtalk_margin(self) -> float
+```
+
+#### Vl53l5cx.set_xtalk_margin
+
+```python
+set_xtalk_margin(self, margin_kcps: float) -> None
+```
+
+#### Vl53l5cx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, reflectance_percent: int, nb_samples: int, distance_mm: int) -> None
+```
+
+Run on-device crosstalk calibration against a flat target at
+`distance_mm` with the given `reflectance_percent` (1..99) averaging
+`nb_samples` (1..16). The result is captured into the xtalk buffer;
+read it back with get_caldata_xtalk(). Blocks several seconds.
+
+#### Vl53l5cx.get_caldata_xtalk
+
+```python
+get_caldata_xtalk(self) -> bytes
+```
+
+Read back the 776-byte xtalk calibration blob (save/restore).
+
+#### Vl53l5cx.set_caldata_xtalk
+
+```python
+set_caldata_xtalk(self, blob: bytes) -> None
+```
+
+Restore a previously saved 776-byte xtalk calibration blob.
+
+#### Vl53l5cx.get_detection_thresholds_enable
+
+```python
+get_detection_thresholds_enable(self) -> int
+```
+
+#### Vl53l5cx.set_detection_thresholds_enable
+
+```python
+set_detection_thresholds_enable(self, enabled: bool) -> None
+```
+
+#### Vl53l5cx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> list[dict]
+```
+
+#### Vl53l5cx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, thresholds: list[dict]) -> None
+```
+
+Program the 64 detection thresholds (interrupt-on-threshold). Each
+entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
+operation (see uld THRESH_* constants).
+
+#### Vl53l5cx.set_detection_thresholds_auto_stop
+
+```python
+set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
+```
+
+#### Vl53l5cx.configure_motion_indicator
+
+```python
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+```
+
+Enable the motion indicator over [distance_min_mm, distance_max_mm]
+and surface motion output in each frame's `.motion`. Returns the
+underlying uld MotionConfig for advanced tuning.
+
+#### Vl53l5cx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Configure the output list, start the sensor and the MCU stream.
+
+#### Vl53l5cx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l5cx.ranging *(property)*
+
+#### Vl53l5cx.on_frame
+
+```python
+on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to parsed frames (reader-thread context; don't block).
+
+#### Vl53l5cx.frames
+
+```python
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over parsed frames (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l5cx.frame_parse_errors *(property)*
+
+Frames dropped because ULD parsing failed (corrupt frame, bad size).
+Distinct from reassembler gap discards (`reassembler_discards`).
+
+#### Vl53l5cx.reassembler_discards *(property)*
+
+Chunked frames discarded by the reassembler (gaps / offset errors).
+
+#### Vl53l5cx.get_frame
+
+```python
+get_frame(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l8.Vl53l8Frame
+```
+
+Convenience: wait for the next frame.
+
+Raises `DepzTimeoutError` when no frame arrives within `timeout`, and
+`LinkClosedError` as soon as the device is closed while waiting —
+a caller blocked here is released by `close()` instead of sitting out
+the full timeout on a link that can never deliver again.
+
+#### Vl53l5cx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l5cx.port *(property)*
+
+#### Vl53l5cx.closed *(property)*
+
+#### Vl53l5cx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l5cx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l5cx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l5cx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l5cx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l5cx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l5cx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l5cx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l5cx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l5cx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l5cx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l5cx.time_sync *(property)*
+
+#### Vl53l5cx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l5cx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l5cx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l5cx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l5cx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l5cx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l5cx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l7cx
+
+```python
+class Vl53l7cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L7CX ToF device (8×8 zones, 90° field of view). `init()` downloads
+the ~84 KB L5/L7 sensor firmware (~1.4 s at the board's default 1 MHz
+I2C), then configure and `start_ranging()` exactly as on `Vl53l8cx`.
+
+Base class of the I2C family: `Vl53l5cx` (same blob, MZ module) and
+`Vl53l7ch` (CH blob, adds CNH) inherit it.
+
+#### Vl53l7cx.init
+
+```python
+init(self, variant=None, *, progress=None, write_progress=None) -> None
+```
+
+Initialize the sensor: firmware blob download + default config.
+
+Refuses non-L5/L7 silicon. After the sensor firmware runs, its
+`module_type` tells L5 (MZ) from L7 (MZEVO); a mismatch with this
+class (a board labelled L7 carrying an L5, or vice versa) is reported
+as a warning — ranging still works, since the blob is shared.
+
+#### Vl53l7cx.module_type *(property)*
+
+Sensor module type read at init(): MODULE_TYPE_MZ (0) = VL53L5CX,
+MODULE_TYPE_MZEVO (1) = VL53L7CX/CH. None before init().
+
+#### Vl53l7cx.get_bridge_info
+
+```python
+get_bridge_info(self) -> depz_sensor_sdk.protocol.vl53l7.Vl53l7Info
+```
+
+Bridge counters and pin levels (never touches the sensor). Read it
+before and after a run, not during one: each call takes the bus from
+the stream and can itself cost a frame.
+
+#### Vl53l7cx.set_i2c_speed_khz
+
+```python
+set_i2c_speed_khz(self, khz: int) -> int
+```
+
+Set the sensor-bus SCL frequency; the board snaps to the nearest of
+100, 200, 400, 500 … 1000 kHz. Returns the value now in effect. Raises
+`BusyError` mid-transfer — stop ranging first.
+
+#### Vl53l7cx.pin_ctrl
+
+```python
+pin_ctrl(self, action: int) -> None
+```
+
+Drive the sensor's LPn / I2C_RST pins (`PinAction`). LPN_OFF and
+SOFT_CYCLE drop the sensor's state: run `init()` again afterwards.
+
+#### Vl53l7cx.xtalk_calibration_failed *(property)*
+
+True when the last calibrate_xtalk() found nothing to calibrate (ST
+XTALK_FAILED: "coverglass too good") — the sensor keeps its default
+xtalk data.
+
+#### Vl53l7cx.uld *(property)*
+
+The underlying ULD driver (escape hatch for advanced DCI access).
+
+#### Vl53l7cx.variant *(property)*
+
+'cx' | 'ch' (valid after init()).
+
+#### Vl53l7cx.is_alive
+
+```python
+is_alive(self) -> bool
+```
+
+#### Vl53l7cx.get_resolution
+
+```python
+get_resolution(self) -> int
+```
+
+Active zone count: 16 (4×4) or 64 (8×8).
+
+#### Vl53l7cx.set_resolution
+
+```python
+set_resolution(self, zones: int) -> None
+```
+
+Select the zone grid: RESOLUTION_4X4 (16) or RESOLUTION_8X8 (64).
+Not while ranging.
+
+#### Vl53l7cx.get_ranging_frequency_hz
+
+```python
+get_ranging_frequency_hz(self) -> int
+```
+
+Configured ranging frequency in Hz.
+
+#### Vl53l7cx.set_ranging_frequency_hz
+
+```python
+set_ranging_frequency_hz(self, hz: int) -> None
+```
+
+Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+
+Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
+enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l7cx.get_ranging_mode
+
+```python
+get_ranging_mode(self) -> int
+```
+
+RANGING_MODE_CONTINUOUS or RANGING_MODE_AUTONOMOUS.
+
+#### Vl53l7cx.set_ranging_mode
+
+```python
+set_ranging_mode(self, mode: int) -> None
+```
+
+Set CONTINUOUS (free-running) or AUTONOMOUS (integrate-then-idle)
+ranging. Not while ranging.
+
+#### Vl53l7cx.get_integration_time_ms
+
+```python
+get_integration_time_ms(self) -> int
+```
+
+Configured integration time in ms.
+
+#### Vl53l7cx.set_integration_time_ms
+
+```python
+set_integration_time_ms(self, ms: int) -> None
+```
+
+Set the integration time, 2–1000 ms. Autonomous mode only (no
+effect in continuous ranging). Not while ranging.
+
+#### Vl53l7cx.get_sharpener_percent
+
+```python
+get_sharpener_percent(self) -> int
+```
+
+Configured edge-sharpener strength, 0–99 %.
+
+#### Vl53l7cx.set_sharpener_percent
+
+```python
+set_sharpener_percent(self, pct: int) -> None
+```
+
+Set the edge sharpener, 0–99 % (0 disables). Not while ranging.
+
+#### Vl53l7cx.get_target_order
+
+```python
+get_target_order(self) -> int
+```
+
+TARGET_ORDER_CLOSEST or TARGET_ORDER_STRONGEST.
+
+#### Vl53l7cx.set_target_order
+
+```python
+set_target_order(self, order: int) -> None
+```
+
+Order multi-target zones by CLOSEST or STRONGEST return. Not while
+ranging.
+
+#### Vl53l7cx.get_power_mode
+
+```python
+get_power_mode(self) -> int
+```
+
+POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants).
+
+#### Vl53l7cx.set_power_mode
+
+```python
+set_power_mode(self, mode: int) -> None
+```
+
+Enter sleep / wake / deep-sleep. Not while ranging. Waking from
+DEEP_SLEEP re-downloads the firmware blob (init()).
+
+#### Vl53l7cx.get_xtalk_margin
+
+```python
+get_xtalk_margin(self) -> float
+```
+
+#### Vl53l7cx.set_xtalk_margin
+
+```python
+set_xtalk_margin(self, margin_kcps: float) -> None
+```
+
+#### Vl53l7cx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, reflectance_percent: int, nb_samples: int, distance_mm: int) -> None
+```
+
+Run on-device crosstalk calibration against a flat target at
+`distance_mm` with the given `reflectance_percent` (1..99) averaging
+`nb_samples` (1..16). The result is captured into the xtalk buffer;
+read it back with get_caldata_xtalk(). Blocks several seconds.
+
+#### Vl53l7cx.get_caldata_xtalk
+
+```python
+get_caldata_xtalk(self) -> bytes
+```
+
+Read back the 776-byte xtalk calibration blob (save/restore).
+
+#### Vl53l7cx.set_caldata_xtalk
+
+```python
+set_caldata_xtalk(self, blob: bytes) -> None
+```
+
+Restore a previously saved 776-byte xtalk calibration blob.
+
+#### Vl53l7cx.get_detection_thresholds_enable
+
+```python
+get_detection_thresholds_enable(self) -> int
+```
+
+#### Vl53l7cx.set_detection_thresholds_enable
+
+```python
+set_detection_thresholds_enable(self, enabled: bool) -> None
+```
+
+#### Vl53l7cx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> list[dict]
+```
+
+#### Vl53l7cx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, thresholds: list[dict]) -> None
+```
+
+Program the 64 detection thresholds (interrupt-on-threshold). Each
+entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
+operation (see uld THRESH_* constants).
+
+#### Vl53l7cx.set_detection_thresholds_auto_stop
+
+```python
+set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
+```
+
+#### Vl53l7cx.configure_motion_indicator
+
+```python
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+```
+
+Enable the motion indicator over [distance_min_mm, distance_max_mm]
+and surface motion output in each frame's `.motion`. Returns the
+underlying uld MotionConfig for advanced tuning.
+
+#### Vl53l7cx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Configure the output list, start the sensor and the MCU stream.
+
+#### Vl53l7cx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l7cx.ranging *(property)*
+
+#### Vl53l7cx.on_frame
+
+```python
+on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to parsed frames (reader-thread context; don't block).
+
+#### Vl53l7cx.frames
+
+```python
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over parsed frames (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l7cx.frame_parse_errors *(property)*
+
+Frames dropped because ULD parsing failed (corrupt frame, bad size).
+Distinct from reassembler gap discards (`reassembler_discards`).
+
+#### Vl53l7cx.reassembler_discards *(property)*
+
+Chunked frames discarded by the reassembler (gaps / offset errors).
+
+#### Vl53l7cx.get_frame
+
+```python
+get_frame(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l8.Vl53l8Frame
+```
+
+Convenience: wait for the next frame.
+
+Raises `DepzTimeoutError` when no frame arrives within `timeout`, and
+`LinkClosedError` as soon as the device is closed while waiting —
+a caller blocked here is released by `close()` instead of sitting out
+the full timeout on a link that can never deliver again.
+
+#### Vl53l7cx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l7cx.port *(property)*
+
+#### Vl53l7cx.closed *(property)*
+
+#### Vl53l7cx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l7cx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l7cx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l7cx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l7cx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l7cx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l7cx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l7cx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l7cx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l7cx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l7cx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l7cx.time_sync *(property)*
+
+#### Vl53l7cx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l7cx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l7cx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l7cx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l7cx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l7cx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l7cx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l7ch
+
+```python
+class Vl53l7ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L7CH ToF device: the VL53L7CX superset. `init()` downloads the CH
+firmware blob (VL53LMZ ULD 2.0.16, the same blob as VL53L8CH) and adds
+Compact-Network-Histogram output (`configure_cnh`). CNH frames up to
+~7.6 KB stream in chunks (≤ 8192 B total).
+
+#### Vl53l7ch.configure_cnh
+
+```python
+configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
+```
+
+Arm the CNH histogram block for the next start_ranging(). CH only —
+this method does not exist on Vl53l8cx.
+
+#### Vl53l7ch.cnh_config *(property)*
+
+The CNH config armed by :meth:`configure_cnh`, or ``None``.
+Recorders read this to persist decode parameters next to raw blocks.
+
+#### Vl53l7ch.init
+
+```python
+init(self, variant=None, *, progress=None, write_progress=None) -> None
+```
+
+Initialize the sensor: firmware blob download + default config.
+
+Refuses non-L5/L7 silicon. After the sensor firmware runs, its
+`module_type` tells L5 (MZ) from L7 (MZEVO); a mismatch with this
+class (a board labelled L7 carrying an L5, or vice versa) is reported
+as a warning — ranging still works, since the blob is shared.
+
+#### Vl53l7ch.module_type *(property)*
+
+Sensor module type read at init(): MODULE_TYPE_MZ (0) = VL53L5CX,
+MODULE_TYPE_MZEVO (1) = VL53L7CX/CH. None before init().
+
+#### Vl53l7ch.get_bridge_info
+
+```python
+get_bridge_info(self) -> depz_sensor_sdk.protocol.vl53l7.Vl53l7Info
+```
+
+Bridge counters and pin levels (never touches the sensor). Read it
+before and after a run, not during one: each call takes the bus from
+the stream and can itself cost a frame.
+
+#### Vl53l7ch.set_i2c_speed_khz
+
+```python
+set_i2c_speed_khz(self, khz: int) -> int
+```
+
+Set the sensor-bus SCL frequency; the board snaps to the nearest of
+100, 200, 400, 500 … 1000 kHz. Returns the value now in effect. Raises
+`BusyError` mid-transfer — stop ranging first.
+
+#### Vl53l7ch.pin_ctrl
+
+```python
+pin_ctrl(self, action: int) -> None
+```
+
+Drive the sensor's LPn / I2C_RST pins (`PinAction`). LPN_OFF and
+SOFT_CYCLE drop the sensor's state: run `init()` again afterwards.
+
+#### Vl53l7ch.xtalk_calibration_failed *(property)*
+
+True when the last calibrate_xtalk() found nothing to calibrate (ST
+XTALK_FAILED: "coverglass too good") — the sensor keeps its default
+xtalk data.
+
+#### Vl53l7ch.uld *(property)*
+
+The underlying ULD driver (escape hatch for advanced DCI access).
+
+#### Vl53l7ch.variant *(property)*
+
+'cx' | 'ch' (valid after init()).
+
+#### Vl53l7ch.is_alive
+
+```python
+is_alive(self) -> bool
+```
+
+#### Vl53l7ch.get_resolution
+
+```python
+get_resolution(self) -> int
+```
+
+Active zone count: 16 (4×4) or 64 (8×8).
+
+#### Vl53l7ch.set_resolution
+
+```python
+set_resolution(self, zones: int) -> None
+```
+
+Select the zone grid: RESOLUTION_4X4 (16) or RESOLUTION_8X8 (64).
+Not while ranging.
+
+#### Vl53l7ch.get_ranging_frequency_hz
+
+```python
+get_ranging_frequency_hz(self) -> int
+```
+
+Configured ranging frequency in Hz.
+
+#### Vl53l7ch.set_ranging_frequency_hz
+
+```python
+set_ranging_frequency_hz(self, hz: int) -> None
+```
+
+Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+
+Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
+enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l7ch.get_ranging_mode
+
+```python
+get_ranging_mode(self) -> int
+```
+
+RANGING_MODE_CONTINUOUS or RANGING_MODE_AUTONOMOUS.
+
+#### Vl53l7ch.set_ranging_mode
+
+```python
+set_ranging_mode(self, mode: int) -> None
+```
+
+Set CONTINUOUS (free-running) or AUTONOMOUS (integrate-then-idle)
+ranging. Not while ranging.
+
+#### Vl53l7ch.get_integration_time_ms
+
+```python
+get_integration_time_ms(self) -> int
+```
+
+Configured integration time in ms.
+
+#### Vl53l7ch.set_integration_time_ms
+
+```python
+set_integration_time_ms(self, ms: int) -> None
+```
+
+Set the integration time, 2–1000 ms. Autonomous mode only (no
+effect in continuous ranging). Not while ranging.
+
+#### Vl53l7ch.get_sharpener_percent
+
+```python
+get_sharpener_percent(self) -> int
+```
+
+Configured edge-sharpener strength, 0–99 %.
+
+#### Vl53l7ch.set_sharpener_percent
+
+```python
+set_sharpener_percent(self, pct: int) -> None
+```
+
+Set the edge sharpener, 0–99 % (0 disables). Not while ranging.
+
+#### Vl53l7ch.get_target_order
+
+```python
+get_target_order(self) -> int
+```
+
+TARGET_ORDER_CLOSEST or TARGET_ORDER_STRONGEST.
+
+#### Vl53l7ch.set_target_order
+
+```python
+set_target_order(self, order: int) -> None
+```
+
+Order multi-target zones by CLOSEST or STRONGEST return. Not while
+ranging.
+
+#### Vl53l7ch.get_power_mode
+
+```python
+get_power_mode(self) -> int
+```
+
+POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants).
+
+#### Vl53l7ch.set_power_mode
+
+```python
+set_power_mode(self, mode: int) -> None
+```
+
+Enter sleep / wake / deep-sleep. Not while ranging. Waking from
+DEEP_SLEEP re-downloads the firmware blob (init()).
+
+#### Vl53l7ch.get_xtalk_margin
+
+```python
+get_xtalk_margin(self) -> float
+```
+
+#### Vl53l7ch.set_xtalk_margin
+
+```python
+set_xtalk_margin(self, margin_kcps: float) -> None
+```
+
+#### Vl53l7ch.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, reflectance_percent: int, nb_samples: int, distance_mm: int) -> None
+```
+
+Run on-device crosstalk calibration against a flat target at
+`distance_mm` with the given `reflectance_percent` (1..99) averaging
+`nb_samples` (1..16). The result is captured into the xtalk buffer;
+read it back with get_caldata_xtalk(). Blocks several seconds.
+
+#### Vl53l7ch.get_caldata_xtalk
+
+```python
+get_caldata_xtalk(self) -> bytes
+```
+
+Read back the 776-byte xtalk calibration blob (save/restore).
+
+#### Vl53l7ch.set_caldata_xtalk
+
+```python
+set_caldata_xtalk(self, blob: bytes) -> None
+```
+
+Restore a previously saved 776-byte xtalk calibration blob.
+
+#### Vl53l7ch.get_detection_thresholds_enable
+
+```python
+get_detection_thresholds_enable(self) -> int
+```
+
+#### Vl53l7ch.set_detection_thresholds_enable
+
+```python
+set_detection_thresholds_enable(self, enabled: bool) -> None
+```
+
+#### Vl53l7ch.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> list[dict]
+```
+
+#### Vl53l7ch.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, thresholds: list[dict]) -> None
+```
+
+Program the 64 detection thresholds (interrupt-on-threshold). Each
+entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
+operation (see uld THRESH_* constants).
+
+#### Vl53l7ch.set_detection_thresholds_auto_stop
+
+```python
+set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
+```
+
+#### Vl53l7ch.configure_motion_indicator
+
+```python
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+```
+
+Enable the motion indicator over [distance_min_mm, distance_max_mm]
+and surface motion output in each frame's `.motion`. Returns the
+underlying uld MotionConfig for advanced tuning.
+
+#### Vl53l7ch.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Configure the output list, start the sensor and the MCU stream.
+
+#### Vl53l7ch.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l7ch.ranging *(property)*
+
+#### Vl53l7ch.on_frame
+
+```python
+on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to parsed frames (reader-thread context; don't block).
+
+#### Vl53l7ch.frames
+
+```python
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over parsed frames (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l7ch.frame_parse_errors *(property)*
+
+Frames dropped because ULD parsing failed (corrupt frame, bad size).
+Distinct from reassembler gap discards (`reassembler_discards`).
+
+#### Vl53l7ch.reassembler_discards *(property)*
+
+Chunked frames discarded by the reassembler (gaps / offset errors).
+
+#### Vl53l7ch.get_frame
+
+```python
+get_frame(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l8.Vl53l8Frame
+```
+
+Convenience: wait for the next frame.
+
+Raises `DepzTimeoutError` when no frame arrives within `timeout`, and
+`LinkClosedError` as soon as the device is closed while waiting —
+a caller blocked here is released by `close()` instead of sitting out
+the full timeout on a link that can never deliver again.
+
+#### Vl53l7ch.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l7ch.port *(property)*
+
+#### Vl53l7ch.closed *(property)*
+
+#### Vl53l7ch.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l7ch.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l7ch.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l7ch.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l7ch.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l7ch.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l7ch.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l7ch.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l7ch.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l7ch.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l7ch.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l7ch.time_sync *(property)*
+
+#### Vl53l7ch.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l7ch.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l7ch.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l7ch.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l7ch.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l7ch.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l7ch.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+## VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)
+
+### Vl53lx
+
+```python
+class Vl53lx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+A board of the VL53L 1D family (firmware ``APP_VL53L0_4``).
+
+``init()`` binds the (product, driver kind) pair and runs the ULD's
+sensor_init; ``configure()`` re-initialises and applies the ranging
+configuration — call it before every run. Then ``start_ranging()`` arms
+the MCU stream and measurements arrive via ``on_measurement`` /
+``measurements()`` / ``get_measurement()``. Configuration must not change
+while ranging: the stream owns the bus (contract 12).
+
+This generic class serves any product (the product is read from the board's
+device name); the per-product subclasses (`Vl53l0x`...) fix it.
+
+#### Vl53lx.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53lx.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53lx.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53lx.driver_kind *(property)*
+
+#### Vl53lx.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53lx.initialized *(property)*
+
+#### Vl53lx.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53lx.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53lx.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53lx.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53lx.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53lx.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53lx.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53lx.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53lx.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53lx.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53lx.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53lx.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53lx.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53lx.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53lx.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53lx.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53lx.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53lx.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53lx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53lx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53lx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53lx.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53lx.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53lx.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53lx.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53lx.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53lx.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53lx.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53lx.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53lx.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53lx.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53lx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53lx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53lx.ranging *(property)*
+
+#### Vl53lx.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53lx.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53lx.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53lx.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53lx.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53lx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53lx.port *(property)*
+
+#### Vl53lx.closed *(property)*
+
+#### Vl53lx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53lx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53lx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53lx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53lx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53lx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53lx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53lx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53lx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53lx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53lx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53lx.time_sync *(property)*
+
+#### Vl53lx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53lx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53lx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53lx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53lx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53lx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53lx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l0x
+
+```python
+class Vl53l0x(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L0X (2 m, 1-byte register addresses, 400 kHz): ULD API 1.0.4 with
+ranging profiles (default / long-range / high-speed / high-accuracy),
+offset and crosstalk calibration, reference-SPAD management.
+
+#### Vl53l0x.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53l0x.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53l0x.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53l0x.driver_kind *(property)*
+
+#### Vl53l0x.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53l0x.initialized *(property)*
+
+#### Vl53l0x.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53l0x.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53l0x.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53l0x.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53l0x.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53l0x.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53l0x.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53l0x.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53l0x.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53l0x.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53l0x.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53l0x.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53l0x.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53l0x.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53l0x.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53l0x.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53l0x.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53l0x.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53l0x.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53l0x.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53l0x.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53l0x.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l0x.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53l0x.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l0x.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53l0x.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53l0x.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53l0x.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53l0x.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53l0x.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53l0x.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53l0x.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53l0x.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l0x.ranging *(property)*
+
+#### Vl53l0x.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53l0x.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53l0x.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l0x.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53l0x.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53l0x.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l0x.port *(property)*
+
+#### Vl53l0x.closed *(property)*
+
+#### Vl53l0x.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l0x.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l0x.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l0x.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l0x.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l0x.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l0x.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l0x.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l0x.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l0x.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l0x.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l0x.time_sync *(property)*
+
+#### Vl53l0x.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l0x.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l0x.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l0x.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l0x.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l0x.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l0x.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l1cx
+
+```python
+class Vl53l1cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L1CX (4 m): VL53L1X ULD (short / long distance modes, tabulated
+budgets, calibrations, thresholds, ROI) or the histogram driver.
+
+#### Vl53l1cx.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53l1cx.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53l1cx.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53l1cx.driver_kind *(property)*
+
+#### Vl53l1cx.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53l1cx.initialized *(property)*
+
+#### Vl53l1cx.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53l1cx.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53l1cx.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53l1cx.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53l1cx.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53l1cx.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53l1cx.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53l1cx.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53l1cx.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53l1cx.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53l1cx.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53l1cx.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53l1cx.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53l1cx.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53l1cx.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53l1cx.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53l1cx.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53l1cx.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53l1cx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53l1cx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53l1cx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53l1cx.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l1cx.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53l1cx.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l1cx.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53l1cx.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53l1cx.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53l1cx.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53l1cx.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53l1cx.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53l1cx.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53l1cx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53l1cx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l1cx.ranging *(property)*
+
+#### Vl53l1cx.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53l1cx.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53l1cx.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l1cx.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53l1cx.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53l1cx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l1cx.port *(property)*
+
+#### Vl53l1cx.closed *(property)*
+
+#### Vl53l1cx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l1cx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l1cx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l1cx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l1cx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l1cx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l1cx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l1cx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l1cx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l1cx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l1cx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l1cx.time_sync *(property)*
+
+#### Vl53l1cx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l1cx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l1cx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l1cx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l1cx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l1cx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l1cx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l1cb
+
+```python
+class Vl53l1cb(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L1CB (8 m, cover-glass module): same die and drivers as VL53L1CX;
+usually the one that needs a crosstalk calibration.
+
+#### Vl53l1cb.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53l1cb.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53l1cb.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53l1cb.driver_kind *(property)*
+
+#### Vl53l1cb.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53l1cb.initialized *(property)*
+
+#### Vl53l1cb.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53l1cb.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53l1cb.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53l1cb.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53l1cb.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53l1cb.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53l1cb.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53l1cb.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53l1cb.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53l1cb.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53l1cb.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53l1cb.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53l1cb.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53l1cb.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53l1cb.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53l1cb.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53l1cb.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53l1cb.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53l1cb.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53l1cb.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53l1cb.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53l1cb.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l1cb.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53l1cb.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l1cb.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53l1cb.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53l1cb.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53l1cb.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53l1cb.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53l1cb.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53l1cb.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53l1cb.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53l1cb.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l1cb.ranging *(property)*
+
+#### Vl53l1cb.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53l1cb.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53l1cb.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l1cb.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53l1cb.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53l1cb.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l1cb.port *(property)*
+
+#### Vl53l1cb.closed *(property)*
+
+#### Vl53l1cb.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l1cb.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l1cb.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l1cb.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l1cb.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l1cb.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l1cb.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l1cb.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l1cb.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l1cb.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l1cb.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l1cb.time_sync *(property)*
+
+#### Vl53l1cb.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l1cb.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l1cb.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l1cb.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l1cb.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l1cb.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l1cb.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l3cx
+
+```python
+class Vl53l3cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L3CX (3 m): ST's ULP driver (single target) or the histogram driver
+(several targets per frame).
+
+#### Vl53l3cx.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53l3cx.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53l3cx.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53l3cx.driver_kind *(property)*
+
+#### Vl53l3cx.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53l3cx.initialized *(property)*
+
+#### Vl53l3cx.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53l3cx.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53l3cx.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53l3cx.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53l3cx.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53l3cx.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53l3cx.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53l3cx.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53l3cx.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53l3cx.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53l3cx.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53l3cx.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53l3cx.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53l3cx.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53l3cx.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53l3cx.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53l3cx.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53l3cx.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53l3cx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53l3cx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53l3cx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53l3cx.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l3cx.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53l3cx.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l3cx.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53l3cx.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53l3cx.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53l3cx.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53l3cx.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53l3cx.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53l3cx.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53l3cx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53l3cx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l3cx.ranging *(property)*
+
+#### Vl53l3cx.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53l3cx.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53l3cx.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l3cx.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53l3cx.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53l3cx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l3cx.port *(property)*
+
+#### Vl53l3cx.closed *(property)*
+
+#### Vl53l3cx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l3cx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l3cx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l3cx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l3cx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l3cx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l3cx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l3cx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l3cx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l3cx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l3cx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l3cx.time_sync *(property)*
+
+#### Vl53l3cx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l3cx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l3cx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l3cx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l3cx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l3cx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l3cx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l4cx
+
+```python
+class Vl53l4cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+VL53L4CX (6 m): the histogram driver only — to run it light, borrow a
+sibling's with ``init(product="VL53L4CD")`` (1.2 m, full calibrations).
+
+#### Vl53l4cx.board_name *(property)*
+
+The board's device name (bootloader metablock), e.g.
+``DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523``.
+
+#### Vl53l4cx.detected *(property)*
+
+The product the device name carries, or None on an unstamped
+board (then pass ``product=`` to init).
+
+#### Vl53l4cx.product *(property)*
+
+The product init() bound (None before init).
+
+#### Vl53l4cx.driver_kind *(property)*
+
+#### Vl53l4cx.driver *(property)*
+
+The ULD port in use — escape hatch for product-specific calls
+(L0X reference SPADs, L1 distance modes by register...).
+
+#### Vl53l4cx.initialized *(property)*
+
+#### Vl53l4cx.driver_kinds
+
+```python
+driver_kinds(self, product: str | None = None) -> tuple[str, ...]
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53l4cx.init
+
+```python
+init(self, driver: str | None = None, *, product: str | None = None) -> None
+```
+
+Bind the (product, driver kind) pair and initialise the sensor.
+
+`product` defaults to this class's product, else the board's device
+name; `driver` defaults to the product's first kind in DRIVER_KINDS
+order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
+no row for raises NotImplementedError naming what the product has.
+
+#### Vl53l4cx.identify
+
+```python
+identify(self) -> dict
+```
+
+Everything about what is connected (needs init()). `model_id_ok`
+is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53l4cx.notes
+
+```python
+notes(self) -> list[str]
+```
+
+The lines a UI should show about the chosen pair: product named by
+hand, a borrowed driver, a pair that reaches less than the board is
+rated for, the driver's caveat.
+
+#### Vl53l4cx.supports
+
+```python
+supports(self, group: str) -> bool
+```
+
+Whether this product/driver serves an optional capability group:
+mode, timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
+signal_thresh, sigma_thresh, roi, temp_update, refspad.
+
+#### Vl53l4cx.modes *(property)*
+
+Named ranging modes, first = what init leaves; () if none.
+
+#### Vl53l4cx.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms
+wait; the host confirms the boot). OFF and RESET stop the stream; the
+sensor then holds none of the configuration — init() again.
+
+#### Vl53l4cx.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53lx.Vl53lxInfo
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; touches no
+sensor register, safe while streaming.
+
+#### Vl53l4cx.configure
+
+```python
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+```
+
+Re-initialise the sensor and apply a ranging configuration.
+
+The re-init is deliberate: it is the only way to know what the
+configuration registers hold, and it puts the bus at the product's
+ceiling. `mode` (one of `modes`) goes on before the budget — a mode
+change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
+calibration (the sensor keeps those only until a reset).
+`inter_ms=0` = continuous; otherwise the period between measurements
+(must exceed the budget).
+
+#### Vl53l4cx.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms) read back from the
+sensor; 0 for the period means continuous.
+
+#### Vl53l4cx.get_mode
+
+```python
+get_mode(self) -> str | None
+```
+
+The ranging mode in use, or None on a product without modes.
+
+#### Vl53l4cx.budget_choices
+
+```python
+budget_choices(self) -> tuple[int, ...]
+```
+
+The only budgets accepted right now (ascending), or () when any
+integer in ``identify()['budget_ms']`` will do. Can move with the mode
+(VL53L1: 15 ms exists in short mode only).
+
+#### Vl53l4cx.snap_budget
+
+```python
+snap_budget(self, budget_ms: int) -> int
+```
+
+The nearest budget this product will actually accept.
+
+#### Vl53l4cx.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+#### Vl53l4cx.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+#### Vl53l4cx.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+#### Vl53l4cx.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+#### Vl53l4cx.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Offset calibration against a flat target at `target_dist_mm`;
+returns the offset now programmed. Store it on the host: it lives in
+sensor RAM and is lost on reset.
+
+#### Vl53l4cx.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm`;
+returns the xtalk now programmed (kcps). Store it on the host.
+
+#### Vl53l4cx.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window).
+
+#### Vl53l4cx.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Arm the distance-window interrupt: INT (and so the stream) only on
+a qualifying event. Stays armed until the next init/configure.
+
+#### Vl53l4cx.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l4cx.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+#### Vl53l4cx.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l4cx.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+#### Vl53l4cx.get_roi
+
+```python
+get_roi(self) -> tuple[int, int]
+```
+
+→ (x, y) SPAD window size.
+
+#### Vl53l4cx.set_roi
+
+```python
+set_roi(self, x: int, y: int) -> None
+```
+
+#### Vl53l4cx.get_roi_center
+
+```python
+get_roi_center(self) -> int
+```
+
+#### Vl53l4cx.set_roi_center
+
+```python
+set_roi_center(self, center_spad: int) -> None
+```
+
+#### Vl53l4cx.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53l4cx.perform_ref_spad_management
+
+```python
+perform_ref_spad_management(self) -> tuple
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53l4cx.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
+interrupt-release writes.
+
+#### Vl53l4cx.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l4cx.ranging *(property)*
+
+#### Vl53l4cx.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read, release the interrupt, stop. Raises while the stream runs.
+
+#### Vl53l4cx.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.vl53lx.Vl53lxMeasurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed measurements (reader-thread context; don't
+block). Returns an unsubscribe function.
+
+#### Vl53l4cx.measurements
+
+```python
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after start_ranging().
+
+#### Vl53l4cx.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53lx.Vl53lxMeasurement
+```
+
+Wait for the next streamed measurement. Raises DepzTimeoutError
+after `timeout`, LinkClosedError as soon as the device is closed.
+
+#### Vl53l4cx.stream_parse_errors *(property)*
+
+Stream reports dropped because the driver failed to decode them.
+
+#### Vl53l4cx.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l4cx.port *(property)*
+
+#### Vl53l4cx.closed *(property)*
+
+#### Vl53l4cx.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Vl53l4cx.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Vl53l4cx.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l4cx.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Vl53l4cx.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l4cx.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l4cx.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l4cx.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l4cx.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l4cx.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l4cx.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l4cx.time_sync *(property)*
+
+#### Vl53l4cx.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l4cx.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l4cx.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l4cx.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l4cx.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l4cx.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l4cx.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53lxMeasurement
+
+```python
+class Vl53lxMeasurement(timestamp_us: int, distance_mm: int, status: int, status_text: str, signal_kcps: float, ambient_kcps: float, sigma_mm: float, spads: float, targets: tuple[depz_sensor_sdk.vl53lx.uld.base.Target, ...] = (), extra: dict = <factory>, bins: Any = None) -> None
+```
+
+One ranging result, the same shape for every product of the family.
+
+On the histogram driver `targets` holds every return of the frame,
+strongest signal first, and the top-level fields repeat ``targets[0]``;
+`bins` carries the raw 24-bin histogram. On the light drivers `targets` is
+empty and `bins` is None. `extra` is driver-specific (stream count,
+per-SPAD rates...) — show it, don't branch on it.
+
+#### Vl53lxMeasurement.valid *(property)*
+
+``status == 0``. On histogram products prefer `plottable`.
+
+#### Vl53lxMeasurement.plottable *(property)*
+
+The frame has a usable range (PLOTTABLE_STATUSES).
+
+### Target
+
+```python
+class Target(distance_mm, status, status_text, signal_kcps, ambient_kcps, sigma_mm, min_range_mm, max_range_mm)
+```
+
+One return of a multi-target frame, in the terms the CLI
+and the GUI already print. `min_range_mm`/`max_range_mm` are the edges of the
+target's own pulse, which only the histogram parts know; the others repeat them
+from `distance_mm`.
+
+#### Target.index
+
+```python
+index(self, value, start=0, stop=9223372036854775807, /)
+```
+
+Return first index of value.
+
+Raises ValueError if the value is not present.
+
+#### Target.count
+
+```python
+count(self, value, /)
+```
+
+Return number of occurrences of value.
+
+### Vl53Error
+
+```python
+class Vl53Error
+```
+
+A ULD-level failure: the sensor did not do what the driver needed
+(timeout waiting for data-ready or boot, a calibration that failed...).
+
+#### Vl53Error.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### Vl53Error.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### ProtocolError
+
+```python
+class ProtocolError
+```
+
+The bridge refused a register command or did not answer it — the
+firmware repo's single error for both. The ports catch it where the sensor
+legitimately NACKs for a while (e.g. right after a soft reset).
+
+#### ProtocolError.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### ProtocolError.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### PRODUCTS
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### DRIVER_KINDS
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### PLOTTABLE_STATUSES
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### primary_target
+
+```python
+primary_target(m: depz_sensor_sdk.vl53lx.Vl53lxMeasurement) -> depz_sensor_sdk.vl53lx.uld.base.Target | None
+```
+
+The one target a single-number readout should show — the first
+plottable one — or None when the frame produced nothing usable.
+
+### plot_distances
+
+```python
+plot_distances(m: depz_sensor_sdk.vl53lx.Vl53lxMeasurement) -> list[int]
+```
+
+The distances a chart should draw for one measurement: the plottable
+targets in driver order (invalid ones dropped, not holding a slot), or the
+single distance on a light driver. On the short/medium histogram presets
+slot 0 alternates between a real target and a phase artefact — use this
+instead of ``targets[0]``.
 
 ## BNO086 (IMU)
 
@@ -3532,6 +8171,1219 @@ class Counts(sensor_id: int, offered: int, accepted: int, on: int, attempted: in
 
 Per-sensor event counts (command 0x02 get response, 2 messages).
 
+## BNO055 (IMU)
+
+### Bno055
+
+```python
+class Bno055(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+BNO055 absolute-orientation IMU.
+
+Typical use: `configure()` (CONFIG → units → axis remap → optional
+calibration profile → NDOF), then `start_stream(period_ms=10)` and read
+`samples()` / `on_sample`, or poll `read_sample()`. The sensor fuses on
+chip at 100 Hz; the stream is timer-driven because the data-ready
+interrupt does not exist on the sensor firmware these boards carry
+(03.11).
+
+Page 1 (sensor configs, interrupts, unique id) is reached by switching
+PAGE_ID; the driver always switches back to page 0 and refuses page 1
+while a stream runs — the bridge would read the wrong registers.
+
+#### Bno055.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.bno055.Bno055Info
+```
+
+RPT_BNO_INFO: chip ids, sensor firmware revision and bridge
+counters. Safe to call while streaming.
+
+#### Bno055.is_alive
+
+```python
+is_alive(self) -> bool
+```
+
+True when the bridge passed the chip-ID handshake and the sensor
+answers with the BNO055 ids.
+
+#### Bno055.reset_sensor
+
+```python
+reset_sensor(self) -> None
+```
+
+Hardware reset via nRESET (the bridge answers after the ~0.5 s boot
+handshake). Stops any stream; the sensor comes back in CONFIG mode
+with power-on units and no calibration — call configure() again, or
+restore_configuration().
+
+#### Bno055.read_registers
+
+```python
+read_registers(self, addr: int, length: int, page: int = 0) -> bytes
+```
+
+Read `length` bytes starting at `addr` on `page` (split into
+128-byte transfers). Page 1 is refused while streaming.
+
+#### Bno055.write_registers
+
+```python
+write_registers(self, addr: int, data: bytes, page: int = 0) -> None
+```
+
+Write `data` starting at `addr` on `page`. Most configuration
+registers only accept writes in CONFIG mode — the sensor silently
+ignores the rest; the typed setters handle that for you.
+
+#### Bno055.read_register
+
+```python
+read_register(self, addr: int, page: int = 0) -> int
+```
+
+#### Bno055.write_register
+
+```python
+write_register(self, addr: int, value: int, page: int = 0) -> None
+```
+
+#### Bno055.get_operation_mode
+
+```python
+get_operation_mode(self) -> depz_sensor_sdk.bno055.regs.OprMode
+```
+
+#### Bno055.set_operation_mode
+
+```python
+set_operation_mode(self, mode: depz_sensor_sdk.bno055.regs.OprMode | int) -> None
+```
+
+Switch OPR_MODE and wait out the datasheet switching time
+(7 ms from CONFIG, 19 ms into CONFIG). Into a fusion mode it also
+waits (up to 1 s) for the fusion outputs, which read zero for
+~70 ms after every CONFIG → fusion transition.
+
+The sensor only switches between CONFIG and another mode: a direct
+write from one operating mode to another is silently ignored
+(measured: NDOF → AMG stays NDOF). Such a switch goes through CONFIG.
+
+#### Bno055.get_power_mode
+
+```python
+get_power_mode(self) -> depz_sensor_sdk.bno055.regs.PwrMode
+```
+
+#### Bno055.set_power_mode
+
+```python
+set_power_mode(self, mode: depz_sensor_sdk.bno055.regs.PwrMode | int) -> None
+```
+
+Normal / low power (accelerometer only until motion) / suspend.
+Written in CONFIG mode; the operating mode is restored after.
+
+#### Bno055.get_units
+
+```python
+get_units(self) -> depz_sensor_sdk.bno055.regs.Units
+```
+
+#### Bno055.set_units
+
+```python
+set_units(self, units: depz_sensor_sdk.bno055.regs.Units) -> None
+```
+
+#### Bno055.get_axis_remap
+
+```python
+get_axis_remap(self) -> depz_sensor_sdk.bno055.regs.AxisRemap
+```
+
+#### Bno055.set_axis_remap
+
+```python
+set_axis_remap(self, remap: depz_sensor_sdk.bno055.regs.AxisRemap | str) -> None
+```
+
+Remap output axes for the board's mounting: an AxisRemap, or a
+datasheet placement name "P0".."P7" (P1 = default).
+
+#### Bno055.get_temperature_source
+
+```python
+get_temperature_source(self) -> depz_sensor_sdk.bno055.regs.TempSource
+```
+
+#### Bno055.set_temperature_source
+
+```python
+set_temperature_source(self, source: depz_sensor_sdk.bno055.regs.TempSource | int) -> None
+```
+
+#### Bno055.configure
+
+```python
+configure(self, mode: depz_sensor_sdk.bno055.regs.OprMode | int = <OprMode.NDOF: 12>, units: depz_sensor_sdk.bno055.regs.Units | None = None, axis_remap: depz_sensor_sdk.bno055.regs.AxisRemap | str | None = None, calibration: depz_sensor_sdk.bno055.regs.CalibrationProfile | None = None) -> None
+```
+
+The usual session setup: CONFIG → units → axis remap →
+calibration profile → `mode`. In a fusion mode it returns once the
+fusion outputs are live (~70 ms). Remembered for
+restore_configuration().
+
+#### Bno055.restore_configuration
+
+```python
+restore_configuration(self) -> None
+```
+
+Re-apply the last configure() — after reset_sensor(), or when
+bridge_info().sensor_resets rose (the bridge's bus recovery pulses
+nRESET and the sensor comes back in CONFIG mode). A running stream
+keeps running across it.
+
+#### Bno055.system_status
+
+```python
+system_status(self) -> depz_sensor_sdk.bno055.regs.SystemStatus
+```
+
+ST_RESULT, SYS_CLK_STATUS, SYS_STATUS, SYS_ERR (INT_STA skipped —
+it clears on read).
+
+#### Bno055.self_test
+
+```python
+self_test(self) -> depz_sensor_sdk.bno055.regs.SystemStatus
+```
+
+Built-in self-test (datasheet §3.9.2): CONFIG mode, SYS_TRIGGER
+SELF_TEST, ~400 ms, then SYS_ERR = 3 and a cleared ST_RESULT bit on
+failure. The operating mode is restored after. Not while streaming.
+
+#### Bno055.calibration_status
+
+```python
+calibration_status(self) -> depz_sensor_sdk.bno055.regs.CalibStatus
+```
+
+CALIB_STAT: per-sensor 0..3. In NDOF the sensor calibrates in the
+background; see the datasheet §3.11 for the motions each needs.
+
+#### Bno055.read_calibration_profile
+
+```python
+read_calibration_profile(self) -> depz_sensor_sdk.bno055.regs.CalibrationProfile
+```
+
+Offsets and radii (0x55..0x6A). The sensor only exposes them in
+CONFIG mode — the driver switches there and back.
+
+#### Bno055.write_calibration_profile
+
+```python
+write_calibration_profile(self, profile: depz_sensor_sdk.bno055.regs.CalibrationProfile) -> None
+```
+
+Restore a stored profile (datasheet §3.11.5): CONFIG, write all 22
+bytes, back to the previous mode. It is a starting point, not a lock:
+the background calibration refines it as soon as fusion resumes —
+measured on an uncalibrated magnetometer, NDOF rewrites the mag
+radius at once and the gyro offsets within ~0.5 s. Read it back
+without leaving CONFIG to verify the write itself.
+
+#### Bno055.get_sic_matrix
+
+```python
+get_sic_matrix(self) -> tuple[int, ...]
+```
+
+Soft-iron compensation matrix, 9 × i16 row-major, 1.0 = 16384.
+
+#### Bno055.set_sic_matrix
+
+```python
+set_sic_matrix(self, matrix: tuple[int, ...] = (16384, 0, 0, 0, 16384, 0, 0, 0, 16384)) -> None
+```
+
+#### Bno055.get_accel_config
+
+```python
+get_accel_config(self) -> depz_sensor_sdk.bno055.regs.AccelConfig
+```
+
+#### Bno055.set_accel_config
+
+```python
+set_accel_config(self, config: depz_sensor_sdk.bno055.regs.AccelConfig) -> None
+```
+
+Range / bandwidth / power of the accelerometer. Fusion modes
+override it — effective in non-fusion modes only.
+
+#### Bno055.get_gyro_config
+
+```python
+get_gyro_config(self) -> depz_sensor_sdk.bno055.regs.GyroConfig
+```
+
+#### Bno055.set_gyro_config
+
+```python
+set_gyro_config(self, config: depz_sensor_sdk.bno055.regs.GyroConfig) -> None
+```
+
+#### Bno055.get_mag_config
+
+```python
+get_mag_config(self) -> depz_sensor_sdk.bno055.regs.MagConfig
+```
+
+#### Bno055.set_mag_config
+
+```python
+set_mag_config(self, config: depz_sensor_sdk.bno055.regs.MagConfig) -> None
+```
+
+#### Bno055.unique_id
+
+```python
+unique_id(self) -> bytes
+```
+
+The chip's 16-byte unique id (page 1, 0x50..0x5F).
+
+#### Bno055.get_interrupt_enable
+
+```python
+get_interrupt_enable(self) -> int
+```
+
+#### Bno055.set_interrupt_enable
+
+```python
+set_interrupt_enable(self, mask: int) -> None
+```
+
+INT_EN: which interrupt engines run (INT_* bits in regs).
+
+#### Bno055.get_interrupt_mask
+
+```python
+get_interrupt_mask(self) -> int
+```
+
+#### Bno055.set_interrupt_mask
+
+```python
+set_interrupt_mask(self, mask: int) -> None
+```
+
+INT_MSK: which enabled interrupts drive the INT pin.
+
+#### Bno055.set_interrupt_setting
+
+```python
+set_interrupt_setting(self, register: int, value: int) -> None
+```
+
+Write one motion-interrupt setting register (page 1, 0x11..0x1F:
+thresholds, durations, axis selects — datasheet §3.8.2), as a raw
+byte. Not while streaming.
+
+#### Bno055.read_interrupt_status
+
+```python
+read_interrupt_status(self) -> int
+```
+
+INT_STA — which interrupts fired. Clears on read.
+
+#### Bno055.clear_interrupt
+
+```python
+clear_interrupt(self) -> None
+```
+
+SYS_TRIGGER RST_INT: reset the interrupt status bits and the INT
+pin (the bridge does this itself on an INT-triggered stream).
+
+#### Bno055.read_sample
+
+```python
+read_sample(self, block: tuple[int, int] = (8, 46)) -> depz_sensor_sdk.bno055.Bno055Sample
+```
+
+Poll one register block (default the full 46-byte 0x08..0x35) and
+decode it. Works alongside a stream.
+
+#### Bno055.read_quaternion
+
+```python
+read_quaternion(self) -> tuple[float, float, float, float]
+```
+
+(w, x, y, z) — the cheapest orientation read (8 bytes).
+
+#### Bno055.start_stream
+
+```python
+start_stream(self, period_ms: int = 10, block: tuple[int, int] = (8, 46), trigger: int = 0) -> None
+```
+
+Arm the bridge: read `block` every `period_ms` (TIMER) and push it.
+Fusion runs at 100 Hz, so 10 ms is the useful floor; the 46-byte
+block costs ~3.2 ms of bus in NDOF. TRIGGER_INT reads on the INT
+edge instead (motion interrupts only on SW 03.11) with `period_ms`
+as a missed-edge watchdog (0 = none). Replaces a running stream.
+
+#### Bno055.stop_stream
+
+```python
+stop_stream(self) -> None
+```
+
+#### Bno055.streaming *(property)*
+
+#### Bno055.on_sample
+
+```python
+on_sample(self, cb: Callable[[depz_sensor_sdk.bno055.Bno055Sample], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to streamed samples (reader-thread context; don't block).
+Returns an unsubscribe function.
+
+#### Bno055.samples
+
+```python
+samples(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over streamed samples (bounded, drop-oldest;
+`dropped_count` on the returned iterator). Subscribes immediately.
+
+#### Bno055.get_sample
+
+```python
+get_sample(self, timeout: float = 1.0) -> depz_sensor_sdk.bno055.Bno055Sample
+```
+
+Wait for the next streamed sample. Raises `DepzTimeoutError` when
+nothing arrives within `timeout`, `LinkClosedError` when the device
+is closed while waiting.
+
+#### Bno055.stream_parse_errors *(property)*
+
+Stream reports dropped because they did not decode (short block).
+
+#### Bno055.stream_dropped_counts *(property)*
+
+#### Bno055.close
+
+```python
+close(self) -> None
+```
+
+#### Bno055.port *(property)*
+
+#### Bno055.closed *(property)*
+
+#### Bno055.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Bno055.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Bno055.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Bno055.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Bno055.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Bno055.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Bno055.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Bno055.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Bno055.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Bno055.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Bno055.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Bno055.time_sync *(property)*
+
+#### Bno055.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Bno055.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Bno055.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Bno055.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Bno055.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Bno055.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Bno055.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Bno055Sample
+
+```python
+class Bno055Sample(timestamp_us: int, addr: int, raw: bytes, units: depz_sensor_sdk.bno055.regs.Units, accel: tuple[float, float, float] | None, mag: tuple[float, float, float] | None, gyro: tuple[float, float, float] | None, euler: tuple[float, float, float] | None, quaternion: tuple[float, float, float, float] | None, linear_accel: tuple[float, float, float] | None, gravity: tuple[float, float, float] | None, temperature: float | None, calibration: depz_sensor_sdk.bno055.regs.CalibStatus | None) -> None
+```
+
+One decoded register block (streamed or polled).
+
+Every channel is None when the block did not cover it; values are scaled
+by the units the sensor was set to when the stream started (`units`).
+In non-fusion modes Euler / quaternion / linear accel / gravity read
+zero; in CONFIG mode everything does.
+
+#### Bno055Sample.decode
+
+```python
+decode(timestamp_us: int, addr: int, data: bytes, units: depz_sensor_sdk.bno055.regs.Units) -> 'Bno055Sample'
+```
+
+### OprMode
+
+```python
+class OprMode(*values)
+```
+
+OPR_MODE (0x3D) bits 3:0.
+
+#### OprMode.is_fusion *(property)*
+
+#### OprMode.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### OprMode.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### OprMode.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### OprMode.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### OprMode.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### OprMode.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### OprMode.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### Units
+
+```python
+class Units(accel_mg: bool = False, gyro_rps: bool = False, euler_rad: bool = False, temp_f: bool = False, android: bool = False) -> None
+```
+
+Output units. The default is SI-ish: m/s², dps, degrees, °C, Windows
+orientation (UNIT_SEL = 0x00). The sensor's own power-on value is 0x80
+(Android orientation), so a fresh sensor must be told.
+
+#### Units.pack
+
+```python
+pack(self) -> int
+```
+
+#### Units.unpack *(classmethod)*
+
+```python
+unpack(cls, value: int) -> 'Units'
+```
+
+#### Units.accel_lsb *(property)*
+
+#### Units.gyro_lsb *(property)*
+
+#### Units.euler_lsb *(property)*
+
+#### Units.temp_lsb *(property)*
+
+### AxisRemap
+
+```python
+class AxisRemap(x: int = 0, y: int = 1, z: int = 2, x_negative: bool = False, y_negative: bool = False, z_negative: bool = False) -> None
+```
+
+Which physical axis feeds each output axis, and its sign.
+
+`x = AXIS_Y` means "output X is the chip's Y axis". The sensor rejects a
+mapping that uses one axis twice and silently keeps the old one, so
+`pack()` refuses it instead.
+
+#### AxisRemap.pack
+
+```python
+pack(self) -> tuple[int, int]
+```
+
+→ (AXIS_MAP_CONFIG, AXIS_MAP_SIGN).
+
+#### AxisRemap.unpack *(classmethod)*
+
+```python
+unpack(cls, config: int, sign: int) -> 'AxisRemap'
+```
+
+#### AxisRemap.placement *(classmethod)*
+
+```python
+placement(cls, name: str) -> 'AxisRemap'
+```
+
+Datasheet §3.4 mounting presets P0..P7 (P1 is the default).
+
+### CalibStatus
+
+```python
+class CalibStatus(system: int, gyro: int, accel: int, mag: int) -> None
+```
+
+CALIB_STAT (0x35): 0 = not calibrated … 3 = fully calibrated.
+
+#### CalibStatus.unpack *(classmethod)*
+
+```python
+unpack(cls, value: int) -> 'CalibStatus'
+```
+
+#### CalibStatus.pack
+
+```python
+pack(self) -> int
+```
+
+#### CalibStatus.fully_calibrated *(property)*
+
+### CalibrationProfile
+
+```python
+class CalibrationProfile(accel_offset: tuple[int, int, int], mag_offset: tuple[int, int, int], gyro_offset: tuple[int, int, int], accel_radius: int, mag_radius: int) -> None
+```
+
+Sensor offsets and radii, registers 0x55..0x6A (22 bytes, all i16 LE).
+
+Read it after a full calibration (sensor in CONFIG mode), store it, and
+write it back after every power-on reset to skip the calibration dance
+(datasheet §3.11.5). Offsets are in the sensor's LSB — the value does not
+depend on UNIT_SEL once written back.
+
+#### CalibrationProfile.pack
+
+```python
+pack(self) -> bytes
+```
+
+#### CalibrationProfile.unpack *(classmethod)*
+
+```python
+unpack(cls, data: bytes) -> 'CalibrationProfile'
+```
+
+#### CalibrationProfile.to_dict
+
+```python
+to_dict(self) -> dict
+```
+
+#### CalibrationProfile.from_dict *(classmethod)*
+
+```python
+from_dict(cls, d: dict) -> 'CalibrationProfile'
+```
+
+### PwrMode
+
+```python
+class PwrMode(*values)
+```
+
+PWR_MODE (0x3E) bits 1:0.
+
+#### PwrMode.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### PwrMode.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### PwrMode.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### PwrMode.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### PwrMode.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### PwrMode.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### PwrMode.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### TempSource
+
+```python
+class TempSource(*values)
+```
+
+TEMP_SOURCE (0x40) bits 1:0.
+
+#### TempSource.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### TempSource.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### TempSource.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### TempSource.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### TempSource.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### TempSource.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### TempSource.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### SystemStatus
+
+```python
+class SystemStatus(self_test: int, clk_status: int, status: int, error: int) -> None
+```
+
+ST_RESULT (0x36) + SYS_CLK_STATUS/SYS_STATUS/SYS_ERR (0x38..0x3A).
+INT_STA (0x37) sits in between and clears on read, so it is not here.
+
+#### SystemStatus.status_text *(property)*
+
+#### SystemStatus.error_text *(property)*
+
+#### SystemStatus.self_test_passed *(property)*
+
+### AccelConfig
+
+```python
+class AccelConfig(range: int = 1, bandwidth: int = 3, power: int = 0) -> None
+```
+
+ACC_CONFIG (page 1, 0x08) as register codes: `range` indexes
+ACC_RANGE_G, `bandwidth` ACC_BANDWIDTH_HZ, `power` ACC_POWER_NAMES.
+Power-on value 0x0D = ±4 g, 62.5 Hz, normal.
+
+#### AccelConfig.pack
+
+```python
+pack(self) -> int
+```
+
+#### AccelConfig.unpack *(classmethod)*
+
+```python
+unpack(cls, value: int) -> 'AccelConfig'
+```
+
+### GyroConfig
+
+```python
+class GyroConfig(range: int = 0, bandwidth: int = 7, power: int = 0) -> None
+```
+
+GYR_CONFIG_0/1 (page 1, 0x0A/0x0B): `range` indexes GYR_RANGE_DPS,
+`bandwidth` GYR_BANDWIDTH_HZ, `power` GYR_POWER_NAMES. Power-on value
+0x38/0x00 = 2000 dps, 32 Hz, normal.
+
+#### GyroConfig.pack
+
+```python
+pack(self) -> bytes
+```
+
+#### GyroConfig.unpack *(classmethod)*
+
+```python
+unpack(cls, data: bytes) -> 'GyroConfig'
+```
+
+### MagConfig
+
+```python
+class MagConfig(rate: int = 3, mode: int = 1, power: int = 0) -> None
+```
+
+MAG_CONFIG (page 1, 0x09): `rate` indexes MAG_RATE_HZ, `mode`
+MAG_OPR_NAMES, `power` MAG_POWER_NAMES. Power-on value 0x0B = 10 Hz,
+regular, normal.
+
+#### MagConfig.pack
+
+```python
+pack(self) -> int
+```
+
+#### MagConfig.unpack *(classmethod)*
+
+```python
+unpack(cls, value: int) -> 'MagConfig'
+```
+
+### RawBlock
+
+```python
+class RawBlock(accel: tuple[int, int, int] | None = None, mag: tuple[int, int, int] | None = None, gyro: tuple[int, int, int] | None = None, euler: tuple[int, int, int] | None = None, quaternion: tuple[int, int, int, int] | None = None, linear_accel: tuple[int, int, int] | None = None, gravity: tuple[int, int, int] | None = None, temperature: int | None = None, calib_stat: int | None = None) -> None
+```
+
+Raw register values found in one block read. A channel is None when the
+window `addr..addr+len` does not cover it completely.
+
+### decode_block
+
+```python
+decode_block(addr: int, data: bytes) -> depz_sensor_sdk.bno055.regs.RawBlock
+```
+
+Unpack whatever channels the register window starting at `addr` holds.
+
+### FULL_BLOCK
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### QUAT_BLOCK
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### PLACEMENTS
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### SIC_IDENTITY
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
+### I2C_ERROR_NAMES
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
 ## Bootloader / firmware update
 
 ### BootloaderDevice
@@ -3643,7 +9495,7 @@ Poll serial ports until a BOOTDEPZ device with `serial_number` appears
 ### SessionRecorder
 
 ```python
-class SessionRecorder(path: str | pathlib.Path, *, note: str = '', vl53l8_layers: bool = False)
+class SessionRecorder(path: str | pathlib.Path, *, note: str = '', vl53l8_layers: bool = False, temperature_hz: float | None = 1.0)
 ```
 
 Record decoded data from several devices onto one host timeline.
@@ -4056,6 +9908,66 @@ silently; watch increments, not absolute values.
 ```python
 unpack(cls, payload: bytes) -> 'Vl53l4Info'
 ```
+
+### Vl53l7Info
+
+```python
+class Vl53l7Info(int_edges: int, frames_dropped: int, i2c_errors: int, last_i2c_error: int, lpn_level: int, int_level: int, i2c_khz: int, frame_size: int, streaming: bool) -> None
+```
+
+RPT_VL53_INFO: bridge state only (the sensor is never probed). All
+counters run from power-up / DEVICE_RESET; SOFT_CYCLE clears the I2C ones.
+Note the report carries no echoed command byte.
+
+#### Vl53l7Info.unpack *(classmethod)*
+
+```python
+unpack(cls, payload: bytes) -> 'Vl53l7Info'
+```
+
+### Vl53lxInfo
+
+```python
+class Vl53lxInfo(int_edges: int, slots_skipped: int, i2c_errors: int, last_i2c_error: int, xshut_level: int, int_level: int, i2c_khz: int, addr_width: int, n_clear: int, frames_dropped: int) -> None
+```
+
+RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads
+no sensor register. Counters are free-running (wrap silently): watch
+increments. `slots_skipped` = a slot that never got the bus, `i2c_errors`
+= a bus that answered badly (since power-up, the last XSHUT reset or
+VL53_CLEAR_I2C_ERRORS — the SDK sends that at the end of every sensor
+init, so the NACKs of a resetting die are not counted), `frames_dropped` =
+a good sample the USB TX ring had no room for (since the stream was armed).
+
+#### Vl53lxInfo.unpack *(classmethod)*
+
+```python
+unpack(cls, payload: bytes) -> 'Vl53lxInfo'
+```
+
+### Bno055Info
+
+```python
+class Bno055Info(i2c_addr: int, chip_id: int, acc_id: int, mag_id: int, gyr_id: int, sw_rev: int, bl_rev: int, initialized: int, int_level: int, int_edges: int, read_min_us: int, read_max_us: int, read_avg_us: int, tx_dropped: int, i2c_errors: int, slots_skipped: int, bus_recoveries: int, last_i2c_error: int, sensor_resets: int, loop_max_us: int) -> None
+```
+
+RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
+diagnostics. Counters are free-running and wrap silently; watch
+increments, not absolute values. A rising `sensor_resets` means the
+bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG
+mode and the host must restore its configuration.
+
+#### Bno055Info.unpack *(classmethod)*
+
+```python
+unpack(cls, payload: bytes) -> 'Bno055Info'
+```
+
+#### Bno055Info.ids_ok *(property)*
+
+#### Bno055Info.sw_rev_text *(property)*
+
+Sensor firmware revision as Bosch writes it: 0x0311 → "03.11".
 
 ### FwDepzImage
 
@@ -5342,6 +11254,235 @@ Classify a GET_NAME_ACTIVE_SOFTWARE string.
 
 The string must already be stripped of trailing NUL/0xFF
 (`strip_device_string`).
+
+### PinAction
+
+```python
+class PinAction(*values)
+```
+
+VL53_PIN_CTRL actions. None is a true sensor reset (the board has no
+power GPIO): after LPN_OFF or SOFT_CYCLE the host must re-run init().
+
+#### PinAction.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### PinAction.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### PinAction.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### PinAction.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### PinAction.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### PinAction.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### PinAction.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### I2cError
+
+```python
+class I2cError(*values)
+```
+
+RPT_VL53_INFO.last_i2c_error.
+
+#### I2cError.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### I2cError.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### I2cError.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### I2cError.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### I2cError.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### I2cError.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### I2cError.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
 
 ## Errors
 

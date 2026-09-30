@@ -147,5 +147,5 @@ factors the encoder applies.
   `NbTargetDetected == 0`; skip those zones.
 - **Live init/config is out of scope** — `Vl53l8Uld.Init` throws on purpose. This
   SDK decodes the frames the hardware already produces.
-- **CNH is CH-only** — histogram decode lives in `Vl53l8Cnh` (a pending
-  extension point); see the [VL53L8CH guide](../vl53l8ch/guide.md).
+- **CNH is CH-only** — histogram decode lives in `Vl53l8Cnh.DecodeHistogram`;
+  see the [VL53L8CH guide](../vl53l8ch/guide.md).

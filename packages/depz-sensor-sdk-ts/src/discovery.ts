@@ -16,10 +16,14 @@ import { DepzDevice } from "./device/device.js";
 import { DepzError, NoDepzDeviceError } from "./errors.js";
 import { parseSoftwareName, type SensorType } from "./protocol/identity.js";
 import { isKnownDepzUsb, usbModelHint } from "./protocol/usb-ids.js";
+import { Bno055 } from "./sensors/bno055/bno055.js";
 import { Bno086 } from "./sensors/bno086/bno086.js";
 import { Sr04 } from "./sensors/sr04.js";
-import { Vl53l4Cd } from "./sensors/vl53l4/vl53l4.js";
-import { Vl53l8Ch, Vl53l8Cx } from "./sensors/vl53l8/vl53l8.js";
+import { Vl53l4cd } from "./sensors/vl53l4/vl53l4.js";
+import { resolveVl53l7Model } from "./protocol/vl53l7.js";
+import { Vl53l5cx, Vl53l7ch, Vl53l7cx } from "./sensors/vl53l7/vl53l7.js";
+import { Vl53l8ch, Vl53l8cx } from "./sensors/vl53l8/vl53l8.js";
+import { resolveVl53lxClass } from "./sensors/vl53lx/vl53lx.js";
 import type { SerialTransport } from "./transport/types.js";
 
 /** One enumerated candidate port (Node: serialport.list; Web: granted port). */
@@ -209,6 +213,7 @@ function constructSensor(
   sensorType: SensorType | null,
   timeoutMs: number,
   port?: DepzPortInfo,
+  deviceName = "",
 ): DepzDevice {
   switch (sensorType) {
     case "sr04":
@@ -219,12 +224,31 @@ function constructSensor(
       // no silicon hint, so it and any non-CH hint fall through to the CX base
       // class.
       return usbModelHint(port?.usbVid, port?.usbPid) === "vl53l8ch"
-        ? new Vl53l8Ch(transport, { timeoutMs })
-        : new Vl53l8Cx(transport, { timeoutMs });
+        ? new Vl53l8ch(transport, { timeoutMs })
+        : new Vl53l8cx(transport, { timeoutMs });
+    case "vl53l7":
+      // All three L5/L7 boards run APP_VL53L7; the PID model, then the stamped
+      // device name, pick the class (contract 11 §1).
+      switch (resolveVl53l7Model(usbModelHint(port?.usbVid, port?.usbPid), deviceName)) {
+        case "vl53l5cx":
+          return new Vl53l5cx(transport, { timeoutMs });
+        case "vl53l7ch":
+          return new Vl53l7ch(transport, { timeoutMs });
+        default:
+          return new Vl53l7cx(transport, { timeoutMs });
+      }
+    case "vl53lx": {
+      // One APP_VL53L0_4 firmware serves six products: the PID model, then
+      // the stamped device name, then the generic class (contract 12 §1).
+      const Cls = resolveVl53lxClass(usbModelHint(port?.usbVid, port?.usbPid), deviceName);
+      return new Cls(transport, { timeoutMs });
+    }
     case "vl53l4":
-      return new Vl53l4Cd(transport, { timeoutMs });
+      return new Vl53l4cd(transport, { timeoutMs });
     case "bno086":
       return new Bno086(transport, { timeoutMs });
+    case "bno055":
+      return new Bno055(transport, { timeoutMs });
     default:
       return new DepzDevice(transport, { timeoutMs });
   }
@@ -240,7 +264,7 @@ async function openProbed(
     throw new DepzError("device is in bootloader mode; use the bootloader client (contract 06)");
   }
   const transport = factory(port);
-  const dev = constructSensor(transport, info.sensorType, timeoutMs, port);
+  const dev = constructSensor(transport, info.sensorType, timeoutMs, port, info.deviceName);
   await dev.open();
   return dev;
 }

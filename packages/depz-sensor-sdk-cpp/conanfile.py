@@ -6,15 +6,16 @@ import os
 
 class DepzSensorSdkCppConan(ConanFile):
     name = "depz-sensor-sdk-cpp"
-    version = "0.1.4"
+    version = "0.3.0"
     license = "MIT"
     author = "DEPZ"
     url = "https://github.com/depz-ai/depz-sensor-sdk"
     homepage = "https://github.com/depz-ai/depz-sensor-sdk"
     description = (
-        "C++17 decode-layer SDK for the DEPZ USB sensor line: framed-protocol "
-        "parser and per-sensor wire codecs (SR04, VL53L8CX/CH, BNO086). "
-        "Pure codecs, no I/O."
+        "C++17 SDK for the DEPZ USB sensor line: framed-protocol parser and "
+        "per-sensor wire codecs (SR04, VL53L8CX/CH, BNO086, ...), plus a "
+        "live-hardware layer over depz-sensor-sdk-c (serial links, "
+        "discovery, record/replay, common commands; sensor classes, SR04 first)."
     )
     topics = ("sensors", "usb", "decode", "protocol", "vl53l8", "bno086", "sr04")
 
@@ -35,6 +36,10 @@ class DepzSensorSdkCppConan(ConanFile):
 
     def layout(self):
         cmake_layout(self)
+
+    def requirements(self):
+        # The live-hardware layer (depz/device.hpp) wraps the C SDK.
+        self.requires(f"depz-sensor-sdk-c/{self.version}", transitive_headers=True)
 
     def generate(self):
         deps = CMakeDeps(self)
@@ -57,6 +62,7 @@ class DepzSensorSdkCppConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["depz_sensor_sdk"]
+        self.cpp_info.requires = ["depz-sensor-sdk-c::depz-sensor-sdk-c"]
 
         # Match the CMake config package so find_package(depz-sensor-sdk-cpp)
         # via Conan's CMakeDeps resolves the same target as an installed build.

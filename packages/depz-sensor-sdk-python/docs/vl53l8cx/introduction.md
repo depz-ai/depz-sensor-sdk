@@ -4,7 +4,7 @@ The **VL53L8CX** is a STMicroelectronics multizone Time-of-Flight ranging
 sensor: a tiny laser depth **imager** that returns a 4×4 or 8×8 grid of
 distances up to ~4 m. On the DEPZ sensor line the MCU is a thin SPI **register
 bridge** — the full ST ULD (Ultra-Lite Driver) runs **on the host**, inside
-`depz_sensor_sdk.vl53l8` (`Vl53l8Cx`).
+`depz_sensor_sdk.vl53l8` (`Vl53l8cx`).
 
 This is the base ToF sensor. Its superset — the **VL53L8CH**, which adds Compact
 Network Histograms — has its own [introduction](../vl53l8ch/introduction.md) and
@@ -27,15 +27,15 @@ Network Histograms — has its own [introduction](../vl53l8ch/introduction.md) a
 
 Two silicon/firmware variants share the same register protocol:
 
-- **`Vl53l8Cx`** — the base ranging sensor (this page). `init()` downloads the
+- **`Vl53l8cx`** — the base ranging sensor (this page). `init()` downloads the
   CX sensor firmware blob. Ships as the dev default.
-- **`Vl53l8Ch`** — a superset that additionally emits **Compact Network
-  Histograms (CNH)**, and carries its own production USB PID. `Vl53l8Ch`
-  inherits every `Vl53l8Cx` method and adds `configure_cnh()`. See the
+- **`Vl53l8ch`** — a superset that additionally emits **Compact Network
+  Histograms (CNH)**, and carries its own production USB PID. `Vl53l8ch`
+  inherits every `Vl53l8cx` method and adds `configure_cnh()`. See the
   [VL53L8CH docs](../vl53l8ch/introduction.md).
 
-`open_device()` returns `Vl53l8Ch` when the USB model hint says so, otherwise
-`Vl53l8Cx`; both are instances of `Vl53l8` (the CX base). The blob variant is
+`open_device()` returns `Vl53l8ch` when the USB model hint says so, otherwise
+`Vl53l8cx`; both are instances of `Vl53l8` (the CX base). The blob variant is
 fixed by the class, so you never pass a variant string to `init()`.
 
 ## When to use it
@@ -66,4 +66,4 @@ you need raw return histograms (multi-return analysis, material work).
 - [VL53L8CX user guide](guide.md) — hello-world, configuration, frame fields,
   advanced features, gotchas.
 - [VL53L8CH docs](../vl53l8ch/introduction.md) — the CNH superset.
-- [API reference](api.md) — `Vl53l8Cx`, `Vl53l8Frame`, and the ToF constants.
+- [API reference](api.md) — `Vl53l8cx`, `Vl53l8Frame`, and the ToF constants.

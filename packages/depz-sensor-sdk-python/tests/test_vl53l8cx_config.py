@@ -16,7 +16,7 @@ from depz_sensor_sdk.vl53l8 import (
     RESOLUTION_8X8,
     TARGET_ORDER_CLOSEST,
     TARGET_ORDER_STRONGEST,
-    Vl53l8Cx,
+    Vl53l8cx,
 )
 from depz_sensor_sdk.vl53l8 import uld as uld_mod
 
@@ -138,7 +138,7 @@ def test_set_caldata_xtalk_wrong_length_raises():
 # ── device wrapper guards ─────────────────────────────────────────────────────
 
 
-def _dev(cls=Vl53l8Cx):
+def _dev(cls=Vl53l8cx):
     a, _b = LoopbackLink.pair()
     return cls(a, timeout=0.2)
 

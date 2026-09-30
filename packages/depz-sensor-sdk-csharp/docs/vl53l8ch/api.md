@@ -15,9 +15,33 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L8CH (ToF + CNH)**: [`Vl53l8Cnh`](#vl53l8cnh)
+- **VL53L8CH (ToF + CNH)**: [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Cnh`](#vl53l8cnh)
 
 ## VL53L8CH (ToF + CNH)
+
+### Vl53l8CnhConfig
+
+```csharp
+public sealed record Vl53l8CnhConfig(int NbOfAggregates, int FeatureLength)
+```
+
+The `Vl53l8Cnh` input: the two aggregate/histogram dimensions of the on-device CNH buffer (`VL53LMZ_Motion_Configuration`). These fix the block's internal offsets, so the decode needs them alongside the raw bytes.
+
+### Vl53l8CnhAggregate
+
+```csharp
+public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler)
+```
+
+One decoded CNH aggregate histogram. The float value of bin `i` is `HistRaw[i] / 2^HistScaler[i]` (a per-bin block-floating-point mantissa + shift). Both arrays are `FeatureLength` long.
+
+### Vl53l8CnhResult
+
+```csharp
+public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8CnhAggregate> Aggregates)
+```
+
+A decoded CNH data block: the reference-residual word plus one histogram per aggregate (in aggregate-id order).
 
 ### Vl53l8Cnh
 
@@ -27,7 +51,7 @@ public static class Vl53l8Cnh
 
 VL53L8CH-specific CNH (Compact Network Histogram) decode.
 
-CNH is what the VL53L8CH firmware adds on top of the CX base: a per-aggregate distance histogram captured in poll-mode alongside the normal ranging frame. The shared results-frame decode (`Vl53l8FrameDecoder`) and the advanced DCI codecs (`Vl53l8Advanced` / `MotionConfig`) already serve both CX and CH; this is the CH-only histogram parse.
+CNH is what the VL53L8CH firmware adds on top of the CX base: a per-aggregate distance histogram carried alongside the normal ranging frame. The shared results-frame decode (`Vl53l8FrameDecoder`) and the advanced DCI codecs (`Vl53l8Advanced` / `MotionConfig`) already serve both CX and CH; this is the CH-only histogram parse.
 
 A 1:1 port of the decode path of `vl53lmz_plugin_cnh.c` (`vl53lmz_cnh_get_block_addresses` / `_cnh_get_mem_block_addresses`, VL53LMZ ULD 2.0.16) for the fixed `cnh_cfg` used by the DEPZ firmware (DISABLE_PING_PONG | DISABLE_VARIANCE | AMBIENT | XTALK | ZERO_INVALID | STORE_REF_RESIDUAL). Verified byte-exact against the live-hardware golden vector `contracts/vectors/vl53l8_cnh.json`. The offset arithmetic mirrors the C plugin verbatim; do not "simplify" it.
 

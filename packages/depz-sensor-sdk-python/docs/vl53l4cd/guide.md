@@ -1,6 +1,6 @@
 # VL53L4CD — user guide
 
-Hands-on guide to the `Vl53l4Cd` device class. For what the sensor is and its
+Hands-on guide to the `Vl53l4cd` device class. For what the sensor is and its
 concepts, read the [introduction](introduction.md); for exact signatures see
 the [API reference](api.md).
 
@@ -19,10 +19,10 @@ the [API reference](api.md).
 ## Open and initialize
 
 ```python
-from depz_sensor_sdk import Vl53l4Cd, open_device
+from depz_sensor_sdk import Vl53l4cd, open_device
 
-dev = open_device("/dev/ttyACM0")   # returns a Vl53l4Cd
-assert isinstance(dev, Vl53l4Cd)
+dev = open_device("/dev/ttyACM0")   # returns a Vl53l4cd
+assert isinstance(dev, Vl53l4cd)
 dev.init()                          # ULD boot + VHV calibration, < 1 s
 ```
 
@@ -34,10 +34,10 @@ well under a second. It leaves the bridge's I2C bus at 1 MHz; pass
 ## Hello-world: live distance
 
 ```python
-from depz_sensor_sdk import Vl53l4Cd, open_device
+from depz_sensor_sdk import Vl53l4cd, open_device
 
 with open_device("/dev/ttyACM0") as dev:
-    assert isinstance(dev, Vl53l4Cd)
+    assert isinstance(dev, Vl53l4cd)
     dev.init()
     dev.start_ranging()              # default: 50 ms budget, continuous (~20 Hz)
     for m in dev.measurements():     # blocks; Ctrl+C to stop

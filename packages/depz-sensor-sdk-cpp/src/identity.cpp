@@ -8,8 +8,11 @@ std::string to_string(SensorType t) {
     switch (t) {
         case SensorType::Sr04: return "sr04";
         case SensorType::Vl53l8: return "vl53l8";
+        case SensorType::Vl53l7: return "vl53l7";
         case SensorType::Vl53l4: return "vl53l4";
+        case SensorType::Vl53lx: return "vl53lx";
         case SensorType::Bno086: return "bno086";
+        case SensorType::Bno055: return "bno055";
         case SensorType::Unknown: return "unknown";
     }
     return "unknown";
@@ -45,8 +48,14 @@ Identity parse_software_name(const std::string& name) {
     if (starts_with("APP_")) {
         if (contains("SR04")) return Identity{DeviceMode::App, SensorType::Sr04, name, version};
         if (contains("VL53L8")) return Identity{DeviceMode::App, SensorType::Vl53l8, name, version};
+        if (contains("VL53L7")) return Identity{DeviceMode::App, SensorType::Vl53l7, name, version};
         if (contains("VL53L4")) return Identity{DeviceMode::App, SensorType::Vl53l4, name, version};
+        // The 1D-family bridge: boards answer APP_VL53L0_4_v*, the protocol
+        // spec calls it APP_VL53LX_v* (contract 12).
+        if (contains("VL53L0_4")) return Identity{DeviceMode::App, SensorType::Vl53lx, name, version};
+        if (contains("VL53LX")) return Identity{DeviceMode::App, SensorType::Vl53lx, name, version};
         if (contains("BNO086")) return Identity{DeviceMode::App, SensorType::Bno086, name, version};
+        if (contains("BNO055")) return Identity{DeviceMode::App, SensorType::Bno055, name, version};
         return Identity{DeviceMode::App, SensorType::Unknown, name, version};
     }
     return Identity{DeviceMode::Unknown, std::nullopt, name, version};

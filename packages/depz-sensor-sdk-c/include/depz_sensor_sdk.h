@@ -12,10 +12,15 @@
  *   - common command/report codecs (contract 02)
  *   - SR04 codecs (contract 03)
  *   - VL53L4CD register-bridge + host-ULD codecs (contract 10)
+ *   - VL53L5CX/L7CX/L7CH I2C bridge codecs + frame decode (contract 11)
+ *   - VL53L 1D family (L0X/L1CX/L1CB/L3CX/L4CD/L4CX) bridge v2.00 codecs,
+ *     product table and stateless block decoders (contract 12)
+ *   - BNO055 register-bridge codecs, units / calibration / axis-remap /
+ *     page-1 config codecs and register-window decode (contract 13)
  *   - .fwdepz container parse/validate (contract 06 §2)
  *
- * Sensor host-logic (VL53L8 ULD, BNO086 SH-2/SHTP) is intentionally out of
- * scope for this milestone.
+ * Sensor host-logic (the ST drivers, the BNO086 SH-2 hub protocol) lives in
+ * the live layer, depz_sensor_io.h; this header is pure codecs.
  */
 #ifndef DEPZ_SENSOR_SDK_H
 #define DEPZ_SENSOR_SDK_H
@@ -145,6 +150,14 @@ typedef enum {
                             * the CX/CH split is DEPZ_VL53L8_VARIANT_*. */
     DEPZ_SENSOR_BNO086,
     DEPZ_SENSOR_VL53L4,    /* VL53L4CD single-zone ToF (contract 10) */
+    DEPZ_SENSOR_VL53L7,    /* APP_VL53L7: one firmware for VL53L5CX, VL53L7CX
+                            * and VL53L7CH (contract 11); the class split is
+                            * depz_vl53l7_resolve_model(). */
+    DEPZ_SENSOR_VL53LX,    /* APP_VL53L0_4 (spec name APP_VL53LX): one bridge
+                            * for VL53L0X/L1CX/L1CB/L3CX/L4CD/L4CX (contract
+                            * 12); the product is depz_vl53lx_resolve_product(). */
+    DEPZ_SENSOR_BNO055,    /* APP_BNO055: 9-axis IMU register bridge, fusion
+                            * on chip (contract 13) */
     DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize; must stay last */
 } depz_sensor_type;
 
@@ -347,25 +360,24 @@ int depz_bl_unpack_flash_info(const uint8_t *p, size_t len, depz_flash_info *out
 /* The chunk parse / reassembler / raw-results frame decoder below are SHARED */
 /* by BOTH variants and are the only VERIFIABLE decode path implemented here. */
 /*                                                                           */
-/* NOT-YET-IMPLEMENTED extension points (hardware-dependent, out of scope):   */
-/*   - the live ULD init/config register-bridge driver (firmware download,    */
-/*     DCI register sequences) — see the TS/Python reference `uld` modules;   */
-/*   - CNH compact-network-histogram decode — the CH-specific extension       */
-/*     point (see DEPZ_VL53L8_VARIANT_CH / the CNH note in vl53l8_decode.c).  */
+/* The live ULD driver (firmware download, DCI register sequences) is the    */
+/* depz_vl53l8_* sensor class of depz_sensor_io.h, built on these codecs.     */
+/* The CH frame and CNH decoders are below (depz_vl53l8ch_decode_frame /      */
+/* _decode_cnh).                                                              */
 /* ======================================================================== */
 
-/* Which ToF sensor produced a frame. The frame decoder is variant-agnostic  */
-/* (CX and CH share the ranging-results layout); the enum exists to name the  */
-/* CX/CH split and anchor the CH-only CNH extension point. */
+/* Which ToF sensor produced a frame. CX and CH share the ranging-results    */
+/* blocks but not the footer position: decode CX frames with                  */
+/* depz_vl53l8_decode_frame, CH frames with depz_vl53l8ch_decode_frame. */
 typedef enum {
     DEPZ_VL53L8_VARIANT_CX = 0, /* base ToF (dev-default)                    */
     DEPZ_VL53L8_VARIANT_CH = 1  /* CX + CNH compact-network-histograms (ED40)*/
 } depz_vl53l8_variant;
 
 /* Footer-id offset in a decoded frame: the header id at [8..9] must equal    */
-/* the footer id at [raw_len - N]. N = 12 for the CX / shared CH ranging      */
-/* frame. CNH histogram frames (CH-only) are a different layout and are not   */
-/* decoded here — see the CNH extension-point note in vl53l8_decode.c. */
+/* the footer id at [raw_len - N]. N = 12 for the VL53L8CX ULD 2.1.0 frame;   */
+/* the CH (VL53LMZ) frame uses 4 — depz_vl53l8ch_decode_frame, which also     */
+/* hands out the CNH block for depz_vl53l8ch_decode_cnh(). */
 #define DEPZ_VL53L8CX_FOOTER_ID_OFFSET 12
 
 #define DEPZ_VL53L8_CMD_READ_REG     0x32
@@ -452,18 +464,30 @@ typedef struct {
 } depz_vl53l8_frame;
 
 /*
- * Decode a reassembled raw ranging frame. The layout is shared by BOTH
- * VL53L8CX and VL53L8CH (the CX firmware layout; CH emits the same ranging
- * results), so this decoder serves both variants. Returns 0 on success, -1 on
- * corrupted frame (header/footer id mismatch), -2 on bad length.
- * `timestamp_us` is carried through from the reassembler.
+ * Decode a reassembled raw VL53L8CX ranging frame (ULD 2.1.0 layout: the
+ * footer id sits at raw_len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET, 12). Returns 0
+ * on success, -1 on corrupted frame (header/footer id mismatch), -2 on bad
+ * length. `timestamp_us` is carried through from the reassembler.
  *
- * NOTE: the CH-only CNH (compact-network-histogram) frame is a distinct layout
- * and is NOT handled here — see the CNH extension-point note in
- * vl53l8_decode.c.
+ * VL53L8CH frames come from the VL53LMZ firmware, whose footer id sits at
+ * raw_len - 4: this function rejects them (-1). Decode them with
+ * depz_vl53l8ch_decode_frame().
  */
 int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
                              uint64_t timestamp_us, depz_vl53l8_frame *out);
+
+/*
+ * Decode a reassembled raw VL53L8CH ranging frame: the same block walk as
+ * depz_vl53l8_decode_frame(), with the VL53LMZ footer id at raw_len - 4 (the
+ * Python / TS / C++ SDKs use the same variant-specific offset). `cnh_out`
+ * (may be NULL) receives the CNH data block when the frame carries one — the
+ * bytes depz_vl53l8ch_decode_cnh() takes; *cnh_len (may be NULL) is set to its
+ * length, 0 when there is none. Returns 0, -1 (id mismatch), -2 (bad length)
+ * or -3 (CNH block exceeds cnh_cap).
+ */
+int depz_vl53l8ch_decode_frame(const uint8_t *raw, size_t raw_len,
+                               uint64_t timestamp_us, depz_vl53l8_frame *out,
+                               uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len);
 
 /* ======================================================================== */
 /* VL53L8CH CNH (compact-network-histogram) decode — CH-only extension.       */
@@ -561,11 +585,113 @@ void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
 /*
  * Build the default 156-byte VL53L8CX_Motion_Configuration bytes that
  * motion_indicator_init programs for the given resolution (16 | 64). This is
- * the pure codec half of the motion indicator; the live DCI write is out of
- * scope. Returns 0 on success, -1 on bad resolution.
+ * the pure codec half of the motion indicator (the live DCI write is
+ * depz_vl53l8_configure_motion_indicator). Returns 0 on success, -1 on bad resolution.
  */
 int depz_vl53l8_motion_cfg_default_pack(int resolution,
                                         uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE]);
+
+/* ======================================================================== */
+/* VL53L5CX / VL53L7CX / VL53L7CH I2C register bridge (contract 11)           */
+/*                                                                            */
+/* A delta against the VL53L8 bridge above: commands 0x32/0x33/0x35/0x36 and  */
+/* reports 0x91/0x93 keep the VL53L8 wire format (chunk parse, reassembler    */
+/* and reg-data decode are shared — use depz_vl53l8_*), but the sensor is on  */
+/* I2C with tighter transfer ceilings, adds PIN_CTRL / GET_INFO /             */
+/* SET_I2C_SPEED, and its frames carry the footer id at size-4 with per-zone  */
+/* arrays trimmed to the resolution. The live driver is the multizone class   */
+/* of depz_sensor_io.h (models DEPZ_VL53L8_MODEL_L5CX / _L7CX / _L7CH).       */
+/* ======================================================================== */
+
+/* Which sensor an APP_VL53L7 board opens as (contract 11 §1). */
+typedef enum {
+    DEPZ_VL53L7_MODEL_L7CX = 0, /* base class (default)                      */
+    DEPZ_VL53L7_MODEL_L5CX = 1, /* same API, 63° optics (PID 0xED48)         */
+    DEPZ_VL53L7_MODEL_L7CH = 2  /* L7CX + CNH, as VL53L8CH (PID 0xED4A)      */
+} depz_vl53l7_model;
+
+#define DEPZ_VL53L7_CMD_PIN_CTRL      0x34
+#define DEPZ_VL53L7_CMD_GET_INFO      0x37
+#define DEPZ_VL53L7_CMD_SET_I2C_SPEED 0x38
+#define DEPZ_VL53L7_RPT_INFO          0x92 /* no echoed command byte */
+
+/* VL53_PIN_CTRL actions. None is a true sensor reset (no power GPIO): after
+ * LPN_OFF or SOFT_CYCLE the host must re-run init(). */
+#define DEPZ_VL53L7_PIN_LPN_OFF    0u /* stop streaming, LPn low (I2C off)    */
+#define DEPZ_VL53L7_PIN_LPN_ON     1u /* LPn high (power-up default)          */
+#define DEPZ_VL53L7_PIN_I2C_RST    2u /* pulse I2C_RST                        */
+#define DEPZ_VL53L7_PIN_SOFT_CYCLE 3u /* stop, LPn low 1 ms, high, I2C_RST;
+                                        clears the I2C error counters        */
+
+/* RPT_VL53_INFO.last_i2c_error */
+#define DEPZ_VL53L7_I2C_OK        0u
+#define DEPZ_VL53L7_I2C_NACK      1u
+#define DEPZ_VL53L7_I2C_TIMEOUT   2u
+#define DEPZ_VL53L7_I2C_BUS_ERROR 3u
+
+#define DEPZ_VL53L7_READ_MAX_LEN     1536u /* READ_REG len 1..1536 (L8: 2048) */
+#define DEPZ_VL53L7_WRITE_MAX_LEN    2048u /* WRITE_REG N 1..2048             */
+#define DEPZ_VL53L7_STREAM_CHUNK_MAX 1536u /* frame bytes per RPT_VL53_FRAME  */
+#define DEPZ_VL53L7_INFO_SIZE        20u
+/* Header id at [8..9] must equal the footer id at [raw_len - 4] (both the
+ * l7cx and l7ch blob sets; VL53L8CX uses 12). */
+#define DEPZ_VL53L7_FOOTER_ID_OFFSET 4
+
+/* Encoders (return payload length written). READ_REG / WRITE_REG return 0
+ * when the length is outside 1..READ_MAX_LEN / 1..WRITE_MAX_LEN or
+ * addr + length > 0x10000 (the firmware would answer ERR_INVALID_PARAM). */
+size_t depz_vl53l7_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out); /* 4 B */
+size_t depz_vl53l7_pack_write_reg(uint16_t addr, const uint8_t *data,
+                                  size_t data_len, uint8_t *out); /* 2 + N B */
+size_t depz_vl53l7_pack_pin_ctrl(uint8_t action, uint8_t *out);     /* 1 B */
+size_t depz_vl53l7_pack_set_i2c_speed(uint16_t khz, uint8_t *out);  /* 2 B */
+
+/* RPT_VL53_INFO — bridge state only (20 B, little-endian `<IIIBBBHHB`).
+ * Counters run from power-up / DEVICE_RESET; SOFT_CYCLE clears the I2C ones. */
+typedef struct {
+    uint32_t int_edges;
+    uint32_t frames_dropped;
+    uint32_t i2c_errors;
+    uint8_t  last_i2c_error; /* DEPZ_VL53L7_I2C_* */
+    uint8_t  lpn_level;
+    uint8_t  int_level;
+    uint16_t i2c_khz;        /* effective SCL after SET_I2C_SPEED snapping */
+    uint16_t frame_size;
+    bool     streaming;
+} depz_vl53l7_info;
+/* Returns 0 on success, -1 when len < DEPZ_VL53L7_INFO_SIZE. */
+int depz_vl53l7_unpack_info(const uint8_t *payload, size_t len,
+                            depz_vl53l7_info *out);
+
+/*
+ * Class resolution (normative order, contract 11 §1): the production USB PID
+ * model (`usb_model` as returned by depz_usb_model_hint(): "vl53l5cx" |
+ * "vl53l7cx" | "vl53l7ch"; NULL or anything else = none), else the first
+ * match of `VL53L([57])(CX|CH)` in GET_DEVICE_NAME (`device_name`, may be
+ * NULL), else DEPZ_VL53L7_MODEL_L7CX.
+ */
+depz_vl53l7_model depz_vl53l7_resolve_model(const char *usb_model,
+                                            const char *device_name);
+const char *depz_vl53l7_model_str(depz_vl53l7_model m); /* "vl53l7cx", ... */
+
+/*
+ * Decode a reassembled VL53L5CX/L7CX/L7CH ranging frame (shared block walk
+ * with depz_vl53l8_decode_frame). Differences: the footer id sits at
+ * raw_len - DEPZ_VL53L7_FOOTER_ID_OFFSET, and every per-zone array is trimmed
+ * to the frame's resolution — on L5/L7 the per-target blocks carry 64
+ * entries even in 4x4. The resolution is read from the zone-sized ambient
+ * block (index 0x54D0), so out->resolution is 16 or 64 and arrays past it
+ * are zero.
+ *
+ * `cnh_out` (may be NULL) receives the CNH data block (VL53L7CH with CNH
+ * configured) in decode order — the bytes depz_vl53l8ch_decode_cnh() takes;
+ * *cnh_len (may be NULL) is set to its length, 0 when the frame has none.
+ * Returns 0 on success, -1 on header/footer id mismatch, -2 on bad length,
+ * -3 when the CNH block exceeds cnh_cap.
+ */
+int depz_vl53l7_decode_frame(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out,
+                             uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len);
 
 /* ======================================================================== */
 /* VL53L4CD register bridge + host-ULD codecs (contract 10)                   */
@@ -739,8 +865,474 @@ extern const uint8_t DEPZ_VL53L4_DEFAULT_CONFIGURATION[91];
 size_t depz_vl53l4_config_block(uint8_t *out);
 
 /* ======================================================================== */
+/* VL53L 1D family on the APP_VL53L0_4 bridge, protocol v2.00 (contract 12)  */
+/*                                                                            */
+/* One bridge firmware serves VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX, VL53L4CD */
+/* and VL53L4CX; every ULD runs on the host. A delta against contract 10:     */
+/* READ_REG / WRITE_REG / XSHUT / STOP_STREAM / SET_I2C_SPEED and the         */
+/* REG_DATA / STREAM reports are the depz_vl53l4_* codecs unchanged. New here:*/
+/* SET_ADDR_WIDTH, START_STREAM with its interrupt-release (clear) list, the  */
+/* 23-byte RPT_VL53_INFO, the product table + class resolution, and the three */
+/* stateless block decoders ("base" level — no live driver). All of it is     */
+/* frozen in contracts/vectors/vl53lx.json.                                   */
+/* ======================================================================== */
+
+#define DEPZ_VL53LX_CMD_READ_REG       0x32 /* = DEPZ_VL53L4_CMD_READ_REG      */
+#define DEPZ_VL53LX_CMD_WRITE_REG      0x33
+#define DEPZ_VL53LX_CMD_XSHUT          0x34 /* RESET: no boot handshake (v2) */
+#define DEPZ_VL53LX_CMD_START_STREAM   0x35
+#define DEPZ_VL53LX_CMD_STOP_STREAM    0x36
+#define DEPZ_VL53LX_CMD_GET_INFO       0x37
+#define DEPZ_VL53LX_CMD_SET_I2C_SPEED  0x38
+#define DEPZ_VL53LX_CMD_SET_ADDR_WIDTH 0x39 /* new in v2.00                  */
+#define DEPZ_VL53LX_CMD_CLEAR_I2C_ERRORS 0x3A /* v2.01 (fw v0.24), no payload;
+                                                sent after every sensor init */
+#define DEPZ_VL53LX_RPT_REG_DATA       0x91
+#define DEPZ_VL53LX_RPT_INFO           0x92
+#define DEPZ_VL53LX_RPT_STREAM         0x93
+
+#define DEPZ_VL53LX_CLEAR_STEPS_MAX 4u  /* interrupt-release steps per stream */
+#define DEPZ_VL53LX_START_STREAM_MAX (6u + 3u * DEPZ_VL53LX_CLEAR_STEPS_MAX)
+#define DEPZ_VL53LX_INFO_SIZE 23u
+
+/* One interrupt-release write the bridge plays after every block read. */
+typedef struct {
+    uint16_t addr;
+    uint8_t  value;
+} depz_vl53lx_clear_step;
+
+/* VL53_SET_ADDR_WIDTH payload (1 B). Returns 0 when width is not 1 or 2. */
+size_t depz_vl53lx_pack_set_addr_width(uint8_t width, uint8_t *out);
+/* VL53_START_STREAM payload: addr u16, len u16, flags u8, n_clear u8, then
+ * n_clear x {addr u16, value u8} — 6 + 3n bytes (out needs
+ * DEPZ_VL53LX_START_STREAM_MAX). Returns 0 when n_clear > 4. `clear` may be
+ * NULL when n_clear == 0. flags: DEPZ_VL53L4_SF_INT_ACT_HIGH as contract 10. */
+size_t depz_vl53lx_pack_start_stream(uint16_t addr, uint16_t len, uint8_t flags,
+                                     const depz_vl53lx_clear_step *clear,
+                                     size_t n_clear, uint8_t *out);
+
+/* RPT_VL53_INFO v2.00 (0x92, 23 B `<IIIBBBHBBI`) — bridge state only. */
+typedef struct {
+    uint32_t int_edges;
+    uint32_t slots_skipped;  /* reset at START_STREAM */
+    uint32_t i2c_errors;     /* free-running */
+    uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
+    uint8_t  xshut_level;
+    uint8_t  int_level;
+    uint16_t i2c_khz;
+    uint8_t  addr_width;     /* 1 or 2 */
+    uint8_t  n_clear;        /* clear steps of the armed stream */
+    uint32_t frames_dropped; /* reset at START_STREAM */
+} depz_vl53lx_info;
+/* Returns 0 on success, -1 when len < DEPZ_VL53LX_INFO_SIZE. */
+int depz_vl53lx_unpack_info(const uint8_t *payload, size_t len,
+                            depz_vl53lx_info *out);
+
+/* ---- product table (contract 12 §1) ------------------------------------- */
+
+typedef enum {
+    DEPZ_VL53LX_PRODUCT_NONE = -1, /* unknown / unstamped board             */
+    DEPZ_VL53LX_PRODUCT_L0X = 0,
+    DEPZ_VL53LX_PRODUCT_L1CX,
+    DEPZ_VL53LX_PRODUCT_L1CB,
+    DEPZ_VL53LX_PRODUCT_L3CX,
+    DEPZ_VL53LX_PRODUCT_L4CD,
+    DEPZ_VL53LX_PRODUCT_L4CX,
+    DEPZ_VL53LX_PRODUCT_COUNT      /* table order = UI order                */
+} depz_vl53lx_product;
+
+/* Driver kinds, as a bitmask in depz_vl53lx_product_info.driver_kinds. */
+typedef enum {
+    DEPZ_VL53LX_DRIVER_ULD       = 1 << 0, /* ST Ultra Lite Driver           */
+    DEPZ_VL53LX_DRIVER_ULP       = 1 << 1, /* Ultra Low Power (L3CX only)    */
+    DEPZ_VL53LX_DRIVER_HISTOGRAM = 1 << 2  /* Bare Driver: 24 bins, host     */
+} depz_vl53lx_driver;
+
+typedef struct {
+    const char *name;           /* "VL53L0X", ...                          */
+    uint16_t usb_pid;           /* production PID                          */
+    uint16_t model_id;          /* cross-check only (L1CX=L1CB, L4CD=L4CX) */
+    uint32_t reach_mm;          /* datasheet rating                        */
+    unsigned driver_kinds;      /* OR of depz_vl53lx_driver                */
+    depz_vl53lx_driver default_driver;
+    /* bridge parameters of the default driver: */
+    uint8_t  addr_width;        /* VL53_SET_ADDR_WIDTH                     */
+    uint8_t  n_clear;
+    depz_vl53lx_clear_step clear[2];
+    uint16_t max_khz;           /* bus ceiling after init (inits at 400)   */
+} depz_vl53lx_product_info;
+
+/* Row of the table, or NULL for NONE / out of range. */
+const depz_vl53lx_product_info *depz_vl53lx_product_get(depz_vl53lx_product p);
+/* "uld" | "ulp" | "histogram" (NULL for anything else). */
+const char *depz_vl53lx_driver_str(depz_vl53lx_driver d);
+/* Exact product name, case-insensitive ("vl53l4cx" -> L4CX), else NONE. */
+depz_vl53lx_product depz_vl53lx_product_from_str(const char *name);
+/* Product named on the board (GET_DEVICE_NAME): the first
+ * `VL53L<digit>[A-Z0-9]*` in the upper-cased name, NONE when there is no
+ * match or the match is not a family product. `name` may be NULL. */
+depz_vl53lx_product depz_vl53lx_product_from_board_name(const char *name);
+/* The PID model (`usb_model` as from depz_usb_model_hint(), may be NULL) if
+ * it names a family product, else depz_vl53lx_product_from_board_name(). */
+depz_vl53lx_product depz_vl53lx_resolve_product(const char *usb_model,
+                                                const char *device_name);
+
+/* Which class an APP_VL53L0_4 board opens as (contract 12 §1). VL53L4CD has
+ * no class of its own here (its vl53l4cd class belongs to APP_VL53L4): it,
+ * and an unresolved product, open as the generic class. */
+typedef enum {
+    DEPZ_VL53LX_CLASS_GENERIC = 0, /* "vl53lx": takes the product at init   */
+    DEPZ_VL53LX_CLASS_L0X,
+    DEPZ_VL53LX_CLASS_L1CX,
+    DEPZ_VL53LX_CLASS_L1CB,
+    DEPZ_VL53LX_CLASS_L3CX,
+    DEPZ_VL53LX_CLASS_L4CX
+} depz_vl53lx_class;
+
+depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model,
+                                            const char *device_name);
+const char *depz_vl53lx_class_str(depz_vl53lx_class c); /* "vl53lx", "vl53l0x", ... */
+
+/* ---- stateless block decoders (contract 12 §4) -------------------------- */
+
+#define DEPZ_VL53LX_DIE_BLOCK_ADDR       0x0089u
+#define DEPZ_VL53LX_DIE_BLOCK_LEN        17u
+#define DEPZ_VL53LX_L0X_BLOCK_ADDR       0x14u
+#define DEPZ_VL53LX_L0X_BLOCK_LEN        12u
+#define DEPZ_VL53LX_HISTOGRAM_BLOCK_ADDR 0x0088u
+#define DEPZ_VL53LX_HISTOGRAM_BLOCK_LEN  83u
+#define DEPZ_VL53LX_HISTOGRAM_BINS       24u
+
+/* Which ULD reads the 17-byte die block: (signal offset, per-SPAD K). */
+typedef enum {
+    DEPZ_VL53LX_DIE_L4 = 0, /* VL53L4CD ULD, L3CX ULP: (5, 256) — exactly
+                             * depz_vl53l4_parse_result_block()           */
+    DEPZ_VL53LX_DIE_L1 = 1  /* VL53L1X ULD: (15, 25), crosstalk-corrected
+                             * peak signal at 0x0098                      */
+} depz_vl53lx_die_variant;
+
+/* Decode the die block (0x0089..0x0099) as `variant` reads it. Returns 0 on
+ * success, -1 when len < 17 or the variant is unknown. */
+int depz_vl53lx_decode_die_block(const uint8_t *raw, size_t len,
+                                 depz_vl53lx_die_variant variant,
+                                 depz_vl53l4_result *out);
+
+/* Raw fields of the VL53L0X 12-byte block at 0x14. The PAL range status,
+ * sigma and dmax need the device data cached by init — full driver only. */
+typedef struct {
+    uint16_t distance_raw;            /* mm (quarter-mm if RangeFractional) */
+    uint8_t  device_range_status;     /* raw byte 0                         */
+    uint32_t signal_rate_mcps_1616;   /* FixPoint16.16 Mcps (wire 9.7 << 9) */
+    uint32_t ambient_rate_mcps_1616;
+    uint16_t effective_spad_count_88; /* 8.8                                */
+} depz_vl53lx_l0x_raw;
+/* Returns 0 on success, -1 when len < 12. */
+int depz_vl53lx_decode_l0x_raw(const uint8_t *raw, size_t len,
+                               depz_vl53lx_l0x_raw *out);
+
+/* Status bytes and the 24 photon bins of the 83-byte histogram block at
+ * 0x0088. Turning bins into targets is the full driver's job. */
+typedef struct {
+    uint8_t  interrupt_status;
+    uint8_t  range_status;
+    uint8_t  report_status;
+    uint8_t  stream_count;
+    uint16_t dss_actual_effective_spads;
+    uint16_t reference_phase;
+    uint8_t  vcsel_start;
+    uint32_t bins[DEPZ_VL53LX_HISTOGRAM_BINS]; /* 24-bit counts */
+} depz_vl53lx_histogram_raw;
+/* Bin 23's low byte is rebuilt from its MSB/LSB pair ((MSB << 2) + LSB,
+ * truncated to 8 bits) before the bins are read; `raw` is not modified.
+ * Returns 0 on success, -1 when len < 83. */
+int depz_vl53lx_decode_histogram_raw(const uint8_t *raw, size_t len,
+                                     depz_vl53lx_histogram_raw *out);
+
+/* ======================================================================== */
+/* BNO055 9-axis IMU register bridge, protocol v0.10 (contract 13)           */
+/*                                                                            */
+/* APP_BNO055 is a thin register bridge: the MCU owns I2C (0x28, 400 kHz),    */
+/* the reset pin and one streaming loop; Bosch's fusion runs on the chip.     */
+/* Mode, units, axis remap and calibration are host logic over register      */
+/* access. "Base" level: wire codecs, the pure §4 codecs and window decode to */
+/* raw integers (scaling is value = raw / LSB, §4.2). All of it is frozen in  */
+/* contracts/vectors/bno055.json.                                             */
+/* ======================================================================== */
+
+#define DEPZ_BNO055_CMD_READ_REG     0x32
+#define DEPZ_BNO055_CMD_WRITE_REG    0x33
+#define DEPZ_BNO055_CMD_RESET        0x34 /* deferred reply, allow >= 1.5 s   */
+#define DEPZ_BNO055_CMD_START_STREAM 0x35
+#define DEPZ_BNO055_CMD_STOP_STREAM  0x36
+#define DEPZ_BNO055_CMD_GET_INFO     0x37
+#define DEPZ_BNO055_RPT_REG_DATA     0x91
+#define DEPZ_BNO055_RPT_INFO         0x92
+#define DEPZ_BNO055_RPT_STREAM       0x93
+
+/* Max bytes per READ_REG / WRITE_REG / streamed block; addr + len <= 0x100. */
+#define DEPZ_BNO055_XFER_MAX 128u
+#define DEPZ_BNO055_INFO_SIZE 38u
+
+/* BNO_START_STREAM trigger. Data-ready interrupts do not exist on sensor SW
+ * 03.11: TIMER is the only data trigger; INT is for motion interrupts, and
+ * then period_ms is a missed-edge watchdog (0 disables it). */
+#define DEPZ_BNO055_TRIGGER_TIMER 0u
+#define DEPZ_BNO055_TRIGGER_INT   1u
+
+/* Encoders (return payload length written). RESET / STOP_STREAM / GET_INFO
+ * have an empty payload. */
+size_t depz_bno055_pack_read_reg(uint8_t addr, uint8_t len, uint8_t *out); /* 2 B */
+/* BNO_WRITE_REG payload: addr u8 + data. Returns 1 + data_len, or 0 when
+ * data_len is outside 1..DEPZ_BNO055_XFER_MAX. */
+size_t depz_bno055_pack_write_reg(uint8_t addr, const uint8_t *data,
+                                  size_t data_len, uint8_t *out);
+/* BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16. */
+size_t depz_bno055_pack_start_stream(uint8_t trigger, uint8_t addr, uint8_t len,
+                                     uint16_t period_ms, uint8_t *out); /* 5 B */
+
+/* RPT_BNO_REG_DATA (0x91): echoed opcode, u64 timestamp, register bytes. */
+typedef struct {
+    uint8_t  cmd;
+    uint64_t timestamp_us; /* MCU uptime at I2C-read completion */
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_bno055_reg_data;
+int depz_bno055_unpack_reg_data(const uint8_t *payload, size_t len,
+                                depz_bno055_reg_data *out); /* needs >= 9 B */
+
+/* RPT_BNO_INFO (0x92, 38 B `<BBBBBHBBBIHHHIIIHBBH`): sensor identity
+ * (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running
+ * and wrap; read_*_us, slots_skipped, loop_max_us reset at START_STREAM. A
+ * rising sensor_resets means the sensor is back in CONFIG: re-configure. */
+typedef struct {
+    uint8_t  i2c_addr;       /* 0x28 */
+    uint8_t  chip_id;        /* healthy 0xA0 */
+    uint8_t  acc_id;         /* 0xFB */
+    uint8_t  mag_id;         /* 0x32 */
+    uint8_t  gyr_id;         /* 0x0F */
+    uint16_t sw_rev;         /* BCD: 0x0311 = 03.11 */
+    uint8_t  bl_rev;
+    uint8_t  initialized;    /* 1 = chip-ID handshake passed */
+    uint8_t  int_level;
+    uint32_t int_edges;
+    uint16_t read_min_us;
+    uint16_t read_max_us;
+    uint16_t read_avg_us;
+    uint32_t tx_dropped;
+    uint32_t i2c_errors;
+    uint32_t slots_skipped;
+    uint16_t bus_recoveries;
+    uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
+    uint8_t  sensor_resets;
+    uint16_t loop_max_us;
+} depz_bno055_info;
+/* Returns 0 on success, -1 when len < DEPZ_BNO055_INFO_SIZE. */
+int depz_bno055_unpack_info(const uint8_t *payload, size_t len,
+                            depz_bno055_info *out);
+
+/* RPT_BNO_REG_STREAM (0x93): one streamed register block; addr/len echo the
+ * stream configuration. timestamp_us is the trigger time, not I2C completion. */
+typedef struct {
+    uint64_t timestamp_us;
+    uint8_t  addr;
+    uint8_t  len;
+    const uint8_t *data;   /* points into the report payload (len bytes) */
+} depz_bno055_stream;
+/* Returns 0 on success, -1 when len < 10 + the echoed block length. */
+int depz_bno055_unpack_stream(const uint8_t *payload, size_t len,
+                              depz_bno055_stream *out);
+
+/* ---- register map essentials (§4.1; page 0 unless REG1) ------------------ */
+#define DEPZ_BNO055_REG_CHIP_ID          0x00u
+#define DEPZ_BNO055_REG_PAGE_ID          0x07u /* host-owned; always back to 0 */
+#define DEPZ_BNO055_REG_ACC_DATA         0x08u /* 3 x i16 LE (x, y, z)       */
+#define DEPZ_BNO055_REG_MAG_DATA         0x0Eu
+#define DEPZ_BNO055_REG_GYR_DATA         0x14u
+#define DEPZ_BNO055_REG_EUL_DATA         0x1Au /* heading, roll, pitch        */
+#define DEPZ_BNO055_REG_QUA_DATA         0x20u /* 4 x i16: w, x, y, z         */
+#define DEPZ_BNO055_REG_LIA_DATA         0x28u /* linear accel (no gravity)   */
+#define DEPZ_BNO055_REG_GRV_DATA         0x2Eu
+#define DEPZ_BNO055_REG_TEMP             0x34u /* i8                          */
+#define DEPZ_BNO055_REG_CALIB_STAT       0x35u
+#define DEPZ_BNO055_REG_ST_RESULT        0x36u
+#define DEPZ_BNO055_REG_INT_STA          0x37u /* clears on read              */
+#define DEPZ_BNO055_REG_SYS_CLK_STATUS   0x38u
+#define DEPZ_BNO055_REG_SYS_STATUS       0x39u
+#define DEPZ_BNO055_REG_SYS_ERR          0x3Au
+#define DEPZ_BNO055_REG_UNIT_SEL         0x3Bu
+#define DEPZ_BNO055_REG_OPR_MODE         0x3Du /* bits 3:0                    */
+#define DEPZ_BNO055_REG_PWR_MODE         0x3Eu
+#define DEPZ_BNO055_REG_SYS_TRIGGER      0x3Fu
+#define DEPZ_BNO055_REG_TEMP_SOURCE      0x40u
+#define DEPZ_BNO055_REG_AXIS_MAP_CONFIG  0x41u
+#define DEPZ_BNO055_REG_AXIS_MAP_SIGN    0x42u
+#define DEPZ_BNO055_REG_SIC_MATRIX       0x43u /* 9 x i16, 1.0 = 16384        */
+#define DEPZ_BNO055_REG_CALIB_PROFILE    0x55u /* 22 B, CONFIG mode only      */
+#define DEPZ_BNO055_REG1_ACC_CONFIG      0x08u
+#define DEPZ_BNO055_REG1_MAG_CONFIG      0x09u
+#define DEPZ_BNO055_REG1_GYR_CONFIG_0    0x0Au
+#define DEPZ_BNO055_REG1_GYR_CONFIG_1    0x0Bu
+#define DEPZ_BNO055_REG1_INT_MSK         0x0Fu
+#define DEPZ_BNO055_REG1_INT_EN          0x10u
+#define DEPZ_BNO055_REG1_UNIQUE_ID       0x50u /* 16 B                        */
+
+/* Every output channel in one read (0x08..0x35), and the quaternion alone. */
+#define DEPZ_BNO055_FULL_BLOCK_ADDR 0x08u
+#define DEPZ_BNO055_FULL_BLOCK_LEN  46u
+#define DEPZ_BNO055_QUAT_BLOCK_ADDR 0x20u
+#define DEPZ_BNO055_QUAT_BLOCK_LEN  8u
+
+/* OPR_MODE values; >= IMU are fusion modes. */
+typedef enum {
+    DEPZ_BNO055_MODE_CONFIG = 0x00,
+    DEPZ_BNO055_MODE_ACCONLY, DEPZ_BNO055_MODE_MAGONLY, DEPZ_BNO055_MODE_GYROONLY,
+    DEPZ_BNO055_MODE_ACCMAG, DEPZ_BNO055_MODE_ACCGYRO, DEPZ_BNO055_MODE_MAGGYRO,
+    DEPZ_BNO055_MODE_AMG,
+    DEPZ_BNO055_MODE_IMU = 0x08,
+    DEPZ_BNO055_MODE_COMPASS, DEPZ_BNO055_MODE_M4G, DEPZ_BNO055_MODE_NDOF_FMC_OFF,
+    DEPZ_BNO055_MODE_NDOF = 0x0C
+} depz_bno055_opr_mode;
+
+/* ---- units (UNIT_SEL 0x3B, §4.2 — as the silicon implements them) -------- */
+#define DEPZ_BNO055_UNIT_ACC_MG      0x01u /* ACC_DATA in mg, else m/s^2     */
+#define DEPZ_BNO055_UNIT_GYR_RPS     0x02u /* rad/s, else dps                */
+#define DEPZ_BNO055_UNIT_EUL_RAD     0x04u /* radians, else degrees          */
+#define DEPZ_BNO055_UNIT_TEMP_F      0x10u /* deg F (1 LSB = 2 F), else C    */
+#define DEPZ_BNO055_UNIT_ORI_ANDROID 0x80u /* power-on value is 0x80         */
+
+typedef struct {
+    bool accel_mg;
+    bool gyro_rps;
+    bool euler_rad;
+    bool temp_f;
+    bool android;
+} depz_bno055_units;
+/* Other UNIT_SEL bits are ignored (they do nothing on the sensor). */
+void    depz_bno055_unpack_units(uint8_t unit_sel, depz_bno055_units *out);
+uint8_t depz_bno055_pack_units(const depz_bno055_units *u);
+/* LSB per unit: value = raw / lsb. accel 100 (m/s^2) or 1 (mg); gyro 16
+ * (dps) or 900 (rps); euler 16 (deg) or 900 (rad); temp 1 (C) or 0.5 (F). */
+double depz_bno055_accel_lsb(const depz_bno055_units *u);
+double depz_bno055_gyro_lsb(const depz_bno055_units *u);
+double depz_bno055_euler_lsb(const depz_bno055_units *u);
+double depz_bno055_temp_lsb(const depz_bno055_units *u);
+#define DEPZ_BNO055_MAG_LSB          16.0    /* uT, fixed                    */
+#define DEPZ_BNO055_QUAT_LSB         16384.0 /* 2^14, unit-less              */
+/* LIA and GRV ignore the ACC_Unit bit: always m/s^2 at 100 LSB (measured). */
+#define DEPZ_BNO055_FUSION_ACCEL_LSB 100.0
+
+/* ---- calibration (§4.3) -------------------------------------------------- */
+
+/* CALIB_STAT (0x35): sys<7:6> gyr<5:4> acc<3:2> mag<1:0>, 0..3 each. */
+typedef struct {
+    uint8_t system;
+    uint8_t gyro;
+    uint8_t accel;
+    uint8_t mag;
+} depz_bno055_calib_status;
+void    depz_bno055_unpack_calib_status(uint8_t value, depz_bno055_calib_status *out);
+uint8_t depz_bno055_pack_calib_status(const depz_bno055_calib_status *s);
+/* 3/3/3/3. */
+bool    depz_bno055_fully_calibrated(const depz_bno055_calib_status *s);
+
+#define DEPZ_BNO055_CALIB_PROFILE_LEN 22u
+/* Offsets and radii at 0x55..0x6A, 11 x i16 LE, sensor LSB. Read/write only
+ * in CONFIG, all 22 bytes in one transfer. */
+typedef struct {
+    int16_t accel_offset[3];
+    int16_t mag_offset[3];
+    int16_t gyro_offset[3];
+    int16_t accel_radius;
+    int16_t mag_radius;
+} depz_bno055_calib_profile;
+/* Returns 0 on success, -1 when len != DEPZ_BNO055_CALIB_PROFILE_LEN. */
+int    depz_bno055_unpack_calib_profile(const uint8_t *data, size_t len,
+                                        depz_bno055_calib_profile *out);
+size_t depz_bno055_pack_calib_profile(const depz_bno055_calib_profile *p,
+                                      uint8_t *out); /* 22 B */
+
+/* ---- axis remap (AXIS_MAP_CONFIG 0x41 / AXIS_MAP_SIGN 0x42, §4.4) -------- */
+#define DEPZ_BNO055_AXIS_X 0u
+#define DEPZ_BNO055_AXIS_Y 1u
+#define DEPZ_BNO055_AXIS_Z 2u
+
+/* Which chip axis feeds each output axis (x = AXIS_Y: output X is chip Y). */
+typedef struct {
+    uint8_t x, y, z;
+    bool x_negative, y_negative, z_negative;
+} depz_bno055_axis_remap;
+/* config = z<5:4> y<3:2> x<1:0>; sign = x 2, y 1, z 0 (1 = negative). */
+void depz_bno055_unpack_axis_remap(uint8_t config, uint8_t sign,
+                                   depz_bno055_axis_remap *out);
+/* Returns 0 and writes both bytes, or -1 (nothing written) when x/y/z is not
+ * a permutation of 0/1/2 — the sensor would silently keep the old value. */
+int  depz_bno055_pack_axis_remap(const depz_bno055_axis_remap *a,
+                                 uint8_t *config, uint8_t *sign);
+/* Datasheet §3.4 placements P0..P7 as {AXIS_MAP_CONFIG, AXIS_MAP_SIGN};
+ * P1 (0x24/0x00) is the power-on default. */
+extern const uint8_t DEPZ_BNO055_PLACEMENTS[8][2];
+/* "P0".."P7" (case-insensitive). Returns 0, or -1 for any other name/NULL. */
+int  depz_bno055_placement(const char *name, depz_bno055_axis_remap *out);
+
+/* ---- page-1 sensor configuration (non-fusion modes only) ------------------ */
+
+/* ACC_CONFIG (p1 0x08): range<1:0> (2/4/8/16 g), bandwidth<4:2>
+ * (7.81..1000 Hz), power<7:5>. Power-on 0x0D = 4 g, 62.5 Hz, normal. */
+typedef struct { uint8_t range, bandwidth, power; } depz_bno055_accel_config;
+void    depz_bno055_unpack_accel_config(uint8_t value, depz_bno055_accel_config *out);
+uint8_t depz_bno055_pack_accel_config(const depz_bno055_accel_config *c);
+
+/* GYR_CONFIG_0/1 (p1 0x0A/0x0B): byte 0 range<2:0> (2000..125 dps),
+ * bandwidth<5:3>; byte 1 power<2:0>. Power-on 0x38/0x00. */
+typedef struct { uint8_t range, bandwidth, power; } depz_bno055_gyro_config;
+void   depz_bno055_unpack_gyro_config(const uint8_t bytes[2], depz_bno055_gyro_config *out);
+size_t depz_bno055_pack_gyro_config(const depz_bno055_gyro_config *c,
+                                    uint8_t out[2]); /* 2 B */
+
+/* MAG_CONFIG (p1 0x09): rate<2:0> (2..30 Hz), mode<4:3>, power<6:5>; bit 7
+ * is not a field (a repack drops it). Power-on 0x0B = 10 Hz, regular, normal. */
+typedef struct { uint8_t rate, mode, power; } depz_bno055_mag_config;
+void    depz_bno055_unpack_mag_config(uint8_t value, depz_bno055_mag_config *out);
+uint8_t depz_bno055_pack_mag_config(const depz_bno055_mag_config *c);
+
+/* ---- register-window decode (§4.1) --------------------------------------- */
+
+/* Raw register values found in one block read. A channel is present
+ * (has_* true) only when the window addr..addr+len covers all its bytes. */
+typedef struct {
+    bool    has_accel, has_mag, has_gyro, has_euler, has_quaternion,
+            has_linear_accel, has_gravity, has_temperature, has_calib_stat;
+    int16_t accel[3];
+    int16_t mag[3];
+    int16_t gyro[3];
+    int16_t euler[3];        /* heading, roll, pitch */
+    int16_t quaternion[4];   /* w, x, y, z */
+    int16_t linear_accel[3];
+    int16_t gravity[3];
+    int8_t  temperature;
+    uint8_t calib_stat;      /* CALIB_STAT byte */
+} depz_bno055_block;
+/* Unpack whatever channels the window starting at `addr` holds (data may be
+ * NULL when len == 0). Absent channels are zeroed. */
+void depz_bno055_decode_block(uint8_t addr, const uint8_t *data, size_t len,
+                              depz_bno055_block *out);
+
+/* ======================================================================== */
 /* BNO086 SHTP framing (contract 05 §3) + SH-2 control encoders (§6)          */
 /* ======================================================================== */
+
+/* Bridge commands and report (contract 05 §1). SEND_SHTP_PACKET is answered
+ * with RPT_STATUS at once (OK, or ERR_BUSY: retry after >= 200 ms); every
+ * inbound SHTP frame arrives as RPT_DATA with cmd 0 (ERRATA E2). */
+#define DEPZ_BNO086_CMD_SENSOR_RESET      0x32
+#define DEPZ_BNO086_CMD_SENSOR_WAKE_UP    0x33
+#define DEPZ_BNO086_CMD_SEND_SHTP_PACKET  0x34
+#define DEPZ_BNO086_RPT_DATA              0x91
+
+/* RPT_DATA payload: cmd u8, capture timestamp u64 (MCU µs), SHTP frame.
+ * Returns 0 (the frame points into `p`), -1 when shorter than 9 bytes. */
+int depz_bno086_unpack_data(const uint8_t *p, size_t len, uint64_t *capture_us,
+                            const uint8_t **shtp, size_t *shtp_len);
 
 #define DEPZ_SHTP_HEADER_SIZE   4
 #define DEPZ_SHTP_LENGTH_MASK   0x7FFFu
@@ -832,6 +1424,187 @@ size_t depz_bno_pack_frs_write_request(uint16_t frs_type, uint16_t length_words,
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words,
                                     size_t nwords, uint8_t *out, size_t out_cap);
 
+/* --- SH-2 control message parsers (contract 05 §6) ------------------------ */
+
+/* SH-2 sensor ids (the input report ids) — what Set Feature takes, and the
+ * `sensor_id` of a report. Not the depz_bno_report_type catalog. */
+#define DEPZ_BNO_SENSOR_ACCELEROMETER            0x01u
+#define DEPZ_BNO_SENSOR_GYROSCOPE                0x02u
+#define DEPZ_BNO_SENSOR_MAGNETOMETER             0x03u
+#define DEPZ_BNO_SENSOR_LINEAR_ACCELERATION      0x04u
+#define DEPZ_BNO_SENSOR_ROTATION_VECTOR          0x05u
+#define DEPZ_BNO_SENSOR_GRAVITY                  0x06u
+#define DEPZ_BNO_SENSOR_UNCALIBRATED_GYROSCOPE   0x07u
+#define DEPZ_BNO_SENSOR_GAME_ROTATION_VECTOR     0x08u
+#define DEPZ_BNO_SENSOR_GEOMAGNETIC_ROTATION_VECTOR 0x09u
+#define DEPZ_BNO_SENSOR_UNCALIBRATED_MAGNETOMETER 0x0Fu
+#define DEPZ_BNO_SENSOR_TAP_DETECTOR             0x10u
+#define DEPZ_BNO_SENSOR_STEP_COUNTER             0x11u
+#define DEPZ_BNO_SENSOR_SIGNIFICANT_MOTION       0x12u
+#define DEPZ_BNO_SENSOR_STABILITY_CLASSIFIER     0x13u
+#define DEPZ_BNO_SENSOR_RAW_ACCELEROMETER        0x14u
+#define DEPZ_BNO_SENSOR_RAW_GYROSCOPE            0x15u
+#define DEPZ_BNO_SENSOR_RAW_MAGNETOMETER         0x16u
+#define DEPZ_BNO_SENSOR_STEP_DETECTOR            0x18u
+#define DEPZ_BNO_SENSOR_SHAKE_DETECTOR           0x19u
+#define DEPZ_BNO_SENSOR_FLIP_DETECTOR            0x1Au
+#define DEPZ_BNO_SENSOR_PICKUP_DETECTOR          0x1Bu
+#define DEPZ_BNO_SENSOR_STABILITY_DETECTOR       0x1Cu
+#define DEPZ_BNO_SENSOR_PERSONAL_ACTIVITY_CLASSIFIER 0x1Eu
+#define DEPZ_BNO_SENSOR_SLEEP_DETECTOR           0x1Fu
+#define DEPZ_BNO_SENSOR_TILT_DETECTOR            0x20u
+#define DEPZ_BNO_SENSOR_POCKET_DETECTOR          0x21u
+#define DEPZ_BNO_SENSOR_CIRCLE_DETECTOR          0x22u
+#define DEPZ_BNO_SENSOR_HEART_RATE_MONITOR       0x23u
+#define DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV       0x28u
+#define DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV  0x29u
+#define DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV       0x2Au
+
+/* Control-channel report ids. */
+#define DEPZ_SH2_COMMAND_RESPONSE     0xF1
+#define DEPZ_SH2_COMMAND_REQUEST      0xF2
+#define DEPZ_SH2_FRS_READ_RESPONSE    0xF3
+#define DEPZ_SH2_FRS_READ_REQUEST     0xF4
+#define DEPZ_SH2_FRS_WRITE_RESPONSE   0xF5
+#define DEPZ_SH2_FRS_WRITE_DATA       0xF6
+#define DEPZ_SH2_FRS_WRITE_REQUEST    0xF7
+#define DEPZ_SH2_PRODUCT_ID_RESPONSE  0xF8
+#define DEPZ_SH2_PRODUCT_ID_REQUEST   0xF9
+#define DEPZ_SH2_GET_FEATURE_RESPONSE 0xFC
+#define DEPZ_SH2_SET_FEATURE_COMMAND  0xFD
+#define DEPZ_SH2_GET_FEATURE_REQUEST  0xFE
+
+/* Command Request `command` values. */
+#define DEPZ_SH2_CMD_ERRORS              0x01
+#define DEPZ_SH2_CMD_COUNTER             0x02
+#define DEPZ_SH2_CMD_TARE                0x03
+#define DEPZ_SH2_CMD_INITIALIZE          0x04
+#define DEPZ_SH2_CMD_SAVE_DCD            0x06
+#define DEPZ_SH2_CMD_ME_CALIBRATE        0x07
+#define DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG 0x09
+#define DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE 0x0A
+#define DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET 0x0B
+
+/* Tare axes (bitmap) and basis (the rotation vector tared against). */
+#define DEPZ_BNO_TARE_X   1u
+#define DEPZ_BNO_TARE_Y   2u
+#define DEPZ_BNO_TARE_Z   4u
+#define DEPZ_BNO_TARE_ALL 7u
+#define DEPZ_BNO_TARE_BASIS_RV            0u
+#define DEPZ_BNO_TARE_BASIS_GAME_RV       1u
+#define DEPZ_BNO_TARE_BASIS_GEOMAG_RV     2u
+#define DEPZ_BNO_TARE_BASIS_GYRO_RV       3u
+#define DEPZ_BNO_TARE_BASIS_ARVR_RV       4u
+#define DEPZ_BNO_TARE_BASIS_ARVR_GAME_RV  5u
+
+/* Get Oscillator Type results; error-record source 255 ends the queue. */
+#define DEPZ_BNO_OSC_INTERNAL     0u
+#define DEPZ_BNO_OSC_EXT_CRYSTAL  1u
+#define DEPZ_BNO_OSC_EXT_CLOCK    2u
+#define DEPZ_BNO_ERR_SOURCE_NO_MORE 255u
+
+/* FRS record ids used by the SDK (SH-2 figure 28). */
+#define DEPZ_BNO_FRS_STATIC_CALIBRATION_AGM 0x7979u
+#define DEPZ_BNO_FRS_NOMINAL_CALIBRATION    0x4D4Du
+#define DEPZ_BNO_FRS_DYNAMIC_CALIBRATION    0x1F1Fu
+#define DEPZ_BNO_FRS_ME_POWER_MGMT          0xD3E2u
+#define DEPZ_BNO_FRS_SYSTEM_ORIENTATION     0x2D3Eu /* 4 x Q30 words */
+#define DEPZ_BNO_FRS_ACCEL_ORIENTATION      0x2D41u
+#define DEPZ_BNO_FRS_GYROSCOPE_ORIENTATION  0x2D46u
+#define DEPZ_BNO_FRS_MAGNETOMETER_ORIENTATION 0x2D4Cu
+#define DEPZ_BNO_FRS_ARVR_STABILIZATION_RV  0x3E2Du
+#define DEPZ_BNO_FRS_ARVR_STABILIZATION_GRV 0x3E2Eu
+#define DEPZ_BNO_FRS_SIG_MOTION_DETECT_CONFIG 0xC274u
+#define DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG    0x7D7Du
+#define DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG 0xED85u
+#define DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG 0xED88u
+
+/* FRS read statuses (low nibble) and write statuses. */
+#define DEPZ_BNO_FRS_READ_NO_ERROR               0u
+#define DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE      1u
+#define DEPZ_BNO_FRS_READ_BUSY                   2u
+#define DEPZ_BNO_FRS_READ_COMPLETED              3u
+#define DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE    4u
+#define DEPZ_BNO_FRS_READ_RECORD_EMPTY           5u
+#define DEPZ_BNO_FRS_READ_BLOCK_COMPLETED        6u
+#define DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED 7u
+#define DEPZ_BNO_FRS_READ_DEVICE_ERROR           8u
+#define DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED        0u
+#define DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE     1u
+#define DEPZ_BNO_FRS_WRITE_BUSY                  2u
+#define DEPZ_BNO_FRS_WRITE_COMPLETED             3u
+#define DEPZ_BNO_FRS_WRITE_MODE_READY            4u
+#define DEPZ_BNO_FRS_WRITE_FAILED                5u
+#define DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE     6u
+#define DEPZ_BNO_FRS_WRITE_INVALID_LENGTH        7u
+#define DEPZ_BNO_FRS_WRITE_RECORD_VALID          8u
+#define DEPZ_BNO_FRS_WRITE_RECORD_INVALID        9u
+
+/* Get Feature Response 0xFC (17 B): the rates in effect. */
+typedef struct {
+    uint8_t  sensor_id, flags;
+    uint16_t sensitivity;
+    uint32_t interval_us;   /* granted report interval; 0 = disabled */
+    uint32_t batch_us;
+    uint32_t cfg_word;
+} depz_bno_feature;
+
+/* Product ID Response 0xF8 (16 B), one per subsystem. */
+typedef struct {
+    uint8_t  reset_cause, sw_version_major, sw_version_minor;
+    uint32_t sw_part_number;  /* 10004148 = BNO085, 10004563 = BNO086 */
+    uint32_t sw_build_number;
+    uint16_t sw_version_patch;
+} depz_bno_product_id;
+
+/* Command Response 0xF1 (16 B). r[0] is the status for most commands. */
+typedef struct {
+    uint8_t seq, command, command_seq, response_seq;
+    uint8_t r[11];
+} depz_bno_command_response;
+
+/* FRS Read Response 0xF3 (16 B): up to two words per packet. */
+typedef struct {
+    uint8_t  status;        /* DEPZ_BNO_FRS_READ_* */
+    uint8_t  data_length;   /* valid words in data0 / data1 (0..2) */
+    uint16_t offset_words;
+    uint32_t data0, data1;
+    uint16_t frs_type;
+} depz_bno_frs_read_response;
+
+/* FRS Write Response 0xF5 (4 B). */
+typedef struct {
+    uint8_t  status;        /* DEPZ_BNO_FRS_WRITE_* */
+    uint16_t offset_words;
+} depz_bno_frs_write_response;
+
+/* Each returns 0, or -1 when `p` is too short or not that report. */
+int depz_bno_unpack_feature_response(const uint8_t *p, size_t len, depz_bno_feature *out);
+int depz_bno_unpack_product_id(const uint8_t *p, size_t len, depz_bno_product_id *out);
+int depz_bno_unpack_command_response(const uint8_t *p, size_t len, depz_bno_command_response *out);
+int depz_bno_unpack_frs_read_response(const uint8_t *p, size_t len, depz_bno_frs_read_response *out);
+int depz_bno_unpack_frs_write_response(const uint8_t *p, size_t len, depz_bno_frs_write_response *out);
+
+/* Sensor metadata FRS record (0xE301..0xE324), sh2 reference layout:
+ * revision-gated fields read 0 when the record predates them. */
+typedef struct {
+    uint8_t  me_version, mh_version, sh_version;
+    uint32_t range_raw;        /* same units and Q point as the sensor's reports */
+    uint32_t resolution_raw;
+    uint16_t revision;         /* word 3 bits 31:16 */
+    uint16_t power_ma_q10;     /* word 3 bits 15:0: mA, Q10 */
+    uint32_t min_period_us;
+    uint32_t max_period_us;    /* revision >= 4 */
+    uint16_t fifo_max, fifo_reserved;
+    uint16_t batch_buffer_bytes;
+    uint16_t q_point_1, q_point_2;
+    uint16_t q_point_3;        /* revision >= 3 */
+} depz_bno_metadata;
+
+void depz_bno_metadata_from_words(const uint32_t *words, size_t n, depz_bno_metadata *out);
+/* The metadata FRS record of a sensor id, 0 when none is known. */
+uint16_t depz_bno_metadata_record(uint8_t sensor_id);
+
 /* ======================================================================== */
 /* BNO086 SH-2 input-report parsers (contract 05 §5)                          */
 /* ======================================================================== */
@@ -919,6 +1692,26 @@ size_t depz_bno_parse_input_cargo(const uint8_t *payload, size_t len,
  */
 int depz_bno_parse_gyro_rv(const uint8_t *payload, size_t len,
                            uint64_t capture_timestamp_us, depz_bno_report *out);
+
+/* --- Scaling (value = raw / 2^Q, contract 05 §4) ------------------------- */
+
+#define DEPZ_BNO_RV_ACCURACY_Q     12  /* rotation-vector accuracy, rad */
+#define DEPZ_BNO_GYRO_RV_ANGVEL_Q  10  /* gyro-integrated RV angular velocity, rad/s */
+
+/* Q point of a sensor's primary fields; -1 for event reports. */
+int depz_bno_q_point(uint8_t sensor_id);
+/* x, y, z in m/s², rad/s or µT (raw counts for the raw sensors). */
+void depz_bno_report_xyz(const depz_bno_report *r, double out[3]);
+/* Uncalibrated gyroscope / magnetometer bias, same units. */
+void depz_bno_report_bias(const depz_bno_report *r, double out[3]);
+/* Unit quaternion i, j, k, real (rotation vectors, gyro-integrated RV). */
+void depz_bno_report_quaternion(const depz_bno_report *r, double out[4]);
+/* Heading accuracy estimate in radians; false for the game variants. */
+bool depz_bno_report_accuracy_rad(const depz_bno_report *r, double *out);
+/* Gyro-integrated RV angular velocity, rad/s. */
+void depz_bno_report_angular_velocity(const depz_bno_report *r, double out[3]);
+/* Environment reports 0x0A..0x0E: hPa, lux, %, cm, °C. */
+double depz_bno_report_scalar(const depz_bno_report *r);
 
 /* ======================================================================== */
 /* .depzdata dataset reader (contract 09) — JSONL: header + records.          */

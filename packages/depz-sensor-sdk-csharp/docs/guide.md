@@ -15,8 +15,21 @@ guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board, 63° / 90°) —
+  [VL53L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
+  [api](vl53l5cx/api.md)) · [VL53L7CX](vl53l7cx/introduction.md)
+  ([guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md))
+- **VL53L7CH** (VL53L7CX + CNH histograms) —
+  [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
+  [api](vl53l7ch/api.md)
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
+  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
+  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
+  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
 - **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
   [guide](bno086/guide.md) · [api](bno086/api.md)
+- **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
+  [guide](bno055/guide.md) · [api](bno055/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the `///` XML-doc summaries so it never drifts from the code.
@@ -46,8 +59,7 @@ payloads to send back. It does not own a serial port or a reader thread; that
 transport is the host application's concern.
 
 Each sensor is a USB CDC-ACM device speaking one shared framed protocol
-(`A5 C3` header + CRC). Five sensors across three firmware philosophies —
-mirrored from the firmware:
+(`A5 C3` header + CRC). The sensors fall into three firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `EchoTimeUs` → distance
   (`Depz.Sensor.Protocol.Sr04`).
@@ -62,6 +74,19 @@ mirrored from the firmware:
 - **BNO086** — the device is an SHTP pass-through; the SH-2 stack runs on the
   host. This SDK ports SHTP framing/reassembly, the SH-2 control encoders and
   the input-report decoders (`Depz.Sensor.Bno086`).
+- **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
+  three boards; frames have the VL53L8 layout. This SDK ports the board codecs,
+  class resolution and the L5/L7 frame decoder (`Depz.Sensor.Vl53l7`), with
+  CNH through `Vl53l8Cnh`.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
+  for the 1D family. This SDK ports the v2.00 codecs, the product table and the
+  stateless decode of the streamed blocks (`Depz.Sensor.Vl53lx`).
+- **BNO055** — an I2C register bridge; Bosch's fusion runs on the chip. This
+  SDK ports the wire codecs, the register codecs and the register-window
+  decode (`Depz.Sensor.Bno055`).
+
+For the VL53L5CX / L7CX / L7CH, the 1D family and the BNO055, initialising
+and streaming the board is done with the Python or TypeScript SDK; this SDK decodes what they send and builds the command payloads.
 
 The public surface is every `public` type under `src/Depz.Sensor/`; the API
 reference is generated from it, so it never drifts from the code.
@@ -69,7 +94,7 @@ reference is generated from it, so it never drifts from the code.
 ## Installation
 
 Everything targets **.NET 8** (`net8.0`). It is published on NuGet as
-`Depz.Sensor` (0.1.4):
+`Depz.Sensor` (0.3.0):
 
 ```bash
 dotnet add package Depz.Sensor
@@ -288,10 +313,6 @@ A few things are deliberately **stubbed, not faked**, because they cannot be
 verified from golden vectors alone (rather than return fabricated data, they
 throw a clearly-named exception or are declared as an explicit stub):
 
-- **CNH histogram decode (VL53L8CH-specific)** — `Vl53l8Cnh.DecodeHistogram`.
-  The shared frame decode already serves both CX and CH; CNH is the CH-only
-  addition and has no golden vector yet. See the
-  [VL53L8CH guide](vl53l8ch/guide.md).
 - **Live VL53L8 ULD init/config** — `Vl53l8Uld.Init`. The firmware-download +
   register-bridge init sequence only means anything against real silicon over
   the CDC link, so it is out of scope for a decode SDK. See the
@@ -300,3 +321,12 @@ throw a clearly-named exception or are declared as an explicit stub):
   sequences over `ReadReg`/`WriteReg` are host code you write
   (`Vl53l4Uld.LiveDriverStubbed`); the codec/math layer itself is complete.
   See the [VL53L4CD guide](vl53l4cd/guide.md).
+- **Live drivers of the L5/L7 boards, the 1D family and the BNO055** — the
+  firmware download and ULD configuration (L5/L7), the ST drivers (1D family)
+  and the session logic (BNO055: mode switches through CONFIG, boot and
+  fusion-start waits, page discipline). The codecs and the stateless decode
+  are here; see the per-sensor guides.
+
+The CNH histogram block of the VL53L8CH / VL53L7CH is decoded:
+`Vl53l8Cnh.DecodeHistogram` unpacks `Vl53l8Frame.CnhRaw` into per-aggregate
+histograms.

@@ -10,12 +10,12 @@ The **VL53L8CX** is a multi-zone time-of-flight depth sensor. It ranges a
 image at up to ~15 Hz. On the DEPZ boards the MCU is a thin SPI bridge; the
 full ST ULD driver runs **on the host** inside this SDK.
 
-`Vl53l8Cx` is the base ToF class — the dev-default silicon. There is also a
-superset part, **VL53L8CH** (`Vl53l8Ch`, production USB PID `0xED40`), which
+`Vl53l8cx` is the base ToF class — the dev-default silicon. There is also a
+superset part, **VL53L8CH** (`Vl53l8ch`, production USB PID `0xED40`), which
 adds Compact-Network-Histogram output on top of everything here; it has its own
 [introduction](../vl53l8ch/introduction.md) and [guide](../vl53l8ch/guide.md).
 `openDevice()` picks the class from the USB model hint; both are
-`instanceof Vl53l8Cx`.
+`instanceof Vl53l8cx`.
 
 ## What it measures
 
@@ -45,5 +45,5 @@ the active resolution (16 or 64), row-major.
   caldata save/restore, detection thresholds, and the motion indicator.
 - **Timestamps** are device microseconds as `bigint` on every frame.
 
-The class is [`Vl53l8Cx`](api.md); `zoneGrid(arr, resolution)` reshapes any
+The class is [`Vl53l8cx`](api.md); `zoneGrid(arr, resolution)` reshapes any
 per-zone array to a 2-D grid. See the [guide](guide.md) for code.

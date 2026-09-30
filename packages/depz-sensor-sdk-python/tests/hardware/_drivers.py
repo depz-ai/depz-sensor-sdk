@@ -20,10 +20,15 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from _support import (
+    FAMILY_BNO055,
     FAMILY_BNO086,
     FAMILY_SR04,
+    FAMILY_VL53L5CX,
+    FAMILY_VL53L7CH,
+    FAMILY_VL53L7CX,
     FAMILY_VL53L8CH,
     FAMILY_VL53L8CX,
+    VL53LX_FAMILIES,
     SR04_MODULE_NO_ECHO_US,
     HwDevice,
     open_family,
@@ -208,6 +213,38 @@ class Vl53l8Driver(SensorDriver):
         )
 
 
+class Vl53lxDriver(SensorDriver):
+    """The 1D family (APP_VL53L0_4): init() picks the product's default
+    driver kind, configure() sets a 33 ms budget."""
+
+    first_sample_timeout = 2.0
+    nominal_hz = 25.0
+
+    def prepare(self) -> None:
+        self.dev.init()
+        self.dev.configure(budget_ms=self.dev.snap_budget(33))
+
+    def start(self) -> None:
+        self.dev.start_ranging()
+
+    def stop(self) -> None:
+        self.dev.stop_ranging()
+
+    def read_one(self, timeout: float | None = None) -> Any:
+        return self.dev.get_measurement(
+            timeout=self.first_sample_timeout if timeout is None else timeout
+        )
+
+    def pending_read(self) -> Any:
+        return self.dev.get_measurement(timeout=30.0)
+
+    def sample_timestamp_us(self, sample) -> int:
+        return sample.timestamp_us
+
+    def sample_is_valid(self, sample) -> bool:
+        return isinstance(sample.distance_mm, int) and isinstance(sample.status, int)
+
+
 class Bno086Driver(SensorDriver):
     first_sample_timeout = 2.0
     nominal_hz = 50.0
@@ -290,9 +327,49 @@ class Bno086Driver(SensorDriver):
         return finite and abs(norm - 1.0) < 0.02
 
 
+class Bno055Driver(SensorDriver):
+    """NDOF fusion, the full 46-byte block on a 10 ms timer — what the viewer
+    streams."""
+
+    first_sample_timeout = 2.0
+    nominal_hz = 100.0
+
+    def prepare(self) -> None:
+        self.dev.configure()
+
+    def start(self) -> None:
+        self.dev.start_stream(10)
+
+    def stop(self) -> None:
+        self.dev.stop_stream()
+
+    def read_one(self, timeout: float | None = None) -> Any:
+        return self.dev.get_sample(
+            timeout=self.first_sample_timeout if timeout is None else timeout
+        )
+
+    def pending_read(self) -> Any:
+        return self.dev.get_sample(timeout=30.0)
+
+    def sample_timestamp_us(self, sample) -> int:
+        return sample.timestamp_us
+
+    def sample_is_valid(self, sample) -> bool:
+        import math
+
+        q = sample.quaternion
+        return q is not None and abs(math.sqrt(sum(v * v for v in q)) - 1.0) < 0.02
+
+
 DRIVERS: dict[str, type[SensorDriver]] = {
     FAMILY_SR04: Sr04Driver,
     FAMILY_VL53L8CX: Vl53l8Driver,
     FAMILY_VL53L8CH: Vl53l8Driver,
+    # The L5/L7 classes subclass Vl53l8cx: same lifecycle, same frame type.
+    FAMILY_VL53L5CX: Vl53l8Driver,
+    FAMILY_VL53L7CX: Vl53l8Driver,
+    FAMILY_VL53L7CH: Vl53l8Driver,
+    **{family: Vl53lxDriver for family in VL53LX_FAMILIES},
     FAMILY_BNO086: Bno086Driver,
+    FAMILY_BNO055: Bno055Driver,
 }

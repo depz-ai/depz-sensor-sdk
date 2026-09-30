@@ -1,6 +1,14 @@
 /** Firmware-name parsing (contracts/02_COMMON_COMMANDS.md §4). */
 
-export type SensorType = "sr04" | "vl53l4" | "vl53l8" | "bno086" | "unknown";
+export type SensorType =
+  | "sr04"
+  | "vl53l4"
+  | "vl53l8"
+  | "vl53l7"
+  | "vl53lx"
+  | "bno086"
+  | "bno055"
+  | "unknown";
 
 export interface Identity {
   mode: "app" | "bootloader" | "unknown";
@@ -15,7 +23,13 @@ const PRODUCT_TOKENS: Array<[string, SensorType]> = [
   ["SR04", "sr04"],
   ["VL53L4", "vl53l4"],
   ["VL53L8", "vl53l8"],
+  ["VL53L7", "vl53l7"], // VL53L5CX / VL53L7CX / VL53L7CH board (contract 11)
+  // The 1D-family bridge (contract 12): boards answer APP_VL53L0_4_v*, the
+  // protocol spec calls it APP_VL53LX_v*.
+  ["VL53L0_4", "vl53lx"],
+  ["VL53LX", "vl53lx"],
   ["BNO086", "bno086"],
+  ["BNO055", "bno055"], // register bridge, fusion on chip (contract 13)
 ];
 
 /**

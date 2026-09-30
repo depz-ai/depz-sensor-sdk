@@ -214,13 +214,25 @@ export class DepzDevice {
   private handleLinkClosed(): void {
     if (this.torndown) return;
     this.torndown = true;
-    if (this.closing) {
-      this.failAllPending(new LinkClosedError("device closed"));
-    } else {
-      this.failAllPending(new DeviceLostError("transport closed"));
-      this.emitEvent({ type: "disconnected", reason: "transport closed" });
-    }
+    const error = this.closing
+      ? new LinkClosedError("device closed")
+      : new DeviceLostError("transport closed");
+    this.failAllPending(error);
+    if (!this.closing) this.emitEvent({ type: "disconnected", reason: "transport closed" });
+    // Let subclasses reject their own in-flight waiters (e.g. BNO086's SH-2
+    // control layer) so a disconnect doesn't leave them hanging until their own
+    // timeout, and clear any per-connection resolver state.
+    this.onTeardown(error);
     for (const s of [...this.streams]) s.close();
+  }
+
+  /**
+   * Hook for sensor subclasses: reject any subclass-managed in-flight requests
+   * and clear per-connection state when the link closes. Runs once, after the
+   * base `pending` map is failed. Default: no-op.
+   */
+  protected onTeardown(error: Error): void {
+    void error;
   }
 
   private failAllPending(error: Error): void {
@@ -267,6 +279,18 @@ export class DepzDevice {
     }
 
     // Give pending matchers first shot at any non-status packet.
+    //
+    // Correlation is by opcode/report-id only: the device echoes the request
+    // opcode in its reply but NOT the host's TX sequence number (see link.ts
+    // txSeq — nothing carries it back), so a sequence-based matcher is
+    // impossible without firmware support. One consequence: a reply that arrives
+    // *after* its request timed out is indistinguishable from the genuine reply
+    // to a later same-opcode request and could settle it with stale data. The
+    // only retry-in-place path (the viewer's whole-init retry) mitigates this by
+    // pausing before re-issuing — during that quiet gap there is no pending
+    // entry, so a late reply falls through to handleReport/`text` below and is
+    // discarded harmlessly. A timeout should therefore be treated as "the link
+    // may be desynced"; prefer reopening over transparent same-opcode retry.
     for (const p of [...this.pending.values()]) {
       if (p.matcher === null) continue;
       const result = p.matcher(pkt);

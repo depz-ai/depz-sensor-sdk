@@ -5,10 +5,14 @@
  */
 
 import type { DepzDevice } from "./device/device.js";
-import type { Sr04, Sr04Measurement } from "./sensors/sr04.js";
-import type { Vl53l8, Vl53l8Frame } from "./sensors/vl53l8/vl53l8.js";
+import { Bno055 } from "./sensors/bno055/bno055.js";
+import { packBno055Units } from "./sensors/bno055/regs.js";
+import { Sr04 } from "./sensors/sr04.js";
+import { Vl53l4cd } from "./sensors/vl53l4/vl53l4.js";
+import { Vl53l8cx, type Vl53l8Frame } from "./sensors/vl53l8/vl53l8.js";
+import { Vl53lx } from "./sensors/vl53lx/vl53lx.js";
 
-export const DATASET_SCHEMA = "depz.dataset/1";
+export const DATASET_SCHEMA = "depz.dataset/2";
 
 export interface DatasetDeviceMeta {
   serial?: string;
@@ -117,20 +121,75 @@ export class DatasetRecorder {
 
   private hook(entry: { id: string; device: DepzDevice; offsetUs: bigint }): () => void {
     const writer = this.writer!;
-    const dev = entry.device as DepzDevice & Partial<Sr04> & Partial<Vl53l8>;
+    const dev = entry.device;
     const toHost = (tsUs: bigint) => Number(tsUs - entry.offsetUs);
 
-    if (typeof dev.onMeasurement === "function") {
-      return dev.onMeasurement!((m: Sr04Measurement) => {
+    // Dispatch on the class, not on method names: every ranging device has an
+    // onMeasurement(), and a duck-typed check wrote VL53L4CD / VL53L0X…L4CX
+    // measurements as "sr04" records.
+    if (dev instanceof Sr04) {
+      return dev.onMeasurement((m) => {
         writer.write(entry.id, toHost(m.timestampUs), "sr04", {
           echo_us: m.echoTimeUs,
           source: m.source,
         });
       });
     }
-    if (typeof dev.onFrame === "function") {
+    if (dev instanceof Vl53l4cd) {
+      return dev.onMeasurement((m) => {
+        writer.write(entry.id, toHost(m.timestampUs), "vl53l4", {
+          range_status: m.rangeStatus,
+          distance_mm: m.distanceMm,
+          sigma_mm: m.sigmaMm,
+          signal_rate_kcps: m.signalRateKcps,
+          ambient_rate_kcps: m.ambientRateKcps,
+          number_of_spad: m.numberOfSpad,
+          stream_count: m.streamCount,
+        });
+      });
+    }
+    if (dev instanceof Vl53lx) {
+      return dev.onMeasurement((m) => {
+        const v: Record<string, unknown> = {
+          product: dev.product,
+          driver: dev.driverKind,
+          status: m.status,
+          distance_mm: m.distanceMm,
+          sigma_mm: m.sigmaMm,
+          signal_kcps: m.signalKcps,
+          ambient_kcps: m.ambientKcps,
+          spads: m.spads,
+        };
+        if (m.targets.length > 0) {
+          v.targets = m.targets.map((t) => ({
+            distance_mm: t.distanceMm,
+            status: t.status,
+            signal_kcps: t.signalKcps,
+          }));
+        }
+        writer.write(entry.id, toHost(m.timestampUs), "vl53lx", v);
+      });
+    }
+    if (dev instanceof Bno055) {
+      return dev.onSample((s) => {
+        const v: Record<string, unknown> = { unit_sel: packBno055Units(s.units) };
+        const channels = {
+          quaternion: s.quaternion, euler: s.euler, accel: s.accel, gyro: s.gyro,
+          mag: s.mag, linear_accel: s.linearAccel, gravity: s.gravity,
+        };
+        for (const [key, val] of Object.entries(channels)) if (val !== null) v[key] = [...val];
+        if (s.temperature !== null) v.temperature = s.temperature;
+        if (s.calibration !== null) {
+          const c = s.calibration;
+          v.calib = [c.system, c.gyro, c.accel, c.mag];
+        }
+        writer.write(entry.id, toHost(s.timestampUs), "bno055", v);
+      });
+    }
+    // VL53L8CX/CH and the VL53L5CX/L7CX/L7CH subclasses.
+    if (dev instanceof Vl53l8cx) {
       const layers = this.opts.vl53l8Layers ?? false;
-      return dev.onFrame!((f: Vl53l8Frame) => {
+      return dev.onFrame((f: Vl53l8Frame) => {
         const n = f.resolution;
         const v: Record<string, unknown> = {
           resolution: n,

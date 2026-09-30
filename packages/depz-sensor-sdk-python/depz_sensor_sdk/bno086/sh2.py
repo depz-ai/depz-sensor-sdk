@@ -537,7 +537,11 @@ class SensorMetadata:
     @classmethod
     def from_words(cls, words: list[int] | tuple[int, ...]) -> "SensorMetadata":
         w = list(words) + [0] * (10 - len(words))
-        revision = w[3] & 0xFFFF
+        # Word 3 is `power_mA u16 (Q10) | revision u16 << 16`: on the lab
+        # BNO085 every record reads revision 4 in the high half while the low
+        # half follows the sensor's supply (accelerometer 0.13 mA, the
+        # gyro-driven outputs 5.3 mA).
+        revision = (w[3] >> 16) & 0xFFFF
         return cls(
             me_version=w[0] & 0xFF,
             mh_version=(w[0] >> 8) & 0xFF,
@@ -545,7 +549,7 @@ class SensorMetadata:
             range_raw=w[1],
             resolution_raw=w[2],
             revision=revision,
-            power_ma_q10=(w[3] >> 16) & 0xFFFF,
+            power_ma_q10=w[3] & 0xFFFF,
             min_period_us=w[4],
             fifo_max=w[5] & 0xFFFF,
             fifo_reserved=(w[5] >> 16) & 0xFFFF,

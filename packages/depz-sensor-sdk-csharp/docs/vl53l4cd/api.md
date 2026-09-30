@@ -50,7 +50,7 @@ VL53L4CD report opcodes.
 public static class Vl53l4Xshut
 ```
 
-VL53_XSHUT actions. `Reset` is blocking on the MCU and is answered only after the sensor's boot handshake (allow ≥ 1.5 s).
+VL53_XSHUT actions. What `Reset` does depends on the bridge: on the VL53L4CD bridge (contract 10) it is blocking on the MCU and is answered only after the sensor's boot handshake (allow ≥ 1.5 s); on the 1D-family bridge v2.00 (contract 12 §2, `PackXshut`) it is 1 ms low plus a fixed 5 ms wait with no handshake, and the host polls the boot register itself.
 
 #### Vl53l4Xshut.Off *(constant)*
 

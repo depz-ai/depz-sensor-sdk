@@ -179,7 +179,7 @@ def test_echo_decay_is_clamped_and_reported(sr04):
 
 def test_out_of_range_config_raises_value_error(sr04):
     """An unrepresentable value must raise a typed SDK error, not leak
-    struct.error from the codec (matches Vl53l8Cx's setters)."""
+    struct.error from the codec (matches Vl53l8cx's setters)."""
     original_decay = sr04.get_echo_decay_us()
     original_period = sr04.get_sample_period_us()
     try:

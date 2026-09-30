@@ -16,7 +16,7 @@ import pytest
 from depz_sensor_sdk.device import DeviceBase
 from depz_sensor_sdk.discovery import _identify, _promote
 from depz_sensor_sdk.transport.record_replay import ReplayLink
-from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8Cx
+from depz_sensor_sdk.vl53l8 import RESOLUTION_8X8, Vl53l8cx
 
 RECORDINGS = Path(__file__).resolve().parents[3] / "contracts" / "vectors" / "recordings"
 FIXTURE = RECORDINGS / "vl53l8_8x8_15hz_3s.depzrec"
@@ -29,7 +29,7 @@ def test_vl53l8_full_stack_replay():
 
     dev = DeviceBase(ReplayLink(FIXTURE, strict_tx=True), timeout=2.0)
     dev = _promote(dev, _identify(dev))
-    assert isinstance(dev, Vl53l8Cx)
+    assert isinstance(dev, Vl53l8cx)
     try:
         assert dev.get_software_name() == expected["software_name"]
         dev.init()

@@ -10,13 +10,13 @@ from depz_sensor_sdk.errors import DepzTimeoutError
 from depz_sensor_sdk.transport import Packet
 from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.protocol.vl53l8 import Vl53l8Rpt
-from depz_sensor_sdk.vl53l8 import Vl53l8Cx
+from depz_sensor_sdk.vl53l8 import Vl53l8cx
 from depz_sensor_sdk.vl53l8.uld import Vl53l8cxError
 
 
 def _dev():
     a, _b = LoopbackLink.pair()
-    return Vl53l8Cx(a, timeout=0.2)
+    return Vl53l8cx(a, timeout=0.2)
 
 
 def test_get_frame_raises_depz_timeout():

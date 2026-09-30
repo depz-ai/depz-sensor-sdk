@@ -1,6 +1,6 @@
 [package]
 name = "depz-sensor-sdk"
-version = "0.1.4"
+version = "0.3.0"
 edition = "2021"
 description = "Contract-first Rust SDK for the DEPZ USB sensor line (SR04, VL53L4CD ToF, VL53L8CX/CH ToF, BNO086 IMU) — transport, protocol codecs, and sensor decode."
 license = "MIT"

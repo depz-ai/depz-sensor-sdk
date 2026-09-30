@@ -12,13 +12,28 @@ Full docs live under [`docs/`](docs/):
   model, transport/CRC, datasets, firmware parse, testing, extension points.
 - **[API reference](docs/api.md)** — every public type, generated from the `///`
   summaries (per-sensor: [SR04](docs/sr04/api.md) ·
-  [VL53L8CX](docs/vl53l8cx/api.md) · [VL53L8CH](docs/vl53l8ch/api.md) ·
-  [BNO086](docs/bno086/api.md)).
+  [VL53L4CD](docs/vl53l4cd/api.md) · [VL53L8CX](docs/vl53l8cx/api.md) ·
+  [VL53L8CH](docs/vl53l8ch/api.md) · [VL53L5CX](docs/vl53l5cx/api.md) ·
+  [VL53L7CX](docs/vl53l7cx/api.md) · [VL53L7CH](docs/vl53l7ch/api.md) ·
+  [VL53L0X](docs/vl53l0x/api.md) · [VL53L1CX](docs/vl53l1cx/api.md) ·
+  [VL53L1CB](docs/vl53l1cb/api.md) · [VL53L3CX](docs/vl53l3cx/api.md) ·
+  [VL53L4CX](docs/vl53l4cx/api.md) · [BNO086](docs/bno086/api.md) ·
+  [BNO055](docs/bno055/api.md)).
 - **Per sensor** — SR04 ([intro](docs/sr04/introduction.md) ·
   [guide](docs/sr04/guide.md)), VL53L8CX ([intro](docs/vl53l8cx/introduction.md) ·
   [guide](docs/vl53l8cx/guide.md)), VL53L8CH ([intro](docs/vl53l8ch/introduction.md) ·
   [guide](docs/vl53l8ch/guide.md)), BNO086 ([intro](docs/bno086/introduction.md) ·
-  [guide](docs/bno086/guide.md)).
+  [guide](docs/bno086/guide.md)), VL53L4CD ([intro](docs/vl53l4cd/introduction.md) ·
+  [guide](docs/vl53l4cd/guide.md)), VL53L5CX ([intro](docs/vl53l5cx/introduction.md) ·
+  [guide](docs/vl53l5cx/guide.md)), VL53L7CX ([intro](docs/vl53l7cx/introduction.md) ·
+  [guide](docs/vl53l7cx/guide.md)), VL53L7CH ([intro](docs/vl53l7ch/introduction.md) ·
+  [guide](docs/vl53l7ch/guide.md)), VL53L0X ([intro](docs/vl53l0x/introduction.md) ·
+  [guide](docs/vl53l0x/guide.md)), VL53L1CX ([intro](docs/vl53l1cx/introduction.md) ·
+  [guide](docs/vl53l1cx/guide.md)), VL53L1CB ([intro](docs/vl53l1cb/introduction.md) ·
+  [guide](docs/vl53l1cb/guide.md)), VL53L3CX ([intro](docs/vl53l3cx/introduction.md) ·
+  [guide](docs/vl53l3cx/guide.md)), VL53L4CX ([intro](docs/vl53l4cx/introduction.md) ·
+  [guide](docs/vl53l4cx/guide.md)), BNO055 ([intro](docs/bno055/introduction.md) ·
+  [guide](docs/bno055/guide.md)).
 
 Regenerate the API reference after changing source `///` summaries:
 
@@ -37,6 +52,9 @@ separate silicon variants that share one wire/frame layout:
 | **VL53L8CX**  | Base ToF multizone ranger               | dev-default (ST `0483:56DC`) | `Depz.Sensor.Vl53l8` |
 | **VL53L8CH**  | CX **plus** CNH histograms; own PID      | `0xED40`                  | `Depz.Sensor.Vl53l8` |
 | **BNO086**    | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE08`                  | `Depz.Sensor.Bno086` |
+| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | `Depz.Sensor.Vl53l7` |
+| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware | `0xED41` / `0xED43` / `0xED42` / `0xED44` / `0xED46` | `Depz.Sensor.Vl53lx` |
+| **BNO055**    | 9-axis IMU, fusion on the chip, I2C register bridge | `0xEE0A`          | `Depz.Sensor.Bno055` |
 
 ### VL53L8CX vs VL53L8CH
 
@@ -57,7 +75,7 @@ decode path serves both:
 
 ## Coverage today
 
-Verifiable, golden-vector-backed codecs are implemented for all five sensors:
+Verifiable, golden-vector-backed codecs are implemented for every sensor:
 
 - **SR04** — command encode + data/period/decay decode.
 - **VL53L4CD** — register-bridge codecs, result decode, timing/tuning math and init block.
@@ -66,6 +84,19 @@ Verifiable, golden-vector-backed codecs are implemented for all five sensors:
   recorded `.depzrec` replay.
 - **BNO086** — SHTP framing/reassembly, SH-2 control encode, input-report and
   gyro-integrated-RV decode.
+- **VL53L8CH / VL53L7CH CNH** — `Vl53l8Cnh.DecodeHistogram` unpacks the raw CNH
+  block into per-aggregate histograms.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — pin control / bus speed / info codecs,
+  class resolution, and the L5/L7 frame decoder (footer at size − 4, per-zone
+  trim), replayed against live-board captures.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — v2.00 codecs, the product table and
+  class resolution, die-block / VL53L0X raw / histogram-block decode.
+- **BNO055** — wire codecs, units / calibration status and profile / axis remap
+  + placements / page-1 configs, register-window decode.
+
+For the VL53L5CX / L7CX / L7CH, the 1D family and the BNO055, initialising and
+streaming the board is done with the Python or TypeScript SDK; this SDK
+decodes what they send and builds the command payloads.
 
 Plus the shared foundation: CRC KATs, DEPZ framing encode/decode, USB identity
 table + discovery ordering, common commands (time-sync, sync-pin), `.fwdepz`
@@ -76,12 +107,11 @@ image parse, and `.depzdata` dataset read.
 These are deliberately stubbed (clearly-named, throwing/`TODO` stubs) rather than
 faked, because they cannot be verified from golden vectors alone:
 
-- **CNH histogram decode (VL53L8CH-specific)** — `Vl53l8Cnh`. The CH-only compact
-  histogram block is not decoded yet; it is the CH extension point over the
-  shared CX/CH frame decode. No fabricated implementation.
 - **Live VL53L8 ULD init/config** — `Vl53l8Uld`. The firmware-download +
   register-bridge (DCI) init sequence only means anything against real silicon
   over the CDC link, so it is out of scope for the decode SDK.
+- **Live drivers of the L5/L7 boards, the 1D family and the BNO055** — firmware
+  download and ULD configuration, the ST 1D drivers, the BNO055 session logic.
 
 Everything else in the table above is fully implemented and covered.
 

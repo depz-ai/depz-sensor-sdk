@@ -6,6 +6,9 @@
  * SHARED CX/CH: this ranging-frame decoder serves BOTH ToF variants —
  * VL53L8CX (base) and VL53L8CH (CX + CNH). They emit the same ranging-results
  * layout, so there is a single decode path (no per-variant duplication).
+ * The VL53L5CX / VL53L7CX / VL53L7CH frames (contract 11) go through the same
+ * walk via depz_vl53l7_decode_frame (footer at size-4, per-zone trim, CNH
+ * block extraction).
  *
  * OUT OF SCOPE (hardware-dependent extension points, not implemented):
  *   - the live ULD init/config register-bridge driver (firmware download +
@@ -160,9 +163,24 @@ static int32_t floordiv4(int32_t v)
     return (v >= 0) ? (v / 4) : -(((-v) + 3) / 4);
 }
 
-int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
-                             uint64_t timestamp_us, depz_vl53l8_frame *out)
+#define BH_CNH_IDX      0xc048u /* VL53LMZ_CNH_DATA_IDX (CH-only output block) */
+
+/*
+ * Shared block-header walk behind depz_vl53l8_decode_frame (VL53L8, footer at
+ * size-12) and depz_vl53l7_decode_frame (VL53L5/L7, footer at size-4, contract
+ * 11 §3). `l7_trim` = the L5/L7 output-list rule: per-target blocks keep 64
+ * entries even in 4x4, so every per-zone array is trimmed to the resolution,
+ * which is taken from the zone-sized ambient block (index 0x54D0; falls back
+ * to the SPAD block, then to nb_target_detected). `cnh_out` (may be NULL)
+ * receives the CNH_DATA block bytes in decode order.
+ */
+static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out,
+                             size_t footer_id_offset, bool l7_trim,
+                             uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
 {
+    if (cnh_len)
+        *cnh_len = 0;
     if (raw_len < 24 || raw_len > DEPZ_VL53L8_STREAM_TOTAL_MAX)
         return -2;
 
@@ -176,6 +194,7 @@ int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
     /* zone counts we actually decoded (for arrays sized differently) */
     int dist_n = 0, status_n = 0, nbt_n = 0;
     int sig_n = 0, amb_n = 0, spad_n = 0, sigma_n = 0, refl_n = 0;
+    bool amb_seen = false, spad_seen = false;
 
     size_t i = 16;
     while (i + 4 <= raw_len) {
@@ -209,10 +228,12 @@ int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
             for (int k = 0; k < sig_n; k++) out->signal_per_spad[k] = rd_u32(body + 4 * k);
         } else if (idx == BH_AMBIENT_IDX) {
             amb_n = (int)(msize / 4);
+            amb_seen = true;
             if (amb_n > DEPZ_VL53L8_MAX_ZONES) amb_n = DEPZ_VL53L8_MAX_ZONES;
             for (int k = 0; k < amb_n; k++) out->ambient_per_spad[k] = rd_u32(body + 4 * k);
         } else if (idx == BH_SPAD_IDX) {
             spad_n = (int)(msize / 4);
+            spad_seen = true;
             if (spad_n > DEPZ_VL53L8_MAX_ZONES) spad_n = DEPZ_VL53L8_MAX_ZONES;
             for (int k = 0; k < spad_n; k++) out->nb_spads_enabled[k] = rd_u32(body + 4 * k);
         } else if (idx == BH_SIGMA_IDX) {
@@ -223,16 +244,45 @@ int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
             refl_n = (int)msize;
             if (refl_n > DEPZ_VL53L8_MAX_ZONES) refl_n = DEPZ_VL53L8_MAX_ZONES;
             for (int k = 0; k < refl_n; k++) out->reflectance[k] = body[k];
+        } else if (idx == BH_CNH_IDX && cnh_out) {
+            if (msize > cnh_cap)
+                return -3;
+            memcpy(cnh_out, body, msize);
+            if (cnh_len)
+                *cnh_len = msize;
         }
 
         i += msize + 4;
+    }
+
+    if (l7_trim) {
+        /* L5/L7 (contract 11 §3): blocks 0x54D0 <= idx < 0x5890 (ambient,
+         * SPAD count) are sized to the resolution; per-target blocks keep 64
+         * entries and are zero-padded past it. Trim them all to the zones
+         * that exist. */
+        int res = amb_seen ? amb_n : (spad_seen ? spad_n : nbt_n);
+        int *counts[] = { &dist_n, &status_n, &nbt_n, &sig_n, &amb_n,
+                          &spad_n, &sigma_n, &refl_n };
+        for (size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); c++)
+            if (*counts[c] > res) *counts[c] = res;
+        for (int k = res; k < DEPZ_VL53L8_MAX_ZONES; k++) {
+            out->distance_mm[k] = 0;
+            out->target_status[k] = 0;
+            out->nb_target_detected[k] = 0;
+            out->signal_per_spad[k] = 0;
+            out->ambient_per_spad[k] = 0;
+            out->nb_spads_enabled[k] = 0;
+            out->range_sigma_mm_raw[k] = 0;
+            out->reflectance[k] = 0;
+        }
     }
 
     /* ST GetRangingData fixed-point scaling: distance_mm = raw / 4 (floored). */
     for (int k = 0; k < dist_n; k++)
         out->distance_mm[k] = floordiv4(out->distance_mm[k]);
 
-    /* Zone count = nb_target_detected block length (16 for 4x4, 64 for 8x8). */
+    /* Zone count = nb_target_detected block length (16 for 4x4, 64 for 8x8;
+     * on L5/L7 after the trim above). */
     int nzones = nbt_n;
     out->resolution = nzones;
 
@@ -243,15 +293,41 @@ int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
     }
     (void)dist_n; (void)sig_n; (void)amb_n; (void)spad_n; (void)sigma_n; (void)refl_n;
 
-    /* Header/footer id match check. The footer id sits at raw_len - N; for the
-     * CX / shared CH ranging frame, N = DEPZ_VL53L8CX_FOOTER_ID_OFFSET (12).
-     * A CH CNH histogram frame uses a different footer offset/layout and is not
-     * decoded here (see the CNH extension-point note below). */
-    if (buf[0x8] != buf[raw_len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET] ||
-        buf[0x9] != buf[raw_len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET + 1])
+    /* Header/footer id match check. The footer id sits at raw_len - N:
+     * N = DEPZ_VL53L8CX_FOOTER_ID_OFFSET (12) for the VL53L8 ranging frame,
+     * DEPZ_VL53L7_FOOTER_ID_OFFSET (4) for VL53L5CX/L7CX/L7CH. */
+    if (buf[0x8] != buf[raw_len - footer_id_offset] ||
+        buf[0x9] != buf[raw_len - footer_id_offset + 1])
         return -1;
 
     return 0;
+}
+
+int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out)
+{
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L8CX_FOOTER_ID_OFFSET, false, NULL, 0, NULL);
+}
+
+int depz_vl53l8ch_decode_frame(const uint8_t *raw, size_t raw_len,
+                               uint64_t timestamp_us, depz_vl53l8_frame *out,
+                               uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
+{
+    /* VL53LMZ 2.0.16 (the CH blob): footer id at size-4, like the L5/L7 ULD
+     * 2.0.x — only the VL53L8CX's ULD 2.1.0 puts it at size-12. */
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L7_FOOTER_ID_OFFSET, false,
+                             cnh_out, cnh_cap, cnh_len);
+}
+
+int depz_vl53l7_decode_frame(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out,
+                             uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
+{
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L7_FOOTER_ID_OFFSET, true,
+                             cnh_out, cnh_cap, cnh_len);
 }
 
 /* ---- CNH (compact-network-histograms) — CH-specific decode -----------------

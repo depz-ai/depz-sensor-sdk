@@ -11,7 +11,10 @@ class SensorType(str, Enum):
     SR04 = "sr04"
     VL53L4 = "vl53l4"
     VL53L8 = "vl53l8"
+    VL53L7 = "vl53l7"  # VL53L5CX / VL53L7CX / VL53L7CH board (contract 11)
+    VL53LX = "vl53lx"  # VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX board (contract 12)
     BNO086 = "bno086"
+    BNO055 = "bno055"  # register bridge, fusion on chip (contract 13)
     UNKNOWN = "unknown"
 
 
@@ -29,7 +32,13 @@ _PRODUCT_TOKENS = (
     ("SR04", SensorType.SR04),
     ("VL53L4", SensorType.VL53L4),
     ("VL53L8", SensorType.VL53L8),
+    ("VL53L7", SensorType.VL53L7),
+    # The 1D-family bridge: boards answer APP_VL53L0_4_v*, the protocol spec
+    # calls it APP_VL53LX_v* (contract 12).
+    ("VL53L0_4", SensorType.VL53LX),
+    ("VL53LX", SensorType.VL53LX),
     ("BNO086", SensorType.BNO086),
+    ("BNO055", SensorType.BNO055),
 )
 
 

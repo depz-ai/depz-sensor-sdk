@@ -67,6 +67,13 @@ import { ShtpChannel, ShtpLayer, type ShtpCargo } from "./shtp.js";
 export const RATE_LOW_FACTOR = 0.9;
 export const RATE_HIGH_FACTOR = 2.1;
 
+/**
+ * Re-reads allowed when `enable()`'s verify sees a "disabled" answer (stale
+ * from a preceding `disable()`, or early: the lab BNO085 answers interval 0 for
+ * one or two read-backs right after Set Feature). Mirrors the Python SDK.
+ */
+const VERIFY_STALE_RETRIES = 5;
+
 const EXECUTABLE_RESET_COMPLETE = 0x01;
 
 const CONTROL_TIMEOUT_MS = 1000;
@@ -135,6 +142,10 @@ export class Bno086 extends DepzDevice {
   private reportCbs: Array<{ cb: (r: Report) => void; filter: Set<number> | null }> = [];
   private reportQueues: Array<{ queue: StreamQueue<Report>; filter: Set<number> | null }> = [];
   private controlWaiters = new Map<number, ControlWaiter[]>();
+  // Parallel registry of the `fail` handle for each in-flight control exchange,
+  // so a link close can reject them all promptly (they are otherwise only
+  // rejected by their own 1-2 s timeout — see onTeardown).
+  private controlFails = new Set<(err: Error) => void>();
   private cmdSeq = 0;
   private resetResolvers: Array<() => void> = [];
   private advertisementChunks: Uint8Array[] = [];
@@ -144,6 +155,17 @@ export class Bno086 extends DepzDevice {
     super(transport, opts);
     if (opts?.busyRetries !== undefined) this.busyRetries = opts.busyRetries;
     if (opts?.busyBackoffMs !== undefined) this.busyBackoffMs = opts.busyBackoffMs;
+  }
+
+  protected override onTeardown(error: Error): void {
+    // Reject every in-flight SH-2 control exchange now (each `fail` clears its
+    // own timer + registry entry via cleanup) instead of leaving it to hang the
+    // full control/FRS timeout, and drop reset resolvers so they don't
+    // accumulate across the connection's life.
+    for (const fail of [...this.controlFails]) fail(error);
+    this.controlFails.clear();
+    this.controlWaiters.clear();
+    this.resetResolvers.length = 0;
   }
 
   // ── RX path ────────────────────────────────────────────────────────────────
@@ -241,6 +263,7 @@ export class Bno086 extends DepzDevice {
       let settled = false;
       const cleanup = (): void => {
         clearTimeout(timer);
+        this.controlFails.delete(fail);
         const list = this.controlWaiters.get(rid);
         if (list !== undefined) {
           this.controlWaiters.set(
@@ -266,6 +289,7 @@ export class Bno086 extends DepzDevice {
       const list = this.controlWaiters.get(rid) ?? [];
       list.push(waiter);
       this.controlWaiters.set(rid, list);
+      this.controlFails.add(fail);
       send().catch((err: unknown) => fail(err instanceof Error ? err : new DepzError(String(err))));
     });
   }
@@ -455,7 +479,7 @@ export class Bno086 extends DepzDevice {
       ),
     );
     if (opts.verify === false) return null;
-    const resp = await this.getFeature(sensor, opts.timeoutMs ?? CONTROL_TIMEOUT_MS);
+    const resp = await this.verifyFeature(sensor, opts.timeoutMs ?? CONTROL_TIMEOUT_MS);
     const requestedRate = 1_000_000 / intervalUs;
     const actualRate = resp.intervalUs !== 0 ? 1_000_000 / resp.intervalUs : 0;
     if (
@@ -466,6 +490,26 @@ export class Bno086 extends DepzDevice {
           `${requestedRate.toFixed(1)} Hz, granted ${actualRate.toFixed(1)} Hz (outside ` +
           `${RATE_LOW_FACTOR}–${RATE_HIGH_FACTOR}× band)`,
       );
+    }
+    return resp;
+  }
+
+  /**
+   * Read back a feature we just *enabled*, skipping "disabled" answers.
+   *
+   * The hub emits an unsolicited Get Feature Response for every
+   * state-changing Set Feature — including the `disable()` that typically
+   * precedes a re-enable — and Get Feature Response carries no correlation
+   * token (contract 05 §6: only `sensorId` identifies it). It may also answer
+   * before it applied the rate just set: the lab BNO085 reports interval 0 for
+   * one or two read-backs right after Set Feature. So a "disabled" answer is
+   * stale, early or a genuine refusal: re-read a bounded number of times — a
+   * refusal survives the retries and reaches the warning path.
+   */
+  private async verifyFeature(sensor: number, timeoutMs: number): Promise<FeatureResponse> {
+    let resp = await this.getFeature(sensor, timeoutMs);
+    for (let i = 0; i < VERIFY_STALE_RETRIES && resp.intervalUs === 0; i++) {
+      resp = await this.getFeature(sensor, timeoutMs);
     }
     return resp;
   }

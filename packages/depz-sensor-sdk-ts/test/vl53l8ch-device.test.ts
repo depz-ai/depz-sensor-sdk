@@ -12,25 +12,25 @@ import {
   DepzError,
   LoopbackTransport,
   MI_CFG_DEV_IDX,
-  Vl53l8Ch,
-  Vl53l8Cx,
+  Vl53l8ch,
+  Vl53l8cx,
 } from "../src/index.js";
 import { makeDriver } from "./fake-vl53l8.js";
 
-function ch(): Vl53l8Ch {
-  return new Vl53l8Ch(new LoopbackTransport());
+function ch(): Vl53l8ch {
+  return new Vl53l8ch(new LoopbackTransport());
 }
 
-function cx(): Vl53l8Cx {
-  return new Vl53l8Cx(new LoopbackTransport());
+function cx(): Vl53l8cx {
+  return new Vl53l8cx(new LoopbackTransport());
 }
 
 // ── CH ↔ CX class relationship ────────────────────────────────────────────────
 
 describe("vl53l8ch class wiring", () => {
-  it("Vl53l8Ch is a Vl53l8Cx superset (inherits CX) with configureCnh", () => {
+  it("Vl53l8ch is a Vl53l8cx superset (inherits CX) with configureCnh", () => {
     const dev = ch();
-    expect(dev).toBeInstanceOf(Vl53l8Cx);
+    expect(dev).toBeInstanceOf(Vl53l8cx);
     expect(typeof (dev as unknown as { configureCnh: unknown }).configureCnh).toBe("function");
   });
 

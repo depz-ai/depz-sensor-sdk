@@ -5,7 +5,7 @@ Auto-generated from the public C# surface under `src/Depz.Sensor/` by
 `///` XML-doc summaries in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
 
 Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 
@@ -15,7 +15,10 @@ Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 - **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
 - **VL53L4CD (ToF)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`Vl53l4Xshut`](#vl53l4xshut), [`Vl53l4Wire`](#vl53l4wire), [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4Info`](#vl53l4info), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Exception`](#vl53l4exception), [`Vl53l4Results`](#vl53l4results), [`Vl53l4Uld`](#vl53l4uld)
 - **VL53L8 (ToF)**: [`Vl53l8Variant`](#vl53l8variant), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`Vl53l8Wire`](#vl53l8wire), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Advanced`](#vl53l8advanced), [`MotionConfig`](#motionconfig), [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Cnh`](#vl53l8cnh), [`Vl53l8Uld`](#vl53l8uld)
+- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`Vl53l7PinAction`](#vl53l7pinaction), [`Vl53l7I2cError`](#vl53l7i2cerror), [`Vl53l7Wire`](#vl53l7wire), [`Vl53l7Info`](#vl53l7info), [`Vl53l7Model`](#vl53l7model), [`Vl53l7Discovery`](#vl53l7discovery), [`Vl53l7Frames`](#vl53l7frames)
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`Vl53lxClearStep`](#vl53lxclearstep), [`Vl53lxWire`](#vl53lxwire), [`Vl53lxInfo`](#vl53lxinfo), [`Vl53lxDriverKind`](#vl53lxdriverkind), [`Vl53lxClass`](#vl53lxclass), [`Vl53lxProduct`](#vl53lxproduct), [`Vl53lxProducts`](#vl53lxproducts), [`Vl53lxDieVariant`](#vl53lxdievariant), [`Vl53lxDieResult`](#vl53lxdieresult), [`Vl53lxL0xRaw`](#vl53lxl0xraw), [`Vl53lxHistogramRaw`](#vl53lxhistogramraw), [`Vl53lxDecode`](#vl53lxdecode)
 - **BNO086 (IMU)**: [`SensorId`](#sensorid), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`Sh2Control`](#sh2control), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`Bno055Trigger`](#bno055trigger), [`Bno055Wire`](#bno055wire), [`Bno055RegData`](#bno055regdata), [`Bno055StreamData`](#bno055streamdata), [`Bno055Info`](#bno055info), [`Bno055OprMode`](#bno055oprmode), [`Bno055PwrMode`](#bno055pwrmode), [`Bno055TempSource`](#bno055tempsource), [`Bno055Vec3`](#bno055vec3), [`Bno055Euler`](#bno055euler), [`Bno055Quat`](#bno055quat), [`Bno055Units`](#bno055units), [`Bno055CalibStatus`](#bno055calibstatus), [`Bno055CalibrationProfile`](#bno055calibrationprofile), [`Bno055Axis`](#bno055axis), [`Bno055AxisRemap`](#bno055axisremap), [`Bno055AccelConfig`](#bno055accelconfig), [`Bno055GyroConfig`](#bno055gyroconfig), [`Bno055MagConfig`](#bno055magconfig), [`Bno055RawBlock`](#bno055rawblock), [`Bno055Regs`](#bno055regs)
 - **Firmware update**: [`FwDepz`](#fwdepz)
 - **Datasets (record & replay)**: [`TimeSync`](#timesync), [`DatasetDevice`](#datasetdevice), [`DatasetRecord`](#datasetrecord), [`DatasetReader`](#datasetreader)
 - **Transport**: [`Framing`](#framing), [`PacketParser`](#packetparser), [`ParserEvent`](#parserevent), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`Crc`](#crc), [`CrcType`](#crctype), [`CrcTypeExtensions`](#crctypeextensions)
@@ -47,22 +50,22 @@ Production VID shared by every DEPZ sensor.
 public const int PidSr04 = 0xEC78
 ```
 
-#### UsbIds.PidVl53l8Ch *(constant)*
+#### UsbIds.PidVl53l8ch *(constant)*
 
 ```csharp
-public const int PidVl53l8Ch = 0xED40
+public const int PidVl53l8ch = 0xED40
 ```
 
-#### UsbIds.PidVl53l8Cx *(constant)*
+#### UsbIds.PidVl53l8cx *(constant)*
 
 ```csharp
-public const int PidVl53l8Cx = 0xED4B
+public const int PidVl53l8cx = 0xED4B
 ```
 
-#### UsbIds.PidVl53l4Cd *(constant)*
+#### UsbIds.PidVl53l4cd *(constant)*
 
 ```csharp
-public const int PidVl53l4Cd = 0xED45
+public const int PidVl53l4cd = 0xED45
 ```
 
 #### UsbIds.PidBno086 *(constant)*
@@ -293,7 +296,7 @@ VL53L4CD report opcodes.
 public static class Vl53l4Xshut
 ```
 
-VL53_XSHUT actions. `Reset` is blocking on the MCU and is answered only after the sensor's boot handshake (allow ≥ 1.5 s).
+VL53_XSHUT actions. What `Reset` does depends on the bridge: on the VL53L4CD bridge (contract 10) it is blocking on the MCU and is answered only after the sensor's boot handshake (allow ≥ 1.5 s); on the 1D-family bridge v2.00 (contract 12 §2, `PackXshut`) it is 1 ms low plus a fixed 5 ms wait with no handshake, and the host polls the boot register itself.
 
 #### Vl53l4Xshut.Off *(constant)*
 
@@ -875,7 +878,7 @@ public enum Vl53l8Variant
 
 The two VL53L8 ToF silicon variants in the DEPZ family. Both stream the same ULD results-frame layout, so `Vl53l8FrameDecoder` and the `Vl53l8Advanced` DCI codecs serve both; the differences are:
 
-USB product id — `Ch` ships as production PID 0xED40; `Cx` is the development default and enumerates under the raw ST VID/PID. Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes (`ForVariant`). CNH histograms — CH-only, not yet decoded (`Vl53l8Cnh`).
+USB product id — `Ch` ships as production PID 0xED40; `Cx` is the development default and enumerates under the raw ST VID/PID. Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes (`ForVariant`). CNH histograms — CH-only; the frame decoder copies the raw block into `CnhRaw` and `DecodeHistogram` decodes it.
 
 ### Vl53l8Frame
 
@@ -885,6 +888,14 @@ public sealed record Vl53l8Frame(ulong TimestampUs, int Resolution, int SiliconT
 
 One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Raw wire integers are preserved; `DistanceMm` and `RangeSigmaMm` carry the ST GetRangingData fixed-point scaling applied (÷4 and ÷128).
 
+#### Vl53l8Frame.CnhRaw *(property)*
+
+```csharp
+public byte[]? CnhRaw
+```
+
+Raw CNH data block (output index 0xC048), byte-swapped like every other block — decode with `DecodeHistogram`. Null when the frame carries no CNH block (CX variants, or CNH not configured).
+
 ### Vl53l8FrameDecoder
 
 ```csharp
@@ -893,7 +904,7 @@ public sealed class Vl53l8FrameDecoder
 
 VL53L8 results-frame decoder (contracts/04_SENSOR_VL53L8.md). Verbatim port of the verifiable parse path of the ST ULD's GetRangingData / parse_frame.
 
-Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is a separate, not-yet-decoded extension point (`Vl53l8Cnh`); the live register-bridge init/config that produces these frames is hardware-dependent and out of scope (`Vl53l8Uld`).
+Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is copied out raw (`CnhRaw`) and decoded by `DecodeHistogram`; the live register-bridge init/config that produces these frames is hardware-dependent and out of scope (`Vl53l8Uld`).
 
 #### Vl53l8FrameDecoder.CorruptedFrameException
 
@@ -928,7 +939,7 @@ Frame-id footer offset for VL53L8CH FW (VL53LMZ 2.0.16): 4 bytes from end.
 #### Vl53l8FrameDecoder.Vl53l8FrameDecoder *(constructor)*
 
 ```csharp
-public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx)
+public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx, bool trimToZones = false)
 ```
 
 #### Vl53l8FrameDecoder.ForVariant
@@ -954,6 +965,14 @@ public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw)
 ```
 
 Parse one raw results frame (the reassembled bytes read from reg 0x00). Resolution is derived from the number-of-targets block length.
+
+#### Vl53l8FrameDecoder.ParseFrame
+
+```csharp
+public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw, int resolution)
+```
+
+Parse one raw results frame, trimming every per-zone array to `resolution` entries (16 or 64) — the resolution the host configured in `start_ranging`. Needed for VL53L5/L7 frames, whose per-target blocks carry 64 entries even in 4×4 (contract 11 §3).
 
 ### Vl53l8Cmd
 
@@ -1323,7 +1342,7 @@ public static class Vl53l8Cnh
 
 VL53L8CH-specific CNH (Compact Network Histogram) decode.
 
-CNH is what the VL53L8CH firmware adds on top of the CX base: a per-aggregate distance histogram captured in poll-mode alongside the normal ranging frame. The shared results-frame decode (`Vl53l8FrameDecoder`) and the advanced DCI codecs (`Vl53l8Advanced` / `MotionConfig`) already serve both CX and CH; this is the CH-only histogram parse.
+CNH is what the VL53L8CH firmware adds on top of the CX base: a per-aggregate distance histogram carried alongside the normal ranging frame. The shared results-frame decode (`Vl53l8FrameDecoder`) and the advanced DCI codecs (`Vl53l8Advanced` / `MotionConfig`) already serve both CX and CH; this is the CH-only histogram parse.
 
 A 1:1 port of the decode path of `vl53lmz_plugin_cnh.c` (`vl53lmz_cnh_get_block_addresses` / `_cnh_get_mem_block_addresses`, VL53LMZ ULD 2.0.16) for the fixed `cnh_cfg` used by the DEPZ firmware (DISABLE_PING_PONG | DISABLE_VARIANCE | AMBIENT | XTALK | ZERO_INVALID | STORE_REF_RESIDUAL). Verified byte-exact against the live-hardware golden vector `contracts/vectors/vl53l8_cnh.json`. The offset arithmetic mirrors the C plugin verbatim; do not "simplify" it.
 
@@ -1364,6 +1383,652 @@ public static void Init()
 ```
 
 Not implemented: requires live hardware (see class remarks).
+
+## VL53L5CX / VL53L7CX / VL53L7CH (ToF)
+
+### Vl53l7Cmd
+
+```csharp
+public enum Vl53l7Cmd
+{
+    PinCtrl = 0x34,
+    GetInfo = 0x37,
+    SetI2cSpeed = 0x38,
+}
+```
+
+Commands the VL53L5CX / VL53L7CX / VL53L7CH I2C bridge adds on top of the VL53L8 register bridge (contracts/11_SENSOR_VL53L7.md §2). READ_REG 0x32, WRITE_REG 0x33, START_STREAM 0x35 and STOP_STREAM 0x36 are the VL53L8 ones (`Vl53l8Cmd`), with the tighter I2C limits of `Vl53l7Wire`.
+
+### Vl53l7Rpt
+
+```csharp
+public enum Vl53l7Rpt
+{
+    Vl53Info = 0x92,
+}
+```
+
+Reports the L5/L7 bridge adds. RPT_REG_DATA 0x91 / RPT_VL53_FRAME 0x93 are the VL53L8 ones (`Vl53l8Rpt`).
+
+### Vl53l7PinAction
+
+```csharp
+public static class Vl53l7PinAction
+```
+
+VL53_PIN_CTRL actions. None is a true sensor reset (the board has no power GPIO): after `LpnOff` or `SoftCycle` the host must re-run init() (firmware download included).
+
+#### Vl53l7PinAction.LpnOff *(constant)*
+
+```csharp
+public const byte LpnOff = 0
+```
+
+Stop streaming, drive LPn low: sensor I2C interface off (reads NACK).
+
+#### Vl53l7PinAction.LpnOn *(constant)*
+
+```csharp
+public const byte LpnOn = 1
+```
+
+Drive LPn high: interface on (power-up default).
+
+#### Vl53l7PinAction.I2cRst *(constant)*
+
+```csharp
+public const byte I2cRst = 2
+```
+
+Pulse I2C_RST.
+
+#### Vl53l7PinAction.SoftCycle *(constant)*
+
+```csharp
+public const byte SoftCycle = 3
+```
+
+Stop streaming, LPn low 1 ms, high, I2C_RST pulse; clears the I2C error counters.
+
+### Vl53l7I2cError
+
+```csharp
+public static class Vl53l7I2cError
+```
+
+`LastI2cError` values.
+
+#### Vl53l7I2cError.Ok *(constant)*
+
+```csharp
+public const byte Ok = 0
+```
+
+#### Vl53l7I2cError.Nack *(constant)*
+
+```csharp
+public const byte Nack = 1
+```
+
+#### Vl53l7I2cError.Timeout *(constant)*
+
+```csharp
+public const byte Timeout = 2
+```
+
+#### Vl53l7I2cError.BusError *(constant)*
+
+```csharp
+public const byte BusError = 3
+```
+
+### Vl53l7Wire
+
+```csharp
+public static class Vl53l7Wire
+```
+
+VL53L5/L7 I2C-bridge wire limits and command payload codecs (contract 11 §2). All wire fields are little-endian.
+
+#### Vl53l7Wire.ReadMaxLen *(constant)*
+
+```csharp
+public const int ReadMaxLen = 1536
+```
+
+VL53LMZ_READ_MAX: READ_REG `len` 1..1536 (hosts MUST split larger reads here, not at 2048).
+
+#### Vl53l7Wire.WriteMaxLen *(constant)*
+
+```csharp
+public const int WriteMaxLen = 2048
+```
+
+VL53LMZ_XFER_MAX: WRITE_REG data length 1..2048.
+
+#### Vl53l7Wire.StreamChunkMax *(constant)*
+
+```csharp
+public const int StreamChunkMax = 1536
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk (VL53L8: 1528).
+
+#### Vl53l7Wire.StreamTotalMax *(constant)*
+
+```csharp
+public const int StreamTotalMax = 8192
+```
+
+Max frame_size accepted by START_STREAM (as VL53L8).
+
+#### Vl53l7Wire.InfoSize *(constant)*
+
+```csharp
+public const int InfoSize = 20
+```
+
+RPT_VL53_INFO payload size.
+
+#### Vl53l7Wire.I2cKhzSteps *(property)*
+
+```csharp
+public static ReadOnlySpan<int> I2cKhzSteps
+```
+
+Nominal SCL steps the firmware carries a timing for; others snap to the nearest.
+
+#### Vl53l7Wire.PackReadReg
+
+```csharp
+public static byte[] PackReadReg(ushort addr, int len)
+```
+
+VL53_READ_REG payload: addr u16 LE, len u16 LE (len 1..`ReadMaxLen`, addr+len ≤ 0x10000).
+
+#### Vl53l7Wire.PackWriteReg
+
+```csharp
+public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
+```
+
+VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`WriteMaxLen` bytes).
+
+#### Vl53l7Wire.PackStartStream
+
+```csharp
+public static byte[] PackStartStream(int frameSize)
+```
+
+VL53_START_STREAM payload: frame_size u16 LE (1..`StreamTotalMax`).
+
+#### Vl53l7Wire.PackPinCtrl
+
+```csharp
+public static byte[] PackPinCtrl(byte action)
+```
+
+VL53_PIN_CTRL payload: action u8 (`Vl53l7PinAction`).
+
+#### Vl53l7Wire.PackSetI2cSpeed
+
+```csharp
+public static byte[] PackSetI2cSpeed(ushort khz)
+```
+
+VL53_SET_I2C_SPEED payload: khz u16 LE (the device snaps to `I2cKhzSteps`).
+
+### Vl53l7Info
+
+```csharp
+public sealed record Vl53l7Info(uint IntEdges, uint FramesDropped, uint I2cErrors, byte LastI2cError, byte LpnLevel, byte IntLevel, ushort I2cKhz, ushort FrameSize, bool Streaming)
+```
+
+RPT_VL53_INFO (0x92) — bridge state only (the sensor is never probed). All counters run from power-up / DEVICE_RESET; only SOFT_CYCLE clears the I2C ones. The report carries no echoed command byte. Each GET_INFO takes the bus from the stream and can drop the frame in flight — read it before and after a run, never in a polling loop during one.
+
+#### Vl53l7Info.Unpack
+
+```csharp
+public static Vl53l7Info Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_VL53_INFO payload (`<IIIBBBHHB`, 20 bytes LE).
+
+### Vl53l7Model
+
+```csharp
+public enum Vl53l7Model
+{
+    Vl53l5cx,
+    Vl53l7cx,
+    Vl53l7ch,
+}
+```
+
+The three sensors one `APP_VL53L7` firmware serves (contract 11). They stream the VL53L8 results-frame layout with the L5/L7 geometry (footer id at size − 4, per-zone trim — see `CreateDecoder`); only `Vl53l7ch` adds CNH (decoded by `Vl53l8Cnh`).
+
+### Vl53l7Discovery
+
+```csharp
+public static class Vl53l7Discovery
+```
+
+Class resolution for an `APP_VL53L7` board (contract 11 §1).
+
+#### Vl53l7Discovery.ResolveModel
+
+```csharp
+public static Vl53l7Model ResolveModel(string? usbModel, string? deviceName)
+```
+
+Pick the sensor class. The firmware name cannot tell the three apart and the silicon never tells CX from CH, so (normative order): the production USB PID model (`UsbModelHint`), else the first `VL53L([57])(CX|CH)` match in GET_DEVICE_NAME, else `Vl53l7cx` (its blob runs on every L5/L7 part).
+
+#### Vl53l7Discovery.HasCnh
+
+```csharp
+public static bool HasCnh(Vl53l7Model model)
+```
+
+True for the model that carries CNH histograms (VL53L7CH).
+
+### Vl53l7Frames
+
+```csharp
+public static class Vl53l7Frames
+```
+
+L5/L7 results-frame decoding (contract 11 §3). The frame layout, scaling and CNH block are VL53L8's (`Vl53l8FrameDecoder`); two things differ:
+
+the frame-id footer sits at size − 4 for every L5/L7 class (both ULD 2.0.1 and VL53LMZ 2.0.16); per-target blocks keep 64 entries even in 4×4 — the decoder trims every per-zone array to the frame's resolution, inferred from the zone-scaled ambient block (index 0x54D0).
+
+Chunks are reassembled with the shared `FrameReassembler` (chunk size `StreamChunkMax` does not affect it).
+
+#### Vl53l7Frames.FooterIdOffset *(constant)*
+
+```csharp
+public const int FooterIdOffset = 4
+```
+
+Frame-id footer offset from the frame end, for every L5/L7 class.
+
+#### Vl53l7Frames.MinRangingFrequencyHz *(constant)*
+
+```csharp
+public const int MinRangingFrequencyHz = 1
+```
+
+Minimum ranging frequency: L5/L7 range at 1 Hz (VL53L8: 2 Hz).
+
+#### Vl53l7Frames.CreateDecoder
+
+```csharp
+public static Vl53l8FrameDecoder CreateDecoder()
+```
+
+A decoder for L5/L7 frames (any of the three classes).
+
+## VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)
+
+### Vl53lxCmd
+
+```csharp
+public enum Vl53lxCmd
+{
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    Xshut = 0x34,
+    StartStream = 0x35,
+    StopStream = 0x36,
+    GetInfo = 0x37,
+    SetI2cSpeed = 0x38,
+    SetAddrWidth = 0x39,
+    ClearI2cErrors = 0x3A,
+}
+```
+
+VL53L 1D-family register-bridge command opcodes, protocol v2.00 (contracts/12_SENSOR_VL53LX.md §2). The contract-10 opcodes plus `SetAddrWidth`.
+
+### Vl53lxRpt
+
+```csharp
+public enum Vl53lxRpt
+{
+    RegData = 0x91,
+    Info = 0x92,
+    Stream = 0x93,
+}
+```
+
+VL53L 1D-family report opcodes (same ids as contract 10).
+
+### Vl53lxClearStep
+
+```csharp
+public readonly record struct Vl53lxClearStep(ushort Addr, byte Value)
+```
+
+One interrupt-release step the bridge plays after every streamed block read.
+
+### Vl53lxWire
+
+```csharp
+public static class Vl53lxWire
+```
+
+v2.00 wire codecs. One firmware (`APP_VL53L0_4`) serves six products; it is the contract-10 bridge with the sensor-specific facts moved to the host: the register-address width (`PackSetAddrWidth`, new), the interrupt-release writes (carried by `PackStartStream`) and the boot handshake (no longer inside XSHUT). READ_REG, WRITE_REG, XSHUT, SET_I2C_SPEED and the REG_DATA / STREAM reports are identical on the wire to contract 10 and are forwarded to `Vl53l4Wire` (`Vl53l4RegData`, `Vl53l4StreamData`).
+
+#### Vl53lxWire.ClearStepsMax *(constant)*
+
+```csharp
+public const int ClearStepsMax = 4
+```
+
+Most interrupt-release steps a stream may carry (VL53_CLEAR_STEPS_WIRE_MAX).
+
+#### Vl53lxWire.InfoSize *(constant)*
+
+```csharp
+public const int InfoSize = 23
+```
+
+RPT_VL53_INFO payload size in v2.00.
+
+#### Vl53lxWire.XferMax *(constant)*
+
+```csharp
+public const int XferMax = Vl53l4Wire.XferMax
+```
+
+Max read length / write data length per transfer (contract 10).
+
+#### Vl53lxWire.FlagIntActHigh *(constant)*
+
+```csharp
+public const byte FlagIntActHigh = Vl53l4Wire.FlagIntActHigh
+```
+
+START_STREAM flags bit 1: INT active high (contract 10).
+
+#### Vl53lxWire.PackReadReg
+
+```csharp
+public static byte[] PackReadReg(ushort addr, ushort len)
+```
+
+VL53_READ_REG payload (contract 10): addr u16 LE, len u16 LE.
+
+#### Vl53lxWire.PackWriteReg
+
+```csharp
+public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
+```
+
+VL53_WRITE_REG payload (contract 10): addr u16 LE, then the raw register data.
+
+#### Vl53lxWire.PackXshut
+
+```csharp
+public static byte[] PackXshut(byte action)
+```
+
+VL53_XSHUT payload: action u8 (`Vl53l4Xshut`). In v2.00 RESET has no boot handshake — the host polls the boot register itself.
+
+#### Vl53lxWire.PackSetI2cSpeed
+
+```csharp
+public static byte[] PackSetI2cSpeed(ushort khz)
+```
+
+VL53_SET_I2C_SPEED payload (contract 10): khz u16 LE.
+
+#### Vl53lxWire.PackSetAddrWidth
+
+```csharp
+public static byte[] PackSetAddrWidth(int width)
+```
+
+VL53_SET_ADDR_WIDTH payload: width u8, 1 (VL53L0X) or 2. Sticky, 2 after a reset; set it before the first register access of a session.
+
+#### Vl53lxWire.PackStartStream
+
+```csharp
+public static byte[] PackStartStream(ushort addr, ushort len, IReadOnlyList<Vl53lxClearStep>? clear = null, byte flags = 0)
+```
+
+VL53_START_STREAM payload (v2.00, 6 + 3n bytes): addr u16 LE, len u16 LE, flags u8, n_clear u8, then n × {addr u16 LE, value u8} — the interrupt-release steps the bridge plays after every block read (0..4).
+
+### Vl53lxInfo
+
+```csharp
+public sealed record Vl53lxInfo(uint IntEdges, uint SlotsSkipped, uint I2cErrors, byte LastI2cError, byte XshutLevel, byte IntLevel, ushort I2cKhz, byte AddrWidth, byte NClear, uint FramesDropped)
+```
+
+RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads no sensor register. Counters are free-running and wrap silently: watch increments. `SlotsSkipped` = a slot that never got the bus, `I2cErrors` = a bus that answered badly, `FramesDropped` = a good sample the USB TX ring had no room for (since the stream was armed). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+
+#### Vl53lxInfo.Unpack
+
+```csharp
+public static Vl53lxInfo Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_VL53_INFO payload (`<IIIBBBHBBI`, 23 bytes LE).
+
+### Vl53lxDriverKind
+
+```csharp
+public enum Vl53lxDriverKind
+{
+    Uld,
+    Ulp,
+    Histogram,
+}
+```
+
+The three kinds of driver ST ships for the 1D family, in the order a UI should list them (contract 12 §1). What separates them is where the ranging arithmetic runs.
+
+### Vl53lxClass
+
+```csharp
+public enum Vl53lxClass
+{
+    Vl53lx,
+    Vl53l0x,
+    Vl53l1cx,
+    Vl53l1cb,
+    Vl53l3cx,
+    Vl53l4cx,
+}
+```
+
+Sensor class an `APP_VL53L0_4` board resolves to (contract 12 §1). `Vl53lx` is the generic class that takes the product at init — also what a VL53L4CD board on this firmware gets.
+
+### Vl53lxProduct
+
+```csharp
+public sealed record Vl53lxProduct(string Name, int UsbPid, ushort ModelId, int ReachMm, IReadOnlyList<Vl53lxDriverKind> DriverKinds, Vl53lxDriverKind DefaultDriver, int AddrWidth, IReadOnlyList<Vl53lxClearStep> ClearSteps, int MaxKhz)
+```
+
+One row of the product table: what is true of the part itself, plus the bridge parameters its default driver runs with (register-address width, interrupt-release steps, bus ceiling). The model id is a cross-check only: L1CX/L1CB share 0xEACC, L4CD/L4CX share 0xEBAA.
+
+### Vl53lxProducts
+
+```csharp
+public static class Vl53lxProducts
+```
+
+Product table and board-name / class resolution (contract 12 §1).
+
+#### Vl53lxProducts.All *(field)*
+
+```csharp
+public static readonly IReadOnlyList<Vl53lxProduct> All = …
+```
+
+Every product of the family, in the order a UI should list them.
+
+#### Vl53lxProducts.Find
+
+```csharp
+public static Vl53lxProduct? Find(string? name)
+```
+
+The table row for a product name (exact, upper case), or null.
+
+#### Vl53lxProducts.ProductFromBoardName
+
+```csharp
+public static string? ProductFromBoardName(string? name)
+```
+
+`"ToF Sensor VL53L4CD USB v2.1"` → `"VL53L4CD"`: the first `VL53L<digit><part>` match, case-insensitive. Null if the name carries no family product (an unstamped board, an unknown part).
+
+#### Vl53lxProducts.ResolveClass
+
+```csharp
+public static Vl53lxClass ResolveClass(string? usbModel, string? deviceName)
+```
+
+Pick the class (normative order): the production USB PID model (`UsbModelHint`) if it is a family product, else the product the device name carries, else the generic `Vl53lx`. VL53L4CD maps to the generic class on this firmware (the `vl53l4cd` class belongs to `APP_VL53L4`).
+
+#### Vl53lxProducts.ModelIdOk
+
+```csharp
+public static bool ModelIdOk(string product, int value)
+```
+
+Cross-check the id the sensor answered against the product asked for. True only says "not something else entirely".
+
+### Vl53lxDieVariant
+
+```csharp
+public enum Vl53lxDieVariant
+{
+    L4,
+    L1,
+}
+```
+
+Which ULD reads the die block (contract 12 §4). They differ only in the signal-rate byte offset S and the per-SPAD scale K.
+
+### Vl53lxDieResult
+
+```csharp
+public sealed record Vl53lxDieResult(int RangeStatus, int DistanceMm, int SigmaMm, int SignalRateKcps, int AmbientRateKcps, int SignalPerSpadKcps, int AmbientPerSpadKcps, int NumberOfSpad, int StreamCount)
+```
+
+The 17-byte die block decoded as one ULD reads it.
+
+### Vl53lxL0xRaw
+
+```csharp
+public sealed record Vl53lxL0xRaw(int DistanceRaw, int DeviceRangeStatus, long SignalRateMcps1616, long AmbientRateMcps1616, int EffectiveSpadCount88)
+```
+
+Raw fields of the VL53L0X 12-byte block at 0x14. The PAL range status, sigma and dmax need the device data cached by init — full driver, not base.
+
+### Vl53lxHistogramRaw
+
+```csharp
+public sealed record Vl53lxHistogramRaw(int InterruptStatus, int RangeStatus, int ReportStatus, int StreamCount, int DssActualEffectiveSpads, int ReferencePhase, int VcselStart, IReadOnlyList<int> Bins)
+```
+
+Status bytes and the 24 photon bins of the 83-byte histogram block at 0x0088. Bins → targets is the full driver's job.
+
+### Vl53lxDecode
+
+```csharp
+public static class Vl53lxDecode
+```
+
+Stateless decoders of the blocks the 1D-family bridge streams (contract 12 §4) — the "base" every SDK implements. What a block says on its own, without the driver state an init leaves behind.
+
+#### Vl53lxDecode.DieBlockAddr *(constant)*
+
+```csharp
+public const ushort DieBlockAddr = 0x0089
+```
+
+Die result block (L1CX, L1CB, L3CX, L4CD, L4CX light drivers).
+
+#### Vl53lxDecode.DieBlockLen *(constant)*
+
+```csharp
+public const int DieBlockLen = 17
+```
+
+#### Vl53lxDecode.L0xBlockAddr *(constant)*
+
+```csharp
+public const ushort L0xBlockAddr = 0x14
+```
+
+VL53L0X result block (register-address width 1).
+
+#### Vl53lxDecode.L0xBlockLen *(constant)*
+
+```csharp
+public const int L0xBlockLen = 12
+```
+
+#### Vl53lxDecode.HistogramBlockAddr *(constant)*
+
+```csharp
+public const ushort HistogramBlockAddr = 0x0088
+```
+
+Histogram block, RESULT__INTERRUPT_STATUS .. RESULT__HISTOGRAM_BIN_23_0_LSB.
+
+#### Vl53lxDecode.HistogramBlockLen *(constant)*
+
+```csharp
+public const int HistogramBlockLen = 0x00DA - 0x0088 + 1
+```
+
+#### Vl53lxDecode.HistogramBins *(constant)*
+
+```csharp
+public const int HistogramBins = 24
+```
+
+#### Vl53lxDecode.static
+
+```csharp
+public static (int SignalAt, int K) DieVariantParams(Vl53lxDieVariant variant)
+```
+
+(signal-rate byte offset, per-SPAD scale K) of a die variant.
+
+#### Vl53lxDecode.ParseDieVariant
+
+```csharp
+public static Vl53lxDieVariant ParseDieVariant(string name)
+```
+
+Parse the vector/wire name of a die variant (`"l4"` / `"l1"`).
+
+#### Vl53lxDecode.DecodeDieBlock
+
+```csharp
+public static Vl53lxDieResult DecodeDieBlock(ReadOnlySpan<byte> raw, Vl53lxDieVariant variant = Vl53lxDieVariant.L4)
+```
+
+The 17-byte die block (0x0089..0x0099) as the named ULD reads it. The status maps through the contract-10 table (`StatusRtn`); raw status ≥ 24 passes through unmapped.
+
+#### Vl53lxDecode.DecodeL0xRaw
+
+```csharp
+public static Vl53lxL0xRaw DecodeL0xRaw(ReadOnlySpan<byte> raw)
+```
+
+Raw fields of the VL53L0X block at 0x14 (VL53L0X_GetRangingMeasurementData before the PAL status/sigma step). Distance is mm (quarter-mm when RangeFractionalEnable); rates are FixPoint16.16 Mcps (9.7 on the wire << 9).
+
+#### Vl53lxDecode.DecodeHistogramRaw
+
+```csharp
+public static Vl53lxHistogramRaw DecodeHistogramRaw(ReadOnlySpan<byte> raw)
+```
+
+The 83-byte histogram block at 0x0088: status bytes and the 24 bins of 3 big-endian bytes. Bin 23's low byte is carried separately as an MSB/LSB pair — `((MSB << 2) + LSB) & 0xFF` — and patched in (on a copy; the input is not modified) before the bins are read.
 
 ## BNO086 (IMU)
 
@@ -2045,6 +2710,1028 @@ public void Reset()
 
 Forget all TX seq counters and partial cargos (sensor reset).
 
+## BNO055 (IMU)
+
+### Bno055Cmd
+
+```csharp
+public enum Bno055Cmd
+{
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    Reset = 0x34,
+    StartStream = 0x35,
+    StopStream = 0x36,
+    GetInfo = 0x37,
+}
+```
+
+BNO055 register-bridge command opcodes, protocol v0.10 (contracts/13_SENSOR_BNO055.md §2). 0x30/0x31 are the common sync pins.
+
+### Bno055Rpt
+
+```csharp
+public enum Bno055Rpt
+{
+    RegData = 0x91,
+    Info = 0x92,
+    Stream = 0x93,
+}
+```
+
+BNO055 report opcodes (contract 13 §3).
+
+### Bno055Trigger
+
+```csharp
+public enum Bno055Trigger : byte
+{
+    Timer = 0,
+    Int = 1,
+}
+```
+
+BNO_START_STREAM trigger.
+
+### Bno055Wire
+
+```csharp
+public static class Bno055Wire
+```
+
+Wire codecs of the BNO055 bridge (`APP_BNO055`). The firmware is a thin register bridge: the MCU owns the I2C bus (sensor at 7-bit 0x28, 400 kHz fixed), the nRESET/INT pins and one streaming loop; operating mode, units, axis remap, calibration and decoding are host logic expressed as register access (`Bno055Regs`). Mirrors `depz_sensor_sdk/protocol/bno055.py` 1:1. BNO_RESET, BNO_STOP_STREAM and BNO_GET_INFO carry an empty payload.
+
+#### Bno055Wire.XferMax *(constant)*
+
+```csharp
+public const int XferMax = 128
+```
+
+Max bytes per READ_REG / WRITE_REG / streamed block; addr + len ≤ 0x100.
+
+#### Bno055Wire.InfoSize *(constant)*
+
+```csharp
+public const int InfoSize = 38
+```
+
+RPT_BNO_INFO payload size.
+
+#### Bno055Wire.ResetTimeout *(field)*
+
+```csharp
+public static readonly TimeSpan ResetTimeout = TimeSpan.FromSeconds(3)
+```
+
+BNO_RESET answers after the sensor's ~0.5 s boot handshake.
+
+#### Bno055Wire.ExpectedChipId *(constant)*
+
+```csharp
+public const byte ExpectedChipId = 0xA0
+```
+
+Identity registers 0x00..0x03 of a healthy BNO055.
+
+#### Bno055Wire.ExpectedAccId *(constant)*
+
+```csharp
+public const byte ExpectedAccId = 0xFB
+```
+
+#### Bno055Wire.ExpectedMagId *(constant)*
+
+```csharp
+public const byte ExpectedMagId = 0x32
+```
+
+#### Bno055Wire.ExpectedGyrId *(constant)*
+
+```csharp
+public const byte ExpectedGyrId = 0x0F
+```
+
+#### Bno055Wire.PackReadReg
+
+```csharp
+public static byte[] PackReadReg(byte addr, byte len)
+```
+
+BNO_READ_REG payload: addr u8, len u8.
+
+#### Bno055Wire.PackWriteReg
+
+```csharp
+public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
+```
+
+BNO_WRITE_REG payload: addr u8, then data[1..128].
+
+#### Bno055Wire.PackStartStream
+
+```csharp
+public static byte[] PackStartStream(Bno055Trigger trigger, byte addr, byte len, ushort periodMs)
+```
+
+BNO_START_STREAM payload (5 bytes): trigger u8, addr u8, len u8, period_ms u16 LE. Replaces any running stream.
+
+### Bno055RegData
+
+```csharp
+public sealed record Bno055RegData(byte Cmd, ulong TimestampUs, byte[] Data)
+```
+
+RPT_BNO_REG_DATA: echoed READ_REG opcode, MCU uptime at I2C-read completion, register bytes.
+
+#### Bno055RegData.Unpack
+
+```csharp
+public static Bno055RegData Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_BNO_REG_DATA payload: cmd u8, timestamp u64 LE, then data.
+
+### Bno055StreamData
+
+```csharp
+public sealed record Bno055StreamData(ulong TimestampUs, byte Addr, byte Length, byte[] Data)
+```
+
+RPT_BNO_REG_STREAM — one streamed register block. `Addr` / `Length` echo the stream configuration so each report is self-describing; `TimestampUs` is the trigger time (timer expiry or INT edge), not the I2C completion.
+
+#### Bno055StreamData.Unpack
+
+```csharp
+public static Bno055StreamData Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_BNO_REG_STREAM payload: timestamp u64 LE, addr u8, len u8, data[len].
+
+### Bno055Info
+
+```csharp
+public sealed record Bno055Info(byte I2cAddr, byte ChipId, byte AccId, byte MagId, byte GyrId, ushort SwRev, byte BlRev, byte Initialized, byte IntLevel, uint IntEdges, ushort ReadMinUs, ushort ReadMaxUs, ushort ReadAvgUs, uint TxDropped, uint I2cErrors, uint SlotsSkipped, ushort BusRecoveries, byte LastI2cError, byte SensorResets, ushort LoopMaxUs)
+```
+
+RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+
+#### Bno055Info.Unpack
+
+```csharp
+public static Bno055Info Unpack(ReadOnlySpan<byte> p)
+```
+
+Parse a RPT_BNO_INFO payload (`<BBBBBHBBBIHHHIIIHBBH`, 38 bytes LE).
+
+#### Bno055Info.IdsOk *(property)*
+
+```csharp
+public bool IdsOk
+```
+
+All four identity registers hold the healthy BNO055 values.
+
+#### Bno055Info.SwRevText *(property)*
+
+```csharp
+public string SwRevText
+```
+
+Sensor firmware revision as Bosch writes it: 0x0311 → "03.11".
+
+### Bno055OprMode
+
+```csharp
+public enum Bno055OprMode : byte
+{
+    Config = 0x00,
+    AccOnly = 0x01,
+    MagOnly = 0x02,
+    GyroOnly = 0x03,
+    AccMag = 0x04,
+    AccGyro = 0x05,
+    MagGyro = 0x06,
+    Amg = 0x07,
+    Imu = 0x08,
+    Compass = 0x09,
+    M4g = 0x0A,
+    NdofFmcOff = 0x0B,
+    Ndof = 0x0C,
+}
+```
+
+OPR_MODE (0x3D) bits 3:0 (the register reads back 0x10 after reset — mask).
+
+### Bno055PwrMode
+
+```csharp
+public enum Bno055PwrMode : byte
+{
+    Normal = 0x00,
+    LowPower = 0x01,
+    Suspend = 0x02,
+}
+```
+
+PWR_MODE (0x3E) bits 1:0.
+
+### Bno055TempSource
+
+```csharp
+public enum Bno055TempSource : byte
+{
+    Accel = 0x00,
+    Gyro = 0x01,
+}
+```
+
+TEMP_SOURCE (0x40) bits 1:0.
+
+### Bno055Vec3
+
+```csharp
+public readonly record struct Bno055Vec3(short X, short Y, short Z)
+```
+
+Three raw i16 words in register order (x, y, z).
+
+### Bno055Euler
+
+```csharp
+public readonly record struct Bno055Euler(short Heading, short Roll, short Pitch)
+```
+
+Raw Euler angles in register order: heading, roll, pitch.
+
+### Bno055Quat
+
+```csharp
+public readonly record struct Bno055Quat(short W, short X, short Y, short Z)
+```
+
+Raw quaternion in register order: w, x, y, z (1.0 = 2^14).
+
+### Bno055Units
+
+```csharp
+public sealed record Bno055Units(bool AccelMg = false, bool GyroRps = false, bool EulerRad = false, bool TempF = false, bool Android = false)
+```
+
+Output units (UNIT_SEL 0x3B). The SDK default (`Default`, UNIT_SEL = 0x00) is m/s², dps, degrees, °C, Windows orientation. The sensor's own power-on value is 0x80 (Android), so a fresh sensor must be told. Bits as the silicon implements them (contract 13 §4.2; the datasheet §4.3.60 bit table is off by one); unknown bits are dropped on unpack. Physical value = raw / LSB.
+
+#### Bno055Units.AccMg *(constant)*
+
+```csharp
+public const byte AccMg = 0x01
+```
+
+#### Bno055Units.GyrRps *(constant)*
+
+```csharp
+public const byte GyrRps = 0x02
+```
+
+#### Bno055Units.EulRad *(constant)*
+
+```csharp
+public const byte EulRad = 0x04
+```
+
+#### Bno055Units.TempFahrenheit *(constant)*
+
+```csharp
+public const byte TempFahrenheit = 0x10
+```
+
+#### Bno055Units.OriAndroid *(constant)*
+
+```csharp
+public const byte OriAndroid = 0x80
+```
+
+#### Bno055Units.Default *(field)*
+
+```csharp
+public static readonly Bno055Units Default = new()
+```
+
+#### Bno055Units.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055Units.Unpack
+
+```csharp
+public static Bno055Units Unpack(byte value)
+```
+
+#### Bno055Units.AccelLsb *(property)*
+
+```csharp
+public double AccelLsb
+```
+
+ACC_DATA LSB: 1 per mg, else 100 per m/s² (LIA/GRV: `FusionAccelLsb`).
+
+#### Bno055Units.GyroLsb *(property)*
+
+```csharp
+public double GyroLsb
+```
+
+Angular-rate LSB: 900 per rad/s, else 16 per dps.
+
+#### Bno055Units.EulerLsb *(property)*
+
+```csharp
+public double EulerLsb
+```
+
+Euler LSB: 900 per radian, else 16 per degree.
+
+#### Bno055Units.TempLsb *(property)*
+
+```csharp
+public double TempLsb
+```
+
+Temperature LSB: 1 LSB = 2 °F (0.5 LSB/°F), else 1 LSB = 1 °C.
+
+### Bno055CalibStatus
+
+```csharp
+public readonly record struct Bno055CalibStatus(int System, int Gyro, int Accel, int Mag)
+```
+
+CALIB_STAT (0x35) `sys<7:6> gyr<5:4> acc<3:2> mag<1:0>`: 0 = not calibrated … 3 = fully.
+
+#### Bno055CalibStatus.Unpack
+
+```csharp
+public static Bno055CalibStatus Unpack(byte value)
+```
+
+#### Bno055CalibStatus.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055CalibStatus.FullyCalibrated *(property)*
+
+```csharp
+public bool FullyCalibrated
+```
+
+### Bno055CalibrationProfile
+
+```csharp
+public sealed record Bno055CalibrationProfile(Bno055Vec3 AccelOffset, Bno055Vec3 MagOffset, Bno055Vec3 GyroOffset, short AccelRadius, short MagRadius)
+```
+
+Sensor offsets and radii, registers 0x55..0x6A (22 bytes, 11 × i16 LE: acc_offset xyz, mag_offset xyz, gyr_offset xyz, acc_radius, mag_radius). Readable and writable only in CONFIG; write all 22 bytes in one transfer (the sensor latches each group on its MSB). Offsets are in sensor LSB and do not depend on UNIT_SEL.
+
+#### Bno055CalibrationProfile.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+#### Bno055CalibrationProfile.Unpack
+
+```csharp
+public static Bno055CalibrationProfile Unpack(ReadOnlySpan<byte> data)
+```
+
+### Bno055Axis
+
+```csharp
+public enum Bno055Axis : byte
+{
+    X = 0,
+    Y = 1,
+    Z = 2,
+}
+```
+
+Source axis codes of `Bno055AxisRemap`.
+
+### Bno055AxisRemap
+
+```csharp
+public sealed record Bno055AxisRemap(Bno055Axis X = Bno055Axis.X, Bno055Axis Y = Bno055Axis.Y, Bno055Axis Z = Bno055Axis.Z, bool XNegative = false, bool YNegative = false, bool ZNegative = false)
+```
+
+Which chip axis feeds each output axis, and its sign (AXIS_MAP_CONFIG 0x41 = `z<5:4> y<3:2> x<1:0>`, AXIS_MAP_SIGN 0x42 = `x 2, y 1, z 0`, 1 = negative). `X = Bno055Axis.Y` means "output X is the chip's Y axis". The default is P1.
+
+#### Bno055AxisRemap.public
+
+```csharp
+public (byte Config, byte Sign) Pack()
+```
+
+→ (AXIS_MAP_CONFIG, AXIS_MAP_SIGN). The sensor keeps its old mapping when given one that uses an axis twice, so this refuses it up front.
+
+#### Bno055AxisRemap.Unpack
+
+```csharp
+public static Bno055AxisRemap Unpack(byte config, byte sign)
+```
+
+#### Bno055AxisRemap.IReadOnlyList
+
+```csharp
+public static readonly IReadOnlyList<(string Name, byte Config, byte Sign)> Placements = new[]
+```
+
+Datasheet §3.4: placement → (AXIS_MAP_CONFIG, AXIS_MAP_SIGN), P0..P7 in order.
+
+#### Bno055AxisRemap.Placement
+
+```csharp
+public static Bno055AxisRemap Placement(string name)
+```
+
+Datasheet §3.4 mounting preset P0..P7 (case-insensitive; P1 is the default).
+
+### Bno055AccelConfig
+
+```csharp
+public readonly record struct Bno055AccelConfig(int Range, int Bandwidth, int Power)
+```
+
+ACC_CONFIG (page 1, 0x08) as register codes `range<1:0> bandwidth<4:2> power<7:5>`: indexes into `AccRangeG`, `AccBandwidthHz`, `AccPowerNames`. Power-on value 0x0D = ±4 g, 62.5 Hz, normal. Effective in non-fusion modes only.
+
+#### Bno055AccelConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055AccelConfig Default = new(1, 3, 0)
+```
+
+#### Bno055AccelConfig.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055AccelConfig.Unpack
+
+```csharp
+public static Bno055AccelConfig Unpack(byte value)
+```
+
+### Bno055GyroConfig
+
+```csharp
+public readonly record struct Bno055GyroConfig(int Range, int Bandwidth, int Power)
+```
+
+GYR_CONFIG_0/1 (page 1, 0x0A/0x0B), 2 bytes: byte0 = `range<2:0> bandwidth<5:3>`, byte1 = `power<2:0>`. Indexes into `GyrRangeDps`, `GyrBandwidthHz`, `GyrPowerNames`. Power-on 0x38/0x00 = 2000 dps, 32 Hz, normal.
+
+#### Bno055GyroConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055GyroConfig Default = new(0, 7, 0)
+```
+
+#### Bno055GyroConfig.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+#### Bno055GyroConfig.Unpack
+
+```csharp
+public static Bno055GyroConfig Unpack(ReadOnlySpan<byte> data)
+```
+
+### Bno055MagConfig
+
+```csharp
+public readonly record struct Bno055MagConfig(int Rate, int Mode, int Power)
+```
+
+MAG_CONFIG (page 1, 0x09) `rate<2:0> mode<4:3> power<6:5>`: indexes into `MagRateHz`, `MagOprNames`, `MagPowerNames`. Bit 7 is not a field: `Unpack(v).Pack() == (v & 0x7F)`. Power-on 0x0B = 10 Hz, regular, normal.
+
+#### Bno055MagConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055MagConfig Default = new(3, 1, 0)
+```
+
+#### Bno055MagConfig.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055MagConfig.Unpack
+
+```csharp
+public static Bno055MagConfig Unpack(byte value)
+```
+
+### Bno055RawBlock
+
+```csharp
+public sealed record Bno055RawBlock(Bno055Vec3? Accel, Bno055Vec3? Mag, Bno055Vec3? Gyro, Bno055Euler? Euler, Bno055Quat? Quaternion, Bno055Vec3? LinearAccel, Bno055Vec3? Gravity, sbyte? Temperature, byte? CalibStat)
+```
+
+Raw register values found in one block read. A channel is null when the window addr..addr+len does not cover all of its bytes.
+
+### Bno055Regs
+
+```csharp
+public static class Bno055Regs
+```
+
+BNO055 register map and the pure codecs every SDK shares (contracts/13_SENSOR_BNO055.md §4, Bosch BST-BNO055-DS000 rev 1.8) — the "base" layer. Mirrors `depz_sensor_sdk/bno055/regs.py` 1:1. Nothing here touches the wire; `vectors/bno055.json` pins it. Scaling is raw / LSB with `Bno055Units` and the fixed LSB constants below. OUT OF SCOPE (as for every C# sensor): the live driver over the bridge (mode switching, boot / fusion-start polls, page discipline, self-test).
+
+#### Bno055Regs.ChipId *(constant)*
+
+```csharp
+public const byte ChipId = 0x00
+```
+
+#### Bno055Regs.PageId *(constant)*
+
+```csharp
+public const byte PageId = 0x07
+```
+
+#### Bno055Regs.AccData *(constant)*
+
+```csharp
+public const byte AccData = 0x08
+```
+
+#### Bno055Regs.MagData *(constant)*
+
+```csharp
+public const byte MagData = 0x0E
+```
+
+#### Bno055Regs.GyrData *(constant)*
+
+```csharp
+public const byte GyrData = 0x14
+```
+
+#### Bno055Regs.EulData *(constant)*
+
+```csharp
+public const byte EulData = 0x1A
+```
+
+#### Bno055Regs.QuaData *(constant)*
+
+```csharp
+public const byte QuaData = 0x20
+```
+
+#### Bno055Regs.LiaData *(constant)*
+
+```csharp
+public const byte LiaData = 0x28
+```
+
+#### Bno055Regs.GrvData *(constant)*
+
+```csharp
+public const byte GrvData = 0x2E
+```
+
+#### Bno055Regs.Temp *(constant)*
+
+```csharp
+public const byte Temp = 0x34
+```
+
+#### Bno055Regs.CalibStat *(constant)*
+
+```csharp
+public const byte CalibStat = 0x35
+```
+
+#### Bno055Regs.StResult *(constant)*
+
+```csharp
+public const byte StResult = 0x36
+```
+
+#### Bno055Regs.IntSta *(constant)*
+
+```csharp
+public const byte IntSta = 0x37
+```
+
+Clear-on-read — never part of a routine block read.
+
+#### Bno055Regs.SysClkStatus *(constant)*
+
+```csharp
+public const byte SysClkStatus = 0x38
+```
+
+#### Bno055Regs.SysStatus *(constant)*
+
+```csharp
+public const byte SysStatus = 0x39
+```
+
+#### Bno055Regs.SysErr *(constant)*
+
+```csharp
+public const byte SysErr = 0x3A
+```
+
+#### Bno055Regs.UnitSel *(constant)*
+
+```csharp
+public const byte UnitSel = 0x3B
+```
+
+#### Bno055Regs.OprMode *(constant)*
+
+```csharp
+public const byte OprMode = 0x3D
+```
+
+#### Bno055Regs.PwrMode *(constant)*
+
+```csharp
+public const byte PwrMode = 0x3E
+```
+
+#### Bno055Regs.SysTrigger *(constant)*
+
+```csharp
+public const byte SysTrigger = 0x3F
+```
+
+#### Bno055Regs.TempSource *(constant)*
+
+```csharp
+public const byte TempSource = 0x40
+```
+
+#### Bno055Regs.AxisMapConfig *(constant)*
+
+```csharp
+public const byte AxisMapConfig = 0x41
+```
+
+#### Bno055Regs.AxisMapSign *(constant)*
+
+```csharp
+public const byte AxisMapSign = 0x42
+```
+
+#### Bno055Regs.SicMatrix *(constant)*
+
+```csharp
+public const byte SicMatrix = 0x43
+```
+
+9 × i16, row-major, 1.0 = 16384.
+
+#### Bno055Regs.CalibProfile *(constant)*
+
+```csharp
+public const byte CalibProfile = 0x55
+```
+
+acc/mag/gyr offsets + acc/mag radius, `CalibProfileLen` bytes.
+
+#### Bno055Regs.CalibProfileLen *(constant)*
+
+```csharp
+public const int CalibProfileLen = 22
+```
+
+#### Bno055Regs.P1AccConfig *(constant)*
+
+```csharp
+public const byte P1AccConfig = 0x08
+```
+
+#### Bno055Regs.P1MagConfig *(constant)*
+
+```csharp
+public const byte P1MagConfig = 0x09
+```
+
+#### Bno055Regs.P1GyrConfig0 *(constant)*
+
+```csharp
+public const byte P1GyrConfig0 = 0x0A
+```
+
+#### Bno055Regs.P1GyrConfig1 *(constant)*
+
+```csharp
+public const byte P1GyrConfig1 = 0x0B
+```
+
+#### Bno055Regs.P1AccSleepConfig *(constant)*
+
+```csharp
+public const byte P1AccSleepConfig = 0x0C
+```
+
+#### Bno055Regs.P1GyrSleepConfig *(constant)*
+
+```csharp
+public const byte P1GyrSleepConfig = 0x0D
+```
+
+#### Bno055Regs.P1IntMsk *(constant)*
+
+```csharp
+public const byte P1IntMsk = 0x0F
+```
+
+#### Bno055Regs.P1IntEn *(constant)*
+
+```csharp
+public const byte P1IntEn = 0x10
+```
+
+#### Bno055Regs.P1AccAmThres *(constant)*
+
+```csharp
+public const byte P1AccAmThres = 0x11
+```
+
+Page-1 0x11..0x1F are the motion-interrupt settings, written raw.
+
+#### Bno055Regs.P1GyrAmSet *(constant)*
+
+```csharp
+public const byte P1GyrAmSet = 0x1F
+```
+
+#### Bno055Regs.P1UniqueId *(constant)*
+
+```csharp
+public const byte P1UniqueId = 0x50
+```
+
+#### Bno055Regs.UniqueIdLen *(constant)*
+
+```csharp
+public const int UniqueIdLen = 16
+```
+
+#### Bno055Regs.FullBlockAddr *(constant)*
+
+```csharp
+public const byte FullBlockAddr = AccData
+```
+
+The block that carries every output channel: 0x08 (ACC_DATA_X_LSB) … 0x35 (CALIB_STAT).
+
+#### Bno055Regs.FullBlockLen *(constant)*
+
+```csharp
+public const byte FullBlockLen = CalibStat - AccData + 1
+```
+
+#### Bno055Regs.QuatBlockAddr *(constant)*
+
+```csharp
+public const byte QuatBlockAddr = QuaData
+```
+
+Quaternion only — the cheapest orientation read (8 bytes, ~1.2 ms of bus).
+
+#### Bno055Regs.QuatBlockLen *(constant)*
+
+```csharp
+public const byte QuatBlockLen = 8
+```
+
+#### Bno055Regs.SysTriggerSelfTest *(constant)*
+
+```csharp
+public const byte SysTriggerSelfTest = 0x01
+```
+
+#### Bno055Regs.SysTriggerRstSys *(constant)*
+
+```csharp
+public const byte SysTriggerRstSys = 0x20
+```
+
+#### Bno055Regs.SysTriggerRstInt *(constant)*
+
+```csharp
+public const byte SysTriggerRstInt = 0x40
+```
+
+#### Bno055Regs.SysTriggerClkSel *(constant)*
+
+```csharp
+public const byte SysTriggerClkSel = 0x80
+```
+
+#### Bno055Regs.IntAccBsxDrdy *(constant)*
+
+```csharp
+public const byte IntAccBsxDrdy = 0x01
+```
+
+#### Bno055Regs.IntMagDrdy *(constant)*
+
+```csharp
+public const byte IntMagDrdy = 0x02
+```
+
+#### Bno055Regs.IntGyrAm *(constant)*
+
+```csharp
+public const byte IntGyrAm = 0x04
+```
+
+#### Bno055Regs.IntGyrHighRate *(constant)*
+
+```csharp
+public const byte IntGyrHighRate = 0x08
+```
+
+#### Bno055Regs.IntGyrDrdy *(constant)*
+
+```csharp
+public const byte IntGyrDrdy = 0x10
+```
+
+#### Bno055Regs.IntAccHighG *(constant)*
+
+```csharp
+public const byte IntAccHighG = 0x20
+```
+
+#### Bno055Regs.IntAccAm *(constant)*
+
+```csharp
+public const byte IntAccAm = 0x40
+```
+
+#### Bno055Regs.IntAccNm *(constant)*
+
+```csharp
+public const byte IntAccNm = 0x80
+```
+
+#### Bno055Regs.StAcc *(constant)*
+
+```csharp
+public const byte StAcc = 0x01
+```
+
+#### Bno055Regs.StMag *(constant)*
+
+```csharp
+public const byte StMag = 0x02
+```
+
+#### Bno055Regs.StGyr *(constant)*
+
+```csharp
+public const byte StGyr = 0x04
+```
+
+#### Bno055Regs.StMcu *(constant)*
+
+```csharp
+public const byte StMcu = 0x08
+```
+
+#### Bno055Regs.ExpectedSelfTest *(constant)*
+
+```csharp
+public const byte ExpectedSelfTest = StAcc | StMag | StGyr | StMcu
+```
+
+#### Bno055Regs.MagLsb *(constant)*
+
+```csharp
+public const double MagLsb = 16.0
+```
+
+MAG_DATA LSB per µT, not selectable.
+
+#### Bno055Regs.QuatLsb *(constant)*
+
+```csharp
+public const double QuatLsb = 16384.0
+```
+
+Quaternion LSB, 2^14, unit-less.
+
+#### Bno055Regs.FusionAccelLsb *(constant)*
+
+```csharp
+public const double FusionAccelLsb = 100.0
+```
+
+Linear acceleration and gravity ignore the ACC_Unit bit: always m/s² at 100 LSB — measured on SW rev 03.11 (datasheet Tables 3-33/3-35 claim mg).
+
+#### Bno055Regs.IsFusion
+
+```csharp
+public static bool IsFusion(Bno055OprMode mode)
+```
+
+True for the fusion operating modes (IMU and above).
+
+#### Bno055Regs.AccRangeG *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> AccRangeG = new[] { 2, 4, 8, 16 }
+```
+
+#### Bno055Regs.AccBandwidthHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<double> AccBandwidthHz = …
+```
+
+#### Bno055Regs.AccPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> AccPowerNames = …
+```
+
+#### Bno055Regs.GyrRangeDps *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> GyrRangeDps = new[] { 2000, 1000, 500, 250, 125 }
+```
+
+#### Bno055Regs.GyrBandwidthHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> GyrBandwidthHz = new[] { 523, 230, 116, 47, 23, 12, 64, 32 }
+```
+
+#### Bno055Regs.GyrPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> GyrPowerNames = …
+```
+
+#### Bno055Regs.MagRateHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> MagRateHz = new[] { 2, 6, 8, 10, 15, 20, 25, 30 }
+```
+
+#### Bno055Regs.MagOprNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> MagOprNames = …
+```
+
+#### Bno055Regs.MagPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> MagPowerNames = new[] { "normal", "sleep", "suspend", "force" }
+```
+
+#### Bno055Regs.SicIdentity *(field)*
+
+```csharp
+public static readonly IReadOnlyList<short> SicIdentity = new short[] { 16384, 0, 0, 0, 16384, 0, 0, 0, 16384 }
+```
+
+Soft-iron matrix identity, 1.0 = 16384.
+
+#### Bno055Regs.PackSicMatrix
+
+```csharp
+public static byte[] PackSicMatrix(IReadOnlyList<short> m)
+```
+
+Soft-iron matrix, 9 × i16 LE row-major, 1.0 = 16384 (datasheet §3.11.4).
+
+#### Bno055Regs.UnpackSicMatrix
+
+```csharp
+public static short[] UnpackSicMatrix(ReadOnlySpan<byte> data)
+```
+
+#### Bno055Regs.DecodeBlock
+
+```csharp
+public static Bno055RawBlock DecodeBlock(byte addr, ReadOnlySpan<byte> data)
+```
+
+Unpack whatever channels the register window starting at `addr` holds.
+
 ## Firmware update
 
 ### FwDepz
@@ -2600,7 +4287,10 @@ public enum SensorType
     Sr04,
     Vl53l8,
     Vl53l4,
+    Vl53l7,
+    Vl53lx,
     Bno086,
+    Bno055,
     Unknown,
 }
 ```

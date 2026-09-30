@@ -5,7 +5,7 @@ description: Hello-world for the VL53L4CD single-zone ToF sensor in the browser 
 
 # VL53L4CD — guide
 
-Step-by-step for the `Vl53l4Cd` class. See [introduction](introduction.md) for
+Step-by-step for the `Vl53l4cd` class. See [introduction](introduction.md) for
 the concepts and [overview](../overview.md) for discovery, recording, and the
 common device features shared by all sensors.
 
@@ -13,10 +13,10 @@ common device features shared by all sensors.
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/node";
-import { Vl53l4Cd } from "@depz/sensor-sdk";
+import { Vl53l4cd } from "@depz/sensor-sdk";
 
 const dev = await openDevice();          // auto-selects the DEPZ device
-if (!(dev instanceof Vl53l4Cd)) throw new Error("not a VL53L4CD");
+if (!(dev instanceof Vl53l4cd)) throw new Error("not a VL53L4CD");
 
 await dev.init();                        // ULD boot + VHV calibration, < 1 s
 await dev.startRanging();                // default: 50 ms budget, continuous (~20 Hz)
@@ -34,12 +34,12 @@ well under a second. It leaves the bridge's I2C bus at 1 MHz; pass
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/web";
-import { Vl53l4Cd } from "@depz/sensor-sdk";
+import { Vl53l4cd } from "@depz/sensor-sdk";
 
 document.querySelector("#connect")!.addEventListener("click", async () => {
   const port = await navigator.serial.requestPort();  // must be a user gesture
   const dev = await openDevice(port);
-  if (!(dev instanceof Vl53l4Cd)) throw new Error("not a VL53L4CD");
+  if (!(dev instanceof Vl53l4cd)) throw new Error("not a VL53L4CD");
 
   await dev.init();
   await dev.startRanging();

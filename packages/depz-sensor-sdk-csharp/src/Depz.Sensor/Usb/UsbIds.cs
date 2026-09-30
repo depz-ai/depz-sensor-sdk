@@ -14,27 +14,27 @@ public static class UsbIds
     public const int DepzUsbVid = 0x1BCF; // 7119
 
     public const int PidSr04 = 0xEC78;    // 60536 — HC-SR04 ultrasonic
-    public const int PidVl53l8Ch = 0xED40; // 60736 — VL53L8CH ToF
-    public const int PidVl53l8Cx = 0xED4B; // 60747 — VL53L8CX ToF (hw-verified)
-    public const int PidVl53l4Cd = 0xED45; // 60741 — VL53L4CD single-zone ToF
+    public const int PidVl53l8ch = 0xED40; // 60736 — VL53L8CH ToF
+    public const int PidVl53l8cx = 0xED4B; // 60747 — VL53L8CX ToF (hw-verified)
+    public const int PidVl53l4cd = 0xED45; // 60741 — VL53L4CD single-zone ToF
     public const int PidBno086 = 0xEE08;  // 60936 — BNO086 IMU
 
     /// <summary>PID → sensor-model hint. Informational: the protocol probe is authoritative.</summary>
     public static readonly IReadOnlyDictionary<int, string> DepzPidModel = new Dictionary<int, string>
     {
         [PidSr04] = "sr04",
-        [PidVl53l8Ch] = "vl53l8ch",
+        [PidVl53l8ch] = "vl53l8ch",
         [0xED41] = "vl53l0x",  // 60737
         [0xED42] = "vl53l1cb", // 60738
         [0xED43] = "vl53l1cx", // 60739
         [0xED44] = "vl53l3cx", // 60740
-        [PidVl53l4Cd] = "vl53l4cd",
+        [PidVl53l4cd] = "vl53l4cd",
         [0xED46] = "vl53l4cx", // 60742
         [0xED47] = "vl53l4ed", // 60743
         [0xED48] = "vl53l5cx", // 60744
         [0xED49] = "vl53l7cx", // 60745
         [0xED4A] = "vl53l7ch", // 60746
-        [PidVl53l8Cx] = "vl53l8cx",
+        [PidVl53l8cx] = "vl53l8cx",
         [PidBno086] = "bno086",
         [0xEE09] = "bno085",   // 60937
         [0xEE0A] = "bno055",   // 60938

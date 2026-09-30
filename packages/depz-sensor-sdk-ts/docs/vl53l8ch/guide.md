@@ -5,7 +5,7 @@ description: Hello-world for the VL53L8CH ToF sensor — everything the CX does,
 
 # VL53L8CH — guide
 
-The `Vl53l8Ch` class is the [`Vl53l8Cx`](../vl53l8cx/guide.md) superset: it
+The `Vl53l8ch` class is the [`Vl53l8cx`](../vl53l8cx/guide.md) superset: it
 inherits **every** CX method (init, resolution, rate, advanced ULD features,
 frame consumption). This page covers only the CH addition — **CNH histograms**.
 
@@ -13,14 +13,14 @@ frame consumption). This page covers only the CH addition — **CNH histograms**
 > `getFrame()` / `onFrame()`, and the advanced ULD features (power modes,
 > crosstalk, detection thresholds, motion indicator) are identical — see the
 > [VL53L8CX guide](../vl53l8cx/guide.md). Only the class differs — `openDevice()`
-> returns `Vl53l8Ch` for the CH USB PID and `init()` loads the `"ch"` blob from
+> returns `Vl53l8ch` for the CH USB PID and `init()` loads the `"ch"` blob from
 > the class, so you never pass a variant:
 >
 > ```ts
-> import { Vl53l8Ch, RESOLUTION_8X8, zoneGrid } from "@depz/sensor-sdk";
+> import { Vl53l8ch, RESOLUTION_8X8, zoneGrid } from "@depz/sensor-sdk";
 >
 > const dev = await openDevice();
-> if (!(dev instanceof Vl53l8Ch)) throw new Error("need CH firmware");
+> if (!(dev instanceof Vl53l8ch)) throw new Error("need CH firmware");
 > await dev.init(undefined, { progress: (t) => console.log(t) });  // CH blob
 > // …everything else is exactly as the CX guide shows…
 > ```
@@ -32,10 +32,10 @@ Arm the histogram block with a `CnhConfig` while stopped, then decode
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/node";
-import { Vl53l8Ch, CnhConfig, decodeCnh } from "@depz/sensor-sdk";
+import { Vl53l8ch, CnhConfig, decodeCnh } from "@depz/sensor-sdk";
 
 const dev = await openDevice();
-if (!(dev instanceof Vl53l8Ch)) throw new Error("need CH firmware");
+if (!(dev instanceof Vl53l8ch)) throw new Error("need CH firmware");
 await dev.init();
 
 const cfg = new CnhConfig();
@@ -57,12 +57,12 @@ for await (const frame of dev.frames()) {
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/web";
-import { Vl53l8Ch, CnhConfig, decodeCnh } from "@depz/sensor-sdk";
+import { Vl53l8ch, CnhConfig, decodeCnh } from "@depz/sensor-sdk";
 
 connectBtn.addEventListener("click", async () => {
   const port = await navigator.serial.requestPort();     // user gesture
   const dev = await openDevice(port);
-  if (!(dev instanceof Vl53l8Ch)) throw new Error("need CH firmware");
+  if (!(dev instanceof Vl53l8ch)) throw new Error("need CH firmware");
 
   await dev.init(undefined, { progress: setStatus });    // show progress: not a hang
   const cfg = new CnhConfig();
@@ -87,8 +87,8 @@ histogram bins a given aggregate count allows. A decoded `CnhDecoded` carries a
 ## Gotchas
 
 - All the [CX gotchas](../vl53l8cx/guide.md#gotchas) apply.
-- **`configureCnh()` is CH-only** — it does not exist on `Vl53l8Cx`; `openDevice`
-  returns `Vl53l8Ch` only for CH firmware (PID `0xED40`).
+- **`configureCnh()` is CH-only** — it does not exist on `Vl53l8cx`; `openDevice`
+  returns `Vl53l8ch` only for CH firmware (PID `0xED40`).
 - **Arm CNH while stopped** — `configureCnh()` throws while ranging; it takes
   effect on the next `startRanging()`.
 - **A frame's `cnhRaw` can be null** — only CH firmware with CNH armed populates

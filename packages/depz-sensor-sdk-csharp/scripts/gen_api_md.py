@@ -9,15 +9,20 @@ Python SDK's ``docs/api.md`` (title, Contents index, ``## Domain``
 sections, ``### Name`` + fenced ```csharp signature``` + doc):
 
 - ``docs/api.md`` — the full reference (every public symbol), and
-- ``docs/{sr04,vl53l4cd,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused
-  reference per sensor with just that sensor's own symbols. The shared
-  foundation (transport, protocol, firmware, dataset, USB) stays only in
-  the root.
+- ``docs/<sensor>/api.md`` — one focused reference per sensor with just
+  that sensor's own symbols. The shared foundation (transport, protocol,
+  firmware, dataset, USB) stays only in the root.
 
 The single VL53L8 ToF namespace is TWO sensors — the CX base and the CH
-superset — so it is split by symbol: the CH-only ``Vl53l8Cnh`` extension
-point lands in ``vl53l8ch``, everything else (shared by CX and CH) in
-``vl53l8cx``, mirroring the Python split.
+superset — so it is split by symbol: the CH-only CNH decode (``Vl53l8Cnh``
+and its records) lands in ``vl53l8ch``, everything else (shared by CX and CH)
+in ``vl53l8cx``, following the Python split.
+
+Namespaces that serve several boards give each board a page with the same
+content: ``Vl53l7`` serves VL53L5CX / VL53L7CX / VL53L7CH (plus the VL53L8
+types it decodes with; the L7CH page also the CNH decode), ``Vl53lx`` serves
+VL53L0X / L1CX / L1CB / L3CX / L4CX (plus the contract-10 records it forwards
+to), and ``Bno055`` maps onto ``bno055``.
 
 The ``///`` summaries in the source are the single source of truth, so the
 reference never drifts from the code. Regenerate with:
@@ -39,7 +44,7 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 # Domain (documentation group) → section title, in reading order. Mirrors the
 # Python api.md grouping: the four sensors first, then the shared foundation.
 DOMAIN_ORDER = [
-    "usb", "sr04", "vl53l4", "vl53l8", "bno086",
+    "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "firmware", "dataset", "transport", "protocol",
 ]
 DOMAIN_TITLE = {
@@ -47,7 +52,10 @@ DOMAIN_TITLE = {
     "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
+    "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
+    "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
+    "bno055": "BNO055 (IMU)",
     "firmware": "Firmware update",
     "dataset": "Datasets (record & replay)",
     "transport": "Transport",
@@ -59,7 +67,10 @@ FILE_PRIORITY = [
     "Sr04.cs",
     "Vl53l4Wire.cs", "Vl53l4Uld.cs",
     "FrameDecoder.cs", "Vl53l8Stream.cs", "Advanced.cs", "Cnh.cs", "Vl53l8Uld.cs",
+    "Vl53l7Wire.cs", "Vl53l7Model.cs",
+    "Vl53lxWire.cs", "Vl53lxProducts.cs", "Vl53lxDecode.cs",
     "Reports.cs", "Sh2Control.cs", "Shtp.cs",
+    "Bno055Wire.cs", "Bno055Regs.cs",
     "FwDepz.cs",
     "Dataset.cs",
     "Framing.cs", "PacketParser.cs", "Events.cs", "Crc.cs", "CrcType.cs",
@@ -69,7 +80,17 @@ FILE_PRIORITY = [
 
 # The VL53L8 ToF domain is one namespace but two sensors. CH-specific top-level
 # symbols go to the vl53l8ch reference; everything else is the shared CX base.
-VL53L8CH_SYMBOLS = {"Vl53l8Cnh"}
+VL53L8CH_SYMBOLS = {"Vl53l8Cnh", "Vl53l8CnhConfig", "Vl53l8CnhAggregate", "Vl53l8CnhResult"}
+
+# Types a board page needs from a shared namespace, by name.
+VL53L7_PICKS = ["FrameChunk", "FrameReassembler", "Vl53l8FrameDecoder", "Vl53l8Frame"]
+VL53L7CH_EXTRA_PICKS = ["Vl53l8Cnh", "Vl53l8CnhConfig", "Vl53l8CnhResult", "Vl53l8CnhAggregate"]
+VL53LX_PICKS = ["Vl53l4RegData", "Vl53l4StreamData", "Vl53l4Xshut"]
+VL53LX_BOARDS = [
+    ("vl53l0x", "VL53L0X (ToF)"), ("vl53l1cx", "VL53L1CX (ToF)"),
+    ("vl53l1cb", "VL53L1CB (ToF)"), ("vl53l3cx", "VL53L3CX (ToF)"),
+    ("vl53l4cx", "VL53L4CX (ToF)"),
+]
 
 
 # --------------------------------------------------------------------------
@@ -305,7 +326,7 @@ class Parser:
 
     @staticmethod
     def _sig_name(head: str) -> str:
-        m = re.search(r"\b(enum|class|record|struct|interface)\s+([A-Za-z_]\w*)", head)
+        m = re.search(r"\b(enum|class|record|struct|interface)\s+(?:(?:struct|class)\s+)?([A-Za-z_]\w*)", head)
         if m:
             return m.group(2)
         # member: last identifier before '(' or before '{'/'=>'/end
@@ -340,7 +361,7 @@ class Parser:
             head, term, bl, bc, nxt = self._collect_head(i)
             hsan = _sanitize(head)
             is_public = bool(re.search(r"\bpublic\b", hsan.split("(")[0]))
-            kmatch = re.search(r"\b(enum|class|record|struct|interface)\s+([A-Za-z_]\w*)", hsan)
+            kmatch = re.search(r"\b(enum|class|record|struct|interface)\s+(?:(?:struct|class)\s+)?([A-Za-z_]\w*)", hsan)
             doc = self._doc_above(i)
             name = self._sig_name(head)
 
@@ -553,6 +574,12 @@ def _collect():
             domain = "vl53l8"
         elif folder == "Bno086":
             domain = "bno086"
+        elif folder == "Vl53l7":
+            domain = "vl53l7"
+        elif folder == "Vl53lx":
+            domain = "vl53lx"
+        elif folder == "Bno055":
+            domain = "bno055"
         elif folder == "Protocol":
             domain = {"Sr04.cs": "sr04", "FwDepz.cs": "firmware"}.get(base, "protocol")
         else:
@@ -565,7 +592,15 @@ def _collect():
             for d in ordered if by_domain.get(d)]
 
 
+def _pick(groups, names):
+    """The named top-level types from any group, in pick order."""
+    every = {s.name: s for _d, _t, syms in groups for s in syms}
+    return [every[n] for n in names if n in every]
+
+
 def _sensor_targets(groups):
+    """[(folder, title, syms, note[, extra_groups]), ...]; ``extra_groups``
+    are further ``(title, syms)`` sections of types from shared namespaces."""
     by = {d: (t, syms) for d, t, syms in groups}
     targets = []
     if "sr04" in by:
@@ -590,6 +625,33 @@ def _sensor_targets(groups):
     if "bno086" in by:
         t, syms = by["bno086"]
         targets.append(("bno086", "BNO086 (IMU)", syms, []))
+    if "vl53l7" in by:
+        _t, syms = by["vl53l7"]
+        note = ["One namespace serves the VL53L5CX, VL53L7CX and VL53L7CH boards (one",
+                "`APP_VL53L7` firmware), so this page lists the whole",
+                "`Depz.Sensor.Vl53l7` surface and is the same on all three. Frames",
+                "decode through the VL53L8 decoder with the L5/L7 geometry; the",
+                "advanced DCI codecs are documented in the",
+                "[VL53L8CX API reference](../vl53l8cx/api.md).",
+                ""]
+        shared = ("Shared with VL53L8 (frame decode)", _pick(groups, VL53L7_PICKS))
+        cnh = ("CNH histogram decode (from `Depz.Sensor.Vl53l8`)", _pick(groups, VL53L7CH_EXTRA_PICKS))
+        targets.append(("vl53l5cx", "VL53L5CX (ToF)", syms, note, [shared]))
+        targets.append(("vl53l7cx", "VL53L7CX (ToF)", syms, note, [shared]))
+        targets.append(("vl53l7ch", "VL53L7CH (ToF + CNH)", syms, note, [shared, cnh]))
+    if "vl53lx" in by:
+        _t, syms = by["vl53lx"]
+        note = ["One namespace serves the whole 1D family (one `APP_VL53L0_4`",
+                "firmware): VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX. This",
+                "page lists the whole `Depz.Sensor.Vl53lx` surface and is the same on",
+                "every family page; the product table says what differs per board.",
+                ""]
+        shared = ("Contract-10 records (from `Depz.Sensor.Vl53l4`)", _pick(groups, VL53LX_PICKS))
+        for folder, title in VL53LX_BOARDS:
+            targets.append((folder, title, syms, note, [shared]))
+    if "bno055" in by:
+        _t, syms = by["bno055"]
+        targets.append(("bno055", "BNO055 (IMU)", syms, []))
     return targets
 
 
@@ -606,7 +668,11 @@ def main() -> None:
         "Each sensor also has a focused reference with just its own symbols:",
         "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[BNO086](bno086/api.md).",
+        "[VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · "
+        "[VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · "
+        "[VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · "
+        "[VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · "
+        "[BNO086](bno086/api.md) · [BNO055](bno055/api.md).",
         "",
         "Regenerate: `python3 scripts/gen_api_md.py` (from the package root).",
         "",
@@ -616,7 +682,9 @@ def main() -> None:
     (DOCS / "api.md").write_text(_render_reference(groups, root_head))
     print(f"wrote {DOCS / 'api.md'} ({n} public types across {len(groups)} groups)")
 
-    for folder, title, syms, note in _sensor_targets(groups):
+    for folder, title, syms, note, *extra in _sensor_targets(groups):
+        groups_out = [(folder, title, syms)] + [
+            (folder, t, m) for t, m in (extra[0] if extra else []) if m]
         sub_head = [
             f"# {title} — API reference",
             "",
@@ -632,8 +700,8 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference([(folder, title, syms)], sub_head))
-        print(f"wrote {out} ({len(syms)} symbols)")
+        out.write_text(_render_reference(groups_out, sub_head))
+        print(f"wrote {out} ({sum(len(m) for _, _, m in groups_out)} symbols)")
 
 
 if __name__ == "__main__":

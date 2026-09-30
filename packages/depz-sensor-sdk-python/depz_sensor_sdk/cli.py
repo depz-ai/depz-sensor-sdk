@@ -59,7 +59,7 @@ def _open_for_streaming(port: str, record_path: str | None):
 
 def cmd_monitor(args: argparse.Namespace) -> int:
     from .sr04 import Sr04
-    from .vl53l4 import Vl53l4Cd
+    from .vl53l4 import Vl53l4cd
 
     dev = _open_for_streaming(args.port, args.record)
     try:
@@ -71,7 +71,7 @@ def cmd_monitor(args: argparse.Namespace) -> int:
                 d = m.distance_mm
                 dist = f"{d:8.1f} mm" if d is not None else "   no echo"
                 print(f"{m.timestamp_us:>12} us  {m.echo_time_us:>6} us  {dist}  [{m.source}]")
-        elif isinstance(dev, Vl53l4Cd):
+        elif isinstance(dev, Vl53l4cd):
             dev.init()
             dev.start_ranging()
             for r in dev.measurements():
@@ -91,7 +91,7 @@ def cmd_monitor(args: argparse.Namespace) -> int:
         try:
             if isinstance(dev, Sr04):
                 dev.stop()
-            elif isinstance(dev, Vl53l4Cd) and dev.ranging:
+            elif isinstance(dev, Vl53l4cd) and dev.ranging:
                 dev.stop_ranging()
         except Exception:
             pass
@@ -111,7 +111,7 @@ def cmd_record_data(args: argparse.Namespace) -> int:
     from .dataset import SessionRecorder
     from .discovery import open_device
     from .sr04 import Sr04
-    from .vl53l4 import Vl53l4Cd
+    from .vl53l4 import Vl53l4cd
     from .vl53l8 import RESOLUTION_8X8, Vl53l8
 
     devices = [open_device(p) for p in args.ports]
@@ -124,7 +124,7 @@ def cmd_record_data(args: argparse.Namespace) -> int:
         for dev in devices:
             if isinstance(dev, Sr04):
                 dev.start()
-            elif isinstance(dev, Vl53l4Cd):
+            elif isinstance(dev, Vl53l4cd):
                 dev.init()
                 dev.start_ranging()
             elif isinstance(dev, Vl53l8):
@@ -144,7 +144,7 @@ def cmd_record_data(args: argparse.Namespace) -> int:
             try:
                 if isinstance(dev, Sr04):
                     dev.stop()
-                elif isinstance(dev, (Vl53l4Cd, Vl53l8)) and dev.ranging:
+                elif isinstance(dev, (Vl53l4cd, Vl53l8)) and dev.ranging:
                     dev.stop_ranging()
             except Exception:
                 pass

@@ -6,9 +6,10 @@ buffer size, and decode a captured CNH data block into per-aggregate histograms.
 
 CNH is the reason to run the VL53L8CH firmware instead of plain VL53L8CX: the
 sensor returns a per-aggregate distance histogram (the "compact network
-histogram") on top of the normal ranging frame. The MCU streaming buffer is too
-small to push a full CNH frame, so the host captures it in poll-mode (chunked
-READ_REG) — see vl53l8cx_uld.VL53L8CX.start_ranging(cnh_data_size=...).
+histogram") on top of the normal ranging frame. The block rides inside every
+streamed frame (the largest, 6160 B, still fits the 8192 B stream cap — measured
+on the lab VL53L8CH, contract 04 §7); `start_ranging(cnh_data_size=...)` sizes
+the read.
 
 Register/struct layouts are a 1:1 port of the C plugin; do not "simplify" the
 offset arithmetic. The CNH configuration here fixes the cnh_cfg flags to

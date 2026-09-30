@@ -9,6 +9,7 @@ device actually is; the USB table only chooses which port(s) to talk to.
 
 from __future__ import annotations
 
+import re
 import warnings
 from dataclasses import dataclass
 from typing import Literal
@@ -189,6 +190,7 @@ def open_device(
             target.mode,
             timeout,
             usb_model_hint(target.usb_vid, target.usb_pid),
+            target.device_name,
         )
 
     if isinstance(target, bool):  # guard: bool is an int subclass
@@ -249,7 +251,7 @@ def _open_probed(port: str, timeout: float):
         raise DeviceLostError(f"no DEPZ device answered on {port}")
     pi = {p.port: p for p in _enumerate_ports()}.get(port)
     model = usb_model_hint(pi.vid, pi.pid) if pi is not None else None
-    return _open_port(port, info.sensor_type, info.mode, timeout, model)
+    return _open_port(port, info.sensor_type, info.mode, timeout, model, info.device_name)
 
 
 def _open_port(
@@ -258,18 +260,56 @@ def _open_port(
     mode: str,
     timeout: float,
     usb_model: str | None = None,
+    device_name: str = "",
 ):
     if mode == "bootloader":
         raise DepzError("device is in bootloader mode; use the bootloader client (M2)")
-    return _open_by_sensor(port, sensor, timeout, usb_model)
+    return _open_by_sensor(port, sensor, timeout, usb_model, device_name)
 
 
 def _identify(dev: DeviceBase) -> Identity:
     return parse_software_name(dev.get_software_name())
 
 
+_VL53L7_PART_RE = re.compile(r"VL53L([57])(CX|CH)")
+
+
+def _vl53l7_class(usb_model: str | None, device_name: str):
+    """Pick the L5/L7 class. All three boards run APP_VL53L7 and the silicon
+    only tells L5 from L7 after init() (module_type), never CX from CH — so
+    the production USB PID decides, then the device name the bootloader was
+    stamped with (`… VL53L7CH USB v2.1 …`), then the CX base (safe: its blob
+    runs on every L5/L7 part)."""
+    from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx
+
+    by_model = {"vl53l5cx": Vl53l5cx, "vl53l7cx": Vl53l7cx, "vl53l7ch": Vl53l7ch}
+    if usb_model in by_model:
+        return by_model[usb_model]
+    m = _VL53L7_PART_RE.search(device_name or "")
+    if m:
+        return by_model.get(f"vl53l{m.group(1)}{m.group(2)}".lower(), Vl53l7cx)
+    return Vl53l7cx
+
+
+def _vl53lx_class(usb_model: str | None, device_name: str):
+    """Pick the 1D-family class: the production PID model, then the product
+    the device name carries, then the generic class (it reads the product
+    from the device name itself, or takes product= at init)."""
+    from .vl53lx import CLASS_BY_PRODUCT, Vl53lx
+    from .vl53lx.uld import registry
+
+    product = (usb_model or "").upper() or None
+    if product not in registry.PRODUCTS:
+        product = registry.product_from_board_name(device_name or "")
+    return CLASS_BY_PRODUCT.get(product or "", Vl53lx)
+
+
 def _open_by_sensor(
-    port: str, sensor: SensorType | None, timeout: float, usb_model: str | None = None
+    port: str,
+    sensor: SensorType | None,
+    timeout: float,
+    usb_model: str | None = None,
+    device_name: str = "",
 ):
     if sensor == SensorType.SR04:
         return Sr04(port, timeout=timeout)
@@ -280,18 +320,26 @@ def _open_by_sensor(
         # ship; both are hw-verified in usb_ids.py). A dev unit carrying the
         # STMicro default 0x56DC can't be identified at all, so it falls back
         # to the CX base — the safe choice, since CH is a strict superset.
-        from .vl53l8 import Vl53l8Ch, Vl53l8Cx
+        from .vl53l8 import Vl53l8ch, Vl53l8cx
 
-        cls = Vl53l8Ch if usb_model == "vl53l8ch" else Vl53l8Cx
+        cls = Vl53l8ch if usb_model == "vl53l8ch" else Vl53l8cx
         return cls(port, timeout=timeout)
+    if sensor == SensorType.VL53L7:
+        return _vl53l7_class(usb_model, device_name)(port, timeout=timeout)
+    if sensor == SensorType.VL53LX:
+        return _vl53lx_class(usb_model, device_name)(port, timeout=timeout)
     if sensor == SensorType.VL53L4:
-        from .vl53l4 import Vl53l4Cd
+        from .vl53l4 import Vl53l4cd
 
-        return Vl53l4Cd(port, timeout=timeout)
+        return Vl53l4cd(port, timeout=timeout)
     if sensor == SensorType.BNO086:
         from .bno086 import Bno086
 
         return Bno086(port, timeout=timeout)
+    if sensor == SensorType.BNO055:
+        from .bno055 import Bno055
+
+        return Bno055(port, timeout=timeout)
     return DeviceBase(port, timeout=timeout)
 
 
@@ -310,16 +358,40 @@ def _promote(dev: DeviceBase, ident: Identity):
         Vl53l8._init_subclass_state(dev)  # type: ignore[arg-type]
         dev.__class__ = Vl53l8
         return dev
+    if ident.sensor_type == SensorType.VL53L7:
+        try:
+            name = dev.get_device_name()
+        except DepzError:
+            name = ""
+        cls = _vl53l7_class(None, name)
+        cls._init_subclass_state(dev)  # type: ignore[arg-type]
+        dev.__class__ = cls
+        return dev
+    if ident.sensor_type == SensorType.VL53LX:
+        try:
+            name = dev.get_device_name()
+        except DepzError:
+            name = ""
+        cls = _vl53lx_class(None, name)
+        cls._init_subclass_state(dev)  # type: ignore[arg-type]
+        dev.__class__ = cls
+        return dev
     if ident.sensor_type == SensorType.VL53L4:
-        from .vl53l4 import Vl53l4Cd
+        from .vl53l4 import Vl53l4cd
 
-        Vl53l4Cd._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Vl53l4Cd
+        Vl53l4cd._init_subclass_state(dev)  # type: ignore[arg-type]
+        dev.__class__ = Vl53l4cd
         return dev
     if ident.sensor_type == SensorType.BNO086:
         from .bno086 import Bno086
 
         Bno086._init_subclass_state(dev)  # type: ignore[arg-type]
         dev.__class__ = Bno086
+        return dev
+    if ident.sensor_type == SensorType.BNO055:
+        from .bno055 import Bno055
+
+        Bno055._init_subclass_state(dev)  # type: ignore[arg-type]
+        dev.__class__ = Bno055
         return dev
     return dev

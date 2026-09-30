@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "depz/vl53l8.hpp"
 
 #include <cmath>
@@ -160,6 +161,8 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off) {
         } else if (bf.idx == REFLECTANCE_EST_PC_IDX) {
             reflect.assign(msize, 0);
             for (std::size_t z = 0; z < msize; ++z) reflect[z] = u8(buf[i + 4 + z]);
+        } else if (bf.idx == CNH_DATA_IDX) {
+            f.cnh_raw = bytes(buf.begin() + i + 4, buf.begin() + i + 4 + msize);
         }
         i += msize + 4;
     }
@@ -326,6 +329,27 @@ CnhAggregate decode_aggregate(byte_span raw, int nb_agg, int feat, int agg_id) {
 }  // namespace
 
 CnhFrame decode_cnh(int nb_of_aggregates, int feature_length, byte_span raw) {
+    // Bounds first, as the C decoder does: the reads below index `raw`
+    // directly, so a block shorter than this config implies would be read
+    // past its end.
+    if (nb_of_aggregates <= 0 || nb_of_aggregates > CNH_MAX_AGGREGATES ||
+        feature_length <= 0 || feature_length > CNH_MAX_FEATURE_LENGTH)
+        throw std::invalid_argument("decode_cnh: aggregates / feature length out of range");
+    if (raw.size() < static_cast<std::size_t>(CNH_PER_HEADER_WORDS) * 4)
+        throw std::length_error("decode_cnh: block shorter than the CNH header");
+    {
+        const std::size_t agg_x_feat = static_cast<std::size_t>(nb_of_aggregates) * feature_length;
+        const std::uint32_t pp_size =
+            rd_u32(raw, CNH_PER_HEADER_BUFFER_INFO_IDX * 4) & CNH_BUFFER_INFO_WORDS_MASK;
+        int local_pp = 1;
+        if (rd_i32(raw, 0) == CNH_MI_STATE_PING) local_pp = 0;
+        std::size_t base = CNH_PER_HEADER_WORDS + (local_pp == 1 ? pp_size : 0);
+        std::size_t end = (base + CNH_PER_BUFFER_HEADER_WORDS) * 4 + agg_x_feat * 4 +
+                          ((3 + agg_x_feat) / 4) * 4 +
+                          static_cast<std::size_t>(nb_of_aggregates) * 5;
+        if (end > raw.size())
+            throw std::length_error("decode_cnh: block shorter than the config implies");
+    }
     CnhFrame out;
     out.ref_residual_word = rd_u32(raw, 8);  // words[2]; vl53lmz_cnh_get_ref_residual
     out.ref_residual = out.ref_residual_word / 2048.0;

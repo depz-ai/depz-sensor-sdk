@@ -8,6 +8,7 @@ records by host time and can pace them for playback.
 
 from __future__ import annotations
 
+import base64
 import gzip
 import heapq
 import json
@@ -17,10 +18,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any, Callable, Iterator
 
-from .device import DeviceBase
+from .device import DeviceBase, host_now_us
 from .sr04 import Sr04, Sr04Measurement
 
-SCHEMA = "depz.dataset/1"
+SCHEMA = "depz.dataset/2"
 
 
 def _open_text(path: str | Path, mode: str) -> IO[str]:
@@ -91,12 +92,26 @@ class SessionRecorder:
     start/stop streaming yourself.
     """
 
-    def __init__(self, path: str | Path, *, note: str = "", vl53l8_layers: bool = False):
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        note: str = "",
+        vl53l8_layers: bool = False,
+        temperature_hz: float | None = 1.0,
+    ):
         self._path = path
         self._note = note
         self._vl53l8_layers = vl53l8_layers  # include signal/ambient/sigma/reflectance
+        # ~temperature_hz `temperature` records per device (contract 09):
+        # the MCU thermometer, plus the sensor die where frames carry one.
+        # None disables the sampler thread.
+        self._temperature_hz = temperature_hz
         self._entries: dict[str, _DeviceEntry] = {}
         self._writer: DatasetWriter | None = None
+        self._temp_thread: threading.Thread | None = None
+        self._temp_stop = threading.Event()
+        self._last_silicon: dict[str, float] = {}
 
     def add(self, device: DeviceBase, *, device_id: str | None = None, sync_samples: int = 5) -> str:
         """Register a device (before the first record is written). Runs
@@ -130,6 +145,32 @@ class SessionRecorder:
         )
         for did, entry in self._entries.items():
             self._hook(did, entry)
+        if self._temperature_hz:
+            self._temp_stop.clear()
+            self._temp_thread = threading.Thread(
+                target=self._temperature_loop, name="depz-rec-temp", daemon=True
+            )
+            self._temp_thread.start()
+
+    def _temperature_loop(self) -> None:
+        """~temperature_hz per device: MCU temperature (contract 02) and the
+        last sensor-die reading seen in a frame, as `temperature` records."""
+        period = 1.0 / float(self._temperature_hz or 1.0)
+        while not self._temp_stop.wait(period):
+            writer = self._writer
+            if writer is None:
+                return
+            for did, entry in self._entries.items():
+                silicon = self._last_silicon.get(did)
+                if silicon is not None:
+                    writer.write(did, host_now_us(), "temperature",
+                                 {"celsius": silicon, "source": "sensor"})
+                try:
+                    celsius = entry.device.read_mcu_temperature()
+                except Exception:
+                    continue
+                writer.write(did, host_now_us(), "temperature",
+                             {"celsius": celsius, "source": "mcu"})
 
     def _hook(self, did: str, entry: _DeviceEntry) -> None:
         dev = entry.device
@@ -153,7 +194,9 @@ class SessionRecorder:
         if Vl53l8 is not None and isinstance(dev, Vl53l8):
             layers = self._vl53l8_layers
 
-            def on_frame(f: "Vl53l8Frame", _did=did, _off=offset):
+            def on_frame(f: "Vl53l8Frame", _did=did, _off=offset, _dev=dev):
+                t = f.timestamp_us - _off
+                self._last_silicon[_did] = f.silicon_temp_degc
                 v: dict[str, Any] = {
                     "resolution": f.resolution,
                     "silicon_temp_degc": f.silicon_temp_degc,
@@ -166,14 +209,27 @@ class SessionRecorder:
                     v["ambient_per_spad"] = f.ambient_per_spad[: f.resolution].tolist()
                     v["range_sigma_mm"] = f.range_sigma_mm[: f.resolution].tolist()
                     v["reflectance"] = f.reflectance[: f.resolution].tolist()
-                writer.write(_did, f.timestamp_us - _off, "vl53l8", v)
+                if f.motion is not None:
+                    v["motion"] = f.motion
+                writer.write(_did, t, "vl53l8", v)
+                # CH: persist the raw CNH block riding this frame, with the
+                # armed config's decode parameters (contract 09 `vl53l8_cnh`).
+                cfg = getattr(_dev, "cnh_config", None)
+                if f.cnh_raw and cfg is not None:
+                    writer.write(_did, t, "vl53l8_cnh", {
+                        "nb_aggregates": cfg.nb_of_aggregates,
+                        "feature_length": cfg.feature_length,
+                        "sum_span": cfg.sum_span,
+                        "start_bin": cfg.ref_bin_offset // 2048,
+                        "cnh_raw_b64": base64.b64encode(f.cnh_raw).decode("ascii"),
+                    })
 
             entry.unsubscribes.append(dev.on_frame(on_frame))
             return
 
-        from .vl53l4 import Vl53l4Cd, Vl53l4Measurement
+        from .vl53l4 import Vl53l4cd, Vl53l4Measurement
 
-        if isinstance(dev, Vl53l4Cd):
+        if isinstance(dev, Vl53l4cd):
 
             def on_result(m: "Vl53l4Measurement", _did=did, _off=offset):
                 writer.write(_did, m.timestamp_us - _off, "vl53l4", {
@@ -188,9 +244,60 @@ class SessionRecorder:
 
             entry.unsubscribes.append(dev.on_measurement(on_result))
             return
+
+        from .vl53lx import Vl53lx, Vl53lxMeasurement
+
+        if isinstance(dev, Vl53lx):
+
+            def on_lx(m: "Vl53lxMeasurement", _did=did, _off=offset, _dev=dev):
+                v: dict[str, Any] = {
+                    "product": _dev.product,
+                    "driver": _dev.driver_kind,
+                    "status": m.status,
+                    "distance_mm": m.distance_mm,
+                    "sigma_mm": m.sigma_mm,
+                    "signal_kcps": m.signal_kcps,
+                    "ambient_kcps": m.ambient_kcps,
+                    "spads": m.spads,
+                }
+                if m.targets:
+                    v["targets"] = [
+                        {"distance_mm": t.distance_mm, "status": t.status,
+                         "signal_kcps": t.signal_kcps}
+                        for t in m.targets
+                    ]
+                writer.write(_did, m.timestamp_us - _off, "vl53lx", v)
+
+            entry.unsubscribes.append(dev.on_measurement(on_lx))
+            return
+
+        from .bno055 import Bno055, Bno055Sample
+
+        if isinstance(dev, Bno055):
+
+            def on_sample(s: "Bno055Sample", _did=did, _off=offset):
+                v: dict[str, Any] = {"unit_sel": s.units.pack()}
+                for key in ("quaternion", "euler", "accel", "gyro", "mag",
+                            "linear_accel", "gravity"):
+                    val = getattr(s, key)
+                    if val is not None:
+                        v[key] = list(val)
+                if s.temperature is not None:
+                    v["temperature"] = s.temperature
+                if s.calibration is not None:
+                    c = s.calibration
+                    v["calib"] = [c.system, c.gyro, c.accel, c.mag]
+                writer.write(_did, s.timestamp_us - _off, "bno055", v)
+
+            entry.unsubscribes.append(dev.on_sample(on_sample))
+            return
         # Unknown device class: nothing to hook (future sensors extend here).
 
     def stop(self) -> None:
+        self._temp_stop.set()
+        if self._temp_thread is not None:
+            self._temp_thread.join(timeout=3.0)
+            self._temp_thread = None
         for entry in self._entries.values():
             for unsub in entry.unsubscribes:
                 try:

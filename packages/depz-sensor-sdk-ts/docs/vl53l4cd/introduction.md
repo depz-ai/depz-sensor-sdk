@@ -9,7 +9,7 @@ The **VL53L4CD** is a STMicroelectronics single-zone Time-of-Flight ranging
 sensor: one laser distance per measurement, up to ~1.3 m, with millimetre
 resolution and a per-sample quality estimate. On the DEPZ sensor line the MCU
 is a thin I2C **register bridge** (contract 10) — the full ST ULD 2.2.3
-driver runs **on the host**, inside this SDK (`Vl53l4Cd`).
+driver runs **on the host**, inside this SDK (`Vl53l4cd`).
 
 ## What it does
 
@@ -55,6 +55,6 @@ too blunt. It is a **single zone**, not an imager: for a depth image use the
 - **`bridgeInfo()`** — MCU-side diagnostics (INT edge / error counters, pin
   levels, bus speed), safe to call even while streaming.
 
-The class is [`Vl53l4Cd`](api.md); its results are `Vl53l4Measurement`
+The class is [`Vl53l4cd`](api.md); its results are `Vl53l4Measurement`
 `{ timestampUs, distanceMm, sigmaMm, valid, statusText, … }`. See the
 [guide](guide.md) for runnable code.

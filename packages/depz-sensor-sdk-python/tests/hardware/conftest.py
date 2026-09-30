@@ -24,6 +24,7 @@ import pytest
 
 from _support import (  # noqa: E402  (tests dir is on sys.path via rootdir conftest)
     ALL_FAMILIES,
+    FAMILY_BNO055,
     FAMILY_BNO086,
     FAMILY_SR04,
     FAMILY_VL53L4CD,
@@ -65,7 +66,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     g.addoption("--cycles", type=int, default=None, help="override the profile cycle count")
     g.addoption("--duration", type=float, default=None, help="override the profile soak duration (s)")
     g.addoption("--seed", type=int, default=None, help="RNG seed for jitter (default: time-based, printed)")
-    g.addoption("--sensor", default=None, help="restrict hardware tests to one family (sr04|vl53l4cd|vl53l8cx|vl53l8ch|bno086)")
+    g.addoption("--sensor", default=None, help="restrict hardware tests to one family (sr04|vl53l4cd|vl53l8cx|vl53l8ch|vl53l5cx|vl53l7cx|vl53l7ch|vl53l0x|vl53l1cx|vl53l1cb|vl53l3cx|vl53l4cx|bno086|bno055)")
     g.addoption("--port", default=None, help="restrict hardware tests to one device path")
 
 
@@ -181,6 +182,11 @@ def ch_info(hw_inventory) -> HwDevice:
 @pytest.fixture(scope="session")
 def bno_info(hw_inventory) -> HwDevice:
     return _pick(hw_inventory, FAMILY_BNO086)
+
+
+@pytest.fixture(scope="session")
+def bno055_info(hw_inventory) -> HwDevice:
+    return _pick(hw_inventory, FAMILY_BNO055)
 
 
 @pytest.fixture(params=ALL_FAMILIES)

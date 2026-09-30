@@ -5,7 +5,7 @@ description: Hello-world for the VL53L8CX ToF sensor in the browser and Node —
 
 # VL53L8CX — guide
 
-Step-by-step for the `Vl53l8Cx` base ToF class. See
+Step-by-step for the `Vl53l8cx` base ToF class. See
 [introduction](introduction.md) for concepts and [overview](../overview.md) for
 discovery, recording, and common device features. For the CNH histogram
 superset, see the [VL53L8CH guide](../vl53l8ch/guide.md).
@@ -14,10 +14,10 @@ superset, see the [VL53L8CH guide](../vl53l8ch/guide.md).
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/node";
-import { Vl53l8Cx, RESOLUTION_8X8, zoneGrid } from "@depz/sensor-sdk";
+import { Vl53l8cx, RESOLUTION_8X8, zoneGrid } from "@depz/sensor-sdk";
 
 const dev = await openDevice();
-if (!(dev instanceof Vl53l8Cx)) throw new Error("not a VL53L8");
+if (!(dev instanceof Vl53l8cx)) throw new Error("not a VL53L8");
 
 await dev.init(undefined, { progress: (t) => console.log(t) });  // ~seconds: fw download
 await dev.setResolution(RESOLUTION_8X8);
@@ -30,7 +30,7 @@ for await (const frame of dev.frames()) {
 }
 ```
 
-The firmware blob is fixed by the class (`Vl53l8Cx` loads `"cx"`), so you don't
+The firmware blob is fixed by the class (`Vl53l8cx` loads `"cx"`), so you don't
 pass a variant — `openDevice()` already returned the right class from the USB
 PID. Pass `{ writeProgress }` alongside `progress` to track the blob writes.
 
@@ -38,12 +38,12 @@ PID. Pass `{ writeProgress }` alongside `progress` to track the blob writes.
 
 ```ts
 import { openDevice } from "@depz/sensor-sdk/web";
-import { Vl53l8Cx, RESOLUTION_8X8 } from "@depz/sensor-sdk";
+import { Vl53l8cx, RESOLUTION_8X8 } from "@depz/sensor-sdk";
 
 connectBtn.addEventListener("click", async () => {
   const port = await navigator.serial.requestPort();     // user gesture
   const dev = await openDevice(port);
-  if (!(dev instanceof Vl53l8Cx)) throw new Error("not a VL53L8");
+  if (!(dev instanceof Vl53l8cx)) throw new Error("not a VL53L8");
 
   await dev.init(undefined, { progress: setStatus });    // show progress: not a hang
   await dev.setRangingFrequencyHz(10);
@@ -114,5 +114,5 @@ await dev.configureMotionIndicator(400, 1500);   // distance window mm
   throws (`stopRanging()` first).
 - **Size `frames()` for your pace** — the queue is drop-oldest; a slow consumer
   silently drops frames (watch `droppedCount`).
-- **CNH is CH-only** — `configureCnh()` does not exist on `Vl53l8Cx`; run
-  [`Vl53l8Ch`](../vl53l8ch/guide.md) for histograms.
+- **CNH is CH-only** — `configureCnh()` does not exist on `Vl53l8cx`; run
+  [`Vl53l8ch`](../vl53l8ch/guide.md) for histograms.

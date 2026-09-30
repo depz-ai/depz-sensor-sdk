@@ -11,7 +11,7 @@ same per-zone `distanceMm` / signal / ambient / motion surface — **plus**
 Compact-Network-Histogram (CNH) output. On the DEPZ boards it ships as the
 production part (USB PID `0xED40`); the CX silicon is the dev default.
 
-`Vl53l8Ch` extends `Vl53l8Cx` and inherits every method — so **read the
+`Vl53l8ch` extends `Vl53l8cx` and inherits every method — so **read the
 [VL53L8CX introduction](../vl53l8cx/introduction.md) and
 [guide](../vl53l8cx/guide.md) first**. This page and the [CH guide](guide.md)
 cover only what CH adds.
@@ -24,7 +24,7 @@ the returned signal over distance for each zone-aggregate — useful for
 multi-target scenes, transparent/edge targets, and custom peak-picking.
 
 - `configureCnh(config)` — arm the histogram block for the next
-  `startRanging()`. **CH only**: this method does not exist on `Vl53l8Cx`.
+  `startRanging()`. **CH only**: this method does not exist on `Vl53l8cx`.
 - Each frame then carries `cnhRaw`, decoded with `decodeCnh(config, raw)` into
   per-aggregate `hist` / `ambient` values.
 - A `CnhConfig` sizes the histogram (start bin, feature length, subsample) and
@@ -45,11 +45,11 @@ applies (init downloads firmware, ranging ≥ 2 Hz, config only while stopped),
 plus:
 
 - **`init()`** downloads the CH firmware blob (VL53LMZ ULD 2.0.16). The blob is
-  fixed by the class (`Vl53l8Ch` loads `"ch"`), so you don't pass a variant —
-  `openDevice()` already resolved `Vl53l8Ch` from the USB PID.
+  fixed by the class (`Vl53l8ch` loads `"ch"`), so you don't pass a variant —
+  `openDevice()` already resolved `Vl53l8ch` from the USB PID.
 - **CNH is armed before ranging** — call `configureCnh()` while stopped; it
   takes effect on the next `startRanging()`.
 
-The class is [`Vl53l8Ch`](api.md); the CNH types (`CnhConfig`, `decodeCnh`,
+The class is [`Vl53l8ch`](api.md); the CNH types (`CnhConfig`, `decodeCnh`,
 `CnhDecoded`, `CnhAggregate`) live in this reference too. See the
 [guide](guide.md) for code.

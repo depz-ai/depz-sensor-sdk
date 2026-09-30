@@ -125,7 +125,9 @@ describe("enable / feature flow", () => {
   it("enable sends set-feature bytes and verifies", async () => {
     const resp = await dev.enable(SensorId.RotationVector, 100);
     expect(fake.lastSetFeature).not.toBeNull();
-    expect(toHex(fake.lastSetFeature!)).toBe(toHex(buildSetFeature(SensorId.RotationVector, 10_000)));
+    expect(toHex(fake.lastSetFeature!)).toBe(
+      toHex(buildSetFeature(SensorId.RotationVector, 10_000)),
+    );
     expect(resp).not.toBeNull();
     expect(resp!.intervalUs).toBe(10_000);
     expect(fake.features.get(SensorId.RotationVector)).toBe(10_000);
@@ -154,9 +156,23 @@ describe("enable / feature flow", () => {
 
   it("enable argument validation", async () => {
     await expect(dev.enable(SensorId.Accelerometer)).rejects.toThrow(DepzError);
-    await expect(
-      dev.enable(SensorId.Accelerometer, 100, { intervalUs: 10_000 }),
-    ).rejects.toThrow(DepzError);
+    await expect(dev.enable(SensorId.Accelerometer, 100, { intervalUs: 10_000 })).rejects.toThrow(
+      DepzError,
+    );
+  });
+
+  it("enables an event detector at a positive arming rate", async () => {
+    // Detectors are on-change but SH-2 still needs a nonzero report interval to
+    // arm the feature (this is the contract the viewer relies on: enable(id, hz)
+    // with hz>0, not enable(id, 0)).
+    const resp = await dev.enable(SensorId.StepCounter, 50);
+    expect(toHex(fake.lastSetFeature!)).toBe(toHex(buildSetFeature(SensorId.StepCounter, 20_000)));
+    expect(resp!.intervalUs).toBe(20_000);
+    expect(fake.features.get(SensorId.StepCounter)).toBe(20_000);
+  });
+
+  it("rejects a zero rate (the old detector bug)", async () => {
+    await expect(dev.enable(SensorId.TapDetector, 0)).rejects.toThrow("hz must be positive");
   });
 });
 
@@ -266,7 +282,11 @@ describe("tare / calibration facade", () => {
     await waitFor(() => fake.tareRequests.length === 1);
     const tare = fake.tareRequests[0]!;
     expect(tare[2]).toBe(0x03); // TARE command
-    expect(Array.from(tare.subarray(3, 6))).toEqual([0x00, TareAxis.All, TareBasis.GameRotationVector]);
+    expect(Array.from(tare.subarray(3, 6))).toEqual([
+      0x00,
+      TareAxis.All,
+      TareBasis.GameRotationVector,
+    ]);
     await dev.setCalibration({ accel: true, gyro: true, mag: false });
     const cal = await dev.getCalibration();
     expect(cal).toEqual({ accel: true, gyro: true, mag: false, planar: false });
@@ -295,6 +315,7 @@ describe("FRS", () => {
   it("getMetadata parses the accelerometer record", async () => {
     const md = await dev.getMetadata(SensorId.Accelerometer);
     expect(md.revision).toBe(4);
+    expect(md.powerMaQ10).toBe(0x0800); // 2 mA
     expect(md.minPeriodUs).toBe(2500);
     expect(md.maxPeriodUs).toBe(100000);
     expect(md.qPoint1).toBe(8);

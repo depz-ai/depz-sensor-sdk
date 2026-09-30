@@ -3,9 +3,9 @@
 The **VL53L8CH** is the superset of the [VL53L8CX](../vl53l8cx/introduction.md):
 the same STMicroelectronics multizone Time-of-Flight imager, same register
 protocol, same host-side ULD — **plus Compact Network Histograms (CNH)**. In
-the SDK it is `Vl53l8Ch`, which inherits every `Vl53l8Cx` method and adds one
+the SDK it is `Vl53l8ch`, which inherits every `Vl53l8cx` method and adds one
 thing: `configure_cnh()`. It also carries its own production USB PID
-(`0xED40`), so `open_device()` returns a `Vl53l8Ch` for it automatically.
+(`0xED40`), so `open_device()` returns a `Vl53l8ch` for it automatically.
 
 Everything the CX does, the CH does identically — start there:
 
@@ -30,9 +30,9 @@ occlusion, glass/edge effects, material signatures.
   zones into aggregates. `required_memory()` must fit the device buffer
   (≤ 6160 bytes) before you arm it.
 - **`configure_cnh(cfg)`** — CH-only. Arms the histogram block for the next
-  `start_ranging()`. It does **not** exist on `Vl53l8Cx`.
-- A full CNH frame is larger than the MCU stream cap, so CNH is read in **poll
-  mode**; decode a captured block with `depz_sensor_sdk.vl53l8.cnh.decode`.
+  `start_ranging()`. It does **not** exist on `Vl53l8cx`.
+- The CNH block streams inside every frame (`frame.cnh_raw`); decode it with
+  `depz_sensor_sdk.vl53l8.cnh.decode`.
 
 ## When to use CH over CX
 
@@ -44,5 +44,5 @@ depth imaging the [CX](../vl53l8cx/introduction.md) is identical and simpler.
 
 - [VL53L8CH user guide](guide.md) — arming CNH, `CnhConfig`, decoding frames.
 - [VL53L8CX docs](../vl53l8cx/introduction.md) — the base sensor CH inherits.
-- [API reference](api.md) — `Vl53l8Ch`, `CnhConfig` (inherits the
+- [API reference](api.md) — `Vl53l8ch`, `CnhConfig` (inherits the
   [CX surface](../vl53l8cx/api.md)).

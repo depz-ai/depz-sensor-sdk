@@ -1,9 +1,9 @@
 /**
  * TypeDoc entry point for the per-sensor `docs/vl53l8cx/api.md`.
  *
- * The base VL53L8**CX** time-of-flight surface: the `Vl53l8Cx` class (and its
+ * The base VL53L8**CX** time-of-flight surface: the `Vl53l8cx` class (and its
  * `Vl53l8` alias), the frame type, and the ST ULD constants/helpers that drive
- * it. The CH superset (`Vl53l8Ch`) and the Compact-Network-Histogram symbols
+ * it. The CH superset (`Vl53l8ch`) and the Compact-Network-Histogram symbols
  * are documented separately in `docs/vl53l8ch/api.md` (via `entry-vl53l8ch.ts`)
  * — keep them out of here so the CX reference has no CH bleed.
  *
@@ -13,7 +13,7 @@
 export {
   MIN_RANGING_FREQUENCY_HZ,
   Vl53l8,
-  Vl53l8Cx,
+  Vl53l8cx,
   zoneGrid,
 } from "../src/sensors/vl53l8/vl53l8.js";
 export type {

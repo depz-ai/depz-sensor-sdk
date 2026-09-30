@@ -8,7 +8,11 @@
  *
  * The ToF is split by class across two files: `vl53l8cx` (the base ToF surface)
  * and `vl53l8ch` (only the CH superset + Compact-Network-Histogram symbols),
- * so no CH symbol bleeds into the CX reference and vice-versa. The shared
+ * so no CH symbol bleeds into the CX reference and vice-versa. The I2C L5/L7
+ * board follows the same idea (`vl53l7cx` = what the board adds over the L8,
+ * `vl53l5cx` / `vl53l7ch` = only their own class). The five 1D-family products
+ * each get their own class followed by the shared family surface
+ * (`typedoc/vl53lx-family.ts`). The shared
  * cross-sensor surface (discovery/device/transport/dataset/…) stays only in the
  * root `docs/api.md`.
  *
@@ -57,7 +61,7 @@ const SENSORS = [
     dir: "vl53l4cd",
     entry: "typedoc/entry-vl53l4cd.ts",
     header: header("VL53L4CD (ToF)", [
-      "The VL53L4CD single-zone time-of-flight surface: the `Vl53l4Cd` class,",
+      "The VL53L4CD single-zone time-of-flight surface: the `Vl53l4cd` class,",
       "the host-side ST ULD 2.2.3 driver (`VL53L4CD` + codecs), and the",
       "register-bridge wire codecs. Discovery, device-base, transport and",
       `other cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
@@ -67,9 +71,9 @@ const SENSORS = [
     dir: "vl53l8cx",
     entry: "typedoc/entry-vl53l8cx.ts",
     header: header("VL53L8CX (ToF)", [
-      "The base VL53L8**CX** time-of-flight surface: the `Vl53l8Cx` class (and",
+      "The base VL53L8**CX** time-of-flight surface: the `Vl53l8cx` class (and",
       "its `Vl53l8` alias), the frame type, and the ST ULD constants/helpers.",
-      "The CH superset (`Vl53l8Ch` + Compact-Network-Histogram) has its own",
+      "The CH superset (`Vl53l8ch` + Compact-Network-Histogram) has its own",
       "[VL53L8CH reference](../vl53l8ch/api.md); cross-sensor symbols shared by",
       `every sensor live in the ${ROOT_LINK}.`,
     ]),
@@ -78,11 +82,100 @@ const SENSORS = [
     dir: "vl53l8ch",
     entry: "typedoc/entry-vl53l8ch.ts",
     header: header("VL53L8CH (ToF)", [
-      "CH-specific surface: the `Vl53l8Ch` class (the CX superset that adds",
+      "CH-specific surface: the `Vl53l8ch` class (the CX superset that adds",
       "`configureCnh()`) plus the Compact-Network-Histogram (CNH) symbols.",
       "Every base ToF method CH inherits is documented in the",
       "[VL53L8CX reference](../vl53l8cx/api.md); cross-sensor symbols live in",
       `the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l5cx",
+    entry: "typedoc/entry-vl53l5cx.ts",
+    header: header("VL53L5CX (ToF)", [
+      "The `Vl53l5cx` class. It subclasses `Vl53l7cx` and inherits its whole",
+      "surface — the board commands and codecs are in the",
+      "[VL53L7CX reference](../vl53l7cx/api.md), everything shared with the",
+      "VL53L8 in the [VL53L8CX reference](../vl53l8cx/api.md); cross-sensor",
+      `symbols live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l7cx",
+    entry: "typedoc/entry-vl53l7cx.ts",
+    header: header("VL53L7CX (ToF)", [
+      "What the I2C L5/L7 board adds: the `Vl53l7cx` class, its wire codecs",
+      "(`PinAction`, `Vl53l7Info`, …) and the module-type constants.",
+      "`Vl53l7cx` subclasses `Vl53l8cx`: init, resolution, frequency, the",
+      "advanced ULD features and the frame are in the",
+      "[VL53L8CX reference](../vl53l8cx/api.md); cross-sensor symbols live in",
+      `the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l7ch",
+    entry: "typedoc/entry-vl53l7ch.ts",
+    header: header("VL53L7CH (ToF + CNH)", [
+      "The `Vl53l7ch` class (the `Vl53l7cx` superset that adds",
+      "`configureCnh()`) plus the Compact-Network-Histogram (CNH) symbols.",
+      "Board commands are in the [VL53L7CX reference](../vl53l7cx/api.md), the",
+      "shared ToF surface in the [VL53L8CX reference](../vl53l8cx/api.md);",
+      `cross-sensor symbols live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l0x",
+    entry: "typedoc/entry-vl53l0x.ts",
+    header: header("VL53L0X (ToF)", [
+      "`Vl53l0x` fixes the product on the 1D-family class `Vl53lx`; the family",
+      "surface (`Vl53lx`, `Vl53lxMeasurement`, the helpers and the bridge",
+      "codecs) follows it and is identical on every VL53L0X / L1CX / L1CB /",
+      "L3CX / L4CX page. Discovery, device-base, transport and other",
+      `cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l1cx",
+    entry: "typedoc/entry-vl53l1cx.ts",
+    header: header("VL53L1CX (ToF)", [
+      "`Vl53l1cx` fixes the product on the 1D-family class `Vl53lx`; the family",
+      "surface (`Vl53lx`, `Vl53lxMeasurement`, the helpers and the bridge",
+      "codecs) follows it and is identical on every VL53L0X / L1CX / L1CB /",
+      "L3CX / L4CX page. Discovery, device-base, transport and other",
+      `cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l1cb",
+    entry: "typedoc/entry-vl53l1cb.ts",
+    header: header("VL53L1CB (ToF)", [
+      "`Vl53l1cb` fixes the product on the 1D-family class `Vl53lx`; the family",
+      "surface (`Vl53lx`, `Vl53lxMeasurement`, the helpers and the bridge",
+      "codecs) follows it and is identical on every VL53L0X / L1CX / L1CB /",
+      "L3CX / L4CX page. Discovery, device-base, transport and other",
+      `cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l3cx",
+    entry: "typedoc/entry-vl53l3cx.ts",
+    header: header("VL53L3CX (ToF)", [
+      "`Vl53l3cx` fixes the product on the 1D-family class `Vl53lx`; the family",
+      "surface (`Vl53lx`, `Vl53lxMeasurement`, the helpers and the bridge",
+      "codecs) follows it and is identical on every VL53L0X / L1CX / L1CB /",
+      "L3CX / L4CX page. Discovery, device-base, transport and other",
+      `cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "vl53l4cx",
+    entry: "typedoc/entry-vl53l4cx.ts",
+    header: header("VL53L4CX (ToF)", [
+      "`Vl53l4cx` fixes the product on the 1D-family class `Vl53lx`; the family",
+      "surface (`Vl53lx`, `Vl53lxMeasurement`, the helpers and the bridge",
+      "codecs) follows it and is identical on every VL53L0X / L1CX / L1CB /",
+      "L3CX / L4CX page. Discovery, device-base, transport and other",
+      `cross-sensor symbols shared by every sensor live in the ${ROOT_LINK}.`,
     ]),
   },
   {
@@ -92,6 +185,16 @@ const SENSORS = [
       "The public API for the BNO086 IMU: the `Bno086` device plus the SHTP /",
       "SH-2 protocol and report types. Discovery, device-base, transport and",
       `other cross-sensor symbols live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
+    dir: "bno055",
+    entry: "typedoc/entry-bno055.ts",
+    header: header("BNO055 (IMU)", [
+      "The public API for the BNO055 IMU: the `Bno055` device and its sample",
+      "type, the register map and codecs (units, axis remap, calibration",
+      "profile, …) and the register-bridge wire codecs. Discovery, device-base,",
+      `transport and other cross-sensor symbols live in the ${ROOT_LINK}.`,
     ]),
   },
 ];

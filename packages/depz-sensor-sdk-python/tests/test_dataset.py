@@ -111,3 +111,55 @@ def test_playback_pacing_and_stop(tmp_path: Path):
 
     reader.play(cb, speed=0.5, stop=stop)
     assert len(seen) == 2
+
+
+def test_vl53lx_and_bno055_records(tmp_path: Path):
+    """Contract 09 `vl53lx` / `bno055` kinds. The device classes ride the fake
+    SR04 link (it answers the common commands the recorder needs); samples
+    are pushed straight into the subscribers, as the reader thread does."""
+    from depz_sensor_sdk.bno055 import Bno055, Bno055Sample, Units
+    from depz_sensor_sdk.bno055.regs import FULL_BLOCK
+    from depz_sensor_sdk.vl53lx import Target, Vl53l1cx, Vl53lxMeasurement
+
+    fake_a, fake_b = FakeSr04(), FakeSr04()
+    lx = Vl53l1cx(fake_a.link, timeout=1.0)
+    imu = Bno055(fake_b.link, timeout=1.0)
+    path = tmp_path / "session.depzdata"
+    try:
+        rec = SessionRecorder(path)
+        rec.add(lx)
+        rec.add(imu)
+        rec.start()
+        lx._product, lx._driver_kind = "VL53L1CX", "histogram"
+        t1 = Target(612, 0, "Range valid", 812.5, 3.1, 4.2, 600, 625)
+        t2 = Target(1480, 11, "Merged pulse", 90.0, 3.1, 9.9, 1460, 1500)
+        m = Vl53lxMeasurement(2_000_000, 612, 0, "Range valid", 812.5, 3.1, 4.2, 12.5, (t1, t2))
+        for cb in list(lx._measure_cbs):
+            cb(m)
+        block = bytes.fromhex(
+            "c5ffb7ff9a032f00e2ffadfefeffffff0000cd046a0578e6b52963f9efcf0000"
+            "0000fbff0600b1ff0cfeb6fe1b0133")
+        s = Bno055Sample.decode(3_000_000, FULL_BLOCK[0], block, Units(euler_rad=True))
+        for cb in list(imu._sample_cbs):
+            cb(s)
+        rec.stop()
+    finally:
+        lx.close()
+        imu.close()
+        fake_a.close()
+        fake_b.close()
+
+    recs = {r.kind: r for r in DatasetReader(path)}
+    v = recs["vl53lx"].value
+    assert (v["product"], v["driver"], v["status"], v["distance_mm"]) == ("VL53L1CX", "histogram", 0, 612)
+    assert v["targets"] == [
+        {"distance_mm": 612, "status": 0, "signal_kcps": 812.5},
+        {"distance_mm": 1480, "status": 11, "signal_kcps": 90.0},
+    ]
+    b = recs["bno055"].value
+    assert b["unit_sel"] == 0x04
+    assert b["quaternion"] == list(s.quaternion)
+    assert b["euler"] == list(s.euler) and b["gravity"] == list(s.gravity)
+    assert b["temperature"] == s.temperature
+    assert b["calib"] == [s.calibration.system, s.calibration.gyro, s.calibration.accel,
+                          s.calibration.mag]

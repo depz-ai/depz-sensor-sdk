@@ -6,6 +6,13 @@ pub enum SensorType {
     Sr04,
     Vl53l4,
     Vl53l8,
+    /// VL53L5CX / VL53L7CX / VL53L7CH (one `APP_VL53L7` firmware, contract 11).
+    Vl53l7,
+    /// VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX (one `APP_VL53L0_4` bridge,
+    /// contract 12; the protocol spec names it `APP_VL53LX`).
+    Vl53lx,
+    /// BNO055 9-axis IMU (`APP_BNO055` register bridge, contract 13).
+    Bno055,
     Bno086,
     Unknown,
 }
@@ -17,6 +24,9 @@ impl SensorType {
             SensorType::Sr04 => "sr04",
             SensorType::Vl53l4 => "vl53l4",
             SensorType::Vl53l8 => "vl53l8",
+            SensorType::Vl53l7 => "vl53l7",
+            SensorType::Vl53lx => "vl53lx",
+            SensorType::Bno055 => "bno055",
             SensorType::Bno086 => "bno086",
             SensorType::Unknown => "unknown",
         }
@@ -56,6 +66,12 @@ const PRODUCT_TOKENS: &[(&str, SensorType)] = &[
     ("SR04", SensorType::Sr04),
     ("VL53L4", SensorType::Vl53l4),
     ("VL53L8", SensorType::Vl53l8),
+    ("VL53L7", SensorType::Vl53l7),
+    // The 1D-family bridge: boards answer APP_VL53L0_4_v*, the protocol spec
+    // calls it APP_VL53LX_v* (contract 12).
+    ("VL53L0_4", SensorType::Vl53lx),
+    ("VL53LX", SensorType::Vl53lx),
+    ("BNO055", SensorType::Bno055),
     ("BNO086", SensorType::Bno086),
 ];
 

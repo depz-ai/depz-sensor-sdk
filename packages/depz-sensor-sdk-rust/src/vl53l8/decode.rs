@@ -36,33 +36,41 @@ const RANGE_SIGMA_MM_IDX: u16 = 0xdec4;
 const DISTANCE_IDX: u16 = 0xdf44;
 const REFLECTANCE_EST_PC_IDX: u16 = 0xe044;
 const TARGET_STATUS_IDX: u16 = 0xe084;
-/// CNH (compact network histogram) output block id — **CH-only**. The DEPZ
-/// decode surfaces this block's raw bytes ([`Vl53l8Results::cnh_raw`]); the full
-/// histogram unpack is a not-yet-implemented CH extension point (see below).
+/// CNH (compact network histogram) output block id — **CH-only**. The frame
+/// decode copies this block's raw bytes into [`Vl53l8Results::cnh_raw`];
+/// [`super::cnh::decode_cnh`] unpacks them into per-aggregate histograms.
 pub const CNH_DATA_IDX: u16 = 0xc048;
 
 /// ToF silicon/firmware variant. Both the base **VL53L8CX** and the
 /// **VL53L8CH** (CX + CNH + production PID 0xED40) share one results-frame
 /// layout; only the frame-tail geometry differs for decoding, and that is all
 /// this enum selects. The footer-id offset is `size-12` (ULD 2.1.0, selected by
-/// [`Variant::Cx`]) or `size-4` (ULD 2.0.16, selected by [`Variant::Ch`]).
+/// [`Variant::Cx`]) or `size-4` (VL53LMZ 2.0.16, selected by [`Variant::Ch`]).
 ///
-/// Note the geometry tracks the *ULD version the firmware embeds*, not the
-/// silicon: the DEPZ firmware streams 2.1.0-footer frames on both CX and CH
-/// devices, so a CH capture still decodes with [`Variant::Cx`] geometry.
+/// The geometry follows the firmware each part runs: the VL53L8CX firmware
+/// embeds ULD 2.1.0 (`size-12`), the VL53L8CH firmware VL53LMZ 2.0.16
+/// (`size-4`), so decode CH frames with [`Variant::Ch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Variant {
     /// Base VL53L8CX (dev default), or any device on ULD 2.1.0 footer geometry.
     Cx,
-    /// VL53L8CH on ULD 2.0.16 footer geometry.
+    /// VL53L8CH (VL53LMZ 2.0.16 firmware): footer id at `size-4`.
     Ch,
+    /// VL53L5CX / VL53L7CX / VL53L7CH (contract 11): footer id at `size-4`,
+    /// and every per-zone array trimmed to the frame's resolution. On these
+    /// parts the per-target blocks (index ≥ 0x6C90) keep 64 entries even in
+    /// 4×4 — the sensor fills the first `resolution` and zero-pads the rest.
+    /// The resolution is read from the frame itself: the ambient-rate block
+    /// (0x54D0, index range sized to the resolution by the vl53lmz 2.0.16
+    /// output-list rule) holds exactly one entry per zone.
+    L7,
 }
 
 impl Variant {
     fn footer_id_off(self) -> usize {
         match self {
             Variant::Cx => 12,
-            Variant::Ch => 4,
+            Variant::Ch | Variant::L7 => 4,
         }
     }
 }
@@ -175,6 +183,8 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
     let mut reflectance: Vec<u8> = vec![0; max];
     let mut silicon_temp_degc: i8 = 0;
     let mut cnh_raw: Option<Vec<u8>> = None;
+    // Zone count carried by the resolution-sized ambient block (L7 trim).
+    let mut zones_in_frame: Option<usize> = None;
 
     let mut i = 16usize;
     while i + 4 <= data_read_size {
@@ -215,6 +225,7 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
                 out.push(u32_le(&buf, i + 4 + 4 * k));
             }
             ambient_per_spad = out;
+            zones_in_frame = Some(msize / 4);
         } else if bh_idx == SPAD_COUNT_IDX {
             let mut out = Vec::with_capacity(msize / 4);
             for k in 0..msize / 4 {
@@ -241,6 +252,22 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
         i += msize + 4;
     }
 
+    // L5/L7: per-target blocks arrive with 64 entries even in 4x4 (contract 11
+    // §3); keep only the zones that exist. L8 frames are left untouched.
+    if variant == Variant::L7 {
+        if let Some(n) = zones_in_frame.filter(|&n| n == RESOLUTION_4X4 || n == RESOLUTION_8X8) {
+            let nt = n * NB_TARGET_PER_ZONE;
+            ambient_per_spad.truncate(n);
+            nb_spads_enabled.truncate(n);
+            nb_target_detected.truncate(n);
+            distance_mm.truncate(nt);
+            target_status.truncate(nt);
+            signal_per_spad.truncate(nt);
+            range_sigma_mm_raw.truncate(nt);
+            reflectance.truncate(nt);
+        }
+    }
+
     // Fixed-point scaling per ST GetRangingData: distance is /4 (floor).
     for d in distance_mm.iter_mut() {
         *d = d.div_euclid(4);
@@ -259,9 +286,9 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
         }
     }
 
-    // Header/footer id match check. The footer-id offset is the only
-    // variant-specific step in the whole decode: `size-12` for CX (ULD 2.1.0)
-    // vs `size-4` for CH (ULD 2.0.16); everything above is shared CX/CH.
+    // Header/footer id match check. Apart from the L7 trim above, the
+    // footer-id offset is the only variant-specific step in the whole decode:
+    // `size-12` for CX (ULD 2.1.0) vs `size-4` for CH (ULD 2.0.16) and L7.
     let foff = variant.footer_id_off();
     if data_read_size >= foff + 2
         && (buf[0x8] != buf[data_read_size - foff] || buf[0x9] != buf[data_read_size - foff + 1])

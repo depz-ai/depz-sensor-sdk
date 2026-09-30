@@ -15,8 +15,8 @@ import {
   DatasetReader,
   DatasetRecorder,
   Sr04,
-  Vl53l8Ch,
-  Vl53l8Cx,
+  Vl53l8ch,
+  Vl53l8cx,
   type Vl53l8Frame,
 } from "../src/index.js";
 import { FakeBno086 } from "./fake-bno086.js";
@@ -25,7 +25,7 @@ import { FakeTof } from "./fake-tof.js";
 
 /** Push a synthetic frame straight into the device's onFrame subscribers —
  * exactly what the read pump's handleReport does, without the ULD/wire. */
-function emitFrame(dev: Vl53l8Cx, timestampUs: bigint, resolution = 16): void {
+function emitFrame(dev: Vl53l8cx, timestampUs: bigint, resolution = 16): void {
   const n = resolution;
   const frame: Vl53l8Frame = {
     timestampUs,
@@ -108,8 +108,8 @@ describe("DatasetRecorder cross-sensor sync", () => {
     const fImu = new FakeBno086();
 
     const sr04 = new Sr04(fSr04.transport, { timeoutMs: 1000 });
-    const cx = new Vl53l8Cx(fCx.transport, { timeoutMs: 1000 });
-    const ch = new Vl53l8Ch(fCh.transport, { timeoutMs: 1000 });
+    const cx = new Vl53l8cx(fCx.transport, { timeoutMs: 1000 });
+    const ch = new Vl53l8ch(fCh.transport, { timeoutMs: 1000 });
     const imu = new Bno086(fImu.transport, { timeoutMs: 1000 });
     for (const d of [sr04, cx, ch, imu]) await d.open();
 
@@ -164,9 +164,9 @@ describe("DatasetRecorder cross-sensor sync", () => {
     const fCxA = new FakeTof({ variant: "cx", serial: "SN53CXA" });
     const fCxB = new FakeTof({ variant: "cx", serial: "SN53CXB" });
     const fCh = new FakeTof({ variant: "ch", serial: "SN53CHX" });
-    const cxA = new Vl53l8Cx(fCxA.transport, { timeoutMs: 1000 });
-    const cxB = new Vl53l8Cx(fCxB.transport, { timeoutMs: 1000 });
-    const ch = new Vl53l8Ch(fCh.transport, { timeoutMs: 1000 });
+    const cxA = new Vl53l8cx(fCxA.transport, { timeoutMs: 1000 });
+    const cxB = new Vl53l8cx(fCxB.transport, { timeoutMs: 1000 });
+    const ch = new Vl53l8ch(fCh.transport, { timeoutMs: 1000 });
     for (const d of [cxA, cxB, ch]) await d.open();
 
     const rec = new DatasetRecorder({ note: "two-cx-plus-ch" });
@@ -196,5 +196,47 @@ describe("DatasetRecorder cross-sensor sync", () => {
     await fCxA.close();
     await fCxB.close();
     await fCh.close();
+  });
+});
+
+describe("DatasetRecorder — contract 09 kinds by device class", () => {
+  it("writes vl53l4 / vl53lx / bno055 records, never sr04 for a ToF", async () => {
+    const { Bno055, Vl53l1cx, Vl53l4cd, decodeBno055Sample, BNO055_FULL_BLOCK, BNO055_DEFAULT_UNITS } =
+      await import("../src/index.js");
+    const fakes = [new FakeTof(), new FakeTof(), new FakeTof()];
+    const l4 = new Vl53l4cd(fakes[0]!.transport, { timeoutMs: 1000 });
+    const lx = new Vl53l1cx(fakes[1]!.transport, { timeoutMs: 1000 });
+    const imu = new Bno055(fakes[2]!.transport, { timeoutMs: 1000 });
+    for (const d of [l4, lx, imu]) await d.open();
+
+    const rec = new DatasetRecorder();
+    for (const d of [l4, lx, imu]) await rec.add(d);
+    rec.start();
+    type Cbs<T> = { measureCbs?: Array<(m: T) => void>; sampleCbs?: Array<(s: T) => void> };
+    for (const cb of (l4 as unknown as Cbs<unknown>).measureCbs!)
+      cb({ timestampUs: 2_000_000n, rangeStatus: 0, distanceMm: 505, sigmaMm: 2, signalRateKcps: 900,
+           ambientRateKcps: 3, signalPerSpadKcps: 0, ambientPerSpadKcps: 0, numberOfSpad: 12,
+           streamCount: 7, valid: true, statusText: "Range valid" });
+    for (const cb of (lx as unknown as Cbs<unknown>).measureCbs!)
+      cb({ timestampUs: 2_100_000n, distanceMm: 612, status: 0, statusText: "Range valid", signalKcps: 812.5,
+           ambientKcps: 3.1, sigmaMm: 4.2, spads: 12.5, extra: {}, bins: null, valid: true, plottable: true,
+           targets: [{ distanceMm: 612, status: 0, statusText: "", signalKcps: 812.5, ambientKcps: 3.1,
+                       sigmaMm: 4.2, minRangeMm: 600, maxRangeMm: 625 }] });
+    const block = Uint8Array.from(Buffer.from(
+      "c5ffb7ff9a032f00e2ffadfefeffffff0000cd046a0578e6b52963f9efcf00000000fbff0600b1ff0cfeb6fe1b0133", "hex"));
+    const s = decodeBno055Sample(3_000_000n, BNO055_FULL_BLOCK[0], block, { ...BNO055_DEFAULT_UNITS, eulerRad: true });
+    for (const cb of (imu as unknown as Cbs<unknown>).sampleCbs!) cb(s);
+    rec.stop();
+    for (const d of [l4, lx, imu]) await d.close();
+
+    const kinds = Object.fromEntries(new DatasetReader(rec.dump()).records.map((r) => [r.kind, r.value]));
+    expect(Object.keys(kinds).sort()).toEqual(["bno055", "vl53l4", "vl53lx"]);
+    expect(kinds.vl53l4).toMatchObject({ range_status: 0, distance_mm: 505, stream_count: 7 });
+    expect(kinds.vl53lx).toMatchObject({ status: 0, distance_mm: 612,
+      targets: [{ distance_mm: 612, status: 0, signal_kcps: 812.5 }] });
+    const b = kinds.bno055 as Record<string, unknown>;
+    expect(b.unit_sel).toBe(0x04);
+    expect(b.quaternion).toEqual(s.quaternion);
+    expect(b.calib).toEqual([s.calibration!.system, s.calibration!.gyro, s.calibration!.accel, s.calibration!.mag]);
   });
 });

@@ -1,7 +1,14 @@
 @PACKAGE_INIT@
 
-# depz-sensor-sdk-cpp — pure C++17 decode-layer SDK, no external dependencies.
-# Exposes the imported target depz::sensor_sdk_cpp (alias depz::sensor_sdk).
+# depz-sensor-sdk-cpp — C++17 SDK: the decode layer plus, when built with it,
+# the live-hardware layer over depz-sensor-sdk-c. Exposes the imported target
+# depz::sensor_sdk_cpp (alias depz::sensor_sdk).
+
+set(DEPZ_SENSOR_SDK_CPP_BUILD_IO @DEPZ_SENSOR_SDK_CPP_BUILD_IO@)
+if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
+  include(CMakeFindDependencyMacro)
+  find_dependency(depz-sensor-sdk-c)
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/depz-sensor-sdk-cpp-targets.cmake")
 

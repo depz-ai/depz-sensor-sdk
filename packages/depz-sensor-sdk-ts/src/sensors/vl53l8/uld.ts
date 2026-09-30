@@ -26,9 +26,34 @@ export interface Vl53l8Platform {
 // downloaded sensor FW (and hence its checksum at 0x812FFC) and the NVM/config
 // blobs differ. 'cx' = VL53L8CX ULD 2.1.0; 'ch' = VL53L7CH/VL53L8CH (VL53LMZ)
 // ULD 2.0.16 — used to try running CH firmware on VL53L8CX silicon.
-export const FW_CHECKSUM: Record<Vl53l8Variant, number> = {
+//
+// The I2C branch of the family (VL53L5CX / VL53L7CX / VL53L7CH, contract 11)
+// adds 'l7cx' = VL53L5CX/VL53L7CX ULD 2.0.1 and 'l7ch' = VL53LMZ ULD 2.0.16
+// with the VL53L7 default configuration (its firmware is the 'ch' blob).
+// null = the driver publishes no checksum and skips the step (ULD 2.0.1).
+export const FW_CHECKSUM: Record<Vl53l8Variant, number | null> = {
   cx: 0xcadf7caf,
   ch: 0x0c0b6c9e,
+  l7cx: null,
+  l7ch: 0x0c0b6c9e,
+};
+
+/** Variants that run on the I2C L5/L7 silicon (different boot sequence). */
+export const I2C_VARIANTS: readonly Vl53l8Variant[] = ["l7cx", "l7ch"];
+
+export const SI_REVISION_CUT11 = 0x01; // VL53L5CX / VL53L7CX, first cut
+export const SI_REVISION_CUT12 = 0x02; // VL53L5CX / VL53L7CX / VL53L7CH
+export const SI_REVISION_L8 = 0x0c; // VL53L8CX / VL53L8CH
+
+/** byte[1] = module_type, byte[6] = laser safety. */
+export const DCI_FW_FLAGS = 0xe0c4;
+export const MODULE_TYPE_MZ = 0; // VL53L5CX
+export const MODULE_TYPE_MZEVO = 1; // VL53L7CX / VL53L7CH
+export const MODULE_TYPE_MZPLUS = 2; // VL53L8
+export const MODULE_TYPE_NAMES: Record<number, string> = {
+  [MODULE_TYPE_MZ]: "MZ",
+  [MODULE_TYPE_MZEVO]: "MZEVO",
+  [MODULE_TYPE_MZPLUS]: "MZPlus",
 };
 
 export const RESOLUTION_4X4 = 16;
@@ -164,6 +189,40 @@ export const CALIBRATE_XTALK = fromHexConst(
   "545000800004080800000404ad3000800301060300000100ad38010001e0014000100010010001000000000154580040041a0200545c01400001005100000fa00fa003e802801f400000050054700080032003200000000854780100011b0021003300000200000104010802548801400000000000000000000000000000000000000800ad48010001f40000030600100808080800000008ad6001000000008000000000201f01f400001d0aad70008008001f4000000001ad78008000a0032000010190ad80004000002800ad8400800000320003200000ad8c00800258ff380000000cad94010000019000fffffc000000040000000100ada400c00480061a0080058000000106adb000c00480061a1900058000000190adbc044000000000000000000012002500000006000000050000000500000006000000040000000f0000005a00000000000000090b0c0b0b030311050101010100000000000d0000ae00010400000004000000080000000a0000000c0000000d0000000e000000080000000800000010000000100000002000000020000000060000050a02000c0800000000ae400040000000ffae44004000100401ae48004000001000ae4c004000000001ae500140000000140400280003206c000000000000000000ae64004000000001aed8010000c805dc00000ccd0104000000012601b5500282a3e8a3b8a438a428a648a448a788a748ac10a79099bc99b49afc9abc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5a002820088030000820082040404080080040109020908040400800401040100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5f0004000040000b39c01004000051e021b087c8000120100010800b6c000c0000060000000200000000000aea8004000000405aeac00800100010000020000aeb4004000000000aeb800810000000000000000aec000810000000000000000aec800810801010800000008aed000810108080800000001b5f400800000000000000000b5fc00800000000000000000b604004000000000b608004400000000000000000000000000000000b618004400000000000000000000000000000000b628004400000000000000000000000000000000b638004400000000000000000000000000000000b648010000000000000000000000000000000000b658010000000000000000000000000000000000b6680100000000000000000000000000000000005470008000000000000000020000000f000103d4",
 );
 
+// ── L5/L7 xtalk calibration (contract 11 §4) ──────────────────────────────────
+// Verified byte-for-byte (compiled from the C headers) against ST ULD 2.0.1
+// (VL53L7CX/L5CX, the source of the l7cx blobs) and VL53LMZ 2.0.16 (VL53L7CH,
+// the source of the ch/l7ch blobs). Every ST version programs this dedicated
+// 17-block output list for the calibration run, not the ranging list.
+export const XTALK_CAL_OUTPUT: readonly number[] = [
+  0x0000000d, 0x54000040, 0x9fd800c0, 0x9fe40140, 0x9ff80040, 0x9ffc0404, 0xa0fc0100,
+  0xa10c0100, 0xa11c00c0, 0xa1280902, 0xa2480040, 0xa24c0081, 0xa2540081, 0xa25c0081,
+  0xa2640081, 0xa26c0084, 0xa28c0082,
+];
+export const XTALK_CAL_OUTPUT_ENABLE: readonly number[] = [0x0001ffff, 0, 0, 0xc0000000];
+
+// VL53LMZ_CALIBRATE_XTALK, ULD 2.0.16 (VL53L7CH), FW_NBTAR_XTALK = 2 (BSD-3).
+export const CALIBRATE_XTALK_LMZ = fromHexConst(
+  "545000800004080800000404ad3000800301060300000100ad38010001e0014000100010010001000000000154580040041a0200545c01400001005100000fa00fa003e802801f400000050054700080032003200000000854780100011b0021003300000200000104010802548801400000000000000000000000000000000000000800ad48010001f40000030600100808080800000008ad6001000000008000000000201f01f400001d0aad70008008001f4000000001ad78008000a0032000010190ad80004000002800ad8400800000320003200000ad8c00800258ff380000000cad94010000019000fffffc000000040000000100ada400c00480061a0080058000000106adb000c00480061a1900058000000190adbc044000000000000000000012002500000006000000050000000500000006000000040000000f0000005a00000000000000090b0c0b0b030311050101010100000000000d0000ae00010400000004000000080000000a0000000c0000000d0000000e000000080000000800000010000000100000002000000020000000060000050a02000c0800000000ae400040000000ffae44004000100401ae48004000001000ae4c004000000001ae500140000000140400280003206c000000000000000000ae64004000000001aed8010000c805dc00000ccd0104000000012601b5500282a3e8a3b8a438a428a648a448a788a748ac10a79099bc99b49afc9abc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5a002820088030000820082040404080080040109020908040400800401040100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5f0004000040000b39c01004000051e021b087c8000120100010800b6c000c0000060000000200000000000aea8004000000405aeac00800100010000020000aeb4004000000000aeb800810000000000000000aec000810000000000000000aec800810801010800000008aed000810108080800000001b5f400800000000000000000b5fc00800000000000000000b604004000000000b608004400000000000000000000000000000000b618004400000000000000000000000000000000b628004400000000000000000000000000000000b638004400000000000000000000000000000000b648010000000000000000000000000000000000b658010000000000000000000000000000000000b6680100000000000000000000000000000000005470008000000000000000020000000f000103d4",
+);
+
+// VL53L7CX_CALIBRATE_XTALK, ULD 2.0.1 (VL53L5CX/VL53L7CX), FW_NBTAR_XTALK = 2
+// (BSD-3). Differs from the LMZ table in bytes 693 and 697 only.
+export const CALIBRATE_XTALK_L7CX = fromHexConst(
+  "545000800004080800000404ad3000800301060300000100ad38010001e0014000100010010001000000000154580040041a0200545c01400001005100000fa00fa003e802801f400000050054700080032003200000000854780100011b0021003300000200000104010802548801400000000000000000000000000000000000000800ad48010001f40000030600100808080800000008ad6001000000008000000000201f01f400001d0aad70008008001f4000000001ad78008000a0032000010190ad80004000002800ad8400800000320003200000ad8c00800258ff380000000cad94010000019000fffffc000000040000000100ada400c00480061a0080058000000106adb000c00480061a1900058000000190adbc044000000000000000000012002500000006000000050000000500000006000000040000000f0000005a00000000000000090b0c0b0b030311050101010100000000000d0000ae00010400000004000000080000000a0000000c0000000d0000000e000000080000000800000010000000100000002000000020000000060000050a02000c0800000000ae400040000000ffae44004000100401ae48004000001000ae4c004000000001ae500140000000140400280003206c000000000000000000ae64004000000001aed8010000c805dc00000ccd0104000000012601b5500282a3e8a3b8a438a428a648a448a788a748ac10a79099bc99b49afc9abc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5a002820088030000820082040404080080040109020908040400800401040100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5f0004000040000b39c01004000051e021b087c8001120100000800b6c000c0000060000000200000000000aea8004000000405aeac00800100010000020000aeb4004000000000aeb800810000000000000000aec000810000000000000000aec800810801010800000008aed000810108080800000001b5f400800000000000000000b5fc00800000000000000000b604004000000000b608004400000000000000000000000000000000b618004400000000000000000000000000000000b628004400000000000000000000000000000000b638004400000000000000000000000000000000b648010000000000000000000000000000000000b658010000000000000000000000000000000000b6680100000000000000000000000000000000005470008000000000000000020000000f000103d4",
+);
+
+// The table must match the sensor firmware: the VL53L8CH runs the VL53LMZ blob,
+// and with the VL53L8CX table that firmware silently skips the calibration
+// (measured 2026-09-25: 0.7 s, xtalk buffer unchanged; with the LMZ table it
+// runs 2.6 s and answers). 'cx' falls back to CALIBRATE_XTALK — 1000 B against
+// 984 B in every ST 2.x header we have, unsettled (contract 04 §7).
+const CALIBRATE_XTALK_BY_VARIANT: Partial<Record<Vl53l8Variant, Uint8Array>> = {
+  l7cx: CALIBRATE_XTALK_L7CX,
+  l7ch: CALIBRATE_XTALK_LMZ,
+  ch: CALIBRATE_XTALK_LMZ,
+};
+
 export const NB_TARGET_PER_ZONE = 1;
 
 const STATUS_NAMES: Record<number, string> = {
@@ -224,6 +283,10 @@ function packU32ArrayLE(values: number[]): Uint8Array {
 
 function hex4(n: number): string {
   return n.toString(16).toUpperCase().padStart(4, "0");
+}
+
+function hex2(n: number): string {
+  return n.toString(16).toUpperCase().padStart(2, "0");
 }
 
 function hex8(n: number): string {
@@ -410,7 +473,9 @@ export function packDetectionThresholds(thresholds: Partial<DetectionThreshold>[
 export class VL53L8CX {
   readonly p: Vl53l8Platform;
   readonly variant: Vl53l8Variant;
-  readonly fwChecksum: number;
+  /** True for the I2C L5/L7 variants (the non-L8 branch of vl53lmz_init). */
+  readonly i2c: boolean;
+  readonly fwChecksum: number | null;
   readonly firmware: Uint8Array;
   readonly defaultCfg: Uint8Array;
   readonly defaultXtalk: Uint8Array;
@@ -422,32 +487,44 @@ export class VL53L8CX {
   dataReadSize = 0;
   /** { fw, host } when the FW disagrees with the api.c formula. */
   frameSizeMismatch: { fw: number; host: number } | null = null;
+  /** Last calibrateXtalk(): nothing to calibrate (ST XTALK_FAILED). */
+  xtalkCalibrationFailed = false;
   /** [idx, type, size] of the blocks in the last parsed frame. */
   lastBlocks: Array<[number, number, number]> = [];
   /** Whether the motion-indicator output block is configured. */
   motionPresent = false;
+  /** Silicon ids cached by isAlive(). */
+  deviceId: number | null = null;
+  revisionId: number | null = null;
+  /** I2C variants: 0 MZ (L5) / 1 MZEVO (L7), read after init(). */
+  moduleType: number | null = null;
+  /** Zones the last startRanging() used (the L5/L7 parser trims to it). */
+  resolution: number | null = null;
 
   private readonly outputEnableW3: number;
   private readonly frameTail: number;
   private readonly footerIdOff: number;
 
   constructor(platform: Vl53l8Platform, assets: Vl53l8Assets, variant: Vl53l8Variant = "cx") {
+    if (!(variant in FW_CHECKSUM)) throw new Error(`unknown variant ${String(variant)}`);
     this.p = platform;
     this.variant = variant;
+    this.i2c = I2C_VARIANTS.includes(variant);
     this.fwChecksum = FW_CHECKSUM[variant];
     // start_ranging output config differs slightly by FW variant:
     //   cx (ULD 2.1.0):     OUTPUT_ENABLES word[3]=0xC0000000, frame tail +32
     //   ch (VL53LMZ 2.0.16): OUTPUT_ENABLES word[3]=0,          frame tail +24
+    //   l7cx (ULD 2.0.1):   OUTPUT_ENABLES word[3]=0xC0000000, frame tail +24
+    //   l7ch = ch
     // footerIdOff: where the footer id sits relative to the frame end
-    // (cx 2.1.0 = size-12; ch 2.0.16 = size-4).
-    if (variant === "ch") {
-      this.outputEnableW3 = 0x00000000;
-      this.frameTail = 24;
-      this.footerIdOff = 4;
-    } else {
-      this.outputEnableW3 = 0xc0000000;
+    // (cx 2.1.0 = size-12; the 2.0.x drivers = size-4).
+    this.outputEnableW3 = variant === "ch" || variant === "l7ch" ? 0x00000000 : 0xc0000000;
+    if (variant === "cx") {
       this.frameTail = 32;
       this.footerIdOff = 12;
+    } else {
+      this.frameTail = 24;
+      this.footerIdOff = 4;
     }
     this.firmware = assets.firmware;
     this.defaultCfg = assets.defaultCfg;
@@ -675,9 +752,30 @@ export class VL53L8CX {
 
   // ---------------- public API ----------------
 
-  /** Returns [deviceId, revisionId]; alive when (0xF0, 0x0C). */
+  /**
+   * Returns [deviceId, revisionId] and caches them; alive when (0xF0, 0x0C)
+   * on L8, revision 0x02 (or 0x01 with deviceId 0xF0) on L5/L7.
+   */
   async isAlive(): Promise<[number, number]> {
-    return readDeviceRevisionId(this.p);
+    const ids = await readDeviceRevisionId(this.p);
+    [this.deviceId, this.revisionId] = ids;
+    return ids;
+  }
+
+  /**
+   * I2C variants only: refuse to boot an L5/L7 blob on anything but L5/L7
+   * silicon (vl53lmz_is_alive()).
+   */
+  private async checkI2cSilicon(): Promise<void> {
+    const [deviceId, revisionId] = await this.isAlive();
+    if (
+      !(revisionId === SI_REVISION_CUT12 || (deviceId === 0xf0 && revisionId === SI_REVISION_CUT11))
+    ) {
+      throw new Vl53l8cxError(
+        STATUS_ERROR,
+        `not a VL53L5/L7 sensor: device_id=0x${hex2(deviceId)} revision_id=0x${hex2(revisionId)}`,
+      );
+    }
   }
 
   /**
@@ -692,6 +790,10 @@ export class VL53L8CX {
 
     const wr = (addr: number, value: number): Promise<void> => this.wrByte(addr, value);
     const rd = (addr: number): Promise<number> => this.rdByte(addr);
+    const i2c = this.i2c; // L5/L7 branch of vl53lmz_init(); L8 path unchanged
+
+    this.moduleType = null;
+    if (i2c) await this.checkI2cSilicon();
 
     // SW reboot sequence
     note("SW reboot...");
@@ -726,9 +828,15 @@ export class VL53L8CX {
     await wr(0x7fff, 0x02);
 
     // Enable FW access
-    await wr(0x7fff, 0x01);
-    await wr(0x06, 0x01);
-    await this.pollForAnswer(1, 0, 0x21, 0xff, 0x04, "fw access");
+    if (i2c) {
+      await wr(0x03, 0x0d);
+      await wr(0x7fff, 0x01);
+      await this.pollForAnswer(1, 0, 0x21, 0x10, 0x10, "fw access");
+    } else {
+      await wr(0x7fff, 0x01);
+      await wr(0x06, 0x01);
+      await this.pollForAnswer(1, 0, 0x21, 0xff, 0x04, "fw access");
+    }
 
     await wr(0x7fff, 0x00);
 
@@ -756,9 +864,14 @@ export class VL53L8CX {
     // Wake up MCU
     await wr(0x7fff, 0x00);
     await rd(0x7fff);
+    if (i2c) await wr(0x0c, 0x00);
     await wr(0x7fff, 0x01);
+    if (i2c) {
+      await wr(0x20, 0x07);
+      await wr(0x20, 0x06);
+    }
 
-    // Download FW into VL53L8CX
+    // Download FW into the sensor
     note("Downloading sensor FW (84 KB)... bank 1/3");
     await wr(0x7fff, 0x09);
     await this.p.wrMulti(0, this.firmware.subarray(0, 0x8000));
@@ -771,10 +884,17 @@ export class VL53L8CX {
     await wr(0x7fff, 0x01);
 
     // Check if FW correctly downloaded
-    await wr(0x7fff, 0x01);
-    await wr(0x06, 0x03);
+    if (i2c) {
+      await wr(0x7fff, 0x02);
+      await wr(0x03, 0x0d);
+      await wr(0x7fff, 0x01);
+      await this.pollForAnswer(1, 0, 0x21, 0x10, 0x10, "fw downloaded");
+    } else {
+      await wr(0x7fff, 0x01);
+      await wr(0x06, 0x03);
+      await this.p.sleepMs(5);
+    }
 
-    await this.p.sleepMs(5);
     await wr(0x7fff, 0x00);
     await rd(0x7fff);
     await wr(0x0c, 0x01);
@@ -797,15 +917,18 @@ export class VL53L8CX {
 
     // Firmware checksum (0x812FFC & 0xFFFF); value depends on the FW variant
     // (see FW_CHECKSUM). cx = ULD 2.1.0 FW; ch = VL53LMZ ULD 2.0.16 FW.
-    const crcBuf = swapBuffer(await this.p.rdMulti(0x2ffc, 4));
-    const crc = dvOf(crcBuf).getUint32(0, true);
-    if (crc !== this.fwChecksum) {
-      throw new Vl53l8cxError(
-        STATUS_FW_CHECKSUM_FAIL,
-        `crc=0x${hex8(crc)} (expected 0x${hex8(this.fwChecksum)} for ${this.variant})`,
-      );
+    // The L5/L7 ULD 2.0.1 (l7cx) publishes no checksum and skips the step.
+    if (this.fwChecksum !== null) {
+      const crcBuf = swapBuffer(await this.p.rdMulti(0x2ffc, 4));
+      const crc = dvOf(crcBuf).getUint32(0, true);
+      if (crc !== this.fwChecksum) {
+        throw new Vl53l8cxError(
+          STATUS_FW_CHECKSUM_FAIL,
+          `crc=0x${hex8(crc)} (expected 0x${hex8(this.fwChecksum)} for ${this.variant})`,
+        );
+      }
+      note("Sensor FW checksum OK");
     }
-    note("Sensor FW checksum OK");
 
     // Get offset NVM data
     note("Reading NVM offset data...");
@@ -828,7 +951,16 @@ export class VL53L8CX {
     const pipeCtrl = Uint8Array.of(NB_TARGET_PER_ZONE, 0x00, 0x01, 0x00);
     await this.dciWriteData(DCI_PIPE_CONTROL, pipeCtrl);
     await this.dciWriteData(DCI_SINGLE_RANGE, packU32ArrayLE([0x01]));
-    note("Sensor init done");
+    if (i2c) {
+      // Readable only once the sensor FW runs; tells L5 (MZ) from L7 (MZEVO),
+      // which share a blob and a board.
+      this.moduleType = (await this.dciReadData(DCI_FW_FLAGS, 8))[1]!;
+      note(
+        `Sensor init done (module type ${MODULE_TYPE_NAMES[this.moduleType] ?? this.moduleType})`,
+      );
+    } else {
+      note("Sensor init done");
+    }
   }
 
   async getResolution(): Promise<number> {
@@ -1001,7 +1133,16 @@ export class VL53L8CX {
       const [bhType, bhSizeIn, bhIdx] = bhFields(output[i]!);
       let bhSize = bhSizeIn;
       if (bhType >= 0x1 && bhType < 0x0d) {
-        if (bhIdx >= 0x54d0 && bhIdx < 0x54d0 + 960) {
+        if (this.i2c) {
+          // vl53lmz_start_ranging (2.0.16), as verified on L5/L7 hardware:
+          // per-target blocks above 0x6C90 keep their 64-entry size even in
+          // 4x4 (parseFrame trims them).
+          if (bhIdx >= 0x54d0 && bhIdx < 0x5890) {
+            bhSize = resolution;
+          } else if (bhIdx < 0x6c90) {
+            bhSize = resolution * NB_TARGET_PER_ZONE;
+          }
+        } else if (bhIdx >= 0x54d0 && bhIdx < 0x54d0 + 960) {
           bhSize = resolution;
         } else if (bhIdx === CNH_DATA_IDX) {
           // keep CNH block size; not zone-scaled
@@ -1016,6 +1157,7 @@ export class VL53L8CX {
       this.dataReadSize += 4;
     }
     this.dataReadSize += this.frameTail;
+    this.resolution = resolution;
 
     await this.dciWriteData(DCI_OUTPUT_LIST, packU32ArrayLE(output));
 
@@ -1189,6 +1331,22 @@ export class VL53L8CX {
       i += msize + 4;
     }
 
+    // L5/L7: the per-target blocks carry 64 entries even in 4x4 (see
+    // startRanging); the sensor fills the first `resolution` and pads the
+    // rest with zeros. Trim to the zones that exist.
+    if (this.i2c && this.resolution) {
+      const n = this.resolution;
+      results.ambientPerSpad = results.ambientPerSpad.slice(0, n);
+      results.nbSpadsEnabled = results.nbSpadsEnabled.slice(0, n);
+      results.nbTargetDetected = results.nbTargetDetected.slice(0, n);
+      const nt = n * NB_TARGET_PER_ZONE;
+      results.distanceMm = results.distanceMm.slice(0, nt);
+      results.targetStatus = results.targetStatus.slice(0, nt);
+      results.signalPerSpad = results.signalPerSpad.slice(0, nt);
+      results.rangeSigmaMm = results.rangeSigmaMm.slice(0, nt);
+      results.reflectance = results.reflectance.slice(0, nt);
+    }
+
     // Convert to real format (fixed-point scaling, per ST GetRangingData).
     results.distanceMm = results.distanceMm.map((d) => Math.floor(d / 4));
     results.rangeSigmaMm = results.rangeSigmaMm.map((s) => s / 128.0);
@@ -1273,7 +1431,12 @@ export class VL53L8CX {
     if (tmp === 0x04) {
       mode = POWER_MODE_WAKEUP;
     } else if (tmp === 0x02) {
-      mode = (await this.rdByte(0x000f)) === 0x43 ? POWER_MODE_DEEP_SLEEP : POWER_MODE_SLEEP;
+      // ULD 2.0.1 (l7cx) has no deep sleep and never reads 0x000F.
+      if (this.variant === "l7cx") {
+        mode = POWER_MODE_SLEEP;
+      } else {
+        mode = (await this.rdByte(0x000f)) === 0x43 ? POWER_MODE_DEEP_SLEEP : POWER_MODE_SLEEP;
+      }
     } else {
       await this.wrByte(0x7fff, 0x02);
       throw new Vl53l8cxError(STATUS_ERROR, "get_power_mode");
@@ -1287,9 +1450,22 @@ export class VL53L8CX {
    * from DEEP_SLEEP re-runs init() (the FW blob is lost).
    */
   async setPowerMode(powerMode: number): Promise<void> {
+    if (
+      this.variant === "l7cx" &&
+      powerMode !== POWER_MODE_SLEEP &&
+      powerMode !== POWER_MODE_WAKEUP
+    ) {
+      // vl53l7cx_set_power_mode (ULD 2.0.1): SLEEP / WAKEUP only.
+      throw new Vl53l8cxError(STATUS_INVALID_PARAM, "set_power_mode: VL53L5CX/L7CX have no deep sleep");
+    }
     const current = await this.getPowerMode();
     if (powerMode === current) return;
-    if (powerMode === POWER_MODE_WAKEUP) {
+    if (powerMode === POWER_MODE_WAKEUP && this.variant === "l7cx") {
+      await this.wrByte(0x7fff, 0x00);
+      await this.wrByte(0x09, 0x04);
+      await this.pollForAnswer(1, 0, 0x06, 0x01, 1, "wakeup");
+      await this.wrByte(0x7fff, 0x02);
+    } else if (powerMode === POWER_MODE_WAKEUP) {
       await this.wrByte(0x7fff, 0x00);
       await this.wrByte(0x09, 0x04);
       const stored = await this.rdByte(0x000f);
@@ -1414,6 +1590,13 @@ export class VL53L8CX {
   }
 
   async setDetectionThresholdsAutoStop(autoStop: boolean): Promise<void> {
+    if (this.variant === "l7cx") {
+      // Not in the VL53L5CX/L7CX ULD 2.0.1 thresholds plugin.
+      throw new Vl53l8cxError(
+        STATUS_INVALID_PARAM,
+        "detection-threshold auto-stop: not in the L5CX/L7CX ULD",
+      );
+    }
     await this.dciReplaceData(DCI_PIPE_CONTROL, 4, Uint8Array.of(autoStop ? 1 : 0), 0x03);
   }
 
@@ -1513,12 +1696,46 @@ export class VL53L8CX {
   }
 
   /**
-   * vl53l8cx_calibrate_xtalk: run on-device crosstalk calibration.
-   *
-   * NOTE: ported from ST ULD source but NOT verified against live hardware in
-   * this SDK — the get/set caldata-xtalk buffer path IS the tested save/restore
-   * route. Saves & restores resolution/frequency/int-time/sharpener/target-
-   * order/xtalk-margin/ranging-mode around the run.
+   * _vlxxx_program_output_config() of the ST xtalk plugin (every version):
+   * the dedicated 17-block calibration output list, sized with the classic
+   * 0x54D0+960 rule, 24-byte tail. Used by every variant.
+   */
+  private async programXtalkOutputConfig(resolution: number): Promise<number> {
+    const output = [...XTALK_CAL_OUTPUT];
+    let dataReadSize = 0;
+    for (let i = 0; i < output.length; i++) {
+      if (
+        output[i] === 0 ||
+        !((XTALK_CAL_OUTPUT_ENABLE[Math.floor(i / 32)]! & (1 << i % 32)) >>> 0)
+      ) {
+        continue;
+      }
+      const [bhType, bhSizeIn, bhIdx] = bhFields(output[i]!);
+      let bhSize = bhSizeIn;
+      if (bhType >= 0x1 && bhType < 0x0d) {
+        bhSize = bhIdx >= 0x54d0 && bhIdx < 0x54d0 + 960 ? resolution : resolution * NB_TARGET_PER_ZONE;
+        output[i] = bhSetSize(output[i]!, bhSize);
+        dataReadSize += bhType * bhSize;
+      } else {
+        dataReadSize += bhSize;
+      }
+      dataReadSize += 4;
+    }
+    dataReadSize += 24;
+    await this.dciWriteData(DCI_OUTPUT_LIST, packU32ArrayLE(output));
+    await this.dciWriteData(DCI_OUTPUT_CONFIG, packU32ArrayLE([dataReadSize, output.length + 1]));
+    await this.dciWriteData(DCI_OUTPUT_ENABLES, packU32ArrayLE([...XTALK_CAL_OUTPUT_ENABLE]));
+    return dataReadSize;
+  }
+
+  /**
+   * vl53l8cx_calibrate_xtalk: run on-device crosstalk calibration. As every ST
+   * version: the firmware's own calibration table, then the dedicated 17-block
+   * calibration output list. Verified on a VL53L8CH (and L5CX / L7CH) without
+   * cover glass, where the firmware correctly answers XTALK_FAILED
+   * ("coverglass too good"); a successful run needs glass. Saves & restores
+   * resolution/frequency/int-time/sharpener/target-order/xtalk-margin/
+   * ranging-mode around the run.
    */
   async calibrateXtalk(
     reflectancePercent: number,
@@ -1546,7 +1763,9 @@ export class VL53L8CX {
       rangingMode: await this.getRangingMode(),
     };
     await this.setResolution(RESOLUTION_8X8);
-    await this.p.wrMulti(0x2c28, CALIBRATE_XTALK);
+    // L5/L7: the ST table of the matching ULD (verified against the C headers);
+    // L8 keeps its own table (see CALIBRATE_XTALK).
+    await this.p.wrMulti(0x2c28, CALIBRATE_XTALK_BY_VARIANT[this.variant] ?? CALIBRATE_XTALK);
     await this.pollForAnswer(4, 1, UI_CMD_STATUS, 0xff, 0x03, "calib cmd");
     const refl = reflectancePercent * 16;
     const dist = distanceMm * 4;
@@ -1558,15 +1777,21 @@ export class VL53L8CX {
     await this.dciReplaceData(DCI_CAL_CFG, 8, u16(dist), 0x00);
     await this.dciReplaceData(DCI_CAL_CFG, 8, u16(refl), 0x02);
     await this.dciReplaceData(DCI_CAL_CFG, 8, Uint8Array.of(nbSamples), 0x04);
-    await this.programOutputConfig(RESOLUTION_8X8);
+    // Every ST version programs the calibration output list here, not the
+    // ranging one.
+    await this.programXtalkOutputConfig(RESOLUTION_8X8);
     await this.p.wrMulti(UI_CMD_END - 3, cmd);
     await this.pollForAnswer(4, 1, UI_CMD_STATUS, 0xff, 0x03, "calib start");
     let timeout = 0;
+    this.xtalkCalibrationFailed = false;
     for (;;) {
       const buf = await this.p.rdMulti(0x0, 4);
       if (buf[0] !== STATUS_ERROR) {
         if (buf[2]! >= 0x7f && ((buf[3]! & 0x80) >> 7) === 1) {
-          this.xtalkData = this.defaultXtalk; // XTALK_FAILED
+          // ST: "Coverglass too good for Xtalk calibration" (XTALK_FAILED);
+          // the buffer read back below is what the FW keeps.
+          this.xtalkData = this.defaultXtalk;
+          this.xtalkCalibrationFailed = true;
         }
         break;
       }

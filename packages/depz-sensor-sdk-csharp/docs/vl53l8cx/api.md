@@ -10,7 +10,7 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L8CX (ToF)**: [`Vl53l8Variant`](#vl53l8variant), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`Vl53l8Wire`](#vl53l8wire), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Advanced`](#vl53l8advanced), [`MotionConfig`](#motionconfig), [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Uld`](#vl53l8uld)
+- **VL53L8CX (ToF)**: [`Vl53l8Variant`](#vl53l8variant), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`Vl53l8Wire`](#vl53l8wire), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Advanced`](#vl53l8advanced), [`MotionConfig`](#motionconfig), [`Vl53l8Uld`](#vl53l8uld)
 
 ## VL53L8CX (ToF)
 
@@ -26,7 +26,7 @@ public enum Vl53l8Variant
 
 The two VL53L8 ToF silicon variants in the DEPZ family. Both stream the same ULD results-frame layout, so `Vl53l8FrameDecoder` and the `Vl53l8Advanced` DCI codecs serve both; the differences are:
 
-USB product id — `Ch` ships as production PID 0xED40; `Cx` is the development default and enumerates under the raw ST VID/PID. Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes (`ForVariant`). CNH histograms — CH-only, not yet decoded (`Vl53l8Cnh`).
+USB product id — `Ch` ships as production PID 0xED40; `Cx` is the development default and enumerates under the raw ST VID/PID. Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes (`ForVariant`). CNH histograms — CH-only; the frame decoder copies the raw block into `CnhRaw` and `DecodeHistogram` decodes it.
 
 ### Vl53l8Frame
 
@@ -36,6 +36,14 @@ public sealed record Vl53l8Frame(ulong TimestampUs, int Resolution, int SiliconT
 
 One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Raw wire integers are preserved; `DistanceMm` and `RangeSigmaMm` carry the ST GetRangingData fixed-point scaling applied (÷4 and ÷128).
 
+#### Vl53l8Frame.CnhRaw *(property)*
+
+```csharp
+public byte[]? CnhRaw
+```
+
+Raw CNH data block (output index 0xC048), byte-swapped like every other block — decode with `DecodeHistogram`. Null when the frame carries no CNH block (CX variants, or CNH not configured).
+
 ### Vl53l8FrameDecoder
 
 ```csharp
@@ -44,7 +52,7 @@ public sealed class Vl53l8FrameDecoder
 
 VL53L8 results-frame decoder (contracts/04_SENSOR_VL53L8.md). Verbatim port of the verifiable parse path of the ST ULD's GetRangingData / parse_frame.
 
-Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is a separate, not-yet-decoded extension point (`Vl53l8Cnh`); the live register-bridge init/config that produces these frames is hardware-dependent and out of scope (`Vl53l8Uld`).
+Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is copied out raw (`CnhRaw`) and decoded by `DecodeHistogram`; the live register-bridge init/config that produces these frames is hardware-dependent and out of scope (`Vl53l8Uld`).
 
 #### Vl53l8FrameDecoder.CorruptedFrameException
 
@@ -79,7 +87,7 @@ Frame-id footer offset for VL53L8CH FW (VL53LMZ 2.0.16): 4 bytes from end.
 #### Vl53l8FrameDecoder.Vl53l8FrameDecoder *(constructor)*
 
 ```csharp
-public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx)
+public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx, bool trimToZones = false)
 ```
 
 #### Vl53l8FrameDecoder.ForVariant
@@ -105,6 +113,14 @@ public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw)
 ```
 
 Parse one raw results frame (the reassembled bytes read from reg 0x00). Resolution is derived from the number-of-targets block length.
+
+#### Vl53l8FrameDecoder.ParseFrame
+
+```csharp
+public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw, int resolution)
+```
+
+Parse one raw results frame, trimming every per-zone array to `resolution` entries (16 or 64) — the resolution the host configured in `start_ranging`. Needed for VL53L5/L7 frames, whose per-target blocks carry 64 entries even in 4×4 (contract 11 §3).
 
 ### Vl53l8Cmd
 
@@ -441,30 +457,6 @@ public void SetResolution(int resolution)
 ```
 
 vl53l8cx_motion_indicator_set_resolution: fill the per-zone map id.
-
-### Vl53l8CnhConfig
-
-```csharp
-public sealed record Vl53l8CnhConfig(int NbOfAggregates, int FeatureLength)
-```
-
-The `Vl53l8Cnh` input: the two aggregate/histogram dimensions of the on-device CNH buffer (`VL53LMZ_Motion_Configuration`). These fix the block's internal offsets, so the decode needs them alongside the raw bytes.
-
-### Vl53l8CnhAggregate
-
-```csharp
-public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler)
-```
-
-One decoded CNH aggregate histogram. The float value of bin `i` is `HistRaw[i] / 2^HistScaler[i]` (a per-bin block-floating-point mantissa + shift). Both arrays are `FeatureLength` long.
-
-### Vl53l8CnhResult
-
-```csharp
-public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8CnhAggregate> Aggregates)
-```
-
-A decoded CNH data block: the reference-residual word plus one histogram per aggregate (in aggregate-id order).
 
 ### Vl53l8Uld
 

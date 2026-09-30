@@ -101,15 +101,16 @@ Both silicon variants share this decode; [`Variant`](api.md) selects only the
 frame-tail footer-id geometry used for the corruption check:
 
 ```rust
-parse_frame(&frame, Variant::Cx)?;   // ULD 2.1.0 footer (size-12) — DEPZ firmware default
-parse_frame(&frame, Variant::Ch)?;   // ULD 2.0.16 footer (size-4)
+parse_frame(&frame, Variant::Cx)?;   // VL53L8CX, ULD 2.1.0 footer (size-12)
+parse_frame(&frame, Variant::Ch)?;   // VL53L8CH, VL53LMZ 2.0.16 footer (size-4)
 ```
 
-Note the geometry tracks the **ULD version the firmware embeds**, not the
-silicon: the DEPZ firmware streams 2.1.0-footer frames on both CX and CH
-devices, so a CH capture still decodes with `Variant::Cx` geometry. When a CH
-frame carries a CNH block, its raw bytes surface as
-[`Vl53l8Results::cnh_raw`](../vl53l8ch/api.md) — see the
+The geometry follows the firmware each part runs: the VL53L8CX firmware (ULD
+2.1.0) keeps the footer id 12 bytes from the end, the VL53L8CH firmware
+(VL53LMZ 2.0.16) 4 bytes. The wrong variant fails the header/footer check with
+`Vl53l8Error::CorruptedFrame`. When a CH frame carries a CNH block, its raw
+bytes surface as `Vl53l8Results::cnh_raw` and
+[`decode_cnh`](../vl53l8ch/api.md#decode_cnh) unpacks them — see the
 [VL53L8CH guide](../vl53l8ch/guide.md).
 
 ## Advanced DCI codecs

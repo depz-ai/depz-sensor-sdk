@@ -22,13 +22,18 @@ Regenerate (from the crate root, ``packages/depz-sensor-sdk-rust``)::
 Outputs:
 
 - ``docs/api.md`` — the whole public surface;
-- ``docs/{sr04,vl53l4cd,vl53l8cx,vl53l8ch,bno086}/api.md`` — one focused
-  reference per sensor (its own symbols only; the shared
-  transport/protocol/discovery surface stays in the root). The single
-  ``vl53l8`` module is TWO sensors — the CX base and the CH superset (CNH) —
-  so it is split by symbol: the CH-only extension points land in ``vl53l8ch``,
-  everything else in ``vl53l8cx``. The ``vl53l4`` module is one sensor and
-  maps 1:1 onto ``vl53l4cd``.
+- ``docs/<sensor>/api.md`` — one focused reference per sensor (its own
+  symbols only; the shared transport/protocol/discovery surface stays in the
+  root). The single ``vl53l8`` module is TWO sensors — the CX base and the CH
+  superset (CNH) — so it is split by symbol: the CH-only CNH decode lands in
+  ``vl53l8ch``, everything else in ``vl53l8cx``. The ``vl53l4`` module is one
+  sensor and maps 1:1 onto ``vl53l4cd``.
+- One module, several boards: ``vl53l7`` serves ``vl53l5cx``, ``vl53l7cx``
+  and ``vl53l7ch`` (each page carries the whole module plus the VL53L8
+  symbols it re-exports; the L7CH page also the CNH decode); ``vl53lx``
+  serves ``vl53l0x``, ``vl53l1cx``, ``vl53l1cb``, ``vl53l3cx`` and
+  ``vl53l4cx`` (the family surface plus the contract-10 codecs it
+  re-exports from ``vl53l4``); ``bno055`` maps onto ``bno055``.
 """
 
 from __future__ import annotations
@@ -43,7 +48,7 @@ DOCS = ROOT / "docs"
 # Domain (module group) → section title, in reading order — mirrors the Python
 # SDK's DOMAIN_ORDER / DOMAIN_TITLE.
 DOMAIN_ORDER = [
-    "discovery", "sr04", "vl53l4", "vl53l8", "bno086",
+    "discovery", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "fwdepz", "dataset", "transport", "protocol", "json",
 ]
 DOMAIN_TITLE = {
@@ -51,7 +56,10 @@ DOMAIN_TITLE = {
     "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
+    "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
+    "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
+    "bno055": "BNO055 (IMU)",
     "fwdepz": "Bootloader / firmware update",
     "dataset": "Datasets (record & replay)",
     "transport": "Transport",
@@ -60,8 +68,32 @@ DOMAIN_TITLE = {
 }
 
 # CH-only symbols in the shared vl53l8 module. Everything else in the domain is
-# the CX base; these are the VL53L8CH-specific additions/extension points.
-VL53L8CH_SYMBOLS = {"CNH_DATA_IDX"}
+# the CX base; these are the VL53L8CH-specific additions (the CNH block id and
+# the CNH histogram decode).
+VL53L8CH_SYMBOLS = {
+    "CNH_DATA_IDX", "decode_cnh", "CnhDecodeConfig", "CnhAggregate", "CnhData", "CnhError",
+}
+
+# Symbols a board page needs that live in another module — what that board's
+# module re-exports (``pub use``) plus the frame decode it runs through.
+VL53L7_PICKS = [
+    ("vl53l8", "pack_read_reg"), ("vl53l8", "pack_write_reg"), ("vl53l8", "pack_start_stream"),
+    ("vl53l8", "RegData"), ("vl53l8", "unpack_frame_chunk"), ("vl53l8", "FrameReassembler"),
+    ("vl53l8", "parse_frame"), ("vl53l8", "Variant"),
+]
+VL53LX_PICKS = [
+    ("vl53l4", n) for n in (
+        "pack_read_reg", "pack_write_reg", "pack_xshut", "pack_set_i2c_speed", "RegData",
+        "StreamData", "i2c_error_name", "XFER_MAX", "XSHUT_OFF", "XSHUT_ON", "XSHUT_RESET",
+        "SF_INT_ACT_HIGH", "I2C_KHZ_STEPS",
+    )
+]
+BNO055_PICKS = [("vl53l4", "i2c_error_name")]
+VL53LX_BOARDS = [
+    ("vl53l0x", "VL53L0X (ToF)"), ("vl53l1cx", "VL53L1CX (ToF)"),
+    ("vl53l1cb", "VL53L1CB (ToF)"), ("vl53l3cx", "VL53L3CX (ToF)"),
+    ("vl53l4cx", "VL53L4CX (ToF)"),
+]
 
 
 def domain_for(path: Path) -> str | None:
@@ -74,6 +106,12 @@ def domain_for(path: Path) -> str | None:
         return "vl53l8"
     if p.startswith("bno086/"):
         return "bno086"
+    if p.startswith("vl53l7/"):
+        return "vl53l7"
+    if p.startswith("vl53lx/"):
+        return "vl53lx"
+    if p.startswith("bno055/"):
+        return "bno055"
     if p == "protocol/sr04.rs":
         return "sr04"
     if p == "protocol/identity.rs":
@@ -297,9 +335,21 @@ def _render_reference(groups: list[tuple[str, str, list[dict]]], header: list[st
     return "\n".join(head + body).rstrip() + "\n"
 
 
+def _pick(by_domain: dict[str, list[dict]], picks) -> list[dict]:
+    """The named ``(domain, symbol)`` items, in pick order (missing ones skipped)."""
+    out = []
+    for domain, name in picks:
+        hit = next((it for it in by_domain.get(domain, []) if it["name"] == name), None)
+        if hit is not None:
+            out.append(hit)
+    return out
+
+
 def _sensor_targets(by_domain: dict[str, list[dict]]):
-    """[(folder, title, members, note_lines), ...] — one per per-sensor api.md.
-    The vl53l8 module is split by symbol into the CX base and CH superset."""
+    """[(folder, title, members, note_lines[, extra_groups]), ...] — one per
+    per-sensor api.md. The vl53l8 module is split by symbol into the CX base
+    and CH superset; ``extra_groups`` are further ``(title, members)``
+    sections (symbols the board uses from a shared module)."""
     targets = []
     if by_domain.get("sr04"):
         targets.append(("sr04", "SR04", by_domain["sr04"], []))
@@ -312,15 +362,45 @@ def _sensor_targets(by_domain: dict[str, list[dict]]):
         targets.append(("vl53l8cx", "VL53L8CX (ToF)", cx, []))
         targets.append((
             "vl53l8ch", "VL53L8CH (ToF + CNH)", ch,
-            ["`Vl53l8Ch` is the VL53L8CX superset: it shares one results-frame",
+            ["`Vl53l8ch` is the VL53L8CX superset: it shares one results-frame",
              "decoder, framing and advanced-DCI codec set with the CX base — only",
              "the Compact-Network-Histogram (CNH) additions are listed here. For",
              "the frame decoder, reassembler, `Variant`, resolution and the",
              "advanced ULD codecs, see the [VL53L8CX API reference](../vl53l8cx/api.md).",
              ""],
         ))
+    if by_domain.get("vl53l7"):
+        members = by_domain["vl53l7"]
+        shared = ("Shared with VL53L8 (re-exported / frame decode)",
+                  _pick(by_domain, VL53L7_PICKS))
+        cnh = ("CNH histogram decode (from `vl53l8`)",
+               [it for it in by_domain.get("vl53l8", []) if it["name"] in VL53L8CH_SYMBOLS])
+        note = ["One module serves the VL53L5CX, VL53L7CX and VL53L7CH boards (one",
+                "`APP_VL53L7` firmware), so this page lists the whole `vl53l7`",
+                "module and is the same on all three. Frames decode through",
+                "`vl53l8::parse_frame` with `Variant::L7`; the frame result type,",
+                "the reassembler and the advanced DCI codecs are documented in the",
+                "[VL53L8CX API reference](../vl53l8cx/api.md).",
+                ""]
+        targets.append(("vl53l5cx", "VL53L5CX (ToF)", members, note, [shared]))
+        targets.append(("vl53l7cx", "VL53L7CX (ToF)", members, note, [shared]))
+        targets.append(("vl53l7ch", "VL53L7CH (ToF + CNH)", members, note, [shared, cnh]))
+    if by_domain.get("vl53lx"):
+        members = by_domain["vl53lx"]
+        shared = ("Contract-10 codecs (re-exported from `vl53l4`)",
+                  _pick(by_domain, VL53LX_PICKS))
+        note = ["One module serves the whole 1D family (one `APP_VL53L0_4`",
+                "firmware): VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX.",
+                "This page lists the whole `vl53lx` module and is the same on",
+                "every family page; the product table says what differs per board.",
+                ""]
+        for folder, title in VL53LX_BOARDS:
+            targets.append((folder, title, members, note, [shared]))
     if by_domain.get("bno086"):
         targets.append(("bno086", "BNO086 (IMU)", by_domain["bno086"], []))
+    if by_domain.get("bno055"):
+        targets.append(("bno055", "BNO055 (IMU)", by_domain["bno055"], [],
+                        [("Shared (re-exported from `vl53l4`)", _pick(by_domain, BNO055_PICKS))]))
     return targets
 
 
@@ -341,7 +421,11 @@ def main() -> None:
         "Each sensor also has a focused reference with just its own symbols:",
         "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[BNO086](bno086/api.md).",
+        "[VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · "
+        "[VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · "
+        "[VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · "
+        "[VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · "
+        "[BNO086](bno086/api.md) · [BNO055](bno055/api.md).",
         "",
     ]
     DOCS.mkdir(parents=True, exist_ok=True)
@@ -349,7 +433,9 @@ def main() -> None:
     n = sum(len(m) for _, _, m in groups)
     print(f"wrote {DOCS / 'api.md'} ({n} public symbols across {len(groups)} groups)")
 
-    for folder, title, members, note in _sensor_targets(by_domain):
+    for folder, title, members, note, *extra in _sensor_targets(by_domain):
+        groups_out = [(folder, title, members)] + [
+            (folder, t, m) for t, m in (extra[0] if extra else []) if m]
         sub_head = [
             f"# {title} — API reference",
             "",
@@ -364,8 +450,9 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference([(folder, title, members)], sub_head))
-        print(f"wrote {out} ({len(members)} symbols)")
+        out.write_text(_render_reference(groups_out, sub_head))
+        n_sub = sum(len(m) for _, _, m in groups_out)
+        print(f"wrote {out} ({n_sub} symbols)")
 
 
 if __name__ == "__main__":

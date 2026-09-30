@@ -6,7 +6,7 @@ build:           ## configure + build the static library and the vector runner
 	cmake -B build -S .
 	cmake --build build
 
-test: build      ## run the golden-vector / replay suite (13 tests)
+test: build      ## run the golden-vector / replay + live-layer suite (46 tests)
 	ctest --test-dir build --output-on-failure
 
 docs:            ## regenerate docs/api.md + per-sensor api.md from the header

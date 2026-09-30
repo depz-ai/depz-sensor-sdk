@@ -10,6 +10,7 @@ in the header, not this file.
 ## Contents
 
 - **SR04**: [`depz_sr04_cmd`](#depz_sr04_cmd), [`depz_sr04_rpt`](#depz_sr04_rpt), [`DEPZ_SR04_ECHO_TIMEOUT`](#depz_sr04_echo_timeout), [`DEPZ_SR04_ECHO_DECAY_MIN_US`](#depz_sr04_echo_decay_min_us), [`DEPZ_SR04_ECHO_DECAY_MAX_US`](#depz_sr04_echo_decay_max_us), [`depz_sr04_data`](#depz_sr04_data), [`depz_sr04_pack_sample_period`](#depz_sr04_pack_sample_period), [`depz_sr04_pack_echo_decay`](#depz_sr04_pack_echo_decay), [`depz_sr04_unpack_data`](#depz_sr04_unpack_data), [`depz_sr04_unpack_sample_period`](#depz_sr04_unpack_sample_period), [`depz_sr04_unpack_echo_decay`](#depz_sr04_unpack_echo_decay), [`depz_sr04_distance_mm`](#depz_sr04_distance_mm)
+- **SR04 sensor class (live layer)**: [`depz_sr04_measurement`](#depz_sr04_measurement), [`depz_sr04_measurement_cb`](#depz_sr04_measurement_cb), [`depz_sr04_open_link`](#depz_sr04_open_link), [`depz_is_sr04`](#depz_is_sr04), [`depz_sr04_valid`](#depz_sr04_valid), [`depz_sr04_measurement_distance_mm`](#depz_sr04_measurement_distance_mm), [`depz_sr04_measurement_distance_mm_at`](#depz_sr04_measurement_distance_mm_at), [`depz_sr04_get_sample_period_us`](#depz_sr04_get_sample_period_us), [`depz_sr04_set_sample_period_us`](#depz_sr04_set_sample_period_us), [`depz_sr04_get_echo_decay_us`](#depz_sr04_get_echo_decay_us), [`depz_sr04_set_echo_decay_us`](#depz_sr04_set_echo_decay_us), [`depz_sr04_measure_once`](#depz_sr04_measure_once), [`depz_sr04_start`](#depz_sr04_start), [`depz_sr04_stop`](#depz_sr04_stop), [`depz_sr04_on_measurement`](#depz_sr04_on_measurement), [`depz_sr04_off_measurement`](#depz_sr04_off_measurement), [`depz_sr04_stream`](#depz_sr04_stream)
 
 ## SR04
 
@@ -109,3 +110,132 @@ bool depz_sr04_distance_mm(uint16_t echo_time_us, double air_temp_c, bool have_t
 
 Round-trip echo time -> distance in mm; returns false for the timeout
 sentinel. Default 343 m/s; if air_temp_c is finite, c = 331.3 + 0.606*T.
+
+## SR04 sensor class (live layer)
+
+### depz_sr04_measurement
+
+```c
+typedef struct {
+    uint64_t timestamp_us; /* device µs */
+    uint16_t echo_time_us; /* DEPZ_SR04_ECHO_TIMEOUT = no echo */
+    bool     from_loop;    /* false: MEASURE_ONCE or a SYNC_IN edge */
+} depz_sr04_measurement;
+```
+
+### depz_sr04_measurement_cb
+
+```c
+typedef void (*depz_sr04_measurement_cb)(const depz_sr04_measurement *m, void *user);
+```
+
+### depz_sr04_open_link
+
+```c
+int depz_sr04_open_link(depz_link *link, depz_device **out);
+```
+
+An SR04 on a link without an identity probe (tests, replay).
+
+### depz_is_sr04
+
+```c
+bool depz_is_sr04(const depz_device *dev);
+```
+
+### depz_sr04_valid
+
+```c
+bool depz_sr04_valid(const depz_sr04_measurement *m);
+```
+
+### depz_sr04_measurement_distance_mm
+
+```c
+bool depz_sr04_measurement_distance_mm(const depz_sr04_measurement *m, double *mm);
+```
+
+Distance at 343 m/s; false when there was no echo.
+
+### depz_sr04_measurement_distance_mm_at
+
+```c
+bool depz_sr04_measurement_distance_mm_at(const depz_sr04_measurement *m, double air_temp_c, double *mm);
+```
+
+Temperature-compensated speed of sound (331.3 + 0.606·T m/s).
+
+### depz_sr04_get_sample_period_us
+
+```c
+int depz_sr04_get_sample_period_us(depz_device *dev, uint32_t *out);
+```
+
+Stored minimum interval between measurement starts (default 50000). The
+effective rate is also limited by the echo window (contract 03 §3).
+
+### depz_sr04_set_sample_period_us
+
+```c
+int depz_sr04_set_sample_period_us(depz_device *dev, uint32_t period_us);
+```
+
+### depz_sr04_get_echo_decay_us
+
+```c
+int depz_sr04_get_echo_decay_us(depz_device *dev, uint16_t *out);
+```
+
+### depz_sr04_set_echo_decay_us
+
+```c
+int depz_sr04_set_echo_decay_us(depz_device *dev, uint32_t decay_us, uint16_t *effective);
+```
+
+The device clamps to 4000..65000 µs; *effective (optional) is re-read.
+DEPZ_E_ARG above 65535 (the u16 wire field).
+
+### depz_sr04_measure_once
+
+```c
+int depz_sr04_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measurement *out);
+```
+
+Single shot. DEPZ_E_BUSY while the loop runs. The reply comes when the
+echo completes (or times out at ~65.5 ms): < 0 timeout means 1000 ms.
+
+### depz_sr04_start
+
+```c
+int depz_sr04_start(depz_device *dev);
+```
+
+/* measurement loop; idempotent */
+
+### depz_sr04_stop
+
+```c
+int depz_sr04_stop(depz_device *dev);
+```
+
+### depz_sr04_on_measurement
+
+```c
+int depz_sr04_on_measurement(depz_device *dev, depz_sr04_measurement_cb cb, void *user, int *token);
+```
+
+Loop samples and SYNC_IN single shots, as callbacks and/or streams.
+
+### depz_sr04_off_measurement
+
+```c
+void depz_sr04_off_measurement(depz_device *dev, int token);
+```
+
+### depz_sr04_stream
+
+```c
+depz_stream *depz_sr04_stream(depz_device *dev, size_t maxsize);
+```
+
+Pull stream of depz_sr04_measurement items. NULL on wrong type / no memory.

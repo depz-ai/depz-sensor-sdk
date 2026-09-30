@@ -14,8 +14,20 @@ update). Each sensor then has its own **introduction** and **user guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board) —
+  [L5CX](vl53l5cx/introduction.md) · [L7CX](vl53l7cx/introduction.md) ·
+  [guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)
+- **VL53L7CH** (L7CX superset + streamed CNH) —
+  [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
+  [api](vl53l7ch/api.md)
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** (single-zone ToF family) —
+  [L0X](vl53l0x/introduction.md) · [L1CX](vl53l1cx/introduction.md) ·
+  [L1CB](vl53l1cb/introduction.md) · [L3CX](vl53l3cx/introduction.md) ·
+  [L4CX](vl53l4cx/introduction.md), each with its guide and api
 - **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
   [guide](bno086/guide.md) · [api](bno086/api.md)
+- **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
+  [guide](bno055/guide.md) · [api](bno055/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the source docstrings so it never drifts from the code.
@@ -39,8 +51,8 @@ from the source docstrings so it never drifts from the code.
 Each sensor is a USB CDC-ACM device speaking one shared framed protocol
 (`A5 C3` header + CRC). The SDK gives you a typed Python object per sensor with
 a background reader thread; you configure it and consume a stream of decoded,
-timestamped results. Five sensors across three firmware philosophies — mirrored
-from the firmware:
+timestamped results. The sensors fall into a few firmware philosophies —
+mirrored from the firmware:
 
 - **SR04** — the device does the ranging; you get `echo_time_us` → distance.
 - **VL53L4CD** — the device is a thin I2C bridge; the full ST ULD 2.2.3 runs
@@ -48,8 +60,15 @@ from the firmware:
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
   driver runs **on the host** (`depz_sensor_sdk.vl53l8`). CX is the base ToF
   imager; CH is its superset, adding Compact-Network-Histogram output.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — the same ULD family as the VL53L8 on an
+  I2C bridge (`depz_sensor_sdk.vl53l7`); the classes subclass `Vl53l8cx`.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX** — one I2C bridge firmware
+  that knows no sensor; every ST driver (ULD, ULP, the histogram Bare Driver)
+  runs **on the host** (`depz_sensor_sdk.vl53lx`).
 - **BNO086** — the device is an SHTP pass-through; the full SH-2 stack runs
   **on the host** (`depz_sensor_sdk.bno086`).
+- **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
+  and the host configures it with register writes (`depz_sensor_sdk.bno055`).
 
 The public surface is the union of `__all__` across the package; the API
 reference is generated from it, so it never drifts from the code.
@@ -62,9 +81,7 @@ pip install depz-sensor-sdk        # once published
 uv sync                            # installs the workspace incl. the SDK
 ```
 
-Linux note: your user must be able to open the port (group `dialout`), and
-`ModemManager` can grab CDC-ACM devices — disable it or add a udev rule if a
-device is present but every open times out.
+Linux note: your user must be able to open the port (group `dialout`).
 
 ## Getting started
 
@@ -78,8 +95,9 @@ if isinstance(dev, Sr04):
     print(next(dev.stream()).distance_mm)
 ```
 
-`open_device()` probes the port and returns `Sr04`, `Vl53l8Cx`/`Vl53l8Ch`, or
-`Bno086` — each a subclass of `DeviceBase`. From there, follow the per-sensor
+`open_device()` probes the port and returns the class of the connected sensor
+(`Sr04`, `Vl53l4cd`, `Vl53l8cx`/`Vl53l8ch`, `Vl53l5cx`/`Vl53l7cx`/`Vl53l7ch`,
+`Vl53l0x`…`Vl53l4cx`, `Bno086`, `Bno055`) — each a subclass of `DeviceBase`. From there, follow the per-sensor
 guide linked above. Every device is a context manager (`with open_device(...)
 as dev:`) or you call `dev.close()`.
 
@@ -110,7 +128,7 @@ they sort deterministically, so `open_device(0)` / `open_device(1)` and
 ## Mental model
 
 ```
-open_device(port)  ──►  Sr04 | Vl53l8Cx/Ch | Bno086   (subclass of DeviceBase)
+open_device(port)  ──►  Sr04 | Vl53l… | Bno086 | Bno055   (subclass of DeviceBase)
                           │
              background reader thread
                           │
@@ -157,9 +175,10 @@ frame = next(it)
 print("dropped so far:", it.dropped_count)
 ```
 
-The stream method is named per sensor: `stream()` (SR04), `frames()`
-(VL53L8CX/CH), `reports()` (BNO086). Each drops the oldest item when full and
-counts drops.
+The stream method is named per sensor: `stream()` (SR04), `measurements()`
+(VL53L4CD and the VL53L0X…L4CX family), `frames()` (VL53L8CX/CH and
+VL53L5CX/L7CX/L7CH), `reports()` (BNO086), `samples()` (BNO055). Each drops
+the oldest item when full and counts drops.
 
 ## Multi-sensor: one shared timeline
 

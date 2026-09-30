@@ -9,8 +9,11 @@ namespace depz {
 enum class SensorType {
     Sr04,
     Vl53l8,
+    Vl53l7,  // VL53L5CX / VL53L7CX / VL53L7CH (one APP_VL53L7 firmware)
     Vl53l4,
+    Vl53lx,  // VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX (one APP_VL53L0_4 firmware)
     Bno086,
+    Bno055,  // 9-axis IMU on the APP_BNO055 register bridge (contract 13)
     Unknown,
 };
 

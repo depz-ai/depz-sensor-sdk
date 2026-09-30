@@ -14,7 +14,7 @@ from depz_sensor_sdk.transport import Packet
 from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.vl53l4 import (
     WINDOW_IN,
-    Vl53l4Cd,
+    Vl53l4cd,
     Vl53l4Measurement,
 )
 from depz_sensor_sdk.vl53l4 import uld as uld_mod
@@ -151,9 +151,9 @@ def test_parse_result_block_too_short_raises():
 # ── device wrapper (LoopbackLink; no fake firmware needed for guards) ────────
 
 
-def _dev() -> Vl53l4Cd:
+def _dev() -> Vl53l4cd:
     a, _b = LoopbackLink.pair()
-    return Vl53l4Cd(a, timeout=0.2)
+    return Vl53l4cd(a, timeout=0.2)
 
 
 def test_config_while_ranging_raises():

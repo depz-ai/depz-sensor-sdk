@@ -1,6 +1,7 @@
 // Vector-driven parity test runner: loads contracts/vectors/*.json (including
-// vl53l4.json) and asserts
+// vl53l4.json, vl53l7.json, vl53lx.json, bno055.json) and asserts
 // the C++ SDK is byte-exact with the golden vectors.
+#include <stdexcept>
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
@@ -11,6 +12,7 @@
 #include <variant>
 #include <vector>
 
+#include "depz/bno055.hpp"
 #include "depz/bno086.hpp"
 #include "depz/common.hpp"
 #include "depz/crc.hpp"
@@ -20,6 +22,9 @@
 #include "depz/identity.hpp"
 #include "depz/sr04.hpp"
 #include "depz/usb_ids.hpp"
+#include "depz/vl53l4.hpp"
+#include "depz/vl53l7.hpp"
+#include "depz/vl53lx.hpp"
 #include "depz/vl53l8.hpp"
 #include "json.hpp"
 
@@ -587,6 +592,25 @@ static void test_vl53l8_cnh() {
 
     auto decoded = depz::vl53l8::decode_cnh(nb_agg, feat, depz::as_bytes(raw));
 
+    // A block shorter than the config implies must be refused, not read past.
+    {
+        depz::bytes cut(raw.begin(), raw.end() - 1);
+        bool threw = false;
+        try {
+            (void)depz::vl53l8::decode_cnh(nb_agg, feat, depz::as_bytes(cut));
+        } catch (const std::length_error&) {
+            threw = true;
+        }
+        check(threw, "vl53l8 cnh truncated block throws length_error");
+        threw = false;
+        try {
+            (void)depz::vl53l8::decode_cnh(0, feat, depz::as_bytes(raw));
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "vl53l8 cnh zero aggregates throws invalid_argument");
+    }
+
     const Value& exp = v.at("expected");
     check_eq(static_cast<std::uint64_t>(decoded.ref_residual_word),
              exp.at("ref_residual_word").as_u64(), "vl53l8 cnh ref_residual_word");
@@ -611,6 +635,568 @@ static void test_vl53l8_cnh() {
         if (ok) ++agg_pass;
     }
     check_eq(agg_pass, static_cast<int>(want_aggs.size()), "vl53l8 cnh all aggregates exact");
+}
+
+// ---- vl53l7 bridge codecs + class resolution (vl53l7.json, contract 11) ----
+static void test_vl53l7_codecs() {
+    Value v = load_vector("vl53l7.json");
+    for (const Value& c : v.at("encode").as_array()) {
+        std::string kind = c.at("kind").as_string();
+        std::string nm = c.at("name").as_string();
+        depz::bytes got;
+        if (kind == "read_reg") {
+            got = depz::vl53l7::pack_read_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                              static_cast<std::uint16_t>(c.at("len").as_int()));
+        } else if (kind == "write_reg") {
+            depz::bytes data = from_hex(c.at("data").as_string());
+            got = depz::vl53l7::pack_write_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                               depz::as_bytes(data));
+        } else if (kind == "pin_ctrl") {
+            got = depz::vl53l7::pack_pin_ctrl(static_cast<std::uint8_t>(c.at("action").as_int()));
+        } else if (kind == "set_i2c_speed") {
+            got = depz::vl53l7::pack_set_i2c_speed(
+                static_cast<std::uint16_t>(c.at("khz").as_int()));
+        } else {
+            check(false, "unknown vl53l7 encode kind " + kind);
+            continue;
+        }
+        check_eq(to_hex(got), c.at("payload").as_string(), "vl53l7 encode " + nm);
+    }
+    // The read-ceiling vector is the transfer limit itself.
+    check_eq(static_cast<int>(depz::vl53l7::READ_MAX_LEN), 1536, "vl53l7 READ_MAX_LEN");
+    check_eq(static_cast<int>(depz::vl53l7::WRITE_MAX_LEN), 2048, "vl53l7 WRITE_MAX_LEN");
+    check_eq(static_cast<int>(depz::vl53l7::STREAM_CHUNK_MAX), 1536, "vl53l7 STREAM_CHUNK_MAX");
+
+    for (const Value& c : v.at("decode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        check_eq(c.at("report").as_int(), static_cast<std::int64_t>(0x92), "vl53l7 report " + nm);
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        auto r = depz::vl53l7::Vl53l7Info::unpack(depz::as_bytes(payload));
+        if (!r) {
+            check(false, "vl53l7 info unpack " + nm);
+            continue;
+        }
+        const Value& ex = c.at("expect");
+        check_eq(static_cast<std::int64_t>(r->int_edges), ex.at("int_edges").as_int(),
+                 "vl53l7 info.int_edges " + nm);
+        check_eq(static_cast<std::int64_t>(r->frames_dropped), ex.at("frames_dropped").as_int(),
+                 "vl53l7 info.frames_dropped " + nm);
+        check_eq(static_cast<std::int64_t>(r->i2c_errors), ex.at("i2c_errors").as_int(),
+                 "vl53l7 info.i2c_errors " + nm);
+        check_eq(static_cast<std::int64_t>(r->last_i2c_error), ex.at("last_i2c_error").as_int(),
+                 "vl53l7 info.last_i2c_error " + nm);
+        check_eq(static_cast<std::int64_t>(r->lpn_level), ex.at("lpn_level").as_int(),
+                 "vl53l7 info.lpn_level " + nm);
+        check_eq(static_cast<std::int64_t>(r->int_level), ex.at("int_level").as_int(),
+                 "vl53l7 info.int_level " + nm);
+        check_eq(static_cast<std::int64_t>(r->i2c_khz), ex.at("i2c_khz").as_int(),
+                 "vl53l7 info.i2c_khz " + nm);
+        check_eq(static_cast<std::int64_t>(r->frame_size), ex.at("frame_size").as_int(),
+                 "vl53l7 info.frame_size " + nm);
+        check_eq(r->streaming, ex.at("streaming").as_bool(), "vl53l7 info.streaming " + nm);
+    }
+    depz::bytes short_info(depz::vl53l7::INFO_SIZE - 1, std::byte{0});
+    check(!depz::vl53l7::Vl53l7Info::unpack(depz::as_bytes(short_info)).has_value(),
+          "vl53l7 info rejects a short payload");
+
+    for (const Value& c : v.at("model").as_array()) {
+        std::string nm = c.at("name").as_string();
+        std::optional<std::string> usb_model;
+        if (!c.at("usb_model").is_null()) usb_model = c.at("usb_model").as_string();
+        auto m = depz::vl53l7::resolve_model(usb_model, c.at("device_name").as_string());
+        check_eq(depz::vl53l7::to_string(m), c.at("expect").as_string(), "vl53l7 model " + nm);
+    }
+}
+
+// ---- vl53l4 bridge codecs + host-ULD math (vl53l4.json, contract 10) --------
+static void check_l4_result(const std::optional<depz::vl53l4::Vl53l4Result>& r, const Value& ex,
+                            const std::string& what) {
+    if (!r) {
+        check(false, what + " decode");
+        return;
+    }
+    check_eq(static_cast<std::int64_t>(r->range_status), ex.at("range_status").as_int(),
+             what + " range_status");
+    check_eq(static_cast<std::int64_t>(r->distance_mm), ex.at("distance_mm").as_int(),
+             what + " distance_mm");
+    check_eq(static_cast<std::int64_t>(r->sigma_mm), ex.at("sigma_mm").as_int(),
+             what + " sigma_mm");
+    check_eq(static_cast<std::int64_t>(r->signal_rate_kcps), ex.at("signal_rate_kcps").as_int(),
+             what + " signal_rate_kcps");
+    check_eq(static_cast<std::int64_t>(r->ambient_rate_kcps), ex.at("ambient_rate_kcps").as_int(),
+             what + " ambient_rate_kcps");
+    check_eq(static_cast<std::int64_t>(r->signal_per_spad_kcps),
+             ex.at("signal_per_spad_kcps").as_int(), what + " signal_per_spad_kcps");
+    check_eq(static_cast<std::int64_t>(r->ambient_per_spad_kcps),
+             ex.at("ambient_per_spad_kcps").as_int(), what + " ambient_per_spad_kcps");
+    check_eq(static_cast<std::int64_t>(r->number_of_spad), ex.at("number_of_spad").as_int(),
+             what + " number_of_spad");
+    check_eq(static_cast<std::int64_t>(r->stream_count), ex.at("stream_count").as_int(),
+             what + " stream_count");
+}
+
+static void test_vl53l4() {
+    namespace L4 = depz::vl53l4;
+    Value v = load_vector("vl53l4.json");
+    for (const Value& c : v.at("encode").as_array()) {
+        std::string kind = c.at("kind").as_string();
+        std::string nm = c.at("name").as_string();
+        depz::bytes got;
+        if (kind == "read_reg") {
+            got = L4::pack_read_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                    static_cast<std::uint16_t>(c.at("len").as_int()));
+        } else if (kind == "write_reg") {
+            depz::bytes data = from_hex(c.at("data").as_string());
+            got = L4::pack_write_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                     depz::as_bytes(data));
+        } else if (kind == "xshut") {
+            got = L4::pack_xshut(static_cast<std::uint8_t>(c.at("action").as_int()));
+        } else if (kind == "start_stream") {
+            got = L4::pack_start_stream(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                        static_cast<std::uint16_t>(c.at("len").as_int()),
+                                        static_cast<std::uint8_t>(c.at("flags").as_int()));
+        } else if (kind == "set_i2c_speed") {
+            got = L4::pack_set_i2c_speed(static_cast<std::uint16_t>(c.at("khz").as_int()));
+        } else {
+            check(false, "unknown vl53l4 encode kind " + kind);
+            continue;
+        }
+        check_eq(to_hex(got), c.at("payload").as_string(), "vl53l4 encode " + nm);
+    }
+
+    for (const Value& c : v.at("decode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        const Value& ex = c.at("expect");
+        const std::int64_t report = c.at("report").as_int();
+        if (report == 0x91) {
+            auto r = L4::RegData::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "vl53l4 reg_data unpack " + nm);
+                continue;
+            }
+            check_eq(static_cast<std::int64_t>(r->cmd), ex.at("cmd").as_int(), "vl53l4 cmd " + nm);
+            check_eq(r->timestamp_us, ex.at("timestamp_us").as_u64(), "vl53l4 ts " + nm);
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "vl53l4 data " + nm);
+        } else if (report == 0x92) {
+            auto r = L4::Vl53l4Info::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "vl53l4 info unpack " + nm);
+                continue;
+            }
+            auto f = [&](const char* k, std::int64_t got) {
+                check_eq(got, ex.at(k).as_int(), std::string("vl53l4 info.") + k + " " + nm);
+            };
+            f("int_edges", r->int_edges);
+            f("slots_skipped", r->slots_skipped);
+            f("i2c_errors", r->i2c_errors);
+            f("last_i2c_error", r->last_i2c_error);
+            f("model_id", r->model_id);
+            f("fw_status", r->fw_status);
+            f("initialized", r->initialized);
+            f("xshut_level", r->xshut_level);
+            f("int_level", r->int_level);
+            f("i2c_khz", r->i2c_khz);
+        } else if (report == 0x93) {
+            auto r = L4::StreamData::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "vl53l4 stream unpack " + nm);
+                continue;
+            }
+            check_eq(r->timestamp_us, ex.at("timestamp_us").as_u64(), "vl53l4 stream ts " + nm);
+            check_eq(static_cast<std::int64_t>(r->addr), ex.at("addr").as_int(),
+                     "vl53l4 stream addr " + nm);
+            check_eq(static_cast<std::int64_t>(r->len), ex.at("len").as_int(),
+                     "vl53l4 stream len " + nm);
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "vl53l4 stream data " + nm);
+        } else {
+            check(false, "unknown vl53l4 report " + nm);
+        }
+    }
+
+    for (const Value& c : v.at("result_block").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bytes raw = from_hex(c.at("raw").as_string());
+        check_l4_result(L4::parse_result_block(depz::as_bytes(raw)), c.at("expect"),
+                        "vl53l4 result " + nm);
+    }
+
+    const Value& timing = v.at("timing");
+    for (const Value& c : timing.at("encode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        auto r = L4::range_timing_registers(
+            static_cast<std::uint32_t>(c.at("timing_budget_ms").as_int()),
+            static_cast<std::uint32_t>(c.at("inter_measurement_ms").as_int()),
+            static_cast<std::uint16_t>(c.at("osc_frequency").as_int()),
+            static_cast<std::uint16_t>(c.at("clock_pll").as_int()));
+        if (!r) {
+            check(false, "vl53l4 timing encode " + nm);
+            continue;
+        }
+        check_eq(static_cast<std::int64_t>(r->range_config_a), c.at("range_config_a").as_int(),
+                 "vl53l4 timing range_config_a " + nm);
+        check_eq(static_cast<std::int64_t>(r->range_config_b), c.at("range_config_b").as_int(),
+                 "vl53l4 timing range_config_b " + nm);
+        check_eq(static_cast<std::int64_t>(r->intermeasurement_raw),
+                 c.at("intermeasurement_raw").as_int(), "vl53l4 timing intermeasurement " + nm);
+    }
+    for (const Value& c : timing.at("decode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        auto r = L4::decode_range_timing(
+            static_cast<std::uint32_t>(c.at("intermeasurement_raw").as_int()),
+            static_cast<std::uint16_t>(c.at("clock_pll").as_int()),
+            static_cast<std::uint16_t>(c.at("osc_frequency").as_int()),
+            static_cast<std::uint16_t>(c.at("range_config_a").as_int()));
+        if (!r) {
+            check(false, "vl53l4 timing decode " + nm);
+            continue;
+        }
+        check_eq(static_cast<std::int64_t>(r->timing_budget_ms), c.at("timing_budget_ms").as_int(),
+                 "vl53l4 timing budget " + nm);
+        check_eq(static_cast<std::int64_t>(r->inter_measurement_ms),
+                 c.at("inter_measurement_ms").as_int(), "vl53l4 timing inter " + nm);
+    }
+
+    for (const Value& c : v.at("tuning").as_array()) {
+        std::string kind = c.at("kind").as_string();
+        std::string nm = c.at("name").as_string();
+        const int value = static_cast<int>(c.at("value").as_int());
+        const auto raw = static_cast<std::uint16_t>(c.at("raw").as_int());
+        std::int64_t enc = -1, dec = 0;
+        if (kind == "offset") {
+            enc = L4::offset_raw(value);
+            dec = L4::decode_offset(raw);
+        } else if (kind == "xtalk") {
+            enc = L4::xtalk_raw(value);
+            dec = L4::decode_xtalk(raw);
+        } else if (kind == "signal_threshold") {
+            enc = L4::signal_threshold_raw(value);
+            dec = L4::decode_signal_threshold(raw);
+        } else if (kind == "sigma_threshold") {
+            auto e = L4::sigma_threshold_raw(value);
+            enc = e ? static_cast<std::int64_t>(*e) : -1;
+            dec = L4::decode_sigma_threshold(raw);
+        } else {
+            check(false, "unknown vl53l4 tuning kind " + kind);
+            continue;
+        }
+        check_eq(enc, c.at("raw").as_int(), "vl53l4 tuning encode " + nm);
+        check_eq(dec, static_cast<std::int64_t>(value), "vl53l4 tuning decode " + nm);
+    }
+
+    const Value& cfg = v.at("config_block");
+    check_eq(static_cast<std::int64_t>(L4::CONFIG_ADDR), cfg.at("addr").as_int(),
+             "vl53l4 config_block addr");
+    check_eq(to_hex(L4::config_block()), cfg.at("data").as_string(), "vl53l4 config_block data");
+}
+
+// ---- vl53lx 1D family base (vl53lx.json, contract 12) -----------------------
+static std::vector<depz::vl53lx::ClearStep> clear_steps_of(const Value& arr) {
+    std::vector<depz::vl53lx::ClearStep> out;
+    for (const Value& s : arr.as_array()) {
+        const auto& p = s.as_array();
+        out.push_back({static_cast<std::uint16_t>(p.at(0).as_int()),
+                       static_cast<std::uint8_t>(p.at(1).as_int())});
+    }
+    return out;
+}
+
+static void test_vl53lx() {
+    namespace LX = depz::vl53lx;
+    Value v = load_vector("vl53lx.json");
+
+    // encode: SET_ADDR_WIDTH, START_STREAM with its clear list, contract-10 codecs.
+    for (const Value& c : v.at("encode").as_array()) {
+        std::string kind = c.at("kind").as_string();
+        std::string nm = c.at("name").as_string();
+        std::optional<depz::bytes> got;
+        if (kind == "set_addr_width") {
+            got = LX::pack_set_addr_width(static_cast<std::uint8_t>(c.at("width").as_int()));
+        } else if (kind == "read_reg") {
+            got = LX::pack_read_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                    static_cast<std::uint16_t>(c.at("len").as_int()));
+        } else if (kind == "write_reg") {
+            depz::bytes data = from_hex(c.at("data").as_string());
+            got = LX::pack_write_reg(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                     depz::as_bytes(data));
+        } else if (kind == "xshut") {
+            got = LX::pack_xshut(static_cast<std::uint8_t>(c.at("action").as_int()));
+        } else if (kind == "set_i2c_speed") {
+            got = LX::pack_set_i2c_speed(static_cast<std::uint16_t>(c.at("khz").as_int()));
+        } else if (kind == "start_stream") {
+            got = LX::pack_start_stream(static_cast<std::uint16_t>(c.at("addr").as_int()),
+                                        static_cast<std::uint16_t>(c.at("len").as_int()),
+                                        clear_steps_of(c.at("clear")),
+                                        static_cast<std::uint8_t>(c.at("flags").as_int()));
+        } else {
+            check(false, "unknown vl53lx encode kind " + kind);
+            continue;
+        }
+        if (!got) {
+            check(false, "vl53lx encode refused " + nm);
+            continue;
+        }
+        check_eq(to_hex(*got), c.at("payload").as_string(), "vl53lx encode " + nm);
+    }
+    check(!LX::pack_start_stream(0x0089, 17, std::vector<LX::ClearStep>(5, {0x86, 1})),
+          "vl53lx start_stream refuses five clear steps");
+    check(!LX::pack_set_addr_width(0) && !LX::pack_set_addr_width(3),
+          "vl53lx set_addr_width refuses widths other than 1/2");
+
+    // decode: RPT_VL53_INFO (23 B).
+    for (const Value& c : v.at("decode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        check_eq(c.at("report").as_int(), static_cast<std::int64_t>(0x92), "vl53lx report " + nm);
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        auto r = LX::Vl53lxInfo::unpack(depz::as_bytes(payload));
+        if (!r) {
+            check(false, "vl53lx info unpack " + nm);
+            continue;
+        }
+        const Value& ex = c.at("expect");
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(10), "vl53lx info field count " + nm);
+        auto f = [&](const char* k, std::int64_t got) {
+            check_eq(got, ex.at(k).as_int(), std::string("vl53lx info.") + k + " " + nm);
+        };
+        f("int_edges", r->int_edges);
+        f("slots_skipped", r->slots_skipped);
+        f("i2c_errors", r->i2c_errors);
+        f("last_i2c_error", r->last_i2c_error);
+        f("xshut_level", r->xshut_level);
+        f("int_level", r->int_level);
+        f("i2c_khz", r->i2c_khz);
+        f("addr_width", r->addr_width);
+        f("n_clear", r->n_clear);
+        f("frames_dropped", r->frames_dropped);
+    }
+    depz::bytes short_info(LX::INFO_SIZE - 1, std::byte{0});
+    check(!LX::Vl53lxInfo::unpack(depz::as_bytes(short_info)).has_value(),
+          "vl53lx info rejects a short payload");
+
+    // products: the table, in order.
+    const auto& rows = v.at("products").as_array();
+    check_eq(LX::products().size(), rows.size(), "vl53lx product count");
+    for (std::size_t i = 0; i < rows.size() && i < LX::products().size(); ++i) {
+        const Value& w = rows[i];
+        const LX::Product& p = LX::products()[i];
+        std::string nm = w.at("product").as_string();
+        check_eq(p.name, nm, "vl53lx product order #" + std::to_string(i));
+        check(LX::find_product(nm) == &p, "vl53lx find_product " + nm);
+        check_eq(static_cast<std::int64_t>(p.model_id), w.at("model_id").as_int(),
+                 "vl53lx model_id " + nm);
+        check_eq(static_cast<std::int64_t>(p.reach_mm), w.at("reach_mm").as_int(),
+                 "vl53lx reach_mm " + nm);
+        std::string kinds, want_kinds;
+        for (auto k : p.driver_kinds) kinds += LX::to_string(k) + ",";
+        for (const Value& k : w.at("driver_kinds").as_array()) want_kinds += k.as_string() + ",";
+        check_eq(kinds, want_kinds, "vl53lx driver_kinds " + nm);
+        check_eq(LX::to_string(p.default_driver), w.at("default_driver").as_string(),
+                 "vl53lx default_driver " + nm);
+        check_eq(static_cast<std::int64_t>(p.addr_width), w.at("addr_width").as_int(),
+                 "vl53lx addr_width " + nm);
+        auto want_clear = clear_steps_of(w.at("clear_steps"));
+        bool same = want_clear.size() == p.clear_steps.size();
+        for (std::size_t j = 0; same && j < want_clear.size(); ++j) {
+            same = want_clear[j].addr == p.clear_steps[j].addr &&
+                   want_clear[j].value == p.clear_steps[j].value;
+        }
+        check(same, "vl53lx clear_steps " + nm);
+        check_eq(static_cast<std::int64_t>(p.max_khz), w.at("max_khz").as_int(),
+                 "vl53lx max_khz " + nm);
+    }
+    check(LX::find_product("VL53L5CX") == nullptr, "vl53lx find_product unknown");
+
+    // model: class + product resolution.
+    for (const Value& c : v.at("model").as_array()) {
+        std::string nm = c.at("name").as_string();
+        std::optional<std::string> usb_model;
+        if (!c.at("usb_model").is_null()) usb_model = c.at("usb_model").as_string();
+        const std::string& dev = c.at("device_name").as_string();
+        check_eq(LX::to_string(LX::resolve_class(usb_model, dev)), c.at("expect_class").as_string(),
+                 "vl53lx class " + nm);
+        auto prod = LX::product_from_board_name(dev);
+        const Value& ep = c.at("expect_product");
+        if (ep.is_null()) {
+            check(!prod.has_value(), "vl53lx product null " + nm);
+        } else {
+            check(prod.has_value() && *prod == ep.as_string(), "vl53lx product " + nm);
+        }
+    }
+
+    // die_block: both variants.
+    for (const Value& c : v.at("die_block").as_array()) {
+        std::string nm = c.at("name").as_string();
+        std::string var = c.at("variant").as_string();
+        depz::bytes raw = from_hex(c.at("raw").as_string());
+        LX::DieVariant dv = var == "l1" ? LX::DieVariant::L1 : LX::DieVariant::L4;
+        check(var == "l1" || var == "l4", "vl53lx die variant known " + nm);
+        check_l4_result(LX::decode_die_block(depz::as_bytes(raw), dv), c.at("expect"),
+                        "vl53lx die " + nm);
+        if (dv == LX::DieVariant::L4) {
+            auto a = LX::decode_die_block(depz::as_bytes(raw), dv);
+            auto b = depz::vl53l4::parse_result_block(depz::as_bytes(raw));
+            check(a && b && a->signal_rate_kcps == b->signal_rate_kcps &&
+                      a->signal_per_spad_kcps == b->signal_per_spad_kcps,
+                  "vl53lx die l4 == contract-10 decode " + nm);
+        }
+        depz::bytes cut(raw.begin(), raw.end() - 1);
+        check(!LX::decode_die_block(depz::as_bytes(cut), dv).has_value(),
+              "vl53lx die rejects 16 bytes " + nm);
+    }
+
+    // l0x_raw.
+    for (const Value& c : v.at("l0x_raw").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bytes raw = from_hex(c.at("raw").as_string());
+        auto r = LX::decode_l0x_raw(depz::as_bytes(raw));
+        if (!r) {
+            check(false, "vl53lx l0x decode " + nm);
+            continue;
+        }
+        const Value& ex = c.at("expect");
+        auto f = [&](const char* k, std::int64_t got) {
+            check_eq(got, ex.at(k).as_int(), std::string("vl53lx l0x.") + k + " " + nm);
+        };
+        f("distance_raw", r->distance_raw);
+        f("device_range_status", r->device_range_status);
+        f("signal_rate_mcps_1616", r->signal_rate_mcps_1616);
+        f("ambient_rate_mcps_1616", r->ambient_rate_mcps_1616);
+        f("effective_spad_count_88", r->effective_spad_count_88);
+        depz::bytes cut(raw.begin(), raw.end() - 1);
+        check(!LX::decode_l0x_raw(depz::as_bytes(cut)).has_value(),
+              "vl53lx l0x rejects a short block " + nm);
+    }
+
+    // histogram_raw.
+    for (const Value& c : v.at("histogram_raw").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bytes raw = from_hex(c.at("raw").as_string());
+        auto r = LX::decode_histogram_raw(depz::as_bytes(raw));
+        if (!r) {
+            check(false, "vl53lx histogram decode " + nm);
+            continue;
+        }
+        const Value& ex = c.at("expect");
+        auto f = [&](const char* k, std::int64_t got) {
+            check_eq(got, ex.at(k).as_int(), std::string("vl53lx hist.") + k + " " + nm);
+        };
+        f("interrupt_status", r->interrupt_status);
+        f("range_status", r->range_status);
+        f("report_status", r->report_status);
+        f("stream_count", r->stream_count);
+        f("dss_actual_effective_spads", r->dss_actual_effective_spads);
+        f("reference_phase", r->reference_phase);
+        f("vcsel_start", r->vcsel_start);
+        const auto& wb = ex.at("bins").as_array();
+        check_eq(wb.size(), LX::HISTOGRAM_BINS, "vl53lx hist bin count " + nm);
+        for (std::size_t i = 0; i < wb.size() && i < LX::HISTOGRAM_BINS; ++i) {
+            check_eq(static_cast<std::int64_t>(r->bins[i]), wb[i].as_int(),
+                     "vl53lx hist bin " + std::to_string(i) + " " + nm);
+        }
+        depz::bytes cut(raw.begin(), raw.end() - 1);
+        check(!LX::decode_histogram_raw(depz::as_bytes(cut)).has_value(),
+              "vl53lx histogram rejects a short block " + nm);
+    }
+}
+
+// ---- vl53l7 frame reassembly + decode (recording replay) -------------------
+// Full-stack captures from live L5CX / L7CH boards (APP_VL53L7_v0.53). Replay
+// the rx side through framing -> reassembly -> the L5/L7 frame decoder (footer
+// id at size-4, per-zone arrays trimmed to the resolution — the 4x4 capture
+// pins the trim: per-target blocks arrive with 64 entries).
+static void replay_vl53l7(const std::string& stem, int resolution, bool with_cnh) {
+    Value exp = testjson::parse(load_recording(stem + ".expected.json"));
+    const auto& want_frames = exp.at("frames").as_array();
+    check_eq(exp.at("software_name").as_string(), std::string("APP_VL53L7_v0.53"),
+             stem + " software_name");
+
+    std::string rec = load_recording(stem + ".depzrec");
+    depz::PacketParser parser;
+    depz::vl53l8::FrameReassembler reasm;
+    std::vector<depz::vl53l8::Vl53l8Frame> frames;
+    std::size_t parse_errors = 0;
+    std::size_t max_chunk = 0;
+
+    for (const std::string& line : split_lines(rec)) {
+        Value o = testjson::parse(line);
+        if (!o.has("dir") || o.at("dir").as_string() != "rx") continue;
+        depz::bytes data = from_hex(o.at("data").as_string());
+        for (const auto& ev : parser.feed(depz::as_bytes(data))) {
+            auto* pkt = std::get_if<depz::Packet>(&ev);
+            if (!pkt || pkt->cmd != static_cast<std::uint8_t>(depz::vl53l7::Vl53l7Rpt::Frame) ||
+                pkt->payload.size() < 12)
+                continue;
+            auto chunk = depz::vl53l8::FrameChunk::unpack(depz::as_bytes(pkt->payload));
+            max_chunk = std::max(max_chunk, chunk.data.size());
+            auto done = reasm.feed(chunk);
+            if (!done) continue;
+            auto decoded = depz::vl53l7::decode_frame(depz::as_bytes(done->second));
+            if (!decoded) {
+                ++parse_errors;
+                continue;
+            }
+            // The explicit-resolution path must agree with the inferred one.
+            auto explicit_res = depz::vl53l7::decode_frame(depz::as_bytes(done->second), resolution);
+            check(explicit_res && explicit_res->distance_mm == decoded->distance_mm &&
+                      explicit_res->resolution == decoded->resolution,
+                  stem + " explicit==inferred resolution");
+            decoded->timestamp_us = done->first;
+            frames.push_back(std::move(*decoded));
+        }
+    }
+
+    check_eq(parse_errors, static_cast<std::size_t>(0), stem + " no parse errors");
+    check(max_chunk <= depz::vl53l7::STREAM_CHUNK_MAX, stem + " chunks <= STREAM_CHUNK_MAX");
+    check(frames.size() >= want_frames.size(),
+          stem + " decoded>=expected (" + std::to_string(frames.size()) + ">=" +
+              std::to_string(want_frames.size()) + ")");
+
+    std::size_t n = std::min(frames.size(), want_frames.size());
+    for (std::size_t k = 0; k < n; ++k) {
+        const auto& g = frames[k];
+        const Value& w = want_frames[k];
+        std::string nm = stem + " frame#" + std::to_string(k);
+        check_eq(static_cast<std::int64_t>(g.timestamp_us), w.at("timestamp_us").as_int(),
+                 nm + " ts");
+        check_eq(static_cast<std::int64_t>(g.resolution), w.at("resolution").as_int(),
+                 nm + " resolution");
+        check_eq(static_cast<std::int64_t>(g.resolution), static_cast<std::int64_t>(resolution),
+                 nm + " resolution==capture");
+        check_eq(static_cast<std::int64_t>(g.silicon_temp_degc),
+                 w.at("silicon_temp_degc").as_int(), nm + " temp");
+        const auto& wd = w.at("distance_mm").as_array();
+        const auto& ws = w.at("target_status").as_array();
+        const auto& wn = w.at("nb_target_detected").as_array();
+        bool ok = g.distance_mm.size() == wd.size() && g.target_status.size() == ws.size() &&
+                  g.nb_target_detected.size() == wn.size() &&
+                  wd.size() == static_cast<std::size_t>(resolution);
+        for (std::size_t z = 0; ok && z < wd.size(); ++z) {
+            if (static_cast<std::int64_t>(g.distance_mm[z]) != wd[z].as_int()) ok = false;
+            if (static_cast<std::int64_t>(g.target_status[z]) != ws[z].as_int()) ok = false;
+            if (static_cast<std::int64_t>(g.nb_target_detected[z]) != wn[z].as_int()) ok = false;
+        }
+        check(ok, nm + " per-zone arrays");
+        bool trimmed = g.signal_per_spad.size() == static_cast<std::size_t>(resolution) &&
+                       g.ambient_per_spad.size() == static_cast<std::size_t>(resolution) &&
+                       g.nb_spads_enabled.size() == static_cast<std::size_t>(resolution) &&
+                       g.range_sigma_mm_raw.size() == static_cast<std::size_t>(resolution) &&
+                       g.reflectance.size() == static_cast<std::size_t>(resolution);
+        check(trimmed, nm + " all per-zone arrays trimmed to resolution");
+        if (with_cnh) {
+            check(g.cnh_raw.has_value() && w.has("cnh_raw") &&
+                      to_hex(*g.cnh_raw) == w.at("cnh_raw").as_string(),
+                  nm + " cnh_raw exact");
+        } else {
+            check(!g.cnh_raw.has_value() && !w.has("cnh_raw"), nm + " no cnh_raw");
+        }
+    }
+}
+
+static void test_vl53l7_frame() {
+    replay_vl53l7("vl53l5cx_8x8_15hz_3s", depz::vl53l8::RESOLUTION_8X8, false);
+    replay_vl53l7("vl53l5cx_4x4_15hz", depz::vl53l8::RESOLUTION_4X4, false);
+    replay_vl53l7("vl53l7ch_8x8_15hz_3s", depz::vl53l8::RESOLUTION_8X8, false);
+    replay_vl53l7("vl53l7ch_cnh_8x8_15hz", depz::vl53l8::RESOLUTION_8X8, true);
 }
 
 // ---- bno086 SHTP framing ---------------------------------------------------
@@ -829,12 +1415,12 @@ static void test_dataset() {
         check_eq(d0->second.sensor_type, std::string("sr04"), "dataset d0 sensor_type");
         check_eq(d0->second.software_name, std::string("APP_usonic_SR04_v0.95"),
                  "dataset d0 software_name");
-        check_eq(d0->second.time_sync.offset_us, static_cast<std::int64_t>(-8524738852),
+        check_eq(d0->second.time_sync.offset_us, INT64_C(-8524738852),
                  "dataset d0 offset_us");
         check_eq(d0->second.time_sync.rtt_us, static_cast<std::int64_t>(13), "dataset d0 rtt_us");
     }
     if (d1 != ds.devices.end())
-        check_eq(d1->second.time_sync.offset_us, static_cast<std::int64_t>(-3525739108),
+        check_eq(d1->second.time_sync.offset_us, INT64_C(-3525739108),
                  "dataset d1 offset_us");
 
     // Records: merged by host time (stable), 10 SR04 entries.
@@ -863,6 +1449,341 @@ static void test_dataset() {
     check(has_once, "dataset has a 'once' source record");
 }
 
+// ---- BNO055 register bridge (bno055.json, contract 13) ----------------------
+// Consumes every section: encode / decode / units / calib_stat /
+// calibration_profile / axis_remap / axis_remap_invalid / sensor_config / blocks.
+template <std::size_t N>
+static void check_bno_words(const std::optional<std::array<std::int16_t, N>>& got,
+                            const Value& want, const std::string& what) {
+    if (want.is_null()) {
+        check(!got.has_value(), what + " absent");
+        return;
+    }
+    if (!got) {
+        check(false, what + " present");
+        return;
+    }
+    check_eq(want.as_array().size(), N, what + " size");
+    for (std::size_t k = 0; k < N && k < want.as_array().size(); ++k)
+        check_eq(static_cast<std::int64_t>((*got)[k]), want.as_array()[k].as_int(),
+                 what + "[" + std::to_string(k) + "]");
+}
+
+template <class T>
+static void check_bno_scalar(const std::optional<T>& got, const Value& want,
+                             const std::string& what) {
+    if (want.is_null()) {
+        check(!got.has_value(), what + " absent");
+        return;
+    }
+    if (!got) {
+        check(false, what + " present");
+        return;
+    }
+    check_eq(static_cast<std::int64_t>(*got), want.as_int(), what);
+}
+
+static void test_bno055() {
+    namespace B = depz::bno055;
+    Value v = load_vector("bno055.json");
+
+    // encode: 0x32..0x37 payloads.
+    for (const Value& c : v.at("encode").as_array()) {
+        std::string kind = c.at("kind").as_string();
+        std::string nm = c.at("name").as_string();
+        depz::bytes got;
+        if (kind == "read_reg") {
+            got = B::pack_read_reg(static_cast<std::uint8_t>(c.at("addr").as_int()),
+                                   static_cast<std::uint8_t>(c.at("len").as_int()));
+        } else if (kind == "write_reg") {
+            depz::bytes data = from_hex(c.at("data").as_string());
+            got = B::pack_write_reg(static_cast<std::uint8_t>(c.at("addr").as_int()),
+                                    depz::as_bytes(data));
+        } else if (kind == "start_stream") {
+            got = B::pack_start_stream(static_cast<std::uint8_t>(c.at("trigger").as_int()),
+                                       static_cast<std::uint8_t>(c.at("addr").as_int()),
+                                       static_cast<std::uint8_t>(c.at("len").as_int()),
+                                       static_cast<std::uint16_t>(c.at("period_ms").as_int()));
+        } else if (kind == "reset" || kind == "stop_stream" || kind == "get_info") {
+            got = {};  // empty payload
+        } else {
+            check(false, "unknown bno055 encode kind " + kind);
+            continue;
+        }
+        check_eq(to_hex(got), c.at("payload").as_string(), "bno055 encode " + nm);
+    }
+
+    // decode: RPT_BNO_INFO 0x92, RPT_BNO_REG_DATA 0x91, RPT_BNO_REG_STREAM 0x93.
+    for (const Value& c : v.at("decode").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        const Value& ex = c.at("expect");
+        const std::int64_t report = c.at("report").as_int();
+        if (report == static_cast<std::int64_t>(B::Bno055Rpt::Info)) {
+            auto r = B::Bno055Info::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "bno055 info unpack " + nm);
+                continue;
+            }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(20),
+                     "bno055 info field count " + nm);
+            auto f = [&](const char* k, std::int64_t got) {
+                check_eq(got, ex.at(k).as_int(), std::string("bno055 info.") + k + " " + nm);
+            };
+            f("i2c_addr", r->i2c_addr);
+            f("chip_id", r->chip_id);
+            f("acc_id", r->acc_id);
+            f("mag_id", r->mag_id);
+            f("gyr_id", r->gyr_id);
+            f("sw_rev", r->sw_rev);
+            f("bl_rev", r->bl_rev);
+            f("initialized", r->initialized);
+            f("int_level", r->int_level);
+            f("int_edges", r->int_edges);
+            f("read_min_us", r->read_min_us);
+            f("read_max_us", r->read_max_us);
+            f("read_avg_us", r->read_avg_us);
+            f("tx_dropped", r->tx_dropped);
+            f("i2c_errors", r->i2c_errors);
+            f("slots_skipped", r->slots_skipped);
+            f("bus_recoveries", r->bus_recoveries);
+            f("last_i2c_error", r->last_i2c_error);
+            f("sensor_resets", r->sensor_resets);
+            f("loop_max_us", r->loop_max_us);
+        } else if (report == static_cast<std::int64_t>(B::Bno055Rpt::RegData)) {
+            auto r = B::RegData::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "bno055 reg_data unpack " + nm);
+                continue;
+            }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(3),
+                     "bno055 reg_data field count " + nm);
+            check_eq(static_cast<std::int64_t>(r->cmd), ex.at("cmd").as_int(), "bno055 cmd " + nm);
+            check_eq(r->timestamp_us, ex.at("timestamp_us").as_u64(), "bno055 ts " + nm);
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "bno055 data " + nm);
+        } else if (report == static_cast<std::int64_t>(B::Bno055Rpt::Stream)) {
+            auto r = B::StreamData::unpack(depz::as_bytes(payload));
+            if (!r) {
+                check(false, "bno055 stream unpack " + nm);
+                continue;
+            }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(4),
+                     "bno055 stream field count " + nm);
+            check_eq(r->timestamp_us, ex.at("timestamp_us").as_u64(), "bno055 stream ts " + nm);
+            check_eq(static_cast<std::int64_t>(r->addr), ex.at("addr").as_int(),
+                     "bno055 stream addr " + nm);
+            check_eq(static_cast<std::int64_t>(r->len), ex.at("len").as_int(),
+                     "bno055 stream len " + nm);
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "bno055 stream data " + nm);
+        } else {
+            check(false, "unknown bno055 report " + nm);
+        }
+    }
+    depz::bytes short_info(B::INFO_SIZE - 1, std::byte{0});
+    check(!B::Bno055Info::unpack(depz::as_bytes(short_info)).has_value(),
+          "bno055 info rejects a short payload");
+    depz::bytes short_hdr(8, std::byte{0});
+    check(!B::RegData::unpack(depz::as_bytes(short_hdr)).has_value(),
+          "bno055 reg_data rejects 8 bytes");
+    check(!B::StreamData::unpack(depz::as_bytes(short_hdr)).has_value(),
+          "bno055 stream rejects 8 bytes");
+
+    // units: UNIT_SEL flags; the repack drops undefined bits.
+    for (const Value& c : v.at("units").as_array()) {
+        const auto sel = static_cast<std::uint8_t>(c.at("unit_sel").as_int());
+        const std::string nm = "bno055 units " + std::to_string(sel);
+        const Value& ex = c.at("expect");
+        B::Units u = B::Units::unpack(sel);
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(5), nm + " field count");
+        check_eq(u.accel_mg, ex.at("accel_mg").as_bool(), nm + " accel_mg");
+        check_eq(u.gyro_rps, ex.at("gyro_rps").as_bool(), nm + " gyro_rps");
+        check_eq(u.euler_rad, ex.at("euler_rad").as_bool(), nm + " euler_rad");
+        check_eq(u.temp_f, ex.at("temp_f").as_bool(), nm + " temp_f");
+        check_eq(u.android, ex.at("android").as_bool(), nm + " android");
+        check_eq(static_cast<std::int64_t>(u.pack()), c.at("repack").as_int(), nm + " repack");
+        // LSB constants follow the flags (§4.2).
+        check_eq(u.accel_lsb(), u.accel_mg ? 1.0 : 100.0, nm + " accel_lsb");
+        check_eq(u.gyro_lsb(), u.gyro_rps ? 900.0 : 16.0, nm + " gyro_lsb");
+        check_eq(u.euler_lsb(), u.euler_rad ? 900.0 : 16.0, nm + " euler_lsb");
+        check_eq(u.temp_lsb(), u.temp_f ? 0.5 : 1.0, nm + " temp_lsb");
+    }
+    check(B::MAG_LSB == 16.0 && B::QUAT_LSB == 16384.0 && B::FUSION_ACCEL_LSB == 100.0,
+          "bno055 fixed LSBs");
+
+    // calib_stat: 2-bit fields, fully_calibrated, exact repack.
+    for (const Value& c : v.at("calib_stat").as_array()) {
+        const auto val = static_cast<std::uint8_t>(c.at("value").as_int());
+        const std::string nm = "bno055 calib_stat " + std::to_string(val);
+        const Value& ex = c.at("expect");
+        B::CalibStatus s = B::CalibStatus::unpack(val);
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(4), nm + " field count");
+        check_eq(static_cast<std::int64_t>(s.system), ex.at("system").as_int(), nm + " system");
+        check_eq(static_cast<std::int64_t>(s.gyro), ex.at("gyro").as_int(), nm + " gyro");
+        check_eq(static_cast<std::int64_t>(s.accel), ex.at("accel").as_int(), nm + " accel");
+        check_eq(static_cast<std::int64_t>(s.mag), ex.at("mag").as_int(), nm + " mag");
+        check_eq(s.fully_calibrated(), c.at("fully_calibrated").as_bool(), nm + " fully_calibrated");
+        check_eq(static_cast<std::int64_t>(s.pack()), static_cast<std::int64_t>(val), nm + " repack");
+    }
+
+    // calibration_profile: 11 x i16 LE, byte-exact repack.
+    for (const Value& c : v.at("calibration_profile").as_array()) {
+        const std::string nm = "bno055 calibration_profile " + c.at("name").as_string();
+        const std::string hex = c.at("bytes").as_string();
+        depz::bytes raw = from_hex(hex);
+        const Value& ex = c.at("expect");
+        auto p = B::CalibrationProfile::unpack(depz::as_bytes(raw));
+        if (!p) {
+            check(false, nm + " unpack");
+            continue;
+        }
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(5), nm + " field count");
+        check_bno_words<3>(p->accel_offset, ex.at("accel_offset"), nm + " accel_offset");
+        check_bno_words<3>(p->mag_offset, ex.at("mag_offset"), nm + " mag_offset");
+        check_bno_words<3>(p->gyro_offset, ex.at("gyro_offset"), nm + " gyro_offset");
+        check_eq(static_cast<std::int64_t>(p->accel_radius), ex.at("accel_radius").as_int(),
+                 nm + " accel_radius");
+        check_eq(static_cast<std::int64_t>(p->mag_radius), ex.at("mag_radius").as_int(),
+                 nm + " mag_radius");
+        check_eq(to_hex(p->pack()), hex, nm + " repack");
+        check(!B::CalibrationProfile::unpack(depz::byte_span(raw.data(), raw.size() - 1)),
+              nm + " rejects 21 bytes");
+    }
+
+    // axis_remap: placements P0..P7 — unpack, repack, placement() and the table.
+    const auto& remaps = v.at("axis_remap").as_array();
+    check_eq(remaps.size(), B::PLACEMENTS.size(), "bno055 axis_remap placement count");
+    for (std::size_t i = 0; i < remaps.size(); ++i) {
+        const Value& c = remaps[i];
+        const std::string name = c.at("name").as_string();
+        const std::string nm = "bno055 axis_remap " + name;
+        const auto cfg = static_cast<std::uint8_t>(c.at("config").as_int());
+        const auto sgn = static_cast<std::uint8_t>(c.at("sign").as_int());
+        const Value& ex = c.at("expect");
+        B::AxisRemap a = B::AxisRemap::unpack(cfg, sgn);
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(6), nm + " field count");
+        check_eq(static_cast<std::int64_t>(a.x), ex.at("x").as_int(), nm + " x");
+        check_eq(static_cast<std::int64_t>(a.y), ex.at("y").as_int(), nm + " y");
+        check_eq(static_cast<std::int64_t>(a.z), ex.at("z").as_int(), nm + " z");
+        check_eq(a.x_negative, ex.at("x_negative").as_bool(), nm + " x_negative");
+        check_eq(a.y_negative, ex.at("y_negative").as_bool(), nm + " y_negative");
+        check_eq(a.z_negative, ex.at("z_negative").as_bool(), nm + " z_negative");
+        auto packed = a.pack();
+        const auto& rp = c.at("repack").as_array();
+        check(packed && rp.size() == 2 &&
+                  static_cast<std::int64_t>(packed->first) == rp[0].as_int() &&
+                  static_cast<std::int64_t>(packed->second) == rp[1].as_int(),
+              nm + " repack");
+        auto pl = B::placement(name);
+        check(pl && *pl == a, nm + " placement()");
+        if (i < B::PLACEMENTS.size())
+            check(B::PLACEMENTS[i].first == cfg && B::PLACEMENTS[i].second == sgn,
+                  nm + " PLACEMENTS row");
+    }
+    check(B::placement("p1") && *B::placement("p1") == B::AxisRemap{},
+          "bno055 placement is case-insensitive; P1 is the default");
+    check(!B::placement("P8") && !B::placement("P") && !B::placement("P10") && !B::placement(""),
+          "bno055 placement refuses unknown names");
+
+    // axis_remap_invalid: a non-permutation must be refused.
+    for (const Value& c : v.at("axis_remap_invalid").as_array()) {
+        B::AxisRemap a;
+        a.x = static_cast<std::uint8_t>(c.at("x").as_int());
+        a.y = static_cast<std::uint8_t>(c.at("y").as_int());
+        a.z = static_cast<std::uint8_t>(c.at("z").as_int());
+        check(!a.pack().has_value(), "bno055 axis_remap_invalid " + c.at("name").as_string());
+    }
+    {
+        B::AxisRemap a;
+        a.x = 3;
+        check(!a.pack().has_value(), "bno055 axis_remap refuses axis code 3");
+    }
+
+    // sensor_config: page-1 ACC / GYR / MAG config codes.
+    const Value& sc = v.at("sensor_config");
+    for (const Value& c : sc.at("accel").as_array()) {
+        const auto val = static_cast<std::uint8_t>(c.at("value").as_int());
+        const std::string nm = "bno055 accel_config " + std::to_string(val);
+        const Value& ex = c.at("expect");
+        B::AccelConfig a = B::AccelConfig::unpack(val);
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(3), nm + " field count");
+        check_eq(static_cast<std::int64_t>(a.range), ex.at("range").as_int(), nm + " range");
+        check_eq(static_cast<std::int64_t>(a.bandwidth), ex.at("bandwidth").as_int(),
+                 nm + " bandwidth");
+        check_eq(static_cast<std::int64_t>(a.power), ex.at("power").as_int(), nm + " power");
+        check_eq(static_cast<std::int64_t>(a.pack()), static_cast<std::int64_t>(val), nm + " repack");
+    }
+    for (const Value& c : sc.at("gyro").as_array()) {
+        const std::string hex = c.at("bytes").as_string();
+        const std::string nm = "bno055 gyro_config " + hex;
+        const Value& ex = c.at("expect");
+        depz::bytes raw = from_hex(hex);
+        auto g = B::GyroConfig::unpack(depz::as_bytes(raw));
+        if (!g) {
+            check(false, nm + " unpack");
+            continue;
+        }
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(3), nm + " field count");
+        check_eq(static_cast<std::int64_t>(g->range), ex.at("range").as_int(), nm + " range");
+        check_eq(static_cast<std::int64_t>(g->bandwidth), ex.at("bandwidth").as_int(),
+                 nm + " bandwidth");
+        check_eq(static_cast<std::int64_t>(g->power), ex.at("power").as_int(), nm + " power");
+        check_eq(to_hex(g->pack()), hex, nm + " repack");
+    }
+    {
+        depz::bytes one(1, std::byte{0x38});
+        check(!B::GyroConfig::unpack(depz::as_bytes(one)), "bno055 gyro_config needs 2 bytes");
+    }
+    for (const Value& c : sc.at("mag").as_array()) {
+        const std::int64_t val = c.at("value").as_int();
+        const std::string nm = "bno055 mag_config " + std::to_string(val);
+        const Value& ex = c.at("expect");
+        B::MagConfig m = B::MagConfig::unpack(static_cast<std::uint8_t>(val));
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(3), nm + " field count");
+        check_eq(static_cast<std::int64_t>(m.rate), ex.at("rate").as_int(), nm + " rate");
+        check_eq(static_cast<std::int64_t>(m.mode), ex.at("mode").as_int(), nm + " mode");
+        check_eq(static_cast<std::int64_t>(m.power), ex.at("power").as_int(), nm + " power");
+        // Bit 7 is not a field: the repack is value & 0x7F.
+        check_eq(static_cast<std::int64_t>(m.pack()), val & 0x7F, nm + " repack");
+    }
+    check_eq(static_cast<int>(B::MagConfig::unpack(0x8B).pack()), 0x0B,
+             "bno055 mag_config drops bit 7");
+
+    // blocks: channel extraction from any register window.
+    for (const Value& c : v.at("blocks").as_array()) {
+        const std::string nm = "bno055 block " + c.at("name").as_string();
+        depz::bytes data = from_hex(c.at("data").as_string());
+        const Value& ex = c.at("expect");
+        B::RawBlock b =
+            B::decode_block(static_cast<std::uint8_t>(c.at("addr").as_int()), depz::as_bytes(data));
+        check_eq(ex.as_object().size(), static_cast<std::size_t>(9), nm + " field count");
+        check_bno_words(b.accel, ex.at("accel"), nm + " accel");
+        check_bno_words(b.mag, ex.at("mag"), nm + " mag");
+        check_bno_words(b.gyro, ex.at("gyro"), nm + " gyro");
+        check_bno_words(b.euler, ex.at("euler"), nm + " euler");
+        check_bno_words(b.quaternion, ex.at("quaternion"), nm + " quaternion");
+        check_bno_words(b.linear_accel, ex.at("linear_accel"), nm + " linear_accel");
+        check_bno_words(b.gravity, ex.at("gravity"), nm + " gravity");
+        check_bno_scalar(b.temperature, ex.at("temperature"), nm + " temperature");
+        check_bno_scalar(b.calib_stat, ex.at("calib_stat"), nm + " calib_stat");
+    }
+    {
+        // Window edges beyond the vectors: the full block, and one byte short.
+        depz::bytes full(B::FULL_BLOCK_LEN, std::byte{0});
+        full[B::REG_TEMP - B::FULL_BLOCK_ADDR] = std::byte{0xE5};  // -27
+        full[B::REG_CALIB_STAT - B::FULL_BLOCK_ADDR] = std::byte{0xFF};
+        B::RawBlock b = B::decode_block(B::FULL_BLOCK_ADDR, depz::as_bytes(full));
+        check(b.accel && b.mag && b.gyro && b.euler && b.quaternion && b.linear_accel &&
+                  b.gravity && b.temperature == std::int8_t{-27} && b.calib_stat == 0xFF,
+              "bno055 full block: every channel present");
+        b = B::decode_block(B::FULL_BLOCK_ADDR, depz::byte_span(full.data(), full.size() - 1));
+        check(b.temperature && !b.calib_stat, "bno055 45-byte block: no calib_stat");
+        b = B::decode_block(B::REG_GRV_DATA, depz::byte_span(full.data(), 5));
+        check(!b.gravity, "bno055 5-byte gravity window: gravity absent");
+        b = B::decode_block(0xF0, depz::byte_span(full.data(), 16));
+        check(!b.accel && !b.calib_stat, "bno055 window past the data registers");
+    }
+}
+
 static int run_foundation();
 
 int main(int argc, char** argv) {
@@ -873,14 +1794,29 @@ int main(int argc, char** argv) {
         test_vl53l8_advanced();
     } else if (suite == "vl53l8_cnh") {
         test_vl53l8_cnh();
+    } else if (suite == "vl53l7_codecs") {
+        test_vl53l7_codecs();
+    } else if (suite == "vl53l7_frame") {
+        test_vl53l7_frame();
+    } else if (suite == "vl53l4") {
+        test_vl53l4();
+    } else if (suite == "vl53lx") {
+        test_vl53lx();
+    } else if (suite == "bno055") {
+        test_bno055();
     } else if (suite == "bno086_shtp") {
         test_bno086_shtp();
     } else if (suite == "bno086_reports") {
         test_bno086_reports();
     } else if (suite == "dataset") {
         test_dataset();
-    } else {
+    } else if (suite == "foundation") {
         return run_foundation();
+    } else {
+        // An unknown selector used to fall through to the foundation suite, so
+        // a ctest target naming a missing suite passed without checking it.
+        std::cerr << "unknown test suite: " << suite << "\n";
+        return 2;
     }
     std::cout << "checks: " << g_checks << ", failures: " << g_fails << "\n";
     if (g_fails) {

@@ -8,12 +8,12 @@
 //
 // This is the *verifiable* decode layer only: frame-chunk reassembly, the
 // shared results-frame decoder (raw per-zone arrays), and the advanced-feature
-// DCI codecs (xtalk margin, detection thresholds, motion indicator). Two things
-// are hardware-dependent / CH-specific and intentionally NOT ported here:
-//   - the live ULD init / register-bridge driver (firmware download, DCI
-//     read/write handshakes, power-mode register sequences) — see the reference
-//     Python `vl53l8/uld.py`;
-//   - the CH-only CNH histogram decode — see the "CNH" extension point below.
+// DCI codecs (xtalk margin, detection thresholds, motion indicator), and the
+// CH-only CNH histogram decode (decode_cnh, at the bottom of this header). It is
+// pure codecs, no I/O. The live ULD driver (firmware download, DCI read/write
+// handshakes, power-mode register sequences) is the live class depz::Vl53l8 in
+// depz/device.hpp, which runs the C SDK's port of the reference Python
+// `vl53l8/uld.py` and decodes its frames with these structs.
 //
 // Semantics are byte-exact with the Python/TS reference implementations; raw
 // wire integers are authoritative (distance is the fixed-point value divided by
@@ -37,9 +37,8 @@ inline constexpr int RESOLUTION_8X8 = 64;
 inline constexpr std::size_t STREAM_CHUNK_MAX = 1528;
 
 // The two DEPZ ToF die variants. Both stream the same results-frame layout
-// decoded by decode_frame(); they differ only in the footer-id offset here (the
-// CH additionally emits CNH histograms — a not-yet-decoded extension point, see
-// the CNH section at the bottom of this header).
+// decoded by decode_frame(); they differ in the footer-id offset here, and the
+// CH additionally emits CNH histograms (decode_cnh, at the bottom).
 enum class Variant {
     CX,  // base ToF (ULD 2.1.0); dev-default, no dedicated production USB PID
     CH,  // CX + CNH histograms; production USB PID 0xED40 (VL53LMZ 2.0.16)
@@ -49,6 +48,9 @@ enum class Variant {
 // variant: 12 for VL53L8CX (ULD 2.1.0), 4 for VL53L8CH (VL53LMZ 2.0.16).
 inline constexpr int FOOTER_ID_OFF_CX = 12;
 inline constexpr int FOOTER_ID_OFF_CH = 4;
+
+// Results-block index of the CNH data output block (VL53LMZ plugin_cnh).
+inline constexpr std::uint32_t CNH_DATA_IDX = 0xC048;
 
 // Footer-id offset for a variant (convenience for decode_frame's argument).
 inline constexpr int footer_id_off(Variant v) {
@@ -104,6 +106,10 @@ struct Vl53l8Frame {
     std::vector<std::uint32_t> nb_spads_enabled;
     std::vector<std::uint16_t> range_sigma_mm_raw;
     std::vector<std::uint8_t> reflectance;
+    // Raw CNH data block (index CNH_DATA_IDX, byte-swapped like every results
+    // block) when the frame carries one — VL53L8CH / VL53L7CH with CNH
+    // configured; nullopt otherwise. Feed it to decode_cnh().
+    std::optional<bytes> cnh_raw;
 };
 
 // VL53L8CX_SwapBuffer: byte-reverse every 32-bit word (tail bytes unchanged).
@@ -195,6 +201,9 @@ MotionConfig motion_config_init(int resolution);
 // below reproduces _cnh_get_mem_block_addresses exactly; do not "simplify" it.
 
 // Persistent-data header / buffer layout constants (plugin_cnh.c).
+// decode_cnh() bounds (same limits as the C SDK's DEPZ_VL53L8_CNH_MAX_*).
+inline constexpr int CNH_MAX_AGGREGATES = 64;
+inline constexpr int CNH_MAX_FEATURE_LENGTH = 255;
 inline constexpr int CNH_PER_HEADER_WORDS = 5;          // CNH_PER_HEADER_BYTES / 4
 inline constexpr int CNH_PER_BUFFER_HEADER_WORDS = 2;   // CNH_PER_BUFFER_HEADER_BYTES / 4
 inline constexpr int CNH_PER_HEADER_BUFFER_INFO_IDX = 1;
@@ -227,6 +236,8 @@ struct CnhFrame {
 // `feature_length` come from the CNH config used on the device (see CnhConfig /
 // MotionConfig). Faithful port of cnh.decode / _decode_aggregate for the fixed
 // cnh_cfg (ping-pong + variance disabled).
+// Throws std::invalid_argument for an out-of-range config and
+// std::length_error for a block shorter than the config implies.
 CnhFrame decode_cnh(int nb_of_aggregates, int feature_length, byte_span raw);
 
 }  // namespace vl53l8

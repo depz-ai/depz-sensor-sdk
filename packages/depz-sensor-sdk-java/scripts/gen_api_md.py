@@ -20,9 +20,16 @@ protocol surface staying only in the root file. The ToF domain is one Java
 package but *two* sensors: the shared VL53L8CX base decode plus the CH-only
 additions (CNH), so it is split by symbol exactly like the Python generator.
 
-Truthful about scope: this SDK is decode-layer only. The live ULD init /
-register-bridge driver and the VL53L8CH CNH histogram decode are extension
-points and are surfaced here as documented stubs, not working code.
+Truthful about scope: this SDK is decode-layer only. The live drivers (ULD
+init / register-bridge configuration, the 1D family's ST drivers, the BNO055
+session logic) are extension points and are surfaced here as documented stubs,
+not working code.
+
+Boards that share one module get one page each with the same content: the
+``vl53l7`` domain serves VL53L5CX / VL53L7CX / VL53L7CH (plus the VL53L8
+symbols it decodes with; the L7CH page also the CNH decode), the ``vl53lx``
+domain serves VL53L0X / L1CX / L1CB / L3CX / L4CX (plus the contract-10 codecs
+it forwards to), and ``bno055`` maps onto ``bno055``.
 
 Regenerate:
 
@@ -47,7 +54,7 @@ DOCS = ROOT / "docs"
 # submodule, not by re-export).
 DOMAIN_ORDER = [
     "transport", "usb", "protocol", "sr04", "fwdepz",
-    "vl53l4", "vl53l8", "bno086", "dataset",
+    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055", "dataset",
 ]
 DOMAIN_TITLE = {
     "transport": "Transport",
@@ -57,7 +64,10 @@ DOMAIN_TITLE = {
     "fwdepz": "Firmware container",
     "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
+    "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
+    "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
+    "bno055": "BNO055 (IMU)",
     "dataset": "Datasets (record & replay)",
 }
 # Per-class domain overrides (fully-qualified simple name of the top-level type).
@@ -65,12 +75,26 @@ DOMAIN_OF_TYPE = {
     "Sr04": "sr04",
     "Vl53l4": "vl53l4",
     "FwDepz": "fwdepz",
+    "Vl53l7": "vl53l7",
+    "Vl53lx": "vl53lx",
+    "Bno055": "bno055",
 }
 
 # The single ``vl53l8`` package is TWO sensors. Everything shared is the CX base;
 # these symbols (types or ``Type.method`` members) are the CH-only additions and
 # render on the VL53L8CH page instead of / in addition to the CX one.
-VL53L8CH_PICKS = ["Vl53l8Uld.Variant", "Vl53l8Uld.cnhHistogramDecodeStubbed"]
+VL53L8CH_PICKS = ["Vl53l8Uld.Variant", "Vl53l8Uld.decodeCnh", "Vl53l8Uld.CnhResult",
+                  "Vl53l8Uld.CnhAggregate"]
+
+# Symbols a board page needs from a shared package (resolved like the CH picks).
+VL53L7_PICKS = ["FrameReassembler", "Vl53l8Uld.Results"]
+VL53L7CH_EXTRA_PICKS = ["Vl53l8Uld.decodeCnh", "Vl53l8Uld.CnhResult", "Vl53l8Uld.CnhAggregate"]
+VL53LX_PICKS = ["Vl53l4.RegData", "Vl53l4.StreamData", "Vl53l4Uld.Results"]
+VL53LX_BOARDS = [
+    ("vl53l0x", "VL53L0X (ToF)"), ("vl53l1cx", "VL53L1CX (ToF)"),
+    ("vl53l1cb", "VL53L1CB (ToF)"), ("vl53l3cx", "VL53L3CX (ToF)"),
+    ("vl53l4cx", "VL53L4CX (ToF)"),
+]
 
 
 # ── Javadoc cleanup ────────────────────────────────────────────────────────
@@ -508,13 +532,19 @@ def main() -> None:
         "source, not this file.",
         "",
         "This SDK is decode-layer only: pure, host-verifiable codecs. The live",
-        "ULD init / register-bridge driver and the VL53L8CH CNH histogram decode",
-        "are extension points, surfaced here as documented stubs.",
+        "drivers (ULD init / register-bridge configuration, the 1D family's ST",
+        "drivers, the BNO055 session logic) are extension points, surfaced here",
+        "as documented stubs.",
         "",
         "Each sensor also has a focused reference with just its own symbols:",
         "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · "
-        "[VL53L8CH](vl53l8ch/api.md) · [BNO086](bno086/api.md).",
+        "[VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
+        "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
+        "[VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · "
+        "[VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · "
+        "[VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · "
+        "[BNO055](bno055/api.md).",
         "",
     ]
     (DOCS / "api.md").write_text(_render_reference(root_header, sections))
@@ -536,15 +566,45 @@ def main() -> None:
         "every advanced-DCI codec, see the",
         "[VL53L8CX API reference](../vl53l8cx/api.md).",
         "",
-        "CNH (compact-histogram) decode is a CH-only **extension point** and is",
-        "not implemented in this decode-layer SDK; the shared decoder surfaces",
-        "the raw CNH block bytes on `Vl53l8Uld.Results.cnhRaw` but does not",
-        "interpret them.",
+        "The shared decoder surfaces the raw CNH block bytes on",
+        "`Vl53l8Uld.Results.cnhRaw`; `Vl53l8Uld.decodeCnh` unpacks them into",
+        "per-aggregate histograms.",
         "",
     ]
     _write_sensor_custom("vl53l8ch", "VL53L8CH (ToF + CNH)", ch_syms, ch_rows, ch_note)
 
     _write_sensor("bno086", "BNO086 (IMU)", by_domain.get("bno086", []), [])
+
+    # One domain, several boards: every board page carries the whole domain.
+    l7 = by_domain.get("vl53l7", [])
+    if l7:
+        l7_note = [
+            "One package serves the VL53L5CX, VL53L7CX and VL53L7CH boards (one",
+            "`APP_VL53L7` firmware), so this page lists the whole L5/L7 surface",
+            "and is the same on all three. Frames decode through the VL53L8",
+            "decoder with the L5/L7 geometry; the advanced-DCI codecs are",
+            "documented in the [VL53L8CX API reference](../vl53l8cx/api.md).",
+            "",
+        ]
+        shared = ("Shared with VL53L8 (frame decode)", _resolve_picks(index, VL53L7_PICKS))
+        cnh = ("CNH histogram decode (from `Vl53l8Uld`)", _resolve_picks(index, VL53L7CH_EXTRA_PICKS))
+        _write_board("vl53l5cx", "VL53L5CX (ToF)", l7, [shared], l7_note)
+        _write_board("vl53l7cx", "VL53L7CX (ToF)", l7, [shared], l7_note)
+        _write_board("vl53l7ch", "VL53L7CH (ToF + CNH)", l7, [shared, cnh], l7_note)
+    lx = by_domain.get("vl53lx", [])
+    if lx:
+        lx_note = [
+            "One package serves the whole 1D family (one `APP_VL53L0_4`",
+            "firmware): VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX. This",
+            "page lists the whole family surface and is the same on every family",
+            "page; the product table says what differs per board.",
+            "",
+        ]
+        shared = ("Contract-10 codecs and result shape (from `Vl53l4` / `Vl53l4Uld`)",
+                  _resolve_picks(index, VL53LX_PICKS))
+        for folder, title in VL53LX_BOARDS:
+            _write_board(folder, title, lx, [shared], lx_note)
+    _write_sensor("bno055", "BNO055 (IMU)", by_domain.get("bno055", []), [])
 
 
 def _sensor_header(title: str, note: list[str]) -> list[str]:
@@ -569,6 +629,30 @@ def _write_sensor(folder: str, title: str, syms: list[dict], note: list[str]):
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(_render_reference(_sensor_header(title, note), [(title, syms)]))
     print("wrote %s (%d symbols)" % (out, len(syms)))
+
+
+def _write_board(folder: str, title: str, syms: list[dict], extra, note: list[str]):
+    """Per-board page: the board's domain plus extra sections of picked symbols
+    (``extra`` = [(section title, (render entries, index rows)), ...])."""
+    out = DOCS / folder / "api.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    body = list(_sensor_header(title, note)) + ["## Contents", ""]
+    links = ", ".join("[`%s`](#%s)" % (s["qual"], _anchor(s["qual"])) for s in syms)
+    body.append("- **%s**: %s" % (title, links))
+    for sec_title, (_rend, rows) in extra:
+        links = ", ".join("[`%s`](#%s)" % (r["qual"], _anchor(r["qual"])) for r in rows)
+        body.append("- **%s**: %s" % (sec_title, links))
+    body += ["", "## %s" % title, ""]
+    for s in syms:
+        body += _render_type(s)
+    n = len(syms)
+    for sec_title, (rend, _rows) in extra:
+        body += ["## %s" % sec_title, ""]
+        for r in rend:
+            body += r["render"]
+        n += len(rend)
+    out.write_text("\n".join(body).rstrip() + "\n")
+    print("wrote %s (%d symbols)" % (out, n))
 
 
 def _write_sensor_custom(folder: str, title: str, syms: list[dict],

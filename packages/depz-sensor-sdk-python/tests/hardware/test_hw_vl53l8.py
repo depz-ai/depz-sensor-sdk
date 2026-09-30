@@ -12,6 +12,7 @@ round-trips and stream restartability.
 
 from __future__ import annotations
 
+import os
 import time
 
 import numpy as np
@@ -19,7 +20,7 @@ import pytest
 
 from _support import FAMILY_VL53L8CH, FAMILY_VL53L8CX, port_lease
 
-from depz_sensor_sdk import CnhConfig, DepzError, Vl53l8Ch, Vl53l8Cx
+from depz_sensor_sdk import CnhConfig, DepzError, Vl53l8ch, Vl53l8cx
 from depz_sensor_sdk.vl53l8 import MIN_RANGING_FREQUENCY_HZ
 from depz_sensor_sdk.vl53l8.uld import (
     RANGING_MODE_AUTONOMOUS,
@@ -40,7 +41,7 @@ def tof(request, hw_inventory):
     if not matches:
         pytest.skip(f"no {request.param} device attached")
     info = matches[0]
-    cls = Vl53l8Ch if info.family == FAMILY_VL53L8CH else Vl53l8Cx
+    cls = Vl53l8ch if info.family == FAMILY_VL53L8CH else Vl53l8cx
     with port_lease(info.resolve_port()):
         dev = cls(info.resolve_port())
         try:
@@ -59,7 +60,7 @@ def tof(request, hw_inventory):
 
 
 def test_variant_matches_the_class(tof):
-    expected = "ch" if isinstance(tof, Vl53l8Ch) else "cx"
+    expected = "ch" if isinstance(tof, Vl53l8ch) else "cx"
     assert tof.variant == expected, f"loaded the {tof.variant!r} blob into a {expected!r} class"
 
 
@@ -74,7 +75,7 @@ def test_init_is_required_before_configuration(hw_inventory):
         pytest.skip("no VL53L8CX attached")
     info = matches[0]
     with port_lease(info.resolve_port()):
-        dev = Vl53l8Cx(info.resolve_port())
+        dev = Vl53l8cx(info.resolve_port())
         try:
             with pytest.raises(DepzError):
                 dev.get_resolution()
@@ -375,17 +376,17 @@ def test_no_stale_frames_after_restart(tof):
 
 def test_cnh_is_ch_only(tof):
     """The CX must not expose CNH — the variants are not interchangeable."""
-    if isinstance(tof, Vl53l8Ch):
+    if isinstance(tof, Vl53l8ch):
         assert hasattr(tof, "configure_cnh")
     else:
         assert not hasattr(tof, "configure_cnh"), (
-            "Vl53l8Cx exposes configure_cnh — CH capability leaked onto the CX"
+            "Vl53l8cx exposes configure_cnh — CH capability leaked onto the CX"
         )
 
 
 def test_ch_streams_cnh_histograms(tof):
     """CNH is the reason to run CH firmware: frames must carry cnh_raw."""
-    if not isinstance(tof, Vl53l8Ch):
+    if not isinstance(tof, Vl53l8ch):
         pytest.skip("CNH is a VL53L8CH capability")
 
     # 8x8 zones merged 2x2 into a 4x4 aggregate grid, 20 histogram bins —
@@ -408,7 +409,7 @@ def test_ch_streams_cnh_histograms(tof):
 
 def test_cnh_config_rejects_a_map_beyond_the_zone_grid(tof):
     """The aggregate map must fit the configured resolution."""
-    if not isinstance(tof, Vl53l8Ch):
+    if not isinstance(tof, Vl53l8ch):
         pytest.skip("CNH is a VL53L8CH capability")
     from depz_sensor_sdk.vl53l8.cnh import CnhConfigError
 
@@ -420,10 +421,41 @@ def test_cnh_config_rejects_a_map_beyond_the_zone_grid(tof):
 
 
 def test_cx_frames_carry_no_cnh(tof):
-    if isinstance(tof, Vl53l8Ch):
+    if isinstance(tof, Vl53l8ch):
         pytest.skip("CX-only assertion")
     tof.start_ranging()
     try:
         assert tof.get_frame(timeout=6.0).cnh_raw is None
     finally:
         tof.stop_ranging()
+
+
+@pytest.mark.skipif(
+    "DEPZ_XTALK_TARGET_MM" not in os.environ,
+    reason="set DEPZ_XTALK_TARGET_MM (600..3000) to the measured distance to a flat target "
+    "(and DEPZ_XTALK_REFLECTANCE, % — default 3 as in ST's example)",
+)
+def test_xtalk_calibration_really_runs(tof):
+    """The firmware must actually run the calibration: either the xtalk buffer
+    changes, or it answers XTALK_FAILED ("coverglass too good", the right answer
+    without glass). With a table that does not match the blob the VL53LMZ
+    firmware skipped the run and nothing changed (contract 04 §7) — the check
+    that caught it. Ranging must survive the run."""
+    target_mm = int(os.environ["DEPZ_XTALK_TARGET_MM"])
+    reflectance = int(os.environ.get("DEPZ_XTALK_REFLECTANCE", "3"))
+    default = tof.get_caldata_xtalk()
+    t0 = time.monotonic()
+    tof.calibrate_xtalk(reflectance_percent=reflectance, nb_samples=4, distance_mm=target_mm)
+    took = time.monotonic() - t0
+    blob = tof.get_caldata_xtalk()
+    assert len(blob) == 776
+    assert tof.uld.xtalk_calibration_failed or blob != default, (
+        f"calibration returned in {took:.1f} s with the buffer untouched — skipped by the firmware")
+    tof.set_resolution(RESOLUTION_8X8)
+    tof.set_ranging_frequency_hz(15)
+    tof.start_ranging()
+    try:
+        grid = tof.get_frame(timeout=3.0).grid()
+    finally:
+        tof.stop_ranging()
+    assert abs(float(np.median(grid[3:5, 3:5])) - target_mm) < 0.1 * target_mm

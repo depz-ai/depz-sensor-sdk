@@ -13,7 +13,9 @@ namespace Depz.Sensor.Vl53l8;
 ///   <item>Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame
 ///   id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes
 ///   (<see cref="Vl53l8FrameDecoder.ForVariant"/>).</item>
-///   <item>CNH histograms — CH-only, not yet decoded (<see cref="Vl53l8Cnh"/>).</item>
+///   <item>CNH histograms — CH-only; the frame decoder copies the raw block into
+///   <see cref="Vl53l8Frame.CnhRaw"/> and <see cref="Vl53l8Cnh.DecodeHistogram"/>
+///   decodes it.</item>
 /// </list>
 /// </summary>
 public enum Vl53l8Variant
@@ -42,7 +44,15 @@ public sealed record Vl53l8Frame(
     uint[] AmbientPerSpad,
     uint[] NbSpadsEnabled,
     double[] RangeSigmaMm,
-    byte[] Reflectance);
+    byte[] Reflectance)
+{
+    /// <summary>
+    /// Raw CNH data block (output index 0xC048), byte-swapped like every other
+    /// block — decode with <see cref="Vl53l8Cnh.DecodeHistogram"/>. Null when the
+    /// frame carries no CNH block (CX variants, or CNH not configured).
+    /// </summary>
+    public byte[]? CnhRaw { get; init; }
+}
 
 /// <summary>
 /// VL53L8 results-frame decoder (contracts/04_SENSOR_VL53L8.md). Verbatim port
@@ -51,9 +61,10 @@ public sealed record Vl53l8Frame(
 /// Serves <b>both</b> ToF variants — VL53L8CX and VL53L8CH stream the identical
 /// results-frame layout; only the frame-id footer offset differs per variant
 /// (see <see cref="Vl53l8Variant"/> / <see cref="ForVariant"/>). The CH-only CNH
-/// histogram block is a separate, not-yet-decoded extension point
-/// (<see cref="Vl53l8Cnh"/>); the live register-bridge init/config that produces
-/// these frames is hardware-dependent and out of scope (<see cref="Vl53l8Uld"/>).
+/// histogram block is copied out raw (<see cref="Vl53l8Frame.CnhRaw"/>) and
+/// decoded by <see cref="Vl53l8Cnh.DecodeHistogram"/>; the live register-bridge
+/// init/config that produces these frames is hardware-dependent and out of scope
+/// (<see cref="Vl53l8Uld"/>).
 /// </summary>
 public sealed class Vl53l8FrameDecoder
 {
@@ -73,6 +84,7 @@ public sealed class Vl53l8FrameDecoder
     private const int DistanceIdx = 0xDF44;
     private const int ReflectanceEstPcIdx = 0xE044;
     private const int TargetStatusIdx = 0xE084;
+    private const int CnhDataIdx = 0xC048;
 
     /// <summary>Frame-id footer offset for VL53L8CX FW (ULD 2.1.0): 12 bytes from end.</summary>
     public const int FooterIdOffsetCx = 12;
@@ -87,7 +99,23 @@ public sealed class Vl53l8FrameDecoder
     /// </summary>
     private readonly int _footerIdOff;
 
-    public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx) => _footerIdOff = footerIdOff;
+    /// <summary>
+    /// L5/L7 mode (contract 11 §3): per-target blocks keep their declared
+    /// 64-entry size even in 4×4, so every per-zone array is trimmed to the
+    /// frame's resolution — taken from the zone-scaled ambient block (0x54D0,
+    /// sized to the zone count), else the SPAD-count block (0x55D0).
+    /// </summary>
+    private readonly bool _trimToZones;
+
+    /// <param name="footerIdOff">Frame-id footer offset from the frame end
+    /// (<see cref="FooterIdOffsetCx"/> or <see cref="FooterIdOffsetCh"/>).</param>
+    /// <param name="trimToZones">Trim per-zone arrays to the resolution inferred
+    /// from the zone-scaled blocks (VL53L5/L7 frames; off for VL53L8).</param>
+    public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx, bool trimToZones = false)
+    {
+        _footerIdOff = footerIdOff;
+        _trimToZones = trimToZones;
+    }
 
     /// <summary>
     /// Decoder tuned for a specific ToF variant (selects the frame-id footer
@@ -133,7 +161,22 @@ public sealed class Vl53l8FrameDecoder
     /// Parse one raw results frame (the reassembled bytes read from reg 0x00).
     /// Resolution is derived from the number-of-targets block length.
     /// </summary>
-    public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw)
+    public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw) => Parse(timestampUs, raw, null);
+
+    /// <summary>
+    /// Parse one raw results frame, trimming every per-zone array to
+    /// <paramref name="resolution"/> entries (16 or 64) — the resolution the
+    /// host configured in <c>start_ranging</c>. Needed for VL53L5/L7 frames,
+    /// whose per-target blocks carry 64 entries even in 4×4 (contract 11 §3).
+    /// </summary>
+    public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw, int resolution)
+    {
+        if (resolution <= 0 || resolution > 64)
+            throw new ArgumentOutOfRangeException(nameof(resolution), resolution, "resolution must be 1..64 zones");
+        return Parse(timestampUs, raw, resolution);
+    }
+
+    private Vl53l8Frame Parse(ulong timestampUs, byte[] raw, int? resolution)
     {
         int drs = raw.Length;
         byte[] buf = SwapBuffer(raw);
@@ -147,6 +190,8 @@ public sealed class Vl53l8FrameDecoder
         var rangeSigmaMm = new double[64];
         var reflectance = new byte[64];
         int siliconTemp = 0;
+        byte[]? cnhRaw = null;
+        int zoneScaledCount = 0;   // entries of the 0x54D0 ambient block (else 0x55D0)
 
         int i = 16;
         while (i + 4 <= drs)
@@ -183,10 +228,13 @@ public sealed class Vl53l8FrameDecoder
             else if (idx == AmbientRateIdx)
             {
                 ambientPerSpad = ReadU32(buf, i + 4, msize / 4);
+                zoneScaledCount = ambientPerSpad.Length;
             }
             else if (idx == SpadCountIdx)
             {
                 nbSpadsEnabled = ReadU32(buf, i + 4, msize / 4);
+                if (zoneScaledCount == 0)
+                    zoneScaledCount = nbSpadsEnabled.Length;
             }
             else if (idx == RangeSigmaMmIdx)
             {
@@ -198,8 +246,27 @@ public sealed class Vl53l8FrameDecoder
             {
                 reflectance = buf.AsSpan(i + 4, msize).ToArray();
             }
+            else if (idx == CnhDataIdx)
+            {
+                cnhRaw = buf.AsSpan(i + 4, msize).ToArray();
+            }
 
             i += msize + 4;
+        }
+
+        // L5/L7: per-target blocks carry 64 entries even in 4×4; the sensor
+        // fills the first `resolution` and zero-pads the rest. Trim (NB_TARGET_PER_ZONE == 1).
+        int? trimTo = resolution ?? (_trimToZones && zoneScaledCount > 0 ? zoneScaledCount : null);
+        if (trimTo is int n)
+        {
+            ambientPerSpad = Trim(ambientPerSpad, n);
+            nbSpadsEnabled = Trim(nbSpadsEnabled, n);
+            nbTargetDetected = Trim(nbTargetDetected, n);
+            distance = Trim(distance, n);
+            targetStatus = Trim(targetStatus, n);
+            signalPerSpad = Trim(signalPerSpad, n);
+            rangeSigmaMm = Trim(rangeSigmaMm, n);
+            reflectance = Trim(reflectance, n);
         }
 
         // Fixed-point scaling (ST GetRangingData): distance ÷4, sigma ÷128.
@@ -229,8 +296,13 @@ public sealed class Vl53l8FrameDecoder
             ambientPerSpad,
             nbSpadsEnabled,
             rangeSigmaMm,
-            reflectance);
+            reflectance)
+        {
+            CnhRaw = cnhRaw,
+        };
     }
+
+    private static T[] Trim<T>(T[] arr, int n) => arr.Length > n ? arr[..n] : arr;
 
     private static uint[] ReadU32(byte[] buf, int off, int count)
     {

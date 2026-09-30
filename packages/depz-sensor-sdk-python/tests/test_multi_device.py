@@ -19,7 +19,7 @@ from depz_sensor_sdk.dataset import DatasetReader, SessionRecorder
 from depz_sensor_sdk.errors import DeviceLostError, LinkClosedError
 from depz_sensor_sdk.transport import CrcType, Packet, PacketParser, build_packet
 from depz_sensor_sdk.transport.link import LoopbackLink
-from depz_sensor_sdk.vl53l8 import Vl53l8Ch, Vl53l8Cx
+from depz_sensor_sdk.vl53l8 import Vl53l8ch, Vl53l8cx
 
 from fake_device import FakeSr04
 
@@ -77,8 +77,8 @@ def test_sync_time_all_four_sensor_types():
     # one of each: SR04, VL53L8CX, VL53L8CH, BNO086 — distinct device clocks.
     specs = [
         (Sr04, 1_000_000),
-        (Vl53l8Cx, 2_000_000),
-        (Vl53l8Ch, 3_000_000),
+        (Vl53l8cx, 2_000_000),
+        (Vl53l8ch, 3_000_000),
         (Bno086, 4_000_000),
     ]
     bridges = [FakeSyncBridge(mcu) for _cls, mcu in specs]
@@ -87,7 +87,7 @@ def test_sync_time_all_four_sensor_types():
         result = sync_time_all(devs, samples=3)
         assert set(result) == set(devs)
         # all four distinct classes are present on the shared timeline
-        assert {type(d) for d in devs} == {Sr04, Vl53l8Cx, Vl53l8Ch, Bno086}
+        assert {type(d) for d in devs} == {Sr04, Vl53l8cx, Vl53l8ch, Bno086}
         for dev in devs:
             ts = result[dev]
             assert ts.rtt_us >= 0
@@ -105,18 +105,18 @@ def test_sync_time_all_repeated_tof_variants():
     # two-of-a-kind (two VL53L8CX) together with a VL53L8CH: repeats and the
     # CX/CH pair share one sync_time_all timeline.
     specs = [
-        (Vl53l8Cx, 1_500_000),
-        (Vl53l8Cx, 900_000_000),  # very different clock, same model
-        (Vl53l8Ch, 42_000_000),
+        (Vl53l8cx, 1_500_000),
+        (Vl53l8cx, 900_000_000),  # very different clock, same model
+        (Vl53l8ch, 42_000_000),
     ]
     bridges = [FakeSyncBridge(mcu) for _cls, mcu in specs]
     devs = [cls(b.link, timeout=1.0) for (cls, _mcu), b in zip(specs, bridges)]
     try:
         result = sync_time_all(devs, samples=3)
         assert set(result) == set(devs)
-        assert sum(isinstance(d, Vl53l8Cx) for d in devs) == 3  # CH is a CX subclass
-        assert sum(type(d) is Vl53l8Cx for d in devs) == 2  # two plain CX
-        assert sum(type(d) is Vl53l8Ch for d in devs) == 1
+        assert sum(isinstance(d, Vl53l8cx) for d in devs) == 3  # CH is a CX subclass
+        assert sum(type(d) is Vl53l8cx for d in devs) == 2  # two plain CX
+        assert sum(type(d) is Vl53l8ch for d in devs) == 1
         for dev in devs:
             ts = result[dev]
             assert dev.to_host_time_us(777 + ts.offset_us) == 777

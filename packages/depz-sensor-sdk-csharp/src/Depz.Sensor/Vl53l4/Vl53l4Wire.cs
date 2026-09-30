@@ -23,8 +23,12 @@ public enum Vl53l4Rpt
 }
 
 /// <summary>
-/// VL53_XSHUT actions. <see cref="Reset"/> is blocking on the MCU and is
-/// answered only after the sensor's boot handshake (allow ≥ 1.5 s).
+/// VL53_XSHUT actions. What <see cref="Reset"/> does depends on the bridge:
+/// on the VL53L4CD bridge (contract 10) it is blocking on the MCU and is
+/// answered only after the sensor's boot handshake (allow ≥ 1.5 s); on the
+/// 1D-family bridge v2.00 (contract 12 §2, <see cref="Vl53lx.Vl53lxWire.PackXshut"/>)
+/// it is 1 ms low plus a fixed 5 ms wait with no handshake, and the host polls
+/// the boot register itself.
 /// </summary>
 public static class Vl53l4Xshut
 {

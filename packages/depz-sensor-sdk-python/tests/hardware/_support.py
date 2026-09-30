@@ -53,8 +53,30 @@ FAMILY_SR04 = "sr04"
 FAMILY_VL53L4CD = "vl53l4cd"
 FAMILY_VL53L8CX = "vl53l8cx"
 FAMILY_VL53L8CH = "vl53l8ch"
+FAMILY_VL53L5CX = "vl53l5cx"
+FAMILY_VL53L7CX = "vl53l7cx"
+FAMILY_VL53L7CH = "vl53l7ch"
 FAMILY_BNO086 = "bno086"
-ALL_FAMILIES = (FAMILY_SR04, FAMILY_VL53L4CD, FAMILY_VL53L8CX, FAMILY_VL53L8CH, FAMILY_BNO086)
+FAMILY_BNO055 = "bno055"
+#: The I2C L5/L7 board (APP_VL53L7): one firmware, three sensor classes.
+VL53L7_FAMILIES = (FAMILY_VL53L5CX, FAMILY_VL53L7CX, FAMILY_VL53L7CH)
+FAMILY_VL53L0X = "vl53l0x"
+FAMILY_VL53L1CX = "vl53l1cx"
+FAMILY_VL53L1CB = "vl53l1cb"
+FAMILY_VL53L3CX = "vl53l3cx"
+FAMILY_VL53L4CX = "vl53l4cx"
+#: The 1D-family board (APP_VL53L0_4): one firmware, one class per product.
+VL53LX_FAMILIES = (FAMILY_VL53L0X, FAMILY_VL53L1CX, FAMILY_VL53L1CB, FAMILY_VL53L3CX, FAMILY_VL53L4CX)
+ALL_FAMILIES = (
+    FAMILY_SR04,
+    FAMILY_VL53L4CD,
+    FAMILY_VL53L8CX,
+    FAMILY_VL53L8CH,
+    *VL53L7_FAMILIES,
+    *VL53LX_FAMILIES,
+    FAMILY_BNO086,
+    FAMILY_BNO055,
+)
 
 
 # ── device inventory ─────────────────────────────────────────────────────────
@@ -65,7 +87,7 @@ class HwDevice:
     """One physically present DEPZ unit, identified by USB iSerial."""
 
     stable_id: str  # "<family>:<usb_serial>" — survives replug/renumbering
-    family: str  # sr04 | vl53l8cx | vl53l8ch | bno086
+    family: str  # one of ALL_FAMILIES
     usb_serial: str
     usb_vid: int
     usb_pid: int
@@ -131,7 +153,16 @@ _HINT_TO_FAMILY = {
     "vl53l4cd": FAMILY_VL53L4CD,
     "vl53l8cx": FAMILY_VL53L8CX,
     "vl53l8ch": FAMILY_VL53L8CH,
+    "vl53l5cx": FAMILY_VL53L5CX,
+    "vl53l7cx": FAMILY_VL53L7CX,
+    "vl53l7ch": FAMILY_VL53L7CH,
+    "vl53l0x": FAMILY_VL53L0X,
+    "vl53l1cx": FAMILY_VL53L1CX,
+    "vl53l1cb": FAMILY_VL53L1CB,
+    "vl53l3cx": FAMILY_VL53L3CX,
+    "vl53l4cx": FAMILY_VL53L4CX,
     "bno086": FAMILY_BNO086,
+    "bno055": FAMILY_BNO055,
 }
 
 
@@ -180,16 +211,27 @@ def open_family(dev: HwDevice, **kw):
     knows what the unit is, and re-probing on every open would double the
     open/close churn a reconnect test is trying to measure.
     """
-    from depz_sensor_sdk import Bno086, Sr04, Vl53l4Cd
-    from depz_sensor_sdk.vl53l8 import Vl53l8Ch, Vl53l8Cx
+    from depz_sensor_sdk import Bno055, Bno086, Sr04, Vl53l4cd
+    from depz_sensor_sdk.vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx
+    from depz_sensor_sdk.vl53lx import Vl53l0x, Vl53l1cb, Vl53l1cx, Vl53l3cx, Vl53l4cx
+    from depz_sensor_sdk.vl53l8 import Vl53l8ch, Vl53l8cx
 
     port = dev.resolve_port()
     cls = {
         FAMILY_SR04: Sr04,
-        FAMILY_VL53L4CD: Vl53l4Cd,
-        FAMILY_VL53L8CX: Vl53l8Cx,
-        FAMILY_VL53L8CH: Vl53l8Ch,
+        FAMILY_VL53L4CD: Vl53l4cd,
+        FAMILY_VL53L8CX: Vl53l8cx,
+        FAMILY_VL53L8CH: Vl53l8ch,
+        FAMILY_VL53L5CX: Vl53l5cx,
+        FAMILY_VL53L7CX: Vl53l7cx,
+        FAMILY_VL53L7CH: Vl53l7ch,
+        FAMILY_VL53L0X: Vl53l0x,
+        FAMILY_VL53L1CX: Vl53l1cx,
+        FAMILY_VL53L1CB: Vl53l1cb,
+        FAMILY_VL53L3CX: Vl53l3cx,
+        FAMILY_VL53L4CX: Vl53l4cx,
         FAMILY_BNO086: Bno086,
+        FAMILY_BNO055: Bno055,
     }[dev.family]
     return cls(port, **kw)
 

@@ -42,6 +42,33 @@ interface Expected {
 }
 
 describe("vl53l8 full-stack replay", () => {
+  it("reports firmware download as one forward-only progress ramp", async () => {
+    // The ~84 KB firmware is written in three banks; each used to report its
+    // own 0→100, so the bar jumped backwards twice. Progress must now be
+    // cumulative over the whole download: one constant total, done only ever
+    // increasing, ending exactly at total.
+    const replay = new ReplayTransport(readFileSync(FIXTURE, "utf8"), { strictTx: true });
+    const dev = new Vl53l8(replay, { timeoutMs: 2000, sleepImpl: () => Promise.resolve() });
+    await dev.open();
+    const calls: Array<[number, number]> = [];
+    try {
+      await dev.identify();
+      await dev.getSoftwareName();
+      await dev.init("cx", { writeProgress: (done, total) => calls.push([done, total]) });
+    } finally {
+      await dev.close();
+    }
+    expect(calls.length).toBeGreaterThan(3); // multi-chunk, multi-bank
+    const total = calls[0]![1];
+    expect(total).toBe(0x15000); // full firmware size, not a per-bank size
+    expect(calls.every(([, t]) => t === total)).toBe(true); // one constant total
+    for (let i = 1; i < calls.length; i++) {
+      expect(calls[i]![0]).toBeGreaterThanOrEqual(calls[i - 1]![0]); // forward-only
+    }
+    expect(calls.some(([d]) => d > 0x8000)).toBe(true); // spans past bank 1 → cumulative
+    expect(calls[calls.length - 1]![0]).toBe(total); // ends at 100 %
+  });
+
   it("re-issues a byte-identical session and decodes every frame", async () => {
     const expected = JSON.parse(readFileSync(EXPECTED, "utf8")) as Expected;
     const replay = new ReplayTransport(readFileSync(FIXTURE, "utf8"), { strictTx: true });

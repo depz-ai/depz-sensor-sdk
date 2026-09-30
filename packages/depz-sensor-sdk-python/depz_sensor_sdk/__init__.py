@@ -1,4 +1,5 @@
-"""DEPZ sensor line SDK — SR04, VL53L4CD, VL53L8CX/CH, BNO086 over USB CDC-ACM.
+"""DEPZ sensor line SDK — SR04, VL53L4CD, VL53L8CX/CH, VL53L5CX/L7CX/L7CH,
+VL53L0X/L1CX/L1CB/L3CX/L4CX, BNO086, BNO055 over USB CDC-ACM.
 
 Public surface is defined by contracts/07_SDK_FACADE.md.
 """
@@ -25,8 +26,19 @@ from .dataset import DatasetReader, DatasetRecord, SessionRecorder
 from .protocol.bootloader import FwDepzImage
 from .device import StreamIterator
 from .discovery import DeviceInfo, list_depz_devices, open_device, probe_port
-from .vl53l4 import Vl53l4Cd, Vl53l4Info, Vl53l4Measurement
-from .vl53l8 import CnhConfig, Vl53l8, Vl53l8Ch, Vl53l8Cx, Vl53l8Frame
+from .vl53l4 import Vl53l4cd, Vl53l4Info, Vl53l4Measurement
+from .vl53l8 import CnhConfig, Vl53l8, Vl53l8ch, Vl53l8cx, Vl53l8Frame
+from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx, Vl53l7Frame, Vl53l7Info
+from .vl53lx import (
+    Vl53l0x,
+    Vl53l1cb,
+    Vl53l1cx,
+    Vl53l3cx,
+    Vl53l4cx,
+    Vl53lx,
+    Vl53lxInfo,
+    Vl53lxMeasurement,
+)
 from .errors import (
     BusyError,
     DepzError,
@@ -44,6 +56,16 @@ from .usb_ids import (
 )
 from .sr04 import Sr04, Sr04Measurement
 from .bno086 import Bno086, GyroIntegratedRV, RotationVector, SensorId
+from .bno055 import (
+    AxisRemap,
+    Bno055,
+    Bno055Info,
+    Bno055Sample,
+    CalibrationProfile,
+    CalibStatus,
+    OprMode,
+    Units,
+)
 
 try:
     from importlib.metadata import PackageNotFoundError, version as _pkg_version
@@ -85,18 +107,39 @@ __all__ = [
     # sensors
     "Sr04",
     "Sr04Measurement",
-    "Vl53l4Cd",
+    "Vl53l4cd",
     "Vl53l4Measurement",
     "Vl53l4Info",
     "Vl53l8",
-    "Vl53l8Cx",
-    "Vl53l8Ch",
+    "Vl53l8cx",
+    "Vl53l8ch",
     "Vl53l8Frame",
+    "Vl53l5cx",
+    "Vl53l7cx",
+    "Vl53l7ch",
+    "Vl53l7Frame",
+    "Vl53l7Info",
+    "Vl53lx",
+    "Vl53l0x",
+    "Vl53l1cx",
+    "Vl53l1cb",
+    "Vl53l3cx",
+    "Vl53l4cx",
+    "Vl53lxMeasurement",
+    "Vl53lxInfo",
     "CnhConfig",
     "Bno086",
     "SensorId",
     "RotationVector",
     "GyroIntegratedRV",
+    "Bno055",
+    "Bno055Info",
+    "Bno055Sample",
+    "OprMode",
+    "Units",
+    "AxisRemap",
+    "CalibStatus",
+    "CalibrationProfile",
     "StreamIterator",
     # datasets (contract 09)
     "SessionRecorder",

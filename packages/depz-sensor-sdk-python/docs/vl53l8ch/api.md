@@ -4,7 +4,7 @@ The public API for the VL53L8CH (ToF + CNH) sensor. Discovery, device-base,
 transport and other cross-sensor symbols shared by every sensor
 live in the [top-level API reference](../api.md).
 
-`Vl53l8Ch` is a superset of the VL53L8CX and inherits its entire
+`Vl53l8ch` is a superset of the VL53L8CX and inherits its entire
 configuration and ranging surface — only the CH-specific additions
 (Compact-Network-Histogram output) are listed here. For init,
 resolution, frequency, the advanced ULD features and the frame,
@@ -15,14 +15,14 @@ the source, not this file.
 
 ## Contents
 
-- **VL53L8CH (ToF + CNH)**: [`Vl53l8Ch`](#vl53l8ch), [`CnhConfig`](#cnhconfig)
+- **VL53L8CH (ToF + CNH)**: [`Vl53l8ch`](#vl53l8ch), [`CnhConfig`](#cnhconfig)
 
 ## VL53L8CH (ToF + CNH)
 
-### Vl53l8Ch
+### Vl53l8ch
 
 ```python
-class Vl53l8Ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
 ```
 
 VL53L8CH device: the VL53L8CX superset. Inherits every CX method and
@@ -30,30 +30,35 @@ adds Compact-Network-Histogram (CNH) output. `init()` downloads the CH
 firmware blob (VL53LMZ ULD 2.0.16). CNH is the reason to run CH firmware:
 each frame can additionally carry a per-aggregate distance histogram.
 
-#### Vl53l8Ch.configure_cnh
+#### Vl53l8ch.configure_cnh
 
 ```python
 configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
 ```
 
 Arm the CNH histogram block for the next start_ranging(). CH only —
-this method does not exist on Vl53l8Cx.
+this method does not exist on Vl53l8cx.
 
-#### Vl53l8Ch.uld *(property)*
+#### Vl53l8ch.cnh_config *(property)*
+
+The CNH config armed by :meth:`configure_cnh`, or ``None``.
+Recorders read this to persist decode parameters next to raw blocks.
+
+#### Vl53l8ch.uld *(property)*
 
 The underlying ULD driver (escape hatch for advanced DCI access).
 
-#### Vl53l8Ch.variant *(property)*
+#### Vl53l8ch.variant *(property)*
 
 'cx' | 'ch' (valid after init()).
 
-#### Vl53l8Ch.is_alive
+#### Vl53l8ch.is_alive
 
 ```python
 is_alive(self) -> bool
 ```
 
-#### Vl53l8Ch.init
+#### Vl53l8ch.init
 
 ```python
 init(self, variant: str | None = None, *, progress: Optional[Callable[[str], NoneType]] = None, write_progress: Optional[Callable[[int, int], NoneType]] = None) -> None
@@ -61,13 +66,13 @@ init(self, variant: str | None = None, *, progress: Optional[Callable[[str], Non
 
 Initialize the sensor: firmware blob download + default config.
 
-The blob variant is fixed by the class (`Vl53l8Cx` → 'cx',
-`Vl53l8Ch` → 'ch'); `variant` is accepted only for backward
+The blob variant is fixed by the class (`Vl53l8cx` → 'cx',
+`Vl53l8ch` → 'ch'); `variant` is accepted only for backward
 compatibility and must match the class variant when given. `progress`
 receives phase strings; `write_progress(done, total)` tracks the big
 blob writes.
 
-#### Vl53l8Ch.get_resolution
+#### Vl53l8ch.get_resolution
 
 ```python
 get_resolution(self) -> int
@@ -75,7 +80,7 @@ get_resolution(self) -> int
 
 Active zone count: 16 (4×4) or 64 (8×8).
 
-#### Vl53l8Ch.set_resolution
+#### Vl53l8ch.set_resolution
 
 ```python
 set_resolution(self, zones: int) -> None
@@ -84,7 +89,7 @@ set_resolution(self, zones: int) -> None
 Select the zone grid: RESOLUTION_4X4 (16) or RESOLUTION_8X8 (64).
 Not while ranging.
 
-#### Vl53l8Ch.get_ranging_frequency_hz
+#### Vl53l8ch.get_ranging_frequency_hz
 
 ```python
 get_ranging_frequency_hz(self) -> int
@@ -92,7 +97,7 @@ get_ranging_frequency_hz(self) -> int
 
 Configured ranging frequency in Hz.
 
-#### Vl53l8Ch.set_ranging_frequency_hz
+#### Vl53l8ch.set_ranging_frequency_hz
 
 ```python
 set_ranging_frequency_hz(self, hz: int) -> None
@@ -103,7 +108,7 @@ Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
 Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
 enters its ranging loop and streams nothing (contract 04).
 
-#### Vl53l8Ch.get_ranging_mode
+#### Vl53l8ch.get_ranging_mode
 
 ```python
 get_ranging_mode(self) -> int
@@ -111,7 +116,7 @@ get_ranging_mode(self) -> int
 
 RANGING_MODE_CONTINUOUS or RANGING_MODE_AUTONOMOUS.
 
-#### Vl53l8Ch.set_ranging_mode
+#### Vl53l8ch.set_ranging_mode
 
 ```python
 set_ranging_mode(self, mode: int) -> None
@@ -120,7 +125,7 @@ set_ranging_mode(self, mode: int) -> None
 Set CONTINUOUS (free-running) or AUTONOMOUS (integrate-then-idle)
 ranging. Not while ranging.
 
-#### Vl53l8Ch.get_integration_time_ms
+#### Vl53l8ch.get_integration_time_ms
 
 ```python
 get_integration_time_ms(self) -> int
@@ -128,7 +133,7 @@ get_integration_time_ms(self) -> int
 
 Configured integration time in ms.
 
-#### Vl53l8Ch.set_integration_time_ms
+#### Vl53l8ch.set_integration_time_ms
 
 ```python
 set_integration_time_ms(self, ms: int) -> None
@@ -137,7 +142,7 @@ set_integration_time_ms(self, ms: int) -> None
 Set the integration time, 2–1000 ms. Autonomous mode only (no
 effect in continuous ranging). Not while ranging.
 
-#### Vl53l8Ch.get_sharpener_percent
+#### Vl53l8ch.get_sharpener_percent
 
 ```python
 get_sharpener_percent(self) -> int
@@ -145,7 +150,7 @@ get_sharpener_percent(self) -> int
 
 Configured edge-sharpener strength, 0–99 %.
 
-#### Vl53l8Ch.set_sharpener_percent
+#### Vl53l8ch.set_sharpener_percent
 
 ```python
 set_sharpener_percent(self, pct: int) -> None
@@ -153,7 +158,7 @@ set_sharpener_percent(self, pct: int) -> None
 
 Set the edge sharpener, 0–99 % (0 disables). Not while ranging.
 
-#### Vl53l8Ch.get_target_order
+#### Vl53l8ch.get_target_order
 
 ```python
 get_target_order(self) -> int
@@ -161,7 +166,7 @@ get_target_order(self) -> int
 
 TARGET_ORDER_CLOSEST or TARGET_ORDER_STRONGEST.
 
-#### Vl53l8Ch.set_target_order
+#### Vl53l8ch.set_target_order
 
 ```python
 set_target_order(self, order: int) -> None
@@ -170,7 +175,7 @@ set_target_order(self, order: int) -> None
 Order multi-target zones by CLOSEST or STRONGEST return. Not while
 ranging.
 
-#### Vl53l8Ch.get_power_mode
+#### Vl53l8ch.get_power_mode
 
 ```python
 get_power_mode(self) -> int
@@ -178,7 +183,7 @@ get_power_mode(self) -> int
 
 POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants).
 
-#### Vl53l8Ch.set_power_mode
+#### Vl53l8ch.set_power_mode
 
 ```python
 set_power_mode(self, mode: int) -> None
@@ -187,19 +192,19 @@ set_power_mode(self, mode: int) -> None
 Enter sleep / wake / deep-sleep. Not while ranging. Waking from
 DEEP_SLEEP re-downloads the firmware blob (init()).
 
-#### Vl53l8Ch.get_xtalk_margin
+#### Vl53l8ch.get_xtalk_margin
 
 ```python
 get_xtalk_margin(self) -> float
 ```
 
-#### Vl53l8Ch.set_xtalk_margin
+#### Vl53l8ch.set_xtalk_margin
 
 ```python
 set_xtalk_margin(self, margin_kcps: float) -> None
 ```
 
-#### Vl53l8Ch.calibrate_xtalk
+#### Vl53l8ch.calibrate_xtalk
 
 ```python
 calibrate_xtalk(self, reflectance_percent: int, nb_samples: int, distance_mm: int) -> None
@@ -210,7 +215,7 @@ Run on-device crosstalk calibration against a flat target at
 `nb_samples` (1..16). The result is captured into the xtalk buffer;
 read it back with get_caldata_xtalk(). Blocks several seconds.
 
-#### Vl53l8Ch.get_caldata_xtalk
+#### Vl53l8ch.get_caldata_xtalk
 
 ```python
 get_caldata_xtalk(self) -> bytes
@@ -218,7 +223,7 @@ get_caldata_xtalk(self) -> bytes
 
 Read back the 776-byte xtalk calibration blob (save/restore).
 
-#### Vl53l8Ch.set_caldata_xtalk
+#### Vl53l8ch.set_caldata_xtalk
 
 ```python
 set_caldata_xtalk(self, blob: bytes) -> None
@@ -226,25 +231,25 @@ set_caldata_xtalk(self, blob: bytes) -> None
 
 Restore a previously saved 776-byte xtalk calibration blob.
 
-#### Vl53l8Ch.get_detection_thresholds_enable
+#### Vl53l8ch.get_detection_thresholds_enable
 
 ```python
 get_detection_thresholds_enable(self) -> int
 ```
 
-#### Vl53l8Ch.set_detection_thresholds_enable
+#### Vl53l8ch.set_detection_thresholds_enable
 
 ```python
 set_detection_thresholds_enable(self, enabled: bool) -> None
 ```
 
-#### Vl53l8Ch.get_detection_thresholds
+#### Vl53l8ch.get_detection_thresholds
 
 ```python
 get_detection_thresholds(self) -> list[dict]
 ```
 
-#### Vl53l8Ch.set_detection_thresholds
+#### Vl53l8ch.set_detection_thresholds
 
 ```python
 set_detection_thresholds(self, thresholds: list[dict]) -> None
@@ -254,13 +259,13 @@ Program the 64 detection thresholds (interrupt-on-threshold). Each
 entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
 operation (see uld THRESH_* constants).
 
-#### Vl53l8Ch.set_detection_thresholds_auto_stop
+#### Vl53l8ch.set_detection_thresholds_auto_stop
 
 ```python
 set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 ```
 
-#### Vl53l8Ch.configure_motion_indicator
+#### Vl53l8ch.configure_motion_indicator
 
 ```python
 configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
@@ -270,7 +275,7 @@ Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
 
-#### Vl53l8Ch.start_ranging
+#### Vl53l8ch.start_ranging
 
 ```python
 start_ranging(self) -> None
@@ -278,15 +283,15 @@ start_ranging(self) -> None
 
 Configure the output list, start the sensor and the MCU stream.
 
-#### Vl53l8Ch.stop_ranging
+#### Vl53l8ch.stop_ranging
 
 ```python
 stop_ranging(self) -> None
 ```
 
-#### Vl53l8Ch.ranging *(property)*
+#### Vl53l8ch.ranging *(property)*
 
-#### Vl53l8Ch.on_frame
+#### Vl53l8ch.on_frame
 
 ```python
 on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> Callable[[], NoneType]
@@ -294,7 +299,7 @@ on_frame(self, cb: Callable[[depz_sensor_sdk.vl53l8.Vl53l8Frame], NoneType]) -> 
 
 Subscribe to parsed frames (reader-thread context; don't block).
 
-#### Vl53l8Ch.frames
+#### Vl53l8ch.frames
 
 ```python
 frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
@@ -303,16 +308,16 @@ frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
 Blocking iterator over parsed frames (bounded, drop-oldest).
 Subscribes immediately — call before or after start_ranging().
 
-#### Vl53l8Ch.frame_parse_errors *(property)*
+#### Vl53l8ch.frame_parse_errors *(property)*
 
 Frames dropped because ULD parsing failed (corrupt frame, bad size).
 Distinct from reassembler gap discards (`reassembler_discards`).
 
-#### Vl53l8Ch.reassembler_discards *(property)*
+#### Vl53l8ch.reassembler_discards *(property)*
 
 Chunked frames discarded by the reassembler (gaps / offset errors).
 
-#### Vl53l8Ch.get_frame
+#### Vl53l8ch.get_frame
 
 ```python
 get_frame(self, timeout: float = 2.0) -> depz_sensor_sdk.vl53l8.Vl53l8Frame
@@ -325,17 +330,17 @@ Raises `DepzTimeoutError` when no frame arrives within `timeout`, and
 a caller blocked here is released by `close()` instead of sitting out
 the full timeout on a link that can never deliver again.
 
-#### Vl53l8Ch.close
+#### Vl53l8ch.close
 
 ```python
 close(self) -> None
 ```
 
-#### Vl53l8Ch.port *(property)*
+#### Vl53l8ch.port *(property)*
 
-#### Vl53l8Ch.closed *(property)*
+#### Vl53l8ch.closed *(property)*
 
-#### Vl53l8Ch.on_event
+#### Vl53l8ch.on_event
 
 ```python
 on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
@@ -344,7 +349,7 @@ on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> 
 Subscribe to unsolicited/diagnostic events (reader-thread context;
 do not block). Returns an unsubscribe function.
 
-#### Vl53l8Ch.events
+#### Vl53l8ch.events
 
 ```python
 events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
@@ -353,7 +358,7 @@ events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
 Pull-style event stream (bounded, drop-oldest). Subscribes
 immediately — events emitted after this call are never missed.
 
-#### Vl53l8Ch.send
+#### Vl53l8ch.send
 
 ```python
 send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
@@ -361,7 +366,7 @@ send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transpor
 
 Fire-and-forget packet (escape hatch; prefer `request`).
 
-#### Vl53l8Ch.request
+#### Vl53l8ch.request
 
 ```python
 request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
@@ -376,7 +381,7 @@ Exactly one of the completion paths must be configured:
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
 ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
 
-#### Vl53l8Ch.expect_report
+#### Vl53l8ch.expect_report
 
 ```python
 expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -384,7 +389,7 @@ expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_
 
 Matcher for a typed report identified by its report ID alone.
 
-#### Vl53l8Ch.expect_text
+#### Vl53l8ch.expect_text
 
 ```python
 expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
@@ -392,25 +397,25 @@ expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Pac
 
 Matcher for RPT_TEXT echoing `request_cmd`.
 
-#### Vl53l8Ch.get_device_name
+#### Vl53l8ch.get_device_name
 
 ```python
 get_device_name(self) -> str
 ```
 
-#### Vl53l8Ch.get_software_name
+#### Vl53l8ch.get_software_name
 
 ```python
 get_software_name(self) -> str
 ```
 
-#### Vl53l8Ch.get_serial_number
+#### Vl53l8ch.get_serial_number
 
 ```python
 get_serial_number(self) -> str
 ```
 
-#### Vl53l8Ch.read_mcu_temperature
+#### Vl53l8ch.read_mcu_temperature
 
 ```python
 read_mcu_temperature(self) -> float
@@ -418,7 +423,7 @@ read_mcu_temperature(self) -> float
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
-#### Vl53l8Ch.sync_time
+#### Vl53l8ch.sync_time
 
 ```python
 sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
@@ -426,9 +431,9 @@ sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
-#### Vl53l8Ch.time_sync *(property)*
+#### Vl53l8ch.time_sync *(property)*
 
-#### Vl53l8Ch.to_host_time_us
+#### Vl53l8ch.to_host_time_us
 
 ```python
 to_host_time_us(self, device_timestamp_us: int) -> int
@@ -436,13 +441,13 @@ to_host_time_us(self, device_timestamp_us: int) -> int
 
 Device µs → host monotonic µs (requires a prior `sync_time`).
 
-#### Vl53l8Ch.get_report_payload_crc
+#### Vl53l8ch.get_report_payload_crc
 
 ```python
 get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
 ```
 
-#### Vl53l8Ch.set_report_payload_crc
+#### Vl53l8ch.set_report_payload_crc
 
 ```python
 set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
@@ -450,19 +455,19 @@ set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
-#### Vl53l8Ch.get_sync_pin
+#### Vl53l8ch.get_sync_pin
 
 ```python
 get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
 ```
 
-#### Vl53l8Ch.set_sync_pin
+#### Vl53l8ch.set_sync_pin
 
 ```python
 set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
 ```
 
-#### Vl53l8Ch.reset
+#### Vl53l8ch.reset
 
 ```python
 reset(self) -> None
@@ -470,7 +475,7 @@ reset(self) -> None
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
-#### Vl53l8Ch.enter_bootloader_mode
+#### Vl53l8ch.enter_bootloader_mode
 
 ```python
 enter_bootloader_mode(self) -> None

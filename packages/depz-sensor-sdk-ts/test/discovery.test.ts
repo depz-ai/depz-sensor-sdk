@@ -15,7 +15,7 @@ import {
   PacketParser,
   Sr04,
   Vl53l8,
-  Vl53l8Ch,
+  Vl53l8ch,
   buildPacket,
   isKnownDepzUsb,
   listDepzDevicesFrom,
@@ -320,9 +320,9 @@ describe("device-serial selection (browser path)", () => {
   it("serial option selects by exact device serial", async () => {
     const dev = await openDeviceByDeviceSerial(ports(), factory, null, { serial: "SN-B" });
     try {
-      // webserial:2 has PID 0xED40 → the CH silicon hint selects Vl53l8Ch
-      // (which is also an instanceof the Vl53l8/Vl53l8Cx base).
-      expect(dev).toBeInstanceOf(Vl53l8Ch);
+      // webserial:2 has PID 0xED40 → the CH silicon hint selects Vl53l8ch
+      // (which is also an instanceof the Vl53l8/Vl53l8cx base).
+      expect(dev).toBeInstanceOf(Vl53l8ch);
       expect(dev).toBeInstanceOf(Vl53l8);
     } finally {
       await dev.close();
