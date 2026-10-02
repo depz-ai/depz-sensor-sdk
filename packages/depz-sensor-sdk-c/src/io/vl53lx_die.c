@@ -703,7 +703,33 @@ static int calibrate_xtalk(vlx_driver *d, int target_mm, int nb, int32_t *out)
     return DEPZ_OK;
 }
 
-static uint32_t reach_l4(const vlx_driver *d) { (void)d; return 1200; }
+/* ── reach (VL53L1Die.reach_mm) ────────────────────────────────────────── */
+
+/* One PLL period is c/2 of distance at the oscillator the die measured for
+ * itself (OSC_FREQUENCY, 4.12 MHz): 198.4 mm at the usual 0xBCCC. The same
+ * arithmetic as VL53LX_range_maths() in the Bare Driver, which applies this
+ * window on the host side in histogram mode. */
+uint32_t vlx_phase_window_mm(uint32_t fast_osc_frequency, uint32_t valid_phase_high)
+{
+    uint64_t pll_period;
+    if (fast_osc_frequency == 0) return 0;
+    pll_period = (UINT64_C(1) << 30) / fast_osc_frequency; /* us, 0.18 */
+    return (uint32_t)(((uint64_t)valid_phase_high * pll_period * (299704u >> 3)) >> 25);
+}
+
+/* Read off the loaded configuration, so it follows the blob and the mode:
+ * 1388 mm for the 0x38 window of the L4CD, L3CX and L1 short blobs, 4563 mm
+ * for the 0xB8 window L1 long writes. */
+static int die_reach_mm(vlx_driver *d, uint32_t *out)
+{
+    uint16_t osc;
+    uint8_t vph;
+    VLX_TRY(vlx_rd_word(P, OSC_FREQUENCY, &osc));
+    if (osc == 0) return depz_fail(DEPZ_E_PROTOCOL, "vl53lx: osc_frequency reads 0");
+    VLX_TRY(vlx_rd_byte(P, RANGE_CONFIG__VALID_PHASE_HIGH, &vph));
+    *out = vlx_phase_window_mm(osc, vph);
+    return DEPZ_OK;
+}
 
 static void destroy(vlx_driver *d) { free(d); }
 
@@ -721,19 +747,21 @@ static const vlx_ops L4_OPS = {
         DEPZ_VL53LX_CAP_SIGNAL_THRESH | DEPZ_VL53LX_CAP_SIGMA_THRESH | DEPZ_VL53LX_CAP_TEMP_UPDATE |
         DEPZ_VL53LX_CAP_CALIB_OFFSET | DEPZ_VL53LX_CAP_CALIB_XTALK,
     false, 10, 200, DIE_MANDATORY,
-    NULL, NULL, NULL, NULL, reach_l4, set_offset, get_offset, set_xtalk, get_xtalk, calibrate_offset,
+    NULL, NULL, NULL, NULL, die_reach_mm, set_offset, get_offset, set_xtalk, get_xtalk, calibrate_offset,
     calibrate_xtalk, set_detection_thresholds, get_detection_thresholds, set_signal_threshold,
     get_signal_threshold, set_sigma_threshold, get_sigma_threshold, NULL, NULL, NULL, NULL,
-    start_temperature_update, NULL};
+    start_temperature_update, NULL,
+    NULL};
 
 static const vlx_ops L3_OPS = {
     "VL53L3", DIE_COMMON,
     DEPZ_VL53LX_CAP_TIMING | DEPZ_VL53LX_CAP_THRESHOLDS | DEPZ_VL53LX_CAP_SIGNAL_THRESH |
         DEPZ_VL53LX_CAP_SIGMA_THRESH | DEPZ_VL53LX_CAP_ROI,
     false, 10, 200, DIE_MANDATORY,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, set_detection_thresholds,
+    NULL, NULL, NULL, NULL, die_reach_mm, NULL, NULL, NULL, NULL, NULL, NULL, set_detection_thresholds,
     get_detection_thresholds, set_signal_threshold, get_signal_threshold, set_sigma_threshold,
-    get_sigma_threshold, set_roi, get_roi, set_roi_center, get_roi_center, NULL, NULL};
+    get_sigma_threshold, set_roi, get_roi, set_roi_center, get_roi_center, NULL, NULL,
+    NULL};
 
 static const vlx_ops L1_OPS = {
     "VL53L1", DIE_COMMON,
@@ -742,10 +770,11 @@ static const vlx_ops L1_OPS = {
         DEPZ_VL53LX_CAP_TEMP_UPDATE | DEPZ_VL53LX_CAP_CALIB_OFFSET | DEPZ_VL53LX_CAP_CALIB_XTALK |
         DEPZ_VL53LX_CAP_ROI,
     false, 15, 500, DIE_MANDATORY,
-    l1_modes, l1_budget_choices, l1_set_mode, l1_get_mode, NULL, set_offset, get_offset, set_xtalk,
+    l1_modes, l1_budget_choices, l1_set_mode, l1_get_mode, die_reach_mm, set_offset, get_offset, set_xtalk,
     get_xtalk, calibrate_offset, calibrate_xtalk, set_detection_thresholds, get_detection_thresholds,
     set_signal_threshold, get_signal_threshold, set_sigma_threshold, get_sigma_threshold, set_roi,
-    get_roi, set_roi_center, get_roi_center, start_temperature_update, NULL};
+    get_roi, set_roi_center, get_roi_center, start_temperature_update, NULL,
+    NULL};
 
 static vlx_driver *new_die(vlx_plat *p, depz_vl53lx_product product, die_kind kind, const vlx_ops *ops)
 {

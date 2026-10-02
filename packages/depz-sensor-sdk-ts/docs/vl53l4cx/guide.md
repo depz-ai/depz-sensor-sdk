@@ -43,7 +43,7 @@ everything about the bound pair: product, driver, model id, reach, supported
 groups, modes and budgets. (`identify()` is the firmware identity every DEPZ
 device has.)
 
-To run the die on the VL53L4CD's light driver (1.2 m, calibrations,
+To run the die on the VL53L4CD's light driver (~1.4 m, calibrations,
 thresholds), borrow it — `notes()` then says the driver is borrowed:
 
 ```ts
@@ -200,6 +200,6 @@ silently — watch increments.
 - **`configure()` before every run** — it is also what clears an armed detection window.
 - **Configuration while ranging throws** — stop, reconfigure, restart.
 - **Prefer `plottable` over `valid`** — non-zero statuses are data, not errors.
-- **Don't use the `short` preset on the L4CX** — at any distance its frames alternate: one carries the true distance but status 7, the next a wrong one (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m; at 1.0 m the true 1008 mm comes flagged status 4 and the other frame reads 238 mm). A plottable filter drops them all. Same on firmware v0.23 and v0.24 and with the firmware repo's own `vl53_tool.py`; the cause is not known yet. `medium` and `long` are clean at all four distances — use them.
+- **No `short` preset on this die** — the histogram driver offers `medium` and `long` only, with budgets 2–200 ms (`modes` and `identifyProduct()` show it after `init()`); asking for `short` throws `Vl53Error`. ST's own L4CX driver refuses it too: on an L4 die the A frame of the short pair ranges on the wrong side of the phase wrap, one frame in two (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4).
 - **Callbacks run on the read-pump context** — keep them short; hand heavy work to a queue or use `measurements()`.
 - **`timestampUs` is a `bigint`** (device µs). Use `syncTime()` + `toHostTimeUs()` to place measurements on the host clock.

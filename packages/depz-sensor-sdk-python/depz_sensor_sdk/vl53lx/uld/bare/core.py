@@ -92,6 +92,10 @@ DISTANCE_MODES = ('short', 'medium', 'long')
 TIMING_GUARD_US = 1700
 TIMING_DIVISOR  = 6
 FDA_MAX_TIMING_BUDGET_US = 550000
+# The L4CX BareDriver (STSW-IMG029) narrows both for an L4 die: a lower budget
+# ceiling, and no short mode at all (see `BareDriver.is_l4()`).
+L4_FDA_MAX_TIMING_BUDGET_US = 200000
+L4_DISTANCE_MODES = ('medium', 'long')
 
 
 # ── SPAD geometry (vl53lx_core.c, vl53lx_core_support.c) ─────────────────────
@@ -762,11 +766,32 @@ class BareDriver:
             self.add_off_cal_data, self.rtn_good_spads,
             self.img.general_config.dss_config__aperture_attenuation)
 
+    def is_l4(self) -> bool:
+        """`IsL4()` of the L4CX BareDriver: the die, read from NVM, not the
+        product name — an L4CD or L4CX board ranging under a borrowed name is
+        still an L4. 0xEC is the L4ED."""
+        nvm = self.img.nvm_copy_data
+        return (nvm.identification__module_type == 0xAA
+                and nvm.identification__model_id in (0xEB, 0xEC))
+
+    def distance_modes(self) -> tuple:
+        return L4_DISTANCE_MODES if self.is_l4() else DISTANCE_MODES
+
+    def fda_max_timing_budget_us(self) -> int:
+        return (L4_FDA_MAX_TIMING_BUDGET_US if self.is_l4()
+                else FDA_MAX_TIMING_BUDGET_US)
+
     def set_distance_mode(self, mode):
         """VL53LX_SetDistanceMode(): the preset mode, with the timeouts put
         back afterwards. `set_preset_mode()` on its own resets them to the
         preset's own defaults, which would silently throw away the timing
-        budget the caller asked for."""
+        budget the caller asked for.
+
+        Short is refused on an L4 die, as the L4CX BareDriver does: there the
+        A frame of the short pair ranges on the wrong side of the wrap, one
+        frame in two, measured on the L4CX board."""
+        if mode not in self.distance_modes():
+            raise ValueError(f'distance mode {mode} not available on this die')
         phasecal_us = self.phasecal_config_timeout_us
         mm_us = self.mm_config_timeout_us
         range_us = self.range_config_timeout_us
@@ -1007,7 +1032,7 @@ class BareDriver:
         if not TIMING_GUARD_US < budget_us <= 10000000:
             raise ValueError(f'timing budget {budget_us} us out of range')
         range_us = (budget_us - TIMING_GUARD_US) // TIMING_DIVISOR
-        if range_us * TIMING_DIVISOR > FDA_MAX_TIMING_BUDGET_US:
+        if range_us * TIMING_DIVISOR > self.fda_max_timing_budget_us():
             raise ValueError(f'timing budget {budget_us} us out of range')
         self.set_timeouts_us(self.phasecal_config_timeout_us,
                              self.mm_config_timeout_us, range_us)

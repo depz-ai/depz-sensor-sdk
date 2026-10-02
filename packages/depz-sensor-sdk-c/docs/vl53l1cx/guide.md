@@ -216,9 +216,11 @@ void targets(depz_device *dev)
 }
 ```
 
-The histogram driver's presets pick how far the 24 bins reach before the
-phase wraps: `short` 1.6 m, `medium` 2.4 m (what init leaves), `long` 4 m
-(`depz_vl53lx_driver_reach_mm()`). The bin is 199 mm wide in all three.
+The histogram driver's presets set the VCSEL period and, with it, the valid
+phase window: past ~990 mm (`short`), ~1790 mm (`medium`, what init leaves)
+or ~3370 mm (`long`) a target fails with status 4.
+`depz_vl53lx_driver_reach_mm()` gives the figure for the preset in use
+(computed on the host, no bus traffic). The bin is 199 mm wide in all three.
 On this driver `status == 0` is not the test — use `depz_vl53lx_plottable()`
 or `depz_vl53lx_primary_distance()` (the first plottable target). The driver
 steps an A/B frame-pair state and a phase-consistency history on every frame,

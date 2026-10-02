@@ -2070,10 +2070,12 @@ vl53lx::Vl53lxInfo Vl53lx::bridge_info()
 }
 
 void Vl53lx::configure(int budget_ms, int inter_ms, const std::optional<std::string>& mode,
-                       std::optional<std::int32_t> offset_mm, std::optional<std::int32_t> xtalk_kcps)
+                       std::optional<std::int32_t> offset_mm, std::optional<std::int32_t> xtalk_kcps,
+                       std::optional<int> signal_kcps)
 {
-    check(depz_vl53lx_configure(handle(), budget_ms, inter_ms, mode ? mode->c_str() : nullptr,
-                                offset_mm ? &*offset_mm : nullptr, xtalk_kcps ? &*xtalk_kcps : nullptr));
+    check(depz_vl53lx_configure_ex(handle(), budget_ms, inter_ms, mode ? mode->c_str() : nullptr,
+                                   offset_mm ? &*offset_mm : nullptr, xtalk_kcps ? &*xtalk_kcps : nullptr,
+                                   signal_kcps ? &*signal_kcps : nullptr));
 }
 
 std::pair<int, int> Vl53lx::range_timing()

@@ -18,6 +18,7 @@
 
 import { SensorDriver, type BridgePlatform, type Measurement } from "../base.js";
 import { I2C_KHZ_BOOT, Vl53Error } from "../link.js";
+import { phaseWindowMm } from "../vl53l1-die.js";
 import {
   BareDriver,
   CLEAR_RANGE_INT,
@@ -47,13 +48,6 @@ export const PAD_I2C_HV__CONFIG = 0x002d;
  */
 export const FMP_PAD_CONFIG = 0x12;
 
-/** How far the 24 bins reach before the phase wraps, per preset mode. */
-export const REACH_BY_MODE_MM: Readonly<Record<string, number>> = {
-  short: 1600,
-  medium: 2400,
-  long: 4000,
-};
-
 export const DEFAULT_MODE = "medium";
 
 /** VL53L1CX / L1CB / L3CX / L4CX in histogram mode: multi-target ranging. */
@@ -69,11 +63,15 @@ export class VL53LX extends SensorDriver {
   static override readonly MODES: readonly string[] = DISTANCE_MODES;
   // TIMING_GUARD_US comes off the budget before it is divided, and the range
   // timeout is capped at FDA_MAX_TIMING_BUDGET_US: 2..551 ms, rounded inwards.
+  // Both MODES and BUDGET_MS are narrowed per die in sensorInit().
   static override readonly BUDGET_MS: readonly [number, number] = [2, 550];
   static override readonly HISTOGRAM = true;
 
   readonly bare: BareDriver;
   private mode: string = DEFAULT_MODE;
+  // The die's own MODES / BUDGET_MS once NVM is read (null = the class's).
+  private dieModes: readonly string[] | null = null;
+  private dieBudgetMs: readonly [number, number] | null = null;
   private budgetMs = 33;
   private interMs = 0;
   // The A/B alternation rides on the ll-driver state; with the clear done by
@@ -86,6 +84,13 @@ export class VL53LX extends SensorDriver {
   constructor(platform: BridgePlatform, product: string) {
     super(platform, product);
     this.bare = new BareDriver(platform);
+  }
+
+  override get MODES(): readonly string[] {
+    return this.dieModes ?? VL53LX.MODES;
+  }
+  override get BUDGET_MS(): readonly [number, number] {
+    return this.dieBudgetMs ?? VL53LX.BUDGET_MS;
   }
 
   // ── identity ──
@@ -117,17 +122,22 @@ export class VL53LX extends SensorDriver {
     await this.waitBoot();
 
     await this.bare.dataInit();
+    // The die is known once NVM is read: an L4 has no short mode and a
+    // 200 ms budget ceiling, as in ST's L4CX BareDriver.
+    this.dieModes = this.bare.distanceModes();
+    this.dieBudgetMs = [2, floorDiv(this.bare.fdaMaxTimingBudgetUs(), 1000)];
     await this.setMode(this.mode);
     await this.p.wrByte(PAD_I2C_HV__CONFIG, FMP_PAD_CONFIG);
     if (this.MAX_KHZ !== I2C_KHZ_BOOT) await this.p.setI2cSpeed(this.MAX_KHZ);
   }
 
   /**
-   * short / medium / long — the device preset mode, which sets how far the 24
-   * bins reach before the phase wraps (1.6 / 2.4 / 4.0 m). Host-side only.
+   * short / medium / long — the device preset mode: the VCSEL period, which
+   * sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid phase
+   * window inside it (`reachMm()`). Host-side only.
    */
   override async setMode(name: string): Promise<void> {
-    if (!(DISTANCE_MODES as readonly string[]).includes(name)) {
+    if (!this.MODES.includes(name)) {
       throw new Vl53Error(`no such mode: ${name} (have ${this.MODES.join(", ")})`);
     }
     this.mode = name;
@@ -142,8 +152,17 @@ export class VL53LX extends SensorDriver {
     return this.mode;
   }
 
-  override reachMm(): number | null {
-    return REACH_BY_MODE_MM[this.mode] ?? null;
+  /**
+   * The valid phase window of the preset mode, which the post-processing
+   * applies: 992 / 1785 / 3373 mm for short / medium / long at the usual
+   * oscillator. Past it the target is status 4, although the bins only wrap
+   * further out. Host-side: no sensor traffic.
+   */
+  override async reachMm(): Promise<number | null> {
+    return phaseWindowMm(
+      this.bare.img.static_nvm_managed.v.osc_measured__fast_osc__frequency!,
+      this.bare.hpp.valid_phase_high,
+    );
   }
 
   // ── driver-specific readout ──
@@ -236,6 +255,10 @@ export class VL53LX extends SensorDriver {
    * the image reaches the sensor at startRanging().
    */
   async setRangeTiming(timingBudgetMs: number, interMeasurementMs: number): Promise<void> {
+    const [low, high] = this.BUDGET_MS;
+    if (!(timingBudgetMs >= low && timingBudgetMs <= high)) {
+      throw new Vl53Error(`timing_budget_ms must be ${low}..${high}`);
+    }
     this.budgetMs = timingBudgetMs;
     this.interMs = interMeasurementMs;
     this.bare.setMeasurementTimingBudgetUs(timingBudgetMs * 1000);

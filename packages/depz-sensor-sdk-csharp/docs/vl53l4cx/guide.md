@@ -56,7 +56,7 @@ Vl53lxProduct p = Vl53lxProducts.Find("VL53L4CX")!;        // null for an unserv
 Debug.Assert(p.UsbPid == 0xED46 && p.ModelId == 0xEBAA && p.ReachMm == 6000);
 Debug.Assert(p.DriverKinds.SequenceEqual(new[] { Vl53lxDriverKind.Histogram }));   // histogram only
 Debug.Assert(p.DefaultDriver == Vl53lxDriverKind.Histogram);
-// Naming the neighbour borrows its driver: the L4CD's light ULD, 1.2 m reach.
+// Naming the neighbour borrows its driver: the L4CD's light ULD, ~1.4 m reach.
 Debug.Assert(Vl53lxProducts.Find("VL53L4CD")!.DriverKinds.Contains(Vl53lxDriverKind.Uld));
 Debug.Assert(p.AddrWidth == 2 && p.MaxKhz == 1000);
 Debug.Assert(p.ClearSteps.Single() == new Vl53lxClearStep(0x0086, 0x01));   // interrupt release
@@ -125,7 +125,7 @@ driver keeps state from frame to frame, so a stream fed to it must be decoded
 ## Running as a VL53L4CD
 
 For offset/crosstalk calibration or thresholds, the full drivers can run the
-VL53L4CX on the VL53L4CD's light ULD (reach drops to ~1.2 m). The board then
+VL53L4CX on the VL53L4CD's light ULD (reach drops to ~1.4 m). The board then
 streams the 17-byte die block, read with `Vl53lxDieVariant.L4`:
 
 ```csharp
@@ -166,13 +166,12 @@ if (plottable.Contains(r.RangeStatus))
 The histogram block's `RangeStatus` byte is the raw device register, not the
 driver's target status — the rule does not apply to it.
 
-The histogram driver's `short` preset is unusable on the L4CX at any distance:
-its frames alternate between the true distance flagged status 7 and a wrong one
-(flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m; at 1.0 m
-the true 1008 mm comes flagged status 4 and the other frame reads 238 mm), so a
-plottable filter drops them all. Same on firmware v0.23 and v0.24 and with the
-firmware repo's own `vl53_tool.py`; the cause is not known yet. `medium` and
-`long` are clean at all four distances.
+There is no `short` histogram preset on an L4 die (VL53L4CD / L4CX), and the
+budget ceiling there is 200 ms: the SDKs that run the driver (Python, TS, C,
+C++) refuse both, as ST's own L4CX driver does — the A frame of the short pair
+ranges on the wrong side of the phase wrap, one frame in two (flat wall,
+2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4). A
+driver of your own should refuse it too; `medium` and `long` are clean.
 
 ## Reset and bridge diagnostics
 
@@ -201,8 +200,8 @@ silently: watch increments.
 
 ## Gotchas
 
-- **Plot 0, 6 and 11**, not only 0 — and don't use the `short` preset on the
-  L4CX at all (see above); `medium` and `long` are clean.
+- **Plot 0, 6 and 11**, not only 0 — and no `short` preset on the L4CX (see
+  above); `medium` and `long` are clean.
 - **Decode every histogram frame exactly once, in order** if you feed a
   target-extraction driver.
 - **Set the address width before the first register access** of a session,

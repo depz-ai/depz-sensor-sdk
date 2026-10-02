@@ -98,6 +98,10 @@ export type DistanceMode = (typeof DISTANCE_MODES)[number];
 export const TIMING_GUARD_US = 1700;
 export const TIMING_DIVISOR = 6;
 export const FDA_MAX_TIMING_BUDGET_US = 550000;
+// The L4CX BareDriver (STSW-IMG029) narrows both for an L4 die: a lower budget
+// ceiling, and no short mode at all (see `BareDriver.isL4()`).
+export const L4_FDA_MAX_TIMING_BUDGET_US = 200000;
+export const L4_DISTANCE_MODES = ["medium", "long"] as const;
 
 function tp(key: string): number {
   const v = TUNING[key];
@@ -890,10 +894,38 @@ export class BareDriver {
   }
 
   /**
+   * `IsL4()` of the L4CX BareDriver: the die, read from NVM, not the product
+   * name — an L4CD or L4CX board ranging under a borrowed name is still an L4.
+   * 0xEC is the L4ED.
+   */
+  isL4(): boolean {
+    const nvm = this.img.nvm_copy_data.v;
+    return (
+      nvm.identification__module_type === 0xaa &&
+      (nvm.identification__model_id === 0xeb || nvm.identification__model_id === 0xec)
+    );
+  }
+
+  distanceModes(): readonly string[] {
+    return this.isL4() ? L4_DISTANCE_MODES : DISTANCE_MODES;
+  }
+
+  fdaMaxTimingBudgetUs(): number {
+    return this.isL4() ? L4_FDA_MAX_TIMING_BUDGET_US : FDA_MAX_TIMING_BUDGET_US;
+  }
+
+  /**
    * VL53LX_SetDistanceMode(): the preset mode, with the timeouts put back
    * afterwards (the preset alone would reset them to its own defaults).
+   *
+   * Short is refused on an L4 die, as the L4CX BareDriver does: there the A
+   * frame of the short pair ranges on the wrong side of the wrap, one frame
+   * in two, measured on the L4CX board.
    */
   setDistanceMode(mode: string): void {
+    if (!this.distanceModes().includes(mode)) {
+      throw new RangeError(`distance mode ${mode} not available on this die`);
+    }
     const phasecalUs = this.phasecalConfigTimeoutUs;
     const mmUs = this.mmConfigTimeoutUs;
     const rangeUs = this.rangeConfigTimeoutUs;
@@ -1139,7 +1171,7 @@ export class BareDriver {
       throw new RangeError(`timing budget ${budgetUs} us out of range`);
     }
     const rangeUs = floorDiv(budgetUs - TIMING_GUARD_US, TIMING_DIVISOR);
-    if (rangeUs * TIMING_DIVISOR > FDA_MAX_TIMING_BUDGET_US) {
+    if (rangeUs * TIMING_DIVISOR > this.fdaMaxTimingBudgetUs()) {
       throw new RangeError(`timing budget ${budgetUs} us out of range`);
     }
     this.setTimeoutsUs(this.phasecalConfigTimeoutUs, this.mmConfigTimeoutUs, rangeUs);

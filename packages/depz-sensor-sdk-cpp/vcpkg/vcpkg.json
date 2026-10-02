@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "depz-sensor-sdk-cpp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "C++17 SDK for the DEPZ USB sensor line: framed-protocol parser and per-sensor wire codecs (SR04, VL53L8CX/CH, BNO086, ...), plus a live-hardware layer over depz-sensor-sdk-c (serial links, discovery, record/replay, common commands; sensor classes, SR04 first).",
   "homepage": "https://github.com/depz-ai/depz-sensor-sdk",
   "license": "MIT",

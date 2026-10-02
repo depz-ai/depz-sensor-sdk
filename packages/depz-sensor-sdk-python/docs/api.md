@@ -3921,7 +3921,7 @@ sensor register, safe while streaming.
 #### Vl53lx.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -3931,8 +3931,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53lx.get_range_timing
 
@@ -4417,7 +4423,7 @@ sensor register, safe while streaming.
 #### Vl53l0x.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -4427,8 +4433,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53l0x.get_range_timing
 
@@ -4912,7 +4924,7 @@ sensor register, safe while streaming.
 #### Vl53l1cx.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -4922,8 +4934,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53l1cx.get_range_timing
 
@@ -5407,7 +5425,7 @@ sensor register, safe while streaming.
 #### Vl53l1cb.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -5417,8 +5435,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53l1cb.get_range_timing
 
@@ -5902,7 +5926,7 @@ sensor register, safe while streaming.
 #### Vl53l3cx.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -5912,8 +5936,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53l3cx.get_range_timing
 
@@ -6296,7 +6326,7 @@ class Vl53l4cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeo
 ```
 
 VL53L4CX (6 m): the histogram driver only — to run it light, borrow a
-sibling's with ``init(product="VL53L4CD")`` (1.2 m, full calibrations).
+sibling's with ``init(product="VL53L4CD")`` (~1.4 m, full calibrations).
 
 #### Vl53l4cx.board_name *(property)*
 
@@ -6397,7 +6427,7 @@ sensor register, safe while streaming.
 #### Vl53l4cx.configure
 
 ```python
-configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None) -> None
+configure(self, budget_ms: int = 50, inter_ms: int = 0, mode: str | None = None, offset_mm: int | None = None, xtalk_kcps: int | None = None, signal_kcps: int | None = None) -> None
 ```
 
 Re-initialise the sensor and apply a ranging configuration.
@@ -6407,8 +6437,14 @@ configuration registers hold, and it puts the bus at the product's
 ceiling. `mode` (one of `modes`) goes on before the budget — a mode
 change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
 calibration (the sensor keeps those only until a reset).
+`signal_kcps` replaces the blob's signal threshold — the re-init puts
+it back to the default, so a lowered one goes here rather than in a
+`set_signal_threshold_kcps()` before configure: frames past the default
+threshold come back status 2 with the distance right (L1 long at ~4 m,
+a light driver borrowed onto a die without the lens it was tuned for).
 `inter_ms=0` = continuous; otherwise the period between measurements
-(must exceed the budget).
+(must exceed the budget). An unsupported group is refused before the
+re-init.
 
 #### Vl53l4cx.get_range_timing
 

@@ -7,7 +7,7 @@ host** — in this SDK, the live class **`depz::Vl53lx`** (`depz/device.hpp`), a
 
 | driver | what it is | modes | timing budget |
 |---|---|---|---|
-| `histogram` | ST's Bare Driver: the die hands over 24 photon-count bins per frame and the host finds **up to four targets** in them | `short`, `medium` (init), `long` | any 2–550 ms |
+| `histogram` | ST's Bare Driver: the die hands over 24 photon-count bins per frame and the host finds **up to four targets** in them | `medium` (init), `long` — no `short` on this die | any 2–200 ms |
 
 ## What the SDK covers
 
@@ -33,7 +33,7 @@ host** — in this SDK, the live class **`depz::Vl53lx`** (`depz/device.hpp`), a
   id (`0xEBAA`) is a cross-check only.
 - **`configure()` before every run** — it re-initialises the sensor; nothing
   from an earlier session carries over.
-- **Borrowing a driver** — naming another product loads its driver on this die: the VL53L4CD light driver (single target, ~1.2 m, offset and crosstalk calibration, thresholds) — or name `VL53L1CX` for its light driver (long / short modes, ROI, calibrations).
+- **Borrowing a driver** — naming another product loads its driver on this die: the VL53L4CD light driver (single target, ~1.4 m, offset and crosstalk calibration, thresholds) — or name `VL53L1CX` for its light driver (long / short modes, ROI, calibrations).
 - **Status 0 is not the whole story** — `plottable()` also accepts 6 (first
   histogram frame) and 11 (merged target): those are real distances.
 - **Initialise at 400 kHz** — every init runs the bus at 400 kHz and the

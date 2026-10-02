@@ -54,13 +54,6 @@ class VL53L4(VL53L1Die):
                                'signal_thresh', 'sigma_thresh', 'temp_update',
                                'calib_offset', 'calib_xtalk'})
 
-    def reach_mm(self):
-        """1.2 m — the VL53L4CD's rating, because this is its blob: VCSEL
-        periods 0x07/0x05 and a 0x38 phase window. A VL53L4CX running it is
-        held to the same distance although the product is rated for 6 m;
-        `--hist` is what gives that die its own range."""
-        return 1200
-
     def init_extra(self):
         """The one write VL53L4CD_SensorInit() adds at the end of init:
         ALGO__RANGE_IGNORE_THRESHOLD_MCPS."""

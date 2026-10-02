@@ -97,7 +97,9 @@ typedef struct {
     size_t (*budget_choices)(vlx_driver *d, int *out, size_t cap);
     int  (*set_mode)(vlx_driver *d, const char *name);
     int  (*get_mode)(vlx_driver *d, const char **name);
-    uint32_t (*reach_mm)(const vlx_driver *d);
+    /* How far the configuration in use can measure (`reach_mm()`); `*out` 0 =
+     * not characterised. May read the sensor. */
+    int  (*reach_mm)(vlx_driver *d, uint32_t *out);
     int  (*set_offset)(vlx_driver *d, int32_t mm);
     int  (*get_offset)(vlx_driver *d, int32_t *mm);
     int  (*set_xtalk)(vlx_driver *d, int32_t kcps);
@@ -116,6 +118,10 @@ typedef struct {
     int  (*get_roi_center)(vlx_driver *d, int *spad);
     int  (*start_temperature_update)(vlx_driver *d);
     int  (*perform_ref_spad_management)(vlx_driver *d, uint32_t *count, bool *is_aperture);
+    /* The budget range when it depends on the instance (the histogram
+     * driver narrows it per die once init has read the NVM); NULL = the
+     * static budget_min_ms..budget_max_ms above. */
+    void (*budget_range)(const vlx_driver *d, int *min_ms, int *max_ms);
 } vlx_ops;
 
 /* A driver instance: embed this first in the driver's own struct. */
@@ -131,6 +137,12 @@ vlx_driver *vlx_new_l3(vlx_plat *p, depz_vl53lx_product product);   /* uld/l3.py
 vlx_driver *vlx_new_l1(vlx_plat *p, depz_vl53lx_product product);   /* uld/l1.py  */
 vlx_driver *vlx_new_l0x(vlx_plat *p, depz_vl53lx_product product);  /* uld/l0x.py */
 vlx_driver *vlx_new_bare(vlx_plat *p, depz_vl53lx_product product); /* uld/bare/  */
+
+/* How far a target can be before the VL53L1 die fails it with status 4, mm:
+ * RANGE_CONFIG__VALID_PHASE_HIGH (5.3 fixed point, PLL periods from the
+ * zero-distance phase) at the die's own oscillator (vl53l1_die.py
+ * phase_window_mm). 0 when the oscillator reads 0. */
+uint32_t vlx_phase_window_mm(uint32_t fast_osc_frequency, uint32_t valid_phase_high);
 
 /* The default poll-until-data-ready loop of SensorDriver (1 ms steps). */
 int vlx_wait_data_ready(vlx_driver *d, int timeout_ms);

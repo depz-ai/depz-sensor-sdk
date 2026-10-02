@@ -120,6 +120,16 @@ export const L0X_MODE_SETTINGS: ReadonlyMap<
 ]);
 
 /**
+ * ST's range for each final-range VCSEL period the profiles above use: the
+ * period sets how far the phase stays unambiguous. Checked at a wall ~1.8 m:
+ * final 10 fails it with status 4 in all three short profiles, final 14 ranges.
+ */
+export const REACH_BY_FINAL_PCLKS_MM: ReadonlyMap<number, number> = new Map([
+  [10, 1200],
+  [14, 2000],
+]);
+
+/**
  * DefaultTuningSettings[] (vl53l0x_tuning.h, "update 02/11/2015_v36"): a run
  * of {count, address, count bytes...} records ended by a zero count.
  */
@@ -311,6 +321,8 @@ export interface L0xDeviceData {
   SequenceConfig: number;
   RangeFractionalEnable: number;
   DeviceMode: number;
+  /** Not in the C driver: the continuous mode last chosen (null: none yet). */
+  ContinuousMode: number | null;
   MeasurementTimingBudgetMicroSeconds: number;
   Pin0GpioFunctionality: number;
   ReferenceSpadCount: number;
@@ -378,6 +390,7 @@ export class VL53L0X extends SensorDriver {
     SequenceConfig: 0,
     RangeFractionalEnable: 0,
     DeviceMode: DEVICEMODE_SINGLE_RANGING,
+    ContinuousMode: null,
     MeasurementTimingBudgetMicroSeconds: 0,
     Pin0GpioFunctionality: GPIOFUNCTIONALITY_NEW_MEASURE_READY,
     ReferenceSpadCount: 0,
@@ -451,7 +464,7 @@ export class VL53L0X extends SensorDriver {
     await this.resetDevice();
     await this.dataInit();
     await this.staticInit();
-    if (!this.refSpadsFromNvm) await this.performRefSpadManagement();
+    if (!this.refSpadsFromNvm) await this.refSpadManagement();
     await this.performRefCalibration();
     this.setDeviceMode(DEVICEMODE_CONTINUOUS_RANGING);
     this.mode = L0X_MODE_DEFAULT;
@@ -1029,6 +1042,7 @@ export class VL53L0X extends SensorDriver {
       throw new Vl53Error(`device mode ${mode} is not supported`);
     }
     this.d.DeviceMode = mode;
+    if (mode !== DEVICEMODE_SINGLE_RANGING) this.d.ContinuousMode = mode;
   }
 
   /** The undocumented prologue of every VL53L0X_StartMeasurement(). */
@@ -1043,8 +1057,15 @@ export class VL53L0X extends SensorDriver {
     await p.wrByte(0x80, 0x00);
   }
 
-  /** VL53L0X_StartMeasurement() for the two continuous modes. */
+  /**
+   * VL53L0X_StartMeasurement() for the two continuous modes. A single shot (a
+   * calibration, a poll) leaves the device mode on single ranging; the
+   * continuous mode chosen before it is resumed.
+   */
   async startRanging(): Promise<void> {
+    if (this.d.DeviceMode === DEVICEMODE_SINGLE_RANGING && this.d.ContinuousMode !== null) {
+      this.setDeviceMode(this.d.ContinuousMode);
+    }
     await this.armStopVariable();
     const mode = this.d.DeviceMode;
     if (mode === DEVICEMODE_CONTINUOUS_RANGING) {
@@ -1368,6 +1389,15 @@ export class VL53L0X extends SensorDriver {
     return this.mode;
   }
 
+  /**
+   * Looked up by the final-range VCSEL period read from the sensor, so it
+   * follows the configuration, not the profile name. null for a period no
+   * profile here sets.
+   */
+  override async reachMm(): Promise<number | null> {
+    return REACH_BY_FINAL_PCLKS_MM.get(await this.getVcselPulsePeriod(VCSEL_PERIOD_FINAL_RANGE)) ?? null;
+  }
+
   /** What the five registers a mode writes currently read back as. */
   override async driverInfo(): Promise<Record<string, unknown>> {
     return {
@@ -1578,8 +1608,22 @@ export class VL53L0X extends SensorDriver {
     return peak;
   }
 
-  /** VL53L0X_perform_ref_spad_management() → [count, isAperture]. */
+  /**
+   * Re-measure the reference SPADs on a live session → [count, isAperture].
+   * Not in the C driver: the stop variable goes back first. stopRanging()
+   * (VL53L0X_StopMeasurement) zeroes register 0x91, and the VHV/phase single
+   * shots this runs do not arm it the way every StartMeasurement does. Left at
+   * 0, the reference rate reads far too high, the aperture SPADs get picked
+   * and every frame after is Signal Fail (TB9BGETA6M, 30.09.2026). init()
+   * calls the bare routine: after the reset 0x91 already holds it.
+   */
   async performRefSpadManagement(): Promise<[number, number]> {
+    await this.armStopVariable();
+    return this.refSpadManagement();
+  }
+
+  /** VL53L0X_perform_ref_spad_management() → [count, isAperture]. */
+  private async refSpadManagement(): Promise<[number, number]> {
     const startSelect = 0xb4;
     const minimumSpadCount = 3;
     const maxSpadCount = 44;

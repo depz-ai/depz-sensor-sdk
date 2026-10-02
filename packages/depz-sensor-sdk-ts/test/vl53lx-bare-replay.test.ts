@@ -7,8 +7,9 @@
  * `toMeasurement(bins)` and compared to the `.expected.json` sidecar.
  *
  * The histogram driver is stateful (A/B frame pairs, phase-consistency
- * history); the short-preset L4CX capture pins its alternating slot-0
- * artefact frame for frame.
+ * history). A sidecar with `refused` (the short preset on an L4 die, which
+ * the driver no longer accepts): init must still replay, and the mode must be
+ * refused after the configure re-init.
  */
 
 import { readFileSync } from "node:fs";
@@ -29,7 +30,7 @@ import {
 } from "../src/protocol/vl53l4.js";
 import { ReplayTransport } from "../src/transport/replay.js";
 import { BridgePlatform, type Measurement } from "../src/sensors/vl53lx/uld/base.js";
-import { ProtocolError, type BridgeDevice } from "../src/sensors/vl53lx/uld/link.js";
+import { ProtocolError, Vl53Error, type BridgeDevice } from "../src/sensors/vl53lx/uld/link.js";
 import { VL53LX } from "../src/sensors/vl53lx/uld/bare/driver.js";
 import type { HistogramBinData } from "../src/sensors/vl53lx/uld/bare/core.js";
 
@@ -193,6 +194,12 @@ interface Expected {
   mode: string;
   timing: [number, number];
   frames: ExpectedFrame[];
+  refused?: Refused;
+}
+
+interface Refused {
+  note: string;
+  after_init: { modes: string[]; budget_ms: [number, number]; driver_reach_mm: number };
 }
 
 const CAPTURES = [
@@ -237,6 +244,16 @@ describe("vl53lx bare driver replay", () => {
         // Vl53lx.configure(budget, mode).
         await drv.sensorInit();
         await dev.clearI2cErrors();
+        if (expected.refused) {
+          const after = expected.refused.after_init;
+          expect([...drv.MODES]).toEqual(after.modes);
+          expect([...drv.BUDGET_MS]).toEqual(after.budget_ms);
+          expect(await drv.reachMm()).toBe(after.driver_reach_mm);
+          const err = await drv.setMode(expected.mode).catch((e: unknown) => e);
+          expect(err).toBeInstanceOf(Vl53Error);
+          expect(String(err)).toMatch(/no such mode/);
+          return;
+        }
         await drv.setMode(expected.mode);
         await drv.setRangeTiming(expected.budget_ms, 0);
         timing = await drv.getRangeTiming();

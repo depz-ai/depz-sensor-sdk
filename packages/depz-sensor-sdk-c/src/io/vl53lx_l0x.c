@@ -136,6 +136,10 @@ typedef struct {
     uint8_t  sequence_config;
     int      range_fractional;
     int      device_mode;
+    /* Not in the C driver: the continuous mode last chosen (0 = none yet), so
+     * a single shot in between (the calibrations run on one) does not leave
+     * start_ranging() stranded. */
+    int      continuous_mode;
     int64_t  budget_us;
     int      pin0_functionality;
     int      ref_spad_count, ref_spad_type;
@@ -937,7 +941,7 @@ static int sensor_init(vlx_driver *d)
         VLX_TRY(perform_ref_spad_management(d, &c, &a));
     }
     VLX_TRY(perform_ref_calibration(d));
-    ld(d)->device_mode = DEVICEMODE_CONTINUOUS_RANGING;
+    ld(d)->device_mode = ld(d)->continuous_mode = DEVICEMODE_CONTINUOUS_RANGING;
     ld(d)->mode = MODES[0].name;
     return DEPZ_OK;
 }
@@ -956,9 +960,14 @@ static int arm_stop_variable(vlx_driver *d)
     return vlx_wr_byte(P, 0x80, 0x00);
 }
 
+/* A single shot (a calibration, a poll) leaves the device mode on single
+ * ranging; the continuous mode chosen before it is resumed. */
 static int start_ranging(vlx_driver *d)
 {
-    int mode = ld(d)->device_mode;
+    int mode;
+    if (ld(d)->device_mode == DEVICEMODE_SINGLE_RANGING && ld(d)->continuous_mode != 0)
+        ld(d)->device_mode = ld(d)->continuous_mode;
+    mode = ld(d)->device_mode;
     VLX_TRY(arm_stop_variable(d));
     if (mode == DEVICEMODE_CONTINUOUS_RANGING) return vlx_wr_byte(P, SYSRANGE_START, SYSRANGE_MODE_BACKTOBACK);
     if (mode == DEVICEMODE_CONTINUOUS_TIMED) return vlx_wr_byte(P, SYSRANGE_START, SYSRANGE_MODE_TIMED);
@@ -1167,7 +1176,8 @@ static int set_range_timing(vlx_driver *d, int budget_ms, int inter_ms)
     VLX_TRY(vlx_rd_word(P, OSC_CALIBRATE_VAL, &osc));
     value = osc ? (int64_t)inter_ms * osc : inter_ms;
     VLX_TRY(vlx_wr_dword(P, SYSTEM_INTERMEASUREMENT_PERIOD, (uint32_t)((uint64_t)value & 0xFFFFFFFFu)));
-    ld(d)->device_mode = inter_ms == 0 ? DEVICEMODE_CONTINUOUS_RANGING : DEVICEMODE_CONTINUOUS_TIMED;
+    ld(d)->device_mode = ld(d)->continuous_mode =
+        inter_ms == 0 ? DEVICEMODE_CONTINUOUS_RANGING : DEVICEMODE_CONTINUOUS_TIMED;
     return DEPZ_OK;
 }
 
@@ -1266,6 +1276,19 @@ static int set_mode(vlx_driver *d, const char *name)
 static int get_mode(vlx_driver *d, const char **name)
 {
     *name = ld(d)->mode;
+    return DEPZ_OK;
+}
+
+/* ST's range for each final-range VCSEL period the profiles above use: the
+ * period sets how far the phase stays unambiguous. Checked at a wall ~1.8 m:
+ * final 10 fails it with status 4 in all three short profiles, final 14
+ * ranges. Looked up by the period read from the sensor, so it follows the
+ * configuration, not the profile name; 0 for a period no profile sets. */
+static int reach_mm(vlx_driver *d, uint32_t *out)
+{
+    int pclks;
+    VLX_TRY(get_vcsel_pulse_period(d, VCSEL_FINAL_RANGE, &pclks));
+    *out = pclks == 10 ? 1200u : pclks == 14 ? 2000u : 0u;
     return DEPZ_OK;
 }
 
@@ -1519,6 +1542,18 @@ static int perform_ref_spad_management(vlx_driver *d, uint32_t *count_out, bool 
 
 static void destroy(vlx_driver *d) { free(d); }
 
+/* The public re-measure on a live session. Not in the C driver: the stop
+ * variable goes back first. stop_ranging() (VL53L0X_StopMeasurement) zeroes
+ * register 0x91 and the VHV/phase single shots do not arm it the way every
+ * StartMeasurement does; left at 0 the reference rate reads far too high, the
+ * aperture SPADs get picked and every frame after is Signal Fail (TB9BGETA6M,
+ * 30.09.2026). init calls the bare routine: after the reset 0x91 holds it. */
+static int ref_spad_management_live(vlx_driver *d, uint32_t *count_out, bool *aperture_out)
+{
+    VLX_TRY(arm_stop_variable(d));
+    return perform_ref_spad_management(d, count_out, aperture_out);
+}
+
 static const vlx_ops L0X_OPS = {
     "VL53L0X", 1, 2, {{SYSTEM_INTERRUPT_CLEAR, 0x01}, {SYSTEM_INTERRUPT_CLEAR, 0x00}}, 400,
     DEPZ_VL53LX_CAP_MODE | DEPZ_VL53LX_CAP_TIMING | DEPZ_VL53LX_CAP_OFFSET | DEPZ_VL53LX_CAP_XTALK |
@@ -1526,9 +1561,10 @@ static const vlx_ops L0X_OPS = {
     false, 20, 200,
     model_id, sensor_init, start_ranging, stop_ranging, check_for_data_ready, clear_interrupt, stream_block,
     decode, set_range_timing, get_range_timing, destroy,
-    modes, NULL, set_mode, get_mode, NULL, set_offset, get_offset, set_xtalk, get_xtalk, calibrate_offset,
+    modes, NULL, set_mode, get_mode, reach_mm, set_offset, get_offset, set_xtalk, get_xtalk, calibrate_offset,
     calibrate_xtalk, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    perform_ref_spad_management};
+    ref_spad_management_live,
+    NULL};
 
 vlx_driver *vlx_new_l0x(vlx_plat *p, depz_vl53lx_product product)
 {

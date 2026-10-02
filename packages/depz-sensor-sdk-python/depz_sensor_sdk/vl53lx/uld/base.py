@@ -253,8 +253,8 @@ class SensorDriver:
         Not the same as the product's rating (registry.TABLE): the VCSEL
         period in the configuration blob is what sets the unambiguous range, so
         a driver built around one product's blob reaches that product's
-        distance even on a die rated for more. Past it the phase wraps and the
-        frames come back with status 4 and a nonsense distance.
+        distance even on a die rated for more. Past it the phase is out of the
+        valid window and the frames come back with status 4.
         """
         return None
 

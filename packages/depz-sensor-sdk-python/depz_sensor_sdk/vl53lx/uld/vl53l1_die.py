@@ -106,6 +106,19 @@ STATUS_RTN = (255, 255, 255, 5, 2, 4, 1, 7, 3,
               0, 255, 255, 9, 13, 255, 255, 255, 255, 10, 6,
               255, 255, 11, 12)
 
+def phase_window_mm(fast_osc_frequency: int, valid_phase_high: int) -> int:
+    """How far a target can be before the die fails it with status 4, mm.
+
+    RANGE_CONFIG__VALID_PHASE_HIGH is the top of the valid phase window, 5.3
+    fixed point in PLL periods, counted from the zero-distance phase. One PLL
+    period is c/2 of distance at the oscillator the die measured for itself
+    (OSC_FREQUENCY, 4.12 MHz): 198.4 mm at the usual 0xBCCC. The same
+    arithmetic as VL53LX_range_maths() in the Bare Driver, which applies this
+    window on the host side in histogram mode."""
+    pll_period = (1 << 30) // fast_osc_frequency           # us, 0.18
+    return valid_phase_high * pll_period * (299704 >> 3) >> 25
+
+
 # UM2931, "Range status description".
 RANGE_STATUS_NAMES = {
     0:  'valid',
@@ -426,6 +439,16 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
             budget >>= ms_byte
         budget = budget + 2500 if tmp == 0 else budget * 2 + 4300
         return budget // 1000, inter_measurement_ms
+
+    def reach_mm(self):
+        """Read off the loaded configuration, so it follows the blob and the
+        mode: 1388 mm for the 0x38 window of the L4CD, L3CX and L1 short
+        blobs, 4563 mm for the 0xB8 window L1 long writes."""
+        osc_frequency = self.p.rd_word(OSC_FREQUENCY)
+        if osc_frequency == 0:
+            raise Vl53Error('osc_frequency reads 0')
+        return phase_window_mm(osc_frequency,
+                               self.p.rd_byte(RANGE_CONFIG__VALID_PHASE_HIGH))
 
     # ── thresholds ──
     def set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int,

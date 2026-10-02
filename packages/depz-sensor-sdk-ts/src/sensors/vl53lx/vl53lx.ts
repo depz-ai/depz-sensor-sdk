@@ -177,6 +177,14 @@ export interface Vl53lxConfigureOptions {
   offsetMm?: number | null;
   /** Re-apply a stored crosstalk calibration. */
   xtalkKcps?: number | null;
+  /**
+   * Replace the blob's signal threshold, kcps. The re-init puts it back to
+   * the default, so a lowered one goes here, not in a setSignalThresholdKcps()
+   * before configure: frames past the default threshold come back status 2
+   * with the distance right (L1 long at ~4 m, a light driver borrowed onto a
+   * die without the lens it was tuned for).
+   */
+  signalKcps?: number | null;
 }
 
 function isThenable(x: unknown): x is PromiseLike<unknown> {
@@ -421,7 +429,7 @@ export class Vl53lx extends DepzDevice {
       supports: new Set(drv.SUPPORTS),
       modes: [...drv.MODES],
       reachMm: registry.reachMm(detected || this.productName),
-      driverReachMm: drv.reachMm(),
+      driverReachMm: await drv.reachMm(),
       budgetMs: drv.BUDGET_MS,
       budgetChoices: this.budgetChoices(),
       histogram: drv.HISTOGRAM,
@@ -445,12 +453,12 @@ export class Vl53lx extends DepzDevice {
       out.push(`${this.productName}: borrowing this driver - the board says it is a ${detected}`);
     }
     const rated = registry.reachMm(detected || this.productName);
-    const reach = drv.reachMm();
+    const reach = await drv.reachMm();
     if (rated && reach && reach < rated) {
       out.push(
         `${this.productName}/${this.driverKindName}: this pair reaches ${reach} mm, the board ` +
-          `is rated ${rated} mm - past ${reach} mm the phase wraps and frames come back ` +
-          "with status 4",
+          `is rated ${rated} mm - past ${reach} mm the phase is out of the valid window and ` +
+          "frames come back with status 4",
       );
     }
     if (this.caveat) out.push(`${this.productName}/${this.driverKindName}: ${this.caveat}`);
@@ -497,16 +505,21 @@ export class Vl53lx extends DepzDevice {
    * Re-initialise the sensor and apply a ranging configuration. The re-init
    * is deliberate (the only way to know what the configuration registers
    * hold). `mode` goes on before the budget; `offsetMm` / `xtalkKcps`
-   * re-apply a stored calibration.
+   * re-apply a stored calibration; `signalKcps` goes on last. An unsupported
+   * group is refused before the re-init.
    */
   async configure(opts: Vl53lxConfigureOptions = {}): Promise<void> {
     this.requireNotRanging();
     const drv = this.driver;
+    const offset = opts.offsetMm != null ? this.need("offset") : null;
+    const xtalk = opts.xtalkKcps != null ? this.need("xtalk") : null;
+    const signal = opts.signalKcps != null ? this.need("signal_thresh") : null;
     await this.sensorInit(drv);
     if (opts.mode != null) await drv.setMode(opts.mode);
     await drv.setRangeTiming(opts.budgetMs ?? 50, opts.interMs ?? 0);
-    if (opts.offsetMm != null) await this.need("offset").setOffset(opts.offsetMm);
-    if (opts.xtalkKcps != null) await this.need("xtalk").setXtalk(opts.xtalkKcps);
+    if (offset) await offset.setOffset(opts.offsetMm!);
+    if (xtalk) await xtalk.setXtalk(opts.xtalkKcps!);
+    if (signal) await signal.setSignalThreshold(opts.signalKcps!);
   }
 
   /** → [timingBudgetMs, interMeasurementMs]; 0 for the period = continuous. */

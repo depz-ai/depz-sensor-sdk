@@ -176,8 +176,9 @@ void targets(depz::Vl53lx& tof)
 }
 ```
 
-The presets pick how far the 24 bins reach: `short` 1.6 m, `medium` 2.4 m
-(what init leaves), `long` 4 m (`driver_reach_mm()`). Use `plottable()` /
+The presets set the valid phase window: past ~990 mm (`short`), ~1790 mm
+(`medium`, what init leaves) or ~3370 mm (`long`) a target fails with status
+4 — `driver_reach_mm()` gives it for the preset in use. Use `plottable()` /
 `primary_distance_mm()`, not `status == 0`. The driver keeps frame-to-frame
 state, so every streamed frame is decoded exactly once, in order.
 

@@ -8463,10 +8463,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget)."
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init."
             },
             {
               "name": "get_range_timing",
@@ -9281,7 +9287,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 606
+            "line": 619
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l0x",
@@ -9503,10 +9509,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget).",
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -10352,7 +10364,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 614
+            "line": 627
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cx",
@@ -10574,10 +10586,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget).",
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -11423,7 +11441,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 621
+            "line": 634
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cb",
@@ -11645,10 +11663,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget).",
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -12494,7 +12518,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 628
+            "line": 641
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l3cx",
@@ -12716,10 +12740,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget).",
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -13565,13 +13595,13 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 635
+            "line": 648
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l4cx",
             "depz_sensor_sdk.vl53lx.Vl53l4cx"
           ],
-          "doc": "VL53L4CX (6 m): the histogram driver only — to run it light, borrow a\nsibling's with ``init(product=\"VL53L4CD\")`` (1.2 m, full calibrations).",
+          "doc": "VL53L4CX (6 m): the histogram driver only — to run it light, borrow a\nsibling's with ``init(product=\"VL53L4CD\")`` (~1.4 m, full calibrations).",
           "attributes": [
             {
               "name": "PRODUCT",
@@ -13787,10 +13817,16 @@
                   "kind": "positional_or_keyword",
                   "annotation": "int | None",
                   "default": null
+                },
+                {
+                  "name": "signal_kcps",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int | None",
+                  "default": null
                 }
               ],
               "returns": "None",
-              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget).",
+              "doc": "Re-initialise the sensor and apply a ranging configuration.\n\nThe re-init is deliberate: it is the only way to know what the\nconfiguration registers hold, and it puts the bus at the product's\nceiling. `mode` (one of `modes`) goes on before the budget — a mode\nchange rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored\ncalibration (the sensor keeps those only until a reset).\n`signal_kcps` replaces the blob's signal threshold — the re-init puts\nit back to the default, so a lowered one goes here rather than in a\n`set_signal_threshold_kcps()` before configure: frames past the default\nthreshold come back status 2 with the distance right (L1 long at ~4 m,\na light driver borrowed onto a die without the lens it was tuned for).\n`inter_ms=0` = continuous; otherwise the period between measurements\n(must exceed the budget). An unsupported group is refused before the\nre-init.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -25646,7 +25682,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.3.0",
+          "value": "0.4.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

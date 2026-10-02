@@ -110,12 +110,12 @@ TABLE = {
                         'gives several targets instead',
                  'histogram': _HIST_CAVEAT}),
     'VL53L4CD': Product(
-        model_id=0xEBAA, reach_mm=1200,
+        model_id=0xEBAA, reach_mm=1300,
         drivers={'uld': VL53L4, 'histogram': VL53LX},
         caveats={'histogram': _HIST_CAVEAT}),
     'VL53L4CX': Product(
         # The Bare Driver is what ST ships for this part, and it is the only way
-        # the die reaches past the 1.2 m its sibling's blob is built for. To run
+        # the die reaches past the ~1.4 m its sibling's blob is built for. To run
         # it light, name the sibling: product='VL53L4CD' (short range, full
         # calibrations) or product='VL53L1CX' (long VCSEL period, modes, ROI).
         model_id=0xEBAA, reach_mm=6000,

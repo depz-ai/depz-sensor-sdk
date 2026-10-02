@@ -728,9 +728,12 @@ public:
     vl53lx::Vl53lxInfo bridge_info();           // safe while streaming
 
     // Re-initialise and apply budget / mode (and a stored calibration).
+    // signal_kcps replaces the blob's signal threshold, last — the re-init
+    // puts it back to the default (depz_vl53lx_configure_ex).
     void configure(int budget_ms = 50, int inter_ms = 0, const std::optional<std::string>& mode = std::nullopt,
                    std::optional<std::int32_t> offset_mm = std::nullopt,
-                   std::optional<std::int32_t> xtalk_kcps = std::nullopt);
+                   std::optional<std::int32_t> xtalk_kcps = std::nullopt,
+                   std::optional<int> signal_kcps = std::nullopt);
     std::pair<int, int> range_timing();         // (budget ms, inter-measurement ms)
     void set_mode(const std::string& mode);
     std::optional<std::string> mode();          // nullopt on a product without modes

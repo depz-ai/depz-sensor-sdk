@@ -80,7 +80,7 @@ const std::vector<Product>& products() {
         {"VL53L1CX", 0xED43, 0xEACC, 4000, {K::Uld, K::Histogram}, K::Uld, 2, kDieClear, 1000},
         {"VL53L1CB", 0xED42, 0xEACC, 8000, {K::Uld, K::Histogram}, K::Uld, 2, kDieClear, 1000},
         {"VL53L3CX", 0xED44, 0xEAAA, 3000, {K::Ulp, K::Histogram}, K::Ulp, 2, kDieClear, 1000},
-        {"VL53L4CD", 0xED45, 0xEBAA, 1200, {K::Uld, K::Histogram}, K::Uld, 2, kDieClear, 1000},
+        {"VL53L4CD", 0xED45, 0xEBAA, 1300, {K::Uld, K::Histogram}, K::Uld, 2, kDieClear, 1000},
         {"VL53L4CX", 0xED46, 0xEBAA, 6000, {K::Histogram}, K::Histogram, 2, kDieClear, 1000},
     };
     return table;

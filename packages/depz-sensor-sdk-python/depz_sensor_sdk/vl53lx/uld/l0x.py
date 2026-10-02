@@ -131,6 +131,11 @@ MODE_SETTINGS = {
     'high-accuracy': (0.25, 18, 200000, 14, 10),
 }
 
+# ST's range for each final-range VCSEL period the profiles above use: the
+# period sets how far the phase stays unambiguous. Checked at a wall ~1.8 m:
+# final 10 fails it with status 4 in all three short profiles, final 14 ranges.
+REACH_BY_FINAL_PCLKS_MM = {10: 1200, 14: 2000}
+
 # DefaultTuningSettings[] (vl53l0x_tuning.h, "update 02/11/2015_v36"), kept in
 # its original buffer form: a run of {count, address, count bytes...} records
 # ended by a zero count. load_tuning_settings() parses it exactly as the C
@@ -399,6 +404,10 @@ class VL53L0X(SensorDriver):
             'SequenceConfig': 0,
             'RangeFractionalEnable': 0,
             'DeviceMode': DEVICEMODE_SINGLE_RANGING,
+            # Not in the C driver: the continuous mode last chosen, so a
+            # single shot in between (the calibrations run on one) does not
+            # leave start_ranging() stranded. None until one is chosen.
+            'ContinuousMode': None,
             'MeasurementTimingBudgetMicroSeconds': 0,
             'Pin0GpioFunctionality': GPIOFUNCTIONALITY_NEW_MEASURE_READY,
             'ReferenceSpadCount': 0,
@@ -472,7 +481,7 @@ class VL53L0X(SensorDriver):
         self.data_init()
         self.static_init()
         if not self.ref_spads_from_nvm:
-            self.perform_ref_spad_management()
+            self._ref_spad_management()
         self.perform_ref_calibration()
         self.set_device_mode(DEVICEMODE_CONTINUOUS_RANGING)
         self._mode = MODES_DEFAULT      # what static_init() leaves behind
@@ -1046,6 +1055,8 @@ class VL53L0X(SensorDriver):
                         DEVICEMODE_CONTINUOUS_TIMED):
             raise Vl53Error(f'device mode {mode} is not supported')
         self.d['DeviceMode'] = mode
+        if mode != DEVICEMODE_SINGLE_RANGING:
+            self.d['ContinuousMode'] = mode
 
     def arm_stop_variable(self):
         """The undocumented prologue every VL53L0X_StartMeasurement() opens
@@ -1059,7 +1070,14 @@ class VL53L0X(SensorDriver):
         self.p.wr_byte(0x80, 0x00)
 
     def start_ranging(self):
-        """VL53L0X_StartMeasurement() for the two continuous modes."""
+        """VL53L0X_StartMeasurement() for the two continuous modes.
+
+        A single shot (a calibration, a poll) leaves the device mode on single
+        ranging; the continuous mode chosen before it is resumed.
+        """
+        if (self.d['DeviceMode'] == DEVICEMODE_SINGLE_RANGING
+                and self.d['ContinuousMode'] is not None):
+            self.set_device_mode(self.d['ContinuousMode'])
         self.arm_stop_variable()
 
         mode = self.d['DeviceMode']
@@ -1396,6 +1414,13 @@ class VL53L0X(SensorDriver):
     def get_mode(self) -> str:
         return self._mode
 
+    def reach_mm(self):
+        """Looked up by the final-range VCSEL period read from the sensor, so
+        it follows the configuration, not the profile name. None for a period
+        no profile here sets."""
+        return REACH_BY_FINAL_PCLKS_MM.get(
+            self.get_vcsel_pulse_period(VCSEL_PERIOD_FINAL_RANGE))
+
     def driver_info(self) -> dict:
         """What the five registers a mode writes currently read back as."""
         return {
@@ -1602,6 +1627,21 @@ class VL53L0X(SensorDriver):
         return peak
 
     def perform_ref_spad_management(self) -> tuple:
+        """Re-measure the reference SPADs on a live session -> (count,
+        is_aperture). Not in the C driver: the stop variable goes back first.
+
+        stop_ranging() (VL53L0X_StopMeasurement) zeroes register 0x91, and the
+        VHV/phase single shots this runs do not arm it the way every
+        StartMeasurement does. Left at 0, the reference rate reads far too high,
+        the aperture SPADs get picked and every frame after is Signal Fail
+        (TB9BGETA6M, 30.09.2026: stop, then >150 ms, then this -> 12 aperture;
+        re-arming first -> 5 non-aperture, as from the NVM). init() calls the
+        bare routine: after the reset 0x91 already holds the stop variable.
+        """
+        self.arm_stop_variable()
+        return self._ref_spad_management()
+
+    def _ref_spad_management(self) -> tuple:
         """VL53L0X_perform_ref_spad_management() -> (count, is_aperture).
 
         What StaticInit normally takes from the NVM, measured instead: enable

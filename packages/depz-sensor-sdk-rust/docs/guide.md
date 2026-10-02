@@ -108,7 +108,7 @@ The crate never fabricates a decode it cannot verify against a golden vector.
 
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.3.0):
+Published on crates.io as `depz-sensor-sdk` (0.4.0):
 
 ```bash
 cargo add depz-sensor-sdk

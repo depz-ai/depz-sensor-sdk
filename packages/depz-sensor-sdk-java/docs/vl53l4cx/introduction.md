@@ -18,14 +18,14 @@ model id `0xEBAA` (the same as the VL53L4CD).
 
 | driver | what it is | streamed block |
 |---|---|---|
-| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the host finds **up to four targets** in them; modes `short` / `medium` / `long`, budgets 2–550 ms | 83-byte histogram block at `0x0088` |
+| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the host finds **up to four targets** in them; modes `medium` / `long` (no `short` on an L4 die), budgets 2–200 ms | 83-byte histogram block at `0x0088` |
 
 ## When to use it
 
 Use it for the widest range on a small board (up to ~6 m), with several
 targets per frame. If you need offset/crosstalk calibration or thresholds, the
 full drivers can run it on the VL53L4CD's light driver instead (reach drops to
-~1.2 m); the board then streams the VL53L4CD's die block.
+~1.4 m); the board then streams the VL53L4CD's die block.
 
 ## What this SDK offers
 

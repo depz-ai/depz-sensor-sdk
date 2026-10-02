@@ -480,12 +480,23 @@ const char *depz_vl53lx_caveat(const depz_device *dev)
     return c ? c : "";
 }
 
+static int do_driver_reach_mm(depz_device *dev, uint32_t *out)
+{
+    vlx_driver *d = st(dev)->drv;
+    *out = 0;
+    if (!d || !d->ops->reach_mm) return DEPZ_OK;
+    return d->ops->reach_mm(d, out);
+}
+
+static int locked_driver_reach_mm(depz_device *dev, uint32_t *out) { LOCKED(do_driver_reach_mm(dev, out)); }
+
 uint32_t depz_vl53lx_driver_reach_mm(const depz_device *dev)
 {
-    vlx_state *s;
+    uint32_t mm = 0;
     if (!depz_is_vl53lx(dev)) return 0;
-    s = st((depz_device *)dev);
-    return s->drv && s->drv->ops->reach_mm ? s->drv->ops->reach_mm(s->drv) : 0;
+    /* Reads the sensor on the VL53L1 die and the VL53L0X: 0 on a failed read. */
+    if (locked_driver_reach_mm((depz_device *)dev, &mm)) return 0;
+    return mm;
 }
 
 bool depz_vl53lx_supports(const depz_device *dev, unsigned cap)
@@ -521,8 +532,15 @@ int depz_vl53lx_budget_range(const depz_device *dev, int *min_ms, int *max_ms)
     VLX_TRY(need(dev));
     s = st((depz_device *)dev);
     if (!s->drv) return depz_fail(DEPZ_E_ARG, "vl53lx: call init() first");
-    if (min_ms) *min_ms = s->drv->ops->budget_min_ms;
-    if (max_ms) *max_ms = s->drv->ops->budget_max_ms;
+    if (s->drv->ops->budget_range) {
+        int lo, hi;
+        s->drv->ops->budget_range(s->drv, &lo, &hi);
+        if (min_ms) *min_ms = lo;
+        if (max_ms) *max_ms = hi;
+    } else {
+        if (min_ms) *min_ms = s->drv->ops->budget_min_ms;
+        if (max_ms) *max_ms = s->drv->ops->budget_max_ms;
+    }
     return DEPZ_OK;
 }
 
@@ -579,7 +597,7 @@ int depz_vl53lx_bridge_info(depz_device *dev, depz_vl53lx_info *out)
 /* ── configuration ─────────────────────────────────────────────────────── */
 
 static int do_configure(depz_device *dev, int budget_ms, int inter_ms, const char *mode, const int32_t *offset_mm,
-                        const int32_t *xtalk_kcps)
+                        const int32_t *xtalk_kcps, const int *signal_kcps)
 {
     vlx_driver *d;
     VLX_TRY(need_not_ranging(dev));
@@ -587,19 +605,27 @@ static int do_configure(depz_device *dev, int budget_ms, int inter_ms, const cha
     d = st(dev)->drv;
     if (offset_mm) VLX_TRY(need_cap(dev, DEPZ_VL53LX_CAP_OFFSET, "offset"));
     if (xtalk_kcps) VLX_TRY(need_cap(dev, DEPZ_VL53LX_CAP_XTALK, "xtalk"));
+    if (signal_kcps) VLX_TRY(need_cap(dev, DEPZ_VL53LX_CAP_SIGNAL_THRESH, "signal_thresh"));
     if (mode && !d->ops->set_mode) return depz_fail(DEPZ_E_ARG, "vl53lx: this driver has no modes");
     VLX_TRY(sensor_init(d));
     if (mode) VLX_TRY(d->ops->set_mode(d, mode));
     VLX_TRY(d->ops->set_range_timing(d, budget_ms, inter_ms));
     if (offset_mm) VLX_TRY(d->ops->set_offset(d, *offset_mm));
     if (xtalk_kcps) VLX_TRY(d->ops->set_xtalk(d, *xtalk_kcps));
+    if (signal_kcps) VLX_TRY(d->ops->set_signal_threshold(d, *signal_kcps));
     return DEPZ_OK;
 }
 
 int depz_vl53lx_configure(depz_device *dev, int budget_ms, int inter_ms, const char *mode, const int32_t *offset_mm,
                           const int32_t *xtalk_kcps)
 {
-    LOCKED(do_configure(dev, budget_ms, inter_ms, mode, offset_mm, xtalk_kcps));
+    LOCKED(do_configure(dev, budget_ms, inter_ms, mode, offset_mm, xtalk_kcps, NULL));
+}
+
+int depz_vl53lx_configure_ex(depz_device *dev, int budget_ms, int inter_ms, const char *mode,
+                             const int32_t *offset_mm, const int32_t *xtalk_kcps, const int *signal_kcps)
+{
+    LOCKED(do_configure(dev, budget_ms, inter_ms, mode, offset_mm, xtalk_kcps, signal_kcps));
 }
 
 static int do_get_timing(depz_device *dev, int *budget_ms, int *inter_ms)

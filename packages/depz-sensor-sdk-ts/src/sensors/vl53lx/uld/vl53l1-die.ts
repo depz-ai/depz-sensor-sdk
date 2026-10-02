@@ -103,6 +103,22 @@ export const DIE_RANGE_STATUS_NAMES: Readonly<Record<number, string>> = {
   255: "other error",
 };
 
+/**
+ * How far a target can be before the die fails it with status 4, mm.
+ *
+ * RANGE_CONFIG__VALID_PHASE_HIGH is the top of the valid phase window, 5.3
+ * fixed point in PLL periods, counted from the zero-distance phase. One PLL
+ * period is c/2 of distance at the oscillator the die measured for itself
+ * (OSC_FREQUENCY, 4.12 MHz): 198.4 mm at the usual 0xBCCC. The same
+ * arithmetic as VL53LX_range_maths() in the Bare Driver, which applies this
+ * window on the host side in histogram mode. Exact in a double: the product
+ * stays below 2^53.
+ */
+export function phaseWindowMm(fastOscFrequency: number, validPhaseHigh: number): number {
+  const pllPeriod = Math.floor(2 ** 30 / fastOscFrequency); // us, 0.18
+  return Math.floor((validPhaseHigh * pllPeriod * (299704 >> 3)) / 2 ** 25);
+}
+
 export function dieStatusText(status: number): string {
   return DIE_RANGE_STATUS_NAMES[status] ?? `unknown (${status})`;
 }
@@ -358,6 +374,17 @@ export abstract class VL53L1Die extends SensorDriver {
       }
       await this.p.wrWord(reg, (msByte * 256 + (lsByte & 0xff)) & 0xffff);
     }
+  }
+
+  /**
+   * Read off the loaded configuration, so it follows the blob and the mode:
+   * 1388 mm for the 0x38 window of the L4CD, L3CX and L1 short blobs, 4563 mm
+   * for the 0xB8 window L1 long writes.
+   */
+  override async reachMm(): Promise<number | null> {
+    const oscFrequency = await this.p.rdWord(OSC_FREQUENCY);
+    if (oscFrequency === 0) throw new Vl53Error("osc_frequency reads 0");
+    return phaseWindowMm(oscFrequency, await this.p.rdByte(RANGE_CONFIG__VALID_PHASE_HIGH));
   }
 
   /** → [timingBudgetMs, interMeasurementMs]. */

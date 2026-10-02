@@ -49,7 +49,7 @@ The model id (`0xEBAA`) is a cross-check only: several products share
 theirs.
 
 To run the die on another product's driver, name that product — here
-the VL53L4CD light driver (single target, ~1.2 m, offset and crosstalk calibration, thresholds) — or name `VL53L1CX` for its light driver (long / short modes, ROI, calibrations):
+the VL53L4CD light driver (single target, ~1.4 m, offset and crosstalk calibration, thresholds) — or name `VL53L1CX` for its light driver (long / short modes, ROI, calibrations):
 
 ```cpp
 #include "depz/device.hpp"
@@ -176,8 +176,10 @@ void targets(depz::Vl53lx& tof)
 }
 ```
 
-The presets pick how far the 24 bins reach: `short` 1.6 m, `medium` 2.4 m
-(what init leaves), `long` 4 m (`driver_reach_mm()`). Use `plottable()` /
+The presets set the valid phase window: past ~1790 mm (`medium`, what init
+leaves) or ~3370 mm (`long`) a target fails with status 4 — there is no
+`short` on this die; `driver_reach_mm()` gives it for the preset in use. Use
+`plottable()` /
 `primary_distance_mm()`, not `status == 0`. The driver keeps frame-to-frame
 state, so every streamed frame is decoded exactly once, in order.
 
@@ -232,7 +234,9 @@ void replay(const std::string& path)
 `tests/test_device.cpp` replays these committed captures of this board
 (recorded by the Python SDK) strictly through `depz::Vl53lx`:
 
-- `vl53l4cx_histogram_short_33ms` — `device_vlx_l4cx_hist_short_replay`
+- `vl53l4cx_histogram_short_33ms` — `device_vlx_l4cx_hist_short_replay`:
+  recorded before `short` was refused on an L4 die; now init replays and
+  `configure()` with `short` must throw `depz::ArgumentError`
 - `vl53l4cx_uld_as_l4cd_50ms` — `device_vlx_l4cd_uld_replay`
 
 ## Verification status
@@ -323,7 +327,8 @@ the device name tells them apart), 6000 mm, driver `histogram`, 2-byte
 addresses, one release step `0x0086 ← 0x01`, 1000 kHz after init.
 `resolve_class()` gives `SensorClass::Vl53l4cx`. Borrowing a neighbour's
 driver is explicit: `find_product("VL53L4CD")` is the row the borrowed light
-driver runs with (reach 1200 mm).
+driver runs with (rated 1300 mm; the light driver's own window reaches
+~1390 mm).
 
 ### Stream a block
 
@@ -382,7 +387,7 @@ frame pairs, the phase-consistency history — is the class's job (the sections 
 ### Decode the die block (borrowed VL53L4CD driver)
 
 The VL53L4CX has one driver of its own — the histogram driver. The class can also run the die on the **VL53L4CD's light driver** (single
-target, ~1.2 m, with calibrations and thresholds); it then streams the
+target, ~1.4 m, with calibrations and thresholds); it then streams the
 17-byte die block at `0x0089`, read the VL53L4CD way — pass
 `DieVariant::L4` (the default):
 
@@ -457,7 +462,7 @@ sample the USB link had no room for) and the fault latch reset at
 - **`configure()` before every run** — it re-initialises the sensor.
 - **Configuration while ranging throws** — stop, reconfigure, restart.
 - **Prefer `plottable()` over `status == 0`**.
-- **Don't use the `short` preset on the L4CX** — at any distance its frames alternate: one carries the true distance but status 7, the next a wrong one (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m; at 1.0 m the true 1008 mm comes flagged status 4 and the other frame reads 238 mm). A plottable filter drops them all; from C on 2026-09-29 at 0.6 m, every short frame after the first came back status 7. Same on firmware v0.23 and v0.24, in the Python SDK and with the firmware repo's own tool; the cause is not known yet. `medium` and `long` are clean — use them.
+- **No `short` preset on this die** — the histogram driver offers `medium` and `long` only, with budgets 2–200 ms (`modes()` and `budget_range()` show it after `init()`); asking for `short` throws `depz::ArgumentError`. ST's own L4CX driver refuses it too: on an L4 die the A frame of the short pair ranges on the wrong side of the phase wrap, one frame in two (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4).
 - **Same model id as the VL53L4CD** (`0xEBAA`) — the device name tells them apart.
 - **The borrowed light drivers read long uncalibrated** — +15..20 mm at 0.6 m on the lab board; calibrate the offset (they have it) and re-apply it with `configure()`. The histogram driver has no calibration and needed none there (+3..6 mm).
 - **Callbacks run on the reader thread** — keep them short, never call a blocking method from one.

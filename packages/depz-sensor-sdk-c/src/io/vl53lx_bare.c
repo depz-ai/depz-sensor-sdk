@@ -79,6 +79,9 @@
 #define TIMING_GUARD_US 1700
 #define TIMING_DIVISOR  6
 #define FDA_MAX_TIMING_BUDGET_US 550000
+/* The L4CX BareDriver (STSW-IMG029) narrows both for an L4 die: a lower budget
+ * ceiling, and no short mode at all (see is_l4()). */
+#define L4_FDA_MAX_TIMING_BUDGET_US 200000
 
 /* ST's histogram preset leaves the pad at 0x00; Fast Mode Plus is a property
  * of the die, so it is set here and never cleared (driver.py). */
@@ -86,7 +89,6 @@
 
 typedef enum { MODE_SHORT = 0, MODE_MEDIUM = 1, MODE_LONG = 2 } dist_mode;
 static const char *const MODE_NAMES[3] = {"short", "medium", "long"};
-static const uint32_t REACH_BY_MODE_MM[3] = {1600, 2400, 4000};
 
 /* core.py HistConfig: VL53LX_histogram_config_t. */
 typedef struct {
@@ -803,6 +805,21 @@ static int set_inter_measurement_period_ms(vlx_driver *d, int64_t period_ms)
     return DEPZ_OK;
 }
 
+/* `IsL4()` of the L4CX BareDriver: the die, read from NVM, not the product
+ * name — an L4CD or L4CX board ranging under a borrowed name is still an L4.
+ * 0xEC is the L4ED. False until data_init() has read the NVM. */
+static bool is_l4(const bare_drv *s)
+{
+    return s->img.nvm_copy_data.identification__module_type == 0xAA &&
+           (s->img.nvm_copy_data.identification__model_id == 0xEB ||
+            s->img.nvm_copy_data.identification__model_id == 0xEC);
+}
+
+static int64_t fda_max_timing_budget_us(const bare_drv *s)
+{
+    return is_l4(s) ? L4_FDA_MAX_TIMING_BUDGET_US : FDA_MAX_TIMING_BUDGET_US;
+}
+
 static int set_measurement_timing_budget_us(vlx_driver *d, int64_t budget_us)
 {
     bare_drv *s = bd(d);
@@ -810,7 +827,7 @@ static int set_measurement_timing_budget_us(vlx_driver *d, int64_t budget_us)
     if (!(TIMING_GUARD_US < budget_us && budget_us <= 10000000))
         return depz_fail(DEPZ_E_ARG, "vl53lx: timing budget %lld us out of range", (long long)budget_us);
     range_us = (budget_us - TIMING_GUARD_US) / TIMING_DIVISOR;
-    if (range_us * TIMING_DIVISOR > FDA_MAX_TIMING_BUDGET_US)
+    if (range_us * TIMING_DIVISOR > fda_max_timing_budget_us(s))
         return depz_fail(DEPZ_E_ARG, "vl53lx: timing budget %lld us out of range", (long long)budget_us);
     set_timeouts_us(d, s->phasecal_timeout_us, s->mm_timeout_us, range_us);
     return DEPZ_OK;
@@ -1009,9 +1026,22 @@ static int wait_boot(vlx_driver *d)
     }
 }
 
+/* The budget range of this die: TIMING_GUARD_US comes off the budget before
+ * it is divided, and the range timeout is capped at the FDA maximum — 2..550
+ * ms, 2..200 on an L4 die. Rounded inwards. */
+static void budget_range(const vlx_driver *d, int *min_ms, int *max_ms)
+{
+    *min_ms = 2;
+    *max_ms = (int)(fda_max_timing_budget_us((const bare_drv *)d) / 1000);
+}
+
 static int set_range_timing(vlx_driver *d, int budget_ms, int inter_ms)
 {
     bare_drv *s = bd(d);
+    int low, high;
+    budget_range(d, &low, &high);
+    if (!(low <= budget_ms && budget_ms <= high))
+        return depz_fail(DEPZ_E_ARG, "vl53lx: timing_budget_ms must be %d..%d", low, high);
     s->budget_ms = budget_ms;
     s->inter_ms = inter_ms;
     VLX_TRY(set_measurement_timing_budget_us(d, (int64_t)budget_ms * 1000));
@@ -1038,12 +1068,16 @@ static int apply_mode(vlx_driver *d, dist_mode mode)
     return set_range_timing(d, s->budget_ms, s->inter_ms);
 }
 
+/* Short is refused on an L4 die, as the L4CX BareDriver does: there the A
+ * frame of the short pair ranges on the wrong side of the wrap, one frame in
+ * two, measured on the L4CX board. */
 static int set_mode(vlx_driver *d, const char *name)
 {
     int m;
-    for (m = 0; m < 3; m++)
+    for (m = is_l4(bd(d)) ? MODE_MEDIUM : MODE_SHORT; m < 3; m++)
         if (!strcmp(name, MODE_NAMES[m])) return apply_mode(d, (dist_mode)m);
-    return depz_fail(DEPZ_E_ARG, "vl53lx: no such mode: %s (have short, medium, long)", name);
+    return depz_fail(DEPZ_E_ARG, "vl53lx: no such mode: %s (have %s)", name,
+                     is_l4(bd(d)) ? "medium, long" : "short, medium, long");
 }
 
 static int get_mode(vlx_driver *d, const char **name)
@@ -1054,13 +1088,22 @@ static int get_mode(vlx_driver *d, const char **name)
 
 static size_t modes(const vlx_driver *d, const char **names, size_t cap)
 {
-    size_t i;
-    (void)d;
-    for (i = 0; i < 3 && i < cap; i++) names[i] = MODE_NAMES[i];
-    return 3;
+    size_t first = is_l4((const bare_drv *)d) ? MODE_MEDIUM : MODE_SHORT, i;
+    for (i = 0; first + i < 3 && i < cap; i++) names[i] = MODE_NAMES[first + i];
+    return 3 - first;
 }
 
-static uint32_t reach_mm(const vlx_driver *d) { return REACH_BY_MODE_MM[((const bare_drv *)d)->mode]; }
+/* The valid phase window of the preset mode, which the post-processing
+ * applies: 992 / 1785 / 3373 mm for short / medium / long at the usual
+ * oscillator. Past it the target is status 4, although the bins only wrap
+ * further out. Host-side: no register traffic. */
+static int reach_mm(vlx_driver *d, uint32_t *out)
+{
+    bare_drv *s = bd(d);
+    *out = vlx_phase_window_mm((uint32_t)s->img.static_nvm_managed.osc_measured__fast_osc__frequency,
+                               (uint32_t)s->hpp.valid_phase_high);
+    return DEPZ_OK;
+}
 
 /* A reset, not a boot check: the register image assumes the reset defaults. */
 static int sensor_init(vlx_driver *d)
@@ -1231,7 +1274,8 @@ static const vlx_ops BARE_OPS = {
     model_id, sensor_init, start_ranging, stop_ranging, check_for_data_ready, clear_interrupt, stream_block,
     decode, set_range_timing, get_range_timing, destroy,
     modes, NULL, set_mode, get_mode, reach_mm,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    budget_range};
 
 vlx_driver *vlx_new_bare(vlx_plat *p, depz_vl53lx_product product)
 {

@@ -23,6 +23,7 @@ BareDriver does not keep.
 import time
 
 from depz_sensor_sdk.vl53lx.uld.base import Measurement, SensorDriver, Vl53Error
+from depz_sensor_sdk.vl53lx.uld.vl53l1_die import phase_window_mm
 from depz_sensor_sdk.vl53lx.uld.bare import hist
 from depz_sensor_sdk.vl53lx.uld.bare.core import (BareDriver, CLEAR_RANGE_INT, DISTANCE_MODES,
                              HISTOGRAM_BIN_DATA_I2C_INDEX,
@@ -43,10 +44,6 @@ PAD_I2C_HV__CONFIG      = 0x002D
 # property of the die, not of the preset, so it is set here and never cleared.
 # FM+ pads work at every step down to 100 kHz.
 FMP_PAD_CONFIG = 0x12
-
-# How far the 24 bins reach before the phase wraps, per preset mode. The bin
-# is 199 mm wide in all three; what changes is the VCSEL period behind it.
-REACH_BY_MODE_MM = {'short': 1600, 'medium': 2400, 'long': 4000}
 
 DEFAULT_MODE = 'medium'
 
@@ -69,6 +66,7 @@ class VL53LX(SensorDriver):
     MODES = DISTANCE_MODES
     # TIMING_GUARD_US comes off the budget before it is divided, and the range
     # timeout is capped at FDA_MAX_TIMING_BUDGET_US: 2..551 ms. Rounded inwards.
+    # Both MODES and BUDGET_MS are narrowed per die in sensor_init().
     BUDGET_MS = (2, 550)
     HISTOGRAM = True
 
@@ -124,17 +122,22 @@ class VL53LX(SensorDriver):
         self.wait_boot()
 
         self.bare.data_init()
+        # The die is known once NVM is read: an L4 has no short mode and a
+        # 200 ms budget ceiling, as in ST's L4CX BareDriver.
+        self.MODES = self.bare.distance_modes()
+        self.BUDGET_MS = (2, self.bare.fda_max_timing_budget_us() // 1000)
         self.set_mode(self._mode)
         self.p.wr_byte(PAD_I2C_HV__CONFIG, FMP_PAD_CONFIG)
         if self.MAX_KHZ != I2C_KHZ_BOOT:
             self.p.set_i2c_speed(self.MAX_KHZ)
 
     def set_mode(self, name: str):
-        """short / medium / long — the device preset mode, which sets how far
-        the 24 bins reach before the phase wraps (1.6 / 2.4 / 4.0 m). The bin
-        itself is 199 mm wide in all three, so this does not change how far
-        apart two targets have to be to be told apart."""
-        if name not in DISTANCE_MODES:
+        """short / medium / long — the device preset mode: the VCSEL period,
+        which sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid
+        phase window inside it (`reach_mm()`). The bin itself is 199 mm wide in
+        all three, so this does not change how far apart two targets have to
+        be to be told apart."""
+        if name not in self.MODES:
             raise Vl53Error(f'no such mode: {name} '
                             f'(have {", ".join(self.MODES)})')
         self._mode = name
@@ -150,7 +153,13 @@ class VL53LX(SensorDriver):
         return self._mode
 
     def reach_mm(self):
-        return REACH_BY_MODE_MM[self._mode]
+        """The valid phase window of the preset mode, which the
+        post-processing applies (`hist._fill_target`): 992 / 1785 / 3373 mm
+        for short / medium / long at the usual oscillator. Past it the target
+        is status 4, although the bins only wrap further out."""
+        return phase_window_mm(
+            self.bare.img.static_nvm_managed.osc_measured__fast_osc__frequency,
+            self.bare.hpp.valid_phase_high)
 
     # ── driver-specific readout ──
     def driver_info(self) -> dict:
@@ -227,6 +236,9 @@ class VL53LX(SensorDriver):
         """The family-wide timing call. The budget covers the whole
         measurement, of which the range timeout is one sixth after a fixed
         guard comes off — ST's own arithmetic, in `BareDriver`."""
+        low, high = self.BUDGET_MS
+        if not low <= timing_budget_ms <= high:
+            raise Vl53Error(f'timing_budget_ms must be {low}..{high}')
         self._budget_ms = timing_budget_ms
         self._inter_ms = inter_measurement_ms
         self.bare.set_measurement_timing_budget_us(timing_budget_ms * 1000)

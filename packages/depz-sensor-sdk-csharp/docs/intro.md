@@ -32,7 +32,7 @@ Python or TypeScript SDK.
 
 ## Install
 
-Published on NuGet as `Depz.Sensor` (0.3.0):
+Published on NuGet as `Depz.Sensor` (0.4.0):
 
 ```bash
 dotnet add package Depz.Sensor

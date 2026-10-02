@@ -159,7 +159,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.3.0
+    GIT_TAG        v0.4.0
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -690,8 +690,8 @@ byte for byte as recorded and decode the same values;
 SDK's fake hub (busy, refusals, the rarer report types); five VL53L 1D-family
 captures replay through `depz::Vl53lx` (`device_vlx_l0x_uld_replay`,
 `_l1cx_uld_replay`, `_l3cx_ulp_replay`, `_l4cd_uld_replay` — the VL53L4CD ULD
-borrowed by a VL53L4CX — and `_l4cx_hist_short_replay`, the histogram
-driver's alternating short-preset frames, frame for frame). `ctest` runs 30
+borrowed by a VL53L4CX — and `_l4cx_hist_short_replay`, which checks that the
+histogram driver now refuses the short preset on an L4 die). `ctest` runs 30
 tests in all: `vectors`, 18 `device_*` tests and 11 per-suite vector
 tests.
 Your own tests can do the same: record a session once with `Link::recording`, then

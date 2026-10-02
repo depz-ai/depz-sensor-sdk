@@ -16,11 +16,11 @@ host**, inside `depz_sensor_sdk.vl53lx` (`Vl53l4cx`).
 
 | driver | what it is | modes | timing budget |
 |---|---|---|---|
-| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the SDK finds **up to four targets** in them | `short`, `medium`, `long` | any 2–550 ms (default 33 ms) |
+| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the SDK finds **up to four targets** in them | `medium`, `long` — no `short` on this die | any 2–200 ms (default 33 ms) |
 
 ## When to use it
 
-Use it for the widest range on a small board (up to ~6 m), with several targets per frame. If you need offset/crosstalk calibration or thresholds, run it on the VL53L4CD's light driver instead: `init(product="VL53L4CD")` (reach drops to ~1.2 m).
+Use it for the widest range on a small board (up to ~6 m), with several targets per frame. If you need offset/crosstalk calibration or thresholds, run it on the VL53L4CD's light driver instead: `init(product="VL53L4CD")` (reach drops to ~1.4 m).
 
 ## Key concepts
 
@@ -34,7 +34,7 @@ Use it for the widest range on a small board (up to ~6 m), with several targets 
   histogram driver `targets` lists every return, strongest first.
 - **Configure only when stopped** — while ranging the stream owns the bus;
   configuration calls raise until `stop_ranging()`.
-- **Borrowing a driver** — `init(product="VL53L4CD")` loads the VL53L4CD ULD on this die: single target, 1.2 m, full calibrations and thresholds. `notes()` says so.
+- **Borrowing a driver** — `init(product="VL53L4CD")` loads the VL53L4CD ULD on this die: single target, ~1.4 m, full calibrations and thresholds. `notes()` says so.
 - **Same model id as the VL53L4CD** (0xEBAA) — the device name tells them apart.
 
 ## See also

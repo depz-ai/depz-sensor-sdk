@@ -68,7 +68,7 @@ public static class Vl53lxProducts
             Vl53lxDriverKind.Uld, 2, DieClear, 1000),
         new("VL53L3CX", 0xED44, 0xEAAA, 3000, new[] { Vl53lxDriverKind.Ulp, Vl53lxDriverKind.Histogram },
             Vl53lxDriverKind.Ulp, 2, DieClear, 1000),
-        new("VL53L4CD", 0xED45, 0xEBAA, 1200, new[] { Vl53lxDriverKind.Uld, Vl53lxDriverKind.Histogram },
+        new("VL53L4CD", 0xED45, 0xEBAA, 1300, new[] { Vl53lxDriverKind.Uld, Vl53lxDriverKind.Histogram },
             Vl53lxDriverKind.Uld, 2, DieClear, 1000),
         new("VL53L4CX", 0xED46, 0xEBAA, 6000, new[] { Vl53lxDriverKind.Histogram },
             Vl53lxDriverKind.Histogram, 2, DieClear, 1000),

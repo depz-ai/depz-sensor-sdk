@@ -462,7 +462,7 @@ pub const PRODUCTS: [Product; 6] = [
         name: "VL53L4CD",
         usb_pid: 0xED45,
         model_id: 0xEBAA,
-        reach_mm: 1200,
+        reach_mm: 1300,
         default_driver: DriverKind::Uld,
         drivers: &[(DriverKind::Uld, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
     },

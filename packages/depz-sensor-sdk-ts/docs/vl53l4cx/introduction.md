@@ -21,11 +21,11 @@ host**, inside this SDK (`Vl53l4cx`, a subclass of the family class `Vl53lx`).
 
 | driver | what it is | modes | timing budget |
 |---|---|---|---|
-| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the SDK finds **up to four targets** in them | `short`, `medium`, `long` | any 2–550 ms (default 33 ms) |
+| `histogram` | ST's Bare Driver: the die hands the host 24 photon-count bins per frame and the SDK finds **up to four targets** in them | `medium`, `long` — no `short` on this die | any 2–200 ms (default 33 ms) |
 
 ## When to use it
 
-Use it for the widest range on a small board (up to ~6 m), with several targets per frame. If you need offset/crosstalk calibration or thresholds, run it on the VL53L4CD's light driver instead: `init(undefined, { product: "VL53L4CD" })` (reach drops to ~1.2 m).
+Use it for the widest range on a small board (up to ~6 m), with several targets per frame. If you need offset/crosstalk calibration or thresholds, run it on the VL53L4CD's light driver instead: `init(undefined, { product: "VL53L4CD" })` (reach drops to ~1.4 m).
 
 ## Key concepts
 
@@ -33,7 +33,7 @@ Use it for the widest range on a small board (up to ~6 m), with several targets 
 - **`configure()` before every run** — it re-initialises the sensor and applies budget, period, mode and stored calibrations. That is the only way to know what the configuration registers hold.
 - **Same measurement for every product** — `Vl53lxMeasurement`; on the histogram driver `targets` lists every return, strongest first.
 - **Configure only when stopped** — while ranging the stream owns the bus; configuration calls throw until `stopRanging()`.
-- **Borrowing a driver** — `init(undefined, { product: "VL53L4CD" })` loads the VL53L4CD ULD on this die: single target, 1.2 m, full calibrations and thresholds. `notes()` says so.
+- **Borrowing a driver** — `init(undefined, { product: "VL53L4CD" })` loads the VL53L4CD ULD on this die: single target, ~1.4 m, full calibrations and thresholds. `notes()` says so.
 - **Same model id as the VL53L4CD** (0xEBAA) — the device name tells them apart.
 - **Timestamps** are device microseconds as `bigint` (`timestampUs`) on every measurement.
 

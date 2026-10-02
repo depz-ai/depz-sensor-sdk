@@ -102,12 +102,12 @@ layer — is complete and vector-tested.
 
 ## Build
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.3.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.4.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.3.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.4.0")
 ```
 
 Maven:
@@ -116,7 +116,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 

@@ -1416,6 +1416,33 @@ static void vlx_replay(const char *stem)
                                                  : depz_vl53lx_product_from_str(json_as_str(parg))), DEPZ_OK);
     CHECK(strcmp(depz_vl53lx_product_get(depz_vl53lx_product_bound(dev))->name,
                  json_as_str(json_obj_get(exp, "product"))) == 0);
+    if (json_obj_get(exp, "refused")) {
+        /* A configuration the driver no longer accepts (short on an L4 die):
+         * init still replays, configure refuses the mode. */
+        const json_value *after = json_obj_get(json_obj_get(exp, "refused"), "after_init");
+        const json_value *want_modes = json_obj_get(after, "modes"), *want_budget = json_obj_get(after, "budget_ms");
+        const char *names[8];
+        int lo, hi;
+        size_t n = depz_vl53lx_modes(dev, names, 8);
+        CHECK(n == json_arr_size(want_modes));
+        for (k = 0; k < n; k++) CHECK(strcmp(names[k], json_as_str(json_arr_get(want_modes, k))) == 0);
+        CHECK_RC(depz_vl53lx_budget_range(dev, &lo, &hi), DEPZ_OK);
+        CHECK(lo == json_as_int(json_arr_get(want_budget, 0)) && hi == json_as_int(json_arr_get(want_budget, 1)));
+        CHECK(depz_vl53lx_driver_reach_mm(dev) == (uint32_t)json_as_int(json_obj_get(after, "driver_reach_mm")));
+        CHECK_RC(depz_vl53lx_configure(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0, json_as_str(mode),
+                                       NULL, NULL), DEPZ_E_ARG);
+        depz_device_close(dev);
+        json_free(exp);
+        return;
+    }
+    if (!depz_vl53lx_supports(dev, DEPZ_VL53LX_CAP_SIGNAL_THRESH)) {
+        /* A group the driver lacks is refused before the re-init: no traffic,
+         * so the capture's own configure below still replays strictly. */
+        const int kcps = 512;
+        CHECK_RC(depz_vl53lx_configure_ex(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0,
+                                          json_is_null(mode) ? NULL : json_as_str(mode), NULL, NULL, &kcps),
+                 DEPZ_E_ARG);
+    }
     CHECK_RC(depz_vl53lx_configure(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0,
                                    json_is_null(mode) ? NULL : json_as_str(mode), NULL, NULL), DEPZ_OK);
     CHECK_RC(depz_vl53lx_get_range_timing(dev, &budget, &inter), DEPZ_OK);

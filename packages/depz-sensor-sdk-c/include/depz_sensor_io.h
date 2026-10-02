@@ -905,7 +905,10 @@ depz_vl53lx_product depz_vl53lx_product_bound(const depz_device *dev);
 depz_vl53lx_driver  depz_vl53lx_driver_bound(const depz_device *dev);
 /* The driver's caveat for the pair ("" when none). */
 const char *depz_vl53lx_caveat(const depz_device *dev);
-/* What the driver's configuration can reach, mm (0 = not characterised). */
+/* What the configuration in use can reach, mm (0 = not characterised, or a
+ * failed read). Read off the sensor: the valid phase window on the VL53L1 die,
+ * the final-range VCSEL period's figure on the VL53L0X. The histogram driver
+ * answers its preset's window host-side, with no traffic. */
 uint32_t depz_vl53lx_driver_reach_mm(const depz_device *dev);
 bool depz_vl53lx_supports(const depz_device *dev, unsigned cap);
 bool depz_vl53lx_ranging(const depz_device *dev);
@@ -929,9 +932,18 @@ int  depz_vl53lx_bridge_info(depz_device *dev, depz_vl53lx_info *out);
 
 /* Re-initialise and apply a configuration: `mode` NULL = leave the init
  * default, `offset_mm` / `xtalk_kcps` NULL = leave (a stored calibration
- * re-applied otherwise). inter_ms 0 = continuous. */
+ * re-applied otherwise). inter_ms 0 = continuous. An unsupported group is
+ * refused before the re-init. */
 int  depz_vl53lx_configure(depz_device *dev, int budget_ms, int inter_ms, const char *mode,
                            const int32_t *offset_mm, const int32_t *xtalk_kcps);
+/* depz_vl53lx_configure() plus `signal_kcps` (NULL = leave): replaces the
+ * blob's signal threshold, applied last. The re-init puts it back to the
+ * default, so a lowered one goes here, not in a set_signal_threshold_kcps()
+ * before configure: frames past the default threshold come back status 2 with
+ * the distance right (L1 long at ~4 m, a light driver borrowed onto a die
+ * without the lens it was tuned for). */
+int  depz_vl53lx_configure_ex(depz_device *dev, int budget_ms, int inter_ms, const char *mode,
+                              const int32_t *offset_mm, const int32_t *xtalk_kcps, const int *signal_kcps);
 int  depz_vl53lx_get_range_timing(depz_device *dev, int *budget_ms, int *inter_ms);
 int  depz_vl53lx_set_mode(depz_device *dev, const char *mode);
 /* The mode in use; NULL (and DEPZ_OK) on a product without modes. */

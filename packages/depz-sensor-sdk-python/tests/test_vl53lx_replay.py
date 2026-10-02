@@ -6,8 +6,9 @@ identify, device name (picks the product class), init(driver), configure
 ULD — boot polls, NVM reads, the histogram preset — must re-issue
 byte-identical requests, and every decoded frame (distance, status, targets,
 histogram bins) must match the sidecar. The histogram driver is stateful (A/B
-frame pairs, phase-consistency history): the short-preset capture pins its
-alternating slot-0 artefact frame for frame.
+frame pairs, phase-consistency history). A sidecar with `refused` is a capture
+of a configuration the driver no longer accepts (the short preset on an L4
+die): init must still replay, and configure must refuse the mode.
 """
 
 import itertools
@@ -17,9 +18,10 @@ from pathlib import Path
 import pytest
 
 from depz_sensor_sdk.device import DeviceBase
+from depz_sensor_sdk.errors import DepzError
 from depz_sensor_sdk.discovery import _identify, _promote
 from depz_sensor_sdk.transport.record_replay import ReplayLink
-from depz_sensor_sdk.vl53lx import Vl53lx
+from depz_sensor_sdk.vl53lx import Vl53Error, Vl53lx
 
 RECORDINGS = Path(__file__).resolve().parents[3] / "contracts" / "vectors" / "recordings"
 _FAMILY = ("vl53l0x_", "vl53l1cx_", "vl53l1cb_", "vl53l3cx_", "vl53l4cx_", "vl53lx_l4cd_")
@@ -42,6 +44,15 @@ def test_vl53lx_full_stack_replay(stem):
         assert dev.get_software_name() == expected["software_name"]
         dev.init(expected["driver"], product=expected.get("product_arg"))
         assert dev.product == expected["product"]
+        refused = expected.get("refused")
+        if refused:
+            after = refused["after_init"]
+            assert list(dev.modes) == after["modes"]
+            assert list(dev.driver.BUDGET_MS) == after["budget_ms"]
+            assert dev.driver.reach_mm() == after["driver_reach_mm"]
+            with pytest.raises(Vl53Error, match="no such mode"):
+                dev.configure(budget_ms=expected["budget_ms"], mode=expected["mode"])
+            return
         dev.configure(budget_ms=expected["budget_ms"], mode=expected["mode"])
         assert list(dev.get_range_timing()) == expected["timing"]
         stream = dev.measurements(maxsize=len(expected["frames"]) + 8)
@@ -65,3 +76,40 @@ def test_vl53lx_full_stack_replay(stem):
             assert b.result__stream_count == want["bins"]["stream_count"]
         else:
             assert got.bins is None
+
+
+def _replay_to_init(stem):
+    expected = json.loads((RECORDINGS / f"{stem}.expected.json").read_text())
+    dev = DeviceBase(ReplayLink(RECORDINGS / f"{stem}.depzrec", strict_tx=True), timeout=2.0)
+    dev = _promote(dev, _identify(dev))
+    dev.get_software_name()
+    dev.init(expected["driver"], product=expected.get("product_arg"))
+    return dev, expected
+
+
+def test_configure_signal_kcps_goes_on_after_the_reinit():
+    """The re-init puts the signal threshold back to the blob's, so configure
+    applies `signal_kcps` last. The capture has no such write: the driver call
+    is recorded instead, after the re-init and timing replayed strictly."""
+    dev, expected = _replay_to_init("vl53l1cx_uld_long_33ms")
+    calls = []
+    dev.driver.set_signal_threshold = calls.append
+    try:
+        dev.configure(budget_ms=expected["budget_ms"], mode=expected["mode"], signal_kcps=512)
+        assert calls == [512]
+        assert list(dev.get_range_timing()) == expected["timing"]
+    finally:
+        dev.close()
+
+
+def test_configure_refuses_an_unsupported_group_before_the_reinit():
+    """L0X has no signal threshold: refused with no traffic, so the capture's
+    own configure still replays strictly afterwards."""
+    dev, expected = _replay_to_init("vl53l0x_uld_long-range_33ms")
+    try:
+        with pytest.raises(DepzError, match="signal_thresh"):
+            dev.configure(budget_ms=expected["budget_ms"], mode=expected["mode"], signal_kcps=512)
+        dev.configure(budget_ms=expected["budget_ms"], mode=expected["mode"])
+        assert list(dev.get_range_timing()) == expected["timing"]
+    finally:
+        dev.close()

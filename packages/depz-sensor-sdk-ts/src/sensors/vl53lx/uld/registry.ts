@@ -97,7 +97,7 @@ export const TABLE: Readonly<Record<string, Product>> = {
   },
   VL53L4CD: {
     modelId: 0xebaa,
-    reachMm: 1200,
+    reachMm: 1300,
     drivers: { uld: VL53L4, histogram: VL53LX },
     caveats: { histogram: HIST_CAVEAT },
   },

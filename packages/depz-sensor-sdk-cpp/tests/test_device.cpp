@@ -540,6 +540,40 @@ void vlx_replay(const std::string& stem)
     v->init(dk, parg.is_null() ? std::nullopt : std::optional<std::string>(parg.as_string()));
     CHECK(v->product() == exp.at("product").as_string());
     const auto& mode = exp.at("mode");
+    if (exp.has("refused")) {
+        // A configuration the driver no longer accepts (short on an L4 die):
+        // init still replays, configure refuses the mode.
+        const auto& after = exp.at("refused").at("after_init");
+        const auto& want_modes = after.at("modes").as_array();
+        const auto modes = v->modes();
+        CHECK(modes.size() == want_modes.size());
+        for (std::size_t k = 0; k < modes.size(); k++) CHECK(modes[k] == want_modes[k].as_string());
+        const auto budget = v->budget_range();
+        CHECK(budget.first == after.at("budget_ms").as_array()[0].as_int() &&
+              budget.second == after.at("budget_ms").as_array()[1].as_int());
+        CHECK(v->driver_reach_mm() == static_cast<std::uint32_t>(after.at("driver_reach_mm").as_int()));
+        bool refused = false;
+        try {
+            v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0, mode.as_string());
+        } catch (const depz::ArgumentError&) {
+            refused = true;
+        }
+        CHECK(refused);
+        return;
+    }
+    if (!v->supports(depz::Vl53lxCap::SignalThresh)) {
+        // A group the driver lacks is refused before the re-init: no traffic,
+        // so the capture's own configure below still replays strictly.
+        bool refused = false;
+        try {
+            v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0,
+                         mode.is_null() ? std::nullopt : std::optional<std::string>(mode.as_string()),
+                         std::nullopt, std::nullopt, 512);
+        } catch (const depz::ArgumentError&) {
+            refused = true;
+        }
+        CHECK(refused);
+    }
     v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0,
                  mode.is_null() ? std::nullopt : std::optional<std::string>(mode.as_string()));
     const auto timing = v->range_timing();

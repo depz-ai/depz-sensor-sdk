@@ -55,11 +55,6 @@ export class VL53L4 extends VL53L1Die {
 
   protected readonly CONFIGURATION = L4_DEFAULT_CONFIGURATION;
 
-  /** 1.2 m — the VL53L4CD's rating, because this is its blob. */
-  override reachMm(): number | null {
-    return 1200;
-  }
-
   /** ALGO__RANGE_IGNORE_THRESHOLD_MCPS, the write closing VL53L4CD_SensorInit(). */
   protected override async initExtra(): Promise<void> {
     await this.p.wrWord(0x0024, 0x0500);

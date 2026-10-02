@@ -175,7 +175,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.3.0
+  GIT_TAG        v0.4.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -697,8 +697,9 @@ The suite is 83 CTests, no hardware required:
   timing read-back and every streamed frame — distance, status, targets,
   histogram bins — for the VL53L0X API, the VL53L1X ULD on a VL53L1CX and a
   VL53L1CB, the VL53L3CX ULP, the VL53L4CD ULD borrowed by a VL53L4CX, and
-  the histogram driver on the VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX,
-  the short-preset artefact frames included).
+  the histogram driver on the VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX;
+  the VL53L4CX short-preset capture now checks that `configure()` refuses
+  `short` on an L4 die).
 
 ```sh
 ctest --test-dir build            # 83/83

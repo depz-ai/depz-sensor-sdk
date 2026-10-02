@@ -99,7 +99,7 @@ public final class Vl53lxProducts {
         t.put("VL53L1CX", row("VL53L1CX", 0xEACC, 4000, "uld", "uld", DIE_ULD, "histogram", HISTOGRAM));
         t.put("VL53L1CB", row("VL53L1CB", 0xEACC, 8000, "uld", "uld", DIE_ULD, "histogram", HISTOGRAM));
         t.put("VL53L3CX", row("VL53L3CX", 0xEAAA, 3000, "ulp", "ulp", DIE_ULD, "histogram", HISTOGRAM));
-        t.put("VL53L4CD", row("VL53L4CD", 0xEBAA, 1200, "uld", "uld", DIE_ULD, "histogram", HISTOGRAM));
+        t.put("VL53L4CD", row("VL53L4CD", 0xEBAA, 1300, "uld", "uld", DIE_ULD, "histogram", HISTOGRAM));
         t.put("VL53L4CX", row("VL53L4CX", 0xEBAA, 6000, "histogram", "histogram", HISTOGRAM));
         TABLE = java.util.Collections.unmodifiableMap(t);
     }

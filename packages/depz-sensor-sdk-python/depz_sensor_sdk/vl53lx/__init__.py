@@ -292,8 +292,8 @@ class Vl53lx(DeviceBase):
         if rated and reach and reach < rated:
             out.append(
                 f"{self._product}/{self._driver_kind}: this pair reaches {reach} mm, the board "
-                f"is rated {rated} mm - past {reach} mm the phase wraps and frames come back "
-                "with status 4"
+                f"is rated {rated} mm - past {reach} mm the phase is out of the valid window "
+                "and frames come back with status 4"
             )
         if self._caveat:
             out.append(f"{self._product}/{self._driver_kind}: {self._caveat}")
@@ -337,6 +337,7 @@ class Vl53lx(DeviceBase):
         mode: str | None = None,
         offset_mm: int | None = None,
         xtalk_kcps: int | None = None,
+        signal_kcps: int | None = None,
     ) -> None:
         """Re-initialise the sensor and apply a ranging configuration.
 
@@ -345,18 +346,30 @@ class Vl53lx(DeviceBase):
         ceiling. `mode` (one of `modes`) goes on before the budget — a mode
         change rewrites the timing. `offset_mm` / `xtalk_kcps` re-apply a stored
         calibration (the sensor keeps those only until a reset).
+        `signal_kcps` replaces the blob's signal threshold — the re-init puts
+        it back to the default, so a lowered one goes here rather than in a
+        `set_signal_threshold_kcps()` before configure: frames past the default
+        threshold come back status 2 with the distance right (L1 long at ~4 m,
+        a light driver borrowed onto a die without the lens it was tuned for).
         `inter_ms=0` = continuous; otherwise the period between measurements
-        (must exceed the budget)."""
+        (must exceed the budget). An unsupported group is refused before the
+        re-init."""
         self._require_not_ranging()
         drv = self.driver
+        for group, value in (("offset", offset_mm), ("xtalk", xtalk_kcps),
+                             ("signal_thresh", signal_kcps)):
+            if value is not None:
+                self._need(group)
         self._sensor_init(drv)
         if mode is not None:
             drv.set_mode(mode)
         drv.set_range_timing(budget_ms, inter_ms)
         if offset_mm is not None:
-            self._need("offset").set_offset(offset_mm)
+            drv.set_offset(offset_mm)
         if xtalk_kcps is not None:
-            self._need("xtalk").set_xtalk(xtalk_kcps)
+            drv.set_xtalk(xtalk_kcps)
+        if signal_kcps is not None:
+            drv.set_signal_threshold(signal_kcps)
 
     def get_range_timing(self) -> tuple[int, int]:
         """→ (timing_budget_ms, inter_measurement_ms) read back from the
@@ -634,7 +647,7 @@ class Vl53l3cx(Vl53lx):
 
 class Vl53l4cx(Vl53lx):
     """VL53L4CX (6 m): the histogram driver only — to run it light, borrow a
-    sibling's with ``init(product="VL53L4CD")`` (1.2 m, full calibrations)."""
+    sibling's with ``init(product="VL53L4CD")`` (~1.4 m, full calibrations)."""
 
     PRODUCT = "VL53L4CX"
 

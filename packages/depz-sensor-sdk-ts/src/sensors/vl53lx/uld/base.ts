@@ -229,8 +229,13 @@ export abstract class SensorDriver {
     throw new Vl53Error(`${this.product}: no ranging modes`);
   }
 
-  /** How far this driver's configuration can measure (mm), or null. */
-  reachMm(): number | null {
+  /**
+   * How far the configuration in use can measure (mm), read off the sensor —
+   * not the product's rating (registry): past it the phase is out of the
+   * valid window and the frames come back with status 4. null where not
+   * characterised.
+   */
+  async reachMm(): Promise<number | null> {
     return null;
   }
 

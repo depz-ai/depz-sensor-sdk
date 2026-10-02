@@ -31,7 +31,7 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.3.0):
+Published on crates.io as `depz-sensor-sdk` (0.4.0):
 
 ```bash
 cargo add depz-sensor-sdk

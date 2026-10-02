@@ -94,7 +94,7 @@ reference is generated from it, so it never drifts from the code.
 ## Installation
 
 Everything targets **.NET 8** (`net8.0`). It is published on NuGet as
-`Depz.Sensor` (0.3.0):
+`Depz.Sensor` (0.4.0):
 
 ```bash
 dotnet add package Depz.Sensor

@@ -8,15 +8,16 @@
  * whole ULD — boot polls, NVM reads, the histogram preset — re-issue
  * byte-identical requests; every decoded frame (distance, status, targets,
  * histogram bins) must match the sidecar. The histogram driver is stateful
- * (A/B frame pairs): the short-preset capture pins its alternating slot-0
- * artefact frame for frame.
+ * (A/B frame pairs). A sidecar with `refused` is a capture of a configuration
+ * the driver no longer accepts (the short preset on an L4 die): init must
+ * still replay, and configure must refuse the mode.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ReplayTransport } from "../src/index.js";
+import { DepzError, ReplayTransport } from "../src/index.js";
 import type { HistogramBinData } from "../src/sensors/vl53lx/uld/bare/core.js";
 import {
   VL53LX_CLASS_BY_PRODUCT,
@@ -56,6 +57,12 @@ interface Expected {
   mode: string | null;
   timing: [number, number];
   frames: ExpectedFrame[];
+  refused?: Refused;
+}
+
+interface Refused {
+  note: string;
+  after_init: { modes: string[]; budget_ms: [number, number]; driver_reach_mm: number };
 }
 
 describe("vl53lx full-stack replay", () => {
@@ -88,6 +95,17 @@ describe("vl53lx full-stack replay", () => {
         expect(await dev.getSoftwareName()).toBe(expected.software_name);
         await dev.init(expected.driver, { product: expected.product_arg ?? undefined });
         expect(dev.product).toBe(expected.product);
+        const refused = expected.refused;
+        if (refused) {
+          const after = refused.after_init;
+          expect([...dev.modes]).toEqual(after.modes);
+          expect([...dev.driver.BUDGET_MS]).toEqual(after.budget_ms);
+          expect(await dev.driver.reachMm()).toBe(after.driver_reach_mm);
+          await expect(
+            dev.configure({ budgetMs: expected.budget_ms, mode: expected.mode }),
+          ).rejects.toThrow(/no such mode/);
+          return;
+        }
         await dev.configure({ budgetMs: expected.budget_ms, mode: expected.mode });
         expect(await dev.getRangeTiming()).toEqual(expected.timing);
         const stream = dev.measurements(expected.frames.length + 8);
@@ -121,4 +139,57 @@ describe("vl53lx full-stack replay", () => {
       }
     }, 30_000);
   }
+});
+
+async function replayToInit(stem: string): Promise<[Vl53lx, Expected]> {
+  const expected = JSON.parse(
+    readFileSync(path.join(RECORDINGS, `${stem}.expected.json`), "utf8"),
+  ) as Expected;
+  const replay = new ReplayTransport(readFileSync(path.join(RECORDINGS, `${stem}.depzrec`), "utf8"), {
+    strictTx: true,
+  });
+  const dev: Vl53lx = new CLASSES[expected.class]!(replay, {
+    timeoutMs: 2000,
+    sleepImpl: () => Promise.resolve(),
+  });
+  await dev.open();
+  await dev.identify();
+  await dev.getDeviceName();
+  await dev.getSoftwareName();
+  await dev.init(expected.driver, { product: expected.product_arg ?? undefined });
+  return [dev, expected];
+}
+
+describe("vl53lx configure({ signalKcps })", () => {
+  it("goes on after the re-init (which puts the blob's threshold back)", async () => {
+    // The capture has no such write: the driver call is recorded instead,
+    // after the re-init and timing replayed strictly.
+    const [dev, expected] = await replayToInit("vl53l1cx_uld_long_33ms");
+    const calls: number[] = [];
+    (dev.driver as unknown as { setSignalThreshold: (k: number) => Promise<void> }).setSignalThreshold =
+      async (k) => {
+        calls.push(k);
+      };
+    try {
+      await dev.configure({ budgetMs: expected.budget_ms, mode: expected.mode, signalKcps: 512 });
+      expect(calls).toEqual([512]);
+      expect(await dev.getRangeTiming()).toEqual(expected.timing);
+    } finally {
+      await dev.close();
+    }
+  }, 30_000);
+
+  it("is refused before the re-init on a driver without it (L0X)", async () => {
+    // No traffic on the refusal, so the capture's own configure still replays.
+    const [dev, expected] = await replayToInit("vl53l0x_uld_long-range_33ms");
+    try {
+      await expect(
+        dev.configure({ budgetMs: expected.budget_ms, mode: expected.mode, signalKcps: 512 }),
+      ).rejects.toThrow(DepzError);
+      await dev.configure({ budgetMs: expected.budget_ms, mode: expected.mode });
+      expect(await dev.getRangeTiming()).toEqual(expected.timing);
+    } finally {
+      await dev.close();
+    }
+  }, 30_000);
 });

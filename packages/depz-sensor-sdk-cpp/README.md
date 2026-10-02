@@ -195,7 +195,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.3.0
+  GIT_TAG        v0.4.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -263,7 +263,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.3.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.4.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test
@@ -285,8 +285,8 @@ calibration profile through CONFIG, a 100 Hz full-block stream) and a real
 BNO085 session (reset, three enables with their read-backs, 150 reports, a
 busy retry, calibration, metadata, counts), plus five VL53L 1D-family
 captures through `depz::Vl53lx` (the VL53L0X API, the VL53L1X ULD, the
-VL53L3CX ULP, the VL53L4CD ULD borrowed by a VL53L4CX and the VL53L4CX
-histogram driver's short preset, frame for frame). CI builds and tests Linux, macOS and Windows.
+VL53L3CX ULP, the VL53L4CD ULD borrowed by a VL53L4CX, and the VL53L4CX
+histogram driver refusing its short preset on an L4 die). CI builds and tests Linux, macOS and Windows.
 
 The live layer has also been checked on real boards. SR04 (firmware
 `APP_usonic_SR04_v0.97`): `open_sr04`, temperature, `measure_once`,
