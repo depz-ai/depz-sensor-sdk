@@ -24,9 +24,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 15,
+							"line": 16,
 							"character": 13,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L15"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L16"
 						}
 					],
 					"type": {
@@ -53,27 +53,6 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 18,
-									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L18"
-								}
-							],
-							"type": {
-								"type": "intrinsic",
-								"name": "string"
-							}
-						},
-						{
-							"id": 7346,
-							"name": "sensor_type",
-							"variant": "declaration",
-							"kind": 1024,
-							"flags": {
-								"isOptional": true
-							},
-							"sources": [
-								{
-									"fileName": "src/dataset.ts",
 									"line": 19,
 									"character": 2,
 									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L19"
@@ -85,8 +64,8 @@
 							}
 						},
 						{
-							"id": 7347,
-							"name": "software_name",
+							"id": 7346,
+							"name": "sensor_type",
 							"variant": "declaration",
 							"kind": 1024,
 							"flags": {
@@ -106,6 +85,27 @@
 							}
 						},
 						{
+							"id": 7347,
+							"name": "software_name",
+							"variant": "declaration",
+							"kind": 1024,
+							"flags": {
+								"isOptional": true
+							},
+							"sources": [
+								{
+									"fileName": "src/dataset.ts",
+									"line": 21,
+									"character": 2,
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21"
+								}
+							],
+							"type": {
+								"type": "intrinsic",
+								"name": "string"
+							}
+						},
+						{
 							"id": 7348,
 							"name": "time_sync",
 							"variant": "declaration",
@@ -114,9 +114,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 21,
+									"line": 22,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L22"
 								}
 							],
 							"type": {
@@ -137,9 +137,9 @@
 											"sources": [
 												{
 													"fileName": "src/dataset.ts",
-													"line": 21,
+													"line": 22,
 													"character": 15,
-													"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21"
+													"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L22"
 												}
 											],
 											"type": {
@@ -156,9 +156,9 @@
 											"sources": [
 												{
 													"fileName": "src/dataset.ts",
-													"line": 21,
+													"line": 22,
 													"character": 34,
-													"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21"
+													"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L22"
 												}
 											],
 											"type": {
@@ -194,9 +194,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 17,
+							"line": 18,
 							"character": 17,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L17"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L18"
 						}
 					],
 					"indexSignatures": [
@@ -209,9 +209,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 22,
+									"line": 23,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L22"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L23"
 								}
 							],
 							"parameters": [
@@ -250,9 +250,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 26,
+									"line": 27,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L26"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L27"
 								}
 							],
 							"type": {
@@ -269,9 +269,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 27,
+									"line": 28,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L27"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L28"
 								}
 							],
 							"type": {
@@ -288,9 +288,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 28,
+									"line": 29,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L28"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L29"
 								}
 							],
 							"type": {
@@ -327,9 +327,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 29,
+									"line": 30,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L29"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L30"
 								}
 							],
 							"type": {
@@ -352,9 +352,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 25,
+							"line": 26,
 							"character": 17,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L25"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L26"
 						}
 					],
 					"indexSignatures": [
@@ -367,9 +367,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 30,
+									"line": 31,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L30"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L31"
 								}
 							],
 							"parameters": [
@@ -408,9 +408,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 34,
+									"line": 35,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L34"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L35"
 								}
 							],
 							"type": {
@@ -427,9 +427,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 35,
+									"line": 36,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L35"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L36"
 								}
 							],
 							"type": {
@@ -446,9 +446,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 36,
+									"line": 37,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L36"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L37"
 								}
 							],
 							"type": {
@@ -465,9 +465,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 37,
+									"line": 38,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L37"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L38"
 								}
 							],
 							"type": {
@@ -506,9 +506,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 33,
+							"line": 34,
 							"character": 17,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L33"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L34"
 						}
 					]
 				},
@@ -544,9 +544,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 44,
+									"line": 45,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L44"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L45"
 								}
 							],
 							"type": {
@@ -564,9 +564,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 46,
+									"line": 47,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L46"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L47"
 								}
 							],
 							"signatures": [
@@ -579,9 +579,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 46,
+											"line": 47,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L46"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L47"
 										}
 									],
 									"parameters": [
@@ -646,9 +646,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 61,
+									"line": 62,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L61"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L62"
 								}
 							],
 							"signatures": [
@@ -685,9 +685,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 61,
+											"line": 62,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L61"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L62"
 										}
 									],
 									"parameters": [
@@ -732,9 +732,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 65,
+									"line": 66,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L65"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L66"
 								}
 							],
 							"signatures": [
@@ -747,9 +747,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 65,
+											"line": 66,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L65"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L66"
 										}
 									],
 									"parameters": [
@@ -830,9 +830,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 70,
+									"line": 71,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L70"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L71"
 								}
 							],
 							"signatures": [
@@ -845,9 +845,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 70,
+											"line": 71,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L70"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L71"
 										}
 									],
 									"type": {
@@ -883,9 +883,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 41,
+							"line": 42,
 							"character": 13,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L41"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L42"
 						}
 					]
 				},
@@ -945,9 +945,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 90,
+									"line": 91,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L90"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L91"
 								}
 							],
 							"signatures": [
@@ -960,9 +960,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 90,
+											"line": 91,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L90"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L91"
 										}
 									],
 									"parameters": [
@@ -992,9 +992,9 @@
 															"sources": [
 																{
 																	"fileName": "src/dataset.ts",
-																	"line": 90,
+																	"line": 91,
 																	"character": 30,
-																	"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L90"
+																	"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L91"
 																}
 															],
 															"type": {
@@ -1013,9 +1013,9 @@
 															"sources": [
 																{
 																	"fileName": "src/dataset.ts",
-																	"line": 90,
+																	"line": 91,
 																	"character": 45,
-																	"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L90"
+																	"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L91"
 																}
 															],
 															"type": {
@@ -1056,9 +1056,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 92,
+									"line": 93,
 									"character": 8,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L92"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L93"
 								}
 							],
 							"signatures": [
@@ -1071,9 +1071,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 92,
+											"line": 93,
 											"character": 8,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L92"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L93"
 										}
 									],
 									"parameters": [
@@ -1144,9 +1144,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 111,
+									"line": 112,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L111"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L112"
 								}
 							],
 							"signatures": [
@@ -1159,9 +1159,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 111,
+											"line": 112,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L111"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L112"
 										}
 									],
 									"type": {
@@ -1180,9 +1180,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 213,
+									"line": 231,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L213"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L231"
 								}
 							],
 							"signatures": [
@@ -1195,9 +1195,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 213,
+											"line": 231,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L213"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L231"
 										}
 									],
 									"type": {
@@ -1216,9 +1216,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 220,
+									"line": 238,
 									"character": 6,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L220"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L238"
 								}
 							],
 							"getSignature": {
@@ -1230,9 +1230,9 @@
 								"sources": [
 									{
 										"fileName": "src/dataset.ts",
-										"line": 220,
+										"line": 238,
 										"character": 6,
-										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L220"
+										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L238"
 									}
 								],
 								"type": {
@@ -1250,9 +1250,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 224,
+									"line": 242,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L224"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L242"
 								}
 							],
 							"signatures": [
@@ -1265,9 +1265,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 224,
+											"line": 242,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L224"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L242"
 										}
 									],
 									"type": {
@@ -1304,9 +1304,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 80,
+							"line": 81,
 							"character": 13,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L80"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L81"
 						}
 					]
 				},
@@ -1344,9 +1344,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 232,
+									"line": 250,
 									"character": 11,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L232"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L250"
 								}
 							],
 							"type": {
@@ -1367,9 +1367,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 233,
+									"line": 251,
 									"character": 11,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L233"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L251"
 								}
 							],
 							"type": {
@@ -1391,9 +1391,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 235,
+									"line": 253,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L235"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253"
 								}
 							],
 							"signatures": [
@@ -1406,9 +1406,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 235,
+											"line": 253,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L235"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253"
 										}
 									],
 									"parameters": [
@@ -1442,9 +1442,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 253,
+									"line": 271,
 									"character": 6,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L271"
 								}
 							],
 							"getSignature": {
@@ -1456,9 +1456,9 @@
 								"sources": [
 									{
 										"fileName": "src/dataset.ts",
-										"line": 253,
+										"line": 271,
 										"character": 6,
-										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253"
+										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L271"
 									}
 								],
 								"type": {
@@ -1494,9 +1494,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 257,
+									"line": 275,
 									"character": 6,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L257"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L275"
 								}
 							],
 							"getSignature": {
@@ -1508,9 +1508,9 @@
 								"sources": [
 									{
 										"fileName": "src/dataset.ts",
-										"line": 257,
+										"line": 275,
 										"character": 6,
-										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L257"
+										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L275"
 									}
 								],
 								"type": {
@@ -1545,9 +1545,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 231,
+							"line": 249,
 							"character": 13,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L231"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L249"
 						}
 					]
 				},
@@ -1560,9 +1560,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 263,
+							"line": 281,
 							"character": 12,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L263"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L281"
 						}
 					],
 					"type": {
@@ -1611,9 +1611,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 275,
+									"line": 293,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L275"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L293"
 								}
 							],
 							"type": {
@@ -1631,9 +1631,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 277,
+									"line": 295,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L277"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L295"
 								}
 							],
 							"signatures": [
@@ -1646,9 +1646,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 277,
+											"line": 295,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L277"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L295"
 										}
 									],
 									"parameters": [
@@ -1686,9 +1686,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 277,
+									"line": 295,
 									"character": 23,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L277"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L295"
 								}
 							],
 							"type": {
@@ -1707,9 +1707,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 279,
+									"line": 297,
 									"character": 6,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L279"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297"
 								}
 							],
 							"getSignature": {
@@ -1721,9 +1721,9 @@
 								"sources": [
 									{
 										"fileName": "src/dataset.ts",
-										"line": 279,
+										"line": 297,
 										"character": 6,
-										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L279"
+										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297"
 									}
 								],
 								"type": {
@@ -1743,9 +1743,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 284,
+									"line": 302,
 									"character": 6,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L284"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L302"
 								}
 							],
 							"getSignature": {
@@ -1765,9 +1765,9 @@
 								"sources": [
 									{
 										"fileName": "src/dataset.ts",
-										"line": 284,
+										"line": 302,
 										"character": 6,
-										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L284"
+										"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L302"
 									}
 								],
 								"type": {
@@ -1785,9 +1785,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 290,
+									"line": 308,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L290"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L308"
 								}
 							],
 							"signatures": [
@@ -1800,9 +1800,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 290,
+											"line": 308,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L290"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L308"
 										}
 									],
 									"parameters": [
@@ -1887,9 +1887,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 297,
+									"line": 315,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L315"
 								}
 							],
 							"signatures": [
@@ -1902,9 +1902,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 297,
+											"line": 315,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L315"
 										}
 									],
 									"parameters": [
@@ -1989,9 +1989,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 309,
+									"line": 327,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L309"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L327"
 								}
 							],
 							"signatures": [
@@ -2004,9 +2004,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 309,
+											"line": 327,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L309"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L327"
 										}
 									],
 									"type": {
@@ -2025,9 +2025,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 316,
+									"line": 334,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L316"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L334"
 								}
 							],
 							"signatures": [
@@ -2040,9 +2040,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 316,
+											"line": 334,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L316"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L334"
 										}
 									],
 									"type": {
@@ -2061,9 +2061,9 @@
 							"sources": [
 								{
 									"fileName": "src/dataset.ts",
-									"line": 323,
+									"line": 341,
 									"character": 2,
-									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L323"
+									"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L341"
 								}
 							],
 							"signatures": [
@@ -2084,9 +2084,9 @@
 									"sources": [
 										{
 											"fileName": "src/dataset.ts",
-											"line": 323,
+											"line": 341,
 											"character": 2,
-											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L323"
+											"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L341"
 										}
 									],
 									"parameters": [
@@ -2145,9 +2145,9 @@
 					"sources": [
 						{
 							"fileName": "src/dataset.ts",
-							"line": 269,
+							"line": 287,
 							"character": 13,
-							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L269"
+							"url": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L287"
 						}
 					]
 				},

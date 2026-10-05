@@ -291,6 +291,27 @@ class SessionRecorder:
 
             entry.unsubscribes.append(dev.on_sample(on_sample))
             return
+
+        from .bno086 import Bno086
+
+        if isinstance(dev, Bno086):
+
+            def on_report(r: Any, _did=did):
+                # Contract 09 `bno086`: every enabled sensor's report, snake_case,
+                # full quaternion / vector components. `t` is host arrival time
+                # (reports of different sensors in one cargo carry out-of-order
+                # device times; records must stay monotonic per device); the
+                # device time rides along as `timestamp_us`.
+                v: dict[str, Any] = {"type": type(r).__name__, "sensor_id": r.sensor_id}
+                for key in ("i", "j", "k", "real", "x", "y", "z", "accuracy_rad"):
+                    val = getattr(r, key, None)
+                    if val is not None:
+                        v[key] = val
+                v["timestamp_us"] = r.timestamp_us
+                writer.write(_did, host_now_us(), "bno086", v)
+
+            entry.unsubscribes.append(dev.on_report(on_report))
+            return
         # Unknown device class: nothing to hook (future sensors extend here).
 
     def stop(self) -> None:

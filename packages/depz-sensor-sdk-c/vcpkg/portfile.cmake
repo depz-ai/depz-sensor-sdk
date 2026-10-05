@@ -8,7 +8,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO depz-ai/depz-sensor-sdk
     REF "v${VERSION}"
-    SHA512 d1ca37a32455d1111a773d3acc5ef80007490935688d4ecd1f83239755fc7ae17b0dc80e26f1da874d667a680f4bf6c271f65a57b6dfba8caf0f3ec2657075eb
+    SHA512 ecd906b01c0dcffa86fab720a31bc112eddd0cc959b7153a9715c5b0c43e9f37eab27bf4935c9d04c345b06d37188a2a4b5c653fdbc059696adb28ef7e3e9e8c
     HEAD_REF main
 )
 

@@ -4,8 +4,9 @@
  * `depz_sensor_sdk.dataset` module; browser-safe (no Node APIs).
  */
 
-import type { DepzDevice } from "./device/device.js";
+import { hostNowUs, type DepzDevice } from "./device/device.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
+import { Bno086 } from "./sensors/bno086/bno086.js";
 import { packBno055Units } from "./sensors/bno055/regs.js";
 import { Sr04 } from "./sensors/sr04.js";
 import { Vl53l4cd } from "./sensors/vl53l4/vl53l4.js";
@@ -184,6 +185,23 @@ export class DatasetRecorder {
           v.calib = [c.system, c.gyro, c.accel, c.mag];
         }
         writer.write(entry.id, toHost(s.timestampUs), "bno055", v);
+      });
+    }
+    if (dev instanceof Bno086) {
+      // Contract 09 `bno086`: every enabled sensor's report, snake_case, full
+      // quaternion / vector components. `t` is host arrival time (reports of
+      // different sensors in one cargo carry out-of-order device times; records
+      // must stay monotonic per device); the device time rides along as
+      // `timestamp_us`.
+      return dev.onReport((r) => {
+        const f = r as unknown as Record<string, unknown>;
+        const v: Record<string, unknown> = { type: r.type, sensor_id: r.sensorId };
+        const keys = { i: "i", j: "j", k: "k", real: "real", x: "x", y: "y", z: "z", accuracy_rad: "accuracyRad" };
+        for (const [out, key] of Object.entries(keys)) {
+          if (typeof f[key] === "number") v[out] = f[key];
+        }
+        v.timestamp_us = Number(r.timestampUs);
+        writer.write(entry.id, Number(hostNowUs()), "bno086", v);
       });
     }
     // VL53L8CX/CH and the VL53L5CX/L7CX/L7CH subclasses.

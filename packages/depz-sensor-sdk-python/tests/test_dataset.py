@@ -163,3 +163,41 @@ def test_vl53lx_and_bno055_records(tmp_path: Path):
     assert b["temperature"] == s.temperature
     assert b["calib"] == [s.calibration.system, s.calibration.gyro, s.calibration.accel,
                           s.calibration.mag]
+
+
+def test_bno086_records(tmp_path: Path):
+    """Contract 09 `bno086`: every report the subscribers see, snake_case, full
+    components; `t` is host arrival time (monotonic per device), the report's
+    own device time rides along as `timestamp_us`."""
+    from depz_sensor_sdk.bno086 import Bno086
+    from depz_sensor_sdk.bno086.reports import Acceleration, RotationVector
+
+    fake = FakeSr04()
+    imu = Bno086(fake.link, timeout=1.0)
+    path = tmp_path / "session.depzdata"
+    rv = RotationVector(0x05, 5_000_300, 7, 3, 0, 1 << 13, 0, 0, 14189, 820)
+    acc = Acceleration(0x01, 5_000_100, 8, 2, 0, 0, 0, 2511)  # 9.8 m/s² on z
+    try:
+        rec = SessionRecorder(path)
+        rec.add(imu)
+        rec.start()
+        # One cargo, device times out of order: the records must still be
+        # monotonic in `t`.
+        for r in (rv, acc):
+            for cb, _ in list(imu._report_cbs):
+                cb(r)
+        rec.stop()
+    finally:
+        imu.close()
+        fake.close()
+
+    recs = [r for r in DatasetReader(path) if r.kind == "bno086"]
+    assert [r.value["type"] for r in recs] == ["RotationVector", "Acceleration"]
+    assert recs[0].t_host_us <= recs[1].t_host_us
+    q = recs[0].value
+    assert (q["sensor_id"], q["i"], q["real"]) == (0x05, 0.5, rv.real)
+    assert q["accuracy_rad"] == rv.accuracy_rad and q["timestamp_us"] == 5_000_300
+    assert "x" not in q
+    a = recs[1].value
+    assert (a["sensor_id"], a["z"], a["timestamp_us"]) == (0x01, acc.z, 5_000_100)
+    assert "i" not in a and "accuracy_rad" not in a

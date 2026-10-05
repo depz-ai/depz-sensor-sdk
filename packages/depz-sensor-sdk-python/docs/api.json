@@ -21582,7 +21582,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 326
+            "line": 347
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetReader"
@@ -25682,7 +25682,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.4.0",
+          "value": "0.4.1",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

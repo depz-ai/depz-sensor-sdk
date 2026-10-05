@@ -4501,7 +4501,7 @@ Error.prepareStackTrace
 
 # Class: DatasetPlayer
 
-Defined in: [src/dataset.ts:269](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L269)
+Defined in: [src/dataset.ts:287](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L287)
 
 Timeline player: paced delivery with play/pause/seek/speed — the engine
 behind the viewer's playback mode.
@@ -4514,7 +4514,7 @@ behind the viewer's playback mode.
 new DatasetPlayer(reader): DatasetPlayer;
 ```
 
-Defined in: [src/dataset.ts:277](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L277)
+Defined in: [src/dataset.ts:295](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L295)
 
 #### Parameters
 
@@ -4534,7 +4534,7 @@ Defined in: [src/dataset.ts:277](https://github.com/depz-ai/depz-sensor-sdk/blob
 speed: number = 1.0;
 ```
 
-Defined in: [src/dataset.ts:275](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L275)
+Defined in: [src/dataset.ts:293](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L293)
 
 ***
 
@@ -4544,7 +4544,7 @@ Defined in: [src/dataset.ts:275](https://github.com/depz-ai/depz-sensor-sdk/blob
 readonly reader: DatasetReader;
 ```
 
-Defined in: [src/dataset.ts:277](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L277)
+Defined in: [src/dataset.ts:295](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L295)
 
 ## Accessors
 
@@ -4556,7 +4556,7 @@ Defined in: [src/dataset.ts:277](https://github.com/depz-ai/depz-sensor-sdk/blob
 get state(): PlayerState;
 ```
 
-Defined in: [src/dataset.ts:279](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L279)
+Defined in: [src/dataset.ts:297](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297)
 
 ##### Returns
 
@@ -4572,7 +4572,7 @@ Defined in: [src/dataset.ts:279](https://github.com/depz-ai/depz-sensor-sdk/blob
 get positionUs(): number;
 ```
 
-Defined in: [src/dataset.ts:284](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L284)
+Defined in: [src/dataset.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L302)
 
 Current position in µs from the first record.
 
@@ -4588,7 +4588,7 @@ Current position in µs from the first record.
 onRecord(cb): () => void;
 ```
 
-Defined in: [src/dataset.ts:290](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L290)
+Defined in: [src/dataset.ts:308](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L308)
 
 #### Parameters
 
@@ -4608,7 +4608,7 @@ Defined in: [src/dataset.ts:290](https://github.com/depz-ai/depz-sensor-sdk/blob
 onState(cb): () => void;
 ```
 
-Defined in: [src/dataset.ts:297](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L297)
+Defined in: [src/dataset.ts:315](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L315)
 
 #### Parameters
 
@@ -4628,7 +4628,7 @@ Defined in: [src/dataset.ts:297](https://github.com/depz-ai/depz-sensor-sdk/blob
 play(): void;
 ```
 
-Defined in: [src/dataset.ts:309](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L309)
+Defined in: [src/dataset.ts:327](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L327)
 
 #### Returns
 
@@ -4642,7 +4642,7 @@ Defined in: [src/dataset.ts:309](https://github.com/depz-ai/depz-sensor-sdk/blob
 pause(): void;
 ```
 
-Defined in: [src/dataset.ts:316](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L316)
+Defined in: [src/dataset.ts:334](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L334)
 
 #### Returns
 
@@ -4656,7 +4656,7 @@ Defined in: [src/dataset.ts:316](https://github.com/depz-ai/depz-sensor-sdk/blob
 seekUs(offsetUs): void;
 ```
 
-Defined in: [src/dataset.ts:323](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L323)
+Defined in: [src/dataset.ts:341](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L341)
 
 Seek to µs offset from the start; delivery resumes from there.
 
@@ -4672,7 +4672,7 @@ Seek to µs offset from the start; delivery resumes from there.
 
 # Class: DatasetReader
 
-Defined in: [src/dataset.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L231)
+Defined in: [src/dataset.ts:249](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L249)
 
 Parse a `.depzdata` file; records come back merged by host time.
 
@@ -4684,7 +4684,7 @@ Parse a `.depzdata` file; records come back merged by host time.
 new DatasetReader(content): DatasetReader;
 ```
 
-Defined in: [src/dataset.ts:235](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L235)
+Defined in: [src/dataset.ts:253](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253)
 
 #### Parameters
 
@@ -4704,7 +4704,7 @@ Defined in: [src/dataset.ts:235](https://github.com/depz-ai/depz-sensor-sdk/blob
 readonly header: DatasetHeader;
 ```
 
-Defined in: [src/dataset.ts:232](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L232)
+Defined in: [src/dataset.ts:250](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L250)
 
 ***
 
@@ -4714,7 +4714,7 @@ Defined in: [src/dataset.ts:232](https://github.com/depz-ai/depz-sensor-sdk/blob
 readonly records: DatasetRecord[];
 ```
 
-Defined in: [src/dataset.ts:233](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L233)
+Defined in: [src/dataset.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L251)
 
 ## Accessors
 
@@ -4726,7 +4726,7 @@ Defined in: [src/dataset.ts:233](https://github.com/depz-ai/depz-sensor-sdk/blob
 get devices(): Record<string, DatasetDeviceMeta>;
 ```
 
-Defined in: [src/dataset.ts:253](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L253)
+Defined in: [src/dataset.ts:271](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L271)
 
 ##### Returns
 
@@ -4742,7 +4742,7 @@ Defined in: [src/dataset.ts:253](https://github.com/depz-ai/depz-sensor-sdk/blob
 get durationUs(): number;
 ```
 
-Defined in: [src/dataset.ts:257](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L257)
+Defined in: [src/dataset.ts:275](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L275)
 
 ##### Returns
 
@@ -4750,7 +4750,7 @@ Defined in: [src/dataset.ts:257](https://github.com/depz-ai/depz-sensor-sdk/blob
 
 # Class: DatasetRecorder
 
-Defined in: [src/dataset.ts:80](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L80)
+Defined in: [src/dataset.ts:81](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L81)
 
 Hooks live devices into a DatasetWriter on one shared host timeline.
 Call `await recorder.add(device)` for each device (runs syncTime), then
@@ -4764,7 +4764,7 @@ Call `await recorder.add(device)` for each device (runs syncTime), then
 new DatasetRecorder(opts?): DatasetRecorder;
 ```
 
-Defined in: [src/dataset.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L90)
+Defined in: [src/dataset.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L91)
 
 #### Parameters
 
@@ -4788,7 +4788,7 @@ Defined in: [src/dataset.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/
 get recordsWritten(): number;
 ```
 
-Defined in: [src/dataset.ts:220](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L220)
+Defined in: [src/dataset.ts:238](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L238)
 
 ##### Returns
 
@@ -4805,7 +4805,7 @@ add(
 syncSamples?): Promise<string>;
 ```
 
-Defined in: [src/dataset.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L92)
+Defined in: [src/dataset.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L93)
 
 #### Parameters
 
@@ -4827,7 +4827,7 @@ Defined in: [src/dataset.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/
 start(): void;
 ```
 
-Defined in: [src/dataset.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L111)
+Defined in: [src/dataset.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L112)
 
 #### Returns
 
@@ -4841,7 +4841,7 @@ Defined in: [src/dataset.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob
 stop(): void;
 ```
 
-Defined in: [src/dataset.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L213)
+Defined in: [src/dataset.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L231)
 
 #### Returns
 
@@ -4855,7 +4855,7 @@ Defined in: [src/dataset.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob
 dump(): string;
 ```
 
-Defined in: [src/dataset.ts:224](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L224)
+Defined in: [src/dataset.ts:242](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L242)
 
 #### Returns
 
@@ -4863,7 +4863,7 @@ Defined in: [src/dataset.ts:224](https://github.com/depz-ai/depz-sensor-sdk/blob
 
 # Class: DatasetWriter
 
-Defined in: [src/dataset.ts:41](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L41)
+Defined in: [src/dataset.ts:42](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L42)
 
 Accumulates a dataset in memory; `dump()` gives the JSONL file content.
 
@@ -4875,7 +4875,7 @@ Accumulates a dataset in memory; `dump()` gives the JSONL file content.
 new DatasetWriter(devices, note?): DatasetWriter;
 ```
 
-Defined in: [src/dataset.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L46)
+Defined in: [src/dataset.ts:47](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L47)
 
 #### Parameters
 
@@ -4896,7 +4896,7 @@ Defined in: [src/dataset.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/
 recordsWritten: number = 0;
 ```
 
-Defined in: [src/dataset.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L44)
+Defined in: [src/dataset.ts:45](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L45)
 
 ## Methods
 
@@ -4906,7 +4906,7 @@ Defined in: [src/dataset.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/
 setDeviceMeta(deviceId, meta): void;
 ```
 
-Defined in: [src/dataset.ts:61](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L61)
+Defined in: [src/dataset.ts:62](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L62)
 
 Register (or replace) a device's metadata after construction. Lets a
 recorder that adds devices mid-capture keep the header's `devices` map
@@ -4935,7 +4935,7 @@ write(
    value): void;
 ```
 
-Defined in: [src/dataset.ts:65](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L65)
+Defined in: [src/dataset.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L66)
 
 #### Parameters
 
@@ -4958,7 +4958,7 @@ Defined in: [src/dataset.ts:65](https://github.com/depz-ai/depz-sensor-sdk/blob/
 dump(): string;
 ```
 
-Defined in: [src/dataset.ts:70](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L70)
+Defined in: [src/dataset.ts:71](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L71)
 
 #### Returns
 
@@ -47500,7 +47500,7 @@ Defined in: [src/protocol/framing.ts:90](https://github.com/depz-ai/depz-sensor-
 
 # Interface: DatasetDeviceMeta
 
-Defined in: [src/dataset.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L17)
+Defined in: [src/dataset.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L18)
 
 ## Indexable
 
@@ -47516,7 +47516,7 @@ Defined in: [src/dataset.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/
 optional serial?: string;
 ```
 
-Defined in: [src/dataset.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L18)
+Defined in: [src/dataset.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L19)
 
 ***
 
@@ -47526,7 +47526,7 @@ Defined in: [src/dataset.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/
 optional sensor_type?: string;
 ```
 
-Defined in: [src/dataset.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L19)
+Defined in: [src/dataset.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L20)
 
 ***
 
@@ -47536,7 +47536,7 @@ Defined in: [src/dataset.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/
 optional software_name?: string;
 ```
 
-Defined in: [src/dataset.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L20)
+Defined in: [src/dataset.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21)
 
 ***
 
@@ -47549,7 +47549,7 @@ time_sync: {
 };
 ```
 
-Defined in: [src/dataset.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L21)
+Defined in: [src/dataset.ts:22](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L22)
 
 #### offset\_us
 
@@ -47565,7 +47565,7 @@ rtt_us: number;
 
 # Interface: DatasetHeader
 
-Defined in: [src/dataset.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L25)
+Defined in: [src/dataset.ts:26](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L26)
 
 ## Indexable
 
@@ -47581,7 +47581,7 @@ Defined in: [src/dataset.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/
 schema: string;
 ```
 
-Defined in: [src/dataset.ts:26](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L26)
+Defined in: [src/dataset.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L27)
 
 ***
 
@@ -47591,7 +47591,7 @@ Defined in: [src/dataset.ts:26](https://github.com/depz-ai/depz-sensor-sdk/blob/
 created_utc: string;
 ```
 
-Defined in: [src/dataset.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L27)
+Defined in: [src/dataset.ts:28](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L28)
 
 ***
 
@@ -47601,7 +47601,7 @@ Defined in: [src/dataset.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/
 devices: Record<string, DatasetDeviceMeta>;
 ```
 
-Defined in: [src/dataset.ts:28](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L28)
+Defined in: [src/dataset.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L29)
 
 ***
 
@@ -47611,11 +47611,11 @@ Defined in: [src/dataset.ts:28](https://github.com/depz-ai/depz-sensor-sdk/blob/
 optional note?: string;
 ```
 
-Defined in: [src/dataset.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L29)
+Defined in: [src/dataset.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L30)
 
 # Interface: DatasetRecord
 
-Defined in: [src/dataset.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L33)
+Defined in: [src/dataset.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L34)
 
 ## Properties
 
@@ -47625,7 +47625,7 @@ Defined in: [src/dataset.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/
 deviceId: string;
 ```
 
-Defined in: [src/dataset.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L34)
+Defined in: [src/dataset.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L35)
 
 ***
 
@@ -47635,7 +47635,7 @@ Defined in: [src/dataset.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/
 tHostUs: number;
 ```
 
-Defined in: [src/dataset.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L35)
+Defined in: [src/dataset.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L36)
 
 ***
 
@@ -47645,7 +47645,7 @@ Defined in: [src/dataset.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/
 kind: string;
 ```
 
-Defined in: [src/dataset.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L36)
+Defined in: [src/dataset.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L37)
 
 ***
 
@@ -47655,7 +47655,7 @@ Defined in: [src/dataset.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/
 value: Record<string, unknown>;
 ```
 
-Defined in: [src/dataset.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L37)
+Defined in: [src/dataset.ts:38](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L38)
 
 # Interface: DepzPortInfo
 
@@ -54905,7 +54905,7 @@ Defined in: [src/protocol/framing.ts:93](https://github.com/depz-ai/depz-sensor-
 type PlayerState = "idle" | "playing" | "paused" | "done";
 ```
 
-Defined in: [src/dataset.ts:263](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L263)
+Defined in: [src/dataset.ts:281](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L281)
 
 # Type Alias: Report
 
@@ -55912,7 +55912,7 @@ Counter subcommands (command 0x02, P0).
 const DATASET_SCHEMA: "depz.dataset/2" = "depz.dataset/2";
 ```
 
-Defined in: [src/dataset.ts:15](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L15)
+Defined in: [src/dataset.ts:16](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/dataset.ts#L16)
 
 # Variable: DEFAULT\_CONFIGURATION
 
