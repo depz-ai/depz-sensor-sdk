@@ -35,6 +35,34 @@ class ControlReport(IntEnum):
     GET_FEATURE_REQUEST = 0xFE
 
 
+# Fixed lengths of the sensor→host control reports (contract 05 §6). One
+# control cargo may carry several back to back — the Product ID Response comes
+# once per software component (a BNO085 sends four, split over two cargos).
+CONTROL_RESPONSE_LENGTHS: dict[int, int] = {
+    ControlReport.COMMAND_RESPONSE: 16,
+    ControlReport.FRS_READ_RESPONSE: 16,
+    ControlReport.FRS_WRITE_RESPONSE: 4,
+    ControlReport.PRODUCT_ID_RESPONSE: 16,
+    ControlReport.GET_FEATURE_RESPONSE: 17,
+}
+
+
+def split_control_cargo(payload: bytes) -> list[bytes]:
+    """Split a control-channel cargo into its reports. An unknown report ID
+    (or a short tail) ends the walk: the rest is returned as one piece, since
+    its length is unknowable."""
+    out: list[bytes] = []
+    pos = 0
+    while pos < len(payload):
+        n = CONTROL_RESPONSE_LENGTHS.get(payload[pos])
+        if n is None or pos + n > len(payload):
+            out.append(bytes(payload[pos:]))
+            break
+        out.append(bytes(payload[pos:pos + n]))
+        pos += n
+    return out
+
+
 class Sh2Command(IntEnum):
     """`command` field of Command Request/Response (0xF2/0xF1)."""
 
@@ -197,7 +225,9 @@ def build_product_id_request() -> bytes:
 @dataclass(frozen=True)
 class ProductId:
     """Product ID Response (0xF8), 16 bytes. The sensor sends one response
-    per subsystem (typically 2); reset_cause per SH-2 §6.4.5.2."""
+    per software component (a BNO085 sends four: the SH-2 application first,
+    then the bootloader and two support components); reset_cause per SH-2
+    §6.4.5.2, set on the first only."""
 
     reset_cause: int
     sw_version_major: int

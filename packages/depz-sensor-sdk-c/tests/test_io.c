@@ -1168,6 +1168,30 @@ static void bno086_features(void)
     CHECK(depz_is_bno086(dev) && !depz_is_bno055(dev));
     CHECK_RC(depz_bno086_product_id(dev, &p), DEPZ_OK);
     CHECK(p.sw_part_number == FAKE_BNO086_PART && p.sw_version_major == 3 && p.sw_version_patch == 5);
+    {
+        /* Every component, in order; the late three come in one cargo. */
+        depz_bno_product_id all[8];
+        size_t n = 0;
+        int i;
+        CHECK_RC(depz_bno086_product_ids(dev, all, 8, &n), DEPZ_OK);
+        CHECK(n == 4 && all[0].sw_part_number == FAKE_BNO086_PART && all[0].reset_cause == 1);
+        CHECK(n == 4 && all[1].sw_part_number == 10003606u && all[1].sw_version_major == 1);
+        CHECK(n == 4 && all[3].sw_part_number == 10003171u && all[3].sw_version_patch == 10);
+        CHECK_RC(depz_bno086_product_ids(dev, all, 2, &n), DEPZ_OK);
+        CHECK(n == 2);
+        /* Back to back, never a late component (seen live: 9 of 20 calls on a
+         * BNO085 returned the bootloader's when only the first was taken). */
+        for (i = 0; i < 5; i++) {
+            CHECK_RC(depz_bno086_product_id(dev, &p), DEPZ_OK);
+            CHECK(p.sw_part_number == FAKE_BNO086_PART);
+        }
+    }
+    {
+        static const uint8_t ids[] = {0xF1, 0xF3, 0xF5, 0xF8, 0xFC, 0x99};
+        static const size_t lens[] = {16, 16, 4, 16, 17, 0};
+        size_t i;
+        for (i = 0; i < sizeof ids; i++) CHECK(depz_bno_control_report_len(ids[i]) == lens[i]);
+    }
     CHECK_RC(depz_bno086_enable(dev, DEPZ_BNO_SENSOR_ROTATION_VECTOR, 100, &g), DEPZ_OK);
     CHECK(g.sensor_id == DEPZ_BNO_SENSOR_ROTATION_VECTOR && g.interval_us == 8000);
     CHECK(depz_bno086_rate_ok(10000, &g));

@@ -24,10 +24,22 @@ mode, so it is a port of its own.
 Reference C driver: ../../temp/STSW-IMG026/VL53L4CD_ULD_Driver/ (VL53L4CD_api.c)
 """
 
+import math
 import time
 
 from depz_sensor_sdk.vl53lx._link import I2C_KHZ_BOOT, ProtocolError, Vl53Error
 from depz_sensor_sdk.vl53lx.uld.base import Measurement, SensorDriver
+
+
+def round_half_away(x: float) -> int:
+    """C's round(): an exact .5 goes away from zero. ST's ULD rounds xtalk this
+    way; Python's round() sends it to the even neighbour (round(0.5) == 0)."""
+    t = math.trunc(x)
+    if x - t >= 0.5:
+        return t + 1
+    if x - t <= -0.5:
+        return t - 1
+    return t
 
 # The register map of the die. One name per register, spelled the way the full
 # VL53L1 map does: the VL53L4CD ULD header abbreviates a few of them
@@ -495,7 +507,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         self.p.wr_word(XTALK_PLANE_OFFSET_KCPS, (xtalk_kcps << 9) & 0xFFFF)
 
     def get_xtalk(self) -> int:
-        return round(self.p.rd_word(XTALK_PLANE_OFFSET_KCPS) / 512.0)
+        return round_half_away(self.p.rd_word(XTALK_PLANE_OFFSET_KCPS) / 512.0)
 
     # ── ROI (VL53L1X_SetROI / VL53L3CX_ULP_SetROI, the same registers) ──
     def set_roi(self, x: int, y: int):

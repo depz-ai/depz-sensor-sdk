@@ -263,8 +263,8 @@ describe("DatasetRecorder — contract 09 kinds by device class", () => {
     expect(recs.map((r) => r.value.type)).toEqual(["RotationVector", "Acceleration"]);
     expect(recs[0]!.tHostUs).toBeLessThanOrEqual(recs[1]!.tHostUs);
     expect(recs[0]!.value).toEqual({ type: "RotationVector", sensor_id: 0x05, i: 0.5, j: 0, k: 0, real: 0.866,
-                                     accuracy_rad: 0.2, timestamp_us: 5_000_300 });
+                                     accuracy_rad: 0.2, accuracy: 3, timestamp_us: 5_000_300 });
     expect(recs[1]!.value).toEqual({ type: "Acceleration", sensor_id: 0x01, x: 0, y: 0, z: 9.81,
-                                     timestamp_us: 5_000_100 });
+                                     accuracy: 2, timestamp_us: 5_000_100 });
   });
 });

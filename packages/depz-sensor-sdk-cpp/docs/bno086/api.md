@@ -568,6 +568,18 @@ bytes advertisement();
 bno086::ProductId product_id();
 ```
 
+The SH-2 application's Product ID — the first of product_ids().
+
+#### Bno086.product_ids
+
+```cpp
+std::vector<bno086::ProductId> product_ids();
+```
+
+Every software component's answer, in the sensor's order (the SH-2
+application first; a BNO085 sends four). Waits until no answer came for
+150 ms, so the late ones can't answer the next request.
+
 #### Bno086.enable
 
 ```cpp

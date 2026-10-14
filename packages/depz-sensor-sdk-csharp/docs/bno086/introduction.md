@@ -23,6 +23,25 @@ decoders** (`Depz.Sensor.Bno086`).
 - **Control** — Set/Get Feature, Product ID, FRS read/write and the generic
   command request, all as byte-exact cargo encoders (`Sh2Control`).
 
+### What the DEPZ boards actually run
+
+Checked on the boards (BNO085 with SH-2 3.2.13, BNO086 with SH-2 3.12.6,
+2026-10-06). The SDK decodes every report above, but the sensor itself:
+
+- **refuses** significant motion, flip, pickup, sleep, tilt, pocket and circle —
+  enabling them reads back a 0 Hz interval;
+- sends the **raw ADC** reports only while an orientation report is on;
+- refuses the **tap detector** while the step counter runs;
+- needs a non-zero enable mask in the **personal-activity classifier**'s
+  feature configuration word (`0x1FF` = every activity), else it refuses;
+- reports the **detectors at their full rate** whether anything happened or
+  not: an event is a report whose content changed (tap / shake: non-zero flags).
+  The step detector's report carries only a latency, so it cannot be told from
+  a step — count steps with the step counter.
+
+Right after enabling, the Get Feature read-back can be a stale 0 for up to a
+second: read it again before treating a feature as refused.
+
 ## When to use it
 
 Use the BNO086 whenever you need **orientation or motion**: heading/attitude for

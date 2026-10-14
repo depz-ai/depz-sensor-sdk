@@ -982,8 +982,8 @@ pub fn xtalk_raw(xtalk_kcps: u16) -> u16
 pub fn decode_xtalk(raw_word: u16) -> u16
 ```
 
-`GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (round half to even,
-matching the Python reference's `round`).
+`GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (an exact .5 goes away
+from zero, as C's `round()` in ST's ULD).
 
 ### signal_threshold_raw
 

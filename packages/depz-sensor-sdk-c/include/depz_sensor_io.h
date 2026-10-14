@@ -1056,8 +1056,13 @@ int depz_bno086_wake(depz_device *dev);
  * length (copies at most `cap`). */
 int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len);
 
-/* Product ID round trip (the first responding subsystem). */
+/* The SH-2 application's Product ID — the first of depz_bno086_product_ids(). */
 int depz_bno086_product_id(depz_device *dev, depz_bno_product_id *out);
+/* Product ID Request → every software component's response, in the sensor's
+ * order (the SH-2 application first; a BNO085 sends four). Collects until no
+ * response came for 150 ms, so the late ones can't answer the next request.
+ * Stores at most `cap`; *count = how many were stored. */
+int depz_bno086_product_ids(depz_device *dev, depz_bno_product_id *out, size_t cap, size_t *count);
 
 /* Enable `sensor` at `hz` (Set Feature), then read the granted rate back
  * (Get Feature) into *granted (optional). A "disabled" answer is re-read, five

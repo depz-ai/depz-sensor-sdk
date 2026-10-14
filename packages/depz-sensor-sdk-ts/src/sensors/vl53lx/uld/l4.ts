@@ -6,7 +6,7 @@
  */
 
 import { Vl53Error } from "./link.js";
-import { floorDiv, pyRound } from "./arith.js";
+import { floorDiv, roundHalfAway } from "./arith.js";
 import {
   CONFIG_ADDR,
   CONFIG_END,
@@ -105,7 +105,7 @@ export class VL53L4 extends VL53L1Die {
       throw new Vl53Error(`xtalk calibration failed: ${tmpXtalk.toFixed(1)} kcps > 127`);
     }
     await this.p.wrWord(XTALK_PLANE_OFFSET_KCPS, Math.trunc(tmpXtalk * 512.0) & 0xffff);
-    return pyRound(tmpXtalk);
+    return roundHalfAway(tmpXtalk);
   }
 }
 

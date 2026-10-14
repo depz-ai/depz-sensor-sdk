@@ -29,6 +29,39 @@ export enum ControlReport {
   GetFeatureRequest = 0xfe,
 }
 
+/**
+ * Fixed lengths of the sensor→host control reports (contract 05 §6). One
+ * control cargo may carry several back to back — the Product ID Response comes
+ * once per software component (a BNO085 sends four, split over two cargos).
+ */
+export const CONTROL_RESPONSE_LENGTHS: ReadonlyMap<number, number> = new Map([
+  [ControlReport.CommandResponse, 16],
+  [ControlReport.FrsReadResponse, 16],
+  [ControlReport.FrsWriteResponse, 4],
+  [ControlReport.ProductIdResponse, 16],
+  [ControlReport.GetFeatureResponse, 17],
+]);
+
+/**
+ * Split a control-channel cargo into its reports. An unknown report ID (or a
+ * short tail) ends the walk: the rest is returned as one piece, since its
+ * length is unknowable.
+ */
+export function splitControlCargo(payload: Uint8Array): Uint8Array[] {
+  const out: Uint8Array[] = [];
+  let pos = 0;
+  while (pos < payload.length) {
+    const n = CONTROL_RESPONSE_LENGTHS.get(payload[pos]!);
+    if (n === undefined || pos + n > payload.length) {
+      out.push(payload.slice(pos));
+      break;
+    }
+    out.push(payload.slice(pos, pos + n));
+    pos += n;
+  }
+  return out;
+}
+
 /** `command` field of Command Request/Response (0xF2/0xF1). */
 export enum Sh2Command {
   Errors = 0x01,
@@ -201,7 +234,9 @@ export function buildProductIdRequest(): Uint8Array {
 
 /**
  * Product ID Response (0xF8), 16 bytes. The sensor sends one response per
- * subsystem (typically 2); resetCause per SH-2 §6.4.5.2.
+ * software component (a BNO085 sends four: the SH-2 application first, then
+ * the bootloader and two support components); resetCause per SH-2 §6.4.5.2,
+ * set on the first only.
  */
 export interface ProductId {
   resetCause: number;

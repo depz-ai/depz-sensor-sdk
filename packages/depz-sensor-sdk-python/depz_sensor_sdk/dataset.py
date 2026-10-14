@@ -23,6 +23,49 @@ from .sr04 import Sr04, Sr04Measurement
 
 SCHEMA = "depz.dataset/2"
 
+# Report attribute → record key, for the scalar fields contract 09 `bno086` keeps.
+_BNO086_RECORD_KEYS = (
+    ("i", "i"), ("j", "j"), ("k", "k"), ("real", "real"),
+    ("x", "x"), ("y", "y"), ("z", "z"),
+    ("accuracy_rad", "accuracy_rad"), ("accuracy", "accuracy"),
+    ("steps", "steps"), ("latency_us", "latency_us"), ("flags", "flags"),
+    ("double_tap", "double_tap"), ("motion", "motion"),
+    ("classification", "classification"), ("most_likely_state", "most_likely_state"),
+    ("value", "value"),
+)
+# The raw ADC streams (0x14..0x16): only these keep their integer counts.
+_BNO086_RAW_IDS = frozenset((0x14, 0x15, 0x16))
+
+
+def bno086_record_value(r: Any) -> dict[str, Any]:
+    """One BNO086 report as its contract 09 `bno086` record value.
+
+    snake_case, only the fields the report carries: quaternion / vector
+    components, accuracy, uncalibrated bias, gyro-integrated angular velocity,
+    detector and classifier outputs, and the integer counts of the raw ADC
+    streams. Matches the TS SDK's `bno086RecordValue` key for key.
+    """
+    v: dict[str, Any] = {"type": type(r).__name__, "sensor_id": r.sensor_id}
+    for key, out in _BNO086_RECORD_KEYS:
+        val = getattr(r, key, None)
+        if isinstance(val, (bool, int, float)):
+            v[out] = val
+    for key, out in (("bias", "bias"), ("angular_velocity", "angular_velocity"),
+                     ("confidences", "confidences")):
+        val = getattr(r, key, None)
+        if val is not None:
+            v[out] = list(val)
+    if type(r).__name__ == "GenericEvent":
+        v["value_raw"] = r.value_raw
+    if r.sensor_id in _BNO086_RAW_IDS:
+        for key in ("x_raw", "y_raw", "z_raw", "temperature_raw", "sensor_timestamp_us"):
+            val = getattr(r, key, None)
+            if val is not None:
+                v[key] = val
+    if getattr(r, "timestamp_us", None) is not None:
+        v["timestamp_us"] = r.timestamp_us
+    return v
+
 
 def _open_text(path: str | Path, mode: str) -> IO[str]:
     p = Path(path)
@@ -302,13 +345,7 @@ class SessionRecorder:
                 # (reports of different sensors in one cargo carry out-of-order
                 # device times; records must stay monotonic per device); the
                 # device time rides along as `timestamp_us`.
-                v: dict[str, Any] = {"type": type(r).__name__, "sensor_id": r.sensor_id}
-                for key in ("i", "j", "k", "real", "x", "y", "z", "accuracy_rad"):
-                    val = getattr(r, key, None)
-                    if val is not None:
-                        v[key] = val
-                v["timestamp_us"] = r.timestamp_us
-                writer.write(_did, host_now_us(), "bno086", v)
+                writer.write(_did, host_now_us(), "bno086", bno086_record_value(r))
 
             entry.unsubscribes.append(dev.on_report(on_report))
             return

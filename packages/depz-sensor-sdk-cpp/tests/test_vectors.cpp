@@ -884,6 +884,13 @@ static void test_vl53l4() {
         check_eq(dec, static_cast<std::int64_t>(value), "vl53l4 tuning decode " + nm);
     }
 
+    // C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
+    for (const Value& c : v.at("xtalk_decode").as_array()) {
+        const auto raw = static_cast<std::uint16_t>(c.at("raw").as_int());
+        check_eq(static_cast<std::int64_t>(L4::decode_xtalk(raw)), c.at("kcps").as_int(),
+                 "vl53l4 xtalk_decode " + std::to_string(raw));
+    }
+
     const Value& cfg = v.at("config_block");
     check_eq(static_cast<std::int64_t>(L4::CONFIG_ADDR), cfg.at("addr").as_int(),
              "vl53l4 config_block addr");

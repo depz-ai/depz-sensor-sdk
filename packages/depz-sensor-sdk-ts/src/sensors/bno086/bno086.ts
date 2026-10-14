@@ -37,6 +37,7 @@ import {
   buildGetFeatureRequest,
   buildProductIdRequest,
   buildSetFeature,
+  splitControlCargo,
   countsClearParams,
   countsGetParams,
   errorRecordFromResponse,
@@ -189,14 +190,16 @@ export class Bno086 extends DepzDevice {
         }
         return;
       case ShtpChannel.Control: {
-        if (cargo.payload.length === 0) return;
-        const rid = cargo.payload[0]!;
-        if (rid === ControlReport.GetFeatureResponse && cargo.payload.length >= 17) {
-          const resp = unpackFeatureResponse(cargo.payload);
-          this.features.set(resp.sensorId, resp);
-        }
-        for (const waiter of [...(this.controlWaiters.get(rid) ?? [])]) {
-          waiter(cargo.payload.slice());
+        // One cargo may hold several responses back to back.
+        for (const report of splitControlCargo(cargo.payload)) {
+          const rid = report[0]!;
+          if (rid === ControlReport.GetFeatureResponse && report.length >= 17) {
+            const resp = unpackFeatureResponse(report);
+            this.features.set(resp.sensorId, resp);
+          }
+          for (const waiter of [...(this.controlWaiters.get(rid) ?? [])]) {
+            waiter(report.slice());
+          }
         }
         return;
       }
@@ -436,15 +439,36 @@ export class Bno086 extends DepzDevice {
 
   // ── SH-2: identification & features ──────────────────────────────────────
 
-  /** Product ID Request/Response round trip (first responding subsystem). */
-  productId(timeoutMs: number = CONTROL_TIMEOUT_MS): Promise<ProductId> {
-    return this.controlRequest(
-      buildProductIdRequest(),
+  /** The SH-2 application's Product ID — the first of `productIds()`. */
+  async productId(timeoutMs: number = CONTROL_TIMEOUT_MS): Promise<ProductId> {
+    return (await this.productIds(timeoutMs))[0]!;
+  }
+
+  /**
+   * Product ID Request → every component's response, in the sensor's order
+   * (the SH-2 application first). Collects until no response came for
+   * `settleMs`, so the late ones can't answer the next request (they arrive in
+   * a second cargo; taking only the first once returned the bootloader's
+   * version on a back-to-back call).
+   */
+  productIds(timeoutMs: number = CONTROL_TIMEOUT_MS, settleMs = 150): Promise<ProductId[]> {
+    const out: ProductId[] = [];
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    return this.controlExchange<ProductId[]>(
       ControlReport.ProductIdResponse,
-      unpackProductId,
-      undefined,
-      timeoutMs,
-    );
+      timeoutMs + settleMs,
+      (raw, finish, fail) => {
+        try {
+          out.push(unpackProductId(raw));
+        } catch (err) {
+          fail(err instanceof Error ? err : new DepzError(String(err)));
+          return;
+        }
+        clearTimeout(settle);
+        settle = setTimeout(() => finish(out), settleMs);
+      },
+      () => this.sendShtp(ShtpChannel.Control, buildProductIdRequest()),
+    ).finally(() => clearTimeout(settle));
   }
 
   /**

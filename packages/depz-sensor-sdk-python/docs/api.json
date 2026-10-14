@@ -2777,7 +2777,7 @@
           "module": "depz_sensor_sdk.vl53l4.uld",
           "source": {
             "file": "depz_sensor_sdk/vl53l4/uld.py",
-            "line": 122
+            "line": 123
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l4.Vl53l4cdError"
@@ -15038,7 +15038,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 121
+            "line": 122
           },
           "exported_as": [
             "depz_sensor_sdk.Bno086",
@@ -15112,7 +15112,31 @@
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.ProductId",
-              "doc": "Product ID Request/Response round trip (first responding\nsubsystem)."
+              "doc": "The SH-2 application's Product ID — the first of `product_ids()`."
+            },
+            {
+              "name": "product_ids",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "timeout",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float",
+                  "default": 1.0
+                },
+                {
+                  "name": "settle",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float",
+                  "default": 0.15
+                }
+              ],
+              "returns": "list[depz_sensor_sdk.bno086.sh2.ProductId]",
+              "doc": "Product ID Request → every component's response, in the sensor's\norder (the SH-2 application first). Collects until no response came\nfor `settle` s, so the late ones can't answer the next request (they\narrive in a second cargo; taking only the first once returned the\nbootloader's version on a back-to-back call)."
             },
             {
               "name": "enable",
@@ -17152,7 +17176,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 169
+            "line": 197
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.FeatureResponse"
@@ -17243,12 +17267,12 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 197
+            "line": 225
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ProductId"
           ],
-          "doc": "Product ID Response (0xF8), 16 bytes. The sensor sends one response\nper subsystem (typically 2); reset_cause per SH-2 §6.4.5.2.",
+          "doc": "Product ID Response (0xF8), 16 bytes. The sensor sends one response\nper software component (a BNO085 sends four: the SH-2 application first,\nthen the bootloader and two support components); reset_cause per SH-2\n§6.4.5.2, set on the first only.",
           "dataclass_fields": [
             {
               "name": "reset_cause",
@@ -17334,7 +17358,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 235
+            "line": 265
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CommandResponse"
@@ -17476,7 +17500,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 513
+            "line": 543
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.SensorMetadata"
@@ -17582,7 +17606,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 129
+            "line": 157
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.TareAxis"
@@ -17730,7 +17754,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 118
+            "line": 146
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.TareBasis"
@@ -17932,7 +17956,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 111
+            "line": 112
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CalibrationConfig"
@@ -17973,7 +17997,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 52
+            "line": 80
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.OscillatorType"
@@ -18143,7 +18167,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 90
+            "line": 118
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ErrorRecord"
@@ -18209,7 +18233,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 60
+            "line": 88
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ErrorSource"
@@ -18382,7 +18406,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 107
+            "line": 135
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Counts"
@@ -21503,7 +21527,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 79
+            "line": 122
           },
           "exported_as": [
             "depz_sensor_sdk.SessionRecorder"
@@ -21582,7 +21606,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 347
+            "line": 384
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetReader"
@@ -21661,7 +21685,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 34
+            "line": 77
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetRecord"
@@ -25682,7 +25706,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.4.1",
+          "value": "0.4.2",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

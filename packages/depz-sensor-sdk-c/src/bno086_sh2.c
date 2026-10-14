@@ -35,6 +35,18 @@ int depz_bno_unpack_feature_response(const uint8_t *p, size_t len, depz_bno_feat
     return 0;
 }
 
+size_t depz_bno_control_report_len(uint8_t rid)
+{
+    switch (rid) {
+    case DEPZ_SH2_COMMAND_RESPONSE:     return 16;
+    case DEPZ_SH2_FRS_READ_RESPONSE:    return 16;
+    case DEPZ_SH2_FRS_WRITE_RESPONSE:   return 4;
+    case DEPZ_SH2_PRODUCT_ID_RESPONSE:  return 16;
+    case DEPZ_SH2_GET_FEATURE_RESPONSE: return 17;
+    default:                            return 0;
+    }
+}
+
 int depz_bno_unpack_product_id(const uint8_t *p, size_t len, depz_bno_product_id *out)
 {
     if (len < 16 || p[0] != DEPZ_SH2_PRODUCT_ID_RESPONSE) return -1;

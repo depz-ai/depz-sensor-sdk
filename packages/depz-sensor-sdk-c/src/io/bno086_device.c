@@ -90,8 +90,8 @@ static void emit(depz_device *dev, depz_bno_report *reps, size_t n)
     free(cbs);
 }
 
-/* Under `lock`: hand a control cargo to every waiter of its report id. */
-static void deliver_control(bno_state *s, const uint8_t *p, size_t len)
+/* Under `lock`: hand one control report to every waiter of its report id. */
+static void deliver_report(bno_state *s, const uint8_t *p, size_t len)
 {
     waiter *w;
     bool any = false;
@@ -109,6 +109,20 @@ static void deliver_control(bno_state *s, const uint8_t *p, size_t len)
         any = true;
     }
     if (any) depz_cond_broadcast(&s->cond);
+}
+
+/* Under `lock`: one cargo may hold several reports back to back. An unknown
+ * id (or a short tail) ends the walk: its length is unknowable, the rest goes
+ * out as one piece. */
+static void deliver_control(bno_state *s, const uint8_t *p, size_t len)
+{
+    size_t pos = 0;
+    while (pos < len) {
+        size_t n = depz_bno_control_report_len(p[pos]);
+        if (!n || pos + n > len) n = len - pos;
+        deliver_report(s, p + pos, n);
+        pos += n;
+    }
 }
 
 static bool bno_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t len)
@@ -328,8 +342,11 @@ static void waiter_remove(bno_state *s, waiter *w)
     depz_mutex_unlock(&s->lock);
 }
 
-/* The next answer for `w` (copied into msg/len) before `deadline_us`. */
-static int waiter_next(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_t msg[CTRL_MAX], size_t *len)
+/* The next answer for `w` (copied into msg/len) before `deadline_us`. A
+ * `quiet` timeout returns DEPZ_E_TIMEOUT without recording an error (an
+ * expected end, not a failure). */
+static int waiter_next_q(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_t msg[CTRL_MAX], size_t *len,
+                         bool quiet)
 {
     bno_state *s = st(dev);
     depz_mutex_lock(&s->lock);
@@ -341,6 +358,7 @@ static int waiter_next(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_
         }
         if (left <= 0) {
             depz_mutex_unlock(&s->lock);
+            if (quiet) return DEPZ_E_TIMEOUT;
             return depz_fail(DEPZ_E_TIMEOUT, "bno086: no SH-2 report 0x%02X within the timeout", w->rid);
         }
         depz_cond_wait_ms(&s->cond, &s->lock, left);
@@ -351,6 +369,11 @@ static int waiter_next(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_
     w->count--;
     depz_mutex_unlock(&s->lock);
     return DEPZ_OK;
+}
+
+static int waiter_next(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_t msg[CTRL_MAX], size_t *len)
+{
+    return waiter_next_q(dev, w, deadline_us, msg, len, false);
 }
 
 /* Send a control cargo and wait for the first answer with report id `rid`
@@ -510,22 +533,59 @@ int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t
 
 /* ── identification and features ───────────────────────────────────────── */
 
-static int do_product_id(depz_device *dev, depz_bno_product_id *out)
+/* Every component answers a Product ID Request; the late ones come in a
+ * second cargo. Collect until PRODUCT_ID_SETTLE_MS pass with none, so they
+ * can't answer the next request (taking only the first once returned the
+ * bootloader's version on a back-to-back call). */
+#define PRODUCT_ID_SETTLE_MS 150
+
+static int do_product_ids(depz_device *dev, depz_bno_product_id *out, size_t cap, size_t *count)
 {
+    bno_state *s = st(dev);
     uint8_t req[2], msg[CTRL_MAX];
-    size_t mlen;
+    size_t mlen, n = 0;
+    waiter w;
+    uint64_t deadline;
+    int rc;
     depz_bno_pack_product_id_request(req);
-    TRY(control_request(dev, req, sizeof req, DEPZ_SH2_PRODUCT_ID_RESPONSE, NULL, NULL,
-                        timeout_at_least(dev, CONTROL_TIMEOUT_MS), msg, &mlen));
-    if (depz_bno_unpack_product_id(msg, mlen, out))
-        return depz_fail(DEPZ_E_PROTOCOL, "bno086: short product-id response (%zu bytes)", mlen);
-    return DEPZ_OK;
+    waiter_add(s, &w, DEPZ_SH2_PRODUCT_ID_RESPONSE);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, req, sizeof req);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, CONTROL_TIMEOUT_MS) * 1000u;
+    while (rc == DEPZ_OK) {
+        depz_bno_product_id pid;
+        rc = waiter_next_q(dev, &w, deadline, msg, &mlen, n > 0);
+        if (rc == DEPZ_E_TIMEOUT && n > 0) {
+            rc = DEPZ_OK;
+            break;
+        }
+        if (rc != DEPZ_OK) break;
+        if (depz_bno_unpack_product_id(msg, mlen, &pid)) {
+            rc = depz_fail(DEPZ_E_PROTOCOL, "bno086: short product-id response (%zu bytes)", mlen);
+            break;
+        }
+        if (n < cap) out[n] = pid;
+        n++;
+        deadline = depz_now_us() + (uint64_t)PRODUCT_ID_SETTLE_MS * 1000u;
+    }
+    waiter_remove(s, &w);
+    if (count) *count = n < cap ? n : cap;
+    return rc;
+}
+
+int depz_bno086_product_ids(depz_device *dev, depz_bno_product_id *out, size_t cap, size_t *count)
+{
+    if (!out || !cap) return depz_fail(DEPZ_E_ARG, "bno086: NULL or empty output");
+    LOCKED(do_product_ids(dev, out, cap, count));
 }
 
 int depz_bno086_product_id(depz_device *dev, depz_bno_product_id *out)
 {
+    depz_bno_product_id all[8];
+    size_t n = 0;
     if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
-    LOCKED(do_product_id(dev, out));
+    TRY(depz_bno086_product_ids(dev, all, sizeof all / sizeof all[0], &n));
+    *out = all[0];
+    return DEPZ_OK;
 }
 
 static bool accept_feature(const uint8_t *msg, size_t len, void *ctx)

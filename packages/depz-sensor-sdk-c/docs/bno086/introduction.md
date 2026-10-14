@@ -44,6 +44,25 @@ request for request as the Python SDK does. One class serves both chips.
 rotation vector 200 Hz, gravity 9.85 m/s², no drops) **and on a strict replay
 of a real capture** — see [verification status](guide.md#verification-status).
 
+### What the DEPZ boards actually run
+
+Checked on the boards (BNO085 with SH-2 3.2.13, BNO086 with SH-2 3.12.6,
+2026-10-06). The SDK decodes every report above, but the sensor itself:
+
+- **refuses** significant motion, flip, pickup, sleep, tilt, pocket and circle —
+  enabling them reads back a 0 Hz interval;
+- sends the **raw ADC** reports only while an orientation report is on;
+- refuses the **tap detector** while the step counter runs;
+- needs a non-zero enable mask in the **personal-activity classifier**'s
+  feature configuration word (`0x1FF` = every activity), else it refuses;
+- reports the **detectors at their full rate** whether anything happened or
+  not: an event is a report whose content changed (tap / shake: non-zero flags).
+  The step detector's report carries only a latency, so it cannot be told from
+  a step — count steps with the step counter.
+
+Right after enabling, the Get Feature read-back can be a stale 0 for up to a
+second: read it again before treating a feature as refused.
+
 ## When to use it
 
 Use the BNO085 / BNO086 whenever you need **orientation or motion** at a

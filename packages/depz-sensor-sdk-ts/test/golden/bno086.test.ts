@@ -17,6 +17,7 @@ import {
   buildGetFeatureRequest,
   buildProductIdRequest,
   buildSetFeature,
+  bno086RecordValue,
   packShtpHeader,
   parseGyroRvCargo,
   parseInputCargo,
@@ -195,6 +196,8 @@ describe("bno086 input cargo vectors", () => {
         expect(rep.type).toBe(exp.type);
         checkFields(rep, exp.fields);
         checkScaled(rep, exp.fields);
+        // the contract 09 dataset record the recorders write
+        expect(bno086RecordValue(rep)).toEqual(exp.record);
       });
     });
   }
@@ -208,6 +211,7 @@ describe("bno086 gyro-integrated RV vectors", () => {
       expect(rep!.type).toBe(c.expect.type);
       checkFields(rep!, c.expect.fields);
       checkScaled(rep!, c.expect.fields);
+      expect(bno086RecordValue(rep!)).toEqual(c.expect.record);
     });
   }
 });

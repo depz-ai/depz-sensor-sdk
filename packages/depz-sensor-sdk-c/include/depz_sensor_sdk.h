@@ -1549,7 +1549,9 @@ typedef struct {
     uint32_t cfg_word;
 } depz_bno_feature;
 
-/* Product ID Response 0xF8 (16 B), one per subsystem. */
+/* Product ID Response 0xF8 (16 B), one per software component (a BNO085
+ * sends four: the SH-2 application first, then the bootloader and two support
+ * components). */
 typedef struct {
     uint8_t  reset_cause, sw_version_major, sw_version_minor;
     uint32_t sw_part_number;  /* 10004148 = BNO085, 10004563 = BNO086 */
@@ -1584,6 +1586,9 @@ int depz_bno_unpack_product_id(const uint8_t *p, size_t len, depz_bno_product_id
 int depz_bno_unpack_command_response(const uint8_t *p, size_t len, depz_bno_command_response *out);
 int depz_bno_unpack_frs_read_response(const uint8_t *p, size_t len, depz_bno_frs_read_response *out);
 int depz_bno_unpack_frs_write_response(const uint8_t *p, size_t len, depz_bno_frs_write_response *out);
+/* Fixed length of a sensor→host control report (contract 05 §6), 0 when the
+ * id is not one: one control cargo may carry several back to back. */
+size_t depz_bno_control_report_len(uint8_t rid);
 
 /* Sensor metadata FRS record (0xE301..0xE324), sh2 reference layout:
  * revision-gated fields read 0 when the record predates them. */

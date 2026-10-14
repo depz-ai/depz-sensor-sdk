@@ -644,7 +644,7 @@ static void test_vl53l8_advanced(void)
 /* ======================================================================== */
 /* vl53l4.json — VL53L4CD wire codecs + host-ULD math (contract 10).         */
 /* Consumes every section: encode / decode / result_block / timing.encode /  */
-/* timing.decode / tuning (both directions) / config_block.                  */
+/* timing.decode / tuning (both directions) / xtalk_decode / config_block.   */
 /* ======================================================================== */
 static void test_vl53l4(void)
 {
@@ -841,6 +841,16 @@ static void test_vl53l4(void)
         } else {
             CHECK(0, "unknown vl53l4 tuning kind %s", kind);
         }
+    }
+
+    /* xtalk_decode: C round(), an exact .5 goes away from zero (256 -> 1) */
+    const json_value *xd = json_obj_get(root, "xtalk_decode");
+    CHECK(json_arr_size(xd) > 0, "vl53l4 xtalk_decode missing");
+    for (size_t i = 0; i < json_arr_size(xd); i++) {
+        const json_value *c = json_arr_get(xd, i);
+        uint16_t raw = (uint16_t)json_as_int(json_obj_get(c, "raw"));
+        CHECK((int64_t)depz_vl53l4_decode_xtalk(raw) == json_as_int(json_obj_get(c, "kcps")),
+              "vl53l4 xtalk_decode %u: got %u", raw, depz_vl53l4_decode_xtalk(raw));
     }
 
     /* config_block: the 91-byte init block with byte 0 forced to 0x12 */

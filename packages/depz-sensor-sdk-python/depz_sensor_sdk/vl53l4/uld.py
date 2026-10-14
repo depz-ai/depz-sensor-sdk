@@ -14,6 +14,7 @@ byte-exact parity.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
@@ -283,9 +284,20 @@ def xtalk_raw(xtalk_kcps: int) -> int:
     return (xtalk_kcps << 9) & 0xFFFF
 
 
+def round_half_away(x: float) -> int:
+    """C's round(): an exact .5 goes away from zero. ST's ULD rounds xtalk this
+    way; Python's round() sends it to the even neighbour (round(0.5) == 0)."""
+    t = math.trunc(x)
+    if x - t >= 0.5:
+        return t + 1
+    if x - t <= -0.5:
+        return t - 1
+    return t
+
+
 def decode_xtalk(raw_word: int) -> int:
     """GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps."""
-    return round(raw_word / 512.0)
+    return round_half_away(raw_word / 512.0)
 
 
 def signal_threshold_raw(signal_kcps: int) -> int:
@@ -556,4 +568,4 @@ class VL53L4CD:
             raise Vl53l4cdError(f"xtalk calibration failed: {tmp_xtalk:.1f} kcps > 127")
 
         self.wr_word(XTALK_PLANE_OFFSET_KCPS, int(tmp_xtalk * 512.0) & 0xFFFF)
-        return round(tmp_xtalk)
+        return round_half_away(tmp_xtalk)

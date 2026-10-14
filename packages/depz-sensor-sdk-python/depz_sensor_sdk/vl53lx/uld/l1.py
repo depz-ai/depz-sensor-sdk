@@ -39,7 +39,8 @@ from depz_sensor_sdk.vl53lx.uld.vl53l1_die import (CONFIG_END, CONFIG_ADDR,
                             SD_CONFIG__INITIAL_PHASE_SD0, SD_CONFIG__WOI_SD0,
                             SYSTEM__INTERRUPT_CONFIG_GPIO,
                             SYSTEM__MODE_START, THRESH_HIGH, THRESH_LOW,
-                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die)
+                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die,
+                            round_half_away)
 
 ULD_VERSION = (3, 5, 5)
 
@@ -310,4 +311,4 @@ class VL53L1(VL53L1Die):
                         / avg_spad_nb)
         cal_xtalk = min(max(cal_xtalk, 0), 0xFFFF)
         self.p.wr_word(XTALK_PLANE_OFFSET_KCPS, cal_xtalk)
-        return round(cal_xtalk / 512.0)
+        return round_half_away(cal_xtalk / 512.0)

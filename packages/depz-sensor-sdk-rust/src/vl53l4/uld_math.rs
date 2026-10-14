@@ -343,10 +343,10 @@ pub fn xtalk_raw(xtalk_kcps: u16) -> u16 {
     (((xtalk_kcps as u32) << 9) & 0xFFFF) as u16
 }
 
-/// `GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (round half to even,
-/// matching the Python reference's `round`).
+/// `GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (an exact .5 goes away
+/// from zero, as C's `round()` in ST's ULD).
 pub fn decode_xtalk(raw_word: u16) -> u16 {
-    (raw_word as f64 / 512.0).round_ties_even() as u16
+    (raw_word as f64 / 512.0).round() as u16
 }
 
 /// `MIN_COUNT_RATE_RTN_LIMIT_MCPS` word for `SetSignalThreshold`.

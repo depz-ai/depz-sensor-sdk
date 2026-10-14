@@ -1754,10 +1754,8 @@ bytes Bno086::advertisement()
     return out;
 }
 
-bno086::ProductId Bno086::product_id()
+static bno086::ProductId product_id_from_c(const depz_bno_product_id& c)
 {
-    depz_bno_product_id c{};
-    check(depz_bno086_product_id(handle(), &c));
     bno086::ProductId p;
     p.reset_cause = c.reset_cause;
     p.sw_version_major = c.sw_version_major;
@@ -1766,6 +1764,23 @@ bno086::ProductId Bno086::product_id()
     p.sw_build_number = c.sw_build_number;
     p.sw_version_patch = c.sw_version_patch;
     return p;
+}
+
+bno086::ProductId Bno086::product_id()
+{
+    depz_bno_product_id c{};
+    check(depz_bno086_product_id(handle(), &c));
+    return product_id_from_c(c);
+}
+
+std::vector<bno086::ProductId> Bno086::product_ids()
+{
+    depz_bno_product_id c[8]{};
+    std::size_t n = 0;
+    check(depz_bno086_product_ids(handle(), c, 8, &n));
+    std::vector<bno086::ProductId> out;
+    for (std::size_t i = 0; i < n; i++) out.push_back(product_id_from_c(c[i]));
+    return out;
 }
 
 bno086::Feature Bno086::enable(bno086::SensorId sensor, double hz)

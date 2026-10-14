@@ -877,7 +877,12 @@ public:
     void hardware_reset(std::chrono::milliseconds timeout = std::chrono::milliseconds(2000));
     void wake();
     bytes advertisement();
+    // The SH-2 application's Product ID — the first of product_ids().
     bno086::ProductId product_id();
+    // Every software component's answer, in the sensor's order (the SH-2
+    // application first; a BNO085 sends four). Waits until no answer came for
+    // 150 ms, so the late ones can't answer the next request.
+    std::vector<bno086::ProductId> product_ids();
 
     // Set Feature, then the granted rate read back (Get Feature).
     bno086::Feature enable(bno086::SensorId sensor, double hz);

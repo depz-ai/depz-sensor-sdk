@@ -332,7 +332,7 @@ export function xtalkRaw(xtalkKcps: number): number {
 
 /** getXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps. */
 export function decodeXtalk(rawWord: number): number {
-  return roundHalfEven(rawWord / 512.0);
+  return roundHalfAway(rawWord / 512.0);
 }
 
 export function signalThresholdRaw(signalKcps: number): number {
@@ -355,12 +355,14 @@ export function decodeSigmaThreshold(rawWord: number): number {
 }
 
 /**
- * Python's banker's rounding (`round()`): exact .5 goes to the nearest even
- * integer. Keeps the codecs bit-identical to the reference.
+ * C's `round()`: an exact .5 goes away from zero, as ST's ULD rounds xtalk
+ * (`Math.round()` sends -2.5 to -2, Python's `round()` sends 0.5 to 0).
  */
-function roundHalfEven(x: number): number {
-  const r = Math.round(x);
-  return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
+function roundHalfAway(x: number): number {
+  const t = Math.trunc(x);
+  if (x - t >= 0.5) return t + 1;
+  if (x - t <= -0.5) return t - 1;
+  return t;
 }
 
 /** Port of VL53L4CD_api.c + VL53L4CD_calibration.c (ULD 2.2.3). */
@@ -658,6 +660,6 @@ export class VL53L4CD {
     }
 
     await this.wrWord(XTALK_PLANE_OFFSET_KCPS, Math.trunc(tmpXtalk * 512.0) & 0xffff);
-    return roundHalfEven(tmpXtalk);
+    return roundHalfAway(tmpXtalk);
   }
 }

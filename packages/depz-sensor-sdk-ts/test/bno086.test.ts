@@ -15,6 +15,7 @@ import {
   TareAxis,
   TareBasis,
   buildSetFeature,
+  splitControlCargo,
   type Acceleration,
   type GyroIntegratedRV,
   type Magnetometer,
@@ -105,6 +106,38 @@ describe("identity and lifecycle", () => {
     const pid = await dev.productId();
     expect([pid.swVersionMajor, pid.swVersionMinor, pid.swVersionPatch]).toEqual([3, 8, 4]);
     expect(pid.version).toBe("3.8.4");
+  });
+
+  it("productIds collects every component", async () => {
+    const ids = await dev.productIds();
+    expect(ids.map((p) => [p.swPartNumber, p.version])).toEqual([
+      [10003608, "3.8.4"], [10003606, "1.2.4"], [10003254, "4.4.3"], [10003171, "4.2.10"],
+    ]);
+    expect(ids[0]!.resetCause).toBe(0x01);
+    expect(ids.slice(1).every((p) => p.resetCause === 0)).toBe(true);
+  });
+
+  it("back-to-back productId never gets a late component", async () => {
+    // The three late responses arrive in a second cargo; taking the first and
+    // returning let the next call pick up the bootloader's (seen live: 9 of 20
+    // calls on a BNO085).
+    const parts = new Set<number>();
+    for (let i = 0; i < 5; i++) parts.add((await dev.productId()).swPartNumber);
+    expect([...parts]).toEqual([10003608]);
+  });
+
+  it("splitControlCargo", () => {
+    const pid = new Uint8Array(16);
+    pid[0] = 0xf8;
+    const feat = new Uint8Array(17);
+    feat[0] = 0xfc;
+    const join = (...parts: Uint8Array[]) => Uint8Array.from(parts.flatMap((p) => [...p]));
+    expect(splitControlCargo(join(pid, feat, pid)).map(toHex)).toEqual([pid, feat, pid].map(toHex));
+    // An unknown ID ends the walk: its length is unknowable.
+    const tail = Uint8Array.of(0x99, 1, 2);
+    expect(splitControlCargo(join(pid, tail)).map(toHex)).toEqual([pid, tail].map(toHex));
+    expect(splitControlCargo(pid.subarray(0, 10)).map(toHex)).toEqual([toHex(pid.subarray(0, 10))]);
+    expect(splitControlCargo(new Uint8Array(0))).toEqual([]);
   });
 
   it("hardware reset waits for reset-complete", async () => {

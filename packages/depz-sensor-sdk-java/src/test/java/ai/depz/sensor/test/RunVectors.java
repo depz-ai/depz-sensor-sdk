@@ -624,6 +624,12 @@ public final class RunVectors {
             }
             check("vl53l4.tuning:" + name, ok);
         }
+        // C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
+        for (Object to : arr(root.get("xtalk_decode"))) {
+            Map<String, Object> c = obj(to);
+            int raw = intOf(c.get("raw"));
+            check("vl53l4.xtalk_decode:" + raw, Vl53l4Uld.decodeXtalk(raw) == intOf(c.get("kcps")));
+        }
     }
 
     private static void vl53l4ConfigBlockVector() throws Exception {

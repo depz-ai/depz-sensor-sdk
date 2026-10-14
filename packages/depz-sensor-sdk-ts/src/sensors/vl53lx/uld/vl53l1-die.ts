@@ -15,7 +15,7 @@
 
 import { I2C_KHZ_BOOT, ProtocolError, Vl53Error } from "./link.js";
 import { measurement, SensorDriver, type Measurement } from "./base.js";
-import { beUint, floorDiv, pyRound, u32 } from "./arith.js";
+import { beUint, floorDiv, roundHalfAway, u32 } from "./arith.js";
 
 export const SOFT_RESET = 0x0000;
 export const I2C_SLAVE__DEVICE_ADDRESS = 0x0001;
@@ -466,7 +466,7 @@ export abstract class VL53L1Die extends SensorDriver {
   }
 
   async getXtalk(): Promise<number> {
-    return pyRound((await this.p.rdWord(XTALK_PLANE_OFFSET_KCPS)) / 512.0);
+    return roundHalfAway((await this.p.rdWord(XTALK_PLANE_OFFSET_KCPS)) / 512.0);
   }
 
   // ── ROI (VL53L1X_SetROI / VL53L3CX_ULP_SetROI, the same registers) ──

@@ -7,6 +7,7 @@
 import { hostNowUs, type DepzDevice } from "./device/device.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
 import { Bno086 } from "./sensors/bno086/bno086.js";
+import type { Report as Bno086Report } from "./sensors/bno086/reports.js";
 import { packBno055Units } from "./sensors/bno055/regs.js";
 import { Sr04 } from "./sensors/sr04.js";
 import { Vl53l4cd } from "./sensors/vl53l4/vl53l4.js";
@@ -14,6 +15,68 @@ import { Vl53l8cx, type Vl53l8Frame } from "./sensors/vl53l8/vl53l8.js";
 import { Vl53lx } from "./sensors/vl53lx/vl53lx.js";
 
 export const DATASET_SCHEMA = "depz.dataset/2";
+
+/** Report field → record key, for the scalar fields contract 09 `bno086` keeps. */
+const BNO086_RECORD_KEYS: [string, string][] = [
+  ["i", "i"],
+  ["j", "j"],
+  ["k", "k"],
+  ["real", "real"],
+  ["x", "x"],
+  ["y", "y"],
+  ["z", "z"],
+  ["accuracyRad", "accuracy_rad"],
+  ["accuracy", "accuracy"],
+  ["steps", "steps"],
+  ["latencyUs", "latency_us"],
+  ["flags", "flags"],
+  ["doubleTap", "double_tap"],
+  ["motion", "motion"],
+  ["classification", "classification"],
+  ["mostLikelyState", "most_likely_state"],
+  ["value", "value"],
+];
+
+/** The raw ADC streams (0x14..0x16): only these keep their integer counts. */
+const BNO086_RAW_IDS = new Set([0x14, 0x15, 0x16]);
+
+/**
+ * One BNO086 report as its contract 09 `bno086` record value: snake_case, only
+ * the fields the report carries — quaternion / vector components, accuracy,
+ * uncalibrated bias, gyro-integrated angular velocity, detector and classifier
+ * outputs, and the integer counts of the raw ADC streams. Shared by the SDK
+ * recorder and the viewer's, so both write the same record.
+ */
+export function bno086RecordValue(r: Bno086Report): Record<string, unknown> {
+  const f = r as unknown as Record<string, unknown>;
+  const v: Record<string, unknown> = { type: r.type, sensor_id: r.sensorId };
+  for (const [key, out] of BNO086_RECORD_KEYS) {
+    const val = f[key];
+    if (typeof val === "number" || typeof val === "boolean") v[out] = val;
+  }
+  for (const [key, out] of [
+    ["bias", "bias"],
+    ["angularVelocity", "angular_velocity"],
+    ["confidences", "confidences"],
+  ] as const) {
+    const val = f[key];
+    if (Array.isArray(val)) v[out] = [...(val as number[])];
+  }
+  if (r.type === "GenericEvent") v.value_raw = r.valueRaw;
+  if (BNO086_RAW_IDS.has(r.sensorId)) {
+    for (const [key, out] of [
+      ["xRaw", "x_raw"],
+      ["yRaw", "y_raw"],
+      ["zRaw", "z_raw"],
+      ["temperatureRaw", "temperature_raw"],
+      ["sensorTimestampUs", "sensor_timestamp_us"],
+    ] as const) {
+      if (typeof f[key] === "number") v[out] = f[key];
+    }
+  }
+  if (typeof r.timestampUs === "bigint") v.timestamp_us = Number(r.timestampUs);
+  return v;
+}
 
 export interface DatasetDeviceMeta {
   serial?: string;
@@ -194,14 +257,7 @@ export class DatasetRecorder {
       // must stay monotonic per device); the device time rides along as
       // `timestamp_us`.
       return dev.onReport((r) => {
-        const f = r as unknown as Record<string, unknown>;
-        const v: Record<string, unknown> = { type: r.type, sensor_id: r.sensorId };
-        const keys = { i: "i", j: "j", k: "k", real: "real", x: "x", y: "y", z: "z", accuracy_rad: "accuracyRad" };
-        for (const [out, key] of Object.entries(keys)) {
-          if (typeof f[key] === "number") v[out] = f[key];
-        }
-        v.timestamp_us = Number(r.timestampUs);
-        writer.write(entry.id, Number(hostNowUs()), "bno086", v);
+        writer.write(entry.id, Number(hostNowUs()), "bno086", bno086RecordValue(r));
       });
     }
     // VL53L8CX/CH and the VL53L5CX/L7CX/L7CH subclasses.

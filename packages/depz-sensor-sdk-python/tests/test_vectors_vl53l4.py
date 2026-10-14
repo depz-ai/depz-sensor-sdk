@@ -104,6 +104,12 @@ def test_tuning_vectors(vectors):
         assert decoders[case["kind"]](case["raw"]) == case["value"], case["name"]
 
 
+def test_xtalk_decode_vectors(vectors):
+    # C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
+    for case in vectors("vl53l4.json")["xtalk_decode"]:
+        assert uld.decode_xtalk(case["raw"]) == case["kcps"], case["raw"]
+
+
 def test_config_block_vector(vectors):
     block = vectors("vl53l4.json")["config_block"]
     assert block["addr"] == uld.CONFIG_ADDR

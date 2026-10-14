@@ -11,6 +11,7 @@ from depz_sensor_sdk.bno086.reports import (
     parse_input_cargo,
 )
 from depz_sensor_sdk.bno086.shtp import ShtpHeader, ShtpLayer
+from depz_sensor_sdk.dataset import bno086_record_value
 
 # ── bno086_shtp.json ──────────────────────────────────────────────────────────
 
@@ -86,7 +87,8 @@ def _serialize(rep) -> dict:
         elif isinstance(v, tuple):
             v = list(v)
         fields[k] = int(v) if isinstance(v, bool) else v
-    return {"type": type(rep).__name__, "fields": fields}
+    # `record`: the contract 09 dataset record value the recorder writes
+    return {"type": type(rep).__name__, "fields": fields, "record": bno086_record_value(rep)}
 
 
 def test_q_point_table_matches(vectors):

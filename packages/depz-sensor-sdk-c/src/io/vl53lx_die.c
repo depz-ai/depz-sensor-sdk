@@ -555,7 +555,7 @@ static int get_xtalk(vlx_driver *d, int32_t *kcps)
 {
     uint16_t v;
     VLX_TRY(vlx_rd_word(P, XTALK_PLANE_OFFSET_KCPS, &v));
-    *kcps = (int32_t)nearbyint(v / 512.0); /* round half to even, as Python */
+    *kcps = (int32_t)lround(v / 512.0); /* .5 away from zero, as ST's ULD */
     return DEPZ_OK;
 }
 
@@ -691,14 +691,14 @@ static int calibrate_xtalk(vlx_driver *d, int target_mm, int nb, int32_t *out)
         if (cal < 0) cal = 0;
         if (cal > 0xFFFF) cal = 0xFFFF;
         VLX_TRY(vlx_wr_word(P, XTALK_PLANE_OFFSET_KCPS, (uint16_t)cal));
-        *out = (int32_t)nearbyint(cal / 512.0);
+        *out = (int32_t)lround(cal / 512.0);
     } else {
         double tmp;
         if (n == 0) return depz_fail(DEPZ_E_PROTOCOL, "vl53lx: xtalk calibration failed: no valid samples");
         tmp = (1.0 - (dist / n) / (double)target_mm) * ((signal / n) / (spads / n));
         if (tmp > 127) return depz_fail(DEPZ_E_PROTOCOL, "vl53lx: xtalk calibration failed: %.1f kcps > 127", tmp);
         VLX_TRY(vlx_wr_word(P, XTALK_PLANE_OFFSET_KCPS, (uint16_t)((int64_t)(tmp * 512.0) & 0xFFFF)));
-        *out = (int32_t)nearbyint(tmp);
+        *out = (int32_t)lround(tmp);
     }
     return DEPZ_OK;
 }

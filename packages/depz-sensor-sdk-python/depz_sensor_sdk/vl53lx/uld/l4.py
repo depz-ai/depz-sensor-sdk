@@ -21,7 +21,8 @@ Reference C driver: ../../temp/STSW-IMG026/VL53L4CD_ULD_Driver/
 from depz_sensor_sdk.vl53lx._link import Vl53Error
 from depz_sensor_sdk.vl53lx.uld.vl53l1_die import (CONFIG_ADDR, CONFIG_END, INNER_OFFSET_MM,
                             OUTER_OFFSET_MM, RANGE_OFFSET_MM,
-                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die)
+                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die,
+                            round_half_away)
 
 # ── ULD driver (VL53L4CD_api.c / VL53L4CD_calibration.c, 2.2.3) ──────────────
 ULD_VERSION = (2, 2, 3, 0)
@@ -107,4 +108,4 @@ class VL53L4(VL53L1Die):
             raise Vl53Error(f'xtalk calibration failed: {tmp_xtalk:.1f} kcps > 127')
 
         self.p.wr_word(XTALK_PLANE_OFFSET_KCPS, int(tmp_xtalk * 512.0) & 0xFFFF)
-        return round(tmp_xtalk)
+        return round_half_away(tmp_xtalk)

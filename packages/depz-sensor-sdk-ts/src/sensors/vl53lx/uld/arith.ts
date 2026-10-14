@@ -38,6 +38,17 @@ export function pyRound(x: number): number {
   return Math.round(x);
 }
 
+/**
+ * C's `round()`: an exact .5 goes away from zero. ST's ULD rounds xtalk this
+ * way; Python's `round()` and JS's `Math.round()` don't (0.5 → 0, -2.5 → -2).
+ */
+export function roundHalfAway(x: number): number {
+  const t = Math.trunc(x);
+  if (x - t >= 0.5) return t + 1;
+  if (x - t <= -0.5) return t - 1;
+  return t;
+}
+
 /** Big-endian unsigned integer of `b[start:end]`. */
 export function beUint(b: Uint8Array, start: number, end: number): number {
   let v = 0;

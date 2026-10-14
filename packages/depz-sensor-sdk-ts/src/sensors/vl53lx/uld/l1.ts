@@ -10,7 +10,7 @@
  */
 
 import { Vl53Error } from "./link.js";
-import { floorDiv, pyRound } from "./arith.js";
+import { floorDiv, roundHalfAway } from "./arith.js";
 import {
   CONFIG_ADDR,
   CONFIG_END,
@@ -306,7 +306,7 @@ export class VL53L1 extends VL53L1Die {
     let calXtalk = Math.trunc((512 * (avgSignal * (1 - avgDistance / targetDistMm))) / avgSpadNb);
     calXtalk = Math.min(Math.max(calXtalk, 0), 0xffff);
     await this.p.wrWord(XTALK_PLANE_OFFSET_KCPS, calXtalk);
-    return pyRound(calXtalk / 512.0);
+    return roundHalfAway(calXtalk / 512.0);
   }
 }
 

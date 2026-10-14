@@ -75,6 +75,11 @@ describe("vl53l4.json", () => {
     expect(decode(c.raw)).toBe(c.value);
   });
 
+  // C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
+  for (const c of v.xtalk_decode) it(`xtalk decode ${c.raw}`, () => {
+    expect(decodeXtalk(c.raw)).toBe(c.kcps);
+  });
+
   it("config block", () => {
     expect(DEFAULT_CONFIGURATION.length).toBe(fromHex(v.config_block.data).length);
     expect(toHex(configBlock())).toBe(v.config_block.data);

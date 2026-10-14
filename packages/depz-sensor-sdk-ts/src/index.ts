@@ -154,6 +154,7 @@ export {
   driverFor as vl53lxDriverFor,
   driverKinds as vl53lxDriverKinds,
   productFromBoardName as vl53lxProductFromBoardName,
+  product as vl53lxProduct,
 } from "./sensors/vl53lx/uld/registry.js";
 export {
   CALIBRATE_XTALK,
@@ -219,6 +220,7 @@ export {
   DatasetReader,
   DatasetRecorder,
   DatasetWriter,
+  bno086RecordValue,
 } from "./dataset.js";
 export type {
   DatasetDeviceMeta,

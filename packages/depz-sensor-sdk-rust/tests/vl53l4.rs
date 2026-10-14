@@ -273,6 +273,20 @@ fn vl53l4_tuning_vectors() {
     eprintln!("vl53l4.json: {} tuning cases (both directions)", n);
 }
 
+// ---- vl53l4.json: "xtalk_decode" -------------------------------------------
+
+/// C `round()`: an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk.
+#[test]
+fn vl53l4_xtalk_decode_vectors() {
+    let doc = load("vl53l4.json");
+    let cases = doc["xtalk_decode"].as_array().unwrap();
+    assert!(!cases.is_empty());
+    for c in cases {
+        let raw = c["raw"].as_u64().unwrap() as u16;
+        assert_eq!(decode_xtalk(raw) as u64, c["kcps"].as_u64().unwrap(), "xtalk decode {}", raw);
+    }
+}
+
 // ---- vl53l4.json: "config_block" -------------------------------------------
 
 #[test]

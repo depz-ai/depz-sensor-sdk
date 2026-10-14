@@ -77,6 +77,12 @@ class FakeBno086:
     def _text(self, cmd: int, text: str) -> None:
         self._send(0x81, bytes((cmd,)) + text.encode() + b"\x00")
 
+    # The hub thinks before answering a Product ID Request (~200 ms live), and
+    # the second cargo (the three non-application components) trails the
+    # first — long enough for a back-to-back request to receive it first.
+    product_id_delay_s = 0.03
+    product_id_tail_delay_s = 0.02
+
     def push_shtp_cargo(self, channel: int, payload: bytes, *, max_frame: int = 4096) -> None:
         """Emit an SHTP cargo as RPT_DATA(cmd=0) frames; `max_frame` < cargo
         size exercises multi-frame reassembly on the host."""
@@ -146,8 +152,20 @@ class FakeBno086:
             return
         rid = payload[0]
         if rid == 0xF9:  # product id request
-            resp = struct.pack("<BBBBIIH", 0xF8, 0x01, 3, 8, 10003608, 475, 4) + b"\x00\x00"
-            self.push_shtp_cargo(ShtpChannel.CONTROL, resp)
+            # Like the lab BNO085: one response per software component — the
+            # SH-2 application alone in a first cargo, the other three in a
+            # second one that lands a moment later.
+            def pid(cause, maj, mnr, part, build, patch):
+                return struct.pack("<BBBBIIH", 0xF8, cause, maj, mnr, part, build, patch) + b"\x00\x00"
+
+            first = pid(0x01, 3, 8, 10003608, 475, 4)
+            rest = (pid(0, 1, 2, 10003606, 230, 4) + pid(0, 4, 4, 10003254, 485, 3)
+                    + pid(0, 4, 2, 10003171, 548, 10))
+            for delay, cargo in ((self.product_id_delay_s, first),
+                                 (self.product_id_delay_s + self.product_id_tail_delay_s, rest)):
+                threading.Timer(
+                    delay, lambda c=cargo: self.push_shtp_cargo(ShtpChannel.CONTROL, c)
+                ).start()
         elif rid == 0xFD:  # set feature
             self.last_set_feature = bytes(payload)
             _, sensor, _, _, interval, _, _ = struct.unpack_from("<BBBHIII", payload)

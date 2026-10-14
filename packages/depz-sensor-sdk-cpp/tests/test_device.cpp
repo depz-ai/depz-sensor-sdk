@@ -478,6 +478,11 @@ void bno086_fake_errors_and_reports()
     auto b = depz::Bno086::open(depz::Link::adopt(link));
     b->hardware_reset();
     CHECK(b->product_id().sw_part_number == FAKE_BNO086_PART);
+    {
+        const auto ids = b->product_ids();
+        CHECK(ids.size() == 4 && ids[0].sw_part_number == FAKE_BNO086_PART && ids[0].reset_cause == 1);
+        CHECK(ids.size() == 4 && ids[1].sw_part_number == 10003606u && ids[3].sw_version_patch == 10);
+    }
     fake_bno086_busy_next(fk, DEPZ_BNO086_BUSY_RETRIES);
     CHECK(throws<depz::BusyError>([&] { b->disable(SensorId::Gravity); }));
     CHECK(throws<depz::StatusError>([&] { b->frs_read(0x1234); }));  // unrecognised record

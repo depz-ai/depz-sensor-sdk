@@ -116,6 +116,14 @@ export class FakeBno086 {
    * Emit an SHTP cargo as RPT_DATA(cmd=0) frames; `maxFrame` < cargo size
    * exercises multi-frame reassembly on the host.
    */
+  /**
+   * The hub thinks before answering a Product ID Request (~200 ms live), and
+   * the second cargo (the three non-application components) trails the first
+   * — long enough for a back-to-back request to receive it first.
+   */
+  productIdDelayMs = 30;
+  productIdTailDelayMs = 20;
+
   pushShtpCargo(channel: number, payload: Uint8Array, maxFrame = 4096): void {
     const seq = this.shtpTxSeq[channel]!;
     const frames = fragmentCargo(channel, payload, seq, maxFrame);
@@ -221,17 +229,31 @@ export class FakeBno086 {
     const v = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     const rid = payload[0]!;
     if (rid === 0xf9) {
-      // product id request
-      const resp = new Uint8Array(16);
-      const rv = new DataView(resp.buffer);
-      rv.setUint8(0, 0xf8);
-      rv.setUint8(1, 0x01);
-      rv.setUint8(2, 3);
-      rv.setUint8(3, 8);
-      rv.setUint32(4, 10003608, true);
-      rv.setUint32(8, 475, true);
-      rv.setUint16(12, 4, true);
-      this.pushShtpCargo(ShtpChannel.Control, resp);
+      // product id request — like the lab BNO085: one response per software
+      // component, the SH-2 application alone in a first cargo, the other
+      // three in a second one that trails it.
+      const pid = (cause: number, maj: number, mnr: number, part: number, build: number, patch: number) => {
+        const resp = new Uint8Array(16);
+        const rv = new DataView(resp.buffer);
+        rv.setUint8(0, 0xf8);
+        rv.setUint8(1, cause);
+        rv.setUint8(2, maj);
+        rv.setUint8(3, mnr);
+        rv.setUint32(4, part, true);
+        rv.setUint32(8, build, true);
+        rv.setUint16(12, patch, true);
+        return resp;
+      };
+      const first = pid(0x01, 3, 8, 10003608, 475, 4);
+      const rest = new Uint8Array(48);
+      rest.set(pid(0, 1, 2, 10003606, 230, 4), 0);
+      rest.set(pid(0, 4, 4, 10003254, 485, 3), 16);
+      rest.set(pid(0, 4, 2, 10003171, 548, 10), 32);
+      setTimeout(() => this.pushShtpCargo(ShtpChannel.Control, first), this.productIdDelayMs);
+      setTimeout(
+        () => this.pushShtpCargo(ShtpChannel.Control, rest),
+        this.productIdDelayMs + this.productIdTailDelayMs,
+      );
     } else if (rid === 0xfd) {
       // set feature
       this.lastSetFeature = payload.slice();

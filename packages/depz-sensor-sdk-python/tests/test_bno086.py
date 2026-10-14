@@ -49,6 +49,34 @@ def test_identity_and_product_id(rig):
     assert pid.version == "3.8.4"
 
 
+def test_product_ids_collects_every_component(rig):
+    fake, dev = rig
+    ids = dev.product_ids()
+    assert [(p.sw_part_number, p.version) for p in ids] == [
+        (10003608, "3.8.4"), (10003606, "1.2.4"), (10003254, "4.4.3"), (10003171, "4.2.10")]
+    assert ids[0].reset_cause == 0x01 and all(p.reset_cause == 0 for p in ids[1:])
+
+
+def test_back_to_back_product_id_never_gets_a_late_component(rig):
+    """The three late responses arrive in a second cargo; taking the first
+    and returning let the next call pick up the bootloader's (seen live: 9
+    of 20 calls on a BNO085)."""
+    fake, dev = rig
+    assert {dev.product_id().sw_part_number for _ in range(5)} == {10003608}
+
+
+def test_split_control_cargo():
+    from depz_sensor_sdk.bno086.sh2 import split_control_cargo
+
+    pid = bytes([0xF8]) + bytes(15)
+    feat = bytes([0xFC]) + bytes(16)
+    assert split_control_cargo(pid + feat + pid) == [pid, feat, pid]
+    # An unknown ID ends the walk: its length is unknowable.
+    assert split_control_cargo(pid + b"\x99\x01\x02") == [pid, b"\x99\x01\x02"]
+    assert split_control_cargo(pid[:10]) == [pid[:10]]
+    assert split_control_cargo(b"") == []
+
+
 def test_hardware_reset_waits_for_reset_complete(rig):
     fake, dev = rig
     dev.hardware_reset(timeout=1.0)

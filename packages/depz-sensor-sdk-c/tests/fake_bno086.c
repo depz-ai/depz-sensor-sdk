@@ -35,6 +35,9 @@ struct fake_bno086 {
     size_t      wr_len;
     uint32_t    wr_words[MAX_WORDS];
     size_t      wr_got;
+    /* Control cargos sent later (the Product ID answer): due time, bytes. */
+    struct { uint64_t due_us; uint8_t data[64]; size_t len; } later[4];
+    size_t      n_later;
 };
 
 static void put_u16le(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
@@ -80,6 +83,27 @@ static void shtp_out(fake_bno086 *f, uint8_t channel, uint64_t capture_us, const
 static void control_out(fake_bno086 *f, const uint8_t *cargo, size_t len)
 {
     shtp_out(f, 2, f->mcu_time_us, cargo, len);
+}
+
+/* Under `lock`: queue a control cargo for `delay_ms` from now. */
+static void control_later(fake_bno086 *f, int delay_ms, const uint8_t *cargo, size_t len)
+{
+    if (f->n_later == sizeof f->later / sizeof f->later[0] || len > sizeof f->later[0].data) return;
+    f->later[f->n_later].due_us = depz_now_us() + (uint64_t)delay_ms * 1000u;
+    memcpy(f->later[f->n_later].data, cargo, len);
+    f->later[f->n_later].len = len;
+    f->n_later++;
+}
+
+/* Under `lock`: send the queued cargos that are due, in order. */
+static void flush_later(fake_bno086 *f)
+{
+    uint64_t now = depz_now_us();
+    while (f->n_later && f->later[0].due_us <= now) {
+        control_out(f, f->later[0].data, f->later[0].len);
+        memmove(&f->later[0], &f->later[1], (f->n_later - 1) * sizeof f->later[0]);
+        f->n_later--;
+    }
 }
 
 static void gfr(fake_bno086 *f, uint8_t sensor, uint8_t out[17])
@@ -210,16 +234,32 @@ static void sh2_control(fake_bno086 *f, const uint8_t *c, size_t len)
     uint8_t out[32];
     if (!len) return;
     switch (c[0]) {
-    case 0xF9: /* product id: two subsystems */
+    case 0xF9: { /* product id */
+        /* Like the lab BNO085: one response per software component, the
+         * SH-2 application alone in a first cargo ~30 ms on (the hub thinks;
+         * ~200 ms live), the other three in a second cargo 20 ms later — long
+         * enough for a back-to-back request to receive it first. */
+        static const struct { uint8_t maj, mnr; uint32_t part, build; uint16_t patch; } rest[3] = {
+            {1, 2, 10003606u, 230, 4}, {4, 4, 10003254u, 485, 3}, {4, 2, 10003171u, 548, 10}};
+        uint8_t tail[48];
+        int i;
         memset(out, 0, 16);
         out[0] = 0xF8; out[1] = 1; out[2] = 3; out[3] = 7;
         put_u32le(out + 4, FAKE_BNO086_PART);
         put_u32le(out + 8, 12);
         put_u16le(out + 12, 5);
-        control_out(f, out, 16);
-        put_u32le(out + 4, 10004384u);
-        control_out(f, out, 16);
+        control_later(f, 30, out, 16);
+        memset(tail, 0, sizeof tail);
+        for (i = 0; i < 3; i++) {
+            uint8_t *t = tail + 16 * i;
+            t[0] = 0xF8; t[2] = rest[i].maj; t[3] = rest[i].mnr;
+            put_u32le(t + 4, rest[i].part);
+            put_u32le(t + 8, rest[i].build);
+            put_u16le(t + 12, rest[i].patch);
+        }
+        control_later(f, 50, tail, sizeof tail);
         break;
+    }
     case 0xFD: { /* set feature: answered unsolicited */
         uint32_t iv = rd_u32(c + 5);
         /* The grid: a rate rounds up to 1000 / 2^n Hz. */
@@ -363,8 +403,11 @@ static void run(void *arg)
     uint8_t buf[512];
     for (;;) {
         size_t got;
-        if (depz_link_read(f->side, buf, sizeof buf, 1000, &got) != DEPZ_OK) return;
+        if (depz_link_read(f->side, buf, sizeof buf, 5, &got) != DEPZ_OK) return;
         if (got) depz_parser_feed(&f->parser, buf, got, on_event, f);
+        depz_mutex_lock(&f->lock);
+        flush_later(f);
+        depz_mutex_unlock(&f->lock);
     }
 }
 

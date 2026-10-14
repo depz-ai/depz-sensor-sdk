@@ -55,6 +55,7 @@ from .sh2 import (
     build_command_request,
     build_get_feature_request,
     build_product_id_request,
+    split_control_cargo,
     build_set_feature,
     counts_clear_params,
     counts_get_params,
@@ -169,16 +170,16 @@ class Bno086(DeviceBase):
                 self._reset_event.set()
             return
         if ch == ShtpChannel.CONTROL:
-            if not cargo.payload:
-                return
-            rid = cargo.payload[0]
-            if rid == ControlReport.GET_FEATURE_RESPONSE and len(cargo.payload) >= 17:
-                resp = FeatureResponse.unpack(cargo.payload)
-                self._features[resp.sensor_id] = resp
-            with self._control_lock:
-                waiters = list(self._control_waiters.get(rid, ()))
-            for w in waiters:
-                w.put(bytes(cargo.payload))
+            # One cargo may hold several responses back to back.
+            for report in split_control_cargo(cargo.payload):
+                rid = report[0]
+                if rid == ControlReport.GET_FEATURE_RESPONSE and len(report) >= 17:
+                    resp = FeatureResponse.unpack(report)
+                    self._features[resp.sensor_id] = resp
+                with self._control_lock:
+                    waiters = list(self._control_waiters.get(rid, ()))
+                for w in waiters:
+                    w.put(report)
             return
         if ch in (ShtpChannel.INPUT_NORMAL, ShtpChannel.INPUT_WAKE):
             for rep in parse_input_cargo(cargo.payload, capture_us):
@@ -351,14 +352,33 @@ class Bno086(DeviceBase):
     # ── SH-2: identification & features ─────────────────────────────────────
 
     def product_id(self, timeout: float = 1.0) -> ProductId:
-        """Product ID Request/Response round trip (first responding
-        subsystem)."""
-        return self._control_request(
-            build_product_id_request(),
-            ControlReport.PRODUCT_ID_RESPONSE,
-            ProductId.unpack,
-            timeout=timeout,
-        )
+        """The SH-2 application's Product ID — the first of `product_ids()`."""
+        return self.product_ids(timeout=timeout)[0]
+
+    def product_ids(self, timeout: float = 1.0, settle: float = 0.15) -> list[ProductId]:
+        """Product ID Request → every component's response, in the sensor's
+        order (the SH-2 application first). Collects until no response came
+        for `settle` s, so the late ones can't answer the next request (they
+        arrive in a second cargo; taking only the first once returned the
+        bootloader's version on a back-to-back call)."""
+        q: queue.SimpleQueue = queue.SimpleQueue()
+        rid = ControlReport.PRODUCT_ID_RESPONSE
+        with self._control_lock:
+            self._control_waiters.setdefault(rid, []).append(q)
+        try:
+            self._send_shtp(ShtpChannel.CONTROL, build_product_id_request())
+            try:
+                out = [ProductId.unpack(q.get(timeout=timeout))]
+            except queue.Empty:
+                raise DepzTimeoutError(rid, timeout) from None
+            while True:
+                try:
+                    out.append(ProductId.unpack(q.get(timeout=settle)))
+                except queue.Empty:
+                    return out
+        finally:
+            with self._control_lock:
+                self._control_waiters[rid].remove(q)
 
     def enable(
         self,

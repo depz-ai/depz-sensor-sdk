@@ -66,8 +66,19 @@ Raw SHTP channel-0 advertisement bytes seen since open/reset.
 product_id(self, timeout: float = 1.0) -> depz_sensor_sdk.bno086.sh2.ProductId
 ```
 
-Product ID Request/Response round trip (first responding
-subsystem).
+The SH-2 application's Product ID — the first of `product_ids()`.
+
+#### Bno086.product_ids
+
+```python
+product_ids(self, timeout: float = 1.0, settle: float = 0.15) -> list[depz_sensor_sdk.bno086.sh2.ProductId]
+```
+
+Product ID Request → every component's response, in the sensor's
+order (the SH-2 application first). Collects until no response came
+for `settle` s, so the late ones can't answer the next request (they
+arrive in a second cargo; taking only the first once returned the
+bootloader's version on a back-to-back call).
 
 #### Bno086.enable
 
@@ -681,7 +692,9 @@ class ProductId(reset_cause: int, sw_version_major: int, sw_version_minor: int, 
 ```
 
 Product ID Response (0xF8), 16 bytes. The sensor sends one response
-per subsystem (typically 2); reset_cause per SH-2 §6.4.5.2.
+per software component (a BNO085 sends four: the SH-2 application first,
+then the bootloader and two support components); reset_cause per SH-2
+§6.4.5.2, set on the first only.
 
 #### ProductId.unpack *(classmethod)*
 

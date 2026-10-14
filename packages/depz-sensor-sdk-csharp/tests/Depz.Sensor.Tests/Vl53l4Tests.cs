@@ -188,6 +188,18 @@ public class Vl53l4TuningTests
             Assert.True(value == decoded, $"{name}: value expected {value} got {decoded}");
         }
     }
+
+    // C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
+    [Fact]
+    public void XtalkDecode_RoundsHalfAwayFromZero()
+    {
+        var root = Vectors.Load("vl53l4.json");
+        foreach (var c in root.GetProperty("xtalk_decode").EnumerateArray())
+        {
+            int raw = c.GetProperty("raw").GetInt32();
+            Assert.Equal(c.GetProperty("kcps").GetInt32(), Vl53l4Uld.DecodeXtalk((ushort)raw));
+        }
+    }
 }
 
 public class Vl53l4ConfigBlockTests
