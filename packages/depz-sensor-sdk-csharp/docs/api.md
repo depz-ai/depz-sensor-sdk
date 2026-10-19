@@ -5,7 +5,7 @@ Auto-generated from the public C# surface under `src/Depz.Sensor/` by
 `///` XML-doc summaries in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 
@@ -17,7 +17,7 @@ Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 - **VL53L8 (ToF)**: [`Vl53l8Variant`](#vl53l8variant), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`Vl53l8Wire`](#vl53l8wire), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Advanced`](#vl53l8advanced), [`MotionConfig`](#motionconfig), [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Cnh`](#vl53l8cnh), [`Vl53l8Uld`](#vl53l8uld)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`Vl53l7PinAction`](#vl53l7pinaction), [`Vl53l7I2cError`](#vl53l7i2cerror), [`Vl53l7Wire`](#vl53l7wire), [`Vl53l7Info`](#vl53l7info), [`Vl53l7Model`](#vl53l7model), [`Vl53l7Discovery`](#vl53l7discovery), [`Vl53l7Frames`](#vl53l7frames)
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`Vl53lxClearStep`](#vl53lxclearstep), [`Vl53lxWire`](#vl53lxwire), [`Vl53lxInfo`](#vl53lxinfo), [`Vl53lxDriverKind`](#vl53lxdriverkind), [`Vl53lxClass`](#vl53lxclass), [`Vl53lxProduct`](#vl53lxproduct), [`Vl53lxProducts`](#vl53lxproducts), [`Vl53lxDieVariant`](#vl53lxdievariant), [`Vl53lxDieResult`](#vl53lxdieresult), [`Vl53lxL0xRaw`](#vl53lxl0xraw), [`Vl53lxHistogramRaw`](#vl53lxhistogramraw), [`Vl53lxDecode`](#vl53lxdecode)
-- **BNO086 (IMU)**: [`SensorId`](#sensorid), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`Sh2Control`](#sh2control), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
+- **BNO086 (IMU)**: [`SensorId`](#sensorid), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`FeatureFlags`](#featureflags), [`Sh2Control`](#sh2control), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
 - **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`Bno055Trigger`](#bno055trigger), [`Bno055Wire`](#bno055wire), [`Bno055RegData`](#bno055regdata), [`Bno055StreamData`](#bno055streamdata), [`Bno055Info`](#bno055info), [`Bno055OprMode`](#bno055oprmode), [`Bno055PwrMode`](#bno055pwrmode), [`Bno055TempSource`](#bno055tempsource), [`Bno055Vec3`](#bno055vec3), [`Bno055Euler`](#bno055euler), [`Bno055Quat`](#bno055quat), [`Bno055Units`](#bno055units), [`Bno055CalibStatus`](#bno055calibstatus), [`Bno055CalibrationProfile`](#bno055calibrationprofile), [`Bno055Axis`](#bno055axis), [`Bno055AxisRemap`](#bno055axisremap), [`Bno055AccelConfig`](#bno055accelconfig), [`Bno055GyroConfig`](#bno055gyroconfig), [`Bno055MagConfig`](#bno055magconfig), [`Bno055RawBlock`](#bno055rawblock), [`Bno055Regs`](#bno055regs)
 - **Firmware update**: [`FwDepz`](#fwdepz)
 - **Datasets (record & replay)**: [`TimeSync`](#timesync), [`DatasetDevice`](#datasetdevice), [`DatasetRecord`](#datasetrecord), [`DatasetReader`](#datasetreader)
@@ -2464,6 +2464,30 @@ public static GyroIntegratedRV? ParseGyroRvCargo(byte[] payload, long captureTim
 
 Parse a channel-5 cargo (gyro-integrated RV, dense). Two shapes: bare 7×i16, or prefixed with 0xFB + i32 base delta + u16 delay. Returns null when the cargo is too short.
 
+### FeatureFlags
+
+```csharp
+public static class FeatureFlags
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for `SetFeature`. `Wakeup | AlwaysOn` keeps a sensor reporting through `Sleep`: on a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate during sleep, delivered on SHTP channel 4 (wake input), while every other report stopped.
+
+#### FeatureFlags.Wakeup *(constant)*
+
+```csharp
+public const byte Wakeup = 0x04
+```
+
+Bit 2: wake-up enabled — the sensor reports on channel 4.
+
+#### FeatureFlags.AlwaysOn *(constant)*
+
+```csharp
+public const byte AlwaysOn = 0x08
+```
+
+Bit 3: always-on — the sensor keeps running while the hub sleeps.
+
 ### Sh2Control
 
 ```csharp
@@ -2538,6 +2562,22 @@ public static byte[] ProductId()
 
 0xF9 Product ID Request.
 
+#### Sh2Control.Sleep
+
+```csharp
+public static byte[] Sleep()
+```
+
+SH-2 "Sleep" for the executable channel (channel 1, not control): `[0x03]`. Frame it with `NextFrame((int)ShtpChannel.Executable, Sh2Control.Sleep())` and send it through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no response. Every report stops, except those enabled with `Wakeup` | `AlwaysOn`, which keep their rate; the configuration (enabled sensors, rates) is kept. `PowerOn` ends it. On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) all reports stopped within one sample; a Wakeup|AlwaysOn report kept streaming at full rate on channel 4.
+
+#### Sh2Control.PowerOn
+
+```csharp
+public static byte[] PowerOn()
+```
+
+SH-2 "On" for the executable channel (channel 1): `[0x02]` — ends `Sleep`. Every report that was enabled comes back at its rate, without re-enabling; the hub sends no response. Not the bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware signal, not an SH-2 command.
+
 #### Sh2Control.Command
 
 ```csharp
@@ -2585,6 +2625,19 @@ public enum ShtpChannel
 ```
 
 SHTP channels (contracts/05_SENSOR_BNO086.md §3).
+
+### ExecutableCommand
+
+```csharp
+public enum ExecutableCommand : byte
+{
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+```
+
+One-byte host writes on the executable channel (SHTP channel 1, contracts/05_SENSOR_BNO086.md §6a). The hub answers none of them. `Reset` restarts the hub (answered later by the 0x01 reset-complete on the same channel); `Sleep` stops every report except those enabled with `Wakeup` | `AlwaysOn`, keeping the configuration; `On` ends `Sleep` and every report resumes at its rate.
 
 ### ShtpHeader
 

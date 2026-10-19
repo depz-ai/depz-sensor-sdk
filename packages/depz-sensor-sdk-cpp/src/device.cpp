@@ -1744,6 +1744,10 @@ void Bno086::hardware_reset(std::chrono::milliseconds timeout)
 
 void Bno086::wake() { check(depz_bno086_wake(handle())); }
 
+void Bno086::sleep() { check(depz_bno086_sleep(handle())); }
+
+void Bno086::power_on() { check(depz_bno086_power_on(handle())); }
+
 bytes Bno086::advertisement()
 {
     std::size_t n = 0;

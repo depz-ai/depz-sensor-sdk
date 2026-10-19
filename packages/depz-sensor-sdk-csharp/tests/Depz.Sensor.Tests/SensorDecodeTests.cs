@@ -303,6 +303,43 @@ public class Bno086ShtpTests
             Assert.True(expected == Vectors.ToHex(actual), $"{name} ({kind}): expected {expected} got {Vectors.ToHex(actual)}");
         }
     }
+
+    [Fact]
+    public void Executable_SleepPowerOn_Frames()
+    {
+        var root = Vectors.Load("bno086_shtp.json");
+        var layer = new ShtpLayer(); // fresh: sleep then power_on → channel-1 seq 0, 1
+        int n = 0;
+        foreach (var c in root.GetProperty("executable").EnumerateArray())
+        {
+            string name = c.GetProperty("name").GetString()!;
+            (ExecutableCommand command, byte[] payload) = name switch
+            {
+                "sleep" => (ExecutableCommand.Sleep, Sh2Control.Sleep()),
+                "power_on" => (ExecutableCommand.On, Sh2Control.PowerOn()),
+                _ => throw new InvalidOperationException("unknown executable command: " + name),
+            };
+            Assert.Equal(c.GetProperty("command").GetInt32(), (int)command);
+            Assert.Equal((int)ShtpChannel.Executable, c.GetProperty("channel").GetInt32());
+            Assert.Equal(c.GetProperty("payload").GetString(), Vectors.ToHex(payload));
+            byte[] frame = layer.NextFrame((int)ShtpChannel.Executable, payload);
+            Assert.Equal(c.GetProperty("shtp_frame").GetString(), Vectors.ToHex(frame));
+            byte[] bridge = Framing.BuildPacket(
+                c.GetProperty("bridge_cmd").GetInt32(), frame,
+                c.GetProperty("bridge_seq").GetInt32(), (CrcType)c.GetProperty("crc_type").GetInt32());
+            Assert.Equal(c.GetProperty("bridge_frame").GetString(), Vectors.ToHex(bridge));
+            n++;
+        }
+        Assert.Equal(2, n);
+    }
+
+    [Fact]
+    public void FeatureFlags_MatchVectors()
+    {
+        var flags = Vectors.Load("bno086_shtp.json").GetProperty("feature_flags");
+        Assert.Equal(FeatureFlags.Wakeup, flags.GetProperty("wakeup").GetInt32());
+        Assert.Equal(FeatureFlags.AlwaysOn, flags.GetProperty("always_on").GetInt32());
+    }
 }
 
 // ── target 4: BNO086 report parsers ─────────────────────────────────────────

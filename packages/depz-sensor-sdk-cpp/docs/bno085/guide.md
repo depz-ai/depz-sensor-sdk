@@ -15,6 +15,7 @@ exact signatures see the [API reference](api.md).
 - [Callbacks](#callbacks)
 - [Choosing outputs and rates](#choosing-outputs-and-rates)
 - [Calibration, tare and reorientation](#calibration-tare-and-reorientation)
+- [Sleep and power on](#sleep-and-power-on)
 - [FRS records and sensor metadata](#frs-records-and-sensor-metadata)
 - [Diagnostics](#diagnostics)
 - [Errors](#errors)
@@ -186,6 +187,38 @@ void calibrate(depz::Bno086& imu)
 - `tare_now(axes, basis)` makes the current orientation the zero until reset;
   `persist_tare()` keeps it. `set_reorientation(x, y, z, w)` sets a fixed
   mounting rotation (all zeros clears it). These three have no SH-2 answer.
+
+## Sleep and power on
+
+`sleep()` puts the hub to sleep: every report stops, but the configuration
+(enabled sensors, rates) stays. `power_on()` ends it, and every report that was
+on comes back at its rate — no re-enabling. Neither has an SH-2 answer.
+
+```cpp
+#include "depz/device.hpp"
+
+void nap(depz::Bno086& imu)
+{
+    using depz::bno086::SensorId;
+    imu.enable(SensorId::Accelerometer, 100);
+    depz::bno086::FeatureRequest req;
+    req.interval_us = 20000;  // 50 Hz
+    req.flags = depz::bno086::FEATURE_WAKEUP | depz::bno086::FEATURE_ALWAYS_ON;  // keeps going in sleep
+    imu.enable(SensorId::Gyroscope, req);
+    imu.sleep();     // accelerometer stops; gyroscope keeps its 50 Hz
+    // ...
+    imu.power_on();  // accelerometer is back at 100 Hz
+}
+```
+
+Measured on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+`wake()` is a different thing: it pulses the board's WAKE pin (bridge command
+0x33), a hardware signal. `power_on()` is the SH-2 "On" command that ends
+`sleep()`.
 
 ## FRS records and sensor metadata
 

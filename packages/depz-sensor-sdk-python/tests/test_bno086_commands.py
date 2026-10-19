@@ -9,7 +9,7 @@ import time
 import pytest
 
 from depz_sensor_sdk import Bno086, SensorId
-from depz_sensor_sdk.bno086 import TareAxis, TareBasis
+from depz_sensor_sdk.bno086 import FeatureFlag, TareAxis, TareBasis
 from depz_sensor_sdk.bno086.sh2 import build_set_feature
 
 from fake_bno086 import FakeBno086
@@ -109,3 +109,24 @@ def test_tare_now_default_all_axes(rig):
     _wait(lambda: len(fake.tare_requests) == 1)
     (req,) = fake.tare_requests
     assert req[3:6] == bytes((0x00, TareAxis.ALL, TareBasis.ROTATION_VECTOR))
+
+
+# ── hub power: sleep / power_on (contract 05 §6a) ─────────────────────────────
+
+
+def test_sleep_and_power_on_send_executable_frames(rig, vectors):
+    fake, dev = rig
+    dev.sleep()  # no response from the hub — must return on the bridge ack
+    dev.power_on()
+    _wait(lambda: len(fake.executable_frames) == 2)
+    want = [bytes.fromhex(c["shtp_frame"]) for c in vectors("bno086_shtp.json")["executable"]]
+    assert fake.executable_frames == want
+    assert fake.tare_requests == []  # nothing on the control channel
+
+
+def test_enable_with_wakeup_always_on_flags(rig):
+    fake, dev = rig
+    flags = FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON
+    dev.enable(SensorId.ACCELEROMETER, interval_us=10_000, flags=flags, verify=False)
+    _wait(lambda: fake.last_set_feature is not None)
+    assert fake.last_set_feature[2] == 0x0C

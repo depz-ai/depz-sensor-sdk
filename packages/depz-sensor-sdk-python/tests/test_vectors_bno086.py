@@ -10,7 +10,9 @@ from depz_sensor_sdk.bno086.reports import (
     parse_gyro_rv_cargo,
     parse_input_cargo,
 )
-from depz_sensor_sdk.bno086.shtp import ShtpHeader, ShtpLayer
+from depz_sensor_sdk.bno086.shtp import ExecutableCommand, ShtpChannel, ShtpHeader, ShtpLayer
+from depz_sensor_sdk.protocol.bno086 import Bno086Cmd
+from depz_sensor_sdk.transport import build_packet
 from depz_sensor_sdk.dataset import bno086_record_value
 
 # ── bno086_shtp.json ──────────────────────────────────────────────────────────
@@ -74,6 +76,27 @@ def test_sh2_control_encodes(vectors):
         else:
             raise AssertionError(kind)
         assert got.hex() == case["payload"], case["name"]
+
+
+def test_executable_sleep_power_on_frames(vectors):
+    commands = {"sleep": ExecutableCommand.SLEEP, "power_on": ExecutableCommand.ON}
+    layer = ShtpLayer()  # fresh: sleep then power_on → channel-1 seq 0, 1
+    for case in vectors("bno086_shtp.json")["executable"]:
+        command = commands[case["name"]]
+        assert int(command) == case["command"], case["name"]
+        assert case["channel"] == ShtpChannel.EXECUTABLE
+        payload = bytes((command,))
+        assert payload.hex() == case["payload"], case["name"]
+        frame = layer.next_frame(ShtpChannel.EXECUTABLE, payload)
+        assert frame.hex() == case["shtp_frame"], case["name"]
+        assert case["bridge_cmd"] == Bno086Cmd.SEND_SHTP_PACKET
+        bridge = build_packet(case["bridge_cmd"], frame, case["bridge_seq"], case["crc_type"])
+        assert bridge.hex() == case["bridge_frame"], case["name"]
+
+
+def test_feature_flag_bits(vectors):
+    flags = vectors("bno086_shtp.json")["feature_flags"]
+    assert flags == {"wakeup": sh2.FeatureFlag.WAKEUP, "always_on": sh2.FeatureFlag.ALWAYS_ON}
 
 
 # ── bno086_reports.json ───────────────────────────────────────────────────────

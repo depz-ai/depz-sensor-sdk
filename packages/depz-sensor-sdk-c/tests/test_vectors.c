@@ -1000,6 +1000,48 @@ static void test_bno086_shtp(void)
         } else { CHECK(0, "unknown control_encode kind %s", kind); continue; }
         check_payload(name, out, on, json_as_str(json_obj_get(c, "payload")));
     }
+
+    /* executable: sleep / power_on (contract 05 §6a) — fresh layer, seq 0, 1 */
+    {
+        depz_shtp_layer layer;
+        depz_shtp_init(&layer);
+        const json_value *ex = json_obj_get(root, "executable");
+        CHECK(json_arr_size(ex) == 2, "executable: want 2 cases");
+        for (size_t i = 0; i < json_arr_size(ex); i++) {
+            const json_value *c = json_arr_get(ex, i);
+            const char *name = json_as_str(json_obj_get(c, "name"));
+            uint8_t command;
+            if (strcmp(name, "sleep") == 0) command = DEPZ_SHTP_EXEC_SLEEP;
+            else if (strcmp(name, "power_on") == 0) command = DEPZ_SHTP_EXEC_ON;
+            else { CHECK(0, "unknown executable command %s", name); continue; }
+            CHECK(command == json_as_int(json_obj_get(c, "command")), "executable %s command", name);
+            CHECK(json_as_int(json_obj_get(c, "channel")) == DEPZ_SHTP_CH_EXECUTABLE,
+                  "executable %s channel", name);
+            check_payload(name, &command, 1, json_as_str(json_obj_get(c, "payload")));
+            uint8_t frame[DEPZ_SHTP_MAX_TX_FRAME];
+            size_t fn = depz_shtp_next_frame(&layer, DEPZ_SHTP_CH_EXECUTABLE, &command, 1,
+                                             frame, sizeof(frame));
+            check_payload(name, frame, fn, json_as_str(json_obj_get(c, "shtp_frame")));
+            CHECK(json_as_int(json_obj_get(c, "bridge_cmd")) == DEPZ_BNO086_CMD_SEND_SHTP_PACKET,
+                  "executable %s bridge cmd", name);
+            uint8_t bridge[64]; size_t bn = 0;
+            int rc = depz_build_packet(DEPZ_BNO086_CMD_SEND_SHTP_PACKET, frame, fn,
+                                       (unsigned int)json_as_int(json_obj_get(c, "bridge_seq")),
+                                       (depz_crc_type)json_as_int(json_obj_get(c, "crc_type")),
+                                       bridge, sizeof(bridge), &bn);
+            CHECK(rc == 0, "executable %s build_packet rc=%d", name, rc);
+            check_payload(name, bridge, bn, json_as_str(json_obj_get(c, "bridge_frame")));
+        }
+        depz_shtp_free(&layer);
+    }
+
+    /* Set Feature flag bits */
+    {
+        const json_value *ff = json_obj_get(root, "feature_flags");
+        CHECK(json_as_int(json_obj_get(ff, "wakeup")) == DEPZ_BNO_FEATURE_WAKEUP, "feature flag wakeup");
+        CHECK(json_as_int(json_obj_get(ff, "always_on")) == DEPZ_BNO_FEATURE_ALWAYS_ON,
+              "feature flag always_on");
+    }
     json_free(root);
 }
 

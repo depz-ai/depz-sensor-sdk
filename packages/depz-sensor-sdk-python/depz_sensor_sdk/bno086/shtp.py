@@ -31,6 +31,19 @@ class ShtpChannel(IntEnum):
     GYRO_RV = 5  # gyro-integrated rotation vector, dense format
 
 
+class ExecutableCommand(IntEnum):
+    """One-byte host writes on the executable channel (SHTP channel 1).
+
+    The hub answers none of them. RESET restarts the hub (answered later by
+    the 0x01 reset-complete on the same channel); SLEEP stops every report
+    except those enabled with FeatureFlag.WAKEUP | ALWAYS_ON, keeping the
+    configuration; ON ends SLEEP and every report resumes at its rate."""
+
+    RESET = 1
+    ON = 2
+    SLEEP = 3
+
+
 SHTP_HEADER_SIZE = 4
 LENGTH_MASK = 0x7FFF
 CONTINUATION_BIT = 0x8000

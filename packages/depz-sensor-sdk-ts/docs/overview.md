@@ -6,11 +6,11 @@ description: Mental model, installation, discovery, multi-sensor recording, and 
 # @depz/sensor-sdk — overview
 
 TypeScript SDK for the DEPZ USB sensor line — **SR04** ultrasonic,
-**VL53L4CD** and the **VL53L0X / L1CX / L1CB / L3CX / L4CX** single-zone
-time-of-flight family, **VL53L8CX/CH** and **VL53L5CX / L7CX / L7CH** 8×8
-time-of-flight, **BNO086** and **BNO055** 9-axis IMUs. One codebase runs
-in the **browser** (Web Serial) and in **Node** (via the optional `serialport`
-peer dependency).
+the **VL53L0X / L1CX / L1CB / L3CX / L4CX** single-zone time-of-flight family
+and **VL53L4CD**, **VL53L5CX / L7CX / L7CH** and **VL53L8CX/CH** 8×8
+time-of-flight, **BNO055** and **BNO085 / BNO086** 9-axis IMUs. One codebase
+runs in the **browser** (Web Serial) and in **Node** (via the optional
+`serialport` peer dependency).
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md). Each sensor
 also has its own pages (the SPI 8×8 ToF is two parts — the `Vl53l8cx` base and
@@ -18,19 +18,20 @@ the `Vl53l8ch` CNH superset; the I2C 8×8 board is three — `Vl53l5cx`,
 `Vl53l7cx`, `Vl53l7ch`):
 
 - SR04 — [introduction](sr04/introduction.md) · [guide](sr04/guide.md) · [api](sr04/api.md)
-- VL53L4CD — [introduction](vl53l4cd/introduction.md) · [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
-- VL53L8CX — [introduction](vl53l8cx/introduction.md) · [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- VL53L8CH — [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) · [api](vl53l8ch/api.md)
-- VL53L5CX — [introduction](vl53l5cx/introduction.md) · [guide](vl53l5cx/guide.md) · [api](vl53l5cx/api.md)
-- VL53L7CX — [introduction](vl53l7cx/introduction.md) · [guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)
-- VL53L7CH — [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) · [api](vl53l7ch/api.md)
 - VL53L0X — [introduction](vl53l0x/introduction.md) · [guide](vl53l0x/guide.md) · [api](vl53l0x/api.md)
 - VL53L1CX — [introduction](vl53l1cx/introduction.md) · [guide](vl53l1cx/guide.md) · [api](vl53l1cx/api.md)
 - VL53L1CB — [introduction](vl53l1cb/introduction.md) · [guide](vl53l1cb/guide.md) · [api](vl53l1cb/api.md)
 - VL53L3CX — [introduction](vl53l3cx/introduction.md) · [guide](vl53l3cx/guide.md) · [api](vl53l3cx/api.md)
+- VL53L4CD — [introduction](vl53l4cd/introduction.md) · [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
 - VL53L4CX — [introduction](vl53l4cx/introduction.md) · [guide](vl53l4cx/guide.md) · [api](vl53l4cx/api.md)
-- BNO086 — [introduction](bno086/introduction.md) · [guide](bno086/guide.md) · [api](bno086/api.md)
+- VL53L5CX — [introduction](vl53l5cx/introduction.md) · [guide](vl53l5cx/guide.md) · [api](vl53l5cx/api.md)
+- VL53L7CX — [introduction](vl53l7cx/introduction.md) · [guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)
+- VL53L7CH — [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) · [api](vl53l7ch/api.md)
+- VL53L8CX — [introduction](vl53l8cx/introduction.md) · [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- VL53L8CH — [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) · [api](vl53l8ch/api.md)
 - BNO055 — [introduction](bno055/introduction.md) · [guide](bno055/guide.md) · [api](bno055/api.md)
+- BNO085 — [introduction](bno085/introduction.md) · [guide](bno085/guide.md) · [api](bno085/api.md)
+- BNO086 — [introduction](bno086/introduction.md) · [guide](bno086/guide.md) · [api](bno086/api.md)
 
 ## What it is
 
@@ -42,23 +43,23 @@ the firmware and reflected here (every ToF class shares one: the sensor
 driver runs on the host):
 
 - **SR04** — the device does the ranging; you get `echoTimeUs` → distance.
-- **VL53L4CD** — the device is a thin I2C register bridge; the full ST ULD
-  2.2.3 driver runs **here on the host** (`sensors/vl53l4/uld.ts`). One
-  laser distance per sample, INT-driven streaming.
-- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
-  driver runs **here on the host** (`sensors/vl53l8/uld.ts`). `Vl53l8ch` is the
-  `Vl53l8cx` superset, adding Compact-Network-Histogram output.
-- **VL53L5CX / VL53L7CX / VL53L7CH** — the same ULD family as the VL53L8 on
-  an I2C bridge (`sensors/vl53l7`); the classes subclass `Vl53l8cx`, and
-  `Vl53l7ch` adds streamed CNH.
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C bridge firmware that knows
   no sensor; every ST driver (ULD, ULP, the histogram Bare Driver) runs
   **here on the host** (`sensors/vl53lx`). One class per product on the family
   class `Vl53lx`.
-- **BNO086** — the device is an SHTP pass-through; the full SH-2 stack runs
-  **here on the host** (`sensors/bno086`).
+- **VL53L4CD** — the device is a thin I2C register bridge; the full ST ULD
+  2.2.3 driver runs **here on the host** (`sensors/vl53l4/uld.ts`). One
+  laser distance per sample, INT-driven streaming.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — the same ULD family as the VL53L8 on
+  an I2C bridge (`sensors/vl53l7`); the classes subclass `Vl53l8cx`, and
+  `Vl53l7ch` adds streamed CNH.
+- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
+  driver runs **here on the host** (`sensors/vl53l8/uld.ts`). `Vl53l8ch` is the
+  `Vl53l8cx` superset, adding Compact-Network-Histogram output.
 - **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
   and the host configures it with register writes (`sensors/bno055`).
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the full SH-2
+  stack runs **here on the host** (`sensors/bno086`).
 
 ## Installation
 

@@ -1050,8 +1050,21 @@ bool depz_is_bno086(const depz_device *dev);
  * for the executable reset-complete, best effort — older firmware never sends
  * it (ERRATA E9). < 0 timeout = 2000 ms. */
 int depz_bno086_hardware_reset(depz_device *dev, int timeout_ms);
-/* WAKE (PS0) pulse: out of sleep, no state lost. */
+/* WAKE (PS0) pulse: out of sleep, no state lost. The board's hardware pin
+ * pulse (bridge 0x33), not an SH-2 command — the SH-2 "On" that ends
+ * depz_bno086_sleep() is depz_bno086_power_on(). */
 int depz_bno086_wake(depz_device *dev);
+/* SH-2 "Sleep" (0x03 on SHTP channel 1, contract 05 §6a): every report stops
+ * except those enabled with DEPZ_BNO_FEATURE_WAKEUP | DEPZ_BNO_FEATURE_ALWAYS_ON,
+ * which keep their rate; the configuration is kept. No SH-2 answer: returns
+ * once the bridge took the frame. On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16)
+ * all reports stopped within one sample; a WAKEUP|ALWAYS_ON report kept
+ * streaming at full rate on channel 4. */
+int depz_bno086_sleep(depz_device *dev);
+/* SH-2 "On" (0x02 on SHTP channel 1): ends depz_bno086_sleep() — every report
+ * that was enabled comes back at its rate without re-enabling. No SH-2 answer.
+ * Not depz_bno086_wake(), which pulses the WAKE pin. */
+int depz_bno086_power_on(depz_device *dev);
 /* SHTP channel-0 advertisement bytes seen since open / reset; *len = full
  * length (copies at most `cap`). */
 int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len);

@@ -14,12 +14,12 @@ Further boards, each with its decode and codec layer here (initialising and
 streaming the register-bridge boards is done with the Python or TypeScript
 SDK):
 
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the 1D ToF family
+  on one I2C register-bridge firmware.
 - **VL53L4CD** — single-zone ToF behind an I2C register bridge (host runs the
   ST ULD math).
 - **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 multizone ToF on one I2C board
   firmware; the VL53L8 frame layout, and CNH histograms on the L7CH.
-- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the 1D ToF family
-  on one I2C register-bridge firmware.
 - **BNO055** — 9-axis IMU with Bosch's fusion on the chip, behind an I2C
   register bridge.
 
@@ -31,7 +31,7 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.4.2):
+Published on crates.io as `depz-sensor-sdk` (0.5.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -109,21 +109,21 @@ Notes on the ToF pair:
 
 The register-bridge boards:
 
-| Area | VL53L5CX / L7CX / L7CH | VL53L0X / L1CX / L1CB / L3CX / L4CX | BNO055 |
-|------|------------------------|-------------------------------------|--------|
-| Identity / class resolution | ✅ (`vl53l7`, `resolve_model`) | ✅ (`vl53lx`, `resolve_class`, product table) | ✅ (`bno055`) |
-| Command encoders / report decoders | ✅ (pin, bus speed, info + the VL53L8 register codecs) | ✅ (v2.00: address width, stream with clear list, info) | ✅ (read/write/reset/stream/info) |
-| Stateless decode | ✅ frames via `vl53l8::parse_frame(Variant::L7)`; CNH via `decode_cnh` (L7CH) | ✅ die block, VL53L0X raw fields, histogram bins | ✅ units, calibration, axis remap, page-1 configs, register windows |
+| Area | VL53L0X / L1CX / L1CB / L3CX / L4CX | VL53L5CX / L7CX / L7CH | BNO055 |
+|------|-------------------------------------|------------------------|--------|
+| Identity / class resolution | ✅ (`vl53lx`, `resolve_class`, product table) | ✅ (`vl53l7`, `resolve_model`) | ✅ (`bno055`) |
+| Command encoders / report decoders | ✅ (v2.00: address width, stream with clear list, info) | ✅ (pin, bus speed, info + the VL53L8 register codecs) | ✅ (read/write/reset/stream/info) |
+| Stateless decode | ✅ die block, VL53L0X raw fields, histogram bins | ✅ frames via `vl53l8::parse_frame(Variant::L7)`; CNH via `decode_cnh` (L7CH) | ✅ units, calibration, axis remap, page-1 configs, register windows |
 | Live driver (init, configuration, ranging) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) |
 
 ## Layout
 
-- `vl53l8` — frame reassembly, raw-frame decode (`Variant` CX/CH/L7), advanced
-  DCI, CNH histogram decode.
-- `vl53l7` — VL53L5CX / L7CX / L7CH board codecs and class resolution.
-- `vl53l4` — VL53L4CD register-bridge codecs, result-block decode, ULD math.
 - `vl53lx` — VL53L0X / L1CX / L1CB / L3CX / L4CX codecs, product table, block
   decode.
+- `vl53l4` — VL53L4CD register-bridge codecs, result-block decode, ULD math.
+- `vl53l7` — VL53L5CX / L7CX / L7CH board codecs and class resolution.
+- `vl53l8` — frame reassembly, raw-frame decode (`Variant` CX/CH/L7), advanced
+  DCI, CNH histogram decode.
 - `bno055` — BNO055 register-bridge codecs, register codecs, window decode.
 - `bno086` — SHTP framing, SH-2 report parsers, control request builders.
 - `protocol`, `framing`, `crc`, `fwdepz`, `usb_ids` — shared transport/protocol.

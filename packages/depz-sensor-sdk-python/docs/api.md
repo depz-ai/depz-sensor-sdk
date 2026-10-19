@@ -6,7 +6,7 @@ Auto-generated from the package's public surface (the union of
 docstrings in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 ## Contents
 
@@ -17,7 +17,7 @@ Each sensor also has a focused reference with just its own symbols:
 - **VL53L8 (ToF)**: [`Vl53l8`](#vl53l8), [`Vl53l8ch`](#vl53l8ch), [`Vl53l8Frame`](#vl53l8frame), [`CnhConfig`](#cnhconfig), [`Vl53l8cxError`](#vl53l8cxerror), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l5cx`](#vl53l5cx), [`Vl53l7cx`](#vl53l7cx), [`Vl53l7ch`](#vl53l7ch)
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lx`](#vl53lx), [`Vl53l0x`](#vl53l0x), [`Vl53l1cx`](#vl53l1cx), [`Vl53l1cb`](#vl53l1cb), [`Vl53l3cx`](#vl53l3cx), [`Vl53l4cx`](#vl53l4cx), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Target`](#target), [`Vl53Error`](#vl53error), [`ProtocolError`](#protocolerror), [`PRODUCTS`](#products), [`DRIVER_KINDS`](#driver_kinds), [`PLOTTABLE_STATUSES`](#plottable_statuses), [`primary_target`](#primary_target), [`plot_distances`](#plot_distances)
-- **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
+- **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
 - **BNO055 (IMU)**: [`Bno055`](#bno055), [`Bno055Sample`](#bno055sample), [`OprMode`](#oprmode), [`Units`](#units), [`AxisRemap`](#axisremap), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`SystemStatus`](#systemstatus), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`PLACEMENTS`](#placements), [`SIC_IDENTITY`](#sic_identity), [`I2C_ERROR_NAMES`](#i2c_error_names)
 - **Bootloader / firmware update**: [`BootloaderDevice`](#bootloaderdevice), [`update_firmware`](#update_firmware), [`find_bootloader_port`](#find_bootloader_port)
 - **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord)
@@ -7025,6 +7025,40 @@ wake(self) -> None
 
 Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.
 
+This is the board's hardware pin pulse (board command 0x33), not an
+SH-2 command; the SH-2 "On" command that ends `sleep()` is
+`power_on()`.
+
+#### Bno086.sleep
+
+```python
+sleep(self) -> None
+```
+
+Put the hub to sleep: SH-2 "Sleep" (0x03 on SHTP channel 1).
+
+Every report stops, except those enabled with
+``flags=FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON``, which keep their
+rate; the configuration (enabled sensors, rates) is kept. The hub
+sends no response. `power_on()` ends it.
+
+On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): all reports stopped
+within one sample; a WAKEUP|ALWAYS_ON report kept streaming at full
+rate on channel 4.
+
+#### Bno086.power_on
+
+```python
+power_on(self) -> None
+```
+
+End `sleep()`: SH-2 "On" (0x02 on SHTP channel 1).
+
+Every report that was enabled comes back at its rate — no need to
+re-enable. The hub sends no response. Not to be confused with
+`wake()`, which pulses the WAKE pin (board command 0x33) instead of
+sending an SH-2 command.
+
 #### Bno086.advertisement *(property)*
 
 Raw SHTP channel-0 advertisement bytes seen since open/reset.
@@ -7653,6 +7687,244 @@ Get Feature Response (0xFC), 17 bytes — the rates in effect.
 ```python
 unpack(cls, payload: bytes) -> 'FeatureResponse'
 ```
+
+### FeatureFlag
+
+```python
+class FeatureFlag(*values)
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for `Bno086.enable(flags=...)`.
+
+WAKEUP | ALWAYS_ON keeps a sensor reporting through `Bno086.sleep()`: on a
+DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate
+during sleep, delivered on SHTP channel 4 (wake input), while every other
+report stopped.
+
+#### FeatureFlag.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### FeatureFlag.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### FeatureFlag.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### FeatureFlag.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### FeatureFlag.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### FeatureFlag.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### FeatureFlag.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### ExecutableCommand
+
+```python
+class ExecutableCommand(*values)
+```
+
+One-byte host writes on the executable channel (SHTP channel 1).
+
+The hub answers none of them. RESET restarts the hub (answered later by
+the 0x01 reset-complete on the same channel); SLEEP stops every report
+except those enabled with FeatureFlag.WAKEUP | ALWAYS_ON, keeping the
+configuration; ON ends SLEEP and every report resumes at its rate.
+
+#### ExecutableCommand.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### ExecutableCommand.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### ExecutableCommand.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### ExecutableCommand.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### ExecutableCommand.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### ExecutableCommand.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### ExecutableCommand.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
 
 ### ProductId
 
@@ -8336,6 +8608,11 @@ set_power_mode(self, mode: depz_sensor_sdk.bno055.regs.PwrMode | int) -> None
 
 Normal / low power (accelerometer only until motion) / suspend.
 Written in CONFIG mode; the operating mode is restored after.
+
+A suspended chip ignores OPR_MODE writes and stays in CONFIG
+(measured 19.10.2026), so the operating mode is kept here and put
+back on wake-up — NDOF if the chip was already asleep when we
+connected (contract 13 §4.6).
 
 #### Bno055.get_units
 

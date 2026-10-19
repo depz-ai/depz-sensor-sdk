@@ -496,6 +496,17 @@ void bno086_fake_errors_and_reports()
     CHECK(b->frs_read(0x7979) == words);
     b->frs_write(0x2D3E, {1, 2, 3});
     CHECK(b->frs_read(0x2D3E) == (std::vector<std::uint32_t>{1, 2, 3}));
+    {   // hub power (contract 05 §6a): one byte on channel 1, no answer
+        b->sleep();
+        b->power_on();
+        std::uint8_t fr[8];
+        CHECK(fake_bno086_executable_frame(fk, 0, fr) == 5 && fr[2] == 1 && fr[3] == 0 && fr[4] == 0x03);
+        CHECK(fake_bno086_executable_frame(fk, 1, fr) == 5 && fr[2] == 1 && fr[3] == 1 && fr[4] == 0x02);
+        depz::bno086::FeatureRequest req;
+        req.interval_us = 10000;
+        req.flags = depz::bno086::FEATURE_WAKEUP | depz::bno086::FEATURE_ALWAYS_ON;
+        CHECK(!b->enable(SensorId::Accelerometer, req, false));
+    }
     const auto g = b->enable(SensorId::GameRotationVector, 200);
     CHECK(g.interval_us == 4000 && depz::Bno086::rate_ok(5000, g));
     CHECK(!b->enable(SensorId::Gyroscope, depz::bno086::FeatureRequest{2000}, false));

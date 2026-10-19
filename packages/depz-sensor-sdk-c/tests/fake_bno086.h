@@ -32,6 +32,9 @@ size_t   fake_bno086_record(fake_bno086 *f, uint16_t type, uint32_t *out, size_t
 /* The parameters (9 bytes) of the last Command Request for `command`; false
  * when none came. */
 bool     fake_bno086_last_command(fake_bno086 *f, uint8_t command, uint8_t params[9]);
+/* The i-th host SHTP frame on the executable channel (sleep / on), header
+ * included; 0 when fewer came. */
+size_t   fake_bno086_executable_frame(fake_bno086 *f, size_t i, uint8_t out[8]);
 /* ME calibration status the next configure answers with (0 = success). */
 void     fake_bno086_calibration_status(fake_bno086 *f, uint8_t status);
 /* Push an input cargo on SHTP `channel` as RPT_DATA captured at `capture_us`. */

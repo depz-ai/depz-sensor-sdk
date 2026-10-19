@@ -10,7 +10,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`pack_shtp_header`](#pack_shtp_header), [`unpack_shtp_header`](#unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`build_frame`](#build_frame), [`ShtpLayer`](#shtplayer)
+- **BNO085 (IMU)**: [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`pack_shtp_header`](#pack_shtp_header), [`unpack_shtp_header`](#unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`build_frame`](#build_frame), [`ShtpLayer`](#shtplayer)
 
 ## BNO085 (IMU)
 
@@ -346,6 +346,26 @@ pub enum Sh2Error {
 
 SH-2 command builder error.
 
+### FEATURE_FLAG_WAKEUP
+
+```rust
+pub const FEATURE_FLAG_WAKEUP: u8 = 0x04;
+```
+
+Set Feature `flags` bit 2 (SH-2 §6.5.4): wake-up enabled — the sensor
+reports on SHTP channel 4 (wake input).
+
+### FEATURE_FLAG_ALWAYS_ON
+
+```rust
+pub const FEATURE_FLAG_ALWAYS_ON: u8 = 0x08;
+```
+
+Set Feature `flags` bit 3 (SH-2 §6.5.4): always-on — the sensor keeps
+running while the hub sleeps. With [`FEATURE_FLAG_WAKEUP`] a report kept
+its full rate through the executable-channel sleep on a DEPZ BNO085
+(SH-2 3.12.6, 2026-10-16), on channel 4, while every other report stopped.
+
 ### build_set_feature
 
 ```rust
@@ -455,6 +475,53 @@ pub enum ShtpChannel {
 ```
 
 SHTP channels (contract 05 §3).
+
+### ExecutableCommand
+
+```rust
+pub enum ExecutableCommand {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+```
+
+One-byte host writes on the executable channel (SHTP channel 1,
+contract 05 §6a). The hub answers none of them.
+
+`Reset` restarts the hub (answered later by the 0x01 reset-complete on the
+same channel); `Sleep` stops every report except those enabled with
+`sh2::FEATURE_FLAG_WAKEUP | sh2::FEATURE_FLAG_ALWAYS_ON`, keeping the
+configuration; `On` ends `Sleep` and every report resumes at its rate.
+
+### build_sleep
+
+```rust
+pub fn build_sleep() -> [u8; 1]
+```
+
+SH-2 "Sleep" payload for the executable channel: `[0x03]`. Send it with
+`next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
+bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
+
+Every report stops, except those enabled with flags wake-up | always-on,
+which keep their rate; the configuration (enabled sensors, rates) is kept.
+[`build_power_on`] ends it. On a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) all
+reports stopped within one sample; a WAKEUP|ALWAYS_ON report kept
+streaming at full rate on channel 4.
+
+### build_power_on
+
+```rust
+pub fn build_power_on() -> [u8; 1]
+```
+
+SH-2 "On" payload for the executable channel: `[0x02]` — ends
+[`build_sleep`]'s sleep. Every report that was enabled comes back at its
+rate, without re-enabling; the hub sends no response.
+
+Not the bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin —
+a hardware signal, not an SH-2 command.
 
 ### ShtpHeader
 

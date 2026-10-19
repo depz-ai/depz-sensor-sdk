@@ -168,6 +168,21 @@ function view(p: Uint8Array): DataView {
 // ── feature control (0xFD / 0xFE / 0xFC) ─────────────────────────────────────
 
 /**
+ * Set Feature `flags` bits (SH-2 §6.5.4) for `Bno086.enable({ flags })`.
+ *
+ * `Wakeup | AlwaysOn` keeps a sensor reporting through `Bno086.sleep()`: on a
+ * DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate
+ * during sleep, delivered on SHTP channel 4 (wake input), while every other
+ * report stopped.
+ */
+export enum FeatureFlag {
+  /** Bit 2: wake-up enabled — reports on channel 4. */
+  Wakeup = 0x04,
+  /** Bit 3: always-on — keeps running while the hub sleeps. */
+  AlwaysOn = 0x08,
+}
+
+/**
  * Set Feature Command (0xFD), 17 bytes.
  *
  * `intervalUs` = 0 disables the sensor. `sensitivity` units are

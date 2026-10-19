@@ -6,7 +6,7 @@ declarations and `//` doc-comments) by `scripts/gen_api_md.py` — run
 to regenerate. Edit the doc-comments in the headers, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 Two layers: the *decode layer* (every header but `depz/device.hpp`)
 takes bytes and returns typed values, no I/O; the *live-hardware
@@ -24,11 +24,11 @@ runs its commands and delivers its data — see the last section.
 - **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`CNH_DATA_IDX`](#cnh_data_idx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_MAX_AGGREGATES`](#cnh_max_aggregates), [`CNH_MAX_FEATURE_LENGTH`](#cnh_max_feature_length), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`FOOTER_ID_OFF`](#footer_id_off), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`Model`](#model), [`to_string`](#to_string), [`resolve_model`](#resolve_model), [`infer_resolution`](#infer_resolution), [`decode_frame`](#decode_frame)
 - **VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`RegData`](#regdata), [`StreamData`](#streamdata), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`ClearStep`](#clearstep), [`pack_read_reg`](#pack_read_reg), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_addr_width`](#pack_set_addr_width), [`Vl53lxInfo`](#vl53lxinfo), [`DriverKind`](#driverkind), [`to_string`](#to_string), [`Product`](#product), [`products`](#products), [`find_product`](#find_product), [`product_from_board_name`](#product_from_board_name), [`SensorClass`](#sensorclass), [`resolve_class`](#resolve_class), [`DieVariant`](#dievariant), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw)
-- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
 - **Bootloader / firmware**: [`FWDEPZ_HEADER_SIZE`](#fwdepz_header_size), [`FWDEPZ_MAGIC`](#fwdepz_magic), [`BlCmd`](#blcmd), [`BlRpt`](#blrpt), [`BlStatus`](#blstatus), [`FlashInfo`](#flashinfo), [`pack_write_page`](#pack_write_page), [`pack_read_page`](#pack_read_page), [`FwDepzErrorKind`](#fwdepzerrorkind), [`FwDepzError`](#fwdepzerror), [`FwDepzImage`](#fwdepzimage)
 - **Datasets**: [`SCHEMA_PREFIX`](#schema_prefix), [`TimeSync`](#timesync), [`DeviceMeta`](#devicemeta), [`Record`](#record), [`Reader`](#reader)
-- **Live hardware (links, device, discovery)**: [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx)
+- **Live hardware (links, device, discovery)**: [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FEATURE_WAKEUP`](#feature_wakeup), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx)
 
 ## Transport (framing & CRC)
 
@@ -2113,6 +2113,22 @@ enum class ShtpChannel : std::uint8_t {
     GyroRv = 5,
 };
 ```
+
+### ExecutableCommand
+
+```cpp
+enum class ExecutableCommand : std::uint8_t {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+};
+```
+
+One-byte host writes on the executable channel (contract 05 §6a); the hub
+answers none of them. Reset restarts the hub (the 0x01 reset-complete
+follows on the same channel); Sleep stops every report except those enabled
+with FEATURE_WAKEUP | FEATURE_ALWAYS_ON, keeping the configuration; On ends
+Sleep and every report resumes at its rate. Bno086::sleep() / power_on().
 
 ### ShtpHeader
 
@@ -5659,6 +5675,18 @@ enum class TareBasis : std::uint8_t {
 inline constexpr std::uint8_t TARE_X = 1, TARE_Y = 2, TARE_Z = 4, TARE_ALL = 7;
 ```
 
+### FEATURE_WAKEUP
+
+```cpp
+inline constexpr std::uint8_t FEATURE_WAKEUP = 0x04, FEATURE_ALWAYS_ON = 0x08;
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for FeatureRequest::flags.
+FEATURE_WAKEUP: the sensor reports on SHTP channel 4 (wake input);
+FEATURE_ALWAYS_ON: it keeps running while the hub sleeps. Together they kept
+a report at its full rate through Bno086::sleep() on a DEPZ BNO086
+(SH-2 3.12.6, 2026-10-16), while every other report stopped.
+
 ### Feature
 
 ```cpp
@@ -5857,6 +5885,30 @@ nRST: SHTP state, the advertisement and every enabled sensor restart.
 ```cpp
 void wake();
 ```
+
+WAKE (PS0) pulse: the board's hardware pin pulse (bridge 0x33), not an
+SH-2 command — the SH-2 "On" that ends sleep() is power_on().
+
+#### Bno086.sleep
+
+```cpp
+void sleep();
+```
+
+SH-2 "Sleep" (0x03 on SHTP channel 1, contract 05 §6a): every report
+stops except those enabled with FEATURE_WAKEUP | FEATURE_ALWAYS_ON,
+which keep their rate; the configuration is kept. No SH-2 answer. On a
+DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) all reports stopped within one
+sample; a WAKEUP|ALWAYS_ON report kept streaming at full rate on channel 4.
+
+#### Bno086.power_on
+
+```cpp
+void power_on();
+```
+
+SH-2 "On" (0x02 on SHTP channel 1): ends sleep() — every report that was
+enabled comes back at its rate without re-enabling. No SH-2 answer.
 
 #### Bno086.advertisement
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 
 from ..errors import DepzError
 
@@ -162,6 +162,18 @@ class TareAxis(IntEnum):
 
 
 # ── feature control (0xFD / 0xFE / 0xFC) ─────────────────────────────────────
+
+
+class FeatureFlag(IntFlag):
+    """Set Feature `flags` bits (SH-2 §6.5.4) for `Bno086.enable(flags=...)`.
+
+    WAKEUP | ALWAYS_ON keeps a sensor reporting through `Bno086.sleep()`: on a
+    DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate
+    during sleep, delivered on SHTP channel 4 (wake input), while every other
+    report stopped."""
+
+    WAKEUP = 0x04  # bit 2: wake-up enabled — reports on channel 4
+    ALWAYS_ON = 0x08  # bit 3: always-on — keeps running while the hub sleeps
 
 
 def build_set_feature(

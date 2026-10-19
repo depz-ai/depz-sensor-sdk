@@ -15038,7 +15038,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 122
+            "line": 125
           },
           "exported_as": [
             "depz_sensor_sdk.Bno086",
@@ -15088,7 +15088,31 @@
                 }
               ],
               "returns": "None",
-              "doc": "Pulse WAKE (PS0): wakes the sensor from sleep, no state loss."
+              "doc": "Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.\n\nThis is the board's hardware pin pulse (board command 0x33), not an\nSH-2 command; the SH-2 \"On\" command that ends `sleep()` is\n`power_on()`."
+            },
+            {
+              "name": "sleep",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Put the hub to sleep: SH-2 \"Sleep\" (0x03 on SHTP channel 1).\n\nEvery report stops, except those enabled with\n``flags=FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON``, which keep their\nrate; the configuration (enabled sensors, rates) is kept. The hub\nsends no response. `power_on()` ends it.\n\nOn a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): all reports stopped\nwithin one sample; a WAKEUP|ALWAYS_ON report kept streaming at full\nrate on channel 4."
+            },
+            {
+              "name": "power_on",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "End `sleep()`: SH-2 \"On\" (0x02 on SHTP channel 1).\n\nEvery report that was enabled comes back at its rate — no need to\nre-enable. The hub sends no response. Not to be confused with\n`wake()`, which pulses the WAKE pin (board command 0x33) instead of\nsending an SH-2 command."
             },
             {
               "name": "advertisement",
@@ -17176,7 +17200,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 197
+            "line": 209
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.FeatureResponse"
@@ -17228,6 +17252,292 @@
           ]
         },
         {
+          "name": "FeatureFlag",
+          "kind": "class",
+          "bases": [
+            "enum.IntFlag"
+          ],
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "var_positional"
+            }
+          ],
+          "module": "depz_sensor_sdk.bno086.sh2",
+          "source": {
+            "file": "depz_sensor_sdk/bno086/sh2.py",
+            "line": 167
+          },
+          "exported_as": [
+            "depz_sensor_sdk.bno086.FeatureFlag"
+          ],
+          "doc": "Set Feature `flags` bits (SH-2 §6.5.4) for `Bno086.enable(flags=...)`.\n\nWAKEUP | ALWAYS_ON keeps a sensor reporting through `Bno086.sleep()`: on a\nDEPZ BNO086 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate\nduring sleep, delivered on SHTP channel 4 (wake input), while every other\nreport stopped.",
+          "enum_members": [
+            {
+              "name": "WAKEUP",
+              "value": 4
+            },
+            {
+              "name": "ALWAYS_ON",
+              "value": 8
+            }
+          ],
+          "members": [
+            {
+              "name": "conjugate",
+              "kind": "method",
+              "doc": "Returns self, the complex conjugate of any int.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_length",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of bits necessary to represent self in binary.\n\n>>> bin(37)\n'0b100101'\n>>> (37).bit_length()\n6",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_count",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of ones in the binary representation of the absolute value of self.\n\nAlso known as the population count.\n\n>>> bin(13)\n'0b1101'\n>>> (13).bit_count()\n3",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "to_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "length",
+                  "kind": "positional_or_keyword",
+                  "default": 1
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return an array of bytes representing an integer.\n\nlength\n  Length of bytes object to use.  An OverflowError is raised if the\n  integer is not representable with the given number of bytes.  Default\n  is length 1.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Determines whether two's complement is used to represent the integer.\n  If signed is False and a negative integer is given, an OverflowError\n  is raised.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "from_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "type",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "bytes",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return the integer represented by the given array of bytes.\n\nbytes\n  Holds the array of bytes to convert.  The argument must either\n  support the buffer protocol or be an iterable object producing bytes.\n  Bytes and bytearray are examples of built-in objects that support the\n  buffer protocol.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Indicates whether two's complement is used to represent the integer.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "as_integer_ratio",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a pair of integers, whose ratio is equal to the original int.\n\nThe ratio is in lowest terms and has a positive denominator.\n\n>>> (10).as_integer_ratio()\n(10, 1)\n>>> (-10).as_integer_ratio()\n(-10, 1)\n>>> (0).as_integer_ratio()\n(0, 1)",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "is_integer",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Returns True. Exists for duck type compatibility with float.is_integer.",
+              "defined_in": "builtins.int"
+            }
+          ]
+        },
+        {
+          "name": "ExecutableCommand",
+          "kind": "class",
+          "bases": [
+            "enum.IntEnum"
+          ],
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "var_positional"
+            }
+          ],
+          "module": "depz_sensor_sdk.bno086.shtp",
+          "source": {
+            "file": "depz_sensor_sdk/bno086/shtp.py",
+            "line": 34
+          },
+          "exported_as": [
+            "depz_sensor_sdk.bno086.ExecutableCommand"
+          ],
+          "doc": "One-byte host writes on the executable channel (SHTP channel 1).\n\nThe hub answers none of them. RESET restarts the hub (answered later by\nthe 0x01 reset-complete on the same channel); SLEEP stops every report\nexcept those enabled with FeatureFlag.WAKEUP | ALWAYS_ON, keeping the\nconfiguration; ON ends SLEEP and every report resumes at its rate.",
+          "enum_members": [
+            {
+              "name": "RESET",
+              "value": 1
+            },
+            {
+              "name": "ON",
+              "value": 2
+            },
+            {
+              "name": "SLEEP",
+              "value": 3
+            }
+          ],
+          "members": [
+            {
+              "name": "conjugate",
+              "kind": "method",
+              "doc": "Returns self, the complex conjugate of any int.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_length",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of bits necessary to represent self in binary.\n\n>>> bin(37)\n'0b100101'\n>>> (37).bit_length()\n6",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_count",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of ones in the binary representation of the absolute value of self.\n\nAlso known as the population count.\n\n>>> bin(13)\n'0b1101'\n>>> (13).bit_count()\n3",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "to_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "length",
+                  "kind": "positional_or_keyword",
+                  "default": 1
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return an array of bytes representing an integer.\n\nlength\n  Length of bytes object to use.  An OverflowError is raised if the\n  integer is not representable with the given number of bytes.  Default\n  is length 1.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Determines whether two's complement is used to represent the integer.\n  If signed is False and a negative integer is given, an OverflowError\n  is raised.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "from_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "type",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "bytes",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return the integer represented by the given array of bytes.\n\nbytes\n  Holds the array of bytes to convert.  The argument must either\n  support the buffer protocol or be an iterable object producing bytes.\n  Bytes and bytearray are examples of built-in objects that support the\n  buffer protocol.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Indicates whether two's complement is used to represent the integer.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "as_integer_ratio",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a pair of integers, whose ratio is equal to the original int.\n\nThe ratio is in lowest terms and has a positive denominator.\n\n>>> (10).as_integer_ratio()\n(10, 1)\n>>> (-10).as_integer_ratio()\n(-10, 1)\n>>> (0).as_integer_ratio()\n(0, 1)",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "is_integer",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Returns True. Exists for duck type compatibility with float.is_integer.",
+              "defined_in": "builtins.int"
+            }
+          ]
+        },
+        {
           "name": "ProductId",
           "kind": "class",
           "bases": [],
@@ -17267,7 +17577,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 225
+            "line": 237
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ProductId"
@@ -17358,7 +17668,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 265
+            "line": 277
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CommandResponse"
@@ -17500,7 +17810,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 543
+            "line": 555
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.SensorMetadata"
@@ -17956,7 +18266,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 112
+            "line": 115
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CalibrationConfig"
@@ -18678,7 +18988,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Normal / low power (accelerometer only until motion) / suspend.\nWritten in CONFIG mode; the operating mode is restored after."
+              "doc": "Normal / low power (accelerometer only until motion) / suspend.\nWritten in CONFIG mode; the operating mode is restored after.\n\nA suspended chip ignores OPR_MODE writes and stays in CONFIG\n(measured 19.10.2026), so the operating mode is kept here and put\nback on wake-up — NDOF if the chip was already asleep when we\nconnected (contract 13 §4.6)."
             },
             {
               "name": "get_units",
@@ -25706,7 +26016,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.4.2",
+          "value": "0.5.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

@@ -67,6 +67,8 @@ export class FakeBno086 {
   features = new Map<number, number>();
   lastSetFeature: Uint8Array | null = null;
   tareRequests: Uint8Array[] = [];
+  /** Host SHTP frames on channel 1 (sleep / on — no response). */
+  executableFrames: Uint8Array[] = [];
   frsWrites = new Map<number, number[]>();
 
   private frsWrType: number | null = null;
@@ -225,6 +227,10 @@ export class FakeBno086 {
     if (frame.length < SHTP_HEADER_SIZE) return;
     const hdr = unpackShtpHeader(frame);
     const payload = frame.subarray(SHTP_HEADER_SIZE);
+    if (hdr.channel === (ShtpChannel.Executable as number)) {
+      this.executableFrames.push(frame.slice()); // sleep / on: no response
+      return;
+    }
     if (hdr.channel !== (ShtpChannel.Control as number) || payload.length === 0) return;
     const v = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     const rid = payload[0]!;

@@ -6,11 +6,11 @@ Contract-first Java 17 port of the DEPZ USB sensor transport + protocol
 
 Scope: CRCs, packet framing + incremental parser, USB id table, identity
 parsing, common command codecs, SR04 codecs, `.fwdepz` header parsing, the
-VL53L4CD register-bridge codecs + host-ULD math, the shared VL53L8
-results-frame decoder + advanced-DCI codecs + CNH histogram decode, the
-VL53L5CX / L7CX / L7CH board codecs and frame decode, the VL53L0X / L1CX /
-L1CB / L3CX / L4CX codecs + product table + block decode, the BNO055
-register-bridge and register codecs, and the BNO086 SH-2 / SHTP layer. This SDK is **decode-layer only** — pure, host-verifiable codecs
+VL53L0X / L1CX / L1CB / L3CX / L4CX codecs + product table + block decode, the
+VL53L4CD register-bridge codecs + host-ULD math, the VL53L5CX / L7CX / L7CH
+board codecs and frame decode, the shared VL53L8 results-frame decoder +
+advanced-DCI codecs + CNH histogram decode, the BNO055 register-bridge and
+register codecs, and the BNO086 SH-2 / SHTP layer. This SDK is **decode-layer only** — pure, host-verifiable codecs
 covered by golden vectors; live hardware bring-up (register bridges, ULD init)
 is out of scope.
 
@@ -21,14 +21,14 @@ Full docs live under [`docs/`](docs/):
 - [Common guide](docs/guide.md) — build, mental model, framing/CRCs, USB
   identity, common commands, time-sync, firmware container, datasets, testing.
 - Per-sensor **introduction · guide · api**:
-  [SR04](docs/sr04/introduction.md) · [VL53L4CD](docs/vl53l4cd/introduction.md) ·
-  [VL53L8CX](docs/vl53l8cx/introduction.md) ·
-  [VL53L8CH](docs/vl53l8ch/introduction.md) · [VL53L5CX](docs/vl53l5cx/introduction.md) ·
-  [VL53L7CX](docs/vl53l7cx/introduction.md) · [VL53L7CH](docs/vl53l7ch/introduction.md) ·
+  [SR04](docs/sr04/introduction.md) ·
   [VL53L0X](docs/vl53l0x/introduction.md) · [VL53L1CX](docs/vl53l1cx/introduction.md) ·
   [VL53L1CB](docs/vl53l1cb/introduction.md) · [VL53L3CX](docs/vl53l3cx/introduction.md) ·
-  [VL53L4CX](docs/vl53l4cx/introduction.md) · [BNO086](docs/bno086/introduction.md) ·
-  [BNO055](docs/bno055/introduction.md)
+  [VL53L4CD](docs/vl53l4cd/introduction.md) · [VL53L4CX](docs/vl53l4cx/introduction.md) ·
+  [VL53L5CX](docs/vl53l5cx/introduction.md) · [VL53L7CX](docs/vl53l7cx/introduction.md) ·
+  [VL53L7CH](docs/vl53l7ch/introduction.md) · [VL53L8CX](docs/vl53l8cx/introduction.md) ·
+  [VL53L8CH](docs/vl53l8ch/introduction.md) · [BNO055](docs/bno055/introduction.md) ·
+  [BNO085](docs/bno085/introduction.md) · [BNO086](docs/bno086/introduction.md)
 - [Full API reference](docs/api.md) — generated from the Java sources by
   `scripts/gen_api_md.py`; regenerate with `python3 scripts/gen_api_md.py`.
 
@@ -40,15 +40,15 @@ a wire frame but ship as different parts:
 | Sensor       | What it is                                                      | Coverage today |
 | ------------ | -------------------------------------------------------------- | -------------- |
 | **SR04**     | Ultrasonic range finder.                                       | Full codecs (encode + decode). |
+| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware (protocol v2.00). | v2.00 wire codecs, the product table + class resolution, die-block / VL53L0X raw / histogram-block decode. |
 | **VL53L4CD** | Single-zone ToF (~1.3 m) behind a thin I2C register bridge; production USB PID **0xED45**. | Full wire codecs + host-ULD math (result block, range timing, tuning words, init config block). |
+| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH); PIDs **0xED48 / 0xED49 / 0xED4A**. | Board codecs (pin control, bus speed, info), class resolution, frame decode through the VL53L8 decoder with the L5/L7 geometry, CNH decode on the L7CH. |
 | **VL53L8CX** | Base multizone ToF. Dev-default; enumerates on the ST dev USB id (VID 0x0483 / PID 0x56DC). | Shared VL53L8 frame decode + advanced-DCI codecs. |
 | **VL53L8CH** | CX **plus** CNH (compact histograms) and its own production USB PID **0xED40**. | Shares the VL53L8 frame decode + advanced-DCI with CX, plus the CNH histogram decode (`Vl53l8Uld.decodeCnh`). |
-| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH); PIDs **0xED48 / 0xED49 / 0xED4A**. | Board codecs (pin control, bus speed, info), class resolution, frame decode through the VL53L8 decoder with the L5/L7 geometry, CNH decode on the L7CH. |
-| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware (protocol v2.00). | v2.00 wire codecs, the product table + class resolution, die-block / VL53L0X raw / histogram-block decode. |
-| **BNO086**   | 9-axis IMU (SH-2 over SHTP).                                   | SHTP framing/reassembly, SH-2 control encoders, input-report decode. |
 | **BNO055**   | 9-axis IMU with on-chip fusion behind an I2C register bridge; PID **0xEE0A**. | Wire codecs, units / calibration / axis-remap / page-1 codecs, register-window decode. |
+| **BNO085 / BNO086** | 9-axis IMU (SH-2 over SHTP).                                   | SHTP framing/reassembly, SH-2 control encoders, input-report decode. |
 
-For the VL53L5CX / L7CX / L7CH, the 1D family and the BNO055, initialising and
+For the 1D family, the VL53L5CX / L7CX / L7CH and the BNO055, initialising and
 streaming the board is done with the Python or TypeScript SDK; this SDK
 decodes what they send and builds the command payloads.
 
@@ -83,12 +83,12 @@ register-bridge driver (both variants) is an extension point and intentionally
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.4.2).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.5.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.4.2")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.5.0")
 ```
 
 Maven:
@@ -97,7 +97,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.4.2</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 

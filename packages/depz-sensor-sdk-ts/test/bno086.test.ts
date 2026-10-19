@@ -8,6 +8,7 @@ import {
   Bno086,
   BusyError,
   DepzError,
+  FeatureFlag,
   FrsRecordId,
   OscillatorType,
   SensorId,
@@ -23,7 +24,7 @@ import {
   type RotationVector,
   type StepCounter,
 } from "../src/index.js";
-import { toHex } from "./golden/vectors.js";
+import { loadVectors, toHex } from "./golden/vectors.js";
 import { FakeBno086 } from "./fake-bno086.js";
 
 let fake: FakeBno086;
@@ -432,5 +433,26 @@ describe("two BNO086 devices at once", () => {
       await devB.close();
       await fakeB.close();
     }
+  });
+});
+
+describe("hub power (contract 05 §6a)", () => {
+  it("sleep and powerOn send the executable-channel frames, no response", async () => {
+    await dev.sleep();
+    await dev.powerOn();
+    await waitFor(() => fake.executableFrames.length === 2);
+    const want = loadVectors("bno086_shtp.json").executable.map((c: any) => c.shtp_frame);
+    expect(fake.executableFrames.map(toHex)).toEqual(want);
+    expect(fake.tareRequests.length).toBe(0);
+  });
+
+  it("enable passes Wakeup|AlwaysOn flags into Set Feature", async () => {
+    await dev.enable(SensorId.Accelerometer, undefined, {
+      intervalUs: 10_000,
+      flags: FeatureFlag.Wakeup | FeatureFlag.AlwaysOn,
+      verify: false,
+    });
+    await waitFor(() => fake.lastSetFeature !== null);
+    expect(fake.lastSetFeature![2]).toBe(0x0c);
   });
 });

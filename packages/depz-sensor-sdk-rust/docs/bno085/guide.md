@@ -14,6 +14,7 @@ shared across sensors — see the [common guide](../guide.md).
 - [Report types and units](#report-types-and-units)
 - [The gyro-integrated RV channel](#the-gyro-integrated-rv-channel)
 - [Control requests and FRS](#control-requests-and-frs)
+- [Sleep and power on](#sleep-and-power-on)
 - [Gotchas](#gotchas)
 
 ## The two layers: SHTP then SH-2
@@ -140,6 +141,33 @@ let frs_data = build_frs_write_data(0, &[word0, word1])?;   // 1 or 2 words per 
 `build_command_request` returns [`Sh2Error::TooManyParams`](api.md) beyond 9
 parameter bytes; `build_frs_write_data` returns
 [`Sh2Error::BadWriteWordCount`](api.md) unless given 1 or 2 words.
+
+## Sleep and power on
+
+The hub has two power commands, one byte each on the **executable** channel
+(SHTP channel 1, not control): "Sleep" stops every report but keeps the
+configuration (enabled sensors, rates); "On" ends it, and every report that was
+on comes back at its rate — no re-enabling. The hub answers neither.
+
+```rust
+use depz_sensor_sdk::bno086::sh2::{build_set_feature, FEATURE_FLAG_ALWAYS_ON, FEATURE_FLAG_WAKEUP};
+use depz_sensor_sdk::bno086::shtp::{build_power_on, build_sleep};
+use depz_sensor_sdk::bno086::ShtpChannel;
+
+// a gyroscope at 50 Hz that keeps going while the hub sleeps
+let flags = FEATURE_FLAG_WAKEUP | FEATURE_FLAG_ALWAYS_ON;
+let gyro = build_set_feature(0x02, 20_000, 0, 0, flags, 0);
+let sleep = shtp.next_frame(ShtpChannel::Executable as u8, &build_sleep());    // [0x03]
+let on = shtp.next_frame(ShtpChannel::Executable as u8, &build_power_on());    // [0x02]
+```
+
+Measured on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+Not to be confused with the board's SENSOR_WAKE_UP command (0x33): that pulses
+the WAKE pin, a hardware signal. "On" is the SH-2 command that ends sleep.
 
 ## Gotchas
 

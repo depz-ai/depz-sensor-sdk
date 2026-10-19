@@ -4,17 +4,17 @@ Python SDK for the **DEPZ USB sensor line** — USB CDC-ACM sensors that speak
 one shared framed protocol:
 
 - **HC-SR04** — ultrasonic distance
-- **VL53L4CD** — single-zone Time-of-Flight to ~1.3 m (host runs the ST ULD)
-- **VL53L8CX** — 8×8 multizone Time-of-Flight, the base ToF imager (host runs
-  the ST ULD)
-- **VL53L8CH** — the VL53L8CX superset, adding Compact-Network-Histogram output
-- **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 Time-of-Flight on an I2C board
-  (63° / 90° view; L7CH adds streamed CNH histograms)
 - **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — single-zone
   Time-of-Flight family, 2–8 m, with ST's light and histogram (multi-target)
   drivers on the host
-- **BNO086** — 9-axis IMU (host runs the SH-2 stack)
+- **VL53L4CD** — single-zone Time-of-Flight to ~1.3 m (host runs the ST ULD)
+- **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 Time-of-Flight on an I2C board
+  (63° / 90° view; L7CH adds streamed CNH histograms)
+- **VL53L8CX** — 8×8 multizone Time-of-Flight, the base ToF imager (host runs
+  the ST ULD)
+- **VL53L8CH** — the VL53L8CX superset, adding Compact-Network-Histogram output
 - **BNO055** — 9-axis IMU with on-chip fusion (orientation, gravity, calibration)
+- **BNO085 / BNO086** — 9-axis IMU (host runs the SH-2 stack)
 
 Sync API with a background reader thread: open a device, configure it, consume
 a stream of decoded, timestamped results. A TypeScript SDK

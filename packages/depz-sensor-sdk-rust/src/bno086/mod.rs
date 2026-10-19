@@ -9,4 +9,4 @@ pub mod sh2;
 pub mod shtp;
 
 pub use reports::{parse_gyro_rv_cargo, parse_input_cargo, Report, Vector3Kind};
-pub use shtp::{ShtpCargo, ShtpChannel, ShtpHeader, ShtpLayer};
+pub use shtp::{ExecutableCommand, ShtpCargo, ShtpChannel, ShtpHeader, ShtpLayer};

@@ -92,6 +92,31 @@ await dev.frsWrite(FrsRecordId.SystemOrientation, words);
 const md = await dev.getMetadata(SensorId.Accelerometer);
 ```
 
+## Sleep and power on
+
+`sleep()` puts the hub to sleep: every report stops, but the configuration
+(enabled sensors, rates) stays. `powerOn()` ends it, and every report that was
+on comes back at its rate — no re-enabling. Neither gets an answer from the hub
+(fire-and-forget, like `tareNow`).
+
+```ts
+await dev.enable(SensorId.Accelerometer, 100);
+await dev.enable(SensorId.Gyroscope, 50, {
+  flags: FeatureFlag.Wakeup | FeatureFlag.AlwaysOn,   // keeps going in sleep
+});
+await dev.sleep();     // accelerometer stops; gyroscope keeps its 50 Hz
+await dev.powerOn();   // accelerometer is back at 100 Hz
+```
+
+Measured on a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+`wake()` is a different thing: it pulses the board's WAKE pin (bridge command
+0x33), a hardware signal. `powerOn()` is the SH-2 "On" command that ends
+`sleep()`.
+
 ## Diagnostics
 
 ```ts

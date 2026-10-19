@@ -200,6 +200,7 @@ class Bno055(DeviceBase):
         self._sample_queues: list[StreamQueue] = []
         self._stream_parse_errors = 0
         self._configured: dict | None = None  # last configure() arguments
+        self._mode_before_suspend: OprMode | None = None  # put back on wake-up
 
     # ── identity & bridge diagnostics ────────────────────────────────────────
 
@@ -292,9 +293,30 @@ class Bno055(DeviceBase):
 
     def set_power_mode(self, mode: PwrMode | int) -> None:
         """Normal / low power (accelerometer only until motion) / suspend.
-        Written in CONFIG mode; the operating mode is restored after."""
-        with self._config_mode():
-            self._write(REG_PWR_MODE, bytes([PwrMode(mode)]))
+        Written in CONFIG mode; the operating mode is restored after.
+
+        A suspended chip ignores OPR_MODE writes and stays in CONFIG
+        (measured 19.10.2026), so the operating mode is kept here and put
+        back on wake-up — NDOF if the chip was already asleep when we
+        connected (contract 13 §4.6)."""
+        mode = PwrMode(mode)
+        with self._reg_lock:
+            opr = OprMode(self._read(REG_OPR_MODE, 1)[1][0] & 0x0F)
+            pwr = self._read(REG_PWR_MODE, 1)[1][0] & 0x03
+            if opr != OprMode.CONFIG:
+                resume: OprMode | None = opr
+                self._switch_mode(OprMode.CONFIG)
+            elif pwr == PwrMode.SUSPEND:
+                resume = self._mode_before_suspend or OprMode.NDOF
+            else:
+                resume = None  # CONFIG on purpose: stay there
+            self._write(REG_PWR_MODE, bytes([mode]))
+            if mode == PwrMode.SUSPEND:
+                self._mode_before_suspend = resume
+            else:
+                self._mode_before_suspend = None
+                if resume is not None:
+                    self._switch_mode(resume)
 
     def get_units(self) -> Units:
         units = Units.unpack(self.read_register(REG_UNIT_SEL))

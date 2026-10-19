@@ -8,8 +8,13 @@ import { describe, expect, it } from "vitest";
 import {
   GYRO_RV_ANGVEL_Q,
   Q_POINTS,
+  Bno086Cmd,
+  ExecutableCommand,
+  FeatureFlag,
   RV_ACCURACY_Q,
+  ShtpChannel,
   ShtpLayer,
+  buildPacket,
   buildCommandRequest,
   buildFrsReadRequest,
   buildFrsWriteData,
@@ -111,6 +116,34 @@ describe("bno086 sh2 control encode vectors", () => {
       expect(toHex(encoded)).toBe(c.payload);
     });
   }
+});
+
+describe("bno086 executable-channel vectors (sleep / power_on)", () => {
+  it("channel-1 byte, SHTP frame and SEND_SHTP_PACKET bridge frame", () => {
+    const commands: Record<string, ExecutableCommand> = {
+      sleep: ExecutableCommand.Sleep,
+      power_on: ExecutableCommand.On,
+    };
+    const layer = new ShtpLayer(); // fresh: sleep then power_on → seq 0, 1
+    for (const c of shtpData.executable) {
+      const command = commands[c.name]!;
+      expect(command).toBe(c.command);
+      expect(c.channel).toBe(ShtpChannel.Executable);
+      const payload = Uint8Array.of(command);
+      expect(toHex(payload)).toBe(c.payload);
+      const frame = layer.nextFrame(ShtpChannel.Executable, payload);
+      expect(toHex(frame)).toBe(c.shtp_frame);
+      expect(c.bridge_cmd).toBe(Bno086Cmd.SendShtpPacket);
+      expect(toHex(buildPacket(c.bridge_cmd, frame, c.bridge_seq, c.crc_type))).toBe(c.bridge_frame);
+    }
+  });
+
+  it("feature flag bits", () => {
+    expect(shtpData.feature_flags).toEqual({
+      wakeup: FeatureFlag.Wakeup,
+      always_on: FeatureFlag.AlwaysOn,
+    });
+  });
 });
 
 describe("bno086 report tables", () => {

@@ -3,6 +3,22 @@ using System.Buffers.Binary;
 namespace Depz.Sensor.Bno086;
 
 /// <summary>
+/// Set Feature <c>flags</c> bits (SH-2 §6.5.4) for
+/// <see cref="Sh2Control.SetFeature"/>. <c>Wakeup | AlwaysOn</c> keeps a sensor
+/// reporting through <see cref="Sh2Control.Sleep"/>: on a DEPZ BNO086
+/// (SH-2 3.12.6, 2026-10-16) such a report kept its full rate during sleep,
+/// delivered on SHTP channel 4 (wake input), while every other report stopped.
+/// </summary>
+public static class FeatureFlags
+{
+    /// <summary>Bit 2: wake-up enabled — the sensor reports on channel 4.</summary>
+    public const byte Wakeup = 0x04;
+
+    /// <summary>Bit 3: always-on — the sensor keeps running while the hub sleeps.</summary>
+    public const byte AlwaysOn = 0x08;
+}
+
+/// <summary>
 /// SH-2 control-report encoders (contracts/05_SENSOR_BNO086.md §6). Each method
 /// returns the header-less cargo payload for the control channel (channel 2);
 /// wrap it with <see cref="ShtpLayer.NextFrame"/> to frame it. Byte-exact with
@@ -43,6 +59,29 @@ public static class Sh2Control
 
     /// <summary>0xF9 Product ID Request.</summary>
     public static byte[] ProductId() => new byte[] { ProductIdRequest, 0x00 };
+
+    /// <summary>
+    /// SH-2 "Sleep" for the <b>executable</b> channel (channel 1, not control):
+    /// <c>[0x03]</c>. Frame it with
+    /// <c>NextFrame((int)ShtpChannel.Executable, Sh2Control.Sleep())</c> and send
+    /// it through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no
+    /// response. Every report stops, except those enabled with
+    /// <see cref="FeatureFlags.Wakeup"/> | <see cref="FeatureFlags.AlwaysOn"/>,
+    /// which keep their rate; the configuration (enabled sensors, rates) is
+    /// kept. <see cref="PowerOn"/> ends it. On a DEPZ BNO086 (SH-2 3.12.6,
+    /// 2026-10-16) all reports stopped within one sample; a Wakeup|AlwaysOn
+    /// report kept streaming at full rate on channel 4.
+    /// </summary>
+    public static byte[] Sleep() => new[] { (byte)ExecutableCommand.Sleep };
+
+    /// <summary>
+    /// SH-2 "On" for the <b>executable</b> channel (channel 1): <c>[0x02]</c> —
+    /// ends <see cref="Sleep"/>. Every report that was enabled comes back at its
+    /// rate, without re-enabling; the hub sends no response. Not the bridge's
+    /// SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware
+    /// signal, not an SH-2 command.
+    /// </summary>
+    public static byte[] PowerOn() => new[] { (byte)ExecutableCommand.On };
 
     /// <summary>
     /// 0xF2 Command Request: [id, seq, command] + params, zero-padded to 12

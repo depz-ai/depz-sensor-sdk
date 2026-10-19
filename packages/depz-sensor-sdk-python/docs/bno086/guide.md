@@ -12,6 +12,7 @@ the [API reference](../api.md).
 - [Report types and units](#report-types-and-units)
 - [Streaming and filtering](#streaming-and-filtering)
 - [Tare and calibration](#tare-and-calibration)
+- [Sleep and power on](#sleep-and-power-on)
 - [FRS records](#frs-records)
 - [Diagnostics and housekeeping](#diagnostics-and-housekeeping)
 - [Gotchas](#gotchas)
@@ -125,6 +126,32 @@ dev.configure_periodic_dcd(True)         # enable the hub's periodic autosave
 `set_calibration` / `save_dcd` / `clear_counts` raise `Sh2Error` on a non-zero
 status; the fire-and-forget commands (`tare_now`, `persist_tare`,
 `set_reorientation`, `configure_periodic_dcd`) have no SH-2 response.
+
+## Sleep and power on
+
+`sleep()` puts the hub to sleep: every report stops, but the configuration
+(enabled sensors, rates) stays. `power_on()` ends it, and every report that was
+on comes back at its rate — no re-enabling. Neither gets an answer from the hub
+(fire-and-forget, like `tare_now`).
+
+```python
+from depz_sensor_sdk.bno086 import FeatureFlag
+
+dev.enable(SensorId.ACCELEROMETER, hz=100)
+dev.enable(SensorId.GYROSCOPE, hz=50,
+           flags=FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON)  # keeps going in sleep
+dev.sleep()       # accelerometer stops; gyroscope keeps its 50 Hz
+dev.power_on()    # accelerometer is back at 100 Hz
+```
+
+Measured on a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+`wake()` is a different thing: it pulses the board's WAKE pin (bridge command
+0x33), a hardware signal. `power_on()` is the SH-2 "On" command that ends
+`sleep()`.
 
 ## FRS records
 

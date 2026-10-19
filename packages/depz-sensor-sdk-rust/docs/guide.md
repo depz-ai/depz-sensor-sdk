@@ -8,13 +8,12 @@ sensor then has its own **introduction** and **user guide**:
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
+  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
+  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
+  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
 - **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
   [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
-- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
-  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- **VL53L8CH** (ToF superset + CNH histograms) —
-  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
-  [api](vl53l8ch/api.md)
 - **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board, 63° / 90°) —
   [VL53L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
   [api](vl53l5cx/api.md)) · [VL53L7CX](vl53l7cx/introduction.md)
@@ -22,14 +21,17 @@ sensor then has its own **introduction** and **user guide**:
 - **VL53L7CH** (VL53L7CX + CNH histograms) —
   [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
   [api](vl53l7ch/api.md)
-- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
-  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
-  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
-  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
-- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
-  [guide](bno086/guide.md) · [api](bno086/api.md)
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the source `///` doc-comments so it never drifts from the code.
@@ -64,24 +66,24 @@ The sensors fall into three firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance
   ([`protocol::sr04`](sr04/api.md)).
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
+  for the 1D family; the v2.00 codecs, the product table and the stateless
+  decode of the streamed blocks are in [`vl53lx`](vl53l1cx/api.md).
 - **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD 2.2.3
   math (result block, range timing, tuning words) runs **on the host**
   ([`vl53l4`](vl53l4cd/api.md)).
-- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the ST ULD frame
-  layout is decoded **on the host** ([`vl53l8`](vl53l8cx/api.md)). CX is the
-  base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
 - **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
   three boards; frames have the VL53L8 layout and decode through `vl53l8` with
   `Variant::L7`; the board codecs and class resolution are in
   [`vl53l7`](vl53l7cx/api.md).
-- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
-  for the 1D family; the v2.00 codecs, the product table and the stateless
-  decode of the streamed blocks are in [`vl53lx`](vl53l1cx/api.md).
-- **BNO086** — the device is an SHTP pass-through; the SH-2 stack is decoded
-  **on the host** ([`bno086`](bno086/api.md)).
+- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the ST ULD frame
+  layout is decoded **on the host** ([`vl53l8`](vl53l8cx/api.md)). CX is the
+  base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
 - **BNO055** — the device is an I2C register bridge; Bosch's fusion runs on the
   chip, and the register codecs and block decode are in
   [`bno055`](bno055/api.md).
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the SH-2 stack is
+  decoded **on the host** ([`bno086`](bno086/api.md)).
 
 Everything is pure computation over `&[u8]` — no threads, no alloc(beyond the
 returned `Vec`s), no runtime dependencies.
@@ -96,7 +98,7 @@ frames these builders produce and write them to your transport. The
 **live drivers** are documented extension points, present in shape but not
 here:
 
-- **Live ULD init/config** (VL53L8 / VL53L5 / VL53L7 firmware download + the
+- **Live ULD init/config** (VL53L5 / VL53L7 / VL53L8 firmware download + the
   DCI register bridge over the wire) — hardware-dependent.
 - **The 1D family's ST drivers** (init, modes, budgets, calibration, histogram
   target extraction) and the **BNO055 session logic** (mode switches through
@@ -108,7 +110,7 @@ The crate never fabricates a decode it cannot verify against a golden vector.
 
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.4.2):
+Published on crates.io as `depz-sensor-sdk` (0.5.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -230,26 +232,26 @@ The typed layer per sensor — see each sensor's own guide and API reference:
 
 - **SR04** — [`protocol::sr04`](sr04/api.md): `Sr04Data::unpack`,
   `distance_mm_from_echo`, the sample-period / echo-decay codecs.
-- **VL53L4CD** — [`vl53l4`](vl53l4cd/api.md): the register-bridge command
-  packers and report unpackers (`RegData` / `Vl53l4Info` / `StreamData`) plus
-  the pure ULD math — `parse_result_block`, range timing, tuning words.
-- **VL53L8CX / CH** — [`vl53l8`](vl53l8cx/api.md): `FrameReassembler` rebuilds a
-  frame from `RPT_VL53_FRAME` chunks, `parse_frame` decodes it into per-zone
-  arrays, `advanced` holds the DCI codecs (motion, xtalk, thresholds).
-- **VL53L5CX / VL53L7CX / VL53L7CH** — [`vl53l7`](vl53l7cx/api.md): the
-  board's pin / bus-speed / info codecs and `resolve_model`; frames decode with
-  `vl53l8::parse_frame(frame, Variant::L7)`, the VL53L7CH's CNH block with
-  `vl53l8::decode_cnh`.
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — [`vl53lx`](vl53l1cx/api.md): the
   v2.00 stream / address-width / info codecs, the product table
   (`PRODUCTS`, `resolve_class`) and `decode_die_block` / `decode_l0x_raw` /
   `decode_histogram_raw`.
-- **BNO086** — [`bno086`](bno086/api.md): `ShtpLayer` reassembles SHTP cargos,
-  `parse_input_cargo` / `parse_gyro_rv_cargo` decode reports, `sh2` builds
-  control requests.
+- **VL53L4CD** — [`vl53l4`](vl53l4cd/api.md): the register-bridge command
+  packers and report unpackers (`RegData` / `Vl53l4Info` / `StreamData`) plus
+  the pure ULD math — `parse_result_block`, range timing, tuning words.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — [`vl53l7`](vl53l7cx/api.md): the
+  board's pin / bus-speed / info codecs and `resolve_model`; frames decode with
+  `vl53l8::parse_frame(frame, Variant::L7)`, the VL53L7CH's CNH block with
+  `vl53l8::decode_cnh`.
+- **VL53L8CX / CH** — [`vl53l8`](vl53l8cx/api.md): `FrameReassembler` rebuilds a
+  frame from `RPT_VL53_FRAME` chunks, `parse_frame` decodes it into per-zone
+  arrays, `advanced` holds the DCI codecs (motion, xtalk, thresholds).
 - **BNO055** — [`bno055`](bno055/api.md): the register-bridge codecs, `Units`,
   `CalibStatus`, `CalibrationProfile`, `AxisRemap` + placements, the page-1
   configs and `decode_block`.
+- **BNO085 / BNO086** — [`bno086`](bno086/api.md): `ShtpLayer` reassembles SHTP
+  cargos, `parse_input_cargo` / `parse_gyro_rv_cargo` decode reports, `sh2`
+  builds control requests.
 
 Common command/report codecs shared by all sensors (temperature, sync-time,
 status, text, sync-pins) live in [`protocol::common`](api.md#protocol-codecs).
@@ -301,7 +303,7 @@ JSON as `RecordValue::Other`.
 Truthfully, the live drivers are present in shape but not here (see
 [What it is not](#what-it-is-not)):
 
-- **Live ULD init/config** — the VL53L8 / VL53L5 / VL53L7 firmware download
+- **Live ULD init/config** — the VL53L5 / VL53L7 / VL53L8 firmware download
   and the DCI register bridge that performs writes over the wire. The pure DCI
   byte layouts are here (`vl53l8::advanced`); the bridge that ships them is
   not.
@@ -309,7 +311,7 @@ Truthfully, the live drivers are present in shape but not here (see
   the stateless decode are here; initialising and streaming those boards is
   done with the Python or TypeScript SDK.
 
-The CNH histogram block of the VL53L8CH / VL53L7CH is decoded:
+The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:
 `parse_frame` surfaces it as `Vl53l8Results::cnh_raw` and `vl53l8::decode_cnh`
 unpacks it into per-aggregate histograms.
 

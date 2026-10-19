@@ -47,6 +47,7 @@ class FakeBno086:
         self.features: dict[int, int] = {}  # sensor -> granted interval_us
         self.last_set_feature: bytes | None = None
         self.tare_requests: list[bytes] = []
+        self.executable_frames: list[bytes] = []  # host SHTP frames on channel 1
         self.frs_writes: dict[int, list[int]] = {}
         self._frs_wr_type: int | None = None
         self._frs_wr_len = 0
@@ -148,6 +149,9 @@ class FakeBno086:
             return
         hdr = ShtpHeader.unpack(frame)
         payload = frame[SHTP_HEADER_SIZE:]
+        if hdr.channel == ShtpChannel.EXECUTABLE:
+            self.executable_frames.append(bytes(frame))  # sleep / on: no response
+            return
         if hdr.channel != ShtpChannel.CONTROL or not payload:
             return
         rid = payload[0]

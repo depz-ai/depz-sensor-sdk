@@ -38,6 +38,10 @@ struct fake_bno086 {
     /* Control cargos sent later (the Product ID answer): due time, bytes. */
     struct { uint64_t due_us; uint8_t data[64]; size_t len; } later[4];
     size_t      n_later;
+    /* Host SHTP frames on the executable channel (sleep / on: no answer). */
+    uint8_t     exec_frame[8][8];
+    size_t      exec_len[8];
+    size_t      n_exec;
 };
 
 static void put_u16le(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
@@ -382,6 +386,11 @@ static void handle(fake_bno086 *f, uint8_t cmd, const uint8_t *p, size_t len)
         }
         f->accepted++;
         status(f, cmd, 0x00);
+        if (len >= 4 && p[2] == 1 && f->n_exec < 8) { /* executable: record, no answer */
+            size_t n = len < 8 ? len : 8;
+            memcpy(f->exec_frame[f->n_exec], p, n);
+            f->exec_len[f->n_exec++] = n;
+        }
         if (len >= 4 && p[2] == 2) sh2_control(f, p + 4, len - 4);
         break;
     default: status(f, cmd, 0x02);
@@ -510,6 +519,18 @@ bool fake_bno086_last_command(fake_bno086 *f, uint8_t command, uint8_t params[9]
     if (have) memcpy(params, f->last_params[command], 9);
     depz_mutex_unlock(&f->lock);
     return have;
+}
+
+size_t fake_bno086_executable_frame(fake_bno086 *f, size_t i, uint8_t out[8])
+{
+    size_t n = 0;
+    depz_mutex_lock(&f->lock);
+    if (i < f->n_exec) {
+        n = f->exec_len[i];
+        memcpy(out, f->exec_frame[i], n);
+    }
+    depz_mutex_unlock(&f->lock);
+    return n;
 }
 
 void fake_bno086_calibration_status(fake_bno086 *f, uint8_t status_)

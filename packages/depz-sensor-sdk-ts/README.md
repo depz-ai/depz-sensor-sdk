@@ -5,17 +5,17 @@ across the USB CDC-ACM firmware families that speak one shared framed protocol,
 usable from **the browser (WebSerial)** and **Node (serialport)**:
 
 - **HC-SR04** — ultrasonic distance
-- **VL53L4CD** — single-zone Time-of-Flight (host runs ST ULD 2.2.3)
 - **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the single-zone
   Time-of-Flight family on one I2C register bridge (host runs ST's ULD, ULP or
   histogram Bare Driver, up to four targets per frame)
-- **VL53L8CX / VL53L8CH** — 8×8 multizone Time-of-Flight (host runs the ST ULD);
-  `Vl53l8ch` is the `Vl53l8cx` superset, adding Compact-Network-Histogram output
+- **VL53L4CD** — single-zone Time-of-Flight (host runs ST ULD 2.2.3)
 - **VL53L5CX / VL53L7CX / VL53L7CH** — the same 8×8 ULD family on an I2C board;
   `Vl53l7ch` adds streamed Compact-Network-Histogram output
-- **BNO086** — 9-axis IMU (host runs the SH-2 stack)
+- **VL53L8CX / VL53L8CH** — 8×8 multizone Time-of-Flight (host runs the ST ULD);
+  `Vl53l8ch` is the `Vl53l8cx` superset, adding Compact-Network-Histogram output
 - **BNO055** — 9-axis IMU with on-chip fusion (host configures it over a
   register bridge)
+- **BNO085 / BNO086** — 9-axis IMU (host runs the SH-2 stack)
 
 Pure ESM, zero runtime dependencies on the browser path (`serialport` is an
 optional peer used only by the `./node` entry). Mirrors the Python

@@ -11,7 +11,7 @@ layers:
   it: serial links, USB discovery, `.depzrec` record / replay, a reader thread
   with request / reply matching, the common commands of every board, events
   and the sensor classes (**SR04**, **VL53L4CD** and the multizone
-  **VL53L8CX / VL53L8CH / VL53L5CX / VL53L7CX / VL53L7CH** and **BNO055** so
+  **VL53L5CX / VL53L7CX / VL53L7CH / VL53L8CX / VL53L8CH** and **BNO055** so
   far). A C++ wrapper over the C SDK (`depz-sensor-sdk-c`): exceptions, move-only handles that
   close themselves, `std::function` callbacks and pull streams.
 
@@ -32,8 +32,18 @@ int main() {
 The DEPZ line's sensors share one framed protocol:
 
 - **HC-SR04** — ultrasonic distance (`depz/sr04.hpp`, live class `depz::Sr04`).
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the VL53L 1D ToF
+  family on one I2C bridge firmware: bridge codecs, product table, class
+  resolution and the die / VL53L0X / histogram block decoders
+  (`depz/vl53lx.hpp`), and the live class `depz::Vl53lx` (every ST driver of
+  the family: the VL53L0X API, the VL53L1X / VL53L4CD ULDs, the VL53L3CX ULP,
+  the histogram driver with up to four targets).
 - **VL53L4CD** — single-zone ToF on an I2C register bridge, the ST ULD 2.2.3
   on the host (`depz/vl53l4.hpp`, live class `depz::Vl53l4cd`).
+- **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 ToF on one I2C register-bridge
+  firmware (63° / 90° / 90° + CNH): bridge codecs, class resolution and the
+  L5/L7 frame decode (`depz/vl53l7.hpp`), and the same live class
+  `depz::Vl53l8` (models `L5CX` / `L7CX` / `L7CH`).
 - **VL53L8CX** — 8×8 multizone Time-of-Flight on an SPI register bridge, the
   **base** ToF die (ST ULD 2.1.0 on the host; `depz/vl53l8.hpp`, live class
   `depz::Vl53l8`). This is the dev-default part and carries no dedicated
@@ -43,20 +53,10 @@ The DEPZ line's sensors share one framed protocol:
   production USB PID **0xED40**. Everything the CX does, the CH does
   identically — the same live class, model `L8CH` — and adds the
   compact-network-histogram (CNH) stream on top.
-- **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 ToF on one I2C register-bridge
-  firmware (63° / 90° / 90° + CNH): bridge codecs, class resolution and the
-  L5/L7 frame decode (`depz/vl53l7.hpp`), and the same live class
-  `depz::Vl53l8` (models `L5CX` / `L7CX` / `L7CH`).
-- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the VL53L 1D ToF
-  family on one I2C bridge firmware: bridge codecs, product table, class
-  resolution and the die / VL53L0X / histogram block decoders
-  (`depz/vl53lx.hpp`), and the live class `depz::Vl53lx` (every ST driver of
-  the family: the VL53L0X API, the VL53L1X / VL53L4CD ULDs, the VL53L3CX ULP,
-  the histogram driver with up to four targets).
-- **BNO086** — 9-axis IMU, SH-2 over SHTP (`depz/bno086.hpp`).
 - **BNO055** — 9-axis IMU with on-chip fusion on a register bridge: bridge
   codecs, units / calibration / axis-remap / page-1 config codecs and the
   register-window decode (`depz/bno055.hpp`, live class `depz::Bno055`).
+- **BNO085 / BNO086** — 9-axis IMU, SH-2 over SHTP (`depz/bno086.hpp`).
 
 CX and CH are two distinct sensors but one live class and one decode surface:
 `depz::Vl53l8` drives both (its `Vl53l8Model` picks the sensor firmware), and
@@ -79,39 +79,38 @@ selectable via `depz::vl53l8::Variant`.
   MCU temperature, payload CRC, sync pins, reset, bootloader entry), time
   sync, events, link statistics, and the `request` / `send` escape hatch.
 - Sensor classes: **SR04** (`depz::Sr04` — configuration, single shots, the
-  measurement loop as callbacks and streams), **VL53L4CD**
-  (`depz::Vl53l4cd` — the ST ULD 2.2.3 run on the host over the register
-  bridge: init, range timing, offset, crosstalk, detection window and quality
-  thresholds, calibration, XSHUT, single shots and INT-driven ranging as
-  callbacks and streams, raw register access) and the multizone ToF
-  **VL53L8CX / VL53L8CH** (SPI board) and **VL53L5CX / VL53L7CX / VL53L7CH**
-  (I2C board) (`depz::Vl53l8` — the ST ULD run on the host over the register
-  bridge: init with the ~84 KB sensor-firmware download, resolution,
-  frequency, ranging mode, sharpener, target order, power modes, crosstalk
-  margin / calibration / blob, detection thresholds, the motion indicator,
-  CNH on the L8CH / L7CH, INT-driven frame streaming as callbacks and
-  streams; on the I2C board also bridge info, bus speed and pin control,
-  and the sensor's module type), and the **BNO055** (`depz::Bno055` — the
-  register logic of the on-chip fusion: `configure()` through CONFIG with the
-  boot-settle and fusion-start polls, operating / power mode, units, axis
-  remap and placements, temperature source, system status and self-test,
-  calibration status / profile / soft-iron matrix, page-1 sensor configs,
-  unique id and motion interrupts, raw registers on pages 0 / 1, polled
-  samples and the timer / INT block stream as scaled `Bno055Sample`s through
-  callbacks and streams; verified on replays of real captures and live on a
-  lab board), and the **BNO085 / BNO086** (`depz::Bno086` — the SH-2
-  sensor-hub protocol over the SHTP pass-through: reset and product id,
-  enabling outputs with the granted rate read back, `Bno086Report`s scaled
-  to m/s², rad/s, µT and quaternions through callbacks and streams,
-  calibration / DCD / tare / reorientation, FRS records and sensor metadata,
-  error queue and counts, the busy back-off; verified on a replay of a real
-  capture and live on a lab BNO085), and the **VL53L 1D family** VL53L0X /
+  measurement loop as callbacks and streams), the **VL53L 1D family** VL53L0X /
   L1CX / L1CB / L3CX / L4CX (`depz::Vl53lx` — init with a (product, driver)
-  pair, a sibling's name borrowing its driver; `configure()` with budget,
-  mode and a stored calibration; modes, budgets, calibrations, thresholds,
-  ROI; `Vl53lxMeasurement`s with targets and the 24-bin histogram through
-  callbacks and streams, single shots; verified on strict replays of real
-  captures, the C class it wraps live on a lab VL53L4CX).
+  pair, a sibling's name borrowing its driver; `configure()` with budget, mode
+  and a stored calibration; modes, budgets, calibrations, thresholds, ROI;
+  `Vl53lxMeasurement`s with targets and the 24-bin histogram through callbacks
+  and streams, single shots; verified on strict replays of real captures, the C
+  class it wraps live on a lab VL53L4CX), **VL53L4CD** (`depz::Vl53l4cd` — the
+  ST ULD 2.2.3 run on the host over the register bridge: init, range timing,
+  offset, crosstalk, detection window and quality thresholds, calibration,
+  XSHUT, single shots and INT-driven ranging as callbacks and streams, raw
+  register access) and the multizone ToF **VL53L5CX / VL53L7CX / VL53L7CH**
+  (I2C board) and **VL53L8CX / VL53L8CH** (SPI board) (`depz::Vl53l8` — the ST
+  ULD run on the host over the register bridge: init with the ~84 KB
+  sensor-firmware download, resolution, frequency, ranging mode, sharpener,
+  target order, power modes, crosstalk margin / calibration / blob, detection
+  thresholds, the motion indicator, CNH on the L7CH / L8CH, INT-driven frame
+  streaming as callbacks and streams; on the I2C board also bridge info, bus
+  speed and pin control, and the sensor's module type), and the **BNO055**
+  (`depz::Bno055` — the register logic of the on-chip fusion: `configure()`
+  through CONFIG with the boot-settle and fusion-start polls, operating / power
+  mode, units, axis remap and placements, temperature source, system status and
+  self-test, calibration status / profile / soft-iron matrix, page-1 sensor
+  configs, unique id and motion interrupts, raw registers on pages 0 / 1,
+  polled samples and the timer / INT block stream as scaled `Bno055Sample`s
+  through callbacks and streams; verified on replays of real captures and live
+  on a lab board), and the **BNO085 / BNO086** (`depz::Bno086` — the SH-2
+  sensor-hub protocol over the SHTP pass-through: reset and product id,
+  enabling outputs with the granted rate read back, `Bno086Report`s scaled to
+  m/s², rad/s, µT and quaternions through callbacks and streams, calibration /
+  DCD / tare / reorientation, FRS records and sensor metadata, error queue and
+  counts, the busy back-off; verified on a replay of a real capture and live on
+  a lab BNO085).
 - A typed exception hierarchy under `depz::Error`.
 
 **The decode layer** (no dependencies):
@@ -122,22 +121,22 @@ selectable via `depz::vl53l8::Variant`.
   firmware-name identity parsing (`depz/identity.hpp`), USB id hints
   (`depz/usb_ids.hpp`).
 - SR04: full wire codecs (`depz/sr04.hpp`) — and the live class above.
+- **The VL53L 1D family**: wire codecs, class resolution and stateless
+  decode (`depz/vl53lx.hpp`) — and the live class above.
 - VL53L4CD: register-bridge codecs, result decode, timing/tuning math and
   init block (`depz/vl53l4.hpp`) — and the live class above.
+- **VL53L5CX / L7CX / L7CH**: bridge codecs, class resolution and the L5/L7
+  frame decode (`depz/vl53l7.hpp`) — and the live class above.
 - **VL53L8 (CX + CH)**: frame-chunk reassembly, the shared results-frame decoder
   (raw per-zone arrays), and the advanced-feature DCI codecs (xtalk margin,
   detection thresholds, motion indicator) — `depz/vl53l8.hpp` — and the live
   class above.
-- **BNO086**: SHTP framing, SH-2 encoders, report decode (`depz/bno086.hpp`) —
-  and the live class above.
-- **VL53L5CX / L7CX / L7CH**: bridge codecs, class resolution and the L5/L7
-  frame decode (`depz/vl53l7.hpp`) — and the live class above.
 - **BNO055**: bridge codecs, units / calibration / axis-remap / page-1
   config codecs and the register-window decode (`depz/bno055.hpp`) — and the
   live class above.
-- **The VL53L 1D family**: wire codecs, class resolution and stateless
-  decode (`depz/vl53lx.hpp`) — and the live class above.
-- **CNH histogram decode** (VL53L8CH, VL53L7CH): `depz::vl53l8::decode_cnh`.
+- **BNO085 / BNO086**: SHTP framing, SH-2 encoders, report decode
+  (`depz/bno086.hpp`) — and the live class above.
+- **CNH histogram decode** (VL53L7CH, VL53L8CH): `depz::vl53l8::decode_cnh`.
 
 Every board of the line has its live class.
 
@@ -151,19 +150,20 @@ Full docs live under [`docs/`](docs/):
   discovery, time-sync, firmware, datasets).
 - Per-sensor **introduction + user guide + API**:
   [SR04](docs/sr04/introduction.md) ·
-  [VL53L4CD](docs/vl53l4cd/introduction.md) ·
-  [VL53L8CX](docs/vl53l8cx/introduction.md) ·
-  [VL53L8CH](docs/vl53l8ch/introduction.md) ·
-  [VL53L5CX](docs/vl53l5cx/introduction.md) ·
-  [VL53L7CX](docs/vl53l7cx/introduction.md) ·
-  [VL53L7CH](docs/vl53l7ch/introduction.md) ·
   [VL53L0X](docs/vl53l0x/introduction.md) ·
   [VL53L1CX](docs/vl53l1cx/introduction.md) ·
   [VL53L1CB](docs/vl53l1cb/introduction.md) ·
   [VL53L3CX](docs/vl53l3cx/introduction.md) ·
+  [VL53L4CD](docs/vl53l4cd/introduction.md) ·
   [VL53L4CX](docs/vl53l4cx/introduction.md) ·
-  [BNO086](docs/bno086/introduction.md) ·
-  [BNO055](docs/bno055/introduction.md)
+  [VL53L5CX](docs/vl53l5cx/introduction.md) ·
+  [VL53L7CX](docs/vl53l7cx/introduction.md) ·
+  [VL53L7CH](docs/vl53l7ch/introduction.md) ·
+  [VL53L8CX](docs/vl53l8cx/introduction.md) ·
+  [VL53L8CH](docs/vl53l8ch/introduction.md) ·
+  [BNO055](docs/bno055/introduction.md) ·
+  [BNO085](docs/bno085/introduction.md) ·
+  [BNO086](docs/bno086/introduction.md)
 - [Full API reference](docs/api.md) — every public symbol, generated from the
   header doc-comments by `scripts/gen_api_md.py` (regenerate with
   `cmake --build build --target docs`, or `python3 scripts/gen_api_md.py`).
@@ -195,7 +195,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.4.2
+  GIT_TAG        v0.5.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -263,7 +263,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.4.2`; fill in the archive `SHA512`
+> The portfile references release tag `v0.5.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test

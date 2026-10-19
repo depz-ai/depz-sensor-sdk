@@ -38,6 +38,7 @@ from .sh2 import (
     Counts,
     ErrorRecord,
     ErrorSource,
+    FeatureFlag,
     FeatureResponse,
     FrsReadResponse,
     FrsReadSession,
@@ -66,7 +67,7 @@ from .sh2 import (
     set_reorientation_params,
     tare_now_params,
 )
-from .shtp import ShtpCargo, ShtpChannel, ShtpLayer
+from .shtp import ExecutableCommand, ShtpCargo, ShtpChannel, ShtpLayer
 
 __all__ = [
     "Bno086",
@@ -79,6 +80,8 @@ __all__ = [
     "RotationVector",
     "GyroIntegratedRV",
     "FeatureResponse",
+    "FeatureFlag",
+    "ExecutableCommand",
     "ProductId",
     "CommandResponse",
     "SensorMetadata",
@@ -341,8 +344,34 @@ class Bno086(DeviceBase):
         self._reset_event.wait(min(timeout, 0.5))
 
     def wake(self) -> None:
-        """Pulse WAKE (PS0): wakes the sensor from sleep, no state loss."""
+        """Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.
+
+        This is the board's hardware pin pulse (board command 0x33), not an
+        SH-2 command; the SH-2 "On" command that ends `sleep()` is
+        `power_on()`."""
         self.request(Bno086Cmd.SENSOR_WAKE_UP, ok_completes=True)
+
+    def sleep(self) -> None:
+        """Put the hub to sleep: SH-2 "Sleep" (0x03 on SHTP channel 1).
+
+        Every report stops, except those enabled with
+        ``flags=FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON``, which keep their
+        rate; the configuration (enabled sensors, rates) is kept. The hub
+        sends no response. `power_on()` ends it.
+
+        On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): all reports stopped
+        within one sample; a WAKEUP|ALWAYS_ON report kept streaming at full
+        rate on channel 4."""
+        self._send_shtp(ShtpChannel.EXECUTABLE, bytes([ExecutableCommand.SLEEP]))
+
+    def power_on(self) -> None:
+        """End `sleep()`: SH-2 "On" (0x02 on SHTP channel 1).
+
+        Every report that was enabled comes back at its rate — no need to
+        re-enable. The hub sends no response. Not to be confused with
+        `wake()`, which pulses the WAKE pin (board command 0x33) instead of
+        sending an SH-2 command."""
+        self._send_shtp(ShtpChannel.EXECUTABLE, bytes([ExecutableCommand.ON]))
 
     @property
     def advertisement(self) -> bytes:

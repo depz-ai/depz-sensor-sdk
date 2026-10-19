@@ -30,6 +30,44 @@ pub enum ShtpChannel {
     GyroRv = 5,
 }
 
+/// One-byte host writes on the executable channel (SHTP channel 1,
+/// contract 05 §6a). The hub answers none of them.
+///
+/// `Reset` restarts the hub (answered later by the 0x01 reset-complete on the
+/// same channel); `Sleep` stops every report except those enabled with
+/// `sh2::FEATURE_FLAG_WAKEUP | sh2::FEATURE_FLAG_ALWAYS_ON`, keeping the
+/// configuration; `On` ends `Sleep` and every report resumes at its rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ExecutableCommand {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+
+/// SH-2 "Sleep" payload for the executable channel: `[0x03]`. Send it with
+/// `next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
+/// bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
+///
+/// Every report stops, except those enabled with flags wake-up | always-on,
+/// which keep their rate; the configuration (enabled sensors, rates) is kept.
+/// [`build_power_on`] ends it. On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) all
+/// reports stopped within one sample; a WAKEUP|ALWAYS_ON report kept
+/// streaming at full rate on channel 4.
+pub fn build_sleep() -> [u8; 1] {
+    [ExecutableCommand::Sleep as u8]
+}
+
+/// SH-2 "On" payload for the executable channel: `[0x02]` — ends
+/// [`build_sleep`]'s sleep. Every report that was enabled comes back at its
+/// rate, without re-enabling; the hub sends no response.
+///
+/// Not the bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin —
+/// a hardware signal, not an SH-2 command.
+pub fn build_power_on() -> [u8; 1] {
+    [ExecutableCommand::On as u8]
+}
+
 /// A decoded SHTP header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShtpHeader {

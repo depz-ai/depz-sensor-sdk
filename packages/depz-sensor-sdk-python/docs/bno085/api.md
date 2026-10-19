@@ -10,7 +10,7 @@ the source, not this file.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
+- **BNO085 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
 
 ## BNO085 (IMU)
 
@@ -56,6 +56,40 @@ wake(self) -> None
 ```
 
 Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.
+
+This is the board's hardware pin pulse (board command 0x33), not an
+SH-2 command; the SH-2 "On" command that ends `sleep()` is
+`power_on()`.
+
+#### Bno086.sleep
+
+```python
+sleep(self) -> None
+```
+
+Put the hub to sleep: SH-2 "Sleep" (0x03 on SHTP channel 1).
+
+Every report stops, except those enabled with
+``flags=FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON``, which keep their
+rate; the configuration (enabled sensors, rates) is kept. The hub
+sends no response. `power_on()` ends it.
+
+On a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16): all reports stopped
+within one sample; a WAKEUP|ALWAYS_ON report kept streaming at full
+rate on channel 4.
+
+#### Bno086.power_on
+
+```python
+power_on(self) -> None
+```
+
+End `sleep()`: SH-2 "On" (0x02 on SHTP channel 1).
+
+Every report that was enabled comes back at its rate — no need to
+re-enable. The hub sends no response. Not to be confused with
+`wake()`, which pulses the WAKE pin (board command 0x33) instead of
+sending an SH-2 command.
 
 #### Bno086.advertisement *(property)*
 
@@ -685,6 +719,244 @@ Get Feature Response (0xFC), 17 bytes — the rates in effect.
 ```python
 unpack(cls, payload: bytes) -> 'FeatureResponse'
 ```
+
+### FeatureFlag
+
+```python
+class FeatureFlag(*values)
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for `Bno086.enable(flags=...)`.
+
+WAKEUP | ALWAYS_ON keeps a sensor reporting through `Bno086.sleep()`: on a
+DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate
+during sleep, delivered on SHTP channel 4 (wake input), while every other
+report stopped.
+
+#### FeatureFlag.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### FeatureFlag.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### FeatureFlag.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### FeatureFlag.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### FeatureFlag.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### FeatureFlag.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### FeatureFlag.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### ExecutableCommand
+
+```python
+class ExecutableCommand(*values)
+```
+
+One-byte host writes on the executable channel (SHTP channel 1).
+
+The hub answers none of them. RESET restarts the hub (answered later by
+the 0x01 reset-complete on the same channel); SLEEP stops every report
+except those enabled with FeatureFlag.WAKEUP | ALWAYS_ON, keeping the
+configuration; ON ends SLEEP and every report resumes at its rate.
+
+#### ExecutableCommand.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### ExecutableCommand.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### ExecutableCommand.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### ExecutableCommand.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### ExecutableCommand.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### ExecutableCommand.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### ExecutableCommand.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
 
 ### ProductId
 

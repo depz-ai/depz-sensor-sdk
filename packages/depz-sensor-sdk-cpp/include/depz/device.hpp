@@ -802,6 +802,13 @@ enum class TareBasis : std::uint8_t {
 };
 inline constexpr std::uint8_t TARE_X = 1, TARE_Y = 2, TARE_Z = 4, TARE_ALL = 7;
 
+// Set Feature `flags` bits (SH-2 §6.5.4) for FeatureRequest::flags.
+// FEATURE_WAKEUP: the sensor reports on SHTP channel 4 (wake input);
+// FEATURE_ALWAYS_ON: it keeps running while the hub sleeps. Together they kept
+// a report at its full rate through Bno086::sleep() on a DEPZ BNO086
+// (SH-2 3.12.6, 2026-10-16), while every other report stopped.
+inline constexpr std::uint8_t FEATURE_WAKEUP = 0x04, FEATURE_ALWAYS_ON = 0x08;
+
 // Get Feature Response: the rates in effect.
 struct Feature {
     std::uint8_t sensor_id = 0, flags = 0;
@@ -875,7 +882,18 @@ public:
 
     // nRST: SHTP state, the advertisement and every enabled sensor restart.
     void hardware_reset(std::chrono::milliseconds timeout = std::chrono::milliseconds(2000));
+    // WAKE (PS0) pulse: the board's hardware pin pulse (bridge 0x33), not an
+    // SH-2 command — the SH-2 "On" that ends sleep() is power_on().
     void wake();
+    // SH-2 "Sleep" (0x03 on SHTP channel 1, contract 05 §6a): every report
+    // stops except those enabled with FEATURE_WAKEUP | FEATURE_ALWAYS_ON,
+    // which keep their rate; the configuration is kept. No SH-2 answer. On a
+    // DEPZ BNO086 (SH-2 3.12.6, 2026-10-16) all reports stopped within one
+    // sample; a WAKEUP|ALWAYS_ON report kept streaming at full rate on channel 4.
+    void sleep();
+    // SH-2 "On" (0x02 on SHTP channel 1): ends sleep() — every report that was
+    // enabled comes back at its rate without re-enabling. No SH-2 answer.
+    void power_on();
     bytes advertisement();
     // The SH-2 application's Product ID — the first of product_ids().
     bno086::ProductId product_id();

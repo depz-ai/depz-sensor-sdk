@@ -19,7 +19,7 @@ the headers, not this file.
 
 ## Contents
 
-- **BNO085 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO085 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **BNO085 / BNO086 live class (depz/device.hpp)**: [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`open_bno086`](#open_bno086)
 
 ## BNO085 codecs (depz/bno086.hpp)
@@ -68,6 +68,22 @@ enum class ShtpChannel : std::uint8_t {
     GyroRv = 5,
 };
 ```
+
+### ExecutableCommand
+
+```cpp
+enum class ExecutableCommand : std::uint8_t {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+};
+```
+
+One-byte host writes on the executable channel (contract 05 §6a); the hub
+answers none of them. Reset restarts the hub (the 0x01 reset-complete
+follows on the same channel); Sleep stops every report except those enabled
+with FEATURE_WAKEUP | FEATURE_ALWAYS_ON, keeping the configuration; On ends
+Sleep and every report resumes at its rate. Bno086::sleep() / power_on().
 
 ### ShtpHeader
 
@@ -556,6 +572,30 @@ nRST: SHTP state, the advertisement and every enabled sensor restart.
 ```cpp
 void wake();
 ```
+
+WAKE (PS0) pulse: the board's hardware pin pulse (bridge 0x33), not an
+SH-2 command — the SH-2 "On" that ends sleep() is power_on().
+
+#### Bno086.sleep
+
+```cpp
+void sleep();
+```
+
+SH-2 "Sleep" (0x03 on SHTP channel 1, contract 05 §6a): every report
+stops except those enabled with FEATURE_WAKEUP | FEATURE_ALWAYS_ON,
+which keep their rate; the configuration is kept. No SH-2 answer. On a
+DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) all reports stopped within one
+sample; a WAKEUP|ALWAYS_ON report kept streaming at full rate on channel 4.
+
+#### Bno086.power_on
+
+```cpp
+void power_on();
+```
+
+SH-2 "On" (0x02 on SHTP channel 1): ends sleep() — every report that was
+enabled comes back at its rate without re-enabling. No SH-2 answer.
 
 #### Bno086.advertisement
 

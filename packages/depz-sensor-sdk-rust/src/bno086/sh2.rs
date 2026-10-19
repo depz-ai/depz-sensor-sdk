@@ -41,6 +41,16 @@ impl std::fmt::Display for Sh2Error {
 
 impl std::error::Error for Sh2Error {}
 
+/// Set Feature `flags` bit 2 (SH-2 §6.5.4): wake-up enabled — the sensor
+/// reports on SHTP channel 4 (wake input).
+pub const FEATURE_FLAG_WAKEUP: u8 = 0x04;
+
+/// Set Feature `flags` bit 3 (SH-2 §6.5.4): always-on — the sensor keeps
+/// running while the hub sleeps. With [`FEATURE_FLAG_WAKEUP`] a report kept
+/// its full rate through the executable-channel sleep on a DEPZ BNO086
+/// (SH-2 3.12.6, 2026-10-16), on channel 4, while every other report stopped.
+pub const FEATURE_FLAG_ALWAYS_ON: u8 = 0x08;
+
 /// Set Feature Command (0xFD), 17 bytes. `interval_us` = 0 disables the sensor.
 pub fn build_set_feature(
     sensor_id: u8,

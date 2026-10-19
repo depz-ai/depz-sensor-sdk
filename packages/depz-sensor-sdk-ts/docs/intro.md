@@ -3,26 +3,27 @@
 `@depz/sensor-sdk` is the TypeScript SDK for the DEPZ USB sensor line
 (HC-SR04 ultrasonic, the VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX
 single-zone ToF family, the VL53L5CX / L7CX / L7CH / L8CX / L8CH 8×8 ToF
-matrices, the BNO086 and BNO055 9-axis IMUs). Pure ESM, fully typed, and it
-runs in two places:
+matrices, the BNO055 and BNO085 / BNO086 9-axis IMUs). Pure ESM, fully typed,
+and it runs in two places:
 
 **Working with one specific sensor?** Each has its own introduction, guide
 and API reference:
 
 - **[SR04](sr04/introduction.md)** — ultrasonic ranging: one distance per ping.
-- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one laser distance per sample.
-- **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
-- **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
-- **[VL53L5CX](vl53l5cx/introduction.md)** — 8×8 ToF, 63° view, I2C board.
-- **[VL53L7CX](vl53l7cx/introduction.md)** — 8×8 ToF, 90° view, I2C board.
-- **[VL53L7CH](vl53l7ch/introduction.md)** — the L7CX superset with streamed CNH histograms.
 - **[VL53L0X](vl53l0x/introduction.md)** — single-zone ToF to ~2 m.
 - **[VL53L1CX](vl53l1cx/introduction.md)** — single-zone ToF to ~4 m, ROI, multi-target histogram driver.
 - **[VL53L1CB](vl53l1cb/introduction.md)** — the L1 die behind a cover glass, to ~8 m.
 - **[VL53L3CX](vl53l3cx/introduction.md)** — multi-target ToF to ~3 m.
+- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one laser distance per sample.
 - **[VL53L4CX](vl53l4cx/introduction.md)** — multi-target ToF to ~6 m.
-- **[BNO086](bno086/introduction.md)** — 9-axis IMU: orientation and motion.
+- **[VL53L5CX](vl53l5cx/introduction.md)** — 8×8 ToF, 63° view, I2C board.
+- **[VL53L7CX](vl53l7cx/introduction.md)** — 8×8 ToF, 90° view, I2C board.
+- **[VL53L7CH](vl53l7ch/introduction.md)** — the L7CX superset with streamed CNH histograms.
+- **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
+- **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion: orientation, gravity, calibration.
+- **[BNO085](bno085/introduction.md)** — 9-axis IMU: orientation and motion.
+- **[BNO086](bno086/introduction.md)** — 9-axis IMU: orientation and motion.
 
 - **Browser (WebSerial)** — zero-install: the page talks to the sensor
   directly over `navigator.serial`; this is what powers the DEPZ web viewers.
@@ -78,13 +79,13 @@ protocol, one mental model.
 ## Where to next
 
 - **Your sensor's pages** — [SR04](sr04/introduction.md) ·
-  [VL53L4CD](vl53l4cd/introduction.md) ·
-  [VL53L8CX](vl53l8cx/introduction.md) · [VL53L8CH](vl53l8ch/introduction.md) ·
+  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
+  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
+  [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
   [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
-  [VL53L7CH](vl53l7ch/introduction.md) · [VL53L0X](vl53l0x/introduction.md) ·
-  [VL53L1CX](vl53l1cx/introduction.md) · [VL53L1CB](vl53l1cb/introduction.md) ·
-  [VL53L3CX](vl53l3cx/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
-  [BNO086](bno086/introduction.md) · [BNO055](bno055/introduction.md):
+  [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
   introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](overview.md)** — the SDK-wide walkthrough: mental model,
   installation, discovery, multi-sensor recording, hardware-free testing.

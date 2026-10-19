@@ -6,7 +6,7 @@
 
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.4.2</version>
+  <version>0.5.0</version>
   <packaging>jar</packaging>
 
   <name>depz-sensor-sdk</name>
@@ -92,18 +92,24 @@
         </executions>
       </plugin>
 
-      <!-- Sonatype Central Portal publishing -->
+      <!-- Sonatype Central Portal publishing.
+           0.12.0, not 0.8.0: Maven 3.10.0 (GitHub runners from 2026-10) stages
+           maven-metadata-local.xml + _remote.repositories, and 0.8.0 only
+           pre-bundle-deletes maven-metadata-central-staging.xml (Maven 3.9's
+           name), so the portal failed java 0.4.2 and the first 0.4.3 upload:
+           "Bundle has content that does NOT have a .pom file". -->
       <plugin>
         <groupId>org.sonatype.central</groupId>
         <artifactId>central-publishing-maven-plugin</artifactId>
-        <version>0.8.0</version>
+        <version>0.12.0</version>
         <extensions>true</extensions>
         <configuration>
           <publishingServerId>central</publishingServerId>
           <autoPublish>true</autoPublish>
-          <!-- Do not poll for "published" — the upload + autoPublish is enough,
-               and older plugin builds crash parsing the status response. -->
-          <waitUntil>uploaded</waitUntil>
+          <!-- Wait for the portal's validation, so a rejected bundle turns the
+               publish run red (with waitUntil=uploaded both failures above
+               left it green). Not "published": that step can take hours. -->
+          <waitUntil>validated</waitUntil>
         </configuration>
       </plugin>
     </plugins>

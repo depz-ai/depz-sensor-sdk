@@ -1273,6 +1273,43 @@ public final class RunVectors {
             }
             check("bno.shtp.control:" + name, hex(got).equals(c.get("payload")));
         }
+        // Executable channel: sleep / power_on (contract 05 §6a); fresh layer → seq 0, 1.
+        Shtp.ShtpLayer execLayer = new Shtp.ShtpLayer();
+        int execCount = 0;
+        for (Object xo : arr(root.get("executable"))) {
+            Map<String, Object> c = obj(xo);
+            String name = (String) c.get("name");
+            int command;
+            byte[] payload;
+            switch (name) {
+                case "sleep":
+                    command = Shtp.EXECUTABLE_SLEEP;
+                    payload = Sh2.buildSleep();
+                    break;
+                case "power_on":
+                    command = Shtp.EXECUTABLE_ON;
+                    payload = Sh2.buildPowerOn();
+                    break;
+                default:
+                    throw new RuntimeException("unknown executable command " + name);
+            }
+            boolean ok = command == intOf(c.get("command"))
+                && Shtp.CHANNEL_EXECUTABLE == intOf(c.get("channel"))
+                && hex(payload).equals(c.get("payload"));
+            byte[] frame = execLayer.nextFrame(Shtp.CHANNEL_EXECUTABLE, payload);
+            ok &= hex(frame).equals(c.get("shtp_frame"));
+            byte[] bridge = Framing.buildPacket(
+                intOf(c.get("bridge_cmd")), frame, intOf(c.get("bridge_seq")),
+                CrcType.fromValue(intOf(c.get("crc_type"))));
+            ok &= hex(bridge).equals(c.get("bridge_frame"));
+            check("bno.shtp.executable:" + name, ok);
+            execCount++;
+        }
+        check("bno.shtp.executable:count", execCount == 2);
+        Map<String, Object> flags = obj(root.get("feature_flags"));
+        check("bno.shtp.feature_flags",
+            intOf(flags.get("wakeup")) == Sh2.FEATURE_FLAG_WAKEUP
+                && intOf(flags.get("always_on")) == Sh2.FEATURE_FLAG_ALWAYS_ON);
     }
 
     // ── bno086_reports.json ───────────────────────────────────────────────────

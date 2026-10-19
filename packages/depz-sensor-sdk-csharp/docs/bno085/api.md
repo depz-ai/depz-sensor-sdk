@@ -11,7 +11,7 @@ in the source, not this file.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`SensorId`](#sensorid), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`Sh2Control`](#sh2control), [`ShtpChannel`](#shtpchannel), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
+- **BNO085 (IMU)**: [`SensorId`](#sensorid), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`FeatureFlags`](#featureflags), [`Sh2Control`](#sh2control), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
 
 ## BNO085 (IMU)
 
@@ -447,6 +447,30 @@ public static GyroIntegratedRV? ParseGyroRvCargo(byte[] payload, long captureTim
 
 Parse a channel-5 cargo (gyro-integrated RV, dense). Two shapes: bare 7×i16, or prefixed with 0xFB + i32 base delta + u16 delay. Returns null when the cargo is too short.
 
+### FeatureFlags
+
+```csharp
+public static class FeatureFlags
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for `SetFeature`. `Wakeup | AlwaysOn` keeps a sensor reporting through `Sleep`: on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate during sleep, delivered on SHTP channel 4 (wake input), while every other report stopped.
+
+#### FeatureFlags.Wakeup *(constant)*
+
+```csharp
+public const byte Wakeup = 0x04
+```
+
+Bit 2: wake-up enabled — the sensor reports on channel 4.
+
+#### FeatureFlags.AlwaysOn *(constant)*
+
+```csharp
+public const byte AlwaysOn = 0x08
+```
+
+Bit 3: always-on — the sensor keeps running while the hub sleeps.
+
 ### Sh2Control
 
 ```csharp
@@ -521,6 +545,22 @@ public static byte[] ProductId()
 
 0xF9 Product ID Request.
 
+#### Sh2Control.Sleep
+
+```csharp
+public static byte[] Sleep()
+```
+
+SH-2 "Sleep" for the executable channel (channel 1, not control): `[0x03]`. Frame it with `NextFrame((int)ShtpChannel.Executable, Sh2Control.Sleep())` and send it through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no response. Every report stops, except those enabled with `Wakeup` | `AlwaysOn`, which keep their rate; the configuration (enabled sensors, rates) is kept. `PowerOn` ends it. On a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) all reports stopped within one sample; a Wakeup|AlwaysOn report kept streaming at full rate on channel 4.
+
+#### Sh2Control.PowerOn
+
+```csharp
+public static byte[] PowerOn()
+```
+
+SH-2 "On" for the executable channel (channel 1): `[0x02]` — ends `Sleep`. Every report that was enabled comes back at its rate, without re-enabling; the hub sends no response. Not the bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware signal, not an SH-2 command.
+
 #### Sh2Control.Command
 
 ```csharp
@@ -568,6 +608,19 @@ public enum ShtpChannel
 ```
 
 SHTP channels (contracts/05_SENSOR_BNO086.md §3).
+
+### ExecutableCommand
+
+```csharp
+public enum ExecutableCommand : byte
+{
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+```
+
+One-byte host writes on the executable channel (SHTP channel 1, contracts/05_SENSOR_BNO086.md §6a). The hub answers none of them. `Reset` restarts the hub (answered later by the 0x01 reset-complete on the same channel); `Sleep` stops every report except those enabled with `Wakeup` | `AlwaysOn`, keeping the configuration; `On` ends `Sleep` and every report resumes at its rate.
 
 ### ShtpHeader
 

@@ -202,6 +202,8 @@ export class Bno055 extends DepzDevice {
   private sampleCbs: Array<(s: Bno055Sample) => void> = [];
   private sampleQueues: StreamQueue<Bno055Sample>[] = [];
   private streamParseErrorCount = 0;
+  /** The operating mode to put back when a suspended chip wakes up. */
+  private modeBeforeSuspend: Bno055OprMode | null = null;
   private configured: Required<Pick<Bno055ConfigureOptions, "mode" | "units">> &
     Pick<Bno055ConfigureOptions, "axisRemap" | "calibration"> | null = null;
 
@@ -294,8 +296,33 @@ export class Bno055 extends DepzDevice {
     return ((await this.readRegister(BNO055_REG_PWR_MODE)) & 0x03) as Bno055PwrMode;
   }
 
+  /**
+   * Written in CONFIG mode; the operating mode is restored after. A suspended
+   * chip ignores OPR_MODE writes and stays in CONFIG (measured 19.10.2026), so
+   * the operating mode is kept here and put back on wake-up — NDOF if the chip
+   * was already asleep when we connected (contract 13 §4.6).
+   */
   setPowerMode(mode: Bno055PwrMode): Promise<void> {
-    return this.locked(() => this.inConfig(() => this.wr(BNO055_REG_PWR_MODE, Uint8Array.of(mode))));
+    return this.locked(async () => {
+      const opr = ((await this.rd(BNO055_REG_OPR_MODE, 1)).data[0]! & 0x0f) as Bno055OprMode;
+      const pwr = (await this.rd(BNO055_REG_PWR_MODE, 1)).data[0]! & 0x03;
+      let resume: Bno055OprMode | null;
+      if (opr !== Bno055OprMode.Config) {
+        resume = opr;
+        await this.switchMode(Bno055OprMode.Config);
+      } else if (pwr === Bno055PwrMode.Suspend) {
+        resume = this.modeBeforeSuspend ?? Bno055OprMode.Ndof;
+      } else {
+        resume = null; // CONFIG on purpose: stay there
+      }
+      await this.wr(BNO055_REG_PWR_MODE, Uint8Array.of(mode));
+      if (mode === Bno055PwrMode.Suspend) {
+        this.modeBeforeSuspend = resume;
+      } else {
+        this.modeBeforeSuspend = null;
+        if (resume !== null) await this.switchMode(resume);
+      }
+    });
   }
 
   async getUnits(): Promise<Bno055Units> {

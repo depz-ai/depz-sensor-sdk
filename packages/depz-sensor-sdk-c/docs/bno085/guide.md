@@ -15,6 +15,7 @@ the [introduction](introduction.md); for exact signatures see the
 - [Callbacks](#callbacks)
 - [Choosing outputs and rates](#choosing-outputs-and-rates)
 - [Calibration, tare and reorientation](#calibration-tare-and-reorientation)
+- [Sleep and power on](#sleep-and-power-on)
 - [FRS records and sensor metadata](#frs-records-and-sensor-metadata)
 - [Diagnostics](#diagnostics)
 - [Errors, busy and timeouts](#errors-busy-and-timeouts)
@@ -248,6 +249,38 @@ heading). It lasts until reset unless you call `depz_bno086_persist_tare()`.
 rotation (a unit quaternion; all zeros clears it) — for a board mounted
 rotated in your device. None of these three has an SH-2 answer: they return
 once the bridge took the frame.
+
+## Sleep and power on
+
+`depz_bno086_sleep()` puts the hub to sleep: every report stops, but the
+configuration (enabled sensors, rates) stays. `depz_bno086_power_on()` ends
+it, and every report that was on comes back at its rate — no re-enabling.
+Neither has an SH-2 answer: they return once the bridge took the frame.
+
+```c
+#include <depz_sensor_io.h>
+
+static void nap(depz_device *dev)
+{
+    depz_bno086_feature_request req = {0};
+    req.interval_us = 20000;                                      /* 50 Hz */
+    req.flags = DEPZ_BNO_FEATURE_WAKEUP | DEPZ_BNO_FEATURE_ALWAYS_ON;  /* keeps going in sleep */
+    depz_bno086_enable(dev, DEPZ_BNO_SENSOR_ACCELEROMETER, 100, NULL);
+    depz_bno086_enable_ex(dev, DEPZ_BNO_SENSOR_GYROSCOPE, &req, NULL);
+    depz_bno086_sleep(dev);      /* accelerometer stops; gyroscope keeps its 50 Hz */
+    /* ... */
+    depz_bno086_power_on(dev);   /* accelerometer is back at 100 Hz */
+}
+```
+
+Measured on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+`depz_bno086_wake()` is a different thing: it pulses the board's WAKE pin
+(bridge command 0x33), a hardware signal. `depz_bno086_power_on()` is the SH-2
+"On" command that ends `depz_bno086_sleep()`.
 
 ## FRS records and sensor metadata
 

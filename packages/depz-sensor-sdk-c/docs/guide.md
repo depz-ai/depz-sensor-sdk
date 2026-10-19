@@ -8,19 +8,6 @@ its own **introduction** and **user guide**:
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
-- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
-  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
-- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
-  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- **VL53L8CH** (ToF superset + CNH histograms) —
-  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
-  [api](vl53l8ch/api.md)
-- **VL53L5CX** / **VL53L7CX** / **VL53L7CH** (8×8 ToF, I2C board) —
-  [L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
-  [api](vl53l5cx/api.md)) · [L7CX](vl53l7cx/introduction.md)
-  ([guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)) ·
-  [L7CH](vl53l7ch/introduction.md) ([guide](vl53l7ch/guide.md) ·
-  [api](vl53l7ch/api.md))
 - **VL53L 1D family** (single-zone / multi-target ToF) —
   [L0X](vl53l0x/introduction.md) ([guide](vl53l0x/guide.md) ·
   [api](vl53l0x/api.md)) · [L1CX](vl53l1cx/introduction.md)
@@ -30,11 +17,26 @@ its own **introduction** and **user guide**:
   ([guide](vl53l3cx/guide.md) · [api](vl53l3cx/api.md)) ·
   [L4CX](vl53l4cx/introduction.md) ([guide](vl53l4cx/guide.md) ·
   [api](vl53l4cx/api.md))
-- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
-  [guide](bno086/guide.md) · [api](bno086/api.md)
+- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
+  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
+- **VL53L5CX** / **VL53L7CX** / **VL53L7CH** (8×8 ToF, I2C board) —
+  [L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
+  [api](vl53l5cx/api.md)) · [L7CX](vl53l7cx/introduction.md)
+  ([guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)) ·
+  [L7CH](vl53l7ch/introduction.md) ([guide](vl53l7ch/guide.md) ·
+  [api](vl53l7ch/api.md))
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) —
   [introduction](bno055/introduction.md) · [guide](bno055/guide.md) ·
   [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the two headers' doc-comments so it never drifts from the code.
@@ -85,47 +87,47 @@ two layers, one public header each:
 
 The live layer covers the **common commands on every board**; full **sensor
 classes arrive one sensor at a time — the SR04, the VL53L4CD, the
-multizone ToF boards (VL53L8CX / CH, VL53L5CX / L7CX / L7CH) and the BNO055
+multizone ToF boards (VL53L5CX / L7CX / L7CH, VL53L8CX / CH) and the BNO055
 have one today**. The
 [API reference](api.md) is generated straight from both headers' doc-comments.
 
 The sensors follow three firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance.
-- **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD 2.2.3
-  (init, range timing, tuning, calibration, result-block decode) runs **on the
-  host** over plain register reads/writes — the live class ports it register
-  for register.
-- **VL53L8CX / VL53L8CH** — the device is a thin SPI register bridge; the ST
-  ULD runs **on the host**, the ~84 KB sensor-firmware download included, and
-  the ranging frames are reassembled and decoded there — one live class for
-  both. CX is the base ToF imager; CH is its superset, adding
-  Compact-Network-Histogram (CNH) output.
-- **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
-  three 8×8 ToF boards; the ST ULD runs **on the host** in the same live
-  class as the VL53L8 (its L5/L7 branch), and the frames are reassembled and
-  decoded there (L7CH adds CNH histograms).
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
   for the whole 1D family; every ST driver of the family runs **on the host**
   in one live class (`depz_vl53lx_*`), with the same register traffic as the
   Python SDK — the VL53L0X API, the VL53L1X / VL53L4CD ULDs, the VL53L3CX
   ULP, and the histogram driver that finds up to four targets in 24 bins.
-- **BNO085 / BNO086** — the device is an SHTP pass-through; the whole SH-2
-  sensor-hub protocol runs **on the host** — the live class enables outputs,
-  matches the hub's answers by their content and parses the reports, with the
-  same requests as the Python SDK.
+- **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD 2.2.3
+  (init, range timing, tuning, calibration, result-block decode) runs **on the
+  host** over plain register reads/writes — the live class ports it register
+  for register.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
+  three 8×8 ToF boards; the ST ULD runs **on the host** in the same live
+  class as the VL53L8 (its L5/L7 branch), and the frames are reassembled and
+  decoded there (L7CH adds CNH histograms).
+- **VL53L8CX / VL53L8CH** — the device is a thin SPI register bridge; the ST
+  ULD runs **on the host**, the ~84 KB sensor-firmware download included, and
+  the ranging frames are reassembled and decoded there — one live class for
+  both. CX is the base ToF imager; CH is its superset, adding
+  Compact-Network-Histogram (CNH) output.
 - **BNO055** — the device is a thin register bridge; Bosch's fusion runs on
   the chip, and the mode / unit / calibration / page logic, the register
   codecs and the window decode run **on the host** — the live class does the
   sequencing (mode switches through CONFIG, the boot and fusion-start waits,
   page bookkeeping) with the same register traffic as the Python SDK.
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the whole SH-2
+  sensor-hub protocol runs **on the host** — the live class enables outputs,
+  matches the hub's answers by their content and parses the reports, with the
+  same requests as the Python SDK.
 
 ## What it is not
 
 - **Not a firmware updater.** Every board of the line has a sensor class —
-  the **SR04**, the **VL53L4CD**, the multizone ToF boards (**VL53L8CX /
-  VL53L8CH**, **VL53L5CX / VL53L7CX / VL53L7CH**), the **VL53L 1D family**
-  (**VL53L0X / L1CX / L1CB / L3CX / L4CX**), the **BNO055** and the **BNO085 /
+  the **SR04**, the **VL53L 1D family** (**VL53L0X / L1CX / L1CB / L3CX /
+  L4CX**), the **VL53L4CD**, the multizone ToF boards (**VL53L5CX / VL53L7CX /
+  VL53L7CH**, **VL53L8CX / VL53L8CH**), the **BNO055** and the **BNO085 /
   BNO086** — but flashing firmware is left to the transport you own (see
   [Firmware container & bootloader](#firmware-container--bootloader)). A
   board of an unknown firmware opens as a *plain device*: discovery, the
@@ -175,7 +177,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.4.2
+  GIT_TAG        v0.5.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)

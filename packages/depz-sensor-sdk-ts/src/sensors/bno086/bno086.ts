@@ -60,7 +60,7 @@ import {
   type ProductId,
   type SensorMetadata,
 } from "./sh2.js";
-import { ShtpChannel, ShtpLayer, type ShtpCargo } from "./shtp.js";
+import { ExecutableCommand, ShtpChannel, ShtpLayer, type ShtpCargo } from "./shtp.js";
 
 // Rate verification bounds (contract 05 §7): the hub grants a grid rate; a
 // result outside [0.9, 2.1]× the requested rate is worth a warning, never an
@@ -420,9 +420,41 @@ export class Bno086 extends DepzDevice {
     }
   }
 
-  /** Pulse WAKE (PS0): wakes the sensor from sleep, no state loss. */
+  /**
+   * Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.
+   *
+   * This is the board's hardware pin pulse (board command 0x33), not an SH-2
+   * command; the SH-2 "On" command that ends {@link sleep} is {@link powerOn}.
+   */
   async wake(): Promise<void> {
     await this.request(Bno086Cmd.SensorWakeUp, undefined, { okCompletes: true });
+  }
+
+  /**
+   * Put the hub to sleep: SH-2 "Sleep" (0x03 on SHTP channel 1).
+   *
+   * Every report stops, except those enabled with
+   * `flags: FeatureFlag.Wakeup | FeatureFlag.AlwaysOn`, which keep their rate;
+   * the configuration (enabled sensors, rates) is kept. The hub sends no
+   * response. {@link powerOn} ends it.
+   *
+   * On a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): all reports stopped within one
+   * sample; a Wakeup|AlwaysOn report kept streaming at full rate on channel 4.
+   */
+  async sleep(): Promise<void> {
+    await this.sendShtp(ShtpChannel.Executable, Uint8Array.of(ExecutableCommand.Sleep));
+  }
+
+  /**
+   * End {@link sleep}: SH-2 "On" (0x02 on SHTP channel 1).
+   *
+   * Every report that was enabled comes back at its rate — no need to
+   * re-enable. The hub sends no response. Not to be confused with
+   * {@link wake}, which pulses the WAKE pin (board command 0x33) instead of
+   * sending an SH-2 command.
+   */
+  async powerOn(): Promise<void> {
+    await this.sendShtp(ShtpChannel.Executable, Uint8Array.of(ExecutableCommand.On));
   }
 
   /** Raw SHTP channel-0 advertisement bytes seen since open/reset. */

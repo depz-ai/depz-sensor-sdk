@@ -11,7 +11,7 @@ drivers, the BNO055 session logic) are extension points, surfaced here
 as documented stubs.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · [BNO086](bno086/api.md) · [BNO055](bno055/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 ## Contents
 
@@ -3300,6 +3300,26 @@ public static final int FRS_WRITE_DATA = 0xf6
 public static final int FRS_WRITE_RESPONSE = 0xf5
 ```
 
+#### Sh2.FEATURE_FLAG_WAKEUP *(field)*
+
+```java
+public static final int FEATURE_FLAG_WAKEUP = 0x04
+```
+
+Set Feature `flags` bit 2 (SH-2 §6.5.4): wake-up enabled — the
+sensor reports on SHTP channel 4 (wake input).
+
+#### Sh2.FEATURE_FLAG_ALWAYS_ON *(field)*
+
+```java
+public static final int FEATURE_FLAG_ALWAYS_ON = 0x08
+```
+
+Set Feature `flags` bit 3 (SH-2 §6.5.4): always-on — the sensor
+keeps running while the hub sleeps. With `FEATURE_FLAG_WAKEUP` a
+report kept its full rate through `buildSleep()` on a DEPZ BNO086
+(SH-2 3.12.6, 2026-10-16), on channel 4, while every other report stopped.
+
 #### Sh2.buildSetFeature
 
 ```java
@@ -3323,6 +3343,35 @@ public static byte[] buildProductIdRequest()
 ```
 
 Product ID Request (0xF9), 2 bytes.
+
+#### Sh2.buildSleep
+
+```java
+public static byte[] buildSleep()
+```
+
+SH-2 "Sleep" for the executable channel (channel 1, not control):
+`[0x03]`. Frame it with
+`nextFrame(Shtp.CHANNEL_EXECUTABLE, Sh2.buildSleep())` and send it
+through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
+Every report stops, except those enabled with
+`FEATURE_FLAG_WAKEUP` | `FEATURE_FLAG_ALWAYS_ON`, which keep
+their rate; the configuration (enabled sensors, rates) is kept.
+`buildPowerOn()` ends it. On a DEPZ BNO086 (SH-2 3.12.6,
+2026-10-16) all reports stopped within one sample; a WAKEUP|ALWAYS_ON
+report kept streaming at full rate on channel 4.
+
+#### Sh2.buildPowerOn
+
+```java
+public static byte[] buildPowerOn()
+```
+
+SH-2 "On" for the executable channel (channel 1): `[0x02]` —
+ends `buildSleep()`'s sleep. Every report that was enabled comes
+back at its rate, without re-enabling; the hub sends no response. Not the
+bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware
+signal, not an SH-2 command.
 
 #### Sh2.buildCommandRequest
 
@@ -3400,6 +3449,39 @@ public static final int MAX_TX_FRAME = 64
 ```
 
 Host->sensor frames must fit one MCU transmit slot (ERRATA E2).
+
+#### Shtp.CHANNEL_EXECUTABLE *(field)*
+
+```java
+public static final int CHANNEL_EXECUTABLE = 1
+```
+
+SHTP channel 1: device executable (reset / on / sleep; RX 0x01 = reset done).
+
+#### Shtp.EXECUTABLE_RESET *(field)*
+
+```java
+public static final int EXECUTABLE_RESET = 0x01
+```
+
+One-byte host writes on the executable channel (contract 05 §6a); the hub
+answers none of them. RESET restarts the hub (the 0x01 reset-complete
+follows on the same channel); SLEEP stops every report except those
+enabled with `Sh2#FEATURE_FLAG_WAKEUP` | `Sh2#FEATURE_FLAG_ALWAYS_ON`,
+keeping the configuration; ON ends SLEEP and every report resumes at its
+rate. See `Sh2#buildSleep()` / `Sh2#buildPowerOn()`.
+
+#### Shtp.EXECUTABLE_ON *(field)*
+
+```java
+public static final int EXECUTABLE_ON = 0x02
+```
+
+#### Shtp.EXECUTABLE_SLEEP *(field)*
+
+```java
+public static final int EXECUTABLE_SLEEP = 0x03
+```
 
 #### Shtp.packShtpHeader
 

@@ -128,6 +128,11 @@ set_power_mode(self, mode: depz_sensor_sdk.bno055.regs.PwrMode | int) -> None
 Normal / low power (accelerometer only until motion) / suspend.
 Written in CONFIG mode; the operating mode is restored after.
 
+A suspended chip ignores OPR_MODE writes and stays in CONFIG
+(measured 19.10.2026), so the operating mode is kept here and put
+back on wake-up — NDOF if the chip was already asleep when we
+connected (contract 13 §4.6).
+
 #### Bno055.get_units
 
 ```python

@@ -1349,6 +1349,15 @@ typedef enum {
     DEPZ_SHTP_CH_GYRO_RV     = 5
 } depz_shtp_channel_id;
 
+/* One-byte host writes on the executable channel (contract 05 §6a); the hub
+ * answers none of them. RESET restarts the hub (the 0x01 reset-complete
+ * follows on the same channel); SLEEP stops every report except those enabled
+ * with DEPZ_BNO_FEATURE_WAKEUP | DEPZ_BNO_FEATURE_ALWAYS_ON, keeping the
+ * configuration; ON ends SLEEP and every report resumes at its rate. */
+#define DEPZ_SHTP_EXEC_RESET 0x01
+#define DEPZ_SHTP_EXEC_ON    0x02
+#define DEPZ_SHTP_EXEC_SLEEP 0x03
+
 typedef struct {
     uint16_t length;      /* cargo length incl. this 4-byte header */
     uint8_t  channel;
@@ -1484,6 +1493,14 @@ size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words
 #define DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG 0x09
 #define DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE 0x0A
 #define DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET 0x0B
+
+/* Set Feature `flags` bits (SH-2 §6.5.4) for depz_bno086_feature_request.flags.
+ * WAKEUP: the sensor reports on SHTP channel 4 (wake input); ALWAYS_ON: it
+ * keeps running while the hub sleeps. Together they kept a report at its full
+ * rate through depz_bno086_sleep() on a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16),
+ * while every other report stopped. */
+#define DEPZ_BNO_FEATURE_WAKEUP    0x04u
+#define DEPZ_BNO_FEATURE_ALWAYS_ON 0x08u
 
 /* Tare axes (bitmap) and basis (the rotation vector tared against). */
 #define DEPZ_BNO_TARE_X   1u

@@ -8,11 +8,10 @@ firmware container, datasets). Each sensor then has its own **introduction** and
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
-- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
-  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- **VL53L8CH** (ToF superset + CNH histograms) —
-  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
-  [api](vl53l8ch/api.md)
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
+  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
+  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
+  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
 - **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
   [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
 - **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board, 63° / 90°) —
@@ -22,14 +21,17 @@ firmware container, datasets). Each sensor then has its own **introduction** and
 - **VL53L7CH** (VL53L7CX + CNH histograms) —
   [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
   [api](vl53l7ch/api.md)
-- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
-  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
-  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
-  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
-- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
-  [guide](bno086/guide.md) · [api](bno086/api.md)
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the Java sources by `scripts/gen_api_md.py` so it never drifts from the
@@ -65,19 +67,19 @@ The sensors fall into three firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echoTimeUs` → distance
   (`ai.depz.sensor.protocol.Sr04`).
+- **The 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX), VL53L4CD, VL53L5CX /
+  L7CX / L7CH and BNO055** — the device is a thin I2C register bridge. This
+  SDK ports the wire codecs and the stateless decode: `Vl53lx` /
+  `Vl53lxProducts` / `Vl53lxDecode`, `Vl53l4` / `Vl53l4Uld`, `Vl53l7` /
+  `Vl53l7Uld` (frames through the VL53L8 decoder with the L5/L7 geometry, CNH
+  through `Vl53l8Uld.decodeCnh`), `Bno055` / `Bno055Regs`.
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the host owns the
   ST ULD. This SDK ports the pure decode half — results-frame parsing and the
   advanced-DCI codecs (`ai.depz.sensor.sensors.vl53l8`). CX is the base imager;
   CH is its superset (Compact Network Histograms).
-- **BNO086** — the device is an SHTP pass-through; the host owns the SH-2 stack.
-  This SDK ports the SHTP framing/reassembly, the SH-2 control encoders and the
-  input-report decoders (`ai.depz.sensor.sensors.bno086`).
-- **VL53L4CD, VL53L5CX / L7CX / L7CH, the 1D family (VL53L0X / L1CX / L1CB /
-  L3CX / L4CX) and BNO055** — the device is a thin I2C register bridge. This
-  SDK ports the wire codecs and the stateless decode: `Vl53l4` / `Vl53l4Uld`,
-  `Vl53l7` / `Vl53l7Uld` (frames through the VL53L8 decoder with the L5/L7
-  geometry, CNH through `Vl53l8Uld.decodeCnh`), `Vl53lx` / `Vl53lxProducts` /
-  `Vl53lxDecode`, `Bno055` / `Bno055Regs`.
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the host owns the
+  SH-2 stack. This SDK ports the SHTP framing/reassembly, the SH-2 control
+  encoders and the input-report decoders (`ai.depz.sensor.sensors.bno086`).
 
 ## Scope: a decode layer
 
@@ -87,27 +89,27 @@ live layer (register-bridge bring-up, ULD firmware download, the 1D family's
 ST drivers, the BNO055 session logic) lives in the Python and TypeScript SDKs.
 The live drivers are intentionally left as documented **extension points**:
 
-- **Live ULD init / register-bridge driver** — `Vl53l8Uld.liveDriverStubbed()`
-  (VL53L8CX / CH), `Vl53l7Uld.liveDriverStubbed()` (VL53L5CX / L7CX / L7CH),
-  `Vl53l4Uld.liveDriverStubbed()` (VL53L4CD).
+- **Live ULD init / register-bridge driver** — `Vl53l4Uld.liveDriverStubbed()`
+  (VL53L4CD), `Vl53l7Uld.liveDriverStubbed()` (VL53L5CX / L7CX / L7CH),
+  `Vl53l8Uld.liveDriverStubbed()` (VL53L8CX / CH).
 - **The 1D family's drivers and the BNO055 session logic** — the codecs, the
   product table and the block / register-window decode are here; initialising
   and streaming those boards is done with the Python or TypeScript SDK.
 
 Everything else — CRCs, framing, the incremental parser, USB ids, identity,
-common/SR04 codecs, the shared VL53L8 frame decode, the CNH histogram decode
-(`Vl53l8Uld.decodeCnh`) and advanced-DCI codecs, the register-bridge codecs of
-the VL53L4CD, L5/L7, 1D family and BNO055, and the full BNO086 SHTP/SH-2
+common/SR04 codecs, the register-bridge codecs of the 1D family, VL53L4CD,
+L5/L7 and BNO055, the shared VL53L8 frame decode, the CNH histogram decode
+(`Vl53l8Uld.decodeCnh`) and advanced-DCI codecs, and the full BNO086 SHTP/SH-2
 layer — is complete and vector-tested.
 
 ## Build
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.4.2).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.5.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.4.2")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.5.0")
 ```
 
 Maven:
@@ -116,7 +118,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.4.2</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 

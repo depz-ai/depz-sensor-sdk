@@ -1304,6 +1304,39 @@ static void test_bno086_shtp() {
         }
         check_eq(to_hex(got), c.at("payload").as_string(), "shtp control " + nm);
     }
+
+    // Executable channel: sleep / power_on (contract 05 §6a), fresh layer → seq 0, 1.
+    depz::bno086::ShtpLayer exec;
+    std::size_t n_exec = 0;
+    for (const Value& c : v.at("executable").as_array()) {
+        std::string nm = c.at("name").as_string();
+        depz::bno086::ExecutableCommand command;
+        if (nm == "sleep") {
+            command = depz::bno086::ExecutableCommand::Sleep;
+        } else if (nm == "power_on") {
+            command = depz::bno086::ExecutableCommand::On;
+        } else {
+            check(false, "shtp executable unknown command " + nm);
+            continue;
+        }
+        check_eq(static_cast<std::int64_t>(command), c.at("command").as_int(), "shtp executable command " + nm);
+        check_eq(c.at("channel").as_int(),
+                 static_cast<std::int64_t>(depz::bno086::ShtpChannel::Executable),
+                 "shtp executable channel " + nm);
+        depz::bytes payload{static_cast<std::byte>(command)};
+        check_eq(to_hex(payload), c.at("payload").as_string(), "shtp executable payload " + nm);
+        depz::bytes frame = exec.next_frame(static_cast<int>(depz::bno086::ShtpChannel::Executable),
+                                            depz::as_bytes(payload));
+        check_eq(to_hex(frame), c.at("shtp_frame").as_string(), "shtp executable frame " + nm);
+        check_eq(c.at("bridge_cmd").as_int(), std::int64_t{0x34}, "shtp executable bridge cmd " + nm);
+        depz::bytes bridge = depz::build_packet(
+            static_cast<std::uint8_t>(c.at("bridge_cmd").as_int()), depz::as_bytes(frame),
+            static_cast<std::uint8_t>(c.at("bridge_seq").as_int()),
+            static_cast<depz::CrcType>(c.at("crc_type").as_int()));
+        check_eq(to_hex(bridge), c.at("bridge_frame").as_string(), "shtp executable bridge frame " + nm);
+        n_exec++;
+    }
+    check_eq(n_exec, std::size_t{2}, "shtp executable case count");
 }
 
 // ---- bno086 report parsers -------------------------------------------------

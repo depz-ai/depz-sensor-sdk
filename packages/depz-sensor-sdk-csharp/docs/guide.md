@@ -8,13 +8,12 @@ guide**:
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
+- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
+  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
+  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
+  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
 - **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
   [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
-- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
-  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- **VL53L8CH** (ToF superset + CNH histograms) —
-  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
-  [api](vl53l8ch/api.md)
 - **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board, 63° / 90°) —
   [VL53L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
   [api](vl53l5cx/api.md)) · [VL53L7CX](vl53l7cx/introduction.md)
@@ -22,14 +21,17 @@ guide**:
 - **VL53L7CH** (VL53L7CX + CNH histograms) —
   [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
   [api](vl53l7ch/api.md)
-- **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** (the 1D ToF family) —
-  [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
-  [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
-  [VL53L4CX](vl53l4cx/introduction.md), each with its guide and api
-- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
-  [guide](bno086/guide.md) · [api](bno086/api.md)
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the `///` XML-doc summaries so it never drifts from the code.
@@ -63,29 +65,29 @@ Each sensor is a USB CDC-ACM device speaking one shared framed protocol
 
 - **SR04** — the device does the ranging; you decode `EchoTimeUs` → distance
   (`Depz.Sensor.Protocol.Sr04`).
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
+  for the 1D family. This SDK ports the v2.00 codecs, the product table and the
+  stateless decode of the streamed blocks (`Depz.Sensor.Vl53lx`).
 - **VL53L4CD** — the device is a thin I2C register bridge; the full ST ULD
   runs on the host. This SDK ports the **verifiable codec/math layer**: the
   wire codecs, result-block decode and the range-timing / tuning-word math
   (`Depz.Sensor.Vl53l4`).
-- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
-  runs on the host. This SDK ports the **verifiable decode path**: results-frame
-  decode and the advanced DCI payload codecs (`Depz.Sensor.Vl53l8`). CX is the
-  base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
-- **BNO086** — the device is an SHTP pass-through; the SH-2 stack runs on the
-  host. This SDK ports SHTP framing/reassembly, the SH-2 control encoders and
-  the input-report decoders (`Depz.Sensor.Bno086`).
 - **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
   three boards; frames have the VL53L8 layout. This SDK ports the board codecs,
   class resolution and the L5/L7 frame decoder (`Depz.Sensor.Vl53l7`), with
   CNH through `Vl53l8Cnh`.
-- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
-  for the 1D family. This SDK ports the v2.00 codecs, the product table and the
-  stateless decode of the streamed blocks (`Depz.Sensor.Vl53lx`).
+- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
+  runs on the host. This SDK ports the **verifiable decode path**: results-frame
+  decode and the advanced DCI payload codecs (`Depz.Sensor.Vl53l8`). CX is the
+  base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
 - **BNO055** — an I2C register bridge; Bosch's fusion runs on the chip. This
   SDK ports the wire codecs, the register codecs and the register-window
   decode (`Depz.Sensor.Bno055`).
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the SH-2 stack runs on the
+  host. This SDK ports SHTP framing/reassembly, the SH-2 control encoders and
+  the input-report decoders (`Depz.Sensor.Bno086`).
 
-For the VL53L5CX / L7CX / L7CH, the 1D family and the BNO055, initialising
+For the 1D family, the VL53L5CX / L7CX / L7CH and the BNO055, initialising
 and streaming the board is done with the Python or TypeScript SDK; this SDK decodes what they send and builds the command payloads.
 
 The public surface is every `public` type under `src/Depz.Sensor/`; the API
@@ -94,7 +96,7 @@ reference is generated from it, so it never drifts from the code.
 ## Installation
 
 Everything targets **.NET 8** (`net8.0`). It is published on NuGet as
-`Depz.Sensor` (0.4.2):
+`Depz.Sensor` (0.5.0):
 
 ```bash
 dotnet add package Depz.Sensor
@@ -327,6 +329,6 @@ throw a clearly-named exception or are declared as an explicit stub):
   fusion-start waits, page discipline). The codecs and the stateless decode
   are here; see the per-sensor guides.
 
-The CNH histogram block of the VL53L8CH / VL53L7CH is decoded:
+The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:
 `Vl53l8Cnh.DecodeHistogram` unpacks `Vl53l8Frame.CnhRaw` into per-aggregate
 histograms.

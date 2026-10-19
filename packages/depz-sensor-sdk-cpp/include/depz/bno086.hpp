@@ -32,6 +32,17 @@ enum class ShtpChannel : std::uint8_t {
     GyroRv = 5,
 };
 
+// One-byte host writes on the executable channel (contract 05 §6a); the hub
+// answers none of them. Reset restarts the hub (the 0x01 reset-complete
+// follows on the same channel); Sleep stops every report except those enabled
+// with FEATURE_WAKEUP | FEATURE_ALWAYS_ON, keeping the configuration; On ends
+// Sleep and every report resumes at its rate. Bno086::sleep() / power_on().
+enum class ExecutableCommand : std::uint8_t {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+};
+
 struct ShtpHeader {
     std::uint16_t length = 0;  // bits 14:0 — cargo length incl. this 4-byte header
     std::uint8_t channel = 0;

@@ -1337,6 +1337,15 @@ static void bno086_commands(void)
     CHECK(r.command == DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE && r.r[0] == 1);
     CHECK_RC(depz_bno086_command(dev, 0x55, p, 10, NULL), DEPZ_E_ARG);
     CHECK_RC(depz_bno086_wake(dev), DEPZ_OK);
+    {   /* hub power (contract 05 §6a): one byte on channel 1, no answer */
+        static const uint8_t want_sleep[5] = {0x05, 0x00, 0x01, 0x00, DEPZ_SHTP_EXEC_SLEEP};
+        static const uint8_t want_on[5] = {0x05, 0x00, 0x01, 0x01, DEPZ_SHTP_EXEC_ON};
+        uint8_t fr[8];
+        CHECK_RC(depz_bno086_sleep(dev), DEPZ_OK);
+        CHECK_RC(depz_bno086_power_on(dev), DEPZ_OK);
+        CHECK(fake_bno086_executable_frame(f, 0, fr) == 5 && memcmp(fr, want_sleep, 5) == 0);
+        CHECK(fake_bno086_executable_frame(f, 1, fr) == 5 && memcmp(fr, want_on, 5) == 0);
+    }
     CHECK_RC(depz_bno086_clear_dcd_and_reset(dev, -1), DEPZ_OK);
     CHECK_RC(depz_bno086_get_oscillator_type(dev, &osc), DEPZ_OK);
     depz_device_close(dev);

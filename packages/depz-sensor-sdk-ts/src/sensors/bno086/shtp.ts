@@ -33,6 +33,19 @@ export enum ShtpChannel {
   GyroRv = 5,
 }
 
+/**
+ * One-byte host writes on the executable channel (SHTP channel 1). The hub
+ * answers none of them. `Reset` restarts the hub (answered later by the 0x01
+ * reset-complete on the same channel); `Sleep` stops every report except those
+ * enabled with `FeatureFlag.Wakeup | FeatureFlag.AlwaysOn`, keeping the
+ * configuration; `On` ends `Sleep` and every report resumes at its rate.
+ */
+export enum ExecutableCommand {
+  Reset = 1,
+  On = 2,
+  Sleep = 3,
+}
+
 export const SHTP_HEADER_SIZE = 4;
 export const LENGTH_MASK = 0x7fff;
 export const CONTINUATION_BIT = 0x8000;

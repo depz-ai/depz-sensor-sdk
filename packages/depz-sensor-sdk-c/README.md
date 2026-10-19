@@ -15,9 +15,9 @@ layers, one header each:
 
 The live layer drives every board's **common commands** (names, serial, MCU
 temperature, time sync, payload CRC, sync pins, reset) and hands out
-**sensor classes one sensor at a time — SR04, VL53L4CD, the multizone
-ToF family (VL53L8CX / VL53L8CH, VL53L5CX / VL53L7CX / VL53L7CH), the
-VL53L 1D ToF family (VL53L0X / L1CX / L1CB / L3CX / L4CX), the BNO055 and the
+**sensor classes one sensor at a time — SR04, the VL53L 1D ToF family
+(VL53L0X / L1CX / L1CB / L3CX / L4CX), VL53L4CD, the multizone ToF family
+(VL53L5CX / VL53L7CX / VL53L7CH, VL53L8CX / VL53L8CH), the BNO055 and the
 BNO085 / BNO086 — every board of the line** (the ToF classes run the ST
 drivers on the host, over the board's register bridge — for the multizone
 sensors the ~84 KB sensor-firmware download included, for the 1D family the
@@ -103,17 +103,17 @@ the L5/L7 boards and the VL53L 1D family each share one firmware:
 | Sensor       | What it is                                | USB PID        | SDK coverage today |
 |--------------|-------------------------------------------|----------------|--------------------|
 | **SR04**     | Ultrasonic range finder                   | `0xEC78`       | Full codecs + live sensor class (`depz_sr04_*`: config, single shots, loop via callbacks / streams) |
+| **VL53L0X** / **VL53L1CX** / **VL53L1CB** / **VL53L3CX** / **VL53L4CX** | VL53L 1D ToF family on one I2C bridge | `0xED41` / `0xED43` / `0xED42` / `0xED44` / `0xED46` | Bridge codecs, product table + class resolution, die / VL53L0X / histogram block decoders + live sensor class (`depz_vl53lx_*`: init with a (product, driver) pair — VL53L0X API, VL53L1X / VL53L4CD ULDs, VL53L3CX ULP, histogram driver with up to four targets and the 24 bins —, configure, modes and budgets, calibrations, thresholds, ROI, INT-driven stream via callbacks / streams, single shots) |
 | **VL53L4CD** | Single-zone ToF                           | `0xED45`       | Register-bridge codecs + host-ULD math + live sensor class (`depz_vl53l4cd_*`: ULD init, timing / offset / xtalk / thresholds, calibration, single shots, INT-driven stream via callbacks / streams) |
+| **VL53L5CX** / **VL53L7CX** / **VL53L7CH** | 8×8 ToF on an I2C bridge (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | Bridge codecs, class resolution, L5/L7 frame decode (+ CNH block on L7CH) + the live multizone class (`depz_vl53l8_*`, models `L5CX` / `L7CX` / `L7CH`: everything VL53L8CX has — no deep sleep / threshold auto-stop on L5CX / L7CX, CNH on L7CH, 1 Hz allowed) + board commands (`depz_vl53l7_bridge_info` / `_set_i2c_speed_khz` / `_pin_ctrl`) |
 | **VL53L8CX** | Base multi-zone ToF (4×4 / 8×8)           | dev-default\* | Shared frame decode + advanced DCI codecs + live sensor class (`depz_vl53l8_*`: ULD init with the sensor-firmware download, resolution / frequency / mode / sharpener / target order, power modes, crosstalk margin / calibration / caldata, detection thresholds, motion indicator, INT-driven frame stream via callbacks / streams) |
 | **VL53L8CH** | VL53L8CX **+ CNH** compact-network-histograms | `0xED40`   | Everything VL53L8CX has (the same class, CH firmware blob) + CNH setup (`depz_vl53l8_configure_cnh`) + CNH histogram decode |
-| **VL53L5CX** / **VL53L7CX** / **VL53L7CH** | 8×8 ToF on an I2C bridge (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | Bridge codecs, class resolution, L5/L7 frame decode (+ CNH block on L7CH) + the live multizone class (`depz_vl53l8_*`, models `L5CX` / `L7CX` / `L7CH`: everything VL53L8CX has — no deep sleep / threshold auto-stop on L5CX / L7CX, CNH on L7CH, 1 Hz allowed) + board commands (`depz_vl53l7_bridge_info` / `_set_i2c_speed_khz` / `_pin_ctrl`) |
-| **VL53L0X** / **VL53L1CX** / **VL53L1CB** / **VL53L3CX** / **VL53L4CX** | VL53L 1D ToF family on one I2C bridge | `0xED41` / `0xED43` / `0xED42` / `0xED44` / `0xED46` | Bridge codecs, product table + class resolution, die / VL53L0X / histogram block decoders + live sensor class (`depz_vl53lx_*`: init with a (product, driver) pair — VL53L0X API, VL53L1X / VL53L4CD ULDs, VL53L3CX ULP, histogram driver with up to four targets and the 24 bins —, configure, modes and budgets, calibrations, thresholds, ROI, INT-driven stream via callbacks / streams, single shots) |
-| **BNO086** / **BNO085** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE08` / `0xEE09` | Bridge + SHTP framing, SH-2 encoders and answer parsers, input-report parsers and scaling + live sensor class (`depz_bno086_*`: reset / product id, enable with the granted-rate read-back, reports via callbacks / streams, calibration / DCD / tare / reorientation, FRS read / write and sensor metadata, error queue / counts, busy retry) |
 | **BNO055**   | 9-axis IMU, fusion on the chip (register bridge) | `0xEE0A` | Bridge codecs, units / calibration / axis-remap / page-1 config codecs, register-window decode + live sensor class (`depz_bno055_*`: configure through CONFIG with the boot and fusion-start waits, operating / power mode, units, axis remap and placements, calibration status / profile / soft-iron matrix, system status and self-test, page-1 configs / unique id / motion interrupts, scaled samples polled or streamed via callbacks / streams) |
+| **BNO085** / **BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | Bridge + SHTP framing, SH-2 encoders and answer parsers, input-report parsers and scaling + live sensor class (`depz_bno086_*`: reset / product id, enable with the granted-rate read-back, reports via callbacks / streams, calibration / DCD / tare / reorientation, FRS read / write and sensor metadata, error queue / counts, busy retry) |
 
 Every board in the table also opens live through `depz_sensor_io.h` —
 discovery, the common commands and time sync work on all of them; the SR04,
-the VL53L4CD, the multizone ToF boards (VL53L8CX / CH, VL53L5CX / L7CX / L7CH)
+the VL53L4CD, the multizone ToF boards (VL53L5CX / L7CX / L7CH, VL53L8CX / CH)
 the BNO055 and the BNO085 / BNO086 have their sensor class so far.
 
 \* **VL53L8CH** carries the production PID `0xED40`; **VL53L8CX** currently
@@ -304,7 +304,7 @@ while the board was turned, tilted and shaken by hand.
 The library (`libdepz_sensor_sdk_c.a`, `depz_sensor_sdk_c.lib` with MSVC)
 exports a namespaced target **`depz::sensor_sdk_c`** and ships an
 installable CMake package (`find_package(depz-sensor-sdk-c CONFIG)`), a Conan 2
-recipe, and a vcpkg port. Version **0.4.2**, MIT.
+recipe, and a vcpkg port. Version **0.5.0**, MIT.
 
 ### CMake FetchContent
 
@@ -316,7 +316,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.4.2
+  GIT_TAG        v0.5.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -333,7 +333,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(depz-sensor-sdk-c 0.4.2 CONFIG REQUIRED)
+find_package(depz-sensor-sdk-c 0.5.0 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
@@ -352,7 +352,7 @@ uint8_t crc = depz_crc8_maxim(data, sizeof data);
 conan create packages/depz-sensor-sdk-c            # build & test-package locally
 ```
 
-In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.4.2`.
+In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.5.0`.
 The recipe sets the CMake target name to `depz::sensor_sdk_c` for CMakeDeps
 consumers. Submission to Conan Center is in review
 ([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
@@ -368,7 +368,7 @@ it merges, use the in-repo port (`vcpkg/`) as an overlay:
 vcpkg install depz-sensor-sdk-c --overlay-ports=packages/depz-sensor-sdk-c/vcpkg
 ```
 
-The port fetches the `v0.4.2` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
+The port fetches the `v0.5.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
 `0` placeholder to be filled at release (the first `vcpkg install` prints the
 correct hash).
 

@@ -31,6 +31,7 @@ typedef struct {
     bool streaming;
     depz_bno055_units stream_units;
     uint64_t parse_errors;
+    uint8_t mode_before_suspend;  /* put back on wake-up; CONFIG (0) = none */
     /* last configure() */
     bool configured;
     uint8_t cfg_mode;
@@ -519,7 +520,35 @@ static int do_set_mode(depz_device *dev, uint8_t mode)
 
 int depz_bno055_set_operation_mode(depz_device *dev, uint8_t mode) { LOCKED(do_set_mode(dev, mode)); }
 int depz_bno055_get_power_mode(depz_device *dev, uint8_t *mode) { LOCKED(get_masked(dev, DEPZ_BNO055_REG_PWR_MODE, 0x03, mode)); }
-int depz_bno055_set_power_mode(depz_device *dev, uint8_t mode) { LOCKED(config_write(dev, DEPZ_BNO055_REG_PWR_MODE, &mode, 1)); }
+/* A suspended chip ignores OPR_MODE writes and stays in CONFIG (measured
+ * 19.10.2026), so the operating mode is kept here and put back on wake-up —
+ * NDOF if the chip was already asleep when we connected (contract 13 §4.6). */
+static int do_set_power_mode(depz_device *dev, uint8_t mode)
+{
+    bno_state *s = st(dev);
+    uint8_t opr, pwr, resume;
+    TRY(rd1(dev, DEPZ_BNO055_REG_OPR_MODE, &opr));
+    TRY(rd1(dev, DEPZ_BNO055_REG_PWR_MODE, &pwr));
+    opr &= 0x0F;
+    if (opr != DEPZ_BNO055_MODE_CONFIG) {
+        resume = opr;
+        TRY(switch_mode(dev, DEPZ_BNO055_MODE_CONFIG));
+    } else if ((pwr & 0x03) == DEPZ_BNO055_POWER_SUSPEND) {
+        resume = s->mode_before_suspend != DEPZ_BNO055_MODE_CONFIG ? s->mode_before_suspend
+                                                                  : (uint8_t)DEPZ_BNO055_MODE_NDOF;
+    } else {
+        resume = DEPZ_BNO055_MODE_CONFIG; /* CONFIG on purpose: stay there */
+    }
+    TRY(wr(dev, DEPZ_BNO055_REG_PWR_MODE, &mode, 1));
+    if (mode == DEPZ_BNO055_POWER_SUSPEND) {
+        s->mode_before_suspend = resume;
+        return DEPZ_OK;
+    }
+    s->mode_before_suspend = DEPZ_BNO055_MODE_CONFIG;
+    return resume != DEPZ_BNO055_MODE_CONFIG ? switch_mode(dev, resume) : DEPZ_OK;
+}
+
+int depz_bno055_set_power_mode(depz_device *dev, uint8_t mode) { LOCKED(do_set_power_mode(dev, mode)); }
 
 static int do_get_units(depz_device *dev, depz_bno055_units *out)
 {

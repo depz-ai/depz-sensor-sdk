@@ -22,6 +22,21 @@ public final class Shtp {
     /** Host->sensor frames must fit one MCU transmit slot (ERRATA E2). */
     public static final int MAX_TX_FRAME = 64;
 
+    /** SHTP channel 1: device executable (reset / on / sleep; RX 0x01 = reset done). */
+    public static final int CHANNEL_EXECUTABLE = 1;
+
+    /**
+     * One-byte host writes on the executable channel (contract 05 §6a); the hub
+     * answers none of them. RESET restarts the hub (the 0x01 reset-complete
+     * follows on the same channel); SLEEP stops every report except those
+     * enabled with {@link Sh2#FEATURE_FLAG_WAKEUP} | {@link Sh2#FEATURE_FLAG_ALWAYS_ON},
+     * keeping the configuration; ON ends SLEEP and every report resumes at its
+     * rate. See {@link Sh2#buildSleep()} / {@link Sh2#buildPowerOn()}.
+     */
+    public static final int EXECUTABLE_RESET = 0x01;
+    public static final int EXECUTABLE_ON = 0x02;
+    public static final int EXECUTABLE_SLEEP = 0x03;
+
     public record ShtpHeader(int length, int channel, int seq, boolean continuation) {}
 
     public static byte[] packShtpHeader(ShtpHeader hdr) {

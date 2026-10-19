@@ -519,6 +519,18 @@ int depz_bno086_wake(depz_device *dev)
     LOCKED(depz_device_request(dev, CMD_SENSOR_WAKE_UP, NULL, 0, NULL, NULL, true, -1));
 }
 
+int depz_bno086_sleep(depz_device *dev)
+{
+    static const uint8_t p[1] = {DEPZ_SHTP_EXEC_SLEEP};
+    LOCKED(send_shtp(dev, DEPZ_SHTP_CH_EXECUTABLE, p, sizeof p));
+}
+
+int depz_bno086_power_on(depz_device *dev)
+{
+    static const uint8_t p[1] = {DEPZ_SHTP_EXEC_ON};
+    LOCKED(send_shtp(dev, DEPZ_SHTP_CH_EXECUTABLE, p, sizeof p));
+}
+
 int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
 {
     bno_state *s;

@@ -14,6 +14,22 @@ public enum ShtpChannel
 }
 
 /// <summary>
+/// One-byte host writes on the executable channel (SHTP channel 1,
+/// contracts/05_SENSOR_BNO086.md §6a). The hub answers none of them.
+/// <c>Reset</c> restarts the hub (answered later by the 0x01 reset-complete on
+/// the same channel); <c>Sleep</c> stops every report except those enabled with
+/// <see cref="FeatureFlags.Wakeup"/> | <see cref="FeatureFlags.AlwaysOn"/>,
+/// keeping the configuration; <c>On</c> ends <c>Sleep</c> and every report
+/// resumes at its rate.
+/// </summary>
+public enum ExecutableCommand : byte
+{
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+
+/// <summary>
 /// SHTP frame header: length (bits 14:0 = cargo length incl. this 4-byte
 /// header; bit 15 = continuation), channel, per-channel/per-direction seq.
 /// </summary>

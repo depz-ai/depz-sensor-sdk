@@ -419,13 +419,14 @@ def main() -> None:
         "Edit the doc-comments in the source, not this file.",
         "",
         "Each sensor also has a focused reference with just its own symbols:",
-        "[SR04](sr04/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
-        "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · "
-        "[VL53L7CH](vl53l7ch/api.md) · [VL53L0X](vl53l0x/api.md) · "
+        "[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · "
         "[VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · "
-        "[VL53L3CX](vl53l3cx/api.md) · [VL53L4CX](vl53l4cx/api.md) · "
-        "[BNO086](bno086/api.md) · [BNO055](bno055/api.md).",
+        "[VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · "
+        "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
+        "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
+        "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
+        "[BNO086](bno086/api.md).",
         "",
     ]
     DOCS.mkdir(parents=True, exist_ok=True)

@@ -36,23 +36,24 @@ Live-layer conventions, in short (details in the [guide](guide.md#live-layer)):
 and API reference:
 
 - **[SR04](sr04/introduction.md)** — ultrasonic ranging: one distance per ping.
-- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one precise
-  optical distance.
-- **[VL53L8CX](vl53l8cx/introduction.md)** — multizone ToF: 4×4 / 8×8 depth
-  frames.
-- **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH
-  histograms.
-- **[VL53L5CX](vl53l5cx/introduction.md)** · **[VL53L7CX](vl53l7cx/introduction.md)**
-  · **[VL53L7CH](vl53l7ch/introduction.md)** — 8×8 ToF on the I2C board
-  (63° / 90° / 90° + CNH).
 - **[VL53L0X](vl53l0x/introduction.md)** · **[VL53L1CX](vl53l1cx/introduction.md)**
   · **[VL53L1CB](vl53l1cb/introduction.md)** · **[VL53L3CX](vl53l3cx/introduction.md)**
   · **[VL53L4CX](vl53l4cx/introduction.md)** — the VL53L 1D family (one live class): single-zone
   and multi-target ToF on one bridge firmware.
-- **[BNO086](bno086/introduction.md)** — BNO085 / BNO086 9-axis IMU: orientation
-  and motion outputs, each at its own rate.
+- **[VL53L4CD](vl53l4cd/introduction.md)** — single-zone ToF: one precise
+  optical distance.
+- **[VL53L5CX](vl53l5cx/introduction.md)** · **[VL53L7CX](vl53l7cx/introduction.md)**
+  · **[VL53L7CH](vl53l7ch/introduction.md)** — 8×8 ToF on the I2C board
+  (63° / 90° / 90° + CNH).
+- **[VL53L8CX](vl53l8cx/introduction.md)** — multizone ToF: 4×4 / 8×8 depth
+  frames.
+- **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH
+  histograms.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion:
   orientation, gravity and linear acceleration at 100 Hz.
+- **[BNO085](bno085/introduction.md)** · **[BNO086](bno086/introduction.md)**
+  — BNO085 / BNO086 9-axis IMU: orientation and motion outputs, each at its
+  own rate.
 
 Every board opens live and answers the common commands (names, serial, MCU
 temperature, time sync, sync pins). Full sensor classes arrive one sensor at a
@@ -97,7 +98,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.4.2
+  GIT_TAG        v0.5.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -122,14 +123,14 @@ distance).
 ## Where to next
 
 - **Your sensor's pages** — [SR04](sr04/introduction.md) ·
-  [VL53L4CD](vl53l4cd/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
-  [VL53L8CH](vl53l8ch/introduction.md) · [VL53L5CX](vl53l5cx/introduction.md) ·
-  [VL53L7CX](vl53l7cx/introduction.md) · [VL53L7CH](vl53l7ch/introduction.md) ·
   [VL53L0X](vl53l0x/introduction.md) · [VL53L1CX](vl53l1cx/introduction.md) ·
   [VL53L1CB](vl53l1cb/introduction.md) · [VL53L3CX](vl53l3cx/introduction.md) ·
-  [VL53L4CX](vl53l4cx/introduction.md) · [BNO086](bno086/introduction.md) ·
-  [BNO055](bno055/introduction.md): introduction, hands-on guide, and the
-  sensor's own API reference.
+  [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
+  [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
+  [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
+  introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](guide.md)** — the SDK-wide walkthrough: build, the live layer
   (devices, errors, threading, streams, discovery, record/replay), the
   transport/decode mental model, per-sensor decode.

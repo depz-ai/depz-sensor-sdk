@@ -4,7 +4,11 @@
 use std::path::PathBuf;
 
 use depz_sensor_sdk::bno086::sh2;
-use depz_sensor_sdk::bno086::shtp::{pack_shtp_header, unpack_shtp_header, ShtpHeader, ShtpLayer};
+use depz_sensor_sdk::bno086::shtp::{
+    build_power_on, build_sleep, pack_shtp_header, unpack_shtp_header, ExecutableCommand, ShtpChannel,
+    ShtpHeader, ShtpLayer,
+};
+use depz_sensor_sdk::framing::{build_packet, CrcType};
 use serde_json::Value;
 
 fn vectors_dir() -> PathBuf {
@@ -151,9 +155,41 @@ fn bno086_shtp_vectors() {
         enc += 1;
     }
 
-    assert!(headers > 0 && tx > 0 && reasm > 0 && enc > 0);
+    // ── executable channel: sleep / power_on (contract 05 §6a) ──────────────
+    let mut layer = ShtpLayer::new(); // fresh: sleep then power_on → seq 0, 1
+    let mut exec = 0;
+    for c in doc["executable"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        let (command, payload) = match name {
+            "sleep" => (ExecutableCommand::Sleep, build_sleep()),
+            "power_on" => (ExecutableCommand::On, build_power_on()),
+            other => panic!("unknown executable command {}", other),
+        };
+        assert_eq!(command as u64, c["command"].as_u64().unwrap(), "command {}", name);
+        assert_eq!(c["channel"].as_u64().unwrap(), ShtpChannel::Executable as u64);
+        assert_eq!(hex_encode(&payload), c["payload"].as_str().unwrap(), "payload {}", name);
+        let frame = layer.next_frame(ShtpChannel::Executable as u8, &payload);
+        assert_eq!(hex_encode(&frame), c["shtp_frame"].as_str().unwrap(), "shtp_frame {}", name);
+        assert_eq!(c["crc_type"].as_u64().unwrap(), 0);
+        let bridge = build_packet(
+            c["bridge_cmd"].as_u64().unwrap() as u8,
+            &frame,
+            c["bridge_seq"].as_u64().unwrap() as u32,
+            CrcType::None,
+        )
+        .unwrap();
+        assert_eq!(hex_encode(&bridge), c["bridge_frame"].as_str().unwrap(), "bridge_frame {}", name);
+        exec += 1;
+    }
+
+    // ── Set Feature flag bits ────────────────────────────────────────────────
+    let flags = &doc["feature_flags"];
+    assert_eq!(flags["wakeup"].as_u64().unwrap(), sh2::FEATURE_FLAG_WAKEUP as u64);
+    assert_eq!(flags["always_on"].as_u64().unwrap(), sh2::FEATURE_FLAG_ALWAYS_ON as u64);
+
+    assert!(headers > 0 && tx > 0 && reasm > 0 && enc > 0 && exec == 2);
     eprintln!(
-        "bno086_shtp.json: {} headers + {} tx_seq + {} reassembly + {} control_encode",
-        headers, tx, reasm, enc
+        "bno086_shtp.json: {} headers + {} tx_seq + {} reassembly + {} control_encode + {} executable",
+        headers, tx, reasm, enc, exec
     );
 }

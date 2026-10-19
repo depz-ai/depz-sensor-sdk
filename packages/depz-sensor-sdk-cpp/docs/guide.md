@@ -9,19 +9,6 @@ math, firmware containers, dataset replay). Each sensor then has its own
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
   [guide](sr04/guide.md) · [api](sr04/api.md)
-- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
-  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
-- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
-  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
-- **VL53L8CH** (ToF superset + CNH histograms) —
-  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
-  [api](vl53l8ch/api.md)
-- **VL53L5CX** / **VL53L7CX** / **VL53L7CH** (8×8 ToF, I2C board) —
-  [L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
-  [api](vl53l5cx/api.md)) · [L7CX](vl53l7cx/introduction.md)
-  ([guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)) ·
-  [L7CH](vl53l7ch/introduction.md) ([guide](vl53l7ch/guide.md) ·
-  [api](vl53l7ch/api.md))
 - **VL53L 1D family** (single-zone / multi-target ToF) —
   [L0X](vl53l0x/introduction.md) ([guide](vl53l0x/guide.md) ·
   [api](vl53l0x/api.md)) · [L1CX](vl53l1cx/introduction.md)
@@ -31,11 +18,26 @@ math, firmware containers, dataset replay). Each sensor then has its own
   ([guide](vl53l3cx/guide.md) · [api](vl53l3cx/api.md)) ·
   [L4CX](vl53l4cx/introduction.md) ([guide](vl53l4cx/guide.md) ·
   [api](vl53l4cx/api.md))
-- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
-  [guide](bno086/guide.md) · [api](bno086/api.md)
+- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
+  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
+- **VL53L5CX** / **VL53L7CX** / **VL53L7CH** (8×8 ToF, I2C board) —
+  [L5CX](vl53l5cx/introduction.md) ([guide](vl53l5cx/guide.md) ·
+  [api](vl53l5cx/api.md)) · [L7CX](vl53l7cx/introduction.md)
+  ([guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)) ·
+  [L7CH](vl53l7ch/introduction.md) ([guide](vl53l7ch/guide.md) ·
+  [api](vl53l7ch/api.md))
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) —
   [introduction](bno055/introduction.md) · [guide](bno055/guide.md) ·
   [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
 
 For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
 from the header doc-comments so it never drifts from the code.
@@ -82,10 +84,10 @@ The SDK has two layers:
 
 Every board opens as a `depz::Device` and the common commands work on all of
 them. Sensor classes arrive one at a time; so far **`depz::Sr04`**,
-**`depz::Vl53l4cd`**, **`depz::Vl53l8`** (the multizone ToF: VL53L8CX /
-CH, VL53L5CX, VL53L7CX / CH), **`depz::Bno055`** and **`depz::Bno086`**
-(BNO085 / BNO086) and **`depz::Vl53lx`** (the VL53L 1D family: VL53L0X /
-L1CX / L1CB / L3CX / L4CX) — every board of the line.
+**`depz::Vl53lx`** (the VL53L 1D family: VL53L0X / L1CX / L1CB / L3CX /
+L4CX), **`depz::Vl53l4cd`**, **`depz::Vl53l8`** (the multizone ToF:
+VL53L5CX, VL53L7CX / CH, VL53L8CX / CH), **`depz::Bno055`** and
+**`depz::Bno086`** (BNO085 / BNO086) — every board of the line.
 
 Every sensor speaks one shared framed protocol (`A5 C3` header + optional
 payload CRC). Everything lives in namespace `depz` (ToF under `depz::vl53l4` /
@@ -97,30 +99,30 @@ shared golden vectors in `contracts/vectors`.
 The firmware philosophies mirror the firmware itself:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
+  for the whole 1D family; every ST driver of the family runs on the host —
+  in the C SDK behind `depz::Vl53lx` — and the die, VL53L0X and histogram
+  block codecs are in `depz::vl53lx`.
 - **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD runs on
   the host — the driver in the C SDK behind `depz::Vl53l4cd`, the math and the
   single-zone result-block decode in `depz::vl53l4`.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
+  three 8×8 ToF boards; the same ULD on the host behind `depz::Vl53l8`, the
+  frames reassembled with the VL53L8 pipeline and decoded on the host
+  (`depz::vl53l7`; L7CH adds CNH histograms).
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI register bridge; the ST
   ULD runs on the host — the driver in the C SDK behind `depz::Vl53l8`, the
   firmware download included — and the results frame is reassembled and
   decoded on the host (`depz::vl53l8`). CX is the base ToF imager; CH is its
   superset, adding Compact-Network-Histogram output.
-- **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
-  three 8×8 ToF boards; the same ULD on the host behind `depz::Vl53l8`, the
-  frames reassembled with the VL53L8 pipeline and decoded on the host
-  (`depz::vl53l7`; L7CH adds CNH histograms).
-- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
-  for the whole 1D family; every ST driver of the family runs on the host —
-  in the C SDK behind `depz::Vl53lx` — and the die, VL53L0X and histogram
-  block codecs are in `depz::vl53lx`.
-- **BNO085 / BNO086** — the device is an SHTP pass-through; the whole SH-2
-  sensor-hub protocol runs on the host — the driver in the C SDK behind
-  `depz::Bno086`, the SHTP framing and report decode in `depz::bno086`.
 - **BNO055** — the device is a thin register bridge; Bosch's fusion runs on the
   chip. The register logic (mode switches through CONFIG, boot and
   fusion-start polls, page discipline, calibration) runs on the host — the
   driver in the C SDK behind `depz::Bno055` — and the register codecs and
   window decode are in `depz::bno055`.
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the whole SH-2
+  sensor-hub protocol runs on the host — the driver in the C SDK behind
+  `depz::Bno086`, the SHTP framing and report decode in `depz::bno086`.
 
 ## Build & link
 
@@ -159,7 +161,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.4.2
+    GIT_TAG        v0.5.0
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
