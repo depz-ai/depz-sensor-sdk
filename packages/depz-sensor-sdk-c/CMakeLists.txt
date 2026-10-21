@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.5.0 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.6.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -43,6 +43,8 @@ add_library(depz_sensor_sdk_c
   src/vl53l7.c
   src/vl53lx.c
   src/bno055.c
+  src/tmf8829.c
+  src/tmf8829_firmware.c
   src/bno086_shtp.c
   src/bno086_reports.c
   src/bno086_sh2.c
@@ -66,6 +68,7 @@ if(DEPZ_SENSOR_SDK_C_BUILD_IO)
     src/io/vl53l8_device.c
     src/io/vl53l8_blobs.c
     src/io/bno055_device.c
+    src/io/tmf8829_device.c
     src/io/bno086_device.c
     src/io/vl53lx_device.c
     src/io/vl53lx_die.c
@@ -149,6 +152,11 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.h")
 
+# Third-party licences of what the library embeds: the ams TMF8829 sensor
+# firmware (MIT) that depz_tmf8829_init() downloads.
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/licenses/tmf8829/LICENSES-MIT.TXT
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/depz-sensor-sdk-c/tmf8829)
+
 install(EXPORT depz-sensor-sdk-c-targets
   FILE depz-sensor-sdk-c-targets.cmake
   NAMESPACE depz::
@@ -207,15 +215,18 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   # v2.00 codecs, product table + class resolution, die/L0X/histogram blocks.
   # bno055 = the BNO055 register bridge (contract 13): codecs, units /
   # calibration / axis remap / page-1 configs, register-window decode.
+  # tmf8829 = the TMF8829 SPI bridge (contract 14): codecs, reassembly, frames,
+  # measurements, config page, firmware; tmf8829_frame_time = the clock model
+  # and capture time over 27 recorded streams.
   foreach(stem
       crc usb_ids identity common_commands sr04 framing_encode framing_decode fwdepz
       vl53l8_advanced vl53l4 bno086_shtp bno086_reports vl53l8_replay vl53l8_cnh
-      dataset vl53l7 vl53lx bno055)
+      dataset vl53l7 vl53lx bno055 tmf8829 tmf8829_frame_time)
     add_test(NAME vec_${stem} COMMAND test_vectors ${stem})
   endforeach()
   # The live-hardware layer against a fake SR04 over loopback (no device).
   if(DEPZ_SENSOR_SDK_C_BUILD_IO)
-    add_executable(test_io tests/test_io.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/json.c)
+    add_executable(test_io tests/test_io.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/fake_tmf8829.c tests/json.c)
     target_link_libraries(test_io PRIVATE depz_sensor_sdk_c)
     target_include_directories(test_io PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_compile_definitions(test_io PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
@@ -236,7 +247,7 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         l5cx_replay l5cx_4x4_replay l7ch_replay l7ch_cnh_replay
         bno_imu_replay bno_ndof_replay
         bno086_session_replay bno086_features bno086_busy_retry bno086_reports bno086_commands
-        bno086_frs bno086_codecs
+        bno086_frs bno086_codecs tmf8829_fake_session
         vlx_l4cd_uld_replay vlx_l1cx_uld_replay vlx_l1cb_uld_replay vlx_l3cx_ulp_replay
         vlx_l0x_uld_replay vlx_l4cx_hist_medium_replay vlx_l4cx_hist_short_replay
         vlx_l1cx_hist_replay vlx_l1cb_hist_replay vlx_l3cx_hist_replay)

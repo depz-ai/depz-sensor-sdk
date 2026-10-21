@@ -1,5 +1,5 @@
 """DEPZ sensor line SDK — SR04, VL53L4CD, VL53L8CX/CH, VL53L5CX/L7CX/L7CH,
-VL53L0X/L1CX/L1CB/L3CX/L4CX, BNO086, BNO055 over USB CDC-ACM.
+VL53L0X/L1CX/L1CB/L3CX/L4CX, TMF8829, BNO086, BNO055 over USB CDC-ACM.
 
 Public surface is defined by contracts/07_SDK_FACADE.md.
 """
@@ -66,6 +66,7 @@ from .bno055 import (
     OprMode,
     Units,
 )
+from .tmf8829 import Tmf8829, Tmf8829Config, Tmf8829Measurement
 
 try:
     from importlib.metadata import PackageNotFoundError, version as _pkg_version
@@ -140,6 +141,9 @@ __all__ = [
     "AxisRemap",
     "CalibStatus",
     "CalibrationProfile",
+    "Tmf8829",
+    "Tmf8829Config",
+    "Tmf8829Measurement",
     "StreamIterator",
     # datasets (contract 09)
     "SessionRecorder",

@@ -15,9 +15,10 @@ public enum Cmd
     GetMcuTemperature = 0x07,
     GetPayloadCrcType = 0x08,
     SetPayloadCrcType = 0x09,
-    ThroughputTxStart = 0x1C,
-    ThroughputTxStop = 0x1D,
-    ThroughputRxData = 0x1E,
+    UsbTestTxStart = 0x1C,
+    UsbTestTxStop = 0x1D,
+    UsbTestRxData = 0x1E,
+    UsbTestStats = 0x1F,
     GetSyncPinConfig = 0x30,
     SetSyncPinConfig = 0x31,
 }
@@ -31,7 +32,8 @@ public enum Rpt
     Temperature = 0x83,
     SequenceError = 0x84,
     PayloadCrcType = 0x87,
-    ThroughputData = 0x88,
+    UsbTestData = 0x88,
+    UsbTestStats = 0x8F,
     SyncPinConfig = 0x90,
 }
 

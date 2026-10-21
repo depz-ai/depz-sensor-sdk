@@ -31,6 +31,7 @@ export type { Vl53l4Info, Vl53l4RegData, Vl53l4StreamData } from "./protocol/vl5
 export * from "./protocol/vl53l8.js";
 export * from "./protocol/bno086.js";
 export * from "./protocol/bno055.js";
+export * from "./protocol/tmf8829.js";
 export * from "./protocol/fwdepz.js";
 export * from "./protocol/usb-ids.js";
 export * from "./errors.js";
@@ -213,6 +214,12 @@ export * from "./sensors/bno086/sh2.js";
 export * from "./sensors/bno086/bno086.js";
 export * from "./sensors/bno055/regs.js";
 export * from "./sensors/bno055/bno055.js";
+export * from "./sensors/tmf8829/frames.js";
+export * from "./sensors/tmf8829/clock.js";
+export * from "./sensors/tmf8829/config.js";
+export * from "./sensors/tmf8829/builder.js";
+export * from "./sensors/tmf8829/tmf8829.js";
+export * from "./sensors/tmf8829/firmware-license.js";
 export { RECORDING_SCHEMA, RecordingTransport, ReplayTransport } from "./transport/replay.js";
 export {
   DATASET_SCHEMA,

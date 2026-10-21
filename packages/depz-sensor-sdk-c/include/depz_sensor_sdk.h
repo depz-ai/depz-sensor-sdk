@@ -17,6 +17,9 @@
  *     product table and stateless block decoders (contract 12)
  *   - BNO055 register-bridge codecs, units / calibration / axis-remap /
  *     page-1 config codecs and register-window decode (contract 13)
+ *   - TMF8829 SPI-bridge codecs, chunk reassembly, frame / pixel decode,
+ *     clock model + capture time, measurement assembly, config page and the
+ *     embedded sensor firmware (contract 14)
  *   - .fwdepz container parse/validate (contract 06 §2)
  *
  * Sensor host-logic (the ST drivers, the BNO086 SH-2 hub protocol) lives in
@@ -127,6 +130,7 @@ int depz_parser_feed(depz_parser *p, const uint8_t *data, size_t len,
 #define DEPZ_PID_SR04  0xEC78u /* 60536 */
 #define DEPZ_PID_VL53L8 0xED40u /* 60736 */
 #define DEPZ_PID_VL53L4CD 0xED45u /* 60741 */
+#define DEPZ_PID_TMF8829 0xED4Cu /* 60748 */
 #define DEPZ_PID_BNO086 0xEE08u /* 60936 */
 #define DEPZ_PID_RANGE_LO 60536u
 #define DEPZ_PID_RANGE_HI 65535u
@@ -158,6 +162,8 @@ typedef enum {
                             * 12); the product is depz_vl53lx_resolve_product(). */
     DEPZ_SENSOR_BNO055,    /* APP_BNO055: 9-axis IMU register bridge, fusion
                             * on chip (contract 13) */
+    DEPZ_SENSOR_TMF8829,   /* APP_TMF8829: multizone dToF over an SPI register
+                            * bridge (contract 14) */
     DEPZ_SENSOR_UNKNOWN    /* an APP_* name we don't recognize; must stay last */
 } depz_sensor_type;
 
@@ -192,9 +198,10 @@ typedef enum {
     DEPZ_CMD_GET_MCU_TEMPERATURE      = 0x07,
     DEPZ_CMD_GET_PAYLOAD_CRC_TYPE     = 0x08,
     DEPZ_CMD_SET_PAYLOAD_CRC_TYPE     = 0x09,
-    DEPZ_CMD_THROUGHPUT_TX_START      = 0x1C,
-    DEPZ_CMD_THROUGHPUT_TX_STOP       = 0x1D,
-    DEPZ_CMD_THROUGHPUT_RX_DATA       = 0x1E,
+    DEPZ_CMD_USB_TEST_TX_START        = 0x1C,
+    DEPZ_CMD_USB_TEST_TX_STOP         = 0x1D,
+    DEPZ_CMD_USB_TEST_RX_DATA         = 0x1E,
+    DEPZ_CMD_USB_TEST_STATS           = 0x1F,
     DEPZ_CMD_GET_SYNC_PIN_CONFIG      = 0x30,
     DEPZ_CMD_SET_SYNC_PIN_CONFIG      = 0x31
 } depz_cmd;
@@ -206,7 +213,8 @@ typedef enum {
     DEPZ_RPT_TEMPERATURE      = 0x83,
     DEPZ_RPT_SEQUENCE_ERROR   = 0x84,
     DEPZ_RPT_PAYLOAD_CRC_TYPE = 0x87,
-    DEPZ_RPT_THROUGHPUT_DATA  = 0x88,
+    DEPZ_RPT_USB_TEST_DATA    = 0x88,
+    DEPZ_RPT_USB_TEST_STATS   = 0x8F,
     DEPZ_RPT_SYNC_PIN_CONFIG  = 0x90
 } depz_rpt;
 
@@ -1316,6 +1324,464 @@ typedef struct {
  * NULL when len == 0). Absent channels are zeroed. */
 void depz_bno055_decode_block(uint8_t addr, const uint8_t *data, size_t len,
                               depz_bno055_block *out);
+
+/* ======================================================================== */
+/* TMF8829 multizone dToF over the SPI register bridge, v1.00 (contract 14)  */
+/*                                                                            */
+/* APP_TMF8829 is a thin SPI register bridge: it reads self-sized frames off */
+/* the sensor FIFO on INT and pushes them in chunks. The host runs the       */
+/* sensor (live layer: depz_tmf8829_* in depz_sensor_io.h). Here: the wire   */
+/* codecs, the chunk reassembler, frame / pixel decode with the half-frame   */
+/* merge, the clock model and capture time, measurement assembly, presets    */
+/* and config-page fields, and the embedded ams sensor firmware. All of it   */
+/* is frozen in contracts/vectors/tmf8829.json and tmf8829_frame_time.json.  */
+/* ======================================================================== */
+
+#define DEPZ_TMF8829_CMD_READ_REG     0x32
+#define DEPZ_TMF8829_CMD_WRITE_REG    0x33
+#define DEPZ_TMF8829_CMD_START_STREAM 0x35
+#define DEPZ_TMF8829_CMD_STOP_STREAM  0x36
+#define DEPZ_TMF8829_CMD_GET_INFO     0x37
+#define DEPZ_TMF8829_RPT_REG_DATA     0x91
+#define DEPZ_TMF8829_RPT_INFO         0x92 /* no echoed cmd byte */
+#define DEPZ_TMF8829_RPT_FRAME        0x93 /* unsolicited, chunked */
+#define DEPZ_TMF8829_RPT_EVENT        0x94 /* unsolicited */
+
+/* RPT_TMF_EVENT.code */
+#define DEPZ_TMF8829_EV_INT        0u /* MOTION/PROXIMITY interrupt, no frame  */
+#define DEPZ_TMF8829_EV_BAD_HEADER 1u /* header refused, frame not read: once
+                                       * expected on STOP mid histogram dump  */
+
+#define DEPZ_TMF8829_READ_MAX  1024u /* TMF_READ_REG len 1..1024             */
+#define DEPZ_TMF8829_WRITE_MAX 1023u /* TMF_WRITE_REG data 1..1023           */
+#define DEPZ_TMF8829_CHUNK_MAX 1024u /* frame bytes per RPT_TMF_FRAME        */
+
+/* INT_STATUS bits the bridge serves (TMF_START_STREAM int_mask). */
+#define DEPZ_TMF8829_INT_RESULTS    0x01u
+#define DEPZ_TMF8829_INT_MOTION     0x02u
+#define DEPZ_TMF8829_INT_PROXIMITY  0x04u
+#define DEPZ_TMF8829_INT_HISTOGRAMS 0x08u
+#define DEPZ_TMF8829_INT_MASK_ALL   0x0Fu
+/* TMF_START_STREAM flags: the 60-byte ref-SPAD frame before each results frame. */
+#define DEPZ_TMF8829_SF_REF_FRAME   0x01u
+
+#define DEPZ_TMF8829_REG_DATA_HEADER_SIZE    9u
+#define DEPZ_TMF8829_FRAME_CHUNK_HEADER_SIZE 21u
+#define DEPZ_TMF8829_EVENT_SIZE              12u
+#define DEPZ_TMF8829_INFO_SIZE               25u
+
+/* Encoders: the payload length written, or 0 (nothing written) when an
+ * argument is out of range — addr 0..255, len 1..READ_MAX, data 1..WRITE_MAX
+ * bytes, int_mask a non-zero subset of 0x0F, flags only SF_REF_FRAME.
+ * STOP_STREAM and GET_INFO have an empty payload. */
+size_t depz_tmf8829_pack_read_reg(int addr, int len, uint8_t out[3]);
+/* `out` holds 1 + data_len bytes. */
+size_t depz_tmf8829_pack_write_reg(int addr, const uint8_t *data, size_t data_len,
+                                   uint8_t *out);
+size_t depz_tmf8829_pack_start_stream(int int_mask, int flags, uint8_t out[2]);
+
+/* RPT_TMF_REG_DATA (0x91): echoed 0x32, MCU time at SPI-read completion,
+ * the register bytes. Returns 0, or -1 when shorter than 9 B or the echoed
+ * opcode is not 0x32. */
+typedef struct {
+    uint64_t timestamp_us;
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_tmf8829_reg_data;
+int depz_tmf8829_unpack_reg_data(const uint8_t *payload, size_t len,
+                                 depz_tmf8829_reg_data *out);
+
+/* RPT_TMF_INFO (0x92, 25 B): bridge state only. int_edges runs from MCU
+ * power-up; the frame counters restart at TMF_START_STREAM. -1 when short. */
+typedef struct {
+    uint32_t int_edges;
+    uint32_t frames;
+    uint32_t frames_aborted;
+    uint32_t frame_errors;
+    uint32_t spi_timeouts;
+    uint8_t  int_level;        /* INT pin now, 0 = asserted */
+    bool     streaming;
+    uint8_t  int_mask;
+    uint8_t  last_int_status;
+    uint8_t  last_fifo_status;
+} depz_tmf8829_info;
+int depz_tmf8829_unpack_info(const uint8_t *payload, size_t len, depz_tmf8829_info *out);
+
+/* RPT_TMF_FRAME (0x93) chunk. timestamp_us + the frame's pre-header SYSTICK
+ * are a clock pair (not the capture time); edge_us is the INT falling edge
+ * credited to the frame, 0 = none. -1 when shorter than 21 B. */
+typedef struct {
+    uint64_t timestamp_us;
+    uint16_t full_size;
+    uint16_t offset;
+    uint8_t  frame_seq;
+    uint64_t edge_us;
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_tmf8829_frame_chunk;
+int depz_tmf8829_unpack_frame_chunk(const uint8_t *payload, size_t len,
+                                    depz_tmf8829_frame_chunk *out);
+
+/* RPT_TMF_EVENT (0x94, 12 B). int_status is INT_STATUS as read (unmasked);
+ * frame_id / fifo_status are the refused header's (BAD_HEADER), else 0. */
+typedef struct {
+    uint64_t timestamp_us;
+    uint8_t  int_status;
+    uint8_t  code;         /* DEPZ_TMF8829_EV_* */
+    uint8_t  frame_id;
+    uint8_t  fifo_status;
+} depz_tmf8829_event;
+int depz_tmf8829_unpack_event(const uint8_t *payload, size_t len, depz_tmf8829_event *out);
+
+/* ---- chunk reassembly (§2, normative) ------------------------------------ */
+
+/* Largest frame a u16 full_size can announce. */
+#define DEPZ_TMF8829_FRAME_MAX 65535u
+
+/* A reassembled frame: the sensor bytes from register 0xFA on. */
+typedef struct {
+    uint64_t timestamp_us;
+    uint64_t edge_us;
+    uint8_t  frame_seq;
+    const uint8_t *data;   /* points into the reassembler */
+    size_t   len;
+} depz_tmf8829_raw_frame;
+
+/* Reset on offset 0 (an unfinished frame counts as discarded); append a
+ * chunk only when its frame_seq and full_size equal the frame's and its
+ * offset equals the bytes held, anything else discards the frame in
+ * progress; complete at full_size, discarded past it. Never stitches chunks
+ * of different frame_seq. seq_gaps counts frames the bridge dropped. ~64 KB:
+ * allocate it, don't put it on a small stack. */
+typedef struct {
+    uint64_t completed;
+    uint64_t discarded;
+    uint64_t seq_gaps;
+    /* private */
+    bool     has_head, has_next_seq;
+    uint8_t  next_seq;
+    uint64_t head_timestamp_us, head_edge_us;
+    uint16_t head_full_size;
+    uint8_t  head_seq;
+    size_t   len;
+    uint8_t  buf[DEPZ_TMF8829_FRAME_MAX];
+} depz_tmf8829_reassembler;
+
+/* Forget everything (every stream start: frame_seq restarts at 0). */
+void depz_tmf8829_reassembler_reset(depz_tmf8829_reassembler *r);
+/* Returns 1 and fills *out when `chunk` completes a frame (out->data stays
+ * valid until the next feed / reset), else 0. */
+int  depz_tmf8829_reassembler_feed(depz_tmf8829_reassembler *r,
+                                   const depz_tmf8829_frame_chunk *chunk,
+                                   depz_tmf8829_raw_frame *out);
+
+/* ---- frames (§3) ---------------------------------------------------------- */
+
+#define DEPZ_TMF8829_PRE_HEADER_SIZE 5u
+#define DEPZ_TMF8829_HEADER_SIZE     16u
+#define DEPZ_TMF8829_FOOTER_SIZE     12u
+#define DEPZ_TMF8829_FRAME_HEAD      21u    /* what the bridge reads @0xFA */
+#define DEPZ_TMF8829_FRAME_EOF       0xE0F7u
+
+#define DEPZ_TMF8829_FID_MASK       0xF0u
+#define DEPZ_TMF8829_FID_RESULTS    0x10u
+#define DEPZ_TMF8829_FID_HISTOGRAMS 0x20u
+#define DEPZ_TMF8829_FID_REF_SPAD   0x30u
+
+#define DEPZ_TMF8829_LAYOUT_PEAKS    0x07u
+#define DEPZ_TMF8829_LAYOUT_SIGNAL   0x08u
+#define DEPZ_TMF8829_LAYOUT_NOISE    0x10u
+#define DEPZ_TMF8829_LAYOUT_XTALK    0x20u
+#define DEPZ_TMF8829_LAYOUT_SUBFRAME 0x40u /* second (odd-row) half-frame */
+
+#define DEPZ_TMF8829_FRAME_VALID                0x01u
+#define DEPZ_TMF8829_FRAME_ABORTED              0xC0u
+#define DEPZ_TMF8829_FRAME_HV_CP_OVERLOAD       0x08u
+#define DEPZ_TMF8829_FRAME_VCDRV_OVERLOAD       0x10u
+#define DEPZ_TMF8829_FRAME_VCDRV_BURST_EXCEEDED 0x20u
+#define DEPZ_TMF8829_FOOTER_DIST_IN_MM          0x01u /* else 0.25 mm units */
+#define DEPZ_TMF8829_FIFO_TX_UNDERRUN           0x10u
+#define DEPZ_TMF8829_FIFO_RX_OVERRUN            0x20u
+
+/* Pre-header, header and footer of one frame (any kind). */
+typedef struct {
+    uint8_t  fifo_status;
+    uint32_t systick;          /* sensor SYSTICK, 125 kHz */
+    uint8_t  id;
+    uint8_t  layout;
+    uint16_t payload;
+    uint32_t f_number;
+    int8_t   temperature[3];
+    uint8_t  bdv;
+    uint16_t ref_pos[2];
+    uint32_t t0_integration;   /* SYSTICK at the first sub-integration */
+    uint32_t t1_integration;   /* ... and at the last one */
+    uint8_t  frame_status;
+    uint8_t  reserved;
+    uint16_t eof;
+    size_t   size;             /* bytes of the whole frame */
+    /* derived */
+    uint8_t  kind;             /* id & 0xF0: DEPZ_TMF8829_FID_* */
+    uint8_t  fp_mode;          /* id & 0x0F */
+    bool     second_half;      /* layout & SUBFRAME */
+    bool     distance_in_mm;   /* reserved & FOOTER_DIST_IN_MM */
+} depz_tmf8829_frame_info;
+
+/* Returns 0, or -1 when the frame is shorter than header + footer (33 B). */
+int depz_tmf8829_parse_frame(const uint8_t *raw, size_t len, depz_tmf8829_frame_info *out);
+/* Full frame size (pre-header included) from its first 21 bytes. */
+size_t depz_tmf8829_frame_size(const uint8_t head[21]);
+
+/* fp_mode -> full focal-plane grid (rows x cols): 8x8, 8x8, 16x16, 32x32,
+ * 32x32, 32x48. -1 for an unknown fp_mode. */
+int depz_tmf8829_fp_grid(unsigned fp_mode, unsigned *rows, unsigned *cols);
+/* What one results frame carries: half the rows for 32x32 / 48x32. */
+int depz_tmf8829_frame_rows(unsigned fp_mode, unsigned *rows, unsigned *cols);
+/* "8x8A", "8x8B", "16x16", "32x32", "32x32s", "48x32"; NULL if unknown. */
+const char *depz_tmf8829_fp_name(unsigned fp_mode);
+
+/* What is wrong with a frame, in the reference wording ("EOF 0x1234",
+ * "status 0x00 not valid", "aborted", "HV_CP_OVERLOAD", "VCDRV_OVERLOAD",
+ * "VCDRV_BURST_EXCEEDED", "txfifo_underrun", "rxfifo_overrun"); count 0 =
+ * fine. */
+#define DEPZ_TMF8829_FRAME_PROBLEMS_MAX 8
+typedef struct {
+    int  count;
+    char text[DEPZ_TMF8829_FRAME_PROBLEMS_MAX][32];
+} depz_tmf8829_frame_problems;
+void depz_tmf8829_frame_problems_of(const depz_tmf8829_frame_info *f,
+                                    depz_tmf8829_frame_problems *out);
+
+/* ---- results pixels and the half-frame merge (§3) -------------------------- */
+
+#define DEPZ_TMF8829_MAX_ZONES 1536u /* 48 x 32 */
+#define DEPZ_TMF8829_MAX_PEAKS 4u    /* nr_peaks the sensor supports */
+
+/* Decoded results of one frame or of a merged measurement, raw sensor
+ * integers (distance in 0.25 mm, or mm with the footer flag; not yet
+ * clock-corrected). Per-peak arrays are [peaks][rows][cols] packed densely:
+ * index p * rows * cols + r * cols + c; noise / xtalk are [rows][cols].
+ * distance and snr are present when peaks > 0. ~37 KB. */
+typedef struct {
+    uint8_t  peaks;
+    uint16_t rows, cols;
+    bool     has_signal, has_noise, has_xtalk;
+    uint16_t distance[DEPZ_TMF8829_MAX_PEAKS * DEPZ_TMF8829_MAX_ZONES];
+    uint8_t  snr[DEPZ_TMF8829_MAX_PEAKS * DEPZ_TMF8829_MAX_ZONES];
+    uint16_t signal[DEPZ_TMF8829_MAX_PEAKS * DEPZ_TMF8829_MAX_ZONES];
+    uint16_t noise[DEPZ_TMF8829_MAX_ZONES];
+    uint16_t xtalk[DEPZ_TMF8829_MAX_ZONES];
+} depz_tmf8829_results;
+
+/* Pixel results of one results frame, row-major. `info` may be NULL (the
+ * frame is parsed). Returns 0, or -1 with a reason in `err` (optional): not a
+ * results frame, unknown fp_mode, more than MAX_PEAKS peaks, or data size !=
+ * pixels x pixel size (a corrupt frame). */
+int depz_tmf8829_parse_results(const uint8_t *raw, size_t len,
+                               const depz_tmf8829_frame_info *info,
+                               depz_tmf8829_results *out, char *err, size_t err_cap);
+/* 32x32 / 48x32: the first half-frame holds the even rows, the second the
+ * odd ones; full[2i] = first[i], full[2i+1] = second[i]. A field is present
+ * when both halves have it. Returns 0, or -1 (out untouched) when the halves
+ * differ in peaks or shape. `out` must not alias an input. */
+int depz_tmf8829_merge_halves(const depz_tmf8829_results *first,
+                              const depz_tmf8829_results *second,
+                              depz_tmf8829_results *out);
+
+/* ---- clock model and capture time (§5, bit-exact) -------------------------- */
+
+#define DEPZ_TMF8829_NOMINAL_Q16  (8u << 16) /* 8 MCU µs per tick, Q16 */
+#define DEPZ_TMF8829_WIN_MIN_US   200000
+#define DEPZ_TMF8829_WIN_SLIDE_US 1000000
+#define DEPZ_TMF8829_EDGE_LATE_US 2000
+
+/* Frame-time flags (FT_*). */
+#define DEPZ_TMF8829_FT_NOMINAL     0x01u /* ratio not measured yet            */
+#define DEPZ_TMF8829_FT_CLOCK_RESET 0x02u /* model restarted at this frame     */
+#define DEPZ_TMF8829_FT_EDGE_LATE   0x04u /* INT edge > 2 ms later than usual  */
+#define DEPZ_TMF8829_FT_STALLED     0x08u /* sub-integrations not back to back */
+#define DEPZ_TMF8829_FT_T1_UNSURE   0x10u /* histograms + 32x32/48x32          */
+
+/* Sensor SYSTICK -> MCU µs, fed one clock pair per non-ref frame (MCU time of
+ * the header read, pre-header SYSTICK). Ratio over a sliding 1..2 s window,
+ * first after 200 ms; it is also the distance correction. */
+typedef struct {
+    uint32_t ratio_q16;        /* MCU µs per tick, Q16 */
+    bool     nominal;          /* ratio_q16 not measured yet */
+    /* private */
+    bool     valid, has_mid;
+    int64_t  last_us, anchor_us, mid_us;
+    uint32_t last_tick, anchor_tick, mid_tick;
+} depz_tmf8829_clock;
+
+void    depz_tmf8829_clock_reset(depz_tmf8829_clock *c);
+/* Add a pair -> DEPZ_TMF8829_FT_CLOCK_RESET when it does not fit the model
+ * (which then restarts from it), else 0. */
+uint8_t depz_tmf8829_clock_add(depz_tmf8829_clock *c, int64_t us, uint32_t tick);
+/* SYSTICK `tick` -> MCU µs through the pair (pair_us, pair_tick). */
+int64_t depz_tmf8829_clock_to_us(const depz_tmf8829_clock *c, int64_t pair_us,
+                                 uint32_t pair_tick, uint32_t tick);
+/* MCU/sensor clock ratio (~1.015): distances are scaled by it. */
+double  depz_tmf8829_clock_ratio(const depz_tmf8829_clock *c);
+
+/* Capture time of one results frame, MCU µs. */
+typedef struct {
+    int64_t  timestamp_us;     /* centre of the capture window */
+    uint8_t  flags;            /* DEPZ_TMF8829_FT_* */
+    uint32_t t1_len_us;        /* sub-integration length used */
+    int64_t  t0_us, t1_us;     /* first / last sub-integration start */
+    int64_t  edge_us;          /* INT edge credited to the frame, 0 = none */
+    int64_t  pair_us;          /* the clock pair's MCU time */
+    uint32_t ratio_q16;        /* clock ratio after this frame */
+} depz_tmf8829_frame_time;
+
+/* N equal sub-integrations per results frame; window [t0, t1 + T1] with T1
+ * the stream's shortest (t1 - t0) / (N - 1); its centre is the frame time. */
+typedef struct {
+    /* private */
+    bool     has_lag_min, hist_seen;
+    int64_t  lag_min;
+    uint32_t sub_min;
+} depz_tmf8829_timer;
+
+void depz_tmf8829_timer_reset(depz_tmf8829_timer *t);
+/* A histogram frame was seen in the stream. */
+void depz_tmf8829_timer_histograms(depz_tmf8829_timer *t);
+/* `flags` = what clock_add returned for this frame. */
+void depz_tmf8829_timer_results(depz_tmf8829_timer *t, const depz_tmf8829_clock *c,
+                                unsigned fp_mode, uint32_t systick, uint32_t t0_tick,
+                                uint32_t t1_tick, int64_t pair_us, int64_t edge_us,
+                                uint8_t flags, depz_tmf8829_frame_time *out);
+/* Sub-integrations per results frame: fp_mode 0..2 -> 2, 3..4 -> 4, 5 -> 6,
+ * any other -> 2. */
+unsigned depz_tmf8829_subints(unsigned fp_mode);
+
+/* ---- measurements (§6) ------------------------------------------------------ */
+
+#define DEPZ_TMF8829_PROBLEMS_KEPT 16
+#define DEPZ_TMF8829_PROBLEM_LEN   128
+
+/* One measurement: its results frame (8x8, 16x16) or both half-frames
+ * (32x32, 48x32) merged, with the histogram / ref-SPAD frames before it
+ * counted (their bytes reach the live layer's frame callback). ~90 KB. */
+typedef struct {
+    int64_t  timestamp_us;     /* MCU µs: floor mean of the half-frame times */
+    uint8_t  flags;            /* FT_* of all its results frames, OR-ed */
+    uint8_t  fp_mode;
+    uint32_t f_number;
+    uint16_t rows, cols;       /* full focal plane */
+    int8_t   temperature_c;    /* die temperature (last frame, header byte 0) */
+    bool     distance_in_mm;   /* raw distance unit is mm (8x8-xr), else 0.25 mm */
+    uint32_t ratio_q16;        /* clock ratio used for distance_mm */
+    depz_tmf8829_results results;
+    /* clock-corrected mm, [peaks][rows][cols] like results.distance; valid
+     * when results.peaks > 0 */
+    double   distance_mm[DEPZ_TMF8829_MAX_PEAKS * DEPZ_TMF8829_MAX_ZONES];
+    size_t   n_frames;         /* 1 or 2 */
+    depz_tmf8829_frame_info frames[2];
+    depz_tmf8829_frame_time times[2];
+    size_t   n_histograms;
+    size_t   n_ref_frames;
+    /* what went wrong since the previous measurement: n_problems in all, the
+     * first DEPZ_TMF8829_PROBLEMS_KEPT of them as text */
+    size_t   n_problems;
+    char     problems[DEPZ_TMF8829_PROBLEMS_KEPT][DEPZ_TMF8829_PROBLEM_LEN];
+} depz_tmf8829_measurement;
+
+/* Frames in stream order -> measurements. Histogram frames between two
+ * results frames belong to the second; a ref-SPAD frame comes right before
+ * its results frame. 32x32/48x32: a second half without a first is dropped
+ * with the frames collected for it; two first halves in a row keep the newer;
+ * halves of different fp_mode / layout are dropped with their frames. Every
+ * case is logged in the next measurement's problems. Reset at every stream
+ * start (clock model and T1 are per stream). ~80 KB: allocate it. */
+typedef struct {
+    depz_tmf8829_clock clock;
+    depz_tmf8829_timer timer;
+    uint64_t parse_errors;
+    /* private */
+    size_t   pending_hist, pending_ref, hist, refs;
+    bool     has_half;
+    depz_tmf8829_frame_info half_info;
+    depz_tmf8829_frame_time half_time;
+    depz_tmf8829_results    half;
+    depz_tmf8829_results    cur;
+    size_t   n_problems;
+    char     problems[DEPZ_TMF8829_PROBLEMS_KEPT][DEPZ_TMF8829_PROBLEM_LEN];
+} depz_tmf8829_builder;
+
+void depz_tmf8829_builder_reset(depz_tmf8829_builder *b);
+/* One frame with the MCU time of its header read and its INT edge (0 =
+ * none). Returns 1 and fills *out when it completes a measurement, else 0. */
+int  depz_tmf8829_builder_add(depz_tmf8829_builder *b, const uint8_t *raw, size_t len,
+                              int64_t timestamp_us, int64_t edge_us,
+                              depz_tmf8829_measurement *out);
+
+/* ---- sensor registers, presets, config page (§4) --------------------------- */
+
+#define DEPZ_TMF8829_REG_APP_ID     0x00u /* bootloader 0x80, application 0x01 */
+#define DEPZ_TMF8829_REG_CMD_STAT   0x08u
+#define DEPZ_TMF8829_REG_SERIAL     0x1Cu /* u32 */
+#define DEPZ_TMF8829_REG_CID_RID    0x20u
+#define DEPZ_TMF8829_REG_CFG        0x22u /* config page 0x22..0xDF */
+#define DEPZ_TMF8829_REG_INT_STATUS 0xE1u
+#define DEPZ_TMF8829_REG_INT_ENAB   0xE2u
+#define DEPZ_TMF8829_REG_ID         0xE3u /* reads 0x9E */
+#define DEPZ_TMF8829_REG_REVID      0xE4u
+#define DEPZ_TMF8829_REG_RESET      0xF7u
+#define DEPZ_TMF8829_REG_ENABLE     0xF8u
+#define DEPZ_TMF8829_REG_FIFOSTATUS 0xFAu
+#define DEPZ_TMF8829_REG_FIFO       0xFFu /* the address stays here */
+#define DEPZ_TMF8829_DEVICE_ID      0x9Eu
+#define DEPZ_TMF8829_CFG_SIZE       190u
+
+/* Application commands (CMD_STAT) and statuses. */
+#define DEPZ_TMF8829_CMD_MEASURE          0x10u
+#define DEPZ_TMF8829_CMD_WRITE_PAGE       0x15u
+#define DEPZ_TMF8829_CMD_LOAD_CONFIG_PAGE 0x16u
+#define DEPZ_TMF8829_CMD_STOP             0xFFu
+#define DEPZ_TMF8829_STAT_OK       0x00u
+#define DEPZ_TMF8829_STAT_ACCEPTED 0x01u
+/* "OK", "ERR_CONFIG_RESULT_SIZE", ...; NULL for an unknown status. */
+const char *depz_tmf8829_status_name(uint8_t status);
+
+/* Presets: the load command (then LOAD_CONFIG_PAGE) and the preset's own
+ * kilo_iterations (a preset rescales a stale value, it does not reset it). */
+typedef struct {
+    const char *name;          /* "8x8", "8x8-lr", ..., "8x8-xr" */
+    uint8_t     cmd;           /* 0x40..0x49 */
+    uint16_t    kilo_iterations;
+} depz_tmf8829_preset;
+#define DEPZ_TMF8829_PRESET_COUNT 10
+extern const depz_tmf8829_preset DEPZ_TMF8829_PRESETS[DEPZ_TMF8829_PRESET_COUNT];
+/* NULL for an unknown name. */
+const depz_tmf8829_preset *depz_tmf8829_find_preset(const char *name);
+
+#define DEPZ_TMF8829_DEFAULT_PERIOD_MS 33 /* the sensor's own after init() */
+
+/* Config-page fields: register, bit shift, width (16 = little-endian pair). */
+typedef struct {
+    const char *name;
+    uint8_t     reg, shift, width;
+} depz_tmf8829_cfg_field;
+#define DEPZ_TMF8829_CFG_FIELD_COUNT 14
+extern const depz_tmf8829_cfg_field DEPZ_TMF8829_CFG_FIELDS[DEPZ_TMF8829_CFG_FIELD_COUNT];
+/* NULL for an unknown name. */
+const depz_tmf8829_cfg_field *depz_tmf8829_find_cfg_field(const char *name);
+/* Read a field of a 190-byte page. 0, or -1 for an unknown name. */
+int depz_tmf8829_cfg_get(const uint8_t page[190], const char *name, uint32_t *value);
+/* Set a field. 0; -1 unknown name; -2 value outside 0 .. 2^width - 1 (page
+ * untouched). */
+int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value);
+
+/* ---- sensor firmware ---------------------------------------------------------- */
+
+/* ams tmf8829_application.hex as bytes (application 2.200.0, MIT — see
+ * licenses/tmf8829/LICENSES-MIT.TXT shipped with this SDK), 14 444 B, a
+ * multiple of 4, downloaded by depz_tmf8829_init(). */
+#define DEPZ_TMF8829_FIRMWARE_LOAD_ADDR 0x00010000u
+extern const uint8_t depz_tmf8829_firmware[];
+extern const size_t  depz_tmf8829_firmware_len;
 
 /* ======================================================================== */
 /* BNO086 SHTP framing (contract 05 §3) + SH-2 control encoders (§6)          */

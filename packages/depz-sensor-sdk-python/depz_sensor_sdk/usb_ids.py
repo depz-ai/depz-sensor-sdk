@@ -31,6 +31,7 @@ PID_VL53L5CX = 0xED48  # 60744
 PID_VL53L7CX = 0xED49  # 60745
 PID_VL53L7CH = 0xED4A  # 60746
 PID_VL53L8CX = 0xED4B  # 60747 — VL53L8CX ToF (base); hw-verified 1bcf:ed4b
+PID_TMF8829 = 0xED4C  # 60748 — TMF8829 dToF (catalog p_TM88)
 PID_BNO086 = 0xEE08  # 60936 — BNO086 IMU (hw-verified 1bcf:ee08)
 PID_BNO085 = 0xEE09  # 60937
 PID_BNO055 = 0xEE0A  # 60938
@@ -53,6 +54,7 @@ DEPZ_PID_MODEL: dict[int, str] = {
     PID_VL53L7CX: "vl53l7cx",
     PID_VL53L7CH: "vl53l7ch",
     PID_VL53L8CX: "vl53l8cx",
+    PID_TMF8829: "tmf8829",
     PID_BNO086: "bno086",
     PID_BNO085: "bno085",
     PID_BNO055: "bno055",

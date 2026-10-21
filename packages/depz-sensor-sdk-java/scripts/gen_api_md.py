@@ -29,7 +29,9 @@ Boards that share one module get one page each with the same content: the
 ``vl53l7`` domain serves VL53L5CX / VL53L7CX / VL53L7CH (plus the VL53L8
 symbols it decodes with; the L7CH page also the CNH decode), the ``vl53lx``
 domain serves VL53L0X / L1CX / L1CB / L3CX / L4CX (plus the contract-10 codecs
-it forwards to), and ``bno055`` maps onto ``bno055``.
+it forwards to), ``bno055`` maps onto ``bno055``, and ``tmf8829`` (the
+``sensors.tmf8829`` package plus the ``protocol.Tmf8829`` wire codecs) onto
+``tmf8829``.
 
 Regenerate:
 
@@ -54,7 +56,7 @@ DOCS = ROOT / "docs"
 # submodule, not by re-export).
 DOMAIN_ORDER = [
     "transport", "usb", "protocol", "sr04", "fwdepz",
-    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055", "dataset",
+    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "tmf8829", "bno086", "bno055", "dataset",
 ]
 DOMAIN_TITLE = {
     "transport": "Transport",
@@ -67,6 +69,7 @@ DOMAIN_TITLE = {
     "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
     "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "bno055": "BNO055 (IMU)",
     "dataset": "Datasets (record & replay)",
 }
@@ -78,6 +81,7 @@ DOMAIN_OF_TYPE = {
     "Vl53l7": "vl53l7",
     "Vl53lx": "vl53lx",
     "Bno055": "bno055",
+    "Tmf8829": "tmf8829",
 }
 
 # The single ``vl53l8`` package is TWO sensors. Everything shared is the CX base;
@@ -534,7 +538,8 @@ def main() -> None:
         "This SDK is decode-layer only: pure, host-verifiable codecs. The live",
         "drivers (ULD init / register-bridge configuration, the 1D family's ST",
         "drivers, the BNO055 session logic) are extension points, surfaced here",
-        "as documented stubs.",
+        "as documented stubs. The TMF8829 sensor sequence (init, configure,",
+        "start / stop) is not ported: its codecs and decode classes are.",
         "",
         "Each sensor also has a focused reference with just its own symbols:",
         "[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · "
@@ -543,7 +548,7 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
+        "[TMF8829](tmf8829/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
         "[BNO086](bno086/api.md).",
         "",
     ]
@@ -605,6 +610,14 @@ def main() -> None:
         for folder, title in VL53LX_BOARDS:
             _write_board(folder, title, lx, [shared], lx_note)
     _write_sensor("bno055", "BNO055 (IMU)", by_domain.get("bno055", []), [])
+    _write_sensor("tmf8829", "TMF8829 (dToF)", by_domain.get("tmf8829", []), [
+        "Codec and decode layer only: the bridge wire codecs (`Tmf8829`, in",
+        "`ai.depz.sensor.protocol`) and the frame / config / clock / measurement",
+        "classes of `ai.depz.sensor.sensors.tmf8829`. There is no live device",
+        "class — init, configure and start/stop run in the Python or TypeScript",
+        "SDK.",
+        "",
+    ])
 
 
 def _sensor_header(title: str, note: list[str]) -> list[str]:

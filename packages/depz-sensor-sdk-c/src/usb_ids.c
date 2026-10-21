@@ -22,6 +22,7 @@ static const struct { int pid; const char *model; } DEPZ_PID_MODEL[] = {
     { 0xED49,          "vl53l7cx" }, /* 60745 */
     { 0xED4A,          "vl53l7ch" }, /* 60746 */
     { 0xED4B,          "vl53l8cx" }, /* 60747 — VL53L8CX production PID, hw-verified */
+    { DEPZ_PID_TMF8829, "tmf8829" }, /* 0xED4C 60748 (contract 14) */
     { DEPZ_PID_BNO086, "bno086" },   /* 0xEE08 60936 */
     { 0xEE09,          "bno085" },   /* 60937 */
     { 0xEE0A,          "bno055" },   /* 60938 */

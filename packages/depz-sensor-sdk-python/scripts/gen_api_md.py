@@ -51,12 +51,13 @@ SCAN_MODULES = [
     "depz_sensor_sdk.vl53lx",
     "depz_sensor_sdk.bno086",
     "depz_sensor_sdk.bno055",
+    "depz_sensor_sdk.tmf8829",
 ]
 
 # Domain (subpackage / top-level module) → section title, in reading order.
 DOMAIN_ORDER = [
-    "discovery", "device", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
-    "bootloader", "dataset", "transport", "protocol", "errors",
+    "discovery", "device", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "tmf8829", "bno086",
+    "bno055", "bootloader", "dataset", "transport", "protocol", "errors",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery", "device": "Device core", "sr04": "SR04",
@@ -64,6 +65,7 @@ DOMAIN_TITLE = {
     "vl53l7": "VL53L5CX / VL53L7CX / VL53L7CH (ToF)",
     "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno055": "BNO055 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "bootloader": "Bootloader / firmware update", "dataset": "Datasets (record & replay)",
     "transport": "Transport", "protocol": "Protocol codecs", "errors": "Errors",
     "depz_sensor_sdk": "Top level",
@@ -158,6 +160,9 @@ def _sensor_api_targets(groups):
                 "surface (`Vl53lx`, `Vl53lxMeasurement`, constants) follows it and",
                 "is identical on every VL53L0X / L1CX / L1CB / L3CX / L4CX page.",
                 ""]))
+    if "tmf8829" in by:
+        title, members = by["tmf8829"]
+        targets.append(("tmf8829", title, members + pick("Tmf8829Info"), []))
     if "bno086" in by:
         title, members = by["bno086"]
         targets.append(("bno086", title, members, []))
@@ -674,7 +679,7 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
+        "[TMF8829](tmf8829/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
         "[BNO086](bno086/api.md).",
         "",
     ]

@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from depz_sensor_sdk import Sr04
-from depz_sensor_sdk.dataset import DatasetReader, SessionRecorder
+from depz_sensor_sdk.dataset import DatasetReader, DatasetWriter, SessionRecorder
 
 from fake_device import FakeSr04
 
@@ -167,8 +167,9 @@ def test_vl53lx_and_bno055_records(tmp_path: Path):
 
 def test_bno086_records(tmp_path: Path):
     """Contract 09 `bno086`: every report the subscribers see, snake_case, full
-    components; `t` is host arrival time (monotonic per device), the report's
-    own device time rides along as `timestamp_us`."""
+    components; `t` is the report's measurement time on the host timeline (its
+    device `timestamp_us` minus the sync offset), not arrival time — an IMU
+    recorded next to a ToF must share the ToF's clock."""
     from depz_sensor_sdk.bno086 import Bno086
     from depz_sensor_sdk.bno086.reports import Acceleration, RotationVector
 
@@ -181,8 +182,8 @@ def test_bno086_records(tmp_path: Path):
         rec = SessionRecorder(path)
         rec.add(imu)
         rec.start()
-        # One cargo, device times out of order: the records must still be
-        # monotonic in `t`.
+        # One cargo, device times out of order: the file holds them as they
+        # came, the reader hands them back sorted by `t`.
         for r in (rv, acc):
             for cb, _ in list(imu._report_cbs):
                 cb(r)
@@ -191,13 +192,27 @@ def test_bno086_records(tmp_path: Path):
         imu.close()
         fake.close()
 
-    recs = [r for r in DatasetReader(path) if r.kind == "bno086"]
-    assert [r.value["type"] for r in recs] == ["RotationVector", "Acceleration"]
-    assert recs[0].t_host_us <= recs[1].t_host_us
-    q = recs[0].value
+    reader = DatasetReader(path)
+    offset = reader.devices["d0"]["time_sync"]["offset_us"]
+    recs = [r for r in reader if r.kind == "bno086"]
+    assert [r.value["type"] for r in recs] == ["Acceleration", "RotationVector"]
+    assert [r.t_host_us for r in recs] == [5_000_100 - offset, 5_000_300 - offset]
+    q = recs[1].value
     assert (q["sensor_id"], q["i"], q["real"]) == (0x05, 0.5, rv.real)
     assert q["accuracy_rad"] == rv.accuracy_rad and q["timestamp_us"] == 5_000_300
     assert "x" not in q
-    a = recs[1].value
+    a = recs[0].value
     assert (a["sensor_id"], a["z"], a["timestamp_us"]) == (0x01, acc.z, 5_000_100)
     assert "i" not in a and "accuracy_rad" not in a
+
+
+def test_reader_sorts_within_a_device(tmp_path: Path):
+    """Contract 09: `t` may step back within a device (BNO086 cargos, arrival-
+    time temperature records); the reader still yields one sorted timeline."""
+    path = tmp_path / "s.depzdata"
+    w = DatasetWriter(path, {"d0": {}, "d1": {}})
+    for d, t in (("d0", 300), ("d0", 100), ("d1", 200), ("d0", 250), ("d1", 50)):
+        w.write(d, t, "event", {})
+    w.close()
+    assert [(r.device_id, r.t_host_us) for r in DatasetReader(path)] == [
+        ("d1", 50), ("d0", 100), ("d1", 200), ("d0", 250), ("d0", 300)]

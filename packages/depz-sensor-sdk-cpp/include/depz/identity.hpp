@@ -14,6 +14,7 @@ enum class SensorType {
     Vl53lx,  // VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX (one APP_VL53L0_4 firmware)
     Bno086,
     Bno055,  // 9-axis IMU on the APP_BNO055 register bridge (contract 13)
+    Tmf8829,  // multizone dToF on the APP_TMF8829 SPI register bridge (contract 14)
     Unknown,
 };
 

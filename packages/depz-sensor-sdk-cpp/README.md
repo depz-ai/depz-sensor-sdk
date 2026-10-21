@@ -11,8 +11,8 @@ layers:
   it: serial links, USB discovery, `.depzrec` record / replay, a reader thread
   with request / reply matching, the common commands of every board, events
   and the sensor classes (**SR04**, **VL53L4CD** and the multizone
-  **VL53L5CX / VL53L7CX / VL53L7CH / VL53L8CX / VL53L8CH** and **BNO055** so
-  far). A C++ wrapper over the C SDK (`depz-sensor-sdk-c`): exceptions, move-only handles that
+  **VL53L5CX / VL53L7CX / VL53L7CH / VL53L8CX / VL53L8CH**, **BNO055** and
+  **TMF8829** so far). A C++ wrapper over the C SDK (`depz-sensor-sdk-c`): exceptions, move-only handles that
   close themselves, `std::function` callbacks and pull streams.
 
 ```cpp
@@ -57,6 +57,12 @@ The DEPZ line's sensors share one framed protocol:
   codecs, units / calibration / axis-remap / page-1 config codecs and the
   register-window decode (`depz/bno055.hpp`, live class `depz::Bno055`).
 - **BNO085 / BNO086** — 9-axis IMU, SH-2 over SHTP (`depz/bno086.hpp`).
+- **TMF8829** — ams-OSRAM multizone direct ToF, 8×8 … 48×32 zones, up to 4
+  peaks per zone, raw histograms, on a thin SPI register bridge: bridge codecs,
+  chunk reassembly, frame / pixel decode with the half-frame merge, the clock
+  model and capture time, presets and config-page fields, the embedded ams
+  sensor firmware (MIT, `licenses/tmf8829/`) (`depz/tmf8829.hpp`, live class
+  `depz::Tmf8829`).
 
 CX and CH are two distinct sensors but one live class and one decode surface:
 `depz::Vl53l8` drives both (its `Vl53l8Model` picks the sensor firmware), and
@@ -73,7 +79,7 @@ selectable via `depz::vl53l8::Variant`.
   realtime replay, in-memory loopback pairs, custom C links.
 - Discovery: `list_serial_ports`, `probe_port`, `list_depz_devices`, and
   `open_device` / `open_sr04` / `open_vl53l4cd` / `open_vl53l8` /
-  `open_bno055` / `open_bno086` / `open_vl53lx` — USB-id
+  `open_bno055` / `open_bno086` / `open_vl53lx` / `open_tmf8829` — USB-id
   filtered, ordered by USB serial, identified by a protocol probe.
 - The device core, for **every** board: the common commands (names, serial,
   MCU temperature, payload CRC, sync pins, reset, bootloader entry), time
@@ -110,7 +116,14 @@ selectable via `depz::vl53l8::Variant`.
   m/s², rad/s, µT and quaternions through callbacks and streams, calibration /
   DCD / tare / reorientation, FRS records and sensor metadata, error queue and
   counts, the busy back-off; verified on a replay of a real capture and live on
-  a lab BNO085).
+  a lab BNO085), and the **TMF8829** (`depz::Tmf8829` — the host runs the
+  sensor: `init()` with the firmware download and progress, `configure(preset,
+  options)` writing every field a preset keeps and reading it back, the config
+  page, raw registers, bridge info, start / stop with the expected stop-time
+  bad-header event swallowed, `Tmf8829Measurement`s with clock-corrected
+  capture times through callbacks and streams, raw frames for the histogram /
+  ref-SPAD bytes, events and stream counters; verified against the C SDK's fake
+  bridge).
 - A typed exception hierarchy under `depz::Error`.
 
 **The decode layer** (no dependencies):
@@ -136,6 +149,11 @@ selectable via `depz::vl53l8::Variant`.
   live class above.
 - **BNO085 / BNO086**: SHTP framing, SH-2 encoders, report decode
   (`depz/bno086.hpp`) — and the live class above.
+- **TMF8829**: bridge codecs, chunk reassembler, frame / pixel decode and the
+  half-frame merge, `SensorClock` + `CaptureTimer` (bit-exact with the 27
+  recorded streams of `tmf8829_frame_time.json`), `MeasurementBuilder`,
+  presets / config fields, the sensor firmware image (`depz/tmf8829.hpp`) —
+  and the live class above.
 - **CNH histogram decode** (VL53L7CH, VL53L8CH): `depz::vl53l8::decode_cnh`.
 
 Every board of the line has its live class.
@@ -161,6 +179,7 @@ Full docs live under [`docs/`](docs/):
   [VL53L7CH](docs/vl53l7ch/introduction.md) ·
   [VL53L8CX](docs/vl53l8cx/introduction.md) ·
   [VL53L8CH](docs/vl53l8ch/introduction.md) ·
+  [TMF8829](docs/tmf8829/introduction.md) ·
   [BNO055](docs/bno055/introduction.md) ·
   [BNO085](docs/bno085/introduction.md) ·
   [BNO086](docs/bno086/introduction.md)
@@ -195,7 +214,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.5.0
+  GIT_TAG        v0.6.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -263,7 +282,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.5.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.6.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test
@@ -276,9 +295,10 @@ ctest --test-dir build
 
 Tests are gated behind the `DEPZ_SENSOR_SDK_CPP_BUILD_TESTS` option (ON for a
 standalone build, OFF when the project is pulled in via `add_subdirectory` /
-FetchContent). `ctest` runs 30 tests: the golden-vector suites and the
+FetchContent). `ctest` runs 33 tests: the golden-vector suites and the
 `device_*` tests, which run the live layer against the C SDK's fake SR04,
-fake VL53L4CD bridge and fake BNO086 hub over a loopback link and strictly
+fake VL53L4CD bridge, fake BNO086 hub and fake TMF8829 bridge (fed with frames
+captured on a board) over a loopback link and strictly
 replay a real SR04, a real VL53L4CD, a real VL53L8CH session (with the whole
 firmware download and CNH), a real BNO055 NDOF session (reset, configure, the
 calibration profile through CONFIG, a 100 Hz full-block stream) and a real

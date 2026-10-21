@@ -13,6 +13,7 @@ std::string to_string(SensorType t) {
         case SensorType::Vl53lx: return "vl53lx";
         case SensorType::Bno086: return "bno086";
         case SensorType::Bno055: return "bno055";
+        case SensorType::Tmf8829: return "tmf8829";
         case SensorType::Unknown: return "unknown";
     }
     return "unknown";
@@ -56,6 +57,7 @@ Identity parse_software_name(const std::string& name) {
         if (contains("VL53LX")) return Identity{DeviceMode::App, SensorType::Vl53lx, name, version};
         if (contains("BNO086")) return Identity{DeviceMode::App, SensorType::Bno086, name, version};
         if (contains("BNO055")) return Identity{DeviceMode::App, SensorType::Bno055, name, version};
+        if (contains("TMF8829")) return Identity{DeviceMode::App, SensorType::Tmf8829, name, version};
         return Identity{DeviceMode::App, SensorType::Unknown, name, version};
     }
     return Identity{DeviceMode::Unknown, std::nullopt, name, version};

@@ -33,7 +33,10 @@ declaration together with its ``//`` doc-comment, and writes:
   the BNO055 page, ``Bno086`` / ``Bno086Report`` / ``open_bno086`` and the
   ``depz::bno086`` value types on the BNO086 page, ``Vl53lx`` /
   ``Vl53lxMeasurement`` / ``Vl53lxTarget`` / ``Vl53lxBins`` / ``Vl53lxCap`` /
-  ``open_vl53lx`` on each of the five VL53L 1D-family pages.
+  ``open_vl53lx`` on each of the five VL53L 1D-family pages, ``Tmf8829`` /
+  ``Tmf8829Measurement`` / ``Tmf8829Options`` / ``Tmf8829Config`` /
+  ``Tmf8829SensorId`` / ``Tmf8829StreamStats`` / ``Tmf8829Progress`` /
+  ``open_tmf8829`` on the TMF8829 page.
 
 The doc-comments in the headers are the single source of truth, so the
 reference never drifts from the code. Regenerate with
@@ -72,13 +75,14 @@ FILE_DOMAIN = [
     ("vl53lx.hpp", "vl53lx"),
     ("bno086.hpp", "bno086"),
     ("bno055.hpp", "bno055"),
+    ("tmf8829.hpp", "tmf8829"),
     ("dataset.hpp", "dataset"),
     ("device.hpp", "device"),
 ]
 
 DOMAIN_ORDER = [
     "transport", "common", "identity", "usb_ids", "sr04",
-    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
+    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055", "tmf8829",
     "bootloader", "dataset", "device",
 ]
 DOMAIN_TITLE = {
@@ -93,6 +97,7 @@ DOMAIN_TITLE = {
     "vl53lx": "VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)",
     "bno086": "BNO086 (IMU)",
     "bno055": "BNO055 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "bootloader": "Bootloader / firmware",
     "dataset": "Datasets",
     "device": "Live hardware (links, device, discovery)",
@@ -114,6 +119,10 @@ VL53L8_LIVE_SYMBOLS = {
 }
 VL53L8CH_LIVE_SYMBOLS = {"CnhSetup"}
 BNO055_LIVE_SYMBOLS = {"Bno055Sample", "Bno055Status", "Bno055", "open_bno055"}
+TMF8829_LIVE_SYMBOLS = {
+    "Tmf8829Options", "Tmf8829Config", "Tmf8829SensorId", "Tmf8829StreamStats",
+    "Tmf8829Measurement", "Tmf8829Progress", "Tmf8829", "open_tmf8829",
+}
 # The VL53L 1D family class: on each of the five 1D pages.
 VL53LX_LIVE_SYMBOLS = {
     "Vl53lxCap", "Vl53lxTarget", "Vl53lxBins", "Vl53lxMeasurement", "Vl53lx", "open_vl53lx",
@@ -775,6 +784,18 @@ def sensor_targets(groups):
             ))
         else:
             targets.append(("bno055", "BNO055 (IMU)", m, []))
+    if "tmf8829" in by:
+        _t, m = by["tmf8829"]
+        live = [s for s in by.get("device", ("", []))[1] if s.name in TMF8829_LIVE_SYMBOLS]
+        if live:
+            targets.append((
+                "tmf8829", "TMF8829 (dToF)",
+                [("tmf8829", "TMF8829 codecs, frames, clock (depz/tmf8829.hpp)", m),
+                 ("tmf8829_live", "TMF8829 live class (depz/device.hpp)", live)],
+                live_note("Tmf8829"),
+            ))
+        else:
+            targets.append(("tmf8829", "TMF8829 (dToF)", m, []))
     return targets
 
 
@@ -795,8 +816,8 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
-        "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
-        "[BNO086](bno086/api.md).",
+        "[TMF8829](tmf8829/api.md) · [BNO055](bno055/api.md) · "
+        "[BNO085](bno085/api.md) · [BNO086](bno086/api.md).",
         "",
         "Two layers: the *decode layer* (every header but `depz/device.hpp`)",
         "takes bytes and returns typed values, no I/O; the *live-hardware",

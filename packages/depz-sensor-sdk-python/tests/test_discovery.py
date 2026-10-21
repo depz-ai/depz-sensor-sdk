@@ -51,7 +51,8 @@ def test_model_hint():
     assert usb_model_hint(DEPZ_USB_VID, PID_VL53L8CX) == "vl53l8cx"  # CX production PID
     assert usb_model_hint(DEPZ_USB_VID, PID_VL53L8CH) == "vl53l8ch"
     assert usb_model_hint(DEV_USB_VID, DEV_USB_PID) == "dev"
-    assert usb_model_hint(DEPZ_USB_VID, 0xED4C) is None  # in-range candidate but unnamed
+    assert usb_model_hint(DEPZ_USB_VID, 0xED4C) == "tmf8829"
+    assert usb_model_hint(DEPZ_USB_VID, 0xED4D) is None  # in-range candidate but unnamed
     assert usb_model_hint(0x1234, 0x5678) is None
 
 

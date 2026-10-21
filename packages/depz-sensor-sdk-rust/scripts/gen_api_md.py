@@ -33,7 +33,8 @@ Outputs:
   symbols it re-exports; the L7CH page also the CNH decode); ``vl53lx``
   serves ``vl53l0x``, ``vl53l1cx``, ``vl53l1cb``, ``vl53l3cx`` and
   ``vl53l4cx`` (the family surface plus the contract-10 codecs it
-  re-exports from ``vl53l4``); ``bno055`` maps onto ``bno055``.
+  re-exports from ``vl53l4``); ``bno055`` maps onto ``bno055``; ``tmf8829``
+  maps onto ``tmf8829``.
 """
 
 from __future__ import annotations
@@ -49,7 +50,7 @@ DOCS = ROOT / "docs"
 # SDK's DOMAIN_ORDER / DOMAIN_TITLE.
 DOMAIN_ORDER = [
     "discovery", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
-    "fwdepz", "dataset", "transport", "protocol", "json",
+    "tmf8829", "fwdepz", "dataset", "transport", "protocol", "json",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery",
@@ -60,6 +61,7 @@ DOMAIN_TITLE = {
     "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
     "bno055": "BNO055 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "fwdepz": "Bootloader / firmware update",
     "dataset": "Datasets (record & replay)",
     "transport": "Transport",
@@ -112,6 +114,8 @@ def domain_for(path: Path) -> str | None:
         return "vl53lx"
     if p.startswith("bno055/"):
         return "bno055"
+    if p.startswith("tmf8829/"):
+        return "tmf8829"
     if p == "protocol/sr04.rs":
         return "sr04"
     if p == "protocol/identity.rs":
@@ -401,6 +405,8 @@ def _sensor_targets(by_domain: dict[str, list[dict]]):
     if by_domain.get("bno055"):
         targets.append(("bno055", "BNO055 (IMU)", by_domain["bno055"], [],
                         [("Shared (re-exported from `vl53l4`)", _pick(by_domain, BNO055_PICKS))]))
+    if by_domain.get("tmf8829"):
+        targets.append(("tmf8829", "TMF8829 (dToF)", by_domain["tmf8829"], []))
     return targets
 
 
@@ -425,6 +431,7 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[TMF8829](tmf8829/api.md) · "
         "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
         "[BNO086](bno086/api.md).",
         "",

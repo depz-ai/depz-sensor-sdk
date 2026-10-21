@@ -1,5 +1,6 @@
-// test_device.cpp — the C++ live-hardware wrapper against the C SDK's fake
-// SR04 over loopback: RAII, exceptions, callbacks, streams, replay.
+// test_device.cpp — the C++ live-hardware wrapper against the C SDK's fakes
+// (SR04, VL53L4CD, BNO086, TMF8829) over loopback and recorded sessions:
+// RAII, exceptions, callbacks, streams, replay.
 // Usage: depz_test_device [name] (no name = all).
 #include "depz/device.hpp"
 
@@ -8,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <iostream>
 #include <string>
@@ -17,6 +19,7 @@ extern "C" {
 #include "fake_sr04.h"
 #include "fake_vl53l4.h"
 #include "fake_bno086.h"
+#include "fake_tmf8829.h"
 }
 
 #include "json.hpp"
@@ -625,6 +628,237 @@ void vlx_l3cx_ulp_replay() { vlx_replay("vl53l3cx_ulp_33ms"); }
 void vlx_l0x_uld_replay() { vlx_replay("vl53l0x_uld_long-range_33ms"); }
 void vlx_l4cx_hist_short_replay() { vlx_replay("vl53l4cx_histogram_short_33ms"); }
 
+// The TMF8829 wrapper against the C SDK's fake bridge (tests/fake_tmf8829.c)
+// with the frames of contracts/vectors/tmf8829.json: promote, init (firmware
+// download + progress), configure with read-back and its refusals, the
+// measurement stream / callbacks / raw frames / events, raw registers, bridge
+// info, stop swallowing the BAD_HEADER, a dropped frame_seq, re-init.
+depz::bytes tmf_unhex(const std::string& h)
+{
+    depz::bytes out;
+    for (std::size_t i = 0; i + 1 < h.size(); i += 2)
+        out.push_back(std::byte{static_cast<std::uint8_t>(std::stoi(h.substr(i, 2), nullptr, 16))});
+    return out;
+}
+
+const testjson::Value* tmf_named(const testjson::Value& arr, const std::string& name)
+{
+    for (const auto& v : arr.as_array())
+        if (v.at("name").as_string() == name) return &v;
+    return nullptr;
+}
+
+// Queue the frames of one tmf8829.json measurement scenario on the fake.
+bool tmf_script(fake_tmf8829* f, const testjson::Value& root, const std::string& scenario)
+{
+    const testjson::Value* s = tmf_named(root.at("measurements"), scenario);
+    if (!s) return false;
+    fake_tmf8829_clear_frames(f);
+    for (const auto& e : s->at("frames").as_array()) {
+        const testjson::Value* src = tmf_named(root.at("frames"), e.at("raw_case").as_string());
+        if (!src) return false;
+        const depz::bytes raw = tmf_unhex(src->at("raw").as_string());
+        fake_tmf8829_add_frame(f, reinterpret_cast<const std::uint8_t*>(raw.data()), raw.size(),
+                               e.at("timestamp_us").as_u64(), e.at("edge_us").as_u64());
+    }
+    return true;
+}
+
+bool tmf_same(const depz::Tmf8829Measurement& m, const testjson::Value& e)
+{
+    return m.timestamp_us == e.at("timestamp_us").as_int() && m.flags == e.at("flags").as_int() &&
+           m.f_number == e.at("f_number").as_u64() && m.ratio_q16 == e.at("ratio_q16").as_u64() &&
+           m.n_ref_frames == e.at("n_ref_frames").as_u64() && m.n_histograms == e.at("n_histograms").as_u64() &&
+           m.n_problems == e.at("n_problems").as_u64() && m.results.peaks == e.at("peaks").as_u64() &&
+           m.results.rows == e.at("rows").as_u64() && m.results.cols == e.at("cols").as_u64() &&
+           m.results.distance && m.results.distance->size() == e.at("distance").as_array().size() &&
+           (*m.results.distance)[0] == e.at("distance").as_array()[0].as_int() &&
+           m.histograms.empty() && m.ref_frames.empty();
+}
+
+// The fake and the device on its link; the device goes first.
+struct TmfRig {
+    fake_tmf8829* fake = nullptr;
+    std::unique_ptr<depz::Device> dev;
+    ~TmfRig()
+    {
+        dev.reset();
+        if (fake) fake_tmf8829_stop(fake);
+    }
+};
+
+template <class Pred>
+bool wait_for(Pred p)
+{
+    for (int i = 0; i < 400 && !p(); i++) std::this_thread::sleep_for(5ms);
+    return p();
+}
+
+void tmf8829_fake_session()
+{
+    std::ifstream in(std::string(DEPZ_VECTORS_DIR) + "/tmf8829.json", std::ios::binary);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    const testjson::Value root = testjson::parse(ss.str());
+    const testjson::Value& ex32 = tmf_named(root.at("measurements"), "32x32_ref")->at("expect");
+    const testjson::Value& ex8 = tmf_named(root.at("measurements"), "8x8")->at("expect");
+
+    TmfRig rig;
+    depz_link* link = nullptr;
+    rig.fake = fake_tmf8829_start(&link);
+    CHECK(rig.fake);
+    const depz::bytes base = tmf_unhex(root.at("config").at("page").as_string());
+    fake_tmf8829_set_base_page(rig.fake, reinterpret_cast<const std::uint8_t*>(base.data()));
+
+    // discovery wiring: APP_TMF8829_* promotes to depz::Tmf8829
+    rig.dev = depz::Device::promote(depz::Device::open(depz::Link::adopt(link)));
+    auto* t = dynamic_cast<depz::Tmf8829*>(rig.dev.get());
+    CHECK(t != nullptr);
+    CHECK(t->sensor_type() == depz::SensorType::Tmf8829);
+    CHECK(throws<depz::ArgumentError>([&] { t->sensor_id(); }));  // before init()
+    CHECK(!t->config());
+
+    // init: soft reset, bootloader, the image in <= 1023 B FIFO writes
+    std::size_t calls = 0, last_done = 0, last_total = 0;
+    const auto id = t->init([&](std::size_t done, std::size_t total) {
+        calls++;
+        last_done = done;
+        last_total = total;
+    });
+    CHECK(id.app_version == "2.200.0" && id.serial == FAKE_TMF8829_SERIAL);
+    CHECK(t->sensor_id().serial == FAKE_TMF8829_SERIAL);
+    CHECK(calls == 15 && last_done == 14444 && last_total == 14444);
+    {
+        const std::uint8_t* img = nullptr;
+        const std::size_t n = fake_tmf8829_image(rig.fake, &img);
+        const depz::byte_span want = depz::tmf8829::firmware_image();
+        CHECK(n == want.size() && std::memcmp(img, want.data(), n) == 0);  // the C++ copy is the same image
+        std::uint32_t addr = 0;
+        std::uint16_t words = 0;
+        std::size_t writes = 0, maxw = 0;
+        fake_tmf8829_fifo_params(rig.fake, &addr, &words, &writes, &maxw);
+        CHECK(addr == depz::tmf8829::FIRMWARE_LOAD_ADDR && words == 3611 && maxw == 1023);
+    }
+
+    // configure: every survivor field written over the stale captured page,
+    // verified by read-back
+    depz::Tmf8829Options opt;
+    opt.period_ms = 50;
+    opt.ref_frame = true;
+    auto cfg = t->configure("32x32", opt);
+    CHECK(cfg.preset == "32x32" && cfg.rows == 32 && cfg.cols == 32 && cfg.ref_frame && !cfg.histograms);
+    CHECK(cfg.page.size() == depz::tmf8829::CFG_SIZE && cfg.fields.size() == depz::tmf8829::CFG_FIELDS.size());
+    CHECK(cfg.field("period_ms") == 50 && cfg.field("kilo_iterations") == 2344 && cfg.field("nr_peaks") == 1);
+    CHECK(cfg.field("signal_strength") == 0 && cfg.field("ref_spad_frame") == 1 && cfg.field("fp_mode") == 3);
+    CHECK(cfg.fields[2].first == "fp_mode" && cfg.fields[2].second == 3);
+    CHECK(t->config_page() == cfg.page);
+    CHECK(throws<depz::ArgumentError>([&] { t->configure("64x64"); }));
+    {
+        depz::Tmf8829Options bad;
+        bad.nr_peaks = 8;
+        CHECK(throws<depz::ArgumentError>([&] { t->configure("8x8", bad); }));
+        bad.nr_peaks = 1;
+        bad.fields = {{"no_such_field", 1}};
+        CHECK(throws<depz::ArgumentError>([&] { t->configure("8x8", bad); }));
+        bad.fields = {{"fov_correction", 3}};
+        fake_tmf8829_pin_fov_correction(rig.fake, true);
+        CHECK(throws<depz::ProtocolError>([&] { t->configure("8x8", bad); }));  // did not stick
+        fake_tmf8829_pin_fov_correction(rig.fake, false);
+    }
+    CHECK(t->config() && t->config()->preset == "32x32");  // a refused configure keeps the last good one
+    t->configure("32x32", opt);
+
+    // stream: two 32x32 half-frames, each behind its ref-SPAD frame
+    CHECK(tmf_script(rig.fake, root, "32x32_ref"));
+    std::mutex lock;
+    int frames = 0, measured = 0, events = 0;
+    std::size_t ref_bytes = 0;
+    auto off_frame = t->on_frame([&](const depz::tmf8829::RawFrame& f) {
+        std::lock_guard<std::mutex> g(lock);
+        frames++;
+        if ((std::to_integer<unsigned>(f.data.size() > 5 ? f.data[5] : std::byte{0}) & 0xF0) == 0x30)
+            ref_bytes += f.data.size();
+    });
+    auto off_meas = t->on_measurement([&](const depz::Tmf8829Measurement&) {
+        std::lock_guard<std::mutex> g(lock);
+        measured++;
+    });
+    auto off_event = t->on_event([&](const depz::tmf8829::Tmf8829Event& e) {
+        std::lock_guard<std::mutex> g(lock);
+        if (e.code == depz::tmf8829::EV_INT) events++;
+    });
+    auto stream = t->measurements(4);
+    t->start();
+    CHECK(t->streaming());
+    std::uint8_t mask = 0, flags = 0;
+    CHECK(fake_tmf8829_armed(rig.fake, &mask, &flags) && mask == depz::tmf8829::INT_RESULTS &&
+          flags == depz::tmf8829::SF_REF_FRAME);
+    auto m = stream.next(2000ms);
+    CHECK(m && tmf_same(*m, ex32.as_array()[0]) && m->frames.size() == 2 && m->times.size() == 2);
+    CHECK(m->shape() == std::make_pair(32u, 32u) && m->distance_mm.size() == m->results.distance->size());
+    CHECK(wait_for([&] {
+        std::lock_guard<std::mutex> g(lock);
+        return frames == 4 && measured == 1;
+    }));
+    CHECK(ref_bytes == 2 * 65);  // the ref-SPAD bytes reach on_frame
+    CHECK(throws<depz::ArgumentError>([&] { t->configure("8x8"); }));  // not while streaming
+
+    // an INT event reaches the callback
+    fake_tmf8829_send_event(rig.fake, depz::tmf8829::INT_MOTION, depz::tmf8829::EV_INT);
+    CHECK(wait_for([&] {
+        std::lock_guard<std::mutex> g(lock);
+        return events == 1;
+    }));
+
+    // bridge info + raw reads that run into the FIFO port
+    const auto info = t->bridge_info();
+    CHECK(info.streaming && info.int_mask == 1 && info.frames == 4);
+    for (std::uint8_t i = 0; i < 15; i++) fake_tmf8829_set_reg(rig.fake, static_cast<std::uint8_t>(0xF0 + i), static_cast<std::uint8_t>(0x60 + i));
+    fake_tmf8829_set_reg(rig.fake, 0xFF, 0xAB);
+    const depz::bytes regs = t->read_registers(0xF0, 1100);
+    CHECK(regs.size() == 1100 && regs[0] == std::byte{0x60} && regs[14] == std::byte{0x6E} &&
+          regs[15] == std::byte{0xAB} && regs[1099] == std::byte{0xAB});
+    const depz::bytes one = {std::byte{0x5A}};
+    t->write_registers(0xF0, depz::as_bytes(one));
+    CHECK(fake_tmf8829_reg(rig.fake, 0xF0) == 0x5A);
+
+    // stop swallows the one BAD_HEADER a STOP raises mid histogram dump
+    fake_tmf8829_bad_header_on_stop(rig.fake, true);
+    t->stop();
+    CHECK(!t->streaming() && !fake_tmf8829_armed(rig.fake, nullptr, nullptr));
+    auto st = t->stream_stats();
+    CHECK(st.events_swallowed == 1 && st.frames_completed == 4 && st.measurements == 1 && st.frames_dropped == 0 &&
+          st.frames_discarded == 0 && st.frame_parse_errors == 0);
+    fake_tmf8829_bad_header_on_stop(rig.fake, false);
+    off_frame();
+    off_meas();
+    off_event();
+
+    // a second stream (8x8): a dropped frame_seq is counted, not fatal
+    cfg = t->configure("8x8");
+    CHECK(cfg.rows == 8 && !cfg.ref_frame);
+    CHECK(tmf_script(rig.fake, root, "8x8"));
+    fake_tmf8829_skip_seq_before(rig.fake, 1);
+    t->start();
+    for (std::size_t i = 0; i < 2; i++) {
+        auto m8 = stream.next(2000ms);
+        CHECK(m8 && tmf_same(*m8, ex8.as_array()[i]) && m8->frames.size() == 1);
+    }
+    st = t->stream_stats();
+    CHECK(st.frames_dropped == 1 && st.frames_completed == 2 && st.measurements == 2);
+    t->stop();
+    CHECK(stream.dropped_count() == 0);
+    CHECK(throws<depz::TimeoutError>([&] { t->get_measurement(50ms); }));
+
+    // re-init forgets the config; start() then configures "8x8" itself
+    t->init();
+    CHECK(!t->config());
+    fake_tmf8829_clear_frames(rig.fake);
+    t->start();
+    CHECK(t->config() && t->config()->preset == "8x8");
+    t->stop();
+}
+
 struct Case {
     const char* name;
     void (*fn)();
@@ -649,6 +883,7 @@ const Case k_cases[] = {
     {"vlx_l3cx_ulp_replay", vlx_l3cx_ulp_replay},
     {"vlx_l0x_uld_replay", vlx_l0x_uld_replay},
     {"vlx_l4cx_hist_short_replay", vlx_l4cx_hist_short_replay},
+    {"tmf8829_fake_session", tmf8829_fake_session},
 };
 
 }  // namespace

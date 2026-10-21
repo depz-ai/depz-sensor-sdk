@@ -12,6 +12,7 @@ import ai.depz.sensor.protocol.Common;
 import ai.depz.sensor.protocol.FwDepz;
 import ai.depz.sensor.protocol.Identity;
 import ai.depz.sensor.protocol.Sr04;
+import ai.depz.sensor.protocol.Tmf8829;
 import ai.depz.sensor.protocol.Vl53l4;
 import ai.depz.sensor.protocol.Vl53l7;
 import ai.depz.sensor.protocol.Vl53lx;
@@ -32,6 +33,12 @@ import ai.depz.sensor.sensors.vl53l8.FrameReassembler;
 import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld;
 import ai.depz.sensor.sensors.bno055.Bno055Regs;
 import ai.depz.sensor.sensors.bno086.Shtp;
+import ai.depz.sensor.sensors.tmf8829.CaptureTimer;
+import ai.depz.sensor.sensors.tmf8829.Frames;
+import ai.depz.sensor.sensors.tmf8829.MeasurementBuilder;
+import ai.depz.sensor.sensors.tmf8829.SensorClock;
+import ai.depz.sensor.sensors.tmf8829.Tmf8829Config;
+import ai.depz.sensor.sensors.tmf8829.Tmf8829Firmware;
 import ai.depz.sensor.sensors.bno086.Sh2;
 import ai.depz.sensor.sensors.bno086.Reports;
 import ai.depz.sensor.dataset.Dataset;
@@ -74,6 +81,8 @@ public final class RunVectors {
         bno086ShtpVectors();
         bno086ReportsVectors();
         bno055Vectors();
+        tmf8829Vectors();
+        tmf8829FrameTimeVectors();
         datasetVector();
 
         System.out.println();
@@ -1375,6 +1384,333 @@ public final class RunVectors {
     }
 
     // ── comparison helpers ────────────────────────────────────────────────────
+
+    // ── tmf8829.json + tmf8829_frame_time.json (contract 14) ─────────────────
+
+    private static String sha256(byte[] b) throws Exception {
+        return hex(java.security.MessageDigest.getInstance("SHA-256").digest(b));
+    }
+
+    /** Raw int array vs a JSON list of integers or null. */
+    private static boolean intsEq(int[] got, Object expected) {
+        if (expected == null || got == null) {
+            return expected == null && got == null;
+        }
+        List<Object> ex = arr(expected);
+        if (ex.size() != got.length) {
+            return false;
+        }
+        for (int i = 0; i < got.length; i++) {
+            if (lng(ex.get(i)) != got[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** {@code _arrays(res)} of the Python test vs its expected dict (extra keys ignored). */
+    private static boolean pixelResultsEq(Frames.PixelResults r, Map<String, Object> ex) {
+        int[] shape = r.shape();
+        return r.peaks() == intOf(ex.get("peaks"))
+            && shape[0] == intOf(ex.get("rows"))
+            && shape[1] == intOf(ex.get("cols"))
+            && intsEq(r.distance(), ex.get("distance"))
+            && intsEq(r.snr(), ex.get("snr"))
+            && intsEq(r.signal(), ex.get("signal"))
+            && intsEq(r.noise(), ex.get("noise"))
+            && intsEq(r.xtalk(), ex.get("xtalk"));
+    }
+
+    private static boolean throwsIae(Runnable r) {
+        try {
+            r.run();
+            return false;
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+    }
+
+    private static void tmf8829Vectors() throws Exception {
+        System.out.println("[tmf8829.json]");
+        Map<String, Object> root = load("tmf8829.json");
+
+        // encode
+        for (Object eo : arr(root.get("encode"))) {
+            Map<String, Object> c = obj(eo);
+            String name = (String) c.get("name");
+            int cmd = intOf(c.get("cmd"));
+            byte[] got;
+            if (cmd == Tmf8829.Tmf8829Cmd.READ_REG.value) {
+                got = Tmf8829.packReadReg(intOf(c.get("addr")), intOf(c.get("len")));
+            } else if (cmd == Tmf8829.Tmf8829Cmd.WRITE_REG.value) {
+                got = Tmf8829.packWriteReg(intOf(c.get("addr")), hex((String) c.get("data")));
+            } else if (cmd == Tmf8829.Tmf8829Cmd.START_STREAM.value) {
+                got = Tmf8829.packStartStream(intOf(c.get("int_mask")), intOf(c.get("flags")));
+            } else {
+                got = new byte[0];
+            }
+            check("tmf8829.encode:" + name, hex(got).equals(c.get("payload")));
+        }
+        check("tmf8829.cmd_ids",
+            Tmf8829.Tmf8829Cmd.READ_REG.value == 0x32 && Tmf8829.Tmf8829Cmd.WRITE_REG.value == 0x33
+                && Tmf8829.Tmf8829Cmd.START_STREAM.value == 0x35 && Tmf8829.Tmf8829Cmd.STOP_STREAM.value == 0x36
+                && Tmf8829.Tmf8829Cmd.GET_INFO.value == 0x37
+                && Tmf8829.Tmf8829Rpt.REG_DATA.value == 0x91 && Tmf8829.Tmf8829Rpt.INFO.value == 0x92
+                && Tmf8829.Tmf8829Rpt.FRAME.value == 0x93 && Tmf8829.Tmf8829Rpt.EVENT.value == 0x94);
+
+        // encode_errors
+        for (Object eo : arr(root.get("encode_errors"))) {
+            Map<String, Object> c = obj(eo);
+            String name = (String) c.get("name");
+            String kind = (String) c.get("kind");
+            boolean refused;
+            switch (kind) {
+                case "read_reg":
+                    refused = throwsIae(() -> Tmf8829.packReadReg(intOf(c.get("addr")), intOf(c.get("len"))));
+                    break;
+                case "write_reg":
+                    refused = throwsIae(() -> Tmf8829.packWriteReg(intOf(c.get("addr")), hex((String) c.get("data"))));
+                    break;
+                default:
+                    refused = throwsIae(() -> Tmf8829.packStartStream(intOf(c.get("int_mask")), intOf(c.get("flags"))));
+            }
+            check("tmf8829.encode_error:" + name, refused);
+        }
+
+        // decode
+        for (Object do_ : arr(root.get("decode"))) {
+            Map<String, Object> c = obj(do_);
+            String name = (String) c.get("name");
+            int report = intOf(c.get("report"));
+            byte[] p = hex((String) c.get("payload"));
+            Map<String, Object> ex = obj(c.get("expect"));
+            boolean ok;
+            if (report == Tmf8829.Tmf8829Rpt.REG_DATA.value) {
+                Tmf8829.RegData r = Tmf8829.RegData.unpack(p);
+                ok = ex.size() == 2 && r.timestampUs() == lng(ex.get("timestamp_us"))
+                    && hex(r.data()).equals(ex.get("data"));
+            } else if (report == Tmf8829.Tmf8829Rpt.INFO.value) {
+                Tmf8829.Tmf8829Info i = Tmf8829.Tmf8829Info.unpack(p);
+                ok = ex.size() == 10
+                    && i.intEdges() == lng(ex.get("int_edges"))
+                    && i.frames() == lng(ex.get("frames"))
+                    && i.framesAborted() == lng(ex.get("frames_aborted"))
+                    && i.frameErrors() == lng(ex.get("frame_errors"))
+                    && i.spiTimeouts() == lng(ex.get("spi_timeouts"))
+                    && i.intLevel() == intOf(ex.get("int_level"))
+                    && i.streaming() == (Boolean) ex.get("streaming")
+                    && i.intMask() == intOf(ex.get("int_mask"))
+                    && i.lastIntStatus() == intOf(ex.get("last_int_status"))
+                    && i.lastFifoStatus() == intOf(ex.get("last_fifo_status"));
+            } else if (report == Tmf8829.Tmf8829Rpt.FRAME.value) {
+                Tmf8829.FrameChunk f = Tmf8829.FrameChunk.unpack(p);
+                ok = ex.size() == 6
+                    && f.timestampUs() == lng(ex.get("timestamp_us"))
+                    && f.fullSize() == intOf(ex.get("full_size"))
+                    && f.offset() == intOf(ex.get("offset"))
+                    && f.frameSeq() == intOf(ex.get("frame_seq"))
+                    && f.edgeUs() == lng(ex.get("edge_us"))
+                    && hex(f.data()).equals(ex.get("data"));
+            } else {
+                Tmf8829.Tmf8829Event e = Tmf8829.Tmf8829Event.unpack(p);
+                ok = ex.size() == 5
+                    && e.timestampUs() == lng(ex.get("timestamp_us"))
+                    && e.intStatus() == intOf(ex.get("int_status"))
+                    && e.code() == intOf(ex.get("code"))
+                    && e.frameId() == intOf(ex.get("frame_id"))
+                    && e.fifoStatus() == intOf(ex.get("fifo_status"));
+            }
+            check("tmf8829.decode:" + name, ok);
+        }
+
+        // reassembly
+        for (Object ro : arr(root.get("reassembly"))) {
+            Map<String, Object> c = obj(ro);
+            String name = (String) c.get("name");
+            Tmf8829.FrameReassembler r = new Tmf8829.FrameReassembler();
+            List<String> done = new ArrayList<>();
+            for (Object ch : arr(c.get("chunks"))) {
+                Tmf8829.RawFrame f = r.feed(Tmf8829.FrameChunk.unpack(hex((String) ch)));
+                if (f != null) {
+                    done.add(f.frameSeq() + "|" + f.timestampUs() + "|" + f.edgeUs() + "|"
+                        + f.data().length + "|" + sha256(f.data()));
+                }
+            }
+            Map<String, Object> ex = obj(c.get("expect"));
+            List<String> want = new ArrayList<>();
+            for (Object fo : arr(ex.get("frames"))) {
+                Map<String, Object> f = obj(fo);
+                want.add(lng(f.get("frame_seq")) + "|" + lng(f.get("timestamp_us")) + "|" + lng(f.get("edge_us"))
+                    + "|" + lng(f.get("size")) + "|" + f.get("sha256"));
+            }
+            check("tmf8829.reassembly:" + name, done.equals(want)
+                && r.completed == intOf(ex.get("completed"))
+                && r.discarded == intOf(ex.get("discarded"))
+                && r.seqGaps == intOf(ex.get("seq_gaps")));
+        }
+
+        // frames
+        Map<String, byte[]> rawByCase = new java.util.HashMap<>();
+        for (Object fo : arr(root.get("frames"))) {
+            Map<String, Object> c = obj(fo);
+            String name = (String) c.get("name");
+            byte[] raw = hex((String) c.get("raw"));
+            rawByCase.put(name, raw);
+            Frames.FrameInfo info = Frames.parseFrame(raw);
+            Map<String, Object> h = obj(c.get("header"));
+            List<Object> temp = arr(h.get("temperature"));
+            List<Object> ref = arr(h.get("ref_pos"));
+            boolean hdr = info.fifoStatus() == intOf(h.get("fifo_status"))
+                && info.systick() == lng(h.get("systick"))
+                && info.id() == intOf(h.get("id"))
+                && info.kind() == intOf(h.get("kind"))
+                && info.fpMode() == intOf(h.get("fp_mode"))
+                && info.layout() == intOf(h.get("layout"))
+                && info.payload() == intOf(h.get("payload"))
+                && info.fNumber() == lng(h.get("f_number"))
+                && temp.size() == 3
+                && info.temperature()[0] == intOf(temp.get(0))
+                && info.temperature()[1] == intOf(temp.get(1))
+                && info.temperature()[2] == intOf(temp.get(2))
+                && info.bdv() == intOf(h.get("bdv"))
+                && ref.size() == 2
+                && info.refPos()[0] == intOf(ref.get(0))
+                && info.refPos()[1] == intOf(ref.get(1))
+                && info.t0Integration() == lng(h.get("t0_integration"))
+                && info.t1Integration() == lng(h.get("t1_integration"))
+                && info.frameStatus() == intOf(h.get("frame_status"))
+                && info.reserved() == intOf(h.get("reserved"))
+                && info.eof() == intOf(h.get("eof"))
+                && info.size() == intOf(h.get("size"));
+            check("tmf8829.frame.header:" + name, hdr);
+            check("tmf8829.frame.problems:" + name, info.problems().equals(arr(c.get("problems"))));
+            if (info.kind() == Frames.FID_RESULTS) {
+                check("tmf8829.frame.results:" + name,
+                    pixelResultsEq(Frames.parseResults(raw, info), obj(c.get("results"))));
+            } else {
+                check("tmf8829.frame.data:" + name, sha256(java.util.Arrays.copyOfRange(
+                    raw, Frames.FRAME_HEAD, raw.length - Frames.FOOTER_SIZE)).equals(c.get("data_sha256")));
+            }
+        }
+
+        // measurements
+        for (Object so : arr(root.get("measurements"))) {
+            Map<String, Object> s = obj(so);
+            String name = (String) s.get("name");
+            MeasurementBuilder b = new MeasurementBuilder();
+            List<Object> want = arr(s.get("expect"));
+            int k = 0;
+            boolean ok = true;
+            for (Object fo : arr(s.get("frames"))) {
+                Map<String, Object> f = obj(fo);
+                MeasurementBuilder.Measurement m = b.add(
+                    rawByCase.get((String) f.get("raw_case")), lng(f.get("timestamp_us")), lng(f.get("edge_us")));
+                if (m == null) {
+                    continue;
+                }
+                if (k >= want.size()) {
+                    ok = false;
+                    k++;
+                    continue;
+                }
+                Map<String, Object> ex = obj(want.get(k++));
+                List<Object> ft = arr(ex.get("frame_times_us"));
+                List<Object> tl = arr(ex.get("t1_len_us"));
+                boolean times = ft.size() == m.times().size() && tl.size() == m.times().size();
+                for (int i = 0; times && i < ft.size(); i++) {
+                    times = m.times().get(i).timestampUs() == lng(ft.get(i))
+                        && m.times().get(i).t1LenUs() == lng(tl.get(i));
+                }
+                ok &= times
+                    && m.timestampUs() == lng(ex.get("timestamp_us"))
+                    && m.flags() == intOf(ex.get("flags"))
+                    && m.fpMode() == intOf(ex.get("fp_mode"))
+                    && m.fNumber() == lng(ex.get("f_number"))
+                    && b.clock.ratioQ16 == lng(ex.get("ratio_q16"))
+                    && m.histograms().size() == intOf(ex.get("n_histograms"))
+                    && m.refFrames().size() == intOf(ex.get("n_ref_frames"))
+                    && m.problems().size() == intOf(ex.get("n_problems"))
+                    && m.frames().get(m.frames().size() - 1).distanceInMm() == (Boolean) ex.get("distance_in_mm")
+                    && pixelResultsEq(m.results(), ex);
+            }
+            check("tmf8829.measurements:" + name, ok && k == want.size());
+        }
+
+        // config
+        Map<String, Object> cfg = obj(root.get("config"));
+        byte[] page = hex((String) cfg.get("page"));
+        check("tmf8829.config.page_size", page.length == Tmf8829Config.CFG_SIZE);
+        for (Map.Entry<String, Object> e : obj(cfg.get("get")).entrySet()) {
+            check("tmf8829.config.get:" + e.getKey(),
+                Tmf8829Config.cfgGet(page, e.getKey()) == lng(e.getValue()));
+        }
+        for (Object co : arr(cfg.get("set"))) {
+            Map<String, Object> c = obj(co);
+            String field = (String) c.get("field");
+            byte[] pg = page.clone();
+            Tmf8829Config.cfgSet(pg, field, intOf(c.get("value")));
+            check("tmf8829.config.set:" + field, hex(pg).equals(c.get("page")));
+        }
+        for (Object co : arr(cfg.get("set_errors"))) {
+            Map<String, Object> c = obj(co);
+            String field = (String) c.get("field");
+            check("tmf8829.config.set_error:" + field,
+                throwsIae(() -> Tmf8829Config.cfgSet(page.clone(), field, intOf(c.get("value")))));
+        }
+
+        // firmware
+        Map<String, Object> fw = obj(root.get("firmware"));
+        byte[] img = Tmf8829Firmware.image();
+        check("tmf8829.firmware.load_addr", Tmf8829Firmware.LOAD_ADDR == lng(fw.get("load_addr")));
+        check("tmf8829.firmware.size", img.length == intOf(fw.get("size")));
+        check("tmf8829.firmware.words", img.length / 4 == intOf(fw.get("words")));
+        check("tmf8829.firmware.sha256", sha256(img).equals(fw.get("sha256")));
+        check("tmf8829.firmware.license", Tmf8829Firmware.license().contains("MIT"));
+    }
+
+    private static void tmf8829FrameTimeVectors() throws Exception {
+        System.out.println("[tmf8829_frame_time.json]");
+        Map<String, Object> v = load("tmf8829_frame_time.json");
+        Map<String, Integer> col = new java.util.HashMap<>();
+        List<Object> columns = arr(v.get("columns"));
+        for (int i = 0; i < columns.size(); i++) {
+            col.put((String) columns.get(i), i);
+        }
+        int checked = 0;
+        for (Object so : arr(v.get("streams"))) {
+            Map<String, Object> s = obj(so);
+            String scenario = (String) s.get("scenario");
+            SensorClock clock = new SensorClock();
+            CaptureTimer timer = new CaptureTimer(clock);
+            int idx = 0;
+            for (Object ro : arr(s.get("frames"))) {
+                List<Object> row = arr(ro);
+                int fid = intOf(row.get(col.get("id")));
+                long ts = lng(row.get(col.get("ts")));
+                long tick = lng(row.get(col.get("systick")));
+                int kind = fid & 0xF0;
+                idx++;
+                if (kind == 0x30) {
+                    continue;
+                }
+                int flags = clock.add(ts, tick);
+                if (kind == 0x20) {
+                    timer.histograms();
+                    continue;
+                }
+                CaptureTimer.FrameTime t = timer.results(
+                    fid & 0x0F, tick, lng(row.get(col.get("t0"))), lng(row.get(col.get("t1"))),
+                    ts, lng(row.get(col.get("edge_us"))), flags);
+                check("tmf8829_frame_time:" + scenario + "#" + (idx - 1),
+                    t.timestampUs() == lng(row.get(col.get("exp_timestamp_us")))
+                        && t.t1LenUs() == lng(row.get(col.get("exp_t1_len_us")))
+                        && t.flags() == intOf(row.get(col.get("exp_flags")))
+                        && clock.ratioQ16 == lng(row.get(col.get("exp_ratio_q16"))));
+                checked++;
+            }
+        }
+        check("tmf8829_frame_time:results_frames_checked=970 (got " + checked + ")", checked == 970);
+    }
 
     // ── bno055.json (BNO055 register bridge, contract 13) ────────────────────
 

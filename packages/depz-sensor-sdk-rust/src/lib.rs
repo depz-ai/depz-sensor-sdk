@@ -20,6 +20,11 @@
 //! - [`bno055`] — BNO055 9-axis IMU (one `APP_BNO055` register bridge,
 //!   contract 13): the bridge wire codecs, the §4 register codecs (units,
 //!   calibration, axis remap, page-1 configs) and register-window decode.
+//! - [`tmf8829`] — TMF8829 multizone dToF (one `APP_TMF8829` SPI register
+//!   bridge, contract 14): the bridge wire codecs and chunk reassembler,
+//!   frame / results-pixel decode and half-frame merge, the integer clock
+//!   model and capture time, measurement assembly, config-page fields and
+//!   the embedded ams sensor-firmware image (MIT).
 //! - [`bno086`] — SHTP framing, SH-2 report parsers, control request builders.
 //! - [`dataset`] — `.depzdata` decoded multi-device dataset reader (contract 09).
 //!
@@ -34,6 +39,7 @@ pub mod framing;
 pub mod fwdepz;
 pub mod json;
 pub mod protocol;
+pub mod tmf8829;
 pub mod usb_ids;
 pub mod vl53l4;
 pub mod vl53l7;

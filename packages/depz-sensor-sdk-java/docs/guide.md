@@ -26,6 +26,9 @@ firmware container, datasets). Each sensor then has its own **introduction** and
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (dToF, 8×8 … 48×32 zones, up to 4 peaks) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
 - **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
@@ -63,7 +66,7 @@ into typed Java records and back. It is byte-exact with `contracts/*.md` and the
 golden vectors in `contracts/vectors/`, cross-checked against the Python and
 TypeScript reference SDKs.
 
-The sensors fall into three firmware philosophies:
+The sensors fall into a few firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echoTimeUs` → distance
   (`ai.depz.sensor.protocol.Sr04`).
@@ -77,6 +80,11 @@ The sensors fall into three firmware philosophies:
   ST ULD. This SDK ports the pure decode half — results-frame parsing and the
   advanced-DCI codecs (`ai.depz.sensor.sensors.vl53l8`). CX is the base imager;
   CH is its superset (Compact Network Histograms).
+- **TMF8829** — the device is a thin SPI register bridge; the host runs the
+  sensor (firmware download, presets, start/stop). This SDK ports the wire
+  codecs, the frame reassembly and decode, the config-page fields, the clock
+  model / capture time and the embedded sensor firmware
+  (`ai.depz.sensor.protocol.Tmf8829`, `ai.depz.sensor.sensors.tmf8829`).
 - **BNO085 / BNO086** — the device is an SHTP pass-through; the host owns the
   SH-2 stack. This SDK ports the SHTP framing/reassembly, the SH-2 control
   encoders and the input-report decoders (`ai.depz.sensor.sensors.bno086`).
@@ -98,18 +106,18 @@ The live drivers are intentionally left as documented **extension points**:
 
 Everything else — CRCs, framing, the incremental parser, USB ids, identity,
 common/SR04 codecs, the register-bridge codecs of the 1D family, VL53L4CD,
-L5/L7 and BNO055, the shared VL53L8 frame decode, the CNH histogram decode
+L5/L7, TMF8829 and BNO055, the shared VL53L8 frame decode, the CNH histogram decode
 (`Vl53l8Uld.decodeCnh`) and advanced-DCI codecs, and the full BNO086 SHTP/SH-2
 layer — is complete and vector-tested.
 
 ## Build
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.5.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.6.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.5.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.6.0")
 ```
 
 Maven:
@@ -118,7 +126,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 

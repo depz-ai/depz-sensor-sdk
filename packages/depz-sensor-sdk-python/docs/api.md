@@ -6,7 +6,7 @@ Auto-generated from the package's public surface (the union of
 docstrings in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [TMF8829](tmf8829/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 ## Contents
 
@@ -17,12 +17,13 @@ Each sensor also has a focused reference with just its own symbols:
 - **VL53L8 (ToF)**: [`Vl53l8`](#vl53l8), [`Vl53l8ch`](#vl53l8ch), [`Vl53l8Frame`](#vl53l8frame), [`CnhConfig`](#cnhconfig), [`Vl53l8cxError`](#vl53l8cxerror), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l5cx`](#vl53l5cx), [`Vl53l7cx`](#vl53l7cx), [`Vl53l7ch`](#vl53l7ch)
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lx`](#vl53lx), [`Vl53l0x`](#vl53l0x), [`Vl53l1cx`](#vl53l1cx), [`Vl53l1cb`](#vl53l1cb), [`Vl53l3cx`](#vl53l3cx), [`Vl53l4cx`](#vl53l4cx), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Target`](#target), [`Vl53Error`](#vl53error), [`ProtocolError`](#protocolerror), [`PRODUCTS`](#products), [`DRIVER_KINDS`](#driver_kinds), [`PLOTTABLE_STATUSES`](#plottable_statuses), [`primary_target`](#primary_target), [`plot_distances`](#plot_distances)
+- **TMF8829 (dToF)**: [`Tmf8829`](#tmf8829), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Error`](#tmf8829error), [`Tmf8829InterruptEvent`](#tmf8829interruptevent), [`PixelResults`](#pixelresults), [`FrameInfo`](#frameinfo), [`FrameTime`](#frametime), [`HistogramFrame`](#histogramframe), [`MeasurementBuilder`](#measurementbuilder), [`SensorClock`](#sensorclock), [`CaptureTimer`](#capturetimer), [`PRESETS`](#presets), [`CFG_FIELDS`](#cfg_fields), [`FP_GRID`](#fp_grid), [`FT_NAMES`](#ft_names), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`distance_mm`](#distance_mm), [`flag_names`](#flag_names), [`merge_halves`](#merge_halves), [`parse_frame`](#parse_frame), [`parse_results`](#parse_results), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`firmware_image`](#firmware_image)
 - **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
 - **BNO055 (IMU)**: [`Bno055`](#bno055), [`Bno055Sample`](#bno055sample), [`OprMode`](#oprmode), [`Units`](#units), [`AxisRemap`](#axisremap), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`SystemStatus`](#systemstatus), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`PLACEMENTS`](#placements), [`SIC_IDENTITY`](#sic_identity), [`I2C_ERROR_NAMES`](#i2c_error_names)
 - **Bootloader / firmware update**: [`BootloaderDevice`](#bootloaderdevice), [`update_firmware`](#update_firmware), [`find_bootloader_port`](#find_bootloader_port)
 - **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord)
 - **Transport**: [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`build_packet`](#build_packet), [`payload_crc_bytes`](#payload_crc_bytes), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`Link`](#link), [`LoopbackLink`](#loopbacklink)
-- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror)
+- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`Tmf8829Info`](#tmf8829info)
 - **Errors**: [`DepzError`](#depzerror), [`DepzTimeoutError`](#depztimeouterror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`DeviceLostError`](#devicelosterror), [`LinkClosedError`](#linkclosederror), [`NoDepzDeviceError`](#nodepzdeviceerror)
 - **Top level**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`__version__`](#__version__)
 - **Usb_Ids**: [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint)
@@ -6980,6 +6981,672 @@ single distance on a light driver. On the short/medium histogram presets
 slot 0 alternates between a real target and a phase artefact — use this
 instead of ``targets[0]``.
 
+## TMF8829 (dToF)
+
+### Tmf8829
+
+```python
+class Tmf8829(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+```
+
+TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone,
+histograms). `init()` downloads the 14.4 KB sensor firmware (~0.15 s),
+`configure(preset, …)` writes the config page, `start()` streams
+measurements to `on_measurement` / `measurements()`, `stop()` ends it.
+
+The sensor's EN pin is wired high: there is no sleep, and recovery from
+any state is `init()` (it starts with a soft reset).
+
+#### Tmf8829.read_registers
+
+```python
+read_registers(self, addr: int, length: int) -> bytes
+```
+
+Read `length` bytes from `addr` in ≤1024-byte requests; reads that
+reach the FIFO port 0xFF stay there (the sensor does not auto-increment it).
+
+#### Tmf8829.read_register
+
+```python
+read_register(self, addr: int) -> int
+```
+
+#### Tmf8829.write_registers
+
+```python
+write_registers(self, addr: int, data: bytes, progress: Optional[Callable[[int, int], NoneType]] = None) -> None
+```
+
+Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF).
+
+#### Tmf8829.write_register
+
+```python
+write_register(self, addr: int, value: int) -> None
+```
+
+#### Tmf8829.sensor_state
+
+```python
+sensor_state(self) -> dict[str, int]
+```
+
+Raw host-interface registers, for diagnostics.
+
+#### Tmf8829.get_bridge_info
+
+```python
+get_bridge_info(self) -> depz_sensor_sdk.protocol.tmf8829.Tmf8829Info
+```
+
+Bridge counters (never touches the sensor, safe mid-stream).
+
+#### Tmf8829.init
+
+```python
+init(self, *, progress: Optional[Callable[[int, int], NoneType]] = None) -> tuple[str, int]
+```
+
+Bring the sensor from any state to its running RAM application:
+soft reset, bootloader, firmware download, start. Returns
+(application version, sensor serial). Stops a running stream first.
+`progress(done, total)` tracks the image download.
+
+#### Tmf8829.config_page
+
+```python
+config_page(self) -> bytes
+```
+
+LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
+
+#### Tmf8829.configure
+
+```python
+configure(self, preset: str = '8x8', *, period_ms: int = 33, kilo_iterations: int | None = None, nr_peaks: int = 1, signal_strength: bool = False, noise_strength: bool = False, xtalk: bool = False, histograms: bool = False, ref_frame: bool = False, fields: dict[str, int] | None = None) -> depz_sensor_sdk.tmf8829.Tmf8829Config
+```
+
+Load `preset` and write the config page. Every field a preset does
+not reset is written (contract 14 §4), so the result never depends on
+an earlier config. `fields` sets any other page field by name.
+Raises `Tmf8829Error` when the sensor refuses the page (e.g.
+ERR_CONFIG_RESULT_SIZE: the result format is too big for the grid)
+or a written field does not read back. Not while streaming.
+
+#### Tmf8829.config *(property)*
+
+The last `configure()` result (None after `init()`).
+
+#### Tmf8829.streaming *(property)*
+
+#### Tmf8829.start
+
+```python
+start(self) -> None
+```
+
+MEASURE with the bridge stream armed. Configures the default 8x8
+preset first when `configure()` was not called since `init()`.
+
+#### Tmf8829.stop
+
+```python
+stop(self) -> None
+```
+
+Sensor STOP, then the bridge stream (the frames already queued
+drain). The bad-header event a STOP raises mid histogram dump is
+expected and swallowed.
+
+#### Tmf8829.close
+
+```python
+close(self) -> None
+```
+
+#### Tmf8829.on_measurement
+
+```python
+on_measurement(self, cb: Callable[[depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to measurements (reader-thread context; don't block).
+
+#### Tmf8829.measurements
+
+```python
+measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Blocking iterator over measurements (bounded, drop-oldest).
+Subscribes immediately — call before or after `start()`.
+
+#### Tmf8829.frames_dropped *(property)*
+
+Frames the bridge dropped (frame_seq gaps) in this stream.
+
+#### Tmf8829.frames_discarded *(property)*
+
+Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
+
+#### Tmf8829.frame_parse_errors *(property)*
+
+#### Tmf8829.port *(property)*
+
+#### Tmf8829.closed *(property)*
+
+#### Tmf8829.on_event
+
+```python
+on_event(self, cb: Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to unsolicited/diagnostic events (reader-thread context;
+do not block). Returns an unsubscribe function.
+
+#### Tmf8829.events
+
+```python
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+```
+
+Pull-style event stream (bounded, drop-oldest). Subscribes
+immediately — events emitted after this call are never missed.
+
+#### Tmf8829.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Tmf8829.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+
+#### Tmf8829.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Tmf8829.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Tmf8829.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Tmf8829.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Tmf8829.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Tmf8829.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Tmf8829.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Tmf8829.time_sync *(property)*
+
+#### Tmf8829.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Tmf8829.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Tmf8829.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Tmf8829.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Tmf8829.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Tmf8829.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Tmf8829.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Tmf8829Config
+
+```python
+class Tmf8829Config(preset: str, page: bytes, histograms: bool, ref_frame: bool, fields: dict[str, int] = <factory>) -> None
+```
+
+The config written by `configure()`, as read back from the sensor.
+
+#### Tmf8829Config.grid *(property)*
+
+(rows, cols) of a measurement.
+
+### Tmf8829Measurement
+
+```python
+class Tmf8829Measurement(timestamp_us: int, flags: int, fp_mode: int, f_number: int, results: depz_sensor_sdk.tmf8829.frames.PixelResults, distance_mm: numpy.ndarray | None, frames: list[depz_sensor_sdk.tmf8829.frames.FrameInfo], times: list[depz_sensor_sdk.tmf8829.clock.FrameTime], histograms: list[depz_sensor_sdk.tmf8829.frames.HistogramFrame] = <factory>, ref_frames: list[bytes] = <factory>, problems: list[str] = <factory>) -> None
+```
+
+One measurement: its results frame (8x8, 16x16) or both half-frames
+(32x32, 48x32) merged, with the histogram / ref-SPAD frames before it.
+
+`distance_mm` is [peaks, rows, cols], clock-corrected, in mm (None when
+the result format has no peaks). `results` keeps the raw sensor integers.
+`problems` lists what went wrong since the previous measurement.
+
+#### Tmf8829Measurement.shape *(property)*
+
+(rows, cols) of the full focal plane.
+
+#### Tmf8829Measurement.peaks *(property)*
+
+#### Tmf8829Measurement.temperature_c *(property)*
+
+Sensor die temperature (header byte 0), °C.
+
+### Tmf8829Error
+
+```python
+class Tmf8829Error
+```
+
+The sensor refused or did not answer (bootloader / application status).
+
+#### Tmf8829Error.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### Tmf8829Error.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### Tmf8829InterruptEvent
+
+```python
+class Tmf8829InterruptEvent(event: depz_sensor_sdk.protocol.tmf8829.Tmf8829Event) -> None
+```
+
+RPT_TMF_EVENT that is not an expected stop artefact: a MOTION /
+PROXIMITY interrupt (code 0) or a refused frame header (code 1 — the
+sensor is lost, run `init()` again).
+
+### PixelResults
+
+```python
+class PixelResults(peaks: int, distance: numpy.ndarray | None, snr: numpy.ndarray | None, signal: numpy.ndarray | None, noise: numpy.ndarray | None, xtalk: numpy.ndarray | None) -> None
+```
+
+Decoded results of one frame or of a merged measurement.
+
+`distance`, `snr`, `signal` are [peaks, rows, cols]; `noise`, `xtalk`
+[rows, cols]. Raw sensor integers: distance in 0.25 mm (or mm with the
+footer flag), not yet clock-corrected. Absent fields are None.
+
+#### PixelResults.shape *(property)*
+
+### FrameInfo
+
+```python
+class FrameInfo(fifo_status: int, systick: int, id: int, layout: int, payload: int, f_number: int, temperature: tuple[int, int, int], bdv: int, ref_pos: tuple[int, int], t0_integration: int, t1_integration: int, frame_status: int, reserved: int, eof: int, size: int) -> None
+```
+
+Pre-header, header and footer of one frame (any kind).
+
+#### FrameInfo.kind *(property)*
+
+FID_RESULTS, FID_HISTOGRAMS or FID_REF_SPAD.
+
+#### FrameInfo.fp_mode *(property)*
+
+#### FrameInfo.is_second_half *(property)*
+
+#### FrameInfo.distance_in_mm *(property)*
+
+#### FrameInfo.problems
+
+```python
+problems(self) -> list[str]
+```
+
+What is wrong with the frame, human-readable; empty when fine.
+
+### FrameTime
+
+```python
+class FrameTime(timestamp_us: int, flags: int, t1_len_us: int, t0_us: int, t1_us: int, edge_us: int, pair_us: int, ratio_q16: int) -> None
+```
+
+Capture time of one results frame, MCU µs.
+
+### HistogramFrame
+
+```python
+class HistogramFrame(info: depz_sensor_sdk.tmf8829.frames.FrameInfo, raw: bytes) -> None
+```
+
+A raw histogram frame (25 377 B); decoding the bins is left to the
+caller (ams histogram layout).
+
+#### HistogramFrame.data *(property)*
+
+### MeasurementBuilder
+
+```python
+class MeasurementBuilder() -> None
+```
+
+Histogram frames between two results frames belong to the second; a
+ref-SPAD frame comes right before its results frame (each half-frame has
+its own). 32x32/48x32: the first half (layout 0x40 clear) holds the even
+rows. Call `reset()` at the start of every stream: the clock model and
+T1 are per stream.
+
+#### MeasurementBuilder.reset
+
+```python
+reset(self) -> None
+```
+
+#### MeasurementBuilder.add
+
+```python
+add(self, raw: bytes, timestamp_us: int, edge_us: int = 0) -> depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement | None
+```
+
+One frame with the MCU time of its header read and its INT edge
+(0 = none) → the measurement it completes, or None.
+
+### SensorClock
+
+```python
+class SensorClock() -> None
+```
+
+Sensor SYSTICK (125 kHz) → MCU µs, fed one clock pair per frame (the
+MCU time of the header read and the pre-header SYSTICK sampled by it).
+The ratio is taken over a sliding 1..2 s window, first after 200 ms; it
+is also the distance correction (ams tmf8829ClockCorrection).
+
+#### SensorClock.reset
+
+```python
+reset(self) -> None
+```
+
+#### SensorClock.ratio *(property)*
+
+MCU/sensor clock ratio (≈ 1.015): distances are scaled by it.
+
+#### SensorClock.add
+
+```python
+add(self, us: int, tick: int) -> int
+```
+
+Add a pair → FT_CLOCK_RESET if it does not fit the model (which then
+restarts from it), else 0.
+
+#### SensorClock.to_us
+
+```python
+to_us(self, pair_us: int, pair_tick: int, tick: int) -> int
+```
+
+SYSTICK `tick` → MCU µs through the pair (pair_us, pair_tick).
+
+### CaptureTimer
+
+```python
+class CaptureTimer(clock: depz_sensor_sdk.tmf8829.clock.SensorClock) -> None
+```
+
+When a results frame was captured. A results frame is N equal
+sub-integrations back to back; the footer has the SYSTICK of the start of
+the first (t0) and of the last (t1). The window is [t0, t1 + T1], T1 the
+stream's shortest (t1 − t0)/(N − 1); its centre is the frame time.
+
+#### CaptureTimer.reset
+
+```python
+reset(self) -> None
+```
+
+#### CaptureTimer.histograms
+
+```python
+histograms(self) -> None
+```
+
+A histogram frame was seen in the stream.
+
+#### CaptureTimer.results
+
+```python
+results(self, fp_mode: int, systick: int, t0_tick: int, t1_tick: int, pair_us: int, edge_us: int, flags: int) -> depz_sensor_sdk.tmf8829.clock.FrameTime
+```
+
+#### CaptureTimer.results_frame
+
+```python
+results_frame(self, f: depz_sensor_sdk.tmf8829.frames.FrameInfo, pair_us: int, edge_us: int, flags: int) -> depz_sensor_sdk.tmf8829.clock.FrameTime
+```
+
+### PRESETS
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### CFG_FIELDS
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### FP_GRID
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### FT_NAMES
+
+`dict` constant.
+
+dict(mapping) -> new dictionary initialized from a mapping object's
+    (key, value) pairs
+dict(iterable) -> new dictionary initialized as if via:
+    d = {}
+    for k, v in iterable:
+        d[k] = v
+dict(**kwargs) -> new dictionary initialized with the name=value pairs
+    in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### cfg_get
+
+```python
+cfg_get(page: bytes | bytearray, name: str) -> int
+```
+
+### cfg_set
+
+```python
+cfg_set(page: bytearray, name: str, value: int) -> None
+```
+
+### config_fields
+
+```python
+config_fields(page: bytes | bytearray) -> dict[str, int]
+```
+
+Every named field of a config page.
+
+### distance_mm
+
+```python
+distance_mm(results: depz_sensor_sdk.tmf8829.frames.PixelResults, ratio: float, in_mm: bool) -> numpy.ndarray | None
+```
+
+Raw distances → mm, clock-corrected (×ratio; ÷4 for 0.25 mm units).
+
+### flag_names
+
+```python
+flag_names(flags: int) -> list[str]
+```
+
+### merge_halves
+
+```python
+merge_halves(first: depz_sensor_sdk.tmf8829.frames.PixelResults, second: depz_sensor_sdk.tmf8829.frames.PixelResults) -> depz_sensor_sdk.tmf8829.frames.PixelResults
+```
+
+32x32/48x32: the first half-frame holds the even rows, the second the odd ones.
+
+### parse_frame
+
+```python
+parse_frame(raw: bytes) -> depz_sensor_sdk.tmf8829.frames.FrameInfo
+```
+
+### parse_results
+
+```python
+parse_results(raw: bytes, info: depz_sensor_sdk.tmf8829.frames.FrameInfo | None = None) -> depz_sensor_sdk.tmf8829.frames.PixelResults
+```
+
+Pixel results of one results frame, row-major.
+
+### FIRMWARE_LOAD_ADDR
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### firmware_image
+
+```python
+firmware_image() -> bytes
+```
+
+The sensor firmware image downloaded by `init()` (14 444 B).
+
 ## BNO086 (IMU)
 
 ### Bno086
@@ -11809,6 +12476,22 @@ is_integer(self, /)
 ```
 
 Returns True. Exists for duck type compatibility with float.is_integer.
+
+### Tmf8829Info
+
+```python
+class Tmf8829Info(int_edges: int, frames: int, frames_aborted: int, frame_errors: int, spi_timeouts: int, int_level: int, streaming: bool, int_mask: int, last_int_status: int, last_fifo_status: int) -> None
+```
+
+RPT_TMF_INFO: bridge state only, the sensor is never touched. Carries
+no echoed command byte. `int_edges` runs from MCU power-up; the frame
+counters restart at TMF_START_STREAM.
+
+#### Tmf8829Info.unpack *(classmethod)*
+
+```python
+unpack(cls, payload: bytes) -> 'Tmf8829Info'
+```
 
 ## Errors
 

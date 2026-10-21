@@ -14,6 +14,9 @@ pub enum SensorType {
     /// BNO055 9-axis IMU (`APP_BNO055` register bridge, contract 13).
     Bno055,
     Bno086,
+    /// TMF8829 multizone dToF (`APP_TMF8829` SPI register bridge, contract 14;
+    /// the host runs the sensor).
+    Tmf8829,
     Unknown,
 }
 
@@ -28,6 +31,7 @@ impl SensorType {
             SensorType::Vl53lx => "vl53lx",
             SensorType::Bno055 => "bno055",
             SensorType::Bno086 => "bno086",
+            SensorType::Tmf8829 => "tmf8829",
             SensorType::Unknown => "unknown",
         }
     }
@@ -73,6 +77,7 @@ const PRODUCT_TOKENS: &[(&str, SensorType)] = &[
     ("VL53LX", SensorType::Vl53lx),
     ("BNO055", SensorType::Bno055),
     ("BNO086", SensorType::Bno086),
+    ("TMF8829", SensorType::Tmf8829),
 ];
 
 /// Match `_v(\d+(\.\d+)*)$`: find the leftmost `_v` whose entire remainder is a

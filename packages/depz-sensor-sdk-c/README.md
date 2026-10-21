@@ -17,12 +17,14 @@ The live layer drives every board's **common commands** (names, serial, MCU
 temperature, time sync, payload CRC, sync pins, reset) and hands out
 **sensor classes one sensor at a time — SR04, the VL53L 1D ToF family
 (VL53L0X / L1CX / L1CB / L3CX / L4CX), VL53L4CD, the multizone ToF family
-(VL53L5CX / VL53L7CX / VL53L7CH, VL53L8CX / VL53L8CH), the BNO055 and the
-BNO085 / BNO086 — every board of the line** (the ToF classes run the ST
+(VL53L5CX / VL53L7CX / VL53L7CH, VL53L8CX / VL53L8CH), the TMF8829, the BNO055
+and the BNO085 / BNO086 — every board of the line** (the ToF classes run the ST
 drivers on the host, over the board's register bridge — for the multizone
 sensors the ~84 KB sensor-firmware download included, for the 1D family the
 VL53L0X API, the VL53L1X / VL53L4CD ULDs, the VL53L3CX ULP and ST's
-histogram driver; the BNO055 class does the mode, unit, calibration and page
+histogram driver; the TMF8829 class runs the sensor over its SPI bridge — soft
+reset, the 14.4 KB ams firmware download, config page, the chunked frame
+stream into measurements with the clock model; the BNO055 class does the mode, unit, calibration and page
 logic over its register bridge; the BNO085 / BNO086 class runs the SH-2
 sensor-hub protocol over the board's SHTP pass-through).
 
@@ -77,7 +79,9 @@ Full docs live in [`docs/`](docs/):
   **VL53L7CH** ([intro](docs/vl53l7ch/introduction.md) ·
   [guide](docs/vl53l7ch/guide.md) · [api](docs/vl53l7ch/api.md)) ·
   **BNO055** ([intro](docs/bno055/introduction.md) ·
-  [guide](docs/bno055/guide.md) · [api](docs/bno055/api.md)) — the ones
+  [guide](docs/bno055/guide.md) · [api](docs/bno055/api.md)) ·
+  **TMF8829** ([intro](docs/tmf8829/introduction.md) ·
+  [guide](docs/tmf8829/guide.md) · [api](docs/tmf8829/api.md)) — the ones
   with a live sensor class; every other board has the same three pages under
   [`docs/`](docs/intro.md):
   **VL53L0X** ([intro](docs/vl53l0x/introduction.md) ·
@@ -108,13 +112,14 @@ the L5/L7 boards and the VL53L 1D family each share one firmware:
 | **VL53L5CX** / **VL53L7CX** / **VL53L7CH** | 8×8 ToF on an I2C bridge (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | Bridge codecs, class resolution, L5/L7 frame decode (+ CNH block on L7CH) + the live multizone class (`depz_vl53l8_*`, models `L5CX` / `L7CX` / `L7CH`: everything VL53L8CX has — no deep sleep / threshold auto-stop on L5CX / L7CX, CNH on L7CH, 1 Hz allowed) + board commands (`depz_vl53l7_bridge_info` / `_set_i2c_speed_khz` / `_pin_ctrl`) |
 | **VL53L8CX** | Base multi-zone ToF (4×4 / 8×8)           | dev-default\* | Shared frame decode + advanced DCI codecs + live sensor class (`depz_vl53l8_*`: ULD init with the sensor-firmware download, resolution / frequency / mode / sharpener / target order, power modes, crosstalk margin / calibration / caldata, detection thresholds, motion indicator, INT-driven frame stream via callbacks / streams) |
 | **VL53L8CH** | VL53L8CX **+ CNH** compact-network-histograms | `0xED40`   | Everything VL53L8CX has (the same class, CH firmware blob) + CNH setup (`depz_vl53l8_configure_cnh`) + CNH histogram decode |
+| **TMF8829**  | Multizone dToF, 8×8 … 48×32 zones, up to 4 peaks, histograms (SPI register bridge) | `0xED4C` | Bridge codecs, chunk reassembly, frame / pixel decode + half-frame merge, sensor clock model and capture time (bit-exact), measurement assembly, presets / config-page fields, the embedded ams sensor firmware (MIT, `licenses/tmf8829/`) + live sensor class (`depz_tmf8829_*`: init with the firmware download, configure with read-back, raw registers, start / stop, measurements / raw frames / events via callbacks / streams, stream counters) |
 | **BNO055**   | 9-axis IMU, fusion on the chip (register bridge) | `0xEE0A` | Bridge codecs, units / calibration / axis-remap / page-1 config codecs, register-window decode + live sensor class (`depz_bno055_*`: configure through CONFIG with the boot and fusion-start waits, operating / power mode, units, axis remap and placements, calibration status / profile / soft-iron matrix, system status and self-test, page-1 configs / unique id / motion interrupts, scaled samples polled or streamed via callbacks / streams) |
 | **BNO085** / **BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | Bridge + SHTP framing, SH-2 encoders and answer parsers, input-report parsers and scaling + live sensor class (`depz_bno086_*`: reset / product id, enable with the granted-rate read-back, reports via callbacks / streams, calibration / DCD / tare / reorientation, FRS read / write and sensor metadata, error queue / counts, busy retry) |
 
 Every board in the table also opens live through `depz_sensor_io.h` —
 discovery, the common commands and time sync work on all of them; the SR04,
 the VL53L4CD, the multizone ToF boards (VL53L5CX / L7CX / L7CH, VL53L8CX / CH)
-the BNO055 and the BNO085 / BNO086 have their sensor class so far.
+the TMF8829, the BNO055 and the BNO085 / BNO086 have their sensor class so far.
 
 \* **VL53L8CH** carries the production PID `0xED40`; **VL53L8CX** currently
 enumerates on the dev/unprogrammed default id `0x0483:0x56DC` (no dedicated
@@ -167,6 +172,22 @@ live in C yet.
   `APP_VL53L8_v0.9`) and two real VL53L8CH captures (with and without CNH,
   `APP_VL53L8_v0.92`) replay strictly through the class, firmware download
   included; the class was run on a real VL53L8CH (see *Build & test*).
+
+### TMF8829
+
+The board is a thin SPI register bridge, so the **TMF8829 sensor class**
+(`depz_tmf8829_*`) runs the sensor with the Python SDK's request sequences:
+`depz_tmf8829_init()` (soft reset, sensor bootloader, the ams firmware into
+the FIFO in ≤ 1023-byte pieces, RAM application; app version + serial),
+`depz_tmf8829_configure()` (a preset plus every field a preset does not
+reset, verified by read-back), `start()` / `stop()` (the one bad-header event
+a STOP raises mid histogram dump is swallowed), raw registers and the bridge
+counters. The chunked frame stream is reassembled, 32×32 / 48×32 half-frames
+are merged, histogram / ref-SPAD frames attach to their measurement, and each
+measurement gets its capture time from the sensor-clock model (bit-exact with
+`tmf8829_frame_time.json`) and clock-corrected distances in mm. The class is
+tested against a fake bridge playing captured frames; not yet run on a board
+from C.
 
 ### BNO055
 
@@ -221,7 +242,7 @@ include/depz_sensor_sdk.h   codec / decode layer (pure functions)
 include/depz_sensor_io.h    live-hardware layer (links, devices, discovery, SR04,
                             VL53L4CD, the multizone class: VL53L8CX / CH,
                             VL53L5CX / L7CX / L7CH, the VL53L 1D family,
-                            BNO055, BNO085 / BNO086)
+                            TMF8829, BNO055, BNO085 / BNO086)
 src/crc.c framing.c         transport: CRCs, packet framing
 src/usb_ids.c identity.c    USB identity table + firmware-name parsing
 src/common.c sr04.c         common codecs + SR04 codecs
@@ -232,6 +253,9 @@ src/vl53l4.c                VL53L4CD register bridge + host-ULD codecs
 src/vl53l7.c                VL53L5CX/L7CX/L7CH bridge codecs + frame decode
 src/vl53lx.c                VL53L 1D family codecs, product table, block decode
 src/bno055.c                BNO055 register-bridge + register codecs
+src/tmf8829.c               TMF8829 bridge codecs, reassembly, frames, clock
+                            model, measurement assembly, config page
+src/tmf8829_firmware.c      TMF8829 sensor firmware (generated)
 src/bno086_shtp.c           BNO086 SHTP framing + SH-2 control encoders
 src/bno086_reports.c        BNO086 SH-2 input-report parsers
 src/bno086_sh2.c            BNO086 SH-2 answer parsers, metadata, scaling
@@ -242,19 +266,24 @@ src/io/                     live layer: serial ports (POSIX / Win32), port
                             multizone classes (host ULD over the register
                             bridges, SPI and I2C), the 1D-family class and its
                             drivers (vl53lx_*.c; the histogram driver's tables
-                            vl53lx_bare_tables.c, generated), BNO055 class,
+                            vl53lx_bare_tables.c, generated), TMF8829 class,
+                            BNO055 class,
                             BNO085 / BNO086 class,
                             vl53l8_blobs.c (sensor firmware + config, generated)
 scripts/                    gen_api_md.py (docs/*api.md), gen_vl53l8_blobs.py
                             (src/io/vl53l8_blobs.c from the Python SDK's data),
                             gen_vl53lx_bare_tables.py (src/io/vl53lx_bare_tables.*
-                            from the Python SDK's histogram driver)
+                            from the Python SDK's histogram driver),
+                            gen_tmf8829_firmware.py (src/tmf8829_firmware.c +
+                            its licence from the Python SDK's data)
+licenses/tmf8829/           MIT licence of the embedded ams TMF8829 firmware
+                            (installed with the library)
 examples/                   depz_list.c (ports + DEPZ boards), sr04_minimal.c,
                             bno086_minimal.c (orientation as heading / pitch / roll),
                             vl53lx_minimal.c (any 1D board: distance and targets)
 tests/                      golden-vector + replay runner, live-layer runner,
-                            fake SR04 / fake VL53L4CD bridge firmware, fake
-                            BNO086 hub
+                            fake SR04 / fake VL53L4CD / fake TMF8829 bridge
+                            firmware, fake BNO086 hub
 ```
 
 ## Build & test
@@ -265,7 +294,7 @@ cmake --build build
 ctest --test-dir build
 ```
 
-The suite is 83 CTests, no hardware needed: one per consumed vector / replay
+The suite is 86 CTests, no hardware needed: one per consumed vector / replay
 target (the transport+protocol foundation plus the sensor-decode layer, 24),
 and the live layer against a fake SR04 and a fake VL53L4CD bridge (with a
 register map) over an in-memory loopback link, the VL53L8 state guards and CNH
@@ -304,7 +333,7 @@ while the board was turned, tilted and shaken by hand.
 The library (`libdepz_sensor_sdk_c.a`, `depz_sensor_sdk_c.lib` with MSVC)
 exports a namespaced target **`depz::sensor_sdk_c`** and ships an
 installable CMake package (`find_package(depz-sensor-sdk-c CONFIG)`), a Conan 2
-recipe, and a vcpkg port. Version **0.5.0**, MIT.
+recipe, and a vcpkg port. Version **0.6.0**, MIT.
 
 ### CMake FetchContent
 
@@ -316,7 +345,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.5.0
+  GIT_TAG        v0.6.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -333,7 +362,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(depz-sensor-sdk-c 0.5.0 CONFIG REQUIRED)
+find_package(depz-sensor-sdk-c 0.6.0 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
@@ -352,7 +381,7 @@ uint8_t crc = depz_crc8_maxim(data, sizeof data);
 conan create packages/depz-sensor-sdk-c            # build & test-package locally
 ```
 
-In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.5.0`.
+In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.6.0`.
 The recipe sets the CMake target name to `depz::sensor_sdk_c` for CMakeDeps
 consumers. Submission to Conan Center is in review
 ([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
@@ -368,7 +397,7 @@ it merges, use the in-repo port (`vcpkg/`) as an overlay:
 vcpkg install depz-sensor-sdk-c --overlay-ports=packages/depz-sensor-sdk-c/vcpkg
 ```
 
-The port fetches the `v0.5.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
+The port fetches the `v0.6.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
 `0` placeholder to be filled at release (the first `vcpkg install` prints the
 correct hash).
 

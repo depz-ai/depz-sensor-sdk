@@ -3,7 +3,7 @@
 `@depz/sensor-sdk` is the TypeScript SDK for the DEPZ USB sensor line
 (HC-SR04 ultrasonic, the VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX
 single-zone ToF family, the VL53L5CX / L7CX / L7CH / L8CX / L8CH 8×8 ToF
-matrices, the BNO055 and BNO085 / BNO086 9-axis IMUs). Pure ESM, fully typed,
+matrices, the TMF8829 8×8 … 48×32 dToF, the BNO055 and BNO085 / BNO086 9-axis IMUs). Pure ESM, fully typed,
 and it runs in two places:
 
 **Working with one specific sensor?** Each has its own introduction, guide
@@ -21,6 +21,7 @@ and API reference:
 - **[VL53L7CH](vl53l7ch/introduction.md)** — the L7CX superset with streamed CNH histograms.
 - **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
+- **[TMF8829](tmf8829/introduction.md)** — multizone dToF, 8×8 … 48×32 zones, up to 4 peaks, raw histograms.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion: orientation, gravity, calibration.
 - **[BNO085](bno085/introduction.md)** — 9-axis IMU: orientation and motion.
 - **[BNO086](bno086/introduction.md)** — 9-axis IMU: orientation and motion.
@@ -72,7 +73,7 @@ const dev = await openDevice(port);
 
 The device classes (`Sr04`, `Vl53l4cd`, `Vl53l8cx`, `Vl53l8ch`, `Vl53l5cx`,
 `Vl53l7cx`, `Vl53l7ch`, `Vl53l0x`, `Vl53l1cx`, `Vl53l1cb`, `Vl53l3cx`,
-`Vl53l4cx`, `Bno086`, `Bno055`), streaming,
+`Vl53l4cx`, `Tmf8829`, `Bno086`, `Bno055`), streaming,
 time sync, recording and firmware update match the Python SDK — one shared
 protocol, one mental model.
 
@@ -84,7 +85,8 @@ protocol, one mental model.
   [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
   [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
   [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
-  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [TMF8829](tmf8829/introduction.md) ·
+  [BNO055](bno055/introduction.md) ·
   [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
   introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](overview.md)** — the SDK-wide walkthrough: mental model,

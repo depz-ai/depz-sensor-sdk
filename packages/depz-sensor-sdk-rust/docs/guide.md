@@ -26,6 +26,9 @@ sensor then has its own **introduction** and **user guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (dToF, 8×8 … 48×32 zones, up to 4 peaks) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
 - **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
@@ -62,7 +65,7 @@ need to turn bytes on the wire into typed values, verified against the shared
 golden vectors in `contracts/vectors/` and byte-for-byte identical to the
 Python / TypeScript / Java / C / C++ reference SDKs.
 
-The sensors fall into three firmware philosophies:
+The sensors fall into a few firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance
   ([`protocol::sr04`](sr04/api.md)).
@@ -79,6 +82,10 @@ The sensors fall into three firmware philosophies:
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the ST ULD frame
   layout is decoded **on the host** ([`vl53l8`](vl53l8cx/api.md)). CX is the
   base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
+- **TMF8829** — the device is a thin SPI register bridge; the host runs the
+  sensor (firmware download, presets, start/stop) and the frame decode, clock
+  model and capture time are in [`tmf8829`](tmf8829/api.md), with the embedded
+  MIT sensor-firmware image.
 - **BNO055** — the device is an I2C register bridge; Bosch's fusion runs on the
   chip, and the register codecs and block decode are in
   [`bno055`](bno055/api.md).
@@ -105,12 +112,16 @@ here:
   CONFIG, boot and fusion-start waits, page discipline). Initialising and
   streaming these boards is done today with the Python or TypeScript SDK; this
   crate decodes what they send.
+- **The TMF8829 driver** (soft reset, sensor-firmware download, presets and
+  the config page, start/stop over the port). The firmware image, the presets
+  and config fields, the frame decode and the clock model are here; the ready
+  driver is in the Python, TypeScript, C and C++ SDKs.
 
 The crate never fabricates a decode it cannot verify against a golden vector.
 
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.5.0):
+Published on crates.io as `depz-sensor-sdk` (0.6.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -249,6 +260,12 @@ The typed layer per sensor — see each sensor's own guide and API reference:
 - **BNO055** — [`bno055`](bno055/api.md): the register-bridge codecs, `Units`,
   `CalibStatus`, `CalibrationProfile`, `AxisRemap` + placements, the page-1
   configs and `decode_block`.
+- **TMF8829** — [`tmf8829`](tmf8829/api.md): the bridge codecs,
+  `FrameReassembler` rebuilds frames from `RPT_TMF_FRAME` chunks,
+  `parse_frame` / `parse_results` / `merge_halves` decode them,
+  `SensorClock` + `CaptureTimer` give the capture time, `MeasurementBuilder`
+  assembles measurements, `cfg_get` / `cfg_set` edit the config page, and
+  `firmware_image()` is the embedded sensor firmware.
 - **BNO085 / BNO086** — [`bno086`](bno086/api.md): `ShtpLayer` reassembles SHTP
   cargos, `parse_input_cargo` / `parse_gyro_rv_cargo` decode reports, `sh2`
   builds control requests.
@@ -310,6 +327,9 @@ Truthfully, the live drivers are present in shape but not here (see
 - **The 1D family's drivers and the BNO055 session logic** — the codecs and
   the stateless decode are here; initialising and streaming those boards is
   done with the Python or TypeScript SDK.
+- **The TMF8829 driver** — init (firmware download), configure, start/stop
+  are register writes you send yourself; the Python, TypeScript, C and C++
+  SDKs have them ready.
 
 The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:
 `parse_frame` surfaces it as `Vl53l8Results::cnh_raw` and `vl53l8::decode_cnh`

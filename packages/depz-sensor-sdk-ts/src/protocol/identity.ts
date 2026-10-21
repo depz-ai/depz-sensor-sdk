@@ -8,6 +8,7 @@ export type SensorType =
   | "vl53lx"
   | "bno086"
   | "bno055"
+  | "tmf8829"
   | "unknown";
 
 export interface Identity {
@@ -30,6 +31,7 @@ const PRODUCT_TOKENS: Array<[string, SensorType]> = [
   ["VL53LX", "vl53lx"],
   ["BNO086", "bno086"],
   ["BNO055", "bno055"], // register bridge, fusion on chip (contract 13)
+  ["TMF8829", "tmf8829"], // SPI register bridge, sensor run by the host (contract 14)
 ];
 
 /**

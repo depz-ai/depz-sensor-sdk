@@ -17,6 +17,7 @@ const std::unordered_map<std::uint16_t, std::string>& pid_model_map() {
         {0xED46, "vl53l4cx"},
         {0xED47, "vl53l4ed"},  {0xED48, "vl53l5cx"}, {0xED49, "vl53l7cx"},
         {0xED4A, "vl53l7ch"},  {0xED4B, "vl53l8cx"},  // 0xED4B hw-verified
+        {PID_TMF8829, "tmf8829"},   // 0xED4C
         {PID_BNO086, "bno086"},     // 0xEE08
         {0xEE09, "bno085"},    {0xEE0A, "bno055"},
     };

@@ -31,6 +31,9 @@ math, firmware containers, dataset replay). Each sensor then has its own
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (multizone dToF, 8×8 … 48×32) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) —
   [introduction](bno055/introduction.md) · [guide](bno055/guide.md) ·
   [api](bno055/api.md)
@@ -70,7 +73,7 @@ The SDK has two layers:
   - one header of wire codecs per sensor or board firmware — `depz/sr04.hpp`,
     `depz/vl53l4.hpp`, `depz/vl53l8.hpp` (CX **and** CH), `depz/vl53l7.hpp`
     (VL53L5CX / L7CX / L7CH), `depz/vl53lx.hpp` (the VL53L 1D family),
-    `depz/bno086.hpp`, `depz/bno055.hpp` — plus the cross-sensor pieces
+    `depz/tmf8829.hpp`, `depz/bno086.hpp`, `depz/bno055.hpp` — plus the cross-sensor pieces
     (`depz/common.hpp`, `depz/identity.hpp`, `depz/usb_ids.hpp`,
     `depz/fwdepz.hpp`, `depz/dataset.hpp`).
 - **The live-hardware layer** — `depz/device.hpp`: it opens a board and talks
@@ -86,12 +89,13 @@ Every board opens as a `depz::Device` and the common commands work on all of
 them. Sensor classes arrive one at a time; so far **`depz::Sr04`**,
 **`depz::Vl53lx`** (the VL53L 1D family: VL53L0X / L1CX / L1CB / L3CX /
 L4CX), **`depz::Vl53l4cd`**, **`depz::Vl53l8`** (the multizone ToF:
-VL53L5CX, VL53L7CX / CH, VL53L8CX / CH), **`depz::Bno055`** and
+VL53L5CX, VL53L7CX / CH, VL53L8CX / CH), **`depz::Tmf8829`**,
+**`depz::Bno055`** and
 **`depz::Bno086`** (BNO085 / BNO086) — every board of the line.
 
 Every sensor speaks one shared framed protocol (`A5 C3` header + optional
 payload CRC). Everything lives in namespace `depz` (ToF under `depz::vl53l4` /
-`depz::vl53l8` / `depz::vl53l7` / `depz::vl53lx`, IMUs under `depz::bno086` /
+`depz::vl53l8` / `depz::vl53l7` / `depz::vl53lx` / `depz::tmf8829`, IMUs under `depz::bno086` /
 `depz::bno055`, datasets under `depz::dataset`). It targets **C++17** and is
 byte-for-byte identical to the Python / TypeScript / Java reference SDKs via the
 shared golden vectors in `contracts/vectors`.
@@ -115,6 +119,11 @@ The firmware philosophies mirror the firmware itself:
   firmware download included — and the results frame is reassembled and
   decoded on the host (`depz::vl53l8`). CX is the base ToF imager; CH is its
   superset, adding Compact-Network-Histogram output.
+- **TMF8829** — the device is a thin SPI register bridge that pushes finished
+  sensor frames in chunks; the host runs the sensor — soft reset, the ams
+  firmware download, presets and the config page, start / stop — in the C
+  SDK behind `depz::Tmf8829`, and the chunk reassembly, frame decode,
+  half-frame merge and clock model are in `depz::tmf8829`.
 - **BNO055** — the device is a thin register bridge; Bosch's fusion runs on the
   chip. The register logic (mode switches through CONFIG, boot and
   fusion-start polls, page discipline, calibration) runs on the host — the
@@ -161,7 +170,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.5.0
+    GIT_TAG        v0.6.0
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -214,6 +223,11 @@ int main() {
         l8->start_ranging();
         std::printf("%d mm\n", l8->get_frame().frame.distance_mm[0]);
         l8->stop_ranging();
+    } else if (auto* tmf = dynamic_cast<depz::Tmf8829*>(dev.get())) {
+        tmf->init();                              // sensor firmware download, ~0.15 s
+        tmf->start();                             // the default 8x8 preset
+        std::printf("%.1f mm\n", tmf->get_measurement().distance_mm[0]);
+        tmf->stop();
     } else if (auto* imu = dynamic_cast<depz::Bno055*>(dev.get())) {
         imu->configure();                         // NDOF, returns once the fusion runs
         auto q = imu->read_quaternion();
@@ -229,20 +243,22 @@ int main() {
   unknown USB id), else `serial` (the USB serial), else `index` (the Nth
   candidate); `timeout` sets the request timeout (default 200 ms).
 - `dynamic_cast<depz::Sr04*>` (or `<depz::Vl53l4cd*>`, `<depz::Vl53l8*>`,
-  `<depz::Bno055*>`)
+  `<depz::Bno055*>`, `<depz::Tmf8829*>`)
   tells whether you got a sensor class; `sensor_type()` names the firmware
   family either way. A multizone board also gets its `Vl53l8Model`: on the
   VL53L8 board `0xED40` is a VL53L8CH, anything else a VL53L8CX; on the L5/L7
   board the PID (`0xED48` / `0xED49` / `0xED4A`), else the device name, else
   VL53L7CX.
 - `open_sr04(OpenOptions)` / `open_vl53l4cd(OpenOptions)` /
-  `open_vl53l8(OpenOptions)` / `open_bno055(OpenOptions)` are `open_device`
-  plus a type check: they throw `WrongTypeError` when the board is not an
-  SR04 / a VL53L4CD / a multizone ToF / a BNO055.
+  `open_vl53l8(OpenOptions)` / `open_bno055(OpenOptions)` /
+  `open_tmf8829(OpenOptions)` are `open_device` plus a type check: they throw
+  `WrongTypeError` when the board is not an SR04 / a VL53L4CD / a multizone
+  VL53L ToF / a BNO055 / a TMF8829.
 - `Device::open(port)` / `Device::open(Link)` open a plain device with no
   probe; `Device::promote(std::move(dev))` probes it later and returns the
   matching class. `Sr04::open(Link)` / `Vl53l4cd::open(Link)` /
-  `Vl53l8::open(Link, Vl53l8Model)` / `Bno055::open(Link)` skip the probe
+  `Vl53l8::open(Link, Vl53l8Model)` / `Bno055::open(Link)` /
+  `Tmf8829::open(Link)` skip the probe
   for a link you know is that sensor (tests, replay).
 - Listing without opening: `list_serial_ports()` (every port the OS lists,
   with its USB id), `list_depz_devices()` (the probed DEPZ boards, as
@@ -659,7 +675,8 @@ of everything that crossed the wire — is `Link::recording` / `Link::replay`
 ## What is not here
 
 Every board of the line has its live class — `depz::Sr04`, `depz::Vl53l4cd`,
-`depz::Vl53l8`, `depz::Vl53lx`, `depz::Bno055`, `depz::Bno086`. Not here is
+`depz::Vl53l8`, `depz::Vl53lx`, `depz::Tmf8829`, `depz::Bno055`,
+`depz::Bno086`. Not here is
 the firmware-update flow: the `.fwdepz` container parses (`depz/fwdepz.hpp`)
 and a board reboots into its bootloader (`Device::enter_bootloader()`), but
 erasing and writing pages is left to your transport.
@@ -693,8 +710,12 @@ SDK's fake hub (busy, refusals, the rarer report types); five VL53L 1D-family
 captures replay through `depz::Vl53lx` (`device_vlx_l0x_uld_replay`,
 `_l1cx_uld_replay`, `_l3cx_ulp_replay`, `_l4cd_uld_replay` — the VL53L4CD ULD
 borrowed by a VL53L4CX — and `_l4cx_hist_short_replay`, which checks that the
-histogram driver now refuses the short preset on an L4 die). `ctest` runs 30
-tests in all: `vectors`, 18 `device_*` tests and 11 per-suite vector
+histogram driver now refuses the short preset on an L4 die), and
+`device_tmf8829_fake_session` runs `depz::Tmf8829` against the C SDK's fake
+TMF8829 bridge with frames captured on a board (`init()` with the firmware
+download, `configure()` with read-back, 32×32 with ref frames, a dropped
+frame, the swallowed stop event). `ctest` runs 33
+tests in all: `vectors`, 19 `device_*` tests and 13 per-suite vector
 tests.
 Your own tests can do the same: record a session once with `Link::recording`, then
 replay it with `Link::replay(path, true)` in CI.

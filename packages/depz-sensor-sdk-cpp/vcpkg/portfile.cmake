@@ -9,7 +9,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO depz-ai/depz-sensor-sdk
     REF "v${VERSION}"
-    SHA512 81836497a05865b04100d96975f845e203decc07aaefb881e6a817e6244874e66337bdcae2ad8fcaefde6905bd7bbbc74614781d3d912d4e316a04bcbb5c0115
+    SHA512 6aa9a92feb637e8daad83611eda487a9f0e946b5dd880d836f54b2fc1c72c0920454af3067975c244b8279effa44d701698f90a8a62a3d004130b4704e5179b0
     HEAD_REF main
 )
 
@@ -31,4 +31,7 @@ vcpkg_cmake_config_fixup(
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/share")
 
-vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/packages/depz-sensor-sdk-cpp/LICENSE")
+vcpkg_install_copyright(FILE_LIST
+    "${SOURCE_PATH}/packages/depz-sensor-sdk-cpp/LICENSE"
+    # the embedded ams TMF8829 sensor firmware (MIT)
+    "${SOURCE_PATH}/packages/depz-sensor-sdk-cpp/licenses/tmf8829/LICENSES-MIT.TXT")

@@ -13,6 +13,8 @@ one shared framed protocol:
 - **VL53L8CX** — 8×8 multizone Time-of-Flight, the base ToF imager (host runs
   the ST ULD)
 - **VL53L8CH** — the VL53L8CX superset, adding Compact-Network-Histogram output
+- **TMF8829** — multizone direct ToF, 8×8 … 48×32 zones, up to 4 targets per
+  zone, raw histograms (host downloads the ams sensor firmware)
 - **BNO055** — 9-axis IMU with on-chip fusion (orientation, gravity, calibration)
 - **BNO085 / BNO086** — 9-axis IMU (host runs the SH-2 stack)
 

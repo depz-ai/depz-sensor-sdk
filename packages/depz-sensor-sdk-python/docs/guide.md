@@ -24,6 +24,9 @@ update). Each sensor then has its own **introduction** and **user guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (dToF, 8×8 … 48×32 zones, up to 4 peaks) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
 - **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
@@ -67,6 +70,9 @@ mirrored from the firmware:
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
   driver runs **on the host** (`depz_sensor_sdk.vl53l8`). CX is the base ToF
   imager; CH is its superset, adding Compact-Network-Histogram output.
+- **TMF8829** — the device is a thin SPI register bridge; the host downloads
+  the sensor firmware, writes the config page and parses the frames
+  (`depz_sensor_sdk.tmf8829`).
 - **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
   and the host configures it with register writes (`depz_sensor_sdk.bno055`).
 - **BNO085 / BNO086** — the device is an SHTP pass-through; the full SH-2 stack
@@ -99,7 +105,7 @@ if isinstance(dev, Sr04):
 
 `open_device()` probes the port and returns the class of the connected sensor
 (`Sr04`, `Vl53l4cd`, `Vl53l8cx`/`Vl53l8ch`, `Vl53l5cx`/`Vl53l7cx`/`Vl53l7ch`,
-`Vl53l0x`…`Vl53l4cx`, `Bno086`, `Bno055`) — each a subclass of `DeviceBase`. From there, follow the per-sensor
+`Vl53l0x`…`Vl53l4cx`, `Tmf8829`, `Bno086`, `Bno055`) — each a subclass of `DeviceBase`. From there, follow the per-sensor
 guide linked above. Every device is a context manager (`with open_device(...)
 as dev:`) or you call `dev.close()`.
 
@@ -178,7 +184,7 @@ print("dropped so far:", it.dropped_count)
 ```
 
 The stream method is named per sensor: `stream()` (SR04), `measurements()`
-(the VL53L0X…L4CX family and VL53L4CD), `frames()` (VL53L5CX/L7CX/L7CH and
+(the VL53L0X…L4CX family, VL53L4CD and TMF8829), `frames()` (VL53L5CX/L7CX/L7CH and
 VL53L8CX/CH), `samples()` (BNO055), `reports()` (BNO085 / BNO086). Each drops
 the oldest item when full and counts drops.
 

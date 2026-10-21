@@ -20,6 +20,9 @@ SDK):
   ST ULD math).
 - **VL53L5CX / VL53L7CX / VL53L7CH** — 8×8 multizone ToF on one I2C board
   firmware; the VL53L8 frame layout, and CNH histograms on the L7CH.
+- **TMF8829** — ams-OSRAM multizone dToF (8×8 … 48×32 zones, up to 4 peaks,
+  raw histograms) behind an SPI register bridge; the host runs the sensor,
+  the crate embeds its MIT firmware image.
 - **BNO055** — 9-axis IMU with Bosch's fusion on the chip, behind an I2C
   register bridge.
 
@@ -31,7 +34,7 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.5.0):
+Published on crates.io as `depz-sensor-sdk` (0.6.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -51,7 +54,9 @@ Full docs live under [`docs/`](docs/):
   ([intro](docs/vl53l8cx/introduction.md) · [guide](docs/vl53l8cx/guide.md) ·
   [api](docs/vl53l8cx/api.md)), **VL53L8CH**
   ([intro](docs/vl53l8ch/introduction.md) · [guide](docs/vl53l8ch/guide.md) ·
-  [api](docs/vl53l8ch/api.md)), **BNO086**
+  [api](docs/vl53l8ch/api.md)), **TMF8829**
+  ([intro](docs/tmf8829/introduction.md) · [guide](docs/tmf8829/guide.md) ·
+  [api](docs/tmf8829/api.md)), **BNO086**
   ([intro](docs/bno086/introduction.md) · [guide](docs/bno086/guide.md) ·
   [api](docs/bno086/api.md)), **VL53L4CD**
   ([intro](docs/vl53l4cd/introduction.md) · [guide](docs/vl53l4cd/guide.md) ·
@@ -109,12 +114,12 @@ Notes on the ToF pair:
 
 The register-bridge boards:
 
-| Area | VL53L0X / L1CX / L1CB / L3CX / L4CX | VL53L5CX / L7CX / L7CH | BNO055 |
-|------|-------------------------------------|------------------------|--------|
-| Identity / class resolution | ✅ (`vl53lx`, `resolve_class`, product table) | ✅ (`vl53l7`, `resolve_model`) | ✅ (`bno055`) |
-| Command encoders / report decoders | ✅ (v2.00: address width, stream with clear list, info) | ✅ (pin, bus speed, info + the VL53L8 register codecs) | ✅ (read/write/reset/stream/info) |
-| Stateless decode | ✅ die block, VL53L0X raw fields, histogram bins | ✅ frames via `vl53l8::parse_frame(Variant::L7)`; CNH via `decode_cnh` (L7CH) | ✅ units, calibration, axis remap, page-1 configs, register windows |
-| Live driver (init, configuration, ranging) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) |
+| Area | VL53L0X / L1CX / L1CB / L3CX / L4CX | VL53L5CX / L7CX / L7CH | BNO055 | TMF8829 |
+|------|-------------------------------------|------------------------|--------|---------|
+| Identity / class resolution | ✅ (`vl53lx`, `resolve_class`, product table) | ✅ (`vl53l7`, `resolve_model`) | ✅ (`bno055`) | ✅ (`tmf8829`) |
+| Command encoders / report decoders | ✅ (v2.00: address width, stream with clear list, info) | ✅ (pin, bus speed, info + the VL53L8 register codecs) | ✅ (read/write/reset/stream/info) | ✅ (read/write/stream/info, frame chunks, events, reassembler) |
+| Stateless decode | ✅ die block, VL53L0X raw fields, histogram bins | ✅ frames via `vl53l8::parse_frame(Variant::L7)`; CNH via `decode_cnh` (L7CH) | ✅ units, calibration, axis remap, page-1 configs, register windows | ✅ frames, results pixels, half-frame merge, clock model + capture time, measurements, config fields, firmware image |
+| Live driver (init, configuration, ranging) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript / C / C++ SDK) |
 
 ## Layout
 
@@ -125,6 +130,9 @@ The register-bridge boards:
 - `vl53l8` — frame reassembly, raw-frame decode (`Variant` CX/CH/L7), advanced
   DCI, CNH histogram decode.
 - `bno055` — BNO055 register-bridge codecs, register codecs, window decode.
+- `tmf8829` — TMF8829 bridge codecs + reassembler, frame / pixel decode,
+  `SensorClock` / `CaptureTimer`, `MeasurementBuilder`, config fields, the
+  embedded sensor firmware.
 - `bno086` — SHTP framing, SH-2 report parsers, control request builders.
 - `protocol`, `framing`, `crc`, `fwdepz`, `usb_ids` — shared transport/protocol.
 - `dataset` — `.depzdata` decoded multi-device dataset reader (contract 09).

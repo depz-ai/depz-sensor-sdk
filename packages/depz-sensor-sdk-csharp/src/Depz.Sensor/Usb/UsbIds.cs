@@ -17,6 +17,7 @@ public static class UsbIds
     public const int PidVl53l8ch = 0xED40; // 60736 — VL53L8CH ToF
     public const int PidVl53l8cx = 0xED4B; // 60747 — VL53L8CX ToF (hw-verified)
     public const int PidVl53l4cd = 0xED45; // 60741 — VL53L4CD single-zone ToF
+    public const int PidTmf8829 = 0xED4C; // 60748 — TMF8829 multizone dToF
     public const int PidBno086 = 0xEE08;  // 60936 — BNO086 IMU
 
     /// <summary>PID → sensor-model hint. Informational: the protocol probe is authoritative.</summary>
@@ -35,6 +36,7 @@ public static class UsbIds
         [0xED49] = "vl53l7cx", // 60745
         [0xED4A] = "vl53l7ch", // 60746
         [PidVl53l8cx] = "vl53l8cx",
+        [PidTmf8829] = "tmf8829",
         [PidBno086] = "bno086",
         [0xEE09] = "bno085",   // 60937
         [0xEE0A] = "bno055",   // 60938

@@ -2546,6 +2546,570 @@ static void test_bno055(void)
 }
 
 /* ======================================================================== */
+/* tmf8829.json + tmf8829_frame_time.json (contract 14)                      */
+/* ======================================================================== */
+
+/* SHA-256 (FIPS 180-4), test-runner only: the vectors pin frame and image
+ * bytes by digest. */
+static void sha256_hex(const uint8_t *msg, size_t len, char out[65])
+{
+    static const uint32_t K[64] = {
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+    uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+    size_t total = ((len + 9 + 63) / 64) * 64, off;
+#define ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+    for (off = 0; off < total; off += 64) {
+        uint32_t w[64], a, b, c, d, e, f, g, hh;
+        int i;
+        for (i = 0; i < 64; i++) {
+            size_t k = off + (size_t)i;
+            uint8_t byte;
+            if (k < len) byte = msg[k];
+            else if (k == len) byte = 0x80;
+            else if (k >= total - 8) byte = (uint8_t)(((uint64_t)len * 8) >> (8 * (total - 1 - k)));
+            else byte = 0;
+            if (i % 4 == 0) w[i / 4] = 0;
+            w[i / 4] |= (uint32_t)byte << (8 * (3 - i % 4));
+        }
+        for (i = 16; i < 64; i++) {
+            uint32_t s0 = ROR(w[i - 15], 7) ^ ROR(w[i - 15], 18) ^ (w[i - 15] >> 3);
+            uint32_t s1 = ROR(w[i - 2], 17) ^ ROR(w[i - 2], 19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+        }
+        a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+        for (i = 0; i < 64; i++) {
+            uint32_t t1 = hh + (ROR(e, 6) ^ ROR(e, 11) ^ ROR(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i];
+            uint32_t t2 = (ROR(a, 2) ^ ROR(a, 13) ^ ROR(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
+            hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+        }
+        h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    }
+#undef ROR
+    for (off = 0; off < 8; off++) snprintf(out + 8 * off, 9, "%08x", h[off]);
+}
+
+/* A JSON int array (or null when absent) against n values. */
+static void check_ints(const char *name, const char *field, const json_value *want, bool present,
+                       const int64_t *got, size_t n)
+{
+    size_t i, bad = 0;
+    if (!present) { CHECK(json_is_null(want), "tmf8829 %s %s: expected absent", name, field); return; }
+    CHECK(json_arr_size(want) == n, "tmf8829 %s %s: %zu values, want %zu", name, field, n, json_arr_size(want));
+    if (json_arr_size(want) != n) return;
+    for (i = 0; i < n; i++) bad += json_as_int(json_arr_get(want, i)) != got[i];
+    CHECK(bad == 0, "tmf8829 %s %s: %zu values differ", name, field, bad);
+}
+
+/* Python's _arrays(): peaks, rows, cols (shape of the first present array,
+ * (0, 0) when none) and the flattened per-zone integers. */
+static void check_results(const char *name, const json_value *e, const depz_tmf8829_results *r)
+{
+    size_t z = (size_t)r->rows * r->cols, np = (size_t)r->peaks * z, i;
+    bool any = r->peaks > 0 || r->has_noise || r->has_xtalk;
+    int64_t *v = (int64_t *)malloc(sizeof(int64_t) * (np > z ? np : z) + 8);
+    CHECK(json_as_int(json_obj_get(e, "peaks")) == r->peaks, "tmf8829 %s peaks", name);
+    CHECK(json_as_int(json_obj_get(e, "rows")) == (any ? r->rows : 0), "tmf8829 %s rows", name);
+    CHECK(json_as_int(json_obj_get(e, "cols")) == (any ? r->cols : 0), "tmf8829 %s cols", name);
+    for (i = 0; i < np; i++) v[i] = r->distance[i];
+    check_ints(name, "distance", json_obj_get(e, "distance"), r->peaks > 0, v, np);
+    for (i = 0; i < np; i++) v[i] = r->snr[i];
+    check_ints(name, "snr", json_obj_get(e, "snr"), r->peaks > 0, v, np);
+    for (i = 0; i < np; i++) v[i] = r->signal[i];
+    check_ints(name, "signal", json_obj_get(e, "signal"), r->has_signal, v, np);
+    for (i = 0; i < z; i++) v[i] = r->noise[i];
+    check_ints(name, "noise", json_obj_get(e, "noise"), r->has_noise, v, z);
+    for (i = 0; i < z; i++) v[i] = r->xtalk[i];
+    check_ints(name, "xtalk", json_obj_get(e, "xtalk"), r->has_xtalk, v, z);
+    free(v);
+}
+
+#define TMF_EQ(e, key, got) \
+    CHECK(json_as_int(json_obj_get(e, key)) == (int64_t)(got), "tmf8829 %s " key ": got %lld", name, \
+          (long long)(got))
+
+static void test_tmf8829(void)
+{
+    json_value *root = load_vectors("tmf8829");
+    depz_tmf8829_reassembler *ra;
+    depz_tmf8829_builder *b;
+    depz_tmf8829_measurement *m;
+    depz_tmf8829_results *res;
+    size_t i, j;
+    if (!root) { g_fail++; return; }
+    ra = (depz_tmf8829_reassembler *)malloc(sizeof *ra);
+    b = (depz_tmf8829_builder *)malloc(sizeof *b);
+    m = (depz_tmf8829_measurement *)malloc(sizeof *m);
+    res = (depz_tmf8829_results *)malloc(sizeof *res);
+
+    /* encode */
+    const json_value *enc = json_obj_get(root, "encode");
+    CHECK(json_arr_size(enc) > 0, "tmf8829 encode cases present");
+    for (i = 0; i < json_arr_size(enc); i++) {
+        const json_value *c = json_arr_get(enc, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        int64_t cmd = json_as_int(json_obj_get(c, "cmd"));
+        uint8_t out[1 + DEPZ_TMF8829_WRITE_MAX];
+        size_t n = 0;
+        if (cmd == DEPZ_TMF8829_CMD_READ_REG) {
+            n = depz_tmf8829_pack_read_reg((int)json_as_int(json_obj_get(c, "addr")),
+                                           (int)json_as_int(json_obj_get(c, "len")), out);
+        } else if (cmd == DEPZ_TMF8829_CMD_WRITE_REG) {
+            uint8_t *data;
+            size_t dn = hex_decode(json_as_str(json_obj_get(c, "data")), &data);
+            n = depz_tmf8829_pack_write_reg((int)json_as_int(json_obj_get(c, "addr")), data, dn, out);
+            free(data);
+        } else if (cmd == DEPZ_TMF8829_CMD_START_STREAM) {
+            n = depz_tmf8829_pack_start_stream((int)json_as_int(json_obj_get(c, "int_mask")),
+                                               (int)json_as_int(json_obj_get(c, "flags")), out);
+        }
+        check_payload(name, out, n, json_as_str(json_obj_get(c, "payload")));
+    }
+
+    /* encode_errors: refused before anything is written */
+    const json_value *ee = json_obj_get(root, "encode_errors");
+    CHECK(json_arr_size(ee) > 0, "tmf8829 encode_errors present");
+    for (i = 0; i < json_arr_size(ee); i++) {
+        const json_value *c = json_arr_get(ee, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        const char *kind = json_as_str(json_obj_get(c, "kind"));
+        uint8_t out[2 + DEPZ_TMF8829_WRITE_MAX + 8];
+        size_t n;
+        if (!strcmp(kind, "read_reg")) {
+            n = depz_tmf8829_pack_read_reg((int)json_as_int(json_obj_get(c, "addr")),
+                                           (int)json_as_int(json_obj_get(c, "len")), out);
+        } else if (!strcmp(kind, "write_reg")) {
+            uint8_t *data;
+            size_t dn = hex_decode(json_as_str(json_obj_get(c, "data")), &data);
+            n = dn <= DEPZ_TMF8829_WRITE_MAX + 1 ?
+                depz_tmf8829_pack_write_reg((int)json_as_int(json_obj_get(c, "addr")), data, dn, out) : 1;
+            free(data);
+        } else {
+            n = depz_tmf8829_pack_start_stream((int)json_as_int(json_obj_get(c, "int_mask")),
+                                               (int)json_as_int(json_obj_get(c, "flags")), out);
+        }
+        CHECK(n == 0, "tmf8829 encode_error %s accepted", name);
+    }
+    {
+        uint8_t out[1 + DEPZ_TMF8829_WRITE_MAX], d = 0;
+        CHECK(depz_tmf8829_pack_read_reg(256, 1, out) == 0 && depz_tmf8829_pack_read_reg(-1, 1, out) == 0 &&
+                  depz_tmf8829_pack_write_reg(256, &d, 1, out) == 0,
+              "tmf8829 encoders refuse addr outside 0..255");
+    }
+
+    /* decode */
+    const json_value *dec = json_obj_get(root, "decode");
+    CHECK(json_arr_size(dec) > 0, "tmf8829 decode cases present");
+    for (i = 0; i < json_arr_size(dec); i++) {
+        const json_value *c = json_arr_get(dec, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        int64_t rpt = json_as_int(json_obj_get(c, "report"));
+        const json_value *e = json_obj_get(c, "expect");
+        uint8_t *p;
+        size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
+        if (rpt == DEPZ_TMF8829_RPT_REG_DATA) {
+            depz_tmf8829_reg_data r;
+            CHECK(depz_tmf8829_unpack_reg_data(p, n, &r) == 0, "tmf8829 %s decodes", name);
+            TMF_EQ(e, "timestamp_us", r.timestamp_us);
+            check_payload(name, r.data, r.data_len, json_as_str(json_obj_get(e, "data")));
+            CHECK(depz_tmf8829_unpack_reg_data(p, 8, &r) == -1, "tmf8829 %s short refused", name);
+            p[0] = 0x33;
+            CHECK(depz_tmf8829_unpack_reg_data(p, n, &r) == -1, "tmf8829 %s wrong echo refused", name);
+        } else if (rpt == DEPZ_TMF8829_RPT_INFO) {
+            depz_tmf8829_info r;
+            CHECK(depz_tmf8829_unpack_info(p, n, &r) == 0, "tmf8829 %s decodes", name);
+            TMF_EQ(e, "int_edges", r.int_edges);
+            TMF_EQ(e, "frames", r.frames);
+            TMF_EQ(e, "frames_aborted", r.frames_aborted);
+            TMF_EQ(e, "frame_errors", r.frame_errors);
+            TMF_EQ(e, "spi_timeouts", r.spi_timeouts);
+            TMF_EQ(e, "int_level", r.int_level);
+            CHECK(json_as_bool(json_obj_get(e, "streaming")) == r.streaming, "tmf8829 %s streaming", name);
+            TMF_EQ(e, "int_mask", r.int_mask);
+            TMF_EQ(e, "last_int_status", r.last_int_status);
+            TMF_EQ(e, "last_fifo_status", r.last_fifo_status);
+            CHECK(depz_tmf8829_unpack_info(p, n - 1, &r) == -1, "tmf8829 %s short refused", name);
+        } else if (rpt == DEPZ_TMF8829_RPT_FRAME) {
+            depz_tmf8829_frame_chunk r;
+            CHECK(depz_tmf8829_unpack_frame_chunk(p, n, &r) == 0, "tmf8829 %s decodes", name);
+            TMF_EQ(e, "timestamp_us", r.timestamp_us);
+            TMF_EQ(e, "full_size", r.full_size);
+            TMF_EQ(e, "offset", r.offset);
+            TMF_EQ(e, "frame_seq", r.frame_seq);
+            TMF_EQ(e, "edge_us", r.edge_us);
+            check_payload(name, r.data, r.data_len, json_as_str(json_obj_get(e, "data")));
+        } else {
+            depz_tmf8829_event r;
+            CHECK(depz_tmf8829_unpack_event(p, n, &r) == 0, "tmf8829 %s decodes", name);
+            TMF_EQ(e, "timestamp_us", r.timestamp_us);
+            TMF_EQ(e, "int_status", r.int_status);
+            TMF_EQ(e, "code", r.code);
+            TMF_EQ(e, "frame_id", r.frame_id);
+            TMF_EQ(e, "fifo_status", r.fifo_status);
+        }
+        free(p);
+    }
+
+    /* reassembly */
+    const json_value *rs = json_obj_get(root, "reassembly");
+    CHECK(json_arr_size(rs) > 0, "tmf8829 reassembly cases present");
+    for (i = 0; i < json_arr_size(rs); i++) {
+        const json_value *c = json_arr_get(rs, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        const json_value *chunks = json_obj_get(c, "chunks");
+        const json_value *e = json_obj_get(c, "expect");
+        const json_value *frames = json_obj_get(e, "frames");
+        size_t done = 0;
+        depz_tmf8829_reassembler_reset(ra);
+        for (j = 0; j < json_arr_size(chunks); j++) {
+            uint8_t *p;
+            size_t n = hex_decode(json_as_str(json_arr_get(chunks, j)), &p);
+            depz_tmf8829_frame_chunk ch;
+            depz_tmf8829_raw_frame f;
+            CHECK(depz_tmf8829_unpack_frame_chunk(p, n, &ch) == 0, "tmf8829 %s chunk %zu", name, j);
+            if (depz_tmf8829_reassembler_feed(ra, &ch, &f)) {
+                const json_value *w = json_arr_get(frames, done++);
+                char sha[65];
+                CHECK(w != NULL, "tmf8829 %s: more frames than expected", name);
+                if (w) {
+                    sha256_hex(f.data, f.len, sha);
+                    TMF_EQ(w, "frame_seq", f.frame_seq);
+                    TMF_EQ(w, "timestamp_us", f.timestamp_us);
+                    TMF_EQ(w, "edge_us", f.edge_us);
+                    TMF_EQ(w, "size", f.len);
+                    CHECK(!strcmp(sha, json_as_str(json_obj_get(w, "sha256"))), "tmf8829 %s sha256", name);
+                }
+            }
+            free(p);
+        }
+        CHECK(done == json_arr_size(frames), "tmf8829 %s: %zu frames, want %zu", name, done, json_arr_size(frames));
+        TMF_EQ(e, "completed", ra->completed);
+        TMF_EQ(e, "discarded", ra->discarded);
+        TMF_EQ(e, "seq_gaps", ra->seq_gaps);
+    }
+
+    /* frames: header / footer, problems, pixels or data digest */
+    const json_value *fr = json_obj_get(root, "frames");
+    CHECK(json_arr_size(fr) > 0, "tmf8829 frames present");
+    for (i = 0; i < json_arr_size(fr); i++) {
+        const json_value *c = json_arr_get(fr, i);
+        const char *name = json_as_str(json_obj_get(c, "name"));
+        const json_value *h = json_obj_get(c, "header");
+        const json_value *probs = json_obj_get(c, "problems");
+        depz_tmf8829_frame_info f;
+        depz_tmf8829_frame_problems pr;
+        uint8_t *raw;
+        size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
+        CHECK(depz_tmf8829_parse_frame(raw, n, &f) == 0, "tmf8829 %s parses", name);
+        TMF_EQ(h, "fifo_status", f.fifo_status);
+        TMF_EQ(h, "systick", f.systick);
+        TMF_EQ(h, "id", f.id);
+        TMF_EQ(h, "kind", f.kind);
+        TMF_EQ(h, "fp_mode", f.fp_mode);
+        TMF_EQ(h, "layout", f.layout);
+        TMF_EQ(h, "payload", f.payload);
+        TMF_EQ(h, "f_number", f.f_number);
+        for (j = 0; j < 3; j++)
+            CHECK(json_as_int(json_arr_get(json_obj_get(h, "temperature"), j)) == f.temperature[j],
+                  "tmf8829 %s temperature[%zu]", name, j);
+        TMF_EQ(h, "bdv", f.bdv);
+        for (j = 0; j < 2; j++)
+            CHECK(json_as_int(json_arr_get(json_obj_get(h, "ref_pos"), j)) == f.ref_pos[j],
+                  "tmf8829 %s ref_pos[%zu]", name, j);
+        TMF_EQ(h, "t0_integration", f.t0_integration);
+        TMF_EQ(h, "t1_integration", f.t1_integration);
+        TMF_EQ(h, "frame_status", f.frame_status);
+        TMF_EQ(h, "reserved", f.reserved);
+        TMF_EQ(h, "eof", f.eof);
+        TMF_EQ(h, "size", f.size);
+        CHECK(depz_tmf8829_frame_size(raw) == f.size, "tmf8829 %s frame_size from the head", name);
+        depz_tmf8829_frame_problems_of(&f, &pr);
+        CHECK((size_t)pr.count == json_arr_size(probs), "tmf8829 %s problems count", name);
+        for (j = 0; j < json_arr_size(probs) && j < (size_t)pr.count; j++)
+            CHECK(!strcmp(pr.text[j], json_as_str(json_arr_get(probs, j))), "tmf8829 %s problem %zu", name, j);
+        if (f.kind == DEPZ_TMF8829_FID_RESULTS) {
+            char err[160];
+            int rc = depz_tmf8829_parse_results(raw, n, &f, res, err, sizeof err);
+            CHECK(rc == 0, "tmf8829 %s results: %s", name, err);
+            if (rc == 0) check_results(name, json_obj_get(c, "results"), res);
+            CHECK(depz_tmf8829_parse_results(raw, n - 1, NULL, res, err, sizeof err) == -1,
+                  "tmf8829 %s: a byte short is corrupt", name);
+        } else {
+            char sha[65];
+            sha256_hex(raw + 21, n - 33, sha);
+            CHECK(!strcmp(sha, json_as_str(json_obj_get(c, "data_sha256"))), "tmf8829 %s data_sha256", name);
+            CHECK(depz_tmf8829_parse_results(raw, n, &f, res, NULL, 0) == -1, "tmf8829 %s: not results", name);
+        }
+        free(raw);
+    }
+    {
+        uint8_t shortf[32] = {0};
+        depz_tmf8829_frame_info f;
+        CHECK(depz_tmf8829_parse_frame(shortf, sizeof shortf, &f) == -1, "tmf8829 32 B frame refused");
+    }
+
+    /* measurements: the builder over captured frame sequences */
+    const json_value *ms = json_obj_get(root, "measurements");
+    CHECK(json_arr_size(ms) > 0, "tmf8829 measurements present");
+    for (i = 0; i < json_arr_size(ms); i++) {
+        const json_value *s = json_arr_get(ms, i);
+        const char *name = json_as_str(json_obj_get(s, "name"));
+        const json_value *frames = json_obj_get(s, "frames");
+        const json_value *expect = json_obj_get(s, "expect");
+        size_t got = 0;
+        depz_tmf8829_builder_reset(b);
+        for (j = 0; j < json_arr_size(frames); j++) {
+            const json_value *fj = json_arr_get(frames, j);
+            const char *rc = json_as_str(json_obj_get(fj, "raw_case"));
+            const json_value *src = NULL;
+            uint8_t *raw;
+            size_t k, n;
+            for (k = 0; k < json_arr_size(fr); k++)
+                if (!strcmp(json_as_str(json_obj_get(json_arr_get(fr, k), "name")), rc)) src = json_arr_get(fr, k);
+            CHECK(src != NULL, "tmf8829 %s: raw_case %s", name, rc);
+            if (!src) continue;
+            n = hex_decode(json_as_str(json_obj_get(src, "raw")), &raw);
+            if (depz_tmf8829_builder_add(b, raw, n, json_as_int(json_obj_get(fj, "timestamp_us")),
+                                         json_as_int(json_obj_get(fj, "edge_us")), m)) {
+                const json_value *e = json_arr_get(expect, got++);
+                CHECK(e != NULL, "tmf8829 %s: more measurements than expected", name);
+                if (e) {
+                    size_t t;
+                    TMF_EQ(e, "timestamp_us", m->timestamp_us);
+                    TMF_EQ(e, "flags", m->flags);
+                    TMF_EQ(e, "fp_mode", m->fp_mode);
+                    TMF_EQ(e, "f_number", m->f_number);
+                    CHECK(json_arr_size(json_obj_get(e, "frame_times_us")) == m->n_frames, "tmf8829 %s n_frames", name);
+                    for (t = 0; t < m->n_frames; t++) {
+                        CHECK(json_as_int(json_arr_get(json_obj_get(e, "frame_times_us"), t)) == m->times[t].timestamp_us,
+                              "tmf8829 %s frame_times_us[%zu]", name, t);
+                        CHECK(json_as_int(json_arr_get(json_obj_get(e, "t1_len_us"), t)) == m->times[t].t1_len_us,
+                              "tmf8829 %s t1_len_us[%zu]", name, t);
+                    }
+                    TMF_EQ(e, "ratio_q16", b->clock.ratio_q16);
+                    TMF_EQ(e, "n_histograms", m->n_histograms);
+                    TMF_EQ(e, "n_ref_frames", m->n_ref_frames);
+                    TMF_EQ(e, "n_problems", m->n_problems);
+                    CHECK(json_as_bool(json_obj_get(e, "distance_in_mm")) == m->distance_in_mm,
+                          "tmf8829 %s distance_in_mm", name);
+                    check_results(name, e, &m->results);
+                    /* distance_mm = raw x ratio (/ 4 for 0.25 mm units) */
+                    for (t = 0; t < (size_t)m->results.peaks * m->results.rows * m->results.cols; t++) {
+                        double want = m->results.distance[t] * ((double)m->ratio_q16 / (8 << 16));
+                        if (!m->distance_in_mm) want /= 4.0;
+                        if (m->distance_mm[t] != want) { CHECK(0, "tmf8829 %s distance_mm[%zu]", name, t); break; }
+                    }
+                }
+            }
+            free(raw);
+        }
+        CHECK(got == json_arr_size(expect), "tmf8829 %s: %zu measurements, want %zu", name, got,
+              json_arr_size(expect));
+    }
+
+    /* the half-frame edge cases (no vector): orphan second half, two first
+     * halves, halves of different formats — built from the captured 32x32 pair */
+    {
+        const json_value *h0 = NULL, *h1 = NULL;
+        uint8_t *a, *c2, *mixed;
+        size_t na = 0, nc = 0;
+        for (j = 0; j < json_arr_size(fr); j++) {
+            const char *nm = json_as_str(json_obj_get(json_arr_get(fr, j), "name"));
+            if (!strcmp(nm, "32x32#0")) h0 = json_arr_get(fr, j);
+            if (!strcmp(nm, "32x32#1")) h1 = json_arr_get(fr, j);
+        }
+        CHECK(h0 && h1, "tmf8829 32x32 halves present");
+        if (h0 && h1) {
+            const char *name = "half-frame edge cases";
+            int64_t ts = 2000000;
+            na = hex_decode(json_as_str(json_obj_get(h0, "raw")), &a);
+            nc = hex_decode(json_as_str(json_obj_get(h1, "raw")), &c2);
+            CHECK((a[6] & 0x40) == 0 && (c2[6] & 0x40) != 0, "tmf8829 %s: first / second half order", name);
+            depz_tmf8829_builder_reset(b);
+            CHECK(depz_tmf8829_builder_add(b, c2, nc, ts, 0, m) == 0, "tmf8829 %s: orphan second half", name);
+            CHECK(depz_tmf8829_builder_add(b, a, na, ts + 30000, 0, m) == 0, "tmf8829 %s: first half", name);
+            CHECK(depz_tmf8829_builder_add(b, a, na, ts + 60000, 0, m) == 0, "tmf8829 %s: first half again", name);
+            CHECK(depz_tmf8829_builder_add(b, c2, nc, ts + 90000, 0, m) == 1, "tmf8829 %s: pair merges", name);
+            CHECK(m->n_problems == 2 && m->rows == 32 && m->results.rows == 32 && m->n_frames == 2,
+                  "tmf8829 %s: 2 problems logged, 32 rows", name);
+            CHECK(strstr(m->problems[0], "without a first one") && strstr(m->problems[1], "two first halves"),
+                  "tmf8829 %s: problem texts", name);
+            /* a second half whose layout differs (unused bit 0x80: pixels still decode) */
+            mixed = (uint8_t *)malloc(nc);
+            memcpy(mixed, c2, nc);
+            mixed[6] ^= 0x80;
+            CHECK(depz_tmf8829_builder_add(b, a, na, ts + 120000, 0, m) == 0, "tmf8829 %s: first half", name);
+            CHECK(depz_tmf8829_builder_add(b, mixed, nc, ts + 150000, 0, m) == 0,
+                  "tmf8829 %s: different formats dropped", name);
+            CHECK(depz_tmf8829_builder_add(b, a, na, ts + 180000, 0, m) == 0, "tmf8829 %s: first half", name);
+            CHECK(depz_tmf8829_builder_add(b, c2, nc, ts + 210000, 0, m) == 1, "tmf8829 %s: next pair", name);
+            CHECK(m->n_problems >= 1 && strstr(m->problems[0], "half-frames of different formats"),
+                  "tmf8829 %s: different formats logged", name);
+            /* fp_mode differs (32x32 -> 32x32s, same size) */
+            memcpy(mixed, c2, nc);
+            mixed[5] = (uint8_t)((mixed[5] & 0xF0) | 4);
+            CHECK(depz_tmf8829_builder_add(b, a, na, ts + 240000, 0, m) == 0, "tmf8829 %s: first half", name);
+            CHECK(depz_tmf8829_builder_add(b, mixed, nc, ts + 270000, 0, m) == 0,
+                  "tmf8829 %s: different fp_mode dropped", name);
+            free(mixed);
+            free(a);
+            free(c2);
+        }
+    }
+
+    /* config page fields */
+    const json_value *cfg = json_obj_get(root, "config");
+    {
+        uint8_t *page, pg[DEPZ_TMF8829_CFG_SIZE];
+        size_t n = hex_decode(json_as_str(json_obj_get(cfg, "page")), &page);
+        const json_value *fields = json_obj_get(cfg, "fields");
+        const json_value *get = json_obj_get(cfg, "get");
+        const json_value *set = json_obj_get(cfg, "set");
+        const json_value *se = json_obj_get(cfg, "set_errors");
+        CHECK(n == DEPZ_TMF8829_CFG_SIZE, "tmf8829 config page is 190 B");
+        CHECK(fields->count == DEPZ_TMF8829_CFG_FIELD_COUNT, "tmf8829 config field count");
+        for (i = 0; i < fields->count; i++) {
+            const depz_tmf8829_cfg_field *f = depz_tmf8829_find_cfg_field(fields->keys[i]);
+            const json_value *w = fields->items[i];
+            CHECK(f && f->reg == json_as_int(json_arr_get(w, 0)) && f->shift == json_as_int(json_arr_get(w, 1)) &&
+                      f->width == json_as_int(json_arr_get(w, 2)),
+                  "tmf8829 config field %s", fields->keys[i]);
+        }
+        for (i = 0; i < get->count; i++) {
+            uint32_t v = 0;
+            CHECK(depz_tmf8829_cfg_get(page, get->keys[i], &v) == 0 && v == (uint32_t)json_as_int(get->items[i]),
+                  "tmf8829 cfg_get %s: got %u", get->keys[i], v);
+        }
+        for (i = 0; i < json_arr_size(set); i++) {
+            const json_value *c = json_arr_get(set, i);
+            const char *field = json_as_str(json_obj_get(c, "field"));
+            memcpy(pg, page, sizeof pg);
+            CHECK(depz_tmf8829_cfg_set(pg, field, json_as_int(json_obj_get(c, "value"))) == 0, "tmf8829 cfg_set %s", field);
+            check_payload(field, pg, sizeof pg, json_as_str(json_obj_get(c, "page")));
+        }
+        CHECK(json_arr_size(se) > 0, "tmf8829 set_errors present");
+        for (i = 0; i < json_arr_size(se); i++) {
+            const json_value *c = json_arr_get(se, i);
+            const char *field = json_as_str(json_obj_get(c, "field"));
+            memcpy(pg, page, sizeof pg);
+            CHECK(depz_tmf8829_cfg_set(pg, field, json_as_int(json_obj_get(c, "value"))) == -2 &&
+                      !memcmp(pg, page, sizeof pg),
+                  "tmf8829 cfg_set %s refused, page untouched", field);
+        }
+        {
+            uint32_t v;
+            CHECK(depz_tmf8829_cfg_get(page, "nope", &v) == -1 && depz_tmf8829_cfg_set(pg, "nope", 0) == -1 &&
+                      depz_tmf8829_cfg_set(pg, "xtalk", -1) == -2,
+                  "tmf8829 cfg unknown field / negative value");
+        }
+        free(page);
+    }
+    /* presets */
+    {
+        const depz_tmf8829_preset *p8 = depz_tmf8829_find_preset("8x8"), *p48 = depz_tmf8829_find_preset("48x32-ha");
+        const depz_tmf8829_preset *pxr = depz_tmf8829_find_preset("8x8-xr"), *p32 = depz_tmf8829_find_preset("32x32");
+        CHECK(p8 && p8->cmd == 0x40 && p8->kilo_iterations == 586, "tmf8829 preset 8x8");
+        CHECK(p32 && p32->cmd == 0x45 && p32->kilo_iterations == 2344, "tmf8829 preset 32x32");
+        CHECK(p48 && p48->cmd == 0x48 && p48->kilo_iterations == 3516, "tmf8829 preset 48x32-ha");
+        CHECK(pxr && pxr->cmd == 0x49 && pxr->kilo_iterations == 586, "tmf8829 preset 8x8-xr");
+        CHECK(!depz_tmf8829_find_preset("64x64"), "tmf8829 unknown preset");
+    }
+
+    /* firmware image */
+    {
+        const json_value *fw = json_obj_get(root, "firmware");
+        char sha[65];
+        sha256_hex(depz_tmf8829_firmware, depz_tmf8829_firmware_len, sha);
+        CHECK(json_as_int(json_obj_get(fw, "load_addr")) == DEPZ_TMF8829_FIRMWARE_LOAD_ADDR, "tmf8829 firmware load_addr");
+        CHECK(json_as_int(json_obj_get(fw, "size")) == (int64_t)depz_tmf8829_firmware_len, "tmf8829 firmware size");
+        CHECK(json_as_int(json_obj_get(fw, "words")) == (int64_t)(depz_tmf8829_firmware_len / 4), "tmf8829 firmware words");
+        CHECK(!strcmp(sha, json_as_str(json_obj_get(fw, "sha256"))), "tmf8829 firmware sha256 %s", sha);
+    }
+
+    free(res);
+    free(m);
+    free(b);
+    free(ra);
+    json_free(root);
+}
+
+/* tmf8829_frame_time.json: the clock model and capture time, bit for bit. */
+static void test_tmf8829_frame_time(void)
+{
+    json_value *root = load_vectors("tmf8829_frame_time");
+    const json_value *cols, *streams;
+    int ci[12];
+    static const char *const COLS[12] = {"id", "layout", "f_number", "systick", "t0", "t1", "ts", "edge_us",
+                                         "exp_timestamp_us", "exp_t1_len_us", "exp_flags", "exp_ratio_q16"};
+    size_t i, j, k, checked = 0;
+    if (!root) { g_fail++; return; }
+    cols = json_obj_get(root, "columns");
+    for (k = 0; k < 12; k++) {
+        ci[k] = -1;
+        for (i = 0; i < json_arr_size(cols); i++)
+            if (!strcmp(json_as_str(json_arr_get(cols, i)), COLS[k])) ci[k] = (int)i;
+        CHECK(ci[k] >= 0, "tmf8829_frame_time column %s", COLS[k]);
+        if (ci[k] < 0) { json_free(root); return; }
+    }
+#define COL(row, k) json_as_int(json_arr_get(row, (size_t)ci[k]))
+    streams = json_obj_get(root, "streams");
+    for (i = 0; i < json_arr_size(streams); i++) {
+        const json_value *s = json_arr_get(streams, i);
+        const char *scen = json_as_str(json_obj_get(s, "scenario"));
+        const json_value *frames = json_obj_get(s, "frames");
+        depz_tmf8829_clock clock;
+        depz_tmf8829_timer timer;
+        depz_tmf8829_clock_reset(&clock);
+        depz_tmf8829_timer_reset(&timer);
+        for (j = 0; j < json_arr_size(frames); j++) {
+            const json_value *row = json_arr_get(frames, j);
+            int64_t fid = COL(row, 0), ts = COL(row, 6);
+            uint32_t tick = (uint32_t)COL(row, 3);
+            unsigned kind = (unsigned)fid & 0xF0u;
+            uint8_t flags;
+            depz_tmf8829_frame_time t;
+            if (kind == 0x30) continue;
+            flags = depz_tmf8829_clock_add(&clock, ts, tick);
+            if (kind == 0x20) { depz_tmf8829_timer_histograms(&timer); continue; }
+            depz_tmf8829_timer_results(&timer, &clock, (unsigned)fid & 0x0Fu, tick, (uint32_t)COL(row, 4),
+                                       (uint32_t)COL(row, 5), ts, COL(row, 7), flags, &t);
+            CHECK(t.timestamp_us == COL(row, 8) && t.t1_len_us == COL(row, 9) && t.flags == COL(row, 10) &&
+                      clock.ratio_q16 == COL(row, 11),
+                  "tmf8829_frame_time %s frame %zu: ts %lld/%lld t1 %u/%lld flags %u/%lld ratio %u/%lld", scen, j,
+                  (long long)t.timestamp_us, (long long)COL(row, 8), t.t1_len_us, (long long)COL(row, 9),
+                  t.flags, (long long)COL(row, 10), clock.ratio_q16, (long long)COL(row, 11));
+            checked++;
+        }
+    }
+#undef COL
+    CHECK(checked == 970, "tmf8829_frame_time: %zu results frames checked, want 970", checked);
+    /* floor semantics on negative operands (C truncates toward zero) */
+    {
+        depz_tmf8829_clock c;
+        depz_tmf8829_clock_reset(&c);
+        CHECK(depz_tmf8829_clock_to_us(&c, 1000, 100, 99) == 992, "tmf8829 to_us one tick back");
+        c.ratio_q16 = DEPZ_TMF8829_NOMINAL_Q16 + 1;
+        CHECK(depz_tmf8829_clock_to_us(&c, 0, 100, 99) == -9, "tmf8829 to_us floors a negative product");
+        CHECK(depz_tmf8829_clock_to_us(&c, 0, 0xFFFFFFFFu, 0) == 8, "tmf8829 to_us across the u32 wrap");
+        depz_tmf8829_clock_reset(&c);
+        CHECK(depz_tmf8829_clock_add(&c, 1000000, 0) == 0, "tmf8829 clock first pair");
+        /* MCU time went back 15 us, sensor ticked 0: tol = -15 // 10 + 50 = 48 */
+        CHECK(depz_tmf8829_clock_add(&c, 999985, 0) == 0, "tmf8829 clock: -15 us within tol 48");
+        /* -46 us: tol = -46 // 10 + 50 = 45 < 46 -> reset (truncation would give 46 and accept) */
+        CHECK(depz_tmf8829_clock_add(&c, 999939, 0) == DEPZ_TMF8829_FT_CLOCK_RESET,
+              "tmf8829 clock: -46 us outside the floored tol -> CLOCK_RESET");
+    }
+    json_free(root);
+}
+
+/* ======================================================================== */
 int main(int argc, char **argv)
 {
     if (argc < 2) { fprintf(stderr, "usage: %s <vector-stem>\n", argv[0]); return 2; }
@@ -2570,6 +3134,8 @@ int main(int argc, char **argv)
     else if (strcmp(stem, "vl53l7_replay") == 0)   test_vl53l7_replay(argc > 2 ? argv[2] : NULL);
     else if (strcmp(stem, "vl53lx") == 0)          test_vl53lx();
     else if (strcmp(stem, "bno055") == 0)          test_bno055();
+    else if (strcmp(stem, "tmf8829") == 0)         test_tmf8829();
+    else if (strcmp(stem, "tmf8829_frame_time") == 0) test_tmf8829_frame_time();
     else { fprintf(stderr, "unknown vector stem: %s\n", stem); return 2; }
 
     printf("[%s] %d checks, %d failures\n", stem, g_checks, g_fail);

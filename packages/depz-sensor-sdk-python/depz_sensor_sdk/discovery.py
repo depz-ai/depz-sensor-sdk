@@ -340,6 +340,10 @@ def _open_by_sensor(
         from .bno055 import Bno055
 
         return Bno055(port, timeout=timeout)
+    if sensor == SensorType.TMF8829:
+        from .tmf8829 import Tmf8829
+
+        return Tmf8829(port, timeout=timeout)
     return DeviceBase(port, timeout=timeout)
 
 
@@ -393,5 +397,11 @@ def _promote(dev: DeviceBase, ident: Identity):
 
         Bno055._init_subclass_state(dev)  # type: ignore[arg-type]
         dev.__class__ = Bno055
+        return dev
+    if ident.sensor_type == SensorType.TMF8829:
+        from .tmf8829 import Tmf8829
+
+        Tmf8829._init_subclass_state(dev)  # type: ignore[arg-type]
+        dev.__class__ = Tmf8829
         return dev
     return dev

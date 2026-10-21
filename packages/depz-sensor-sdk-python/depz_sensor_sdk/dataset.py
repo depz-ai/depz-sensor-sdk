@@ -335,17 +335,28 @@ class SessionRecorder:
             entry.unsubscribes.append(dev.on_sample(on_sample))
             return
 
+        from .tmf8829 import Tmf8829, Tmf8829Measurement
+        from .tmf8829.builder import record_value as tmf8829_record_value
+
+        if isinstance(dev, Tmf8829):
+
+            def on_measurement(m: "Tmf8829Measurement", _did=did, _off=offset):
+                writer.write(_did, m.timestamp_us - _off, "tmf8829", tmf8829_record_value(m))
+
+            entry.unsubscribes.append(dev.on_measurement(on_measurement))
+            return
+
         from .bno086 import Bno086
 
         if isinstance(dev, Bno086):
 
-            def on_report(r: Any, _did=did):
+            def on_report(r: Any, _did=did, _off=offset):
                 # Contract 09 `bno086`: every enabled sensor's report, snake_case,
-                # full quaternion / vector components. `t` is host arrival time
-                # (reports of different sensors in one cargo carry out-of-order
-                # device times; records must stay monotonic per device); the
-                # device time rides along as `timestamp_us`.
-                writer.write(_did, host_now_us(), "bno086", bno086_record_value(r))
+                # full quaternion / vector components, at its measurement time
+                # (0xFB/0xFA + delay) like every other sensor. Reports of
+                # different sensors in one cargo carry out-of-order device times,
+                # so `t` may step back within a device; readers sort.
+                writer.write(_did, r.timestamp_us - _off, "bno086", bno086_record_value(r))
 
             entry.unsubscribes.append(dev.on_report(on_report))
             return
@@ -405,11 +416,14 @@ class DatasetReader:
                 yield DatasetRecord(ev["d"], ev["t"], ev["k"], ev["v"])
 
     def __iter__(self) -> Iterator[DatasetRecord]:
-        """Records merged by `t` (per-device order is already monotonic, so a
-        k-way heap merge is exact without loading the file into memory)."""
+        """Records merged by `t`. Per-device order is only roughly monotonic
+        (BNO086 cargos, arrival-time `temperature` records), so each stream is
+        stable-sorted before the k-way merge (contract 09)."""
         streams: dict[str, list[DatasetRecord]] = {}
         for rec in self._raw_iter():
             streams.setdefault(rec.device_id, []).append(rec)
+        for recs in streams.values():
+            recs.sort(key=lambda r: r.t_host_us)
         yield from heapq.merge(*streams.values(), key=lambda r: r.t_host_us)
 
     def play(

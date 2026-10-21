@@ -14,14 +14,14 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Depz.Sensor</PackageId>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <Authors>DEPZ</Authors>
-    <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU) — transport, protocol codecs, and sensor decode.</Description>
+    <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU, TMF8829 dToF) — transport, protocol codecs, and sensor decode.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/depz-ai/depz-sensor-sdk</PackageProjectUrl>
     <RepositoryUrl>https://github.com/depz-ai/depz-sensor-sdk</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>depz;sensor;usb;vl53l8;vl53l4cd;bno086;hc-sr04;tof;imu</PackageTags>
+    <PackageTags>depz;sensor;usb;vl53l8;vl53l4cd;bno086;hc-sr04;tmf8829;tof;imu</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -29,6 +29,14 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- TMF8829 sensor firmware (ams, MIT): embedded in the assembly; the license
+       text is embedded too and packed next to the README. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Tmf8829/Data/tmf8829_application.bin" LogicalName="Depz.Sensor.Tmf8829.tmf8829_application.bin" />
+    <EmbeddedResource Include="Tmf8829/Data/LICENSES-MIT.TXT" LogicalName="Depz.Sensor.Tmf8829.LICENSES-MIT.TXT" />
+    <None Include="Tmf8829/Data/LICENSES-MIT.TXT" Pack="true" PackagePath="licenses/tmf8829/" />
   </ItemGroup>
 
 </Project>

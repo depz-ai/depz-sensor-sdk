@@ -1,6 +1,6 @@
 # @depz/sensor-sdk
 
-TypeScript SDK for the **DEPZ USB sensor line** — fourteen sensor classes
+TypeScript SDK for the **DEPZ USB sensor line** — fifteen sensor classes
 across the USB CDC-ACM firmware families that speak one shared framed protocol,
 usable from **the browser (WebSerial)** and **Node (serialport)**:
 
@@ -13,6 +13,8 @@ usable from **the browser (WebSerial)** and **Node (serialport)**:
   `Vl53l7ch` adds streamed Compact-Network-Histogram output
 - **VL53L8CX / VL53L8CH** — 8×8 multizone Time-of-Flight (host runs the ST ULD);
   `Vl53l8ch` is the `Vl53l8cx` superset, adding Compact-Network-Histogram output
+- **TMF8829** — multizone direct Time-of-Flight, 8×8 … 48×32 zones, up to 4
+  peaks per zone, raw histograms (host runs the sensor over a register bridge)
 - **BNO055** — 9-axis IMU with on-chip fusion (host configures it over a
   register bridge)
 - **BNO085 / BNO086** — 9-axis IMU (host runs the SH-2 stack)
@@ -38,7 +40,7 @@ import { openDevice } from "@depz/sensor-sdk/web";
 const port = await navigator.serial.requestPort(); // user gesture
 const dev = await openDevice(port);
 // dev is the correctly-typed sensor class (Sr04 | Vl53l4cd | Vl53l8cx/ch |
-// Vl53l5cx | Vl53l7cx/ch | Vl53l0x … Vl53l4cx | Bno086 | Bno055)
+// Vl53l5cx | Vl53l7cx/ch | Vl53l0x … Vl53l4cx | Tmf8829 | Bno086 | Bno055)
 ```
 
 ## Quick start (Node)
@@ -76,7 +78,8 @@ guides and the generated API reference.
 ## License
 
 MIT. Bundled VL53L5/L7/L8 sensor-firmware blobs are © STMicroelectronics
-(BSD-3-Clause).
+(BSD-3-Clause); the bundled TMF8829 sensor firmware is © ams-OSRAM (MIT,
+`TMF8829_FIRMWARE_LICENSE`).
 
 Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

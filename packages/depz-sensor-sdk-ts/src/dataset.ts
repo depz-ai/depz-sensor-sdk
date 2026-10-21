@@ -4,8 +4,10 @@
  * `depz_sensor_sdk.dataset` module; browser-safe (no Node APIs).
  */
 
-import { hostNowUs, type DepzDevice } from "./device/device.js";
+import { type DepzDevice } from "./device/device.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
+import { tmf8829RecordValue } from "./sensors/tmf8829/builder.js";
+import { Tmf8829 } from "./sensors/tmf8829/tmf8829.js";
 import { Bno086 } from "./sensors/bno086/bno086.js";
 import type { Report as Bno086Report } from "./sensors/bno086/reports.js";
 import { packBno055Units } from "./sensors/bno055/regs.js";
@@ -250,14 +252,20 @@ export class DatasetRecorder {
         writer.write(entry.id, toHost(s.timestampUs), "bno055", v);
       });
     }
+    if (dev instanceof Tmf8829) {
+      // Contract 09 `tmf8829`: one record per measurement at its capture time.
+      return dev.onMeasurement((m) => {
+        writer.write(entry.id, toHost(BigInt(m.timestampUs)), "tmf8829", tmf8829RecordValue(m));
+      });
+    }
     if (dev instanceof Bno086) {
       // Contract 09 `bno086`: every enabled sensor's report, snake_case, full
-      // quaternion / vector components. `t` is host arrival time (reports of
-      // different sensors in one cargo carry out-of-order device times; records
-      // must stay monotonic per device); the device time rides along as
-      // `timestamp_us`.
+      // quaternion / vector components, at its measurement time (0xFB/0xFA +
+      // delay) like every other sensor. Reports of different sensors in one
+      // cargo carry out-of-order device times, so `t` may step back within a
+      // device; readers sort.
       return dev.onReport((r) => {
-        writer.write(entry.id, Number(hostNowUs()), "bno086", bno086RecordValue(r));
+        writer.write(entry.id, toHost(r.timestampUs), "bno086", bno086RecordValue(r));
       });
     }
     // VL53L8CX/CH and the VL53L5CX/L7CX/L7CH subclasses.
@@ -317,7 +325,8 @@ export class DatasetReader {
       const ev = JSON.parse(l) as { d: string; t: number; k: string; v: Record<string, unknown> };
       return { deviceId: ev.d, tHostUs: ev.t, kind: ev.k, value: ev.v };
     });
-    // Per-device order is monotonic; a stable sort merges exactly.
+    // Per-device order is only roughly monotonic (contract 09); a stable sort
+    // gives the one timeline.
     this.records = raw
       .map((r, i) => [r, i] as const)
       .sort((a, b) => a[0].tHostUs - b[0].tHostUs || a[1] - b[1])

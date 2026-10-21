@@ -131,6 +131,7 @@ static int attach_type(depz_device *dev, depz_sensor_type type, int usb_vid, int
     if (type == DEPZ_SENSOR_SR04) return depz_sr04_attach(dev);
     if (type == DEPZ_SENSOR_VL53L4) return depz_vl53l4cd_attach(dev);
     if (type == DEPZ_SENSOR_BNO055) return depz_bno055_attach(dev);
+    if (type == DEPZ_SENSOR_TMF8829) return depz_tmf8829_attach(dev);
     if (type == DEPZ_SENSOR_BNO086) return depz_bno086_attach(dev);
     if (type == DEPZ_SENSOR_VL53LX)
         return depz_vl53lx_attach(dev, depz_usb_model_hint(usb_vid, usb_pid), device_name);

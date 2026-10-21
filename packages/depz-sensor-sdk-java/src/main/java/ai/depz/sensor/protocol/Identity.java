@@ -27,6 +27,8 @@ public record Identity(String mode, SensorType sensorType, String softwareName, 
         BNO086("bno086"),
         /** BNO055 9-axis IMU on the register bridge (contracts/13_SENSOR_BNO055.md). */
         BNO055("bno055"),
+        /** TMF8829 multizone dToF on the SPI register bridge (contracts/14_SENSOR_TMF8829.md). */
+        TMF8829("tmf8829"),
         UNKNOWN("unknown");
 
         public final String label;
@@ -46,6 +48,7 @@ public record Identity(String mode, SensorType sensorType, String softwareName, 
         {"VL53LX", SensorType.VL53LX},
         {"BNO086", SensorType.BNO086},
         {"BNO055", SensorType.BNO055},
+        {"TMF8829", SensorType.TMF8829},
     };
 
     /**

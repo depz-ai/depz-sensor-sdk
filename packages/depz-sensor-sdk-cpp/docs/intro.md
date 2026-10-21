@@ -8,8 +8,8 @@ two layers:
   and replay it in tests. Every board opens as a `depz::Device` with the
   common commands; the sensor classes arrive one at a time — so far
   **SR04** (`depz::Sr04`), **VL53L4CD** (`depz::Vl53l4cd`), the multizone
-  ToF (`depz::Vl53l8`: VL53L5CX, VL53L7CX / CH, VL53L8CX / CH) and the
-  **BNO055** (`depz::Bno055`). It wraps the
+  ToF (`depz::Vl53l8`: VL53L5CX, VL53L7CX / CH, VL53L8CX / CH), the
+  **TMF8829** (`depz::Tmf8829`) and the **BNO055** (`depz::Bno055`). It wraps the
   C SDK (`depz-sensor-sdk-c`); errors are exceptions.
 - **The decode layer** — pure codecs, no I/O: bytes in, typed values out, and
   typed values back into bytes, byte-for-byte identical to the Python /
@@ -54,6 +54,10 @@ and API reference:
   and codecs.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH
   histograms: the same live class, plus CNH streaming and decode.
+- **[TMF8829](tmf8829/introduction.md)** — ams-OSRAM multizone direct ToF,
+  8×8 … 48×32 zones, up to 4 peaks per zone, raw histograms. Full live class
+  (`depz::Tmf8829`: firmware download, presets, measurements with merged
+  half-frames, clock-corrected distances and capture time) and codecs.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion.
   Full live class (`depz::Bno055`: configuration through CONFIG, calibration,
   scaled sample stream; verified on replays of real captures and live on a
@@ -86,7 +90,7 @@ with FetchContent (it fetches the whole repository, C SDK included):
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.5.0
+  GIT_TAG        v0.6.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -96,7 +100,7 @@ Conan, vcpkg, `add_subdirectory` and `find_package` are covered in the
 [guide](guide.md#build--link). The public headers live under `include/depz/` —
 include what you use (`#include "depz/device.hpp"`, `#include "depz/sr04.hpp"`);
 everything is in namespace `depz` (ToF under
-`depz::vl53l4` / `depz::vl53l8` / `depz::vl53l7` / `depz::vl53lx`, IMUs under
+`depz::vl53l4` / `depz::vl53l8` / `depz::vl53l7` / `depz::vl53lx` / `depz::tmf8829`, IMUs under
 `depz::bno086` / `depz::bno055`, datasets under `depz::dataset`).
 
 ## Where to next
@@ -107,7 +111,8 @@ everything is in namespace `depz` (ToF under
   [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
   [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
   [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
-  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [TMF8829](tmf8829/introduction.md) ·
+  [BNO055](bno055/introduction.md) ·
   [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
   introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](guide.md)** — the SDK-wide walkthrough: build & link, the live

@@ -22,7 +22,7 @@ Namespaces that serve several boards give each board a page with the same
 content: ``Vl53l7`` serves VL53L5CX / VL53L7CX / VL53L7CH (plus the VL53L8
 types it decodes with; the L7CH page also the CNH decode), ``Vl53lx`` serves
 VL53L0X / L1CX / L1CB / L3CX / L4CX (plus the contract-10 records it forwards
-to), and ``Bno055`` maps onto ``bno055``.
+to), ``Bno055`` maps onto ``bno055`` and ``Tmf8829`` onto ``tmf8829``.
 
 The ``///`` summaries in the source are the single source of truth, so the
 reference never drifts from the code. Regenerate with:
@@ -45,7 +45,7 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 # Python api.md grouping: the four sensors first, then the shared foundation.
 DOMAIN_ORDER = [
     "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
-    "firmware", "dataset", "transport", "protocol",
+    "tmf8829", "firmware", "dataset", "transport", "protocol",
 ]
 DOMAIN_TITLE = {
     "usb": "USB identity",
@@ -56,6 +56,7 @@ DOMAIN_TITLE = {
     "vl53lx": "VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)",
     "bno086": "BNO086 (IMU)",
     "bno055": "BNO055 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "firmware": "Firmware update",
     "dataset": "Datasets (record & replay)",
     "transport": "Transport",
@@ -71,6 +72,8 @@ FILE_PRIORITY = [
     "Vl53lxWire.cs", "Vl53lxProducts.cs", "Vl53lxDecode.cs",
     "Reports.cs", "Sh2Control.cs", "Shtp.cs",
     "Bno055Wire.cs", "Bno055Regs.cs",
+    "Tmf8829Wire.cs", "Tmf8829Frames.cs", "Tmf8829Builder.cs", "Tmf8829Clock.cs",
+    "Tmf8829Config.cs", "Tmf8829Firmware.cs",
     "FwDepz.cs",
     "Dataset.cs",
     "Framing.cs", "PacketParser.cs", "Events.cs", "Crc.cs", "CrcType.cs",
@@ -580,6 +583,8 @@ def _collect():
             domain = "vl53lx"
         elif folder == "Bno055":
             domain = "bno055"
+        elif folder == "Tmf8829":
+            domain = "tmf8829"
         elif folder == "Protocol":
             domain = {"Sr04.cs": "sr04", "FwDepz.cs": "firmware"}.get(base, "protocol")
         else:
@@ -652,6 +657,9 @@ def _sensor_targets(groups):
     if "bno055" in by:
         _t, syms = by["bno055"]
         targets.append(("bno055", "BNO055 (IMU)", syms, []))
+    if "tmf8829" in by:
+        _t, syms = by["tmf8829"]
+        targets.append(("tmf8829", "TMF8829 (dToF)", syms, []))
     return targets
 
 
@@ -672,6 +680,7 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[TMF8829](tmf8829/api.md) · "
         "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
         "[BNO086](bno086/api.md).",
         "",

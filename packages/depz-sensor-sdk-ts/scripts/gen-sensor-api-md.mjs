@@ -90,6 +90,17 @@ const SENSORS = [
     ]),
   },
   {
+    dir: "tmf8829",
+    entry: "typedoc/entry-tmf8829.ts",
+    header: header("TMF8829 (dToF)", [
+      "The public API for the TMF8829 multizone direct time-of-flight sensor:",
+      "the `Tmf8829` device and its measurement / config types, the frame",
+      "parser and half-frame merge, the clock model and capture time, presets",
+      "and config-page fields, and the register-bridge wire codecs. Discovery,",
+      `device-base, transport and other cross-sensor symbols live in the ${ROOT_LINK}.`,
+    ]),
+  },
+  {
     dir: "vl53l5cx",
     entry: "typedoc/entry-vl53l5cx.ts",
     header: header("VL53L5CX (ToF)", [

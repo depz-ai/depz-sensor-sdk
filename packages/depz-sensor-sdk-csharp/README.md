@@ -17,7 +17,8 @@ Full docs live under [`docs/`](docs/):
   [VL53L4CD](docs/vl53l4cd/api.md) · [VL53L4CX](docs/vl53l4cx/api.md) ·
   [VL53L5CX](docs/vl53l5cx/api.md) · [VL53L7CX](docs/vl53l7cx/api.md) ·
   [VL53L7CH](docs/vl53l7ch/api.md) · [VL53L8CX](docs/vl53l8cx/api.md) ·
-  [VL53L8CH](docs/vl53l8ch/api.md) · [BNO055](docs/bno055/api.md) ·
+  [VL53L8CH](docs/vl53l8ch/api.md) · [TMF8829](docs/tmf8829/api.md) ·
+  [BNO055](docs/bno055/api.md) ·
   [BNO085](docs/bno085/api.md) · [BNO086](docs/bno086/api.md)).
 - **Per sensor** — SR04 ([intro](docs/sr04/introduction.md) ·
   [guide](docs/sr04/guide.md)), VL53L0X ([intro](docs/vl53l0x/introduction.md) ·
@@ -31,7 +32,8 @@ Full docs live under [`docs/`](docs/):
   [guide](docs/vl53l7cx/guide.md)), VL53L7CH ([intro](docs/vl53l7ch/introduction.md) ·
   [guide](docs/vl53l7ch/guide.md)), VL53L8CX ([intro](docs/vl53l8cx/introduction.md) ·
   [guide](docs/vl53l8cx/guide.md)), VL53L8CH ([intro](docs/vl53l8ch/introduction.md) ·
-  [guide](docs/vl53l8ch/guide.md)), BNO055 ([intro](docs/bno055/introduction.md) ·
+  [guide](docs/vl53l8ch/guide.md)), TMF8829 ([intro](docs/tmf8829/introduction.md) ·
+  [guide](docs/tmf8829/guide.md)), BNO055 ([intro](docs/bno055/introduction.md) ·
   [guide](docs/bno055/guide.md)), BNO085 ([intro](docs/bno085/introduction.md) ·
   [guide](docs/bno085/guide.md)), BNO086 ([intro](docs/bno086/introduction.md) ·
   [guide](docs/bno086/guide.md)).
@@ -44,7 +46,7 @@ python3 scripts/gen_api_md.py    # from packages/depz-sensor-sdk-csharp
 
 ## Sensors
 
-The DEPZ line exposes **four** distinct user-facing sensor types. The ToF is two
+The DEPZ line exposes these user-facing sensor types. The VL53L8 ToF is two
 separate silicon variants that share one wire/frame layout:
 
 | Sensor        | What it is                              | USB product id            | SDK surface |
@@ -54,6 +56,7 @@ separate silicon variants that share one wire/frame layout:
 | **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | `Depz.Sensor.Vl53l7` |
 | **VL53L8CX**  | Base ToF multizone ranger               | dev-default (ST `0483:56DC`) | `Depz.Sensor.Vl53l8` |
 | **VL53L8CH**  | CX **plus** CNH histograms; own PID      | `0xED40`                  | `Depz.Sensor.Vl53l8` |
+| **TMF8829**   | ams-OSRAM dToF, 8×8 … 48×32 zones, up to 4 peaks, SPI register bridge | `0xED4C` | `Depz.Sensor.Tmf8829` |
 | **BNO055**    | 9-axis IMU, fusion on the chip, I2C register bridge | `0xEE0A`          | `Depz.Sensor.Bno055` |
 | **BNO085 / BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | `Depz.Sensor.Bno086` |
 
@@ -90,13 +93,16 @@ Verifiable, golden-vector-backed codecs are implemented for every sensor:
   recorded `.depzrec` replay.
 - **VL53L7CH / VL53L8CH CNH** — `Vl53l8Cnh.DecodeHistogram` unpacks the raw CNH
   block into per-aggregate histograms.
+- **TMF8829** — wire codecs, chunk reassembly, frame / pixel decode and the
+  half-frame merge, clock model and capture time, config-page fields, the
+  embedded ams sensor firmware (MIT).
 - **BNO055** — wire codecs, units / calibration status and profile / axis remap
   + placements / page-1 configs, register-window decode.
 - **BNO085 / BNO086** — SHTP framing/reassembly, SH-2 control encode, input-report and
   gyro-integrated-RV decode.
 
-For the 1D family, the VL53L5CX / L7CX / L7CH and the BNO055, initialising and
-streaming the board is done with the Python or TypeScript SDK; this SDK
+For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055,
+initialising and streaming the board is done with the Python or TypeScript SDK; this SDK
 decodes what they send and builds the command payloads.
 
 Plus the shared foundation: CRC KATs, DEPZ framing encode/decode, USB identity
@@ -111,8 +117,9 @@ faked, because they cannot be verified from golden vectors alone:
 - **Live VL53L8 ULD init/config** — `Vl53l8Uld`. The firmware-download +
   register-bridge (DCI) init sequence only means anything against real silicon
   over the CDC link, so it is out of scope for the decode SDK.
-- **Live drivers of the L5/L7 boards, the 1D family and the BNO055** — firmware
-  download and ULD configuration, the ST 1D drivers, the BNO055 session logic.
+- **Live drivers of the L5/L7 boards, the 1D family, the TMF8829 and the
+  BNO055** — firmware download and ULD configuration, the ST 1D drivers, the
+  TMF8829 sensor sequence, the BNO055 session logic.
 
 Everything else in the table above is fully implemented and covered.
 

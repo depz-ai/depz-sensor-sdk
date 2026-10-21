@@ -27,6 +27,8 @@ public final class UsbIds {
     /** VL53L4CD production USB PID. */
     public static final int PID_VL53L4CD = 0xED45; // 60741
     public static final int PID_BNO086 = 0xEE08; // 60936
+    /** TMF8829 dToF production USB PID (catalog p_TM88). */
+    public static final int PID_TMF8829 = 0xED4C; // 60748
 
     /** PID → sensor-model hint. Informational: the protocol probe is authoritative. */
     public static final Map<Integer, String> DEPZ_PID_MODEL;
@@ -46,6 +48,7 @@ public final class UsbIds {
         m.put(0xED49, "vl53l7cx"); // 60745
         m.put(0xED4A, "vl53l7ch"); // 60746
         m.put(PID_VL53L8CX, "vl53l8cx");
+        m.put(PID_TMF8829, "tmf8829");
         m.put(PID_BNO086, "bno086");
         m.put(0xEE09, "bno085"); // 60937
         m.put(0xEE0A, "bno055"); // 60938

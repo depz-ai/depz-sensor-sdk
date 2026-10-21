@@ -6,7 +6,7 @@ Regenerate with `python3 scripts/gen_api_md.py` from the crate root.
 Edit the doc-comments in the source, not this file.
 
 Each sensor also has a focused reference with just its own symbols:
-[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
+[SR04](sr04/api.md) · [VL53L0X](vl53l0x/api.md) · [VL53L1CX](vl53l1cx/api.md) · [VL53L1CB](vl53l1cb/api.md) · [VL53L3CX](vl53l3cx/api.md) · [VL53L4CD](vl53l4cd/api.md) · [VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · [VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · [VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · [TMF8829](tmf8829/api.md) · [BNO055](bno055/api.md) · [BNO085](bno085/api.md) · [BNO086](bno086/api.md).
 
 ## Contents
 
@@ -18,6 +18,7 @@ Each sensor also has a focused reference with just its own symbols:
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`pack_set_addr_width`](#pack_set_addr_width), [`pack_start_stream`](#pack_start_stream), [`Vl53lxInfo`](#vl53lxinfo), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`DieVariant`](#dievariant), [`ShortBlock`](#shortblock), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw), [`DriverKind`](#driverkind), [`DRIVER_KINDS`](#driver_kinds), [`BusParams`](#busparams), [`Product`](#product), [`PRODUCTS`](#products), [`product`](#product), [`product_from_board_name`](#product_from_board_name), [`Vl53lxClass`](#vl53lxclass), [`resolve_product`](#resolve_product), [`resolve_class`](#resolve_class)
 - **BNO086 (IMU)**: [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`pack_shtp_header`](#pack_shtp_header), [`unpack_shtp_header`](#unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`build_frame`](#build_frame), [`ShtpLayer`](#shtplayer)
 - **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
+- **TMF8829 (dToF)**: [`Tmf8829Measurement`](#tmf8829measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`FT_NAMES`](#ft_names), [`flag_names`](#flag_names), [`fp_subints`](#fp_subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`REG_CFG`](#reg_cfg), [`CFG_SIZE`](#cfg_size), [`PRESETS`](#presets), [`PRESET_KILO_ITERATIONS`](#preset_kilo_iterations), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`preset_cmd`](#preset_cmd), [`preset_kilo_iterations`](#preset_kilo_iterations), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`cfg_field`](#cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`FIRMWARE_IMAGE`](#firmware_image), [`FIRMWARE_LICENSE`](#firmware_license), [`firmware_image`](#firmware_image), [`firmware_words`](#firmware_words), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_WARNINGS`](#frame_warnings), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`fp_grid`](#fp_grid), [`fp_name`](#fp_name), [`frame_rows`](#frame_rows), [`FrameError`](#frameerror), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`pixel_size`](#pixel_size), [`parse_results`](#parse_results), [`parse_results_info`](#parse_results_info), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe)
 - **Bootloader / firmware update**: [`HEADER_SIZE`](#header_size), [`MAGIC`](#magic), [`FwdepzHeader`](#fwdepzheader), [`FwdepzError`](#fwdepzerror), [`parse`](#parse)
 - **Datasets (record & replay)**: [`DatasetError`](#dataseterror), [`Device`](#device), [`RecordValue`](#recordvalue), [`Record`](#record), [`Dataset`](#dataset)
 - **Transport**: [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`FramingError`](#framingerror), [`payload_crc_bytes`](#payload_crc_bytes), [`build_packet`](#build_packet), [`Packet`](#packet), [`Event`](#event), [`PacketParser`](#packetparser)
@@ -41,6 +42,9 @@ pub enum SensorType {
     /// BNO055 9-axis IMU (`APP_BNO055` register bridge, contract 13).
     Bno055,
     Bno086,
+    /// TMF8829 multizone dToF (`APP_TMF8829` SPI register bridge, contract 14;
+    /// the host runs the sensor).
+    Tmf8829,
     Unknown,
 }
 ```
@@ -111,6 +115,7 @@ pub const PID_SR04: u16 = 0xEC78; // 60536 — HC-SR04 ultrasonic
 pub const PID_VL53L8CH: u16 = 0xED40; // 60736 — VL53L8CH ToF
 pub const PID_VL53L4CD: u16 = 0xED45; // 60741 — VL53L4CD ToF
 pub const PID_VL53L8CX: u16 = 0xED4B; // 60747 — VL53L8CX ToF (hw-verified)
+pub const PID_TMF8829: u16 = 0xED4C; // 60748 — TMF8829 dToF (catalog p_TM88)
 pub const PID_BNO086: u16 = 0xEE08; // 60936 — BNO086 IMU
 
 /// Inclusive PID range under `DEPZ_USB_VID` treated as candidate DEPZ sensors.
@@ -140,6 +145,7 @@ const PID_MODEL: &[(u16, &str)] = &[
     (0xED49, "vl53l7cx"), // 60745
     (0xED4A, "vl53l7ch"), // 60746
     (PID_VL53L8CX, "vl53l8cx"),
+    (PID_TMF8829, "tmf8829"),
     (PID_BNO086, "bno086"),
     (0xEE09, "bno085"), // 60937
     (0xEE0A, "bno055"), // 60938
@@ -4092,6 +4098,1234 @@ Unpack whatever channels the register window starting at `addr` holds
 (offsets are `reg − addr`). `data` is the block as read — e.g.
 [`crate::bno055::StreamData::data`] with its `addr`.
 
+## TMF8829 (dToF)
+
+### Tmf8829Measurement
+
+```rust
+pub struct Tmf8829Measurement {
+    /// Capture time, MCU µs (floor mean of the half-frame captures).
+    pub timestamp_us: i64,
+    /// `FT_*` of all its results frames (OR).
+    pub flags: u8,
+    pub fp_mode: u8,
+    pub f_number: u32,
+    pub results: PixelResults,
+    pub distance_mm: Option<Vec<f64>>,
+    pub frames: Vec<FrameInfo>,
+    pub times: Vec<FrameTime>,
+    pub histograms: Vec<HistogramFrame>,
+    /// 65 B each, zero pre-header.
+    pub ref_frames: Vec<Vec<u8>>,
+    pub problems: Vec<String>,
+}
+```
+
+One measurement: its results frame (8x8, 16x16) or both half-frames
+(32x32, 48x32) merged, with the histogram / ref-SPAD frames before it.
+
+`distance_mm` is flat `[peaks][rows][cols]`, clock-corrected, in mm
+(`None` when the result format has no peaks). `results` keeps the raw
+sensor integers. `problems` lists what went wrong since the previous
+measurement.
+
+#### Tmf8829Measurement::shape
+
+```rust
+pub fn shape(&self) -> (usize, usize)
+```
+
+(rows, cols) of the full focal plane.
+
+#### Tmf8829Measurement::peaks
+
+```rust
+pub fn peaks(&self) -> usize
+```
+
+#### Tmf8829Measurement::temperature_c
+
+```rust
+pub fn temperature_c(&self) -> i8
+```
+
+Sensor die temperature (header byte 0), °C.
+
+### distance_mm
+
+```rust
+pub fn distance_mm(results: &PixelResults, ratio: f64, in_mm: bool) -> Option<Vec<f64>>
+```
+
+Raw distances → mm, clock-corrected (×ratio; ÷4 for 0.25 mm units).
+
+### MeasurementBuilder
+
+```rust
+pub struct MeasurementBuilder {
+    pub clock: SensorClock,
+    pub timer: CaptureTimer,
+    /// Frames that failed to parse (or of an unknown kind / corrupt results).
+    pub parse_errors: u64,
+    pending: Vec<(FrameInfo, Vec<u8>)>,
+    hist: Vec<HistogramFrame>,
+    refs: Vec<Vec<u8>>,
+    half: Option<(FrameInfo, PixelResults, FrameTime)>,
+    problems: Vec<String>,
+}
+```
+
+Histogram frames between two results frames belong to the second; a
+ref-SPAD frame comes right before its results frame (each half-frame has
+its own). 32x32/48x32: the first half (layout 0x40 clear) holds the even
+rows. Call [`MeasurementBuilder::reset`] at the start of every stream:
+the clock model and T1 are per stream. Mirrors the Python builder,
+problem texts included.
+
+#### MeasurementBuilder::new
+
+```rust
+pub fn new() -> Self
+```
+
+#### MeasurementBuilder::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+#### MeasurementBuilder::add
+
+```rust
+pub fn add(
+    &mut self,
+    raw: &[u8],
+    timestamp_us: u64,
+    edge_us: u64,
+) -> Option<Tmf8829Measurement>
+```
+
+One frame with the MCU time of its header read and its INT edge
+(0 = none) → the measurement it completes, or `None`.
+
+### NOMINAL_Q16
+
+```rust
+pub const NOMINAL_Q16: u32 = 8 << 16;
+```
+
+SYSTICK 125 kHz = 8 MCU µs per tick, Q16.
+
+### CLOCK_WINDOW_MIN_US
+
+```rust
+pub const CLOCK_WINDOW_MIN_US: i64 = 200_000;
+```
+
+First ratio estimate after this span.
+
+### CLOCK_WINDOW_SLIDE_US
+
+```rust
+pub const CLOCK_WINDOW_SLIDE_US: i64 = 1_000_000;
+```
+
+Then a sliding 1..2 s window.
+
+### EDGE_LATE_US
+
+```rust
+pub const EDGE_LATE_US: i64 = 2000;
+```
+
+### FT_NOMINAL
+
+```rust
+pub const FT_NOMINAL: u8 = 0x01;
+```
+
+Clock ratio not measured yet (nominal 8 µs/tick used).
+
+### FT_CLOCK_RESET
+
+```rust
+pub const FT_CLOCK_RESET: u8 = 0x02;
+```
+
+Clock model restarted at this frame (SYSTICK jump).
+
+### FT_EDGE_LATE
+
+```rust
+pub const FT_EDGE_LATE: u8 = 0x04;
+```
+
+INT edge > 2 ms later after t1 than usual in this stream.
+
+### FT_STALLED
+
+```rust
+pub const FT_STALLED: u8 = 0x08;
+```
+
+Sub-integrations not back to back (histogram FIFO wait).
+
+### FT_T1_UNSURE
+
+```rust
+pub const FT_T1_UNSURE: u8 = 0x10;
+```
+
+Histograms + 32x32/48x32: T1 may be too long, centre late.
+
+### FT_NAMES
+
+```rust
+pub const FT_NAMES: &[(u8, &str)] = &[
+    (FT_NOMINAL, "nominal"),
+    (FT_CLOCK_RESET, "clock_reset"),
+    (FT_EDGE_LATE, "edge_late"),
+    (FT_STALLED, "stalled"),
+    (FT_T1_UNSURE, "t1_unsure"),
+];
+```
+
+### flag_names
+
+```rust
+pub fn flag_names(flags: u8) -> Vec<&'static str>
+```
+
+Names of the `FT_*` bits set in `flags`.
+
+### fp_subints
+
+```rust
+pub fn fp_subints(fp_mode: u8) -> u32
+```
+
+Sub-integrations per results frame by `fp_mode` (unknown → 2).
+
+### SensorClock
+
+```rust
+pub struct SensorClock {
+    /// MCU µs per sensor tick, Q16 ([`NOMINAL_Q16`] until measured).
+    pub ratio_q16: u32,
+    /// True until the ratio is first measured (or after a reset).
+    pub nominal: bool,
+    valid: bool,
+    last: (u64, u32),
+    anchor: (u64, u32),
+    mid: Option<(u64, u32)>,
+}
+```
+
+Sensor SYSTICK (125 kHz) → MCU µs, fed one clock pair per frame (the MCU
+time of the header read and the pre-header SYSTICK sampled by it). The
+ratio is taken over a sliding 1..2 s window, first after 200 ms; it is
+also the distance correction (ams `tmf8829ClockCorrection`).
+
+#### SensorClock::new
+
+```rust
+pub fn new() -> Self
+```
+
+#### SensorClock::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+Restart the model — call at every stream start.
+
+#### SensorClock::ratio
+
+```rust
+pub fn ratio(&self) -> f64
+```
+
+MCU/sensor clock ratio (≈ 1.015): distances are scaled by it.
+
+#### SensorClock::add
+
+```rust
+pub fn add(&mut self, us: u64, tick: u32) -> u8
+```
+
+Add a pair → [`FT_CLOCK_RESET`] if it does not fit the model (which
+then restarts from it), else 0.
+
+#### SensorClock::to_us
+
+```rust
+pub fn to_us(&self, pair_us: u64, pair_tick: u32, tick: u32) -> i64
+```
+
+SYSTICK `tick` → MCU µs through the pair (`pair_us`, `pair_tick`):
+`pair_us + ((s32(tick − pair_tick) × ratio_q16) >> 16)`.
+
+### FrameTime
+
+```rust
+pub struct FrameTime {
+    /// Centre of the capture window.
+    pub timestamp_us: i64,
+    /// `FT_*` bits.
+    pub flags: u8,
+    /// Sub-integration length used.
+    pub t1_len_us: u32,
+    /// Start of the first sub-integration.
+    pub t0_us: i64,
+    /// Start of the last one.
+    pub t1_us: i64,
+    /// INT edge credited to the frame, 0 = none.
+    pub edge_us: u64,
+    /// MCU time of the header read (the clock pair).
+    pub pair_us: u64,
+    /// Clock ratio after this frame.
+    pub ratio_q16: u32,
+}
+```
+
+Capture time of one results frame, MCU µs.
+
+### CaptureTimer
+
+```rust
+pub struct CaptureTimer {
+    lag_min: Option<i64>,
+    hist_seen: bool,
+    sub_min: u32,
+}
+```
+
+When a results frame was captured. A results frame is N equal
+sub-integrations back to back; the footer has the SYSTICK of the start of
+the first (t0) and of the last (t1). The window is `[t0, t1 + T1]`, T1 the
+stream's shortest `(t1 − t0)/(N − 1)`; its centre is the frame time.
+
+Holds only its own per-stream state; the [`SensorClock`] it reads is
+passed to [`CaptureTimer::results`].
+
+#### CaptureTimer::new
+
+```rust
+pub fn new() -> Self
+```
+
+#### CaptureTimer::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+Restart — call at every stream start.
+
+#### CaptureTimer::histograms
+
+```rust
+pub fn histograms(&mut self)
+```
+
+A histogram frame was seen in the stream.
+
+#### CaptureTimer::results
+
+```rust
+pub fn results(
+    &mut self,
+    clock: &SensorClock,
+    fp_mode: u8,
+    systick: u32,
+    t0_tick: u32,
+    t1_tick: u32,
+    pair_us: u64,
+    edge_us: u64,
+    mut flags: u8,
+) -> FrameTime
+```
+
+Capture time of a results frame. `flags` is what
+[`SensorClock::add`] returned for this frame's pair.
+
+#### CaptureTimer::results_frame
+
+```rust
+pub fn results_frame(
+    &mut self,
+    clock: &SensorClock,
+    f: &FrameInfo,
+    pair_us: u64,
+    edge_us: u64,
+    flags: u8,
+) -> FrameTime
+```
+
+[`CaptureTimer::results`] from a parsed results frame.
+
+### Tmf8829Cmd
+
+```rust
+pub enum Tmf8829Cmd {
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    StartStream = 0x35,
+    StopStream = 0x36,
+    GetInfo = 0x37,
+}
+```
+
+TMF8829 host→device command opcodes.
+
+### Tmf8829Rpt
+
+```rust
+pub enum Tmf8829Rpt {
+    RegData = 0x91,
+    /// No echoed cmd byte: a host matching replies by `payload[0] == cmd`
+    /// must exempt it.
+    Info = 0x92,
+    Frame = 0x93,
+    Event = 0x94,
+}
+```
+
+TMF8829 device→host report opcodes.
+
+### EV_INT
+
+```rust
+pub const EV_INT: u8 = 0;
+```
+
+`RPT_TMF_EVENT.code`: a MOTION/PROXIMITY interrupt, no frame; its bits
+already cleared.
+
+### EV_BAD_HEADER
+
+```rust
+pub const EV_BAD_HEADER: u8 = 1;
+```
+
+`RPT_TMF_EVENT.code`: a frame header refused, the frame not read. Expected
+exactly once on STOP mid histogram dump (SDKs swallow it); otherwise the
+sensor is lost — re-run init.
+
+### READ_MAX
+
+```rust
+pub const READ_MAX: usize = 1024;
+```
+
+`TMF_READ_REG` `len` 1..=1024.
+
+### WRITE_MAX
+
+```rust
+pub const WRITE_MAX: usize = 1023;
+```
+
+`TMF_WRITE_REG` N 1..=1023 (1024 B command buffer minus the address).
+
+### CHUNK_MAX
+
+```rust
+pub const CHUNK_MAX: usize = 1024;
+```
+
+Frame bytes per `RPT_TMF_FRAME` chunk.
+
+### INT_RESULTS
+
+```rust
+pub const INT_RESULTS: u8 = 0x01;
+```
+
+`INT_STATUS` bits the bridge serves (`TMF_START_STREAM` `int_mask`).
+
+### INT_MOTION
+
+```rust
+pub const INT_MOTION: u8 = 0x02;
+```
+
+### INT_PROXIMITY
+
+```rust
+pub const INT_PROXIMITY: u8 = 0x04;
+```
+
+### INT_HISTOGRAMS
+
+```rust
+pub const INT_HISTOGRAMS: u8 = 0x08;
+```
+
+### INT_MASK_ALL
+
+```rust
+pub const INT_MASK_ALL: u8 = 0x0F;
+```
+
+### SF_REF_FRAME
+
+```rust
+pub const SF_REF_FRAME: u8 = 0x01;
+```
+
+`TMF_START_STREAM` flags: emit the 60-byte ref-SPAD frame (behind a zero
+5-byte pre-header) before each results frame.
+
+### REG_DATA_HEADER_SIZE
+
+```rust
+pub const REG_DATA_HEADER_SIZE: usize = 9;
+```
+
+### FRAME_CHUNK_HEADER_SIZE
+
+```rust
+pub const FRAME_CHUNK_HEADER_SIZE: usize = 21;
+```
+
+### EVENT_SIZE
+
+```rust
+pub const EVENT_SIZE: usize = 12;
+```
+
+### INFO_SIZE
+
+```rust
+pub const INFO_SIZE: usize = 25;
+```
+
+### pack_read_reg
+
+```rust
+pub fn pack_read_reg(addr: u8, len: u16) -> Result<[u8; 3], CodecError>
+```
+
+`TMF_READ_REG` payload: `addr u8, len u16 LE`. A read reaching `0xFF`
+(the FIFO port) keeps streaming from the FIFO — there is no
+`addr + len ≤ 0x100` check.
+
+### pack_write_reg
+
+```rust
+pub fn pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError>
+```
+
+`TMF_WRITE_REG` payload: `addr u8, data[1..=1023]`.
+
+### pack_start_stream
+
+```rust
+pub fn pack_start_stream(int_mask: u8, flags: u8) -> Result<[u8; 2], CodecError>
+```
+
+`TMF_START_STREAM` payload: `int_mask u8, flags u8`. `int_mask` a
+non-zero subset of [`INT_MASK_ALL`], `flags` only [`SF_REF_FRAME`].
+
+### pack_stop_stream
+
+```rust
+pub fn pack_stop_stream() -> [u8; 0]
+```
+
+`TMF_STOP_STREAM` payload (empty).
+
+### pack_get_info
+
+```rust
+pub fn pack_get_info() -> [u8; 0]
+```
+
+`TMF_GET_INFO` payload (empty).
+
+### RegData
+
+```rust
+pub struct RegData {
+    pub timestamp_us: u64,
+    pub data: Vec<u8>,
+}
+```
+
+A decoded `RPT_TMF_REG_DATA`: register bytes and the MCU time the SPI
+read completed. The echoed cmd byte is checked (must be 0x32).
+
+#### RegData::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<RegData, CodecError>
+```
+
+### Tmf8829Info
+
+```rust
+pub struct Tmf8829Info {
+    pub int_edges: u32,
+    pub frames: u32,
+    pub frames_aborted: u32,
+    pub frame_errors: u32,
+    pub spi_timeouts: u32,
+    /// INT pin level now, 0 = asserted.
+    pub int_level: u8,
+    pub streaming: bool,
+    pub int_mask: u8,
+    pub last_int_status: u8,
+    pub last_fifo_status: u8,
+}
+```
+
+A decoded `RPT_TMF_INFO` (25 B, no echoed cmd byte): bridge state only,
+the sensor is never touched. `int_edges` runs from MCU power-up; the frame
+counters restart at `TMF_START_STREAM`.
+
+#### Tmf8829Info::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<Tmf8829Info, CodecError>
+```
+
+### FrameChunk
+
+```rust
+pub struct FrameChunk {
+    pub timestamp_us: u64,
+    pub full_size: u16,
+    pub offset: u16,
+    pub frame_seq: u8,
+    pub edge_us: u64,
+    pub data: Vec<u8>,
+}
+```
+
+One `RPT_TMF_FRAME` chunk. `timestamp_us` + the frame's pre-header
+SYSTICK are a clock pair (not the capture time); `edge_us` is the INT
+falling edge credited to the frame, 0 = none. `timestamp_us`,
+`full_size`, `frame_seq` and `edge_us` are the same in every chunk of a
+frame.
+
+#### FrameChunk::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<FrameChunk, CodecError>
+```
+
+### Tmf8829Event
+
+```rust
+pub struct Tmf8829Event {
+    pub timestamp_us: u64,
+    pub int_status: u8,
+    pub code: u8,
+    /// Header id byte (BAD_HEADER), else 0.
+    pub frame_id: u8,
+    /// Pre-header byte (BAD_HEADER), else 0.
+    pub fifo_status: u8,
+}
+```
+
+A decoded `RPT_TMF_EVENT` (12 B). `int_status` is INT_STATUS as read
+(unmasked); `code` is [`EV_INT`] or [`EV_BAD_HEADER`].
+
+#### Tmf8829Event::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<Tmf8829Event, CodecError>
+```
+
+### RawFrame
+
+```rust
+pub struct RawFrame {
+    pub timestamp_us: u64,
+    pub edge_us: u64,
+    pub frame_seq: u8,
+    pub data: Vec<u8>,
+}
+```
+
+A reassembled frame: the sensor bytes from register 0xFA on.
+
+### FrameReassembler
+
+```rust
+pub struct FrameReassembler {
+    pub completed: u64,
+    pub discarded: u64,
+    pub seq_gaps: u64,
+    buf: Vec<u8>,
+    head: Option<Head>,
+    next_seq: Option<u8>,
+}
+```
+
+Rebuilds frames from `RPT_TMF_FRAME` chunks (contract 14 §2): reset on
+offset 0; append only a chunk of the same `frame_seq` (and `full_size`)
+at the expected offset; complete at `full_size`. Never stitches chunks of
+different `frame_seq`. `seq_gaps` counts frames the bridge dropped
+(`frame_seq` jumps, u8 wrap). Mirrors the Python `FrameReassembler`.
+
+#### FrameReassembler::new
+
+```rust
+pub fn new() -> Self
+```
+
+#### FrameReassembler::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+Forget everything — call at every stream start (`frame_seq` restarts at 0).
+
+#### FrameReassembler::feed
+
+```rust
+pub fn feed(&mut self, chunk: FrameChunk) -> Option<RawFrame>
+```
+
+Feed one chunk; returns the frame it completes.
+
+### REG_CFG
+
+```rust
+pub const REG_CFG: u8 = 0x22;
+```
+
+Config page 0x22..=0xDF.
+
+### CFG_SIZE
+
+```rust
+pub const CFG_SIZE: usize = 0xDF - REG_CFG as usize + 1;
+```
+
+190 B.
+
+### PRESETS
+
+```rust
+pub const PRESETS: &[(&str, u8)] = &[
+    ("8x8", 0x40),
+    ("8x8-lr", 0x41), // long range
+    ("8x8-ha", 0x42), // high accuracy
+    ("16x16", 0x43),
+    ("16x16-ha", 0x44),
+    ("32x32", 0x45),
+    ("32x32-ha", 0x46),
+    ("48x32", 0x47),
+    ("48x32-ha", 0x48),
+    ("8x8-xr", 0x49), // extended range, distances in mm
+];
+```
+
+Preset name → load command (each loads its config page; then
+LOAD_CONFIG_PAGE).
+
+### PRESET_KILO_ITERATIONS
+
+```rust
+pub const PRESET_KILO_ITERATIONS: &[(&str, u16)] = &[
+    ("8x8", 586),
+    ("8x8-lr", 586),
+    ("8x8-ha", 586),
+    ("8x8-xr", 586),
+    ("16x16", 586),
+    ("16x16-ha", 586),
+    ("32x32", 2344),
+    ("32x32-ha", 2344),
+    ("48x32", 3516),
+    ("48x32-ha", 3516),
+];
+```
+
+The preset's own `kilo_iterations` (a preset rescales a stale value, it
+does not reset it — SDKs write it on every configure).
+
+### DEFAULT_PERIOD_MS
+
+```rust
+pub const DEFAULT_PERIOD_MS: u16 = 33;
+```
+
+The sensor's own `period_ms` after init.
+
+### preset_cmd
+
+```rust
+pub fn preset_cmd(name: &str) -> Option<u8>
+```
+
+Load command of a preset by name.
+
+### preset_kilo_iterations
+
+```rust
+pub fn preset_kilo_iterations(name: &str) -> Option<u16>
+```
+
+The preset's own `kilo_iterations` by name.
+
+### CfgField
+
+```rust
+pub struct CfgField {
+    pub name: &'static str,
+    pub reg: u8,
+    pub shift: u8,
+    pub width: u8,
+}
+```
+
+One named config-page field: register, bit shift, width in bits
+(width 16 = little-endian register pair).
+
+### CFG_FIELDS
+
+```rust
+pub const CFG_FIELDS: &[CfgField] = &[
+    fld("period_ms", 0x22, 0, 16),
+    fld("kilo_iterations", 0x24, 0, 16),
+    fld("fp_mode", 0x26, 0, 3),
+    fld("nr_peaks", 0x2A, 0, 3),
+    fld("signal_strength", 0x2A, 3, 1),
+    fld("noise_strength", 0x2A, 4, 1),
+    fld("xtalk", 0x2A, 5, 1),
+    fld("dump_histograms", 0x2B, 0, 1),
+    fld("ref_spad_frame", 0x2C, 0, 1),
+    fld("power_modes", 0x2E, 0, 8),
+    fld("ha_kilo_iterations", 0x4A, 0, 16),
+    fld("dual_mode", 0x4C, 0, 2),
+    fld("fov_correction", 0x78, 0, 4),
+    fld("distance_in_mm", 0x8F, 0, 1),
+];
+```
+
+The contract's field table. The raw page is always available for
+anything else.
+
+### cfg_field
+
+```rust
+pub fn cfg_field(name: &str) -> Option<&'static CfgField>
+```
+
+A field of [`CFG_FIELDS`] by name.
+
+### cfg_get
+
+```rust
+pub fn cfg_get(page: &[u8], name: &str) -> Result<u16, CodecError>
+```
+
+Read a named field from a config page (register 0x22 at index 0).
+
+### cfg_set
+
+```rust
+pub fn cfg_set(page: &mut [u8], name: &str, value: u32) -> Result<(), CodecError>
+```
+
+Write a named field into a config page; refuses a value that does not fit
+the field width (the page is then untouched).
+
+### config_fields
+
+```rust
+pub fn config_fields(page: &[u8]) -> Vec<(&'static str, u16)>
+```
+
+Every named field of a config page, in table order.
+
+### FIRMWARE_LOAD_ADDR
+
+```rust
+pub const FIRMWARE_LOAD_ADDR: u32 = 0x0001_0000;
+```
+
+Where the sensor bootloader loads the image.
+
+### FIRMWARE_IMAGE
+
+```rust
+pub static FIRMWARE_IMAGE: &[u8] = include_bytes!("data/tmf8829_application.bin");
+```
+
+The image bytes.
+
+### FIRMWARE_LICENSE
+
+```rust
+pub static FIRMWARE_LICENSE: &str = include_str!("data/LICENSES-MIT.TXT");
+```
+
+The image's MIT license (ams-OSRAM), to be shipped with any binary that
+embeds it.
+
+### firmware_image
+
+```rust
+pub fn firmware_image() -> &'static [u8]
+```
+
+The sensor firmware image downloaded by init (14 444 B).
+
+### firmware_words
+
+```rust
+pub fn firmware_words() -> u16
+```
+
+Image size in 32-bit words, as the bootloader `W_FIFO_BOTH` takes it.
+
+### PRE_HEADER_SIZE
+
+```rust
+pub const PRE_HEADER_SIZE: usize = 5;
+```
+
+### HEADER_SIZE
+
+```rust
+pub const HEADER_SIZE: usize = 16;
+```
+
+### FOOTER_SIZE
+
+```rust
+pub const FOOTER_SIZE: usize = 12;
+```
+
+### FRAME_HEAD
+
+```rust
+pub const FRAME_HEAD: usize = PRE_HEADER_SIZE + HEADER_SIZE;
+```
+
+The 21 B the bridge reads at 0xFA (pre-header + header).
+
+### FRAME_EOF
+
+```rust
+pub const FRAME_EOF: u16 = 0xE0F7;
+```
+
+### FID_MASK
+
+```rust
+pub const FID_MASK: u8 = 0xF0;
+```
+
+### FID_RESULTS
+
+```rust
+pub const FID_RESULTS: u8 = 0x10;
+```
+
+### FID_HISTOGRAMS
+
+```rust
+pub const FID_HISTOGRAMS: u8 = 0x20;
+```
+
+### FID_REF_SPAD
+
+```rust
+pub const FID_REF_SPAD: u8 = 0x30;
+```
+
+### LAYOUT_PEAKS
+
+```rust
+pub const LAYOUT_PEAKS: u8 = 0x07;
+```
+
+### LAYOUT_SIGNAL
+
+```rust
+pub const LAYOUT_SIGNAL: u8 = 0x08;
+```
+
+### LAYOUT_NOISE
+
+```rust
+pub const LAYOUT_NOISE: u8 = 0x10;
+```
+
+### LAYOUT_XTALK
+
+```rust
+pub const LAYOUT_XTALK: u8 = 0x20;
+```
+
+### LAYOUT_SUBFRAME
+
+```rust
+pub const LAYOUT_SUBFRAME: u8 = 0x40;
+```
+
+32x32/48x32: set on the second (odd-row) half-frame.
+
+### FRAME_VALID
+
+```rust
+pub const FRAME_VALID: u8 = 0x01;
+```
+
+### FRAME_ABORTED
+
+```rust
+pub const FRAME_ABORTED: u8 = 0xC0;
+```
+
+### FRAME_WARNINGS
+
+```rust
+pub const FRAME_WARNINGS: &[(u8, &str)] = &[
+    (0x08, "HV_CP_OVERLOAD"),
+    (0x10, "VCDRV_OVERLOAD"),
+    (0x20, "VCDRV_BURST_EXCEEDED"),
+];
+```
+
+`frame_status` warning bits, in the order `problems()` reports them.
+
+### FOOTER_DIST_IN_MM
+
+```rust
+pub const FOOTER_DIST_IN_MM: u8 = 0x01;
+```
+
+`footer.reserved` b0: distances in mm, else 0.25 mm.
+
+### FIFO_TX_UNDERRUN
+
+```rust
+pub const FIFO_TX_UNDERRUN: u8 = 0x10;
+```
+
+### FIFO_RX_OVERRUN
+
+```rust
+pub const FIFO_RX_OVERRUN: u8 = 0x20;
+```
+
+### fp_grid
+
+```rust
+pub fn fp_grid(fp_mode: u8) -> Option<(usize, usize)>
+```
+
+`fp_mode` → (rows, cols) of the full focal plane.
+
+### fp_name
+
+```rust
+pub fn fp_name(fp_mode: u8) -> Option<&'static str>
+```
+
+`fp_mode` → its name (`8x8A`, `8x8B`, `16x16`, `32x32`, `32x32s`, `48x32`).
+
+### frame_rows
+
+```rust
+pub fn frame_rows(fp_mode: u8) -> Option<(usize, usize)>
+```
+
+(rows, cols) one results frame carries: half the rows for 32x32/48x32.
+
+### FrameError
+
+```rust
+pub struct FrameError(pub String);
+```
+
+A frame whose bytes do not match its own header (message as the
+reference SDK words it).
+
+### FrameInfo
+
+```rust
+pub struct FrameInfo {
+    pub fifo_status: u8,
+    /// Sensor SYSTICK (125 kHz) sampled at the header read.
+    pub systick: u32,
+    pub id: u8,
+    pub layout: u8,
+    pub payload: u16,
+    pub f_number: u32,
+    pub temperature: [i8; 3],
+    pub bdv: u8,
+    pub ref_pos: [u16; 2],
+    /// SYSTICK at the start of the first sub-integration.
+    pub t0_integration: u32,
+    /// SYSTICK at the start of the last sub-integration.
+    pub t1_integration: u32,
+    pub frame_status: u8,
+    pub reserved: u8,
+    pub eof: u16,
+    /// Whole frame size, pre-header included.
+    pub size: usize,
+}
+```
+
+Pre-header, header and footer of one frame (any kind).
+
+#### FrameInfo::kind
+
+```rust
+pub fn kind(&self) -> u8
+```
+
+[`FID_RESULTS`], [`FID_HISTOGRAMS`] or [`FID_REF_SPAD`].
+
+#### FrameInfo::fp_mode
+
+```rust
+pub fn fp_mode(&self) -> u8
+```
+
+#### FrameInfo::is_second_half
+
+```rust
+pub fn is_second_half(&self) -> bool
+```
+
+#### FrameInfo::distance_in_mm
+
+```rust
+pub fn distance_in_mm(&self) -> bool
+```
+
+#### FrameInfo::problems
+
+```rust
+pub fn problems(&self) -> Vec<String>
+```
+
+What is wrong with the frame, human-readable; empty when fine.
+
+### frame_size
+
+```rust
+pub fn frame_size(head: &[u8]) -> Option<usize>
+```
+
+Full frame size (pre-header included) from its first 21 bytes
+(`5 + 4 + payload`); `None` if fewer than 9 bytes are given.
+
+### parse_frame
+
+```rust
+pub fn parse_frame(raw: &[u8]) -> Result<FrameInfo, FrameError>
+```
+
+Parse the pre-header, header and footer of a reassembled frame.
+
+### PixelResults
+
+```rust
+pub struct PixelResults {
+    pub peaks: usize,
+    /// Grid of these arrays (half the focal-plane rows for a half-frame).
+    pub rows: usize,
+    pub cols: usize,
+    pub distance: Option<Vec<u16>>,
+    pub snr: Option<Vec<u8>>,
+    pub signal: Option<Vec<u16>>,
+    pub noise: Option<Vec<u16>>,
+    pub xtalk: Option<Vec<u16>>,
+}
+```
+
+Decoded results of one frame or of a merged measurement.
+
+`distance`, `snr`, `signal` are flat `[peaks][rows][cols]`; `noise`,
+`xtalk` flat `[rows][cols]`. Raw sensor integers: distance in 0.25 mm (or
+mm with the footer flag), not yet clock-corrected. Absent fields are
+`None` (no peaks → no distance/snr/signal).
+
+#### PixelResults::shape
+
+```rust
+pub fn shape(&self) -> (usize, usize)
+```
+
+(rows, cols) of the arrays present; (0, 0) when the result format has
+no peaks, noise nor xtalk (as the reference SDK).
+
+#### PixelResults::distance_at
+
+```rust
+pub fn distance_at(&self, peak: usize, row: usize, col: usize) -> Option<u16>
+```
+
+Raw distance of `peak` at (`row`, `col`).
+
+### pixel_size
+
+```rust
+pub fn pixel_size(layout: u8) -> usize
+```
+
+Bytes of one results pixel for a `layout` byte.
+
+### parse_results
+
+```rust
+pub fn parse_results(raw: &[u8]) -> Result<PixelResults, FrameError>
+```
+
+Pixel results of one results frame, row-major.
+
+### parse_results_info
+
+```rust
+pub fn parse_results_info(raw: &[u8], f: &FrameInfo) -> Result<PixelResults, FrameError>
+```
+
+[`parse_results`] with the frame already parsed.
+
+### merge_halves
+
+```rust
+pub fn merge_halves(
+    first: &PixelResults,
+    second: &PixelResults,
+) -> Result<PixelResults, FrameError>
+```
+
+32x32/48x32: the first half-frame holds the even rows, the second the
+odd ones (`full[2i] = first[i]`, `full[2i+1] = second[i]`). Errors when
+the halves have different grids or result formats.
+
+### HistogramFrame
+
+```rust
+pub struct HistogramFrame {
+    pub info: FrameInfo,
+    pub raw: Vec<u8>,
+}
+```
+
+A raw histogram frame (25 377 B); decoding the bins is left to the
+caller (ams histogram layout).
+
+#### HistogramFrame::data
+
+```rust
+pub fn data(&self) -> &[u8]
+```
+
+The bytes between the header and the footer.
+
 ## Bootloader / firmware update
 
 ### HEADER_SIZE
@@ -4442,9 +5676,10 @@ pub enum Cmd {
     GetMcuTemperature = 0x07,
     GetPayloadCrcType = 0x08,
     SetPayloadCrcType = 0x09,
-    ThroughputTxStart = 0x1C,
-    ThroughputTxStop = 0x1D,
-    ThroughputRxData = 0x1E,
+    UsbTestTxStart = 0x1C,
+    UsbTestTxStop = 0x1D,
+    UsbTestRxData = 0x1E,
+    UsbTestStats = 0x1F,
     GetSyncPinConfig = 0x30,
     SetSyncPinConfig = 0x31,
 }
@@ -4462,7 +5697,8 @@ pub enum Rpt {
     Temperature = 0x83,
     SequenceError = 0x84,
     PayloadCrcType = 0x87,
-    ThroughputData = 0x88,
+    UsbTestData = 0x88,
+    UsbTestStats = 0x8F,
     SyncPinConfig = 0x90,
 }
 ```

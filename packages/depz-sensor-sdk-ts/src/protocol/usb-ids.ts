@@ -62,6 +62,7 @@ export const DEPZ_USB_MODELS: Readonly<Record<number, DepzUsbModel>> = {
   0xed49: { name: "vl53l7cx", sensorType: null }, // 60745
   0xed4a: { name: "vl53l7ch", sensorType: null }, // 60746
   0xed4b: { name: "vl53l8cx", sensorType: "vl53l8" }, // 60747 — VL53L8CX production PID, verified on hw: 1bcf:ed4b
+  0xed4c: { name: "tmf8829", sensorType: "tmf8829" }, // 60748 — TMF8829 dToF (catalog p_TM88)
   0xee08: { name: "bno086", sensorType: "bno086" }, // 60936 — verified on hw: 1bcf:ee08
   0xee09: { name: "bno085", sensorType: null }, // 60937
   0xee0a: { name: "bno055", sensorType: null }, // 60938

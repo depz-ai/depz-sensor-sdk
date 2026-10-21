@@ -21,14 +21,16 @@ and API reference:
 - **[VL53L7CH](vl53l7ch/introduction.md)** — the VL53L7CX with CNH histograms.
 - **[VL53L8CX](vl53l8cx/introduction.md)** — 8×8 ToF depth frames.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH histograms.
+- **[TMF8829](tmf8829/introduction.md)** — ams-OSRAM dToF depth grids from 8×8
+  to 48×32 zones, up to 4 peaks per zone, raw histograms.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion:
   orientation from one register block.
 - **[BNO085](bno085/introduction.md)** · **[BNO086](bno086/introduction.md)** —
   9-axis IMU: orientation and motion.
 
-The 1D family, the VL53L5CX / L7CX / L7CH and the BNO055 have the decode and
-codec layer in this crate; initialising and streaming them is done with the
-Python or TypeScript SDK.
+The 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055 have the
+decode and codec layer in this crate; initialising and streaming them is done
+with the Python or TypeScript SDK (the TMF8829 also with the C and C++ SDKs).
 
 ## Quickstart
 
@@ -63,7 +65,8 @@ for ev in parser.feed(&rx_bytes) {
   [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
   [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
   [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
-  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [TMF8829](tmf8829/introduction.md) ·
+  [BNO055](bno055/introduction.md) ·
   [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
   introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](guide.md)** — the SDK-wide walkthrough: getting started, the

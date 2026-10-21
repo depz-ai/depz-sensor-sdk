@@ -161,6 +161,7 @@ int depz_sr04_attach(depz_device *dev);
 int depz_vl53l4cd_attach(depz_device *dev);
 int depz_vl53l8_attach(depz_device *dev, depz_vl53l8_model model);
 int depz_bno055_attach(depz_device *dev);
+int depz_tmf8829_attach(depz_device *dev);
 int depz_bno086_attach(depz_device *dev);
 /* usb_model / device_name (either may be NULL) pick the product class. */
 int depz_vl53lx_attach(depz_device *dev, const char *usb_model, const char *device_name);

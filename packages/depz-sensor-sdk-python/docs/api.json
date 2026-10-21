@@ -15008,6 +15008,1917 @@
       ]
     },
     {
+      "title": "TMF8829 (dToF)",
+      "symbols": [
+        {
+          "name": "Tmf8829",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.device.DeviceBase"
+          ],
+          "parameters": [
+            {
+              "name": "port_or_link",
+              "kind": "positional_or_keyword",
+              "annotation": "str | depz_sensor_sdk.transport.link.Link"
+            },
+            {
+              "name": "timeout",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.2
+            },
+            {
+              "name": "tx_crc_type",
+              "kind": "keyword_only",
+              "annotation": "depz_sensor_sdk.transport.framing.CrcType",
+              "default": 0
+            }
+          ],
+          "module": "depz_sensor_sdk.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/__init__.py",
+            "line": 198
+          },
+          "exported_as": [
+            "depz_sensor_sdk.Tmf8829",
+            "depz_sensor_sdk.tmf8829.Tmf8829"
+          ],
+          "doc": "TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone,\nhistograms). `init()` downloads the 14.4 KB sensor firmware (~0.15 s),\n`configure(preset, …)` writes the config page, `start()` streams\nmeasurements to `on_measurement` / `measurements()`, `stop()` ends it.\n\nThe sensor's EN pin is wired high: there is no sleep, and recovery from\nany state is `init()` (it starts with a soft reset).",
+          "attributes": [
+            {
+              "name": "NO_MATCH",
+              "value": "<object object>"
+            }
+          ],
+          "members": [
+            {
+              "name": "read_registers",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "addr",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "length",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "bytes",
+              "doc": "Read `length` bytes from `addr` in ≤1024-byte requests; reads that\nreach the FIFO port 0xFF stay there (the sensor does not auto-increment it)."
+            },
+            {
+              "name": "read_register",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "addr",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "int"
+            },
+            {
+              "name": "write_registers",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "addr",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "data",
+                  "kind": "positional_or_keyword",
+                  "annotation": "bytes"
+                },
+                {
+                  "name": "progress",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Optional[Callable[[int, int], NoneType]]",
+                  "default": null
+                }
+              ],
+              "returns": "None",
+              "doc": "Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF)."
+            },
+            {
+              "name": "write_register",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "addr",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "value",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "None"
+            },
+            {
+              "name": "sensor_state",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "dict[str, int]",
+              "doc": "Raw host-interface registers, for diagnostics."
+            },
+            {
+              "name": "get_bridge_info",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.tmf8829.Tmf8829Info",
+              "doc": "Bridge counters (never touches the sensor, safe mid-stream)."
+            },
+            {
+              "name": "init",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "progress",
+                  "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[int, int], NoneType]]",
+                  "default": null
+                }
+              ],
+              "returns": "tuple[str, int]",
+              "doc": "Bring the sensor from any state to its running RAM application:\nsoft reset, bootloader, firmware download, start. Returns\n(application version, sensor serial). Stops a running stream first.\n`progress(done, total)` tracks the image download."
+            },
+            {
+              "name": "config_page",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "bytes",
+              "doc": "LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor."
+            },
+            {
+              "name": "configure",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "preset",
+                  "kind": "positional_or_keyword",
+                  "annotation": "str",
+                  "default": "8x8"
+                },
+                {
+                  "name": "period_ms",
+                  "kind": "keyword_only",
+                  "annotation": "int",
+                  "default": 33
+                },
+                {
+                  "name": "kilo_iterations",
+                  "kind": "keyword_only",
+                  "annotation": "int | None",
+                  "default": null
+                },
+                {
+                  "name": "nr_peaks",
+                  "kind": "keyword_only",
+                  "annotation": "int",
+                  "default": 1
+                },
+                {
+                  "name": "signal_strength",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "noise_strength",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "xtalk",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "histograms",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "ref_frame",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "fields",
+                  "kind": "keyword_only",
+                  "annotation": "dict[str, int] | None",
+                  "default": null
+                }
+              ],
+              "returns": "depz_sensor_sdk.tmf8829.Tmf8829Config",
+              "doc": "Load `preset` and write the config page. Every field a preset does\nnot reset is written (contract 14 §4), so the result never depends on\nan earlier config. `fields` sets any other page field by name.\nRaises `Tmf8829Error` when the sensor refuses the page (e.g.\nERR_CONFIG_RESULT_SIZE: the result format is too big for the grid)\nor a written field does not read back. Not while streaming."
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "returns": "depz_sensor_sdk.tmf8829.Tmf8829Config | None",
+              "doc": "The last `configure()` result (None after `init()`)."
+            },
+            {
+              "name": "streaming",
+              "kind": "property",
+              "returns": "bool"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "MEASURE with the bridge stream armed. Configures the default 8x8\npreset first when `configure()` was not called since `init()`."
+            },
+            {
+              "name": "stop",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Sensor STOP, then the bridge stream (the frames already queued\ndrain). The bad-header event a STOP raises mid histogram dump is\nexpected and swallowed."
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None"
+            },
+            {
+              "name": "on_measurement",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cb",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Callable[[depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement], NoneType]"
+                }
+              ],
+              "returns": "Callable[[], NoneType]",
+              "doc": "Subscribe to measurements (reader-thread context; don't block)."
+            },
+            {
+              "name": "measurements",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "maxsize",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int",
+                  "default": 16
+                }
+              ],
+              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after `start()`."
+            },
+            {
+              "name": "frames_dropped",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Frames the bridge dropped (frame_seq gaps) in this stream."
+            },
+            {
+              "name": "frames_discarded",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Frames lost to reassembly (incomplete, out-of-order chunks) in this stream."
+            },
+            {
+              "name": "frame_parse_errors",
+              "kind": "property",
+              "returns": "int"
+            },
+            {
+              "name": "port",
+              "kind": "property",
+              "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "closed",
+              "kind": "property",
+              "returns": "bool",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "on_event",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cb",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Callable[[depz_sensor_sdk.device.DeviceEvent], NoneType]"
+                }
+              ],
+              "returns": "Callable[[], NoneType]",
+              "doc": "Subscribe to unsolicited/diagnostic events (reader-thread context;\ndo not block). Returns an unsubscribe function.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "events",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "maxsize",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int",
+                  "default": 256
+                }
+              ],
+              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "send",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cmd",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "payload",
+                  "kind": "positional_or_keyword",
+                  "annotation": "bytes",
+                  "default": "b''"
+                },
+                {
+                  "name": "crc_type",
+                  "kind": "keyword_only",
+                  "annotation": "depz_sensor_sdk.transport.framing.CrcType | None",
+                  "default": null
+                }
+              ],
+              "returns": "None",
+              "doc": "Fire-and-forget packet (escape hatch; prefer `request`).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cmd",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "payload",
+                  "kind": "positional_or_keyword",
+                  "annotation": "bytes",
+                  "default": "b''"
+                },
+                {
+                  "name": "matcher",
+                  "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "default": null
+                },
+                {
+                  "name": "ok_completes",
+                  "kind": "keyword_only",
+                  "annotation": "bool",
+                  "default": false
+                },
+                {
+                  "name": "timeout",
+                  "kind": "keyword_only",
+                  "annotation": "float | None",
+                  "default": null
+                }
+              ],
+              "returns": "Any",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "expect_report",
+              "kind": "staticmethod",
+              "parameters": [
+                {
+                  "name": "report_id",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "unpack",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Callable[[bytes], Any]"
+                }
+              ],
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "doc": "Matcher for a typed report identified by its report ID alone.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "expect_text",
+              "kind": "staticmethod",
+              "parameters": [
+                {
+                  "name": "request_cmd",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "get_device_name",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "get_software_name",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "get_serial_number",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "read_mcu_temperature",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "float",
+              "doc": "Last cached MCU temperature in °C (device refreshes ~2 Hz).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "sync_time",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "samples",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int",
+                  "default": 5
+                }
+              ],
+              "returns": "depz_sensor_sdk.device.TimeSync",
+              "doc": "NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "time_sync",
+              "kind": "property",
+              "returns": "depz_sensor_sdk.device.TimeSync | None",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "to_host_time_us",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "device_timestamp_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "int",
+              "doc": "Device µs → host monotonic µs (requires a prior `sync_time`).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "get_report_payload_crc",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.transport.framing.CrcType",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "set_report_payload_crc",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "crc_type",
+                  "kind": "positional_or_keyword",
+                  "annotation": "depz_sensor_sdk.transport.framing.CrcType"
+                }
+              ],
+              "returns": "None",
+              "doc": "Set the device→host payload CRC mode (host→device is per-packet).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "get_sync_pin",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "pin",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.common.SyncPinConfig",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "set_sync_pin",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "config",
+                  "kind": "positional_or_keyword",
+                  "annotation": "depz_sensor_sdk.protocol.common.SyncPinConfig"
+                }
+              ],
+              "returns": "None",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "reset",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "DEVICE_RESET: device ACKs then reboots; the link will drop.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "enter_bootloader_mode",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Ask the device to reboot into the resident bootloader and close\nthis connection. Re-discovery/flash flow lives in the bootloader\nmodule (contract 06).",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            }
+          ]
+        },
+        {
+          "name": "Tmf8829Config",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "preset",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            },
+            {
+              "name": "page",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes"
+            },
+            {
+              "name": "histograms",
+              "kind": "positional_or_keyword",
+              "annotation": "bool"
+            },
+            {
+              "name": "ref_frame",
+              "kind": "positional_or_keyword",
+              "annotation": "bool"
+            },
+            {
+              "name": "fields",
+              "kind": "positional_or_keyword",
+              "annotation": "dict[str, int]",
+              "default": "<factory>"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/__init__.py",
+            "line": 182
+          },
+          "exported_as": [
+            "depz_sensor_sdk.Tmf8829Config",
+            "depz_sensor_sdk.tmf8829.Tmf8829Config"
+          ],
+          "doc": "The config written by `configure()`, as read back from the sensor.",
+          "dataclass_fields": [
+            {
+              "name": "preset",
+              "type": "str"
+            },
+            {
+              "name": "page",
+              "type": "bytes"
+            },
+            {
+              "name": "histograms",
+              "type": "bool"
+            },
+            {
+              "name": "ref_frame",
+              "type": "bool"
+            },
+            {
+              "name": "fields",
+              "type": "dict[str, int]",
+              "default_factory": "dict"
+            }
+          ],
+          "members": [
+            {
+              "name": "grid",
+              "kind": "property",
+              "returns": "tuple[int, int]",
+              "doc": "(rows, cols) of a measurement."
+            }
+          ]
+        },
+        {
+          "name": "Tmf8829Measurement",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "timestamp_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "flags",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "fp_mode",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "f_number",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "results",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.PixelResults"
+            },
+            {
+              "name": "distance_mm",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            },
+            {
+              "name": "frames",
+              "kind": "positional_or_keyword",
+              "annotation": "list[depz_sensor_sdk.tmf8829.frames.FrameInfo]"
+            },
+            {
+              "name": "times",
+              "kind": "positional_or_keyword",
+              "annotation": "list[depz_sensor_sdk.tmf8829.clock.FrameTime]"
+            },
+            {
+              "name": "histograms",
+              "kind": "positional_or_keyword",
+              "annotation": "list[depz_sensor_sdk.tmf8829.frames.HistogramFrame]",
+              "default": "<factory>"
+            },
+            {
+              "name": "ref_frames",
+              "kind": "positional_or_keyword",
+              "annotation": "list[bytes]",
+              "default": "<factory>"
+            },
+            {
+              "name": "problems",
+              "kind": "positional_or_keyword",
+              "annotation": "list[str]",
+              "default": "<factory>"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.builder",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/builder.py",
+            "line": 26
+          },
+          "exported_as": [
+            "depz_sensor_sdk.Tmf8829Measurement",
+            "depz_sensor_sdk.tmf8829.Tmf8829Measurement"
+          ],
+          "doc": "One measurement: its results frame (8x8, 16x16) or both half-frames\n(32x32, 48x32) merged, with the histogram / ref-SPAD frames before it.\n\n`distance_mm` is [peaks, rows, cols], clock-corrected, in mm (None when\nthe result format has no peaks). `results` keeps the raw sensor integers.\n`problems` lists what went wrong since the previous measurement.",
+          "dataclass_fields": [
+            {
+              "name": "timestamp_us",
+              "type": "int"
+            },
+            {
+              "name": "flags",
+              "type": "int"
+            },
+            {
+              "name": "fp_mode",
+              "type": "int"
+            },
+            {
+              "name": "f_number",
+              "type": "int"
+            },
+            {
+              "name": "results",
+              "type": "PixelResults"
+            },
+            {
+              "name": "distance_mm",
+              "type": "np.ndarray | None"
+            },
+            {
+              "name": "frames",
+              "type": "list[FrameInfo]"
+            },
+            {
+              "name": "times",
+              "type": "list[FrameTime]"
+            },
+            {
+              "name": "histograms",
+              "type": "list[HistogramFrame]",
+              "default_factory": "list"
+            },
+            {
+              "name": "ref_frames",
+              "type": "list[bytes]",
+              "default_factory": "list"
+            },
+            {
+              "name": "problems",
+              "type": "list[str]",
+              "default_factory": "list"
+            }
+          ],
+          "members": [
+            {
+              "name": "shape",
+              "kind": "property",
+              "returns": "tuple[int, int]",
+              "doc": "(rows, cols) of the full focal plane."
+            },
+            {
+              "name": "peaks",
+              "kind": "property",
+              "returns": "int"
+            },
+            {
+              "name": "temperature_c",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Sensor die temperature (header byte 0), °C."
+            }
+          ]
+        },
+        {
+          "name": "Tmf8829Error",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.errors.DepzError"
+          ],
+          "module": "depz_sensor_sdk.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/__init__.py",
+            "line": 169
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.Tmf8829Error"
+          ],
+          "doc": "The sensor refused or did not answer (bootloader / application status).",
+          "members": [
+            {
+              "name": "with_traceback",
+              "kind": "method",
+              "doc": "Exception.with_traceback(tb) --\nset self.__traceback__ to tb and return self.",
+              "defined_in": "builtins.BaseException"
+            },
+            {
+              "name": "add_note",
+              "kind": "method",
+              "doc": "Exception.add_note(note) --\nadd a note to the exception",
+              "defined_in": "builtins.BaseException"
+            }
+          ]
+        },
+        {
+          "name": "Tmf8829InterruptEvent",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.device.DeviceEvent"
+          ],
+          "parameters": [
+            {
+              "name": "event",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.protocol.tmf8829.Tmf8829Event"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/__init__.py",
+            "line": 173
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.Tmf8829InterruptEvent"
+          ],
+          "doc": "RPT_TMF_EVENT that is not an expected stop artefact: a MOTION /\nPROXIMITY interrupt (code 0) or a refused frame header (code 1 — the\nsensor is lost, run `init()` again).",
+          "dataclass_fields": [
+            {
+              "name": "event",
+              "type": "Tmf8829Event"
+            }
+          ],
+          "members": []
+        },
+        {
+          "name": "PixelResults",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "peaks",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "distance",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            },
+            {
+              "name": "snr",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            },
+            {
+              "name": "signal",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            },
+            {
+              "name": "noise",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            },
+            {
+              "name": "xtalk",
+              "kind": "positional_or_keyword",
+              "annotation": "numpy.ndarray | None"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 143
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.PixelResults"
+          ],
+          "doc": "Decoded results of one frame or of a merged measurement.\n\n`distance`, `snr`, `signal` are [peaks, rows, cols]; `noise`, `xtalk`\n[rows, cols]. Raw sensor integers: distance in 0.25 mm (or mm with the\nfooter flag), not yet clock-corrected. Absent fields are None.",
+          "dataclass_fields": [
+            {
+              "name": "peaks",
+              "type": "int"
+            },
+            {
+              "name": "distance",
+              "type": "np.ndarray | None"
+            },
+            {
+              "name": "snr",
+              "type": "np.ndarray | None"
+            },
+            {
+              "name": "signal",
+              "type": "np.ndarray | None"
+            },
+            {
+              "name": "noise",
+              "type": "np.ndarray | None"
+            },
+            {
+              "name": "xtalk",
+              "type": "np.ndarray | None"
+            }
+          ],
+          "members": [
+            {
+              "name": "shape",
+              "kind": "property",
+              "returns": "tuple[int, int]"
+            }
+          ]
+        },
+        {
+          "name": "FrameInfo",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "fifo_status",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "systick",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "id",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "layout",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "payload",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "f_number",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "temperature",
+              "kind": "positional_or_keyword",
+              "annotation": "tuple[int, int, int]"
+            },
+            {
+              "name": "bdv",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "ref_pos",
+              "kind": "positional_or_keyword",
+              "annotation": "tuple[int, int]"
+            },
+            {
+              "name": "t0_integration",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "t1_integration",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "frame_status",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "reserved",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "eof",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "size",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 53
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.FrameInfo"
+          ],
+          "doc": "Pre-header, header and footer of one frame (any kind).",
+          "dataclass_fields": [
+            {
+              "name": "fifo_status",
+              "type": "int"
+            },
+            {
+              "name": "systick",
+              "type": "int"
+            },
+            {
+              "name": "id",
+              "type": "int"
+            },
+            {
+              "name": "layout",
+              "type": "int"
+            },
+            {
+              "name": "payload",
+              "type": "int"
+            },
+            {
+              "name": "f_number",
+              "type": "int"
+            },
+            {
+              "name": "temperature",
+              "type": "tuple[int, int, int]"
+            },
+            {
+              "name": "bdv",
+              "type": "int"
+            },
+            {
+              "name": "ref_pos",
+              "type": "tuple[int, int]"
+            },
+            {
+              "name": "t0_integration",
+              "type": "int"
+            },
+            {
+              "name": "t1_integration",
+              "type": "int"
+            },
+            {
+              "name": "frame_status",
+              "type": "int"
+            },
+            {
+              "name": "reserved",
+              "type": "int"
+            },
+            {
+              "name": "eof",
+              "type": "int"
+            },
+            {
+              "name": "size",
+              "type": "int"
+            }
+          ],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "returns": "int",
+              "doc": "FID_RESULTS, FID_HISTOGRAMS or FID_REF_SPAD."
+            },
+            {
+              "name": "fp_mode",
+              "kind": "property",
+              "returns": "int"
+            },
+            {
+              "name": "is_second_half",
+              "kind": "property",
+              "returns": "bool"
+            },
+            {
+              "name": "distance_in_mm",
+              "kind": "property",
+              "returns": "bool"
+            },
+            {
+              "name": "problems",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "list[str]",
+              "doc": "What is wrong with the frame, human-readable; empty when fine."
+            }
+          ]
+        },
+        {
+          "name": "FrameTime",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "timestamp_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "flags",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "t1_len_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "t0_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "t1_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "edge_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "pair_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "ratio_q16",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.clock",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/clock.py",
+            "line": 105
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.FrameTime"
+          ],
+          "doc": "Capture time of one results frame, MCU µs.",
+          "dataclass_fields": [
+            {
+              "name": "timestamp_us",
+              "type": "int"
+            },
+            {
+              "name": "flags",
+              "type": "int"
+            },
+            {
+              "name": "t1_len_us",
+              "type": "int"
+            },
+            {
+              "name": "t0_us",
+              "type": "int"
+            },
+            {
+              "name": "t1_us",
+              "type": "int"
+            },
+            {
+              "name": "edge_us",
+              "type": "int"
+            },
+            {
+              "name": "pair_us",
+              "type": "int"
+            },
+            {
+              "name": "ratio_q16",
+              "type": "int"
+            }
+          ],
+          "members": []
+        },
+        {
+          "name": "HistogramFrame",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "info",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.FrameInfo"
+            },
+            {
+              "name": "raw",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 246
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.HistogramFrame"
+          ],
+          "doc": "A raw histogram frame (25 377 B); decoding the bins is left to the\ncaller (ams histogram layout).",
+          "dataclass_fields": [
+            {
+              "name": "info",
+              "type": "FrameInfo"
+            },
+            {
+              "name": "raw",
+              "type": "bytes"
+            }
+          ],
+          "members": [
+            {
+              "name": "data",
+              "kind": "property",
+              "returns": "bytes"
+            }
+          ]
+        },
+        {
+          "name": "MeasurementBuilder",
+          "kind": "class",
+          "bases": [],
+          "parameters": [],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.builder",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/builder.py",
+            "line": 70
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.MeasurementBuilder"
+          ],
+          "doc": "Histogram frames between two results frames belong to the second; a\nref-SPAD frame comes right before its results frame (each half-frame has\nits own). 32x32/48x32: the first half (layout 0x40 clear) holds the even\nrows. Call `reset()` at the start of every stream: the clock model and\nT1 are per stream.",
+          "members": [
+            {
+              "name": "reset",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None"
+            },
+            {
+              "name": "add",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "raw",
+                  "kind": "positional_or_keyword",
+                  "annotation": "bytes"
+                },
+                {
+                  "name": "timestamp_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "edge_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int",
+                  "default": 0
+                }
+              ],
+              "returns": "depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement | None",
+              "doc": "One frame with the MCU time of its header read and its INT edge\n(0 = none) → the measurement it completes, or None."
+            }
+          ]
+        },
+        {
+          "name": "SensorClock",
+          "kind": "class",
+          "bases": [],
+          "parameters": [],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.clock",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/clock.py",
+            "line": 45
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.SensorClock"
+          ],
+          "doc": "Sensor SYSTICK (125 kHz) → MCU µs, fed one clock pair per frame (the\nMCU time of the header read and the pre-header SYSTICK sampled by it).\nThe ratio is taken over a sliding 1..2 s window, first after 200 ms; it\nis also the distance correction (ams tmf8829ClockCorrection).",
+          "members": [
+            {
+              "name": "reset",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None"
+            },
+            {
+              "name": "ratio",
+              "kind": "property",
+              "returns": "float",
+              "doc": "MCU/sensor clock ratio (≈ 1.015): distances are scaled by it."
+            },
+            {
+              "name": "add",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "tick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "int",
+              "doc": "Add a pair → FT_CLOCK_RESET if it does not fit the model (which then\nrestarts from it), else 0."
+            },
+            {
+              "name": "to_us",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "pair_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "pair_tick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "tick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "int",
+              "doc": "SYSTICK `tick` → MCU µs through the pair (pair_us, pair_tick)."
+            }
+          ]
+        },
+        {
+          "name": "CaptureTimer",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "clock",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.clock.SensorClock"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.clock",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/clock.py",
+            "line": 119
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.CaptureTimer"
+          ],
+          "doc": "When a results frame was captured. A results frame is N equal\nsub-integrations back to back; the footer has the SYSTICK of the start of\nthe first (t0) and of the last (t1). The window is [t0, t1 + T1], T1 the\nstream's shortest (t1 − t0)/(N − 1); its centre is the frame time.",
+          "members": [
+            {
+              "name": "reset",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None"
+            },
+            {
+              "name": "histograms",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "A histogram frame was seen in the stream."
+            },
+            {
+              "name": "results",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "fp_mode",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "systick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "t0_tick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "t1_tick",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "pair_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "edge_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "flags",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "depz_sensor_sdk.tmf8829.clock.FrameTime"
+            },
+            {
+              "name": "results_frame",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "f",
+                  "kind": "positional_or_keyword",
+                  "annotation": "depz_sensor_sdk.tmf8829.frames.FrameInfo"
+                },
+                {
+                  "name": "pair_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "edge_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "flags",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "depz_sensor_sdk.tmf8829.clock.FrameTime"
+            }
+          ]
+        },
+        {
+          "name": "PRESETS",
+          "kind": "data",
+          "type": "dict",
+          "value": "{'8x8': 64, '8x8-lr': 65, '8x8-ha': 66, '16x16': 67, '16x16-ha': 68, '32x32': 69, '32x32-ha': 70, '48x32': 71, '48x32-ha': 72, '8x8-xr': 73}",
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.PRESETS"
+          ],
+          "doc": "dict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)"
+        },
+        {
+          "name": "CFG_FIELDS",
+          "kind": "data",
+          "type": "dict",
+          "value": "{'period_ms': (34, 0, 16), 'kilo_iterations': (36, 0, 16), 'fp_mode': (38, 0, 3), 'nr_peaks': (42, 0, 3), 'signal_strength': (42, 3, 1), 'noise_strength': (42, 4, 1), 'xtalk': (42, 5, 1), 'dump_histograms': (43, 0, 1), 'ref_spad_frame': (44, 0, 1), 'power_modes': (46, 0, 8), 'ha_kilo_iterations': (74, 0, 16), 'dual_mode': (76, 0, 2), 'fov_correction': (120, 0, 4), 'distance_in_mm': (143, 0, 1)}",
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.CFG_FIELDS"
+          ],
+          "doc": "dict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)"
+        },
+        {
+          "name": "FP_GRID",
+          "kind": "data",
+          "type": "dict",
+          "value": "{0: (8, 8), 1: (8, 8), 2: (16, 16), 3: (32, 32), 4: (32, 32), 5: (32, 48)}",
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.FP_GRID"
+          ],
+          "doc": "dict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)"
+        },
+        {
+          "name": "FT_NAMES",
+          "kind": "data",
+          "type": "dict",
+          "value": "{1: 'nominal', 2: 'clock_reset', 4: 'edge_late', 8: 'stalled', 16: 't1_unsure'}",
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.FT_NAMES"
+          ],
+          "doc": "dict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)"
+        },
+        {
+          "name": "cfg_get",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "page",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes | bytearray"
+            },
+            {
+              "name": "name",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "returns": "int",
+          "module": "depz_sensor_sdk.tmf8829.config",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/config.py",
+            "line": 57
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.cfg_get"
+          ]
+        },
+        {
+          "name": "cfg_set",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "page",
+              "kind": "positional_or_keyword",
+              "annotation": "bytearray"
+            },
+            {
+              "name": "name",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            },
+            {
+              "name": "value",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.tmf8829.config",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/config.py",
+            "line": 65
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.cfg_set"
+          ]
+        },
+        {
+          "name": "config_fields",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "page",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes | bytearray"
+            }
+          ],
+          "returns": "dict[str, int]",
+          "module": "depz_sensor_sdk.tmf8829.config",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/config.py",
+            "line": 77
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.config_fields"
+          ],
+          "doc": "Every named field of a config page."
+        },
+        {
+          "name": "distance_mm",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "results",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.PixelResults"
+            },
+            {
+              "name": "ratio",
+              "kind": "positional_or_keyword",
+              "annotation": "float"
+            },
+            {
+              "name": "in_mm",
+              "kind": "positional_or_keyword",
+              "annotation": "bool"
+            }
+          ],
+          "returns": "numpy.ndarray | None",
+          "module": "depz_sensor_sdk.tmf8829.builder",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/builder.py",
+            "line": 62
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.distance_mm"
+          ],
+          "doc": "Raw distances → mm, clock-corrected (×ratio; ÷4 for 0.25 mm units)."
+        },
+        {
+          "name": "flag_names",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "flags",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "list[str]",
+          "module": "depz_sensor_sdk.tmf8829.clock",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/clock.py",
+            "line": 41
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.flag_names"
+          ]
+        },
+        {
+          "name": "merge_halves",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "first",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.PixelResults"
+            },
+            {
+              "name": "second",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.PixelResults"
+            }
+          ],
+          "returns": "depz_sensor_sdk.tmf8829.frames.PixelResults",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 223
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.merge_halves"
+          ],
+          "doc": "32x32/48x32: the first half-frame holds the even rows, the second the odd ones."
+        },
+        {
+          "name": "parse_frame",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "raw",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes"
+            }
+          ],
+          "returns": "depz_sensor_sdk.tmf8829.frames.FrameInfo",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 114
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.parse_frame"
+          ]
+        },
+        {
+          "name": "parse_results",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "raw",
+              "kind": "positional_or_keyword",
+              "annotation": "bytes"
+            },
+            {
+              "name": "info",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.tmf8829.frames.FrameInfo | None",
+              "default": null
+            }
+          ],
+          "returns": "depz_sensor_sdk.tmf8829.frames.PixelResults",
+          "module": "depz_sensor_sdk.tmf8829.frames",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/frames.py",
+            "line": 185
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.parse_results"
+          ],
+          "doc": "Pixel results of one results frame, row-major."
+        },
+        {
+          "name": "FIRMWARE_LOAD_ADDR",
+          "kind": "data",
+          "type": "int",
+          "value": 65536,
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.FIRMWARE_LOAD_ADDR"
+          ],
+          "doc": "int(x, base=10) -> integer\n\nConvert a number or string to an integer, or return 0 if no arguments\nare given.  If x is a number, return x.__int__().  For floating-point\nnumbers, this truncates towards zero.\n\nIf x is not a number or if base is given, then x must be a string,\nbytes, or bytearray instance representing an integer literal in the\ngiven base.  The literal can be preceded by '+' or '-' and be surrounded\nby whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\nBase 0 means to interpret the base from the string as an integer literal.\n>>> int('0b100', base=0)\n4"
+        },
+        {
+          "name": "firmware_image",
+          "kind": "function",
+          "parameters": [],
+          "returns": "bytes",
+          "module": "depz_sensor_sdk.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/tmf8829/__init__.py",
+            "line": 160
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.firmware_image"
+          ],
+          "doc": "The sensor firmware image downloaded by `init()` (14 444 B)."
+        }
+      ]
+    },
+    {
       "title": "BNO086 (IMU)",
       "symbols": [
         {
@@ -21916,7 +23827,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 384
+            "line": 395
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetReader"
@@ -23472,16 +25383,20 @@
               "value": 9
             },
             {
-              "name": "THROUGHPUT_TX_START",
+              "name": "USB_TEST_TX_START",
               "value": 28
             },
             {
-              "name": "THROUGHPUT_TX_STOP",
+              "name": "USB_TEST_TX_STOP",
               "value": 29
             },
             {
-              "name": "THROUGHPUT_RX_DATA",
+              "name": "USB_TEST_RX_DATA",
               "value": 30
+            },
+            {
+              "name": "USB_TEST_STATS",
+              "value": 31
             },
             {
               "name": "GET_SYNC_PIN_CONFIG",
@@ -23617,7 +25532,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 31
+            "line": 32
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Rpt"
@@ -23648,8 +25563,12 @@
               "value": 135
             },
             {
-              "name": "THROUGHPUT_DATA",
+              "name": "USB_TEST_DATA",
               "value": 136
+            },
+            {
+              "name": "USB_TEST_STATS",
+              "value": 143
             },
             {
               "name": "SYNC_PIN_CONFIG",
@@ -23781,7 +25700,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 42
+            "line": 44
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Status"
@@ -23953,7 +25872,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 55
+            "line": 57
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinMode"
@@ -24105,7 +26024,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 63
+            "line": 65
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinPolarity"
@@ -24255,7 +26174,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 130
+            "line": 132
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinConfig"
@@ -24324,7 +26243,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 71
+            "line": 73
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.StatusReport"
@@ -24378,7 +26297,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 82
+            "line": 84
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.TextReport"
@@ -24437,7 +26356,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 92
+            "line": 94
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncTimeReport"
@@ -24495,7 +26414,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 104
+            "line": 106
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.TemperatureReport"
@@ -24554,7 +26473,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 119
+            "line": 121
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SequenceErrorReport"
@@ -24618,7 +26537,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 145
+            "line": 147
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.pack_sync_time"
@@ -24653,7 +26572,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 149
+            "line": 151
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.sync_time_offset_rtt"
@@ -24674,7 +26593,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 162
+            "line": 164
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.strip_device_string"
@@ -24711,7 +26630,7 @@
           "module": "depz_sensor_sdk.protocol.identity",
           "source": {
             "file": "depz_sensor_sdk/protocol/identity.py",
-            "line": 21
+            "line": 22
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Identity"
@@ -24785,6 +26704,10 @@
             {
               "name": "BNO055",
               "value": "bno055"
+            },
+            {
+              "name": "TMF8829",
+              "value": "tmf8829"
             },
             {
               "name": "UNKNOWN",
@@ -25435,7 +27358,7 @@
           "module": "depz_sensor_sdk.protocol.identity",
           "source": {
             "file": "depz_sensor_sdk/protocol/identity.py",
-            "line": 45
+            "line": 47
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.parse_software_name"
@@ -25739,6 +27662,133 @@
               "defined_in": "builtins.int"
             }
           ]
+        },
+        {
+          "name": "Tmf8829Info",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "int_edges",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "frames",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "frames_aborted",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "frame_errors",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "spi_timeouts",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "int_level",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "streaming",
+              "kind": "positional_or_keyword",
+              "annotation": "bool"
+            },
+            {
+              "name": "int_mask",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "last_int_status",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "last_fifo_status",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.protocol.tmf8829",
+          "source": {
+            "file": "depz_sensor_sdk/protocol/tmf8829.py",
+            "line": 101
+          },
+          "exported_as": [
+            "depz_sensor_sdk.tmf8829.Tmf8829Info"
+          ],
+          "doc": "RPT_TMF_INFO: bridge state only, the sensor is never touched. Carries\nno echoed command byte. `int_edges` runs from MCU power-up; the frame\ncounters restart at TMF_START_STREAM.",
+          "dataclass_fields": [
+            {
+              "name": "int_edges",
+              "type": "int"
+            },
+            {
+              "name": "frames",
+              "type": "int"
+            },
+            {
+              "name": "frames_aborted",
+              "type": "int"
+            },
+            {
+              "name": "frame_errors",
+              "type": "int"
+            },
+            {
+              "name": "spi_timeouts",
+              "type": "int"
+            },
+            {
+              "name": "int_level",
+              "type": "int"
+            },
+            {
+              "name": "streaming",
+              "type": "bool"
+            },
+            {
+              "name": "int_mask",
+              "type": "int"
+            },
+            {
+              "name": "last_int_status",
+              "type": "int"
+            },
+            {
+              "name": "last_fifo_status",
+              "type": "int"
+            }
+          ],
+          "members": [
+            {
+              "name": "unpack",
+              "kind": "classmethod",
+              "parameters": [
+                {
+                  "name": "cls",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "payload",
+                  "kind": "positional_or_keyword",
+                  "annotation": "bytes"
+                }
+              ],
+              "returns": "Tmf8829Info"
+            }
+          ]
         }
       ]
     },
@@ -26006,7 +28056,7 @@
           "name": "DEPZ_PID_MODEL",
           "kind": "data",
           "type": "dict",
-          "value": "{60536: 'sr04', 60736: 'vl53l8ch', 60737: 'vl53l0x', 60738: 'vl53l1cb', 60739: 'vl53l1cx', 60740: 'vl53l3cx', 60741: 'vl53l4cd', 60742: 'vl53l4cx', 60743: 'vl53l4ed', 60744: 'vl53l5cx', 60745: 'vl53l7cx', 60746: 'vl53l7ch', 60747: 'vl53l8cx', 60936: 'bno086', 60937: 'bno085', 60938: 'bno055'}",
+          "value": "{60536: 'sr04', 60736: 'vl53l8ch', 60737: 'vl53l0x', 60738: 'vl53l1cb', 60739: 'vl53l1cx', 60740: 'vl53l3cx', 60741: 'vl53l4cd', 60742: 'vl53l4cx', 60743: 'vl53l4ed', 60744: 'vl53l5cx', 60745: 'vl53l7cx', 60746: 'vl53l7ch', 60747: 'vl53l8cx', 60748: 'tmf8829', 60936: 'bno086', 60937: 'bno085', 60938: 'bno055'}",
           "exported_as": [
             "depz_sensor_sdk.DEPZ_PID_MODEL"
           ],
@@ -26016,7 +28066,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.5.0",
+          "value": "0.6.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],
@@ -26046,7 +28096,7 @@
           "module": "depz_sensor_sdk.usb_ids",
           "source": {
             "file": "depz_sensor_sdk/usb_ids.py",
-            "line": 74
+            "line": 76
           },
           "exported_as": [
             "depz_sensor_sdk.is_known_depz_usb"
@@ -26072,7 +28122,7 @@
           "module": "depz_sensor_sdk.usb_ids",
           "source": {
             "file": "depz_sensor_sdk/usb_ids.py",
-            "line": 88
+            "line": 90
           },
           "exported_as": [
             "depz_sensor_sdk.usb_model_hint"

@@ -63,6 +63,7 @@ std::optional<SensorType> to_cpp(depz_sensor_type t)
     case DEPZ_SENSOR_VL53L7: return SensorType::Vl53l7;
     case DEPZ_SENSOR_VL53LX: return SensorType::Vl53lx;
     case DEPZ_SENSOR_BNO055: return SensorType::Bno055;
+    case DEPZ_SENSOR_TMF8829: return SensorType::Tmf8829;
     case DEPZ_SENSOR_UNKNOWN: return SensorType::Unknown;
     default: return std::nullopt;
     }
@@ -587,6 +588,7 @@ std::unique_ptr<Device> wrap_device(depz_device* d)
     if (depz_is_bno055(d)) return std::unique_ptr<Device>(new Bno055(d));
     if (depz_is_bno086(d)) return std::unique_ptr<Device>(new Bno086(d));
     if (depz_is_vl53lx(d)) return std::unique_ptr<Device>(new Vl53lx(d));
+    if (depz_is_tmf8829(d)) return std::unique_ptr<Device>(new Tmf8829(d));
     return std::unique_ptr<Device>(new Device(d));
 }
 
@@ -2253,6 +2255,309 @@ void Vl53lx::write_reg(std::uint16_t addr, byte_span data)
     check(depz_vl53lx_write_reg(handle(), addr, raw(data), data.size()));
 }
 
+// ── TMF8829 ─────────────────────────────────────────────────────────────────
+
+namespace {
+
+tmf8829::FrameInfo tmf_info_from_c(const depz_tmf8829_frame_info& c)
+{
+    tmf8829::FrameInfo f;
+    f.fifo_status = c.fifo_status;
+    f.systick = c.systick;
+    f.id = c.id;
+    f.layout = c.layout;
+    f.payload = c.payload;
+    f.f_number = c.f_number;
+    f.temperature = {c.temperature[0], c.temperature[1], c.temperature[2]};
+    f.bdv = c.bdv;
+    f.ref_pos = {c.ref_pos[0], c.ref_pos[1]};
+    f.t0_integration = c.t0_integration;
+    f.t1_integration = c.t1_integration;
+    f.frame_status = c.frame_status;
+    f.reserved = c.reserved;
+    f.eof = c.eof;
+    f.size = c.size;
+    return f;
+}
+
+tmf8829::FrameTime tmf_time_from_c(const depz_tmf8829_frame_time& c)
+{
+    tmf8829::FrameTime t;
+    t.timestamp_us = c.timestamp_us;
+    t.flags = c.flags;
+    t.t1_len_us = c.t1_len_us;
+    t.t0_us = c.t0_us;
+    t.t1_us = c.t1_us;
+    t.edge_us = c.edge_us;
+    t.pair_us = c.pair_us;
+    t.ratio_q16 = c.ratio_q16;
+    return t;
+}
+
+template <class T>
+std::vector<T> tmf_take(const T* p, std::size_t n)
+{
+    return std::vector<T>(p, p + n);
+}
+
+Tmf8829Measurement tmf_measurement_from_c(const depz_tmf8829_measurement& c)
+{
+    Tmf8829Measurement m;
+    m.timestamp_us = c.timestamp_us;
+    m.flags = c.flags;
+    m.fp_mode = c.fp_mode;
+    m.f_number = c.f_number;
+    m.ratio_q16 = c.ratio_q16;
+    const depz_tmf8829_results& r = c.results;
+    const std::size_t zones = static_cast<std::size_t>(r.rows) * r.cols, n = r.peaks * zones;
+    m.results.peaks = r.peaks;
+    m.results.rows = r.rows;
+    m.results.cols = r.cols;
+    if (r.peaks) {
+        m.results.distance = tmf_take(r.distance, n);
+        m.results.snr = tmf_take(r.snr, n);
+        m.distance_mm = tmf_take(c.distance_mm, n);
+    }
+    if (r.has_signal) m.results.signal = tmf_take(r.signal, n);
+    if (r.has_noise) m.results.noise = tmf_take(r.noise, zones);
+    if (r.has_xtalk) m.results.xtalk = tmf_take(r.xtalk, zones);
+    for (std::size_t i = 0; i < c.n_frames && i < 2; ++i) {
+        m.frames.push_back(tmf_info_from_c(c.frames[i]));
+        m.times.push_back(tmf_time_from_c(c.times[i]));
+    }
+    m.n_histograms = c.n_histograms;
+    m.n_ref_frames = c.n_ref_frames;
+    m.n_problems = c.n_problems;
+    const std::size_t kept = std::min<std::size_t>(c.n_problems, DEPZ_TMF8829_PROBLEMS_KEPT);
+    for (std::size_t i = 0; i < kept; ++i) m.problems.emplace_back(c.problems[i]);
+    return m;
+}
+
+tmf8829::Tmf8829Info tmf_bridge_from_c(const depz_tmf8829_info& c)
+{
+    tmf8829::Tmf8829Info i;
+    i.int_edges = c.int_edges;
+    i.frames = c.frames;
+    i.frames_aborted = c.frames_aborted;
+    i.frame_errors = c.frame_errors;
+    i.spi_timeouts = c.spi_timeouts;
+    i.int_level = c.int_level;
+    i.streaming = c.streaming;
+    i.int_mask = c.int_mask;
+    i.last_int_status = c.last_int_status;
+    i.last_fifo_status = c.last_fifo_status;
+    return i;
+}
+
+Tmf8829Config tmf_config_from_c(const depz_tmf8829_config& c)
+{
+    Tmf8829Config o;
+    o.preset = c.preset;
+    const auto* p = reinterpret_cast<const std::byte*>(c.page);
+    o.page.assign(p, p + DEPZ_TMF8829_CFG_SIZE);
+    o.histograms = c.histograms;
+    o.ref_frame = c.ref_frame;
+    for (std::size_t i = 0; i < DEPZ_TMF8829_CFG_FIELD_COUNT; ++i)
+        o.fields.emplace_back(DEPZ_TMF8829_CFG_FIELDS[i].name, c.fields[i]);
+    o.rows = c.rows;
+    o.cols = c.cols;
+    return o;
+}
+
+void tmf_progress_tramp(std::size_t done, std::size_t total, void* user)
+{
+    try {
+        (*static_cast<Tmf8829Progress*>(user))(done, total);
+    } catch (...) {
+    }
+}
+
+void tmf_measurement_tramp(const depz_tmf8829_measurement* m, void* user)
+{
+    try {
+        static_cast<FnHolder<Tmf8829Measurement>*>(user)->fn(tmf_measurement_from_c(*m));
+    } catch (...) {
+    }
+}
+
+void tmf_frame_tramp(const depz_tmf8829_raw_frame* f, void* user)
+{
+    try {
+        tmf8829::RawFrame r;
+        r.timestamp_us = f->timestamp_us;
+        r.edge_us = f->edge_us;
+        r.frame_seq = f->frame_seq;
+        const auto* d = reinterpret_cast<const std::byte*>(f->data);
+        r.data.assign(d, d + f->len);
+        static_cast<FnHolder<tmf8829::RawFrame>*>(user)->fn(r);
+    } catch (...) {
+    }
+}
+
+void tmf_event_tramp(const depz_tmf8829_event* e, void* user)
+{
+    try {
+        tmf8829::Tmf8829Event ev;
+        ev.timestamp_us = e->timestamp_us;
+        ev.int_status = e->int_status;
+        ev.code = e->code;
+        ev.frame_id = e->frame_id;
+        ev.fifo_status = e->fifo_status;
+        static_cast<FnHolder<tmf8829::Tmf8829Event>*>(user)->fn(ev);
+    } catch (...) {
+    }
+}
+
+}  // namespace
+
+std::optional<Tmf8829Measurement> Tmf8829Measurement::pull(detail::StreamHandle& h, std::chrono::milliseconds timeout,
+                                                           bool& closed)
+{
+    // ~90 KB: never on the caller's stack.
+    auto c = std::make_unique<depz_tmf8829_measurement>();
+    if (!h.next(c.get(), timeout, closed)) return std::nullopt;
+    return tmf_measurement_from_c(*c);
+}
+
+std::unique_ptr<Tmf8829> Tmf8829::open(Link link)
+{
+    depz_device* d = nullptr;
+    check(depz_tmf8829_open_link(link.release(), &d));
+    return std::unique_ptr<Tmf8829>(new Tmf8829(d));
+}
+
+Tmf8829SensorId Tmf8829::init(Tmf8829Progress progress)
+{
+    char ver[16] = {0};
+    std::uint32_t serial = 0;
+    check(depz_tmf8829_init(handle(), progress ? tmf_progress_tramp : nullptr, progress ? &progress : nullptr, ver,
+                            sizeof ver, &serial));
+    return Tmf8829SensorId{ver, serial};
+}
+
+Tmf8829SensorId Tmf8829::sensor_id()
+{
+    char ver[16] = {0};
+    std::uint32_t serial = 0;
+    check(depz_tmf8829_sensor_id(handle(), ver, sizeof ver, &serial));
+    return Tmf8829SensorId{ver, serial};
+}
+
+Tmf8829Config Tmf8829::configure(const std::string& preset, const Tmf8829Options& options)
+{
+    depz_tmf8829_options o = DEPZ_TMF8829_OPTIONS_INIT;
+    o.period_ms = options.period_ms;
+    o.kilo_iterations = options.kilo_iterations ? *options.kilo_iterations : -1;
+    o.nr_peaks = options.nr_peaks;
+    o.signal_strength = options.signal_strength;
+    o.noise_strength = options.noise_strength;
+    o.xtalk = options.xtalk;
+    o.histograms = options.histograms;
+    o.ref_frame = options.ref_frame;
+    std::vector<depz_tmf8829_field_value> fv;
+    fv.reserve(options.fields.size());
+    for (const auto& f : options.fields) fv.push_back(depz_tmf8829_field_value{f.first.c_str(), f.second});
+    o.fields = fv.empty() ? nullptr : fv.data();
+    o.n_fields = fv.size();
+    depz_tmf8829_config c{};
+    check(depz_tmf8829_configure(handle(), preset.c_str(), &o, &c));
+    return tmf_config_from_c(c);
+}
+
+std::optional<Tmf8829Config> Tmf8829::config()
+{
+    depz_tmf8829_config c{};
+    const int rc = depz_tmf8829_get_config(handle(), &c);
+    if (rc == DEPZ_E_ARG) return std::nullopt;  // no configure() since init()
+    check(rc);
+    return tmf_config_from_c(c);
+}
+
+bytes Tmf8829::config_page()
+{
+    bytes out(DEPZ_TMF8829_CFG_SIZE);
+    check(depz_tmf8829_config_page(handle(), reinterpret_cast<std::uint8_t*>(out.data())));
+    return out;
+}
+
+bytes Tmf8829::read_registers(std::uint8_t addr, std::size_t len)
+{
+    bytes out(len);
+    check(depz_tmf8829_read_registers(handle(), addr, reinterpret_cast<std::uint8_t*>(out.data()), len));
+    return out;
+}
+
+void Tmf8829::write_registers(std::uint8_t addr, byte_span data)
+{
+    check(depz_tmf8829_write_registers(handle(), addr, raw(data), data.size()));
+}
+
+tmf8829::Tmf8829Info Tmf8829::bridge_info()
+{
+    depz_tmf8829_info c{};
+    check(depz_tmf8829_bridge_info(handle(), &c));
+    return tmf_bridge_from_c(c);
+}
+
+void Tmf8829::start() { check(depz_tmf8829_start(handle())); }
+void Tmf8829::stop() { check(depz_tmf8829_stop(handle())); }
+bool Tmf8829::streaming() const { return depz_tmf8829_streaming(d_); }
+
+Device::Unsubscribe Tmf8829::on_measurement(std::function<void(const Tmf8829Measurement&)> cb)
+{
+    auto h = std::make_unique<FnHolder<Tmf8829Measurement>>();
+    h->fn = std::move(cb);
+    int token = 0;
+    check(depz_tmf8829_on_measurement(handle(), tmf_measurement_tramp, h.get(), &token));
+    keep(std::move(h));
+    depz_device* d = d_;
+    return [d, token] { depz_tmf8829_off_measurement(d, token); };
+}
+
+Device::Unsubscribe Tmf8829::on_frame(std::function<void(const tmf8829::RawFrame&)> cb)
+{
+    auto h = std::make_unique<FnHolder<tmf8829::RawFrame>>();
+    h->fn = std::move(cb);
+    int token = 0;
+    check(depz_tmf8829_on_frame(handle(), tmf_frame_tramp, h.get(), &token));
+    keep(std::move(h));
+    depz_device* d = d_;
+    return [d, token] { depz_tmf8829_off_frame(d, token); };
+}
+
+Device::Unsubscribe Tmf8829::on_event(std::function<void(const tmf8829::Tmf8829Event&)> cb)
+{
+    auto h = std::make_unique<FnHolder<tmf8829::Tmf8829Event>>();
+    h->fn = std::move(cb);
+    int token = 0;
+    check(depz_tmf8829_on_event(handle(), tmf_event_tramp, h.get(), &token));
+    keep(std::move(h));
+    depz_device* d = d_;
+    return [d, token] { depz_tmf8829_off_event(d, token); };
+}
+
+Stream<Tmf8829Measurement> Tmf8829::measurements(std::size_t maxsize)
+{
+    depz_stream* s = depz_tmf8829_measurements(handle(), maxsize);
+    if (!s) throw ArgumentError(DEPZ_E_NOMEM, "tmf8829 measurements: cannot subscribe");
+    return Stream<Tmf8829Measurement>(s);
+}
+
+Tmf8829Measurement Tmf8829::get_measurement(std::chrono::milliseconds timeout)
+{
+    auto c = std::make_unique<depz_tmf8829_measurement>();
+    check(depz_tmf8829_get_measurement(handle(), ms(timeout), c.get()));
+    return tmf_measurement_from_c(*c);
+}
+
+Tmf8829StreamStats Tmf8829::stream_stats() const
+{
+    depz_tmf8829_stream_stats c{};
+    depz_tmf8829_get_stream_stats(d_, &c);
+    return Tmf8829StreamStats{c.frames_completed, c.frames_dropped, c.frames_discarded, c.frame_parse_errors,
+                              c.chunk_errors,     c.measurements,   c.events_swallowed};
+}
+
 // ── discovery ───────────────────────────────────────────────────────────────
 
 std::vector<SerialPortInfo> list_serial_ports()
@@ -2368,6 +2673,16 @@ std::unique_ptr<Vl53lx> open_vl53lx(const OpenOptions& opt)
         return std::unique_ptr<Vl53lx>(s);
     }
     throw WrongTypeError(DEPZ_E_WRONG_TYPE, dev->port() + " is not a VL53L 1D-family board");
+}
+
+std::unique_ptr<Tmf8829> open_tmf8829(const OpenOptions& opt)
+{
+    auto dev = open_device(opt);
+    if (auto* s = dynamic_cast<Tmf8829*>(dev.get())) {
+        dev.release();
+        return std::unique_ptr<Tmf8829>(s);
+    }
+    throw WrongTypeError(DEPZ_E_WRONG_TYPE, dev->port() + " is not a TMF8829");
 }
 
 }  // namespace depz

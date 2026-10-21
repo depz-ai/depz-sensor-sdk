@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(depz_sensor_sdk_cpp VERSION 0.5.0 LANGUAGES CXX)
+project(depz_sensor_sdk_cpp VERSION 0.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,6 +40,8 @@ add_library(depz_sensor_sdk
   src/vl53lx.cpp
   src/bno055.cpp
   src/bno086.cpp
+  src/tmf8829.cpp
+  src/tmf8829_firmware.cpp
   src/dataset.cpp
 )
 target_include_directories(depz_sensor_sdk PUBLIC
@@ -99,6 +101,11 @@ install(TARGETS depz_sensor_sdk
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Third-party licences of what the library embeds: the ams TMF8829 sensor
+# firmware (MIT) behind depz::tmf8829::firmware_image().
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/licenses/tmf8829/LICENSES-MIT.TXT
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/depz-sensor-sdk-cpp/tmf8829)
 
 install(EXPORT depz-sensor-sdk-cpp-targets
   FILE depz-sensor-sdk-cpp-targets.cmake
@@ -165,7 +172,8 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   if(DEPZ_SENSOR_SDK_CPP_BUILD_IO AND EXISTS "${_depz_c_tests}/fake_sr04.c")
     enable_language(C)
     add_executable(depz_test_device tests/test_device.cpp "${_depz_c_tests}/fake_sr04.c"
-                   "${_depz_c_tests}/fake_vl53l4.c" "${_depz_c_tests}/fake_bno086.c")
+                   "${_depz_c_tests}/fake_vl53l4.c" "${_depz_c_tests}/fake_bno086.c"
+                   "${_depz_c_tests}/fake_tmf8829.c")
     target_link_libraries(depz_test_device PRIVATE depz_sensor_sdk)
     target_include_directories(depz_test_device PRIVATE "${_depz_c_tests}" tests)
     target_compile_definitions(depz_test_device PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
@@ -174,7 +182,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
               sr04_session_replay l4_fake_roundtrips_and_guards l4_session_replay l8ch_cnh_replay
               bno_ndof_replay bno086_session_replay bno086_fake_errors_and_reports
               vlx_l4cd_uld_replay vlx_l1cx_uld_replay vlx_l3cx_ulp_replay vlx_l0x_uld_replay
-              vlx_l4cx_hist_short_replay)
+              vlx_l4cx_hist_short_replay tmf8829_fake_session)
       add_test(NAME device_${t} COMMAND depz_test_device ${t})
     endforeach()
   endif()
@@ -189,6 +197,8 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   add_test(NAME vl53l4          COMMAND depz_test_vectors vl53l4)
   add_test(NAME vl53lx          COMMAND depz_test_vectors vl53lx)
   add_test(NAME bno055          COMMAND depz_test_vectors bno055)
+  add_test(NAME tmf8829         COMMAND depz_test_vectors tmf8829)
+  add_test(NAME tmf8829_frame_time COMMAND depz_test_vectors tmf8829_frame_time)
   add_test(NAME bno086_shtp     COMMAND depz_test_vectors bno086_shtp)
   add_test(NAME bno086_reports  COMMAND depz_test_vectors bno086_reports)
   add_test(NAME dataset         COMMAND depz_test_vectors dataset)

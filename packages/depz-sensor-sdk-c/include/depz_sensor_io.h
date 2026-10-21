@@ -22,7 +22,8 @@
  * Sensor classes: SR04 (contract 03), VL53L4CD (contract 10), the
  * multizone VL53L8CX / VL53L8CH / VL53L5CX / VL53L7CX / VL53L7CH (contracts
  * 04, 11), the VL53L 1D family VL53L0X / L1CX / L1CB / L3CX / L4CX (contract
- * 12), BNO055 (contract 13), BNO085 / BNO086 (contract 05). A board of an
+ * 12), BNO055 (contract 13), TMF8829 (contract 14), BNO085 / BNO086
+ * (contract 05). A board of an
  * unknown firmware opens as a plain device — common commands work.
  */
 #ifndef DEPZ_SENSOR_IO_H
@@ -775,6 +776,128 @@ depz_stream *depz_bno055_samples(depz_device *dev, size_t maxsize);
 /* The next streamed sample (< 0 timeout = 1000 ms). */
 int  depz_bno055_get_sample(depz_device *dev, int timeout_ms, depz_bno055_sample *out);
 uint64_t depz_bno055_stream_parse_errors(const depz_device *dev);
+
+/* ======================================================================== */
+/* TMF8829 multizone dToF (contract 14)                                      */
+/* ======================================================================== */
+
+/* 8x8 ... 48x32 zones, up to 4 peaks per zone, raw histograms, over a thin
+ * SPI register bridge: the host runs the sensor, as the Python SDK's
+ * tmf8829/__init__.py does it (same request sequences, so a capture made by
+ * either SDK replays in the other). Typical use: init() (soft reset +
+ * firmware download, ~0.15 s), configure("32x32", NULL), start(), then read
+ * measurements; stop(). The sensor's EN pin is wired high: there is no sleep,
+ * and recovery from any state is init() (it starts with a soft reset). A
+ * DEPZ_TMF8829_EV_BAD_HEADER event outside stop() means the sensor is lost:
+ * init() again. Sensor refusals (bootloader / application status, a field
+ * that does not read back) fail with DEPZ_E_PROTOCOL, polls with
+ * DEPZ_E_TIMEOUT. */
+
+/* What configure() writes on top of the preset. Every field a preset does not
+ * reset is written each time (contract 14 §4), so the result never depends on
+ * an earlier config. */
+typedef struct {
+    const char *name;  /* a DEPZ_TMF8829_CFG_FIELDS name */
+    int64_t     value;
+} depz_tmf8829_field_value;
+
+typedef struct {
+    int  period_ms;          /* DEPZ_TMF8829_DEFAULT_PERIOD_MS */
+    int  kilo_iterations;    /* < 0 = the preset's own */
+    int  nr_peaks;           /* 1..4 */
+    bool signal_strength, noise_strength, xtalk;
+    bool histograms;         /* dump_histograms: + HISTOGRAMS frames */
+    bool ref_frame;          /* ref_spad_frame: + the ref-SPAD frame per results frame */
+    /* any other page field by name (also overrides the ones above) */
+    const depz_tmf8829_field_value *fields;
+    size_t n_fields;
+} depz_tmf8829_options;
+
+#define DEPZ_TMF8829_OPTIONS_INIT \
+    { DEPZ_TMF8829_DEFAULT_PERIOD_MS, -1, 1, false, false, false, false, false, NULL, 0 }
+
+/* The config written by configure(), as read back from the sensor. */
+typedef struct {
+    char     preset[16];
+    uint8_t  page[DEPZ_TMF8829_CFG_SIZE];   /* 0x22..0xDF */
+    bool     histograms, ref_frame;
+    uint32_t fields[DEPZ_TMF8829_CFG_FIELD_COUNT]; /* in DEPZ_TMF8829_CFG_FIELDS order */
+    unsigned rows, cols;                    /* grid of a measurement */
+} depz_tmf8829_config;
+
+/* Counters of the current stream (reset at start()). */
+typedef struct {
+    uint64_t frames_completed;    /* frames reassembled */
+    uint64_t frames_dropped;      /* frame_seq gaps: frames the bridge dropped */
+    uint64_t frames_discarded;    /* lost to reassembly (incomplete, out of order) */
+    uint64_t frame_parse_errors;  /* frames that did not parse / decode */
+    uint64_t chunk_errors;        /* RPT_TMF_FRAME / EVENT reports too short */
+    uint64_t measurements;
+    uint64_t events_swallowed;    /* the expected BAD_HEADER of stop() */
+} depz_tmf8829_stream_stats;
+
+/* init() progress over the image download: bytes done / total. */
+typedef void (*depz_tmf8829_progress_cb)(size_t done, size_t total, void *user);
+typedef void (*depz_tmf8829_measurement_cb)(const depz_tmf8829_measurement *m, void *user);
+/* Every reassembled frame, before the measurement it may complete: the way to
+ * the histogram (25 377 B) and ref-SPAD (65 B) bytes, which a measurement only
+ * counts. `f->data` is valid during the call. */
+typedef void (*depz_tmf8829_frame_cb)(const depz_tmf8829_raw_frame *f, void *user);
+/* RPT_TMF_EVENT other than the expected stop() artefact. */
+typedef void (*depz_tmf8829_event_cb)(const depz_tmf8829_event *ev, void *user);
+
+/* A TMF8829 on a link without an identity probe (tests, replay). */
+int  depz_tmf8829_open_link(depz_link *link, depz_device **out);
+bool depz_is_tmf8829(const depz_device *dev);
+
+/* Soft reset -> sensor bootloader -> firmware download -> RAM application.
+ * Stops a running stream first; forgets the config. `progress` may be NULL;
+ * `app_version` ("2.200.0", cap >= 12) and `serial` may be NULL. */
+int depz_tmf8829_init(depz_device *dev, depz_tmf8829_progress_cb progress, void *user,
+                      char *app_version, size_t cap, uint32_t *serial);
+/* What the last init() read; DEPZ_E_ARG before one. */
+int depz_tmf8829_sensor_id(depz_device *dev, char *app_version, size_t cap, uint32_t *serial);
+
+/* Load `preset` (a DEPZ_TMF8829_PRESETS name) and write the config page with
+ * `opt` (NULL = DEPZ_TMF8829_OPTIONS_INIT); every written field must read
+ * back. `out` may be NULL. Not while streaming. */
+int depz_tmf8829_configure(depz_device *dev, const char *preset, const depz_tmf8829_options *opt,
+                           depz_tmf8829_config *out);
+/* The last configure() result; DEPZ_E_ARG when none since init(). */
+int depz_tmf8829_get_config(depz_device *dev, depz_tmf8829_config *out);
+/* LOAD_CONFIG_PAGE -> the 190-byte page 0x22..0xDF now in the sensor. */
+int depz_tmf8829_config_page(depz_device *dev, uint8_t page[DEPZ_TMF8829_CFG_SIZE]);
+
+/* Raw registers in <= 1024 / 1023-byte requests. A read that reaches the FIFO
+ * port 0xFF stays there (the next piece reads at min(addr + len, 0xFF)); a
+ * write to 0xFF stays at 0xFF. */
+int depz_tmf8829_read_registers(depz_device *dev, uint8_t addr, uint8_t *buf, size_t len);
+int depz_tmf8829_write_registers(depz_device *dev, uint8_t addr, const uint8_t *data, size_t len);
+
+/* Bridge counters (never touches the sensor, safe mid-stream). */
+int depz_tmf8829_bridge_info(depz_device *dev, depz_tmf8829_info *out);
+
+/* MEASURE with the bridge stream armed (RESULTS, + HISTOGRAMS / the ref frame
+ * as configured). Configures the default "8x8" first when configure() was not
+ * called since init(). No-op while streaming. */
+int  depz_tmf8829_start(depz_device *dev);
+/* Sensor STOP, then the bridge stream (frames already queued drain); the
+ * bad-header event a STOP raises mid histogram dump is swallowed. */
+int  depz_tmf8829_stop(depz_device *dev);
+bool depz_tmf8829_streaming(const depz_device *dev);
+
+int  depz_tmf8829_on_measurement(depz_device *dev, depz_tmf8829_measurement_cb cb, void *user, int *token);
+void depz_tmf8829_off_measurement(depz_device *dev, int token);
+int  depz_tmf8829_on_frame(depz_device *dev, depz_tmf8829_frame_cb cb, void *user, int *token);
+void depz_tmf8829_off_frame(depz_device *dev, int token);
+int  depz_tmf8829_on_event(depz_device *dev, depz_tmf8829_event_cb cb, void *user, int *token);
+void depz_tmf8829_off_event(depz_device *dev, int token);
+/* Pull stream of depz_tmf8829_measurement items (~90 KB each; maxsize 0 =
+ * 16). Subscribe before start() to see the first one. */
+depz_stream *depz_tmf8829_measurements(depz_device *dev, size_t maxsize);
+/* The next measurement (< 0 timeout = 1000 ms). */
+int  depz_tmf8829_get_measurement(depz_device *dev, int timeout_ms, depz_tmf8829_measurement *out);
+void depz_tmf8829_get_stream_stats(const depz_device *dev, depz_tmf8829_stream_stats *out);
 
 /* ======================================================================== */
 /* VL53L 1D ToF family: VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX, VL53L4CX     */

@@ -9,7 +9,8 @@ parsing, common command codecs, SR04 codecs, `.fwdepz` header parsing, the
 VL53L0X / L1CX / L1CB / L3CX / L4CX codecs + product table + block decode, the
 VL53L4CD register-bridge codecs + host-ULD math, the VL53L5CX / L7CX / L7CH
 board codecs and frame decode, the shared VL53L8 results-frame decoder +
-advanced-DCI codecs + CNH histogram decode, the BNO055 register-bridge and
+advanced-DCI codecs + CNH histogram decode, the TMF8829 register-bridge codecs +
+frame / measurement decode + capture time, the BNO055 register-bridge and
 register codecs, and the BNO086 SH-2 / SHTP layer. This SDK is **decode-layer only** — pure, host-verifiable codecs
 covered by golden vectors; live hardware bring-up (register bridges, ULD init)
 is out of scope.
@@ -27,7 +28,8 @@ Full docs live under [`docs/`](docs/):
   [VL53L4CD](docs/vl53l4cd/introduction.md) · [VL53L4CX](docs/vl53l4cx/introduction.md) ·
   [VL53L5CX](docs/vl53l5cx/introduction.md) · [VL53L7CX](docs/vl53l7cx/introduction.md) ·
   [VL53L7CH](docs/vl53l7ch/introduction.md) · [VL53L8CX](docs/vl53l8cx/introduction.md) ·
-  [VL53L8CH](docs/vl53l8ch/introduction.md) · [BNO055](docs/bno055/introduction.md) ·
+  [VL53L8CH](docs/vl53l8ch/introduction.md) · [TMF8829](docs/tmf8829/introduction.md) ·
+  [BNO055](docs/bno055/introduction.md) ·
   [BNO085](docs/bno085/introduction.md) · [BNO086](docs/bno086/introduction.md)
 - [Full API reference](docs/api.md) — generated from the Java sources by
   `scripts/gen_api_md.py`; regenerate with `python3 scripts/gen_api_md.py`.
@@ -45,10 +47,11 @@ a wire frame but ship as different parts:
 | **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH); PIDs **0xED48 / 0xED49 / 0xED4A**. | Board codecs (pin control, bus speed, info), class resolution, frame decode through the VL53L8 decoder with the L5/L7 geometry, CNH decode on the L7CH. |
 | **VL53L8CX** | Base multizone ToF. Dev-default; enumerates on the ST dev USB id (VID 0x0483 / PID 0x56DC). | Shared VL53L8 frame decode + advanced-DCI codecs. |
 | **VL53L8CH** | CX **plus** CNH (compact histograms) and its own production USB PID **0xED40**. | Shares the VL53L8 frame decode + advanced-DCI with CX, plus the CNH histogram decode (`Vl53l8Uld.decodeCnh`). |
+| **TMF8829**  | ams-OSRAM multizone dToF (8×8 … 48×32 zones, up to 4 peaks, histograms) behind a thin SPI register bridge; PID **0xED4C**. | Wire codecs, chunk reassembly, frame / pixel decode + half-frame merge, config-page fields, clock model + capture time, measurement builder, embedded sensor firmware (MIT). |
 | **BNO055**   | 9-axis IMU with on-chip fusion behind an I2C register bridge; PID **0xEE0A**. | Wire codecs, units / calibration / axis-remap / page-1 codecs, register-window decode. |
 | **BNO085 / BNO086** | 9-axis IMU (SH-2 over SHTP).                                   | SHTP framing/reassembly, SH-2 control encoders, input-report decode. |
 
-For the 1D family, the VL53L5CX / L7CX / L7CH and the BNO055, initialising and
+For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055, initialising and
 streaming the board is done with the Python or TypeScript SDK; this SDK
 decodes what they send and builds the command payloads.
 
@@ -65,7 +68,7 @@ register-bridge driver (both variants) is an extension point and intentionally
 - `src/main/java/ai/depz/sensor/usb/` — `UsbIds` (`isKnownDepzUsb`,
   `usbModelHint`, serial ordering).
 - `src/main/java/ai/depz/sensor/protocol/` — `Common`, `Identity`, `Sr04`,
-  `Vl53l4`, `Vl53l7`, `Vl53lx`, `Bno055`, `FwDepz`.
+  `Vl53l4`, `Vl53l7`, `Vl53lx`, `Bno055`, `Tmf8829`, `FwDepz`.
 - `src/main/java/ai/depz/sensor/sensors/vl53l4/` — `Vl53l4Uld` (VL53L4CD
   result-block decode, range-timing math, tuning codecs, init config block).
 - `src/main/java/ai/depz/sensor/sensors/vl53l8/` — `FrameReassembler` and
@@ -75,6 +78,9 @@ register-bridge driver (both variants) is an extension point and intentionally
 - `src/main/java/ai/depz/sensor/sensors/vl53lx/` — `Vl53lxProducts` (product
   table, class resolution) and `Vl53lxDecode` (die / VL53L0X / histogram
   blocks).
+- `src/main/java/ai/depz/sensor/sensors/tmf8829/` — `Frames`, `Tmf8829Config`,
+  `SensorClock`, `CaptureTimer`, `MeasurementBuilder`, `Tmf8829Firmware`
+  (frame decode, config fields, capture time, the embedded sensor firmware).
 - `src/main/java/ai/depz/sensor/sensors/bno055/` — `Bno055Regs` (register map,
   units, calibration, axis remap, page-1 configs, window decode).
 - `src/main/java/ai/depz/sensor/sensors/bno086/` — `Shtp`, `Sh2`, `Reports`.
@@ -83,12 +89,12 @@ register-bridge driver (both variants) is an extension point and intentionally
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.5.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.6.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.5.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.6.0")
 ```
 
 Maven:
@@ -97,7 +103,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 

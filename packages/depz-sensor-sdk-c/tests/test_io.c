@@ -5,6 +5,7 @@
 #include "fake_sr04.h"
 #include "fake_vl53l4.h"
 #include "fake_bno086.h"
+#include "fake_tmf8829.h"
 #include "json.h"
 
 #include "../src/io/platform.h"
@@ -1527,6 +1528,296 @@ static void vlx_l1cx_hist_replay(void) { vlx_replay("vl53l1cx_histogram_long_33m
 static void vlx_l1cb_hist_replay(void) { vlx_replay("vl53l1cb_histogram_medium_33ms"); }
 static void vlx_l3cx_hist_replay(void) { vlx_replay("vl53l3cx_histogram_medium_33ms"); }
 
+/* ── TMF8829 against the fake bridge (contracts/vectors/tmf8829.json) ────── */
+
+static uint8_t *tmf_unhex(const char *hex, size_t *n)
+{
+    size_t k, len = hex ? strlen(hex) / 2 : 0;
+    uint8_t *b = (uint8_t *)malloc(len ? len : 1);
+    for (k = 0; b && k < len; k++) {
+        unsigned v = 0;
+        if (sscanf(hex + 2 * k, "%2x", &v) != 1) v = 0;
+        b[k] = (uint8_t)v;
+    }
+    *n = len;
+    return b;
+}
+
+static const json_value *tmf_named(const json_value *arr, const char *name)
+{
+    size_t i;
+    for (i = 0; i < json_arr_size(arr); i++)
+        if (!strcmp(json_as_str(json_obj_get(json_arr_get(arr, i), "name")), name)) return json_arr_get(arr, i);
+    return NULL;
+}
+
+typedef struct {
+    depz_mutex lock;
+    int frames, measurements, events;
+    size_t progress_calls, progress_done, progress_total;
+} tmf_counts;
+
+static void tmf_progress(size_t done, size_t total, void *u)
+{
+    tmf_counts *c = (tmf_counts *)u;
+    c->progress_calls++;
+    c->progress_done = done;
+    c->progress_total = total;
+}
+
+static void tmf_frame_cb(const depz_tmf8829_raw_frame *f, void *u)
+{
+    tmf_counts *c = (tmf_counts *)u;
+    (void)f;
+    depz_mutex_lock(&c->lock);
+    c->frames++;
+    depz_mutex_unlock(&c->lock);
+}
+
+static void tmf_meas_cb(const depz_tmf8829_measurement *m, void *u)
+{
+    tmf_counts *c = (tmf_counts *)u;
+    (void)m;
+    depz_mutex_lock(&c->lock);
+    c->measurements++;
+    depz_mutex_unlock(&c->lock);
+}
+
+static void tmf_event_cb(const depz_tmf8829_event *e, void *u)
+{
+    tmf_counts *c = (tmf_counts *)u;
+    (void)e;
+    depz_mutex_lock(&c->lock);
+    c->events++;
+    depz_mutex_unlock(&c->lock);
+}
+
+static int tmf_count(tmf_counts *c, const int *field, int want)
+{
+    int i, v = 0;
+    for (i = 0; i < 200; i++) {
+        depz_mutex_lock(&c->lock);
+        v = *field;
+        depz_mutex_unlock(&c->lock);
+        if (v >= want) break;
+        depz_sleep_ms(5);
+    }
+    return v;
+}
+
+/* Queue the frames of one tmf8829.json measurement sequence on the fake. */
+static bool tmf_script(fake_tmf8829 *f, const json_value *root, const char *seq)
+{
+    const json_value *s = tmf_named(json_obj_get(root, "measurements"), seq), *fr;
+    size_t i;
+    if (!s) return false;
+    fake_tmf8829_clear_frames(f);
+    fr = json_obj_get(s, "frames");
+    for (i = 0; i < json_arr_size(fr); i++) {
+        const json_value *e = json_arr_get(fr, i);
+        const json_value *src = tmf_named(json_obj_get(root, "frames"), json_as_str(json_obj_get(e, "raw_case")));
+        uint8_t *raw;
+        size_t n;
+        if (!src) return false;
+        raw = tmf_unhex(json_as_str(json_obj_get(src, "raw")), &n);
+        fake_tmf8829_add_frame(f, raw, n, (uint64_t)json_as_int(json_obj_get(e, "timestamp_us")),
+                               (uint64_t)json_as_int(json_obj_get(e, "edge_us")));
+        free(raw);
+    }
+    return true;
+}
+
+static bool tmf_same(const depz_tmf8829_measurement *m, const json_value *e)
+{
+    return e && m->timestamp_us == json_as_int(json_obj_get(e, "timestamp_us")) &&
+           m->flags == json_as_int(json_obj_get(e, "flags")) &&
+           m->f_number == (uint32_t)json_as_int(json_obj_get(e, "f_number")) &&
+           m->ratio_q16 == (uint32_t)json_as_int(json_obj_get(e, "ratio_q16")) &&
+           m->n_ref_frames == (size_t)json_as_int(json_obj_get(e, "n_ref_frames")) &&
+           m->n_histograms == (size_t)json_as_int(json_obj_get(e, "n_histograms")) &&
+           m->n_problems == (size_t)json_as_int(json_obj_get(e, "n_problems")) &&
+           m->results.peaks == json_as_int(json_obj_get(e, "peaks")) &&
+           m->results.rows == json_as_int(json_obj_get(e, "rows")) &&
+           m->results.cols == json_as_int(json_obj_get(e, "cols")) &&
+           m->results.distance[0] == json_as_int(json_arr_get(json_obj_get(e, "distance"), 0));
+}
+
+static void tmf8829_session(fake_tmf8829 *f, depz_device *dev, const json_value *root, tmf_counts *cnt,
+                            depz_tmf8829_measurement *m)
+{
+    const json_value *ex32 = json_obj_get(tmf_named(json_obj_get(root, "measurements"), "32x32_ref"), "expect");
+    const json_value *ex8 = json_obj_get(tmf_named(json_obj_get(root, "measurements"), "8x8"), "expect");
+    depz_tmf8829_options opt = DEPZ_TMF8829_OPTIONS_INIT;
+    depz_tmf8829_config cfg;
+    depz_tmf8829_stream_stats stats;
+    depz_tmf8829_info info;
+    char ver[16];
+    uint32_t serial = 0, addr = 0, v;
+    uint16_t words = 0;
+    size_t writes = 0, maxw = 0, nimg, i;
+    const uint8_t *img;
+    uint8_t page[190], mask = 0, flags = 0;
+    depz_stream *s;
+
+    /* discovery wiring: APP_TMF8829_* promotes to the TMF8829 class */
+    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
+    CHECK(depz_is_tmf8829(dev) && !depz_is_bno055(dev));
+    CHECK(depz_device_sensor_type(dev) == DEPZ_SENSOR_TMF8829);
+    CHECK_RC(depz_tmf8829_sensor_id(dev, ver, sizeof ver, &serial), DEPZ_E_ARG);
+
+    /* init: soft reset, bootloader, the image in <= 1023 B FIFO writes */
+    CHECK_RC(depz_tmf8829_init(dev, tmf_progress, cnt, ver, sizeof ver, &serial), DEPZ_OK);
+    CHECK(!strcmp(ver, "2.200.0") && serial == FAKE_TMF8829_SERIAL);
+    nimg = fake_tmf8829_image(f, &img);
+    CHECK(nimg == depz_tmf8829_firmware_len && !memcmp(img, depz_tmf8829_firmware, nimg));
+    fake_tmf8829_fifo_params(f, &addr, &words, &writes, &maxw);
+    CHECK(addr == DEPZ_TMF8829_FIRMWARE_LOAD_ADDR && words == 3611 && writes == 15 && maxw == 1023);
+    CHECK(cnt->progress_calls == 15 && cnt->progress_done == 14444 && cnt->progress_total == 14444);
+    CHECK((fake_tmf8829_reg(f, DEPZ_TMF8829_REG_ENABLE) & 0x30) == 0x20); /* powerup_select = RAM */
+
+    /* configure: every survivor field written over the stale captured page
+     * (4 peaks + all strengths), verified by read-back */
+    opt.period_ms = 50;
+    opt.ref_frame = true;
+    CHECK_RC(depz_tmf8829_configure(dev, "32x32", &opt, &cfg), DEPZ_OK);
+    CHECK(cfg.rows == 32 && cfg.cols == 32 && cfg.ref_frame && !cfg.histograms && !strcmp(cfg.preset, "32x32"));
+    fake_tmf8829_page(f, page);
+    CHECK(depz_tmf8829_cfg_get(page, "period_ms", &v) == 0 && v == 50);
+    CHECK(depz_tmf8829_cfg_get(page, "kilo_iterations", &v) == 0 && v == 2344);
+    CHECK(depz_tmf8829_cfg_get(page, "nr_peaks", &v) == 0 && v == 1);
+    CHECK(depz_tmf8829_cfg_get(page, "signal_strength", &v) == 0 && v == 0);
+    CHECK(depz_tmf8829_cfg_get(page, "xtalk", &v) == 0 && v == 0);
+    CHECK(depz_tmf8829_cfg_get(page, "ref_spad_frame", &v) == 0 && v == 1);
+    CHECK(depz_tmf8829_cfg_get(page, "fp_mode", &v) == 0 && v == 3 && cfg.fields[2] == 3);
+    CHECK_RC(depz_tmf8829_configure(dev, "64x64", NULL, NULL), DEPZ_E_ARG);
+    {
+        depz_tmf8829_options bad = DEPZ_TMF8829_OPTIONS_INIT;
+        depz_tmf8829_field_value fv[1] = {{"no_such_field", 1}};
+        bad.nr_peaks = 8;
+        CHECK_RC(depz_tmf8829_configure(dev, "8x8", &bad, NULL), DEPZ_E_ARG);
+        bad.nr_peaks = 1;
+        bad.fields = fv;
+        bad.n_fields = 1;
+        CHECK_RC(depz_tmf8829_configure(dev, "8x8", &bad, NULL), DEPZ_E_ARG);
+        fv[0].name = "fov_correction";
+        fv[0].value = 3;
+        fake_tmf8829_pin_fov_correction(f, true);
+        CHECK_RC(depz_tmf8829_configure(dev, "8x8", &bad, NULL), DEPZ_E_PROTOCOL);
+        CHECK(strstr(depz_last_error(), "did not stick") && strstr(depz_last_error(), "fov_correction wrote 3"));
+        fake_tmf8829_pin_fov_correction(f, false);
+    }
+    CHECK_RC(depz_tmf8829_get_config(dev, &cfg), DEPZ_OK);
+    CHECK(!strcmp(cfg.preset, "32x32")); /* a refused configure keeps the last good one */
+    CHECK_RC(depz_tmf8829_configure(dev, "32x32", &opt, NULL), DEPZ_OK);
+
+    /* stream: two 32x32 half-frames, each behind its ref-SPAD frame */
+    CHECK(tmf_script(f, root, "32x32_ref"));
+    CHECK_RC(depz_tmf8829_on_frame(dev, tmf_frame_cb, cnt, NULL), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_on_measurement(dev, tmf_meas_cb, cnt, NULL), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_on_event(dev, tmf_event_cb, cnt, NULL), DEPZ_OK);
+    s = depz_tmf8829_measurements(dev, 4);
+    CHECK(s);
+    CHECK_RC(depz_tmf8829_start(dev), DEPZ_OK);
+    CHECK(depz_tmf8829_streaming(dev));
+    CHECK(fake_tmf8829_armed(f, &mask, &flags) && mask == DEPZ_TMF8829_INT_RESULTS && flags == DEPZ_TMF8829_SF_REF_FRAME);
+    CHECK(fake_tmf8829_reg(f, DEPZ_TMF8829_REG_INT_ENAB) == DEPZ_TMF8829_INT_RESULTS);
+    CHECK_RC(depz_stream_next(s, m, 2000), DEPZ_OK);
+    CHECK(tmf_same(m, json_arr_get(ex32, 0)) && m->n_frames == 2 && m->rows == 32);
+    CHECK(tmf_count(cnt, &cnt->frames, 4) == 4 && tmf_count(cnt, &cnt->measurements, 1) == 1);
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", NULL, NULL), DEPZ_E_ARG); /* not while streaming */
+
+    /* an INT event reaches the callback */
+    fake_tmf8829_send_event(f, DEPZ_TMF8829_INT_MOTION, DEPZ_TMF8829_EV_INT);
+    CHECK(tmf_count(cnt, &cnt->events, 1) == 1);
+
+    /* bridge info + raw reads that run into the FIFO port */
+    CHECK_RC(depz_tmf8829_bridge_info(dev, &info), DEPZ_OK);
+    CHECK(info.streaming && info.int_mask == 1 && info.frames == 4);
+    {
+        uint8_t buf[1100];
+        uint8_t ra[8];
+        uint16_t rl[8];
+        for (i = 0; i < 15; i++) fake_tmf8829_set_reg(f, (uint8_t)(0xF0 + i), (uint8_t)(0x60 + i));
+        fake_tmf8829_set_reg(f, 0xFF, 0xAB);
+        fake_tmf8829_clear_reads(f);
+        CHECK_RC(depz_tmf8829_read_registers(dev, 0xF0, buf, sizeof buf), DEPZ_OK);
+        CHECK(fake_tmf8829_reads(f, ra, rl, 8) == 2 && ra[0] == 0xF0 && rl[0] == 1024 && ra[1] == 0xFF && rl[1] == 76);
+        CHECK(buf[0] == 0x60 && buf[14] == 0x6E && buf[15] == 0xAB && buf[1099] == 0xAB);
+        buf[0] = 0x5A;
+        CHECK_RC(depz_tmf8829_write_registers(dev, 0xF0, buf, 1), DEPZ_OK);
+        CHECK(fake_tmf8829_reg(f, 0xF0) == 0x5A);
+    }
+
+    /* stop swallows the one BAD_HEADER a STOP raises mid histogram dump */
+    fake_tmf8829_bad_header_on_stop(f, true);
+    CHECK_RC(depz_tmf8829_stop(dev), DEPZ_OK);
+    CHECK(!depz_tmf8829_streaming(dev) && !fake_tmf8829_armed(f, NULL, NULL));
+    CHECK(fake_tmf8829_reg(f, DEPZ_TMF8829_REG_INT_ENAB) == 0);
+    depz_tmf8829_get_stream_stats(dev, &stats);
+    CHECK(stats.events_swallowed == 1 && stats.frames_completed == 4 && stats.measurements == 1 &&
+          stats.frames_dropped == 0 && stats.frames_discarded == 0 && stats.frame_parse_errors == 0);
+    CHECK(tmf_count(cnt, &cnt->events, 1) == 1);
+    fake_tmf8829_bad_header_on_stop(f, false);
+
+    /* a second stream (8x8): a dropped frame_seq is counted, not fatal */
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", NULL, &cfg), DEPZ_OK);
+    CHECK(cfg.rows == 8 && !cfg.ref_frame);
+    CHECK(tmf_script(f, root, "8x8"));
+    fake_tmf8829_skip_seq_before(f, 1);
+    CHECK_RC(depz_tmf8829_start(dev), DEPZ_OK);
+    CHECK(fake_tmf8829_armed(f, &mask, &flags) && mask == 1 && flags == 0);
+    for (i = 0; i < 2; i++) {
+        CHECK_RC(depz_stream_next(s, m, 2000), DEPZ_OK);
+        CHECK(tmf_same(m, json_arr_get(ex8, i)) && m->n_frames == 1 && m->rows == 8);
+    }
+    depz_tmf8829_get_stream_stats(dev, &stats);
+    CHECK(stats.frames_dropped == 1 && stats.frames_completed == 2 && stats.measurements == 2);
+    CHECK_RC(depz_tmf8829_stop(dev), DEPZ_OK);
+    CHECK(depz_stream_dropped_count(s) == 0);
+    depz_stream_close(s);
+
+    /* re-init forgets the config; start() then configures "8x8" itself */
+    CHECK_RC(depz_tmf8829_init(dev, NULL, NULL, NULL, 0, NULL), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_get_config(dev, &cfg), DEPZ_E_ARG);
+    fake_tmf8829_clear_frames(f);
+    CHECK_RC(depz_tmf8829_start(dev), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_get_config(dev, &cfg), DEPZ_OK);
+    CHECK(!strcmp(cfg.preset, "8x8"));
+    CHECK_RC(depz_tmf8829_stop(dev), DEPZ_OK);
+}
+
+static void tmf8829_fake_session(void)
+{
+    char *text = slurp(DEPZ_VECTORS_DIR "/tmf8829.json");
+    json_value *root;
+    depz_link *link;
+    depz_device *dev = NULL;
+    fake_tmf8829 *f;
+    tmf_counts cnt;
+    depz_tmf8829_measurement *m;
+    uint8_t *page;
+    size_t n;
+    CHECK(text);
+    root = json_parse(text);
+    free(text);
+    CHECK(root);
+    memset(&cnt, 0, sizeof cnt);
+    depz_mutex_init(&cnt.lock);
+    m = (depz_tmf8829_measurement *)malloc(sizeof *m);
+    f = fake_tmf8829_start(&link);
+    CHECK(f && m);
+    page = tmf_unhex(json_as_str(json_obj_get(json_obj_get(root, "config"), "page")), &n);
+    fake_tmf8829_set_base_page(f, page);
+    free(page);
+    if (depz_device_open_link(link, &dev) == DEPZ_OK) tmf8829_session(f, dev, root, &cnt, m);
+    else { g_failed++; fprintf(stderr, "  FAIL open: %s\n", depz_last_error()); }
+    depz_device_close(dev);
+    fake_tmf8829_stop(f);
+    depz_mutex_destroy(&cnt.lock);
+    free(m);
+    json_free(root);
+}
+
 /* ── runner ──────────────────────────────────────────────────────────── */
 
 typedef struct { const char *name; void (*rig_fn)(rig *); void (*plain_fn)(void); } test_case;
@@ -1581,6 +1872,7 @@ static const test_case k_tests[] = {
     {"bno086_commands", NULL, bno086_commands},
     {"bno086_frs", NULL, bno086_frs},
     {"bno086_codecs", NULL, bno086_codecs},
+    {"tmf8829_fake_session", NULL, tmf8829_fake_session},
     {"vlx_l4cd_uld_replay", NULL, vlx_l4cd_uld_replay},
     {"vlx_l1cx_uld_replay", NULL, vlx_l1cx_uld_replay},
     {"vlx_l1cb_uld_replay", NULL, vlx_l1cb_uld_replay},

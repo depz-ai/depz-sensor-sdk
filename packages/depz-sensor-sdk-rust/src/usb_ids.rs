@@ -12,6 +12,7 @@ pub const PID_SR04: u16 = 0xEC78; // 60536 — HC-SR04 ultrasonic
 pub const PID_VL53L8CH: u16 = 0xED40; // 60736 — VL53L8CH ToF
 pub const PID_VL53L4CD: u16 = 0xED45; // 60741 — VL53L4CD ToF
 pub const PID_VL53L8CX: u16 = 0xED4B; // 60747 — VL53L8CX ToF (hw-verified)
+pub const PID_TMF8829: u16 = 0xED4C; // 60748 — TMF8829 dToF (catalog p_TM88)
 pub const PID_BNO086: u16 = 0xEE08; // 60936 — BNO086 IMU
 
 /// Inclusive PID range under `DEPZ_USB_VID` treated as candidate DEPZ sensors.
@@ -36,6 +37,7 @@ const PID_MODEL: &[(u16, &str)] = &[
     (0xED49, "vl53l7cx"), // 60745
     (0xED4A, "vl53l7ch"), // 60746
     (PID_VL53L8CX, "vl53l8cx"),
+    (PID_TMF8829, "tmf8829"),
     (PID_BNO086, "bno086"),
     (0xEE09, "bno085"), // 60937
     (0xEE0A, "bno055"), // 60938

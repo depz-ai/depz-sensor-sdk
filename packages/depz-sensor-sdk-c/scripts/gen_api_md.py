@@ -11,7 +11,7 @@ SAME shape as the Python SDK's ``docs/api.md``:
   ``## <Domain>`` section per header banner (Discovery / Transport / Common
   protocol / SR04 / VL53L4 / VL53L8 / BNO086 / Bootloader / Datasets, then
   the live layer's Errors / Byte links / Streams / Device core / Discovery /
-  SR04 / VL53L4CD / VL53L8 / VL53L 1D family / BNO055 / BNO086 sensor
+  SR04 / VL53L4CD / VL53L8 / VL53L 1D family / BNO055 / TMF8829 / BNO086 sensor
   classes), and per-symbol ``### name`` + a fenced ```c signature``` block + the doc text;
 - ``docs/<sensor>/api.md`` — one focused reference per sensor, carrying only
   that sensor's own symbols (the shared surface stays in the root). The one
@@ -21,7 +21,7 @@ SAME shape as the Python SDK's ``docs/api.md``:
   VL53L7CX / VL53L7CH section feeds all three L5/L7 pages (the L7CH page adds
   the CNH decode), and the VL53L 1D family section feeds the VL53L0X,
   VL53L1CX, VL53L1CB, VL53L3CX and VL53L4CX pages. The live layer's
-  sensor-class sections join their sensor's page (SR04, VL53L4CD, BNO055, BNO086, and the
+  sensor-class sections join their sensor's page (SR04, VL53L4CD, BNO055, TMF8829, BNO086, and the
   VL53L 1D family class on its five pages); the one
   multizone class serves the VL53L8CX / CH and the L5/L7 boards, so it joins
   the VL53L8CX page whole, the VL53L8CH page gets its CNH-setup subset and the
@@ -47,11 +47,11 @@ DOCS = HERE / "docs"
 # from the header banner it lives under (see _domain_for_banner).
 DOMAIN_ORDER = [
     "discovery", "transport", "common", "sr04",
-    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
+    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055", "tmf8829",
     "bootloader", "dataset",
     # depz_sensor_io.h — the live-hardware layer
     "io_errors", "io_links", "io_streams", "io_device", "io_discovery", "sr04_io",
-    "vl53l4_io", "vl53l8_io", "vl53lx_io", "bno055_io", "bno086_io",
+    "vl53l4_io", "vl53l8_io", "vl53lx_io", "bno055_io", "tmf8829_io", "bno086_io",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery",
@@ -64,6 +64,7 @@ DOMAIN_TITLE = {
     "vl53lx": "VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)",
     "bno086": "BNO086 (IMU)",
     "bno055": "BNO055 (IMU)",
+    "tmf8829": "TMF8829 (dToF)",
     "bootloader": "Bootloader / firmware update",
     "dataset": "Datasets (record & replay)",
     "io_errors": "Live layer: errors",
@@ -75,6 +76,7 @@ DOMAIN_TITLE = {
     "vl53l4_io": "VL53L4CD sensor class (live layer)",
     "vl53l8_io": "VL53L8 multizone sensor class (live layer)",
     "bno055_io": "BNO055 sensor class (live layer)",
+    "tmf8829_io": "TMF8829 sensor class (live layer)",
     "bno086_io": "BNO085 / BNO086 sensor class (live layer)",
     "vl53lx_io": "VL53L 1D family sensor class (live layer)",
 }
@@ -124,6 +126,8 @@ def _domain_for_banner(title: str, current: str) -> str:
     """Map a header banner title to a domain key (keeps `current` if unknown)."""
     t = title
     # Checked first: these banners mention their VL53L4 / VL53L8 parents.
+    if "TMF8829" in t:
+        return "tmf8829"
     if "BNO055" in t:
         return "bno055"
     if "VL53L 1D family" in t:
@@ -155,6 +159,8 @@ def _io_domain_for_banner(title: str, current: str) -> str:
     """Map a depz_sensor_io.h banner title to a domain key."""
     t = title
     # Checked first: this banner names VL53L4CX / VL53L4CD too.
+    if "TMF8829" in t:
+        return "tmf8829_io"
     if "1D ToF family" in t:
         return "vl53lx_io"
     if "SR04" in t:
@@ -279,6 +285,10 @@ def parse_header(path: Path, banner_domain=_domain_for_banner,
             m = re.match(r"#define\s+(\w+)", stripped)
             name = m.group(1)
             body = raw
+            # a backslash continues the macro on the next line
+            while body.rstrip().endswith("\\") and i + 1 < n:
+                i += 1
+                body += "\n" + lines[i]
             # a trailing comment may run on to further lines
             if "/*" in body and "*/" not in body[body.index("/*"):]:
                 while i + 1 < n:
@@ -531,6 +541,19 @@ def _sensor_targets(by_domain: dict[str, list[dict]]):
         ]))
     elif by_domain.get("bno055"):
         targets.append(("bno055", "BNO055 (IMU)", by_domain["bno055"], []))
+    if by_domain.get("tmf8829") and by_domain.get("tmf8829_io"):
+        targets.append(("tmf8829", "TMF8829 (dToF)", [
+            ("tmf8829", DOMAIN_TITLE["tmf8829"], by_domain["tmf8829"]),
+            ("tmf8829_io", DOMAIN_TITLE["tmf8829_io"], by_domain["tmf8829_io"]),
+        ], [
+            "The codecs come first (`depz_sensor_sdk.h`: wire commands and",
+            "reports, chunk reassembly, frame / pixel decode, clock model,",
+            "measurement assembly, config page, the sensor firmware); the live",
+            "sensor class (`depz_sensor_io.h`) is built from them and follows.",
+            "",
+        ]))
+    elif by_domain.get("tmf8829"):
+        targets.append(("tmf8829", "TMF8829 (dToF)", by_domain["tmf8829"], []))
     return targets
 
 
@@ -562,6 +585,7 @@ def main() -> None:
         "[VL53L4CX](vl53l4cx/api.md) · [VL53L5CX](vl53l5cx/api.md) · "
         "[VL53L7CX](vl53l7cx/api.md) · [VL53L7CH](vl53l7ch/api.md) · "
         "[VL53L8CX](vl53l8cx/api.md) · [VL53L8CH](vl53l8ch/api.md) · "
+        "[TMF8829](tmf8829/api.md) · "
         "[BNO055](bno055/api.md) · [BNO085](bno085/api.md) · "
         "[BNO086](bno086/api.md).",
         "",

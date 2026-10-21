@@ -5,7 +5,7 @@
 // block, never destroy their device from one).
 //
 // Sensor classes so far: Sr04, Vl53l4cd, Vl53l8 (VL53L8CX/CH, VL53L5CX, VL53L7CX/CH),
-// Bno055, Bno086 (BNO085 / BNO086), Vl53lx (the VL53L 1D family).
+// Bno055, Bno086 (BNO085 / BNO086), Vl53lx (the VL53L 1D family), Tmf8829.
 #pragma once
 
 #include <array>
@@ -27,6 +27,7 @@
 #include "depz/identity.hpp"
 #include "depz/span.hpp"
 #include "depz/sr04.hpp"
+#include "depz/tmf8829.hpp"
 #include "depz/vl53l4.hpp"
 #include "depz/vl53l7.hpp"
 #include "depz/vl53l8.hpp"
@@ -946,6 +947,126 @@ private:
     friend std::unique_ptr<Device> wrap_device(depz_device* d);
 };
 
+// ── TMF8829 multizone dToF (contract 14) ────────────────────────────────────
+// 8x8 ... 48x32 zones, up to 4 peaks per zone, raw histograms, over a thin SPI
+// register bridge: the host runs the sensor, as the Python SDK does (same
+// request sequences, so a capture made by either SDK replays in the other).
+// init() (soft reset + firmware download, ~0.15 s), configure("32x32"),
+// start(), read measurements(), stop(). EN is wired high: there is no sleep,
+// and recovery from any state is init(). An EV_BAD_HEADER event outside
+// stop() means the sensor is lost: init() again. Sensor refusals (bootloader /
+// application status, a field that does not read back) throw ProtocolError,
+// polls TimeoutError; configure() while streaming throws ArgumentError.
+
+// What configure() writes on top of the preset. Every field a preset does not
+// reset is written each time (contract 14 §4), so the result never depends on
+// an earlier config.
+struct Tmf8829Options {
+    int period_ms = tmf8829::DEFAULT_PERIOD_MS;
+    std::optional<int> kilo_iterations;  // nullopt = the preset's own
+    int nr_peaks = 1;                    // 1..4
+    bool signal_strength = false, noise_strength = false, xtalk = false;
+    bool histograms = false;             // dump_histograms: + HISTOGRAMS frames
+    bool ref_frame = false;              // ref_spad_frame: + the ref-SPAD frame per results frame
+    // Any other page field by name (also overrides the ones above).
+    std::vector<std::pair<std::string, std::int64_t>> fields;
+};
+
+// The config written by configure(), as read back from the sensor.
+struct Tmf8829Config {
+    std::string preset;
+    bytes page;  // 190 B, registers 0x22..0xDF
+    bool histograms = false, ref_frame = false;
+    std::vector<std::pair<std::string, std::uint32_t>> fields;  // in tmf8829::CFG_FIELDS order
+    unsigned rows = 0, cols = 0;  // grid of a measurement
+
+    // A field of the page by name; std::out_of_range for an unknown one.
+    std::uint32_t field(const std::string& name) const { return tmf8829::cfg_get(page, name); }
+};
+
+// What init() read from the sensor.
+struct Tmf8829SensorId {
+    std::string app_version;  // "2.200.0"
+    std::uint32_t serial;
+};
+
+// Counters of the current stream (reset at start()).
+struct Tmf8829StreamStats {
+    std::uint64_t frames_completed;    // frames reassembled
+    std::uint64_t frames_dropped;      // frame_seq gaps: frames the bridge dropped
+    std::uint64_t frames_discarded;    // lost to reassembly (incomplete, out of order)
+    std::uint64_t frame_parse_errors;  // frames that did not parse / decode
+    std::uint64_t chunk_errors;        // RPT_TMF_FRAME / EVENT reports too short
+    std::uint64_t measurements;
+    std::uint64_t events_swallowed;    // the expected BAD_HEADER of stop()
+};
+
+// One streamed measurement. The histogram (25 377 B) and ref-SPAD (65 B)
+// frames before it are counted here (n_histograms, n_ref_frames; the
+// `histograms` / `ref_frames` vectors stay empty): their bytes reach
+// on_frame(). `problems` keeps the first 16 of n_problems.
+struct Tmf8829Measurement : tmf8829::Measurement {
+    // Stream<Tmf8829Measurement> plumbing.
+    static std::optional<Tmf8829Measurement> pull(detail::StreamHandle& h, std::chrono::milliseconds timeout,
+                                                  bool& closed);
+};
+
+// init() progress over the image download: bytes done / total.
+using Tmf8829Progress = std::function<void(std::size_t done, std::size_t total)>;
+
+class Tmf8829 : public Device {
+public:
+    // A TMF8829 on a link without an identity probe (tests, replay).
+    static std::unique_ptr<Tmf8829> open(Link link);
+
+    // Soft reset -> sensor bootloader -> firmware download -> RAM application.
+    // Stops a running stream first; forgets the config.
+    Tmf8829SensorId init(Tmf8829Progress progress = {});
+    // What the last init() read; ArgumentError before one.
+    Tmf8829SensorId sensor_id();
+
+    // Load `preset` (a tmf8829::PRESETS name) and write the config page with
+    // `options`; every written field must read back. Not while streaming.
+    Tmf8829Config configure(const std::string& preset = "8x8", const Tmf8829Options& options = {});
+    // The last configure() result; nullopt when none since init().
+    std::optional<Tmf8829Config> config();
+    // LOAD_CONFIG_PAGE -> the 190-byte page 0x22..0xDF now in the sensor.
+    bytes config_page();
+
+    // Raw registers in <= 1024 / 1023-byte requests. A read that reaches the
+    // FIFO port 0xFF stays there; a write to 0xFF stays at 0xFF.
+    bytes read_registers(std::uint8_t addr, std::size_t len);
+    void write_registers(std::uint8_t addr, byte_span data);
+    // Bridge counters (never touches the sensor, safe mid-stream).
+    tmf8829::Tmf8829Info bridge_info();
+
+    // MEASURE with the bridge stream armed (RESULTS, + HISTOGRAMS / the ref
+    // frame as configured). Configures the default "8x8" first when
+    // configure() was not called since init(). No-op while streaming.
+    void start();
+    // Sensor STOP, then the bridge stream; the bad-header event a STOP raises
+    // mid histogram dump is swallowed.
+    void stop();
+    bool streaming() const;
+
+    Unsubscribe on_measurement(std::function<void(const Tmf8829Measurement&)> cb);
+    // Every reassembled frame, before the measurement it may complete: the
+    // way to the histogram and ref-SPAD bytes.
+    Unsubscribe on_frame(std::function<void(const tmf8829::RawFrame&)> cb);
+    // RPT_TMF_EVENT other than the expected stop() artefact.
+    Unsubscribe on_event(std::function<void(const tmf8829::Tmf8829Event&)> cb);
+    // A pull stream of measurements (~90 KB each in the C queue: keep maxsize
+    // small). Subscribe before start() to see the first one.
+    Stream<Tmf8829Measurement> measurements(std::size_t maxsize = 16);
+    // The next measurement; TimeoutError / DeviceLostError.
+    Tmf8829Measurement get_measurement(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
+    Tmf8829StreamStats stream_stats() const;
+
+private:
+    using Device::Device;
+    friend std::unique_ptr<Device> wrap_device(depz_device* d);
+};
+
 // ── discovery (contract 02 §4) ──────────────────────────────────────────────
 
 struct SerialPortInfo {
@@ -981,7 +1102,7 @@ struct OpenOptions {
 };
 
 // Find, probe and open with the right class: dynamic_cast<Sr04*> (or
-// <Vl53l4cd*>, <Vl53l8*>, <Bno055*>, <Bno086*>, <Vl53lx*>) tells.
+// <Vl53l4cd*>, <Vl53l8*>, <Bno055*>, <Bno086*>, <Vl53lx*>, <Tmf8829*>) tells.
 std::unique_ptr<Device> open_device(const OpenOptions& opt = {});
 // open_device, and WrongTypeError unless it is an SR04.
 std::unique_ptr<Sr04> open_sr04(const OpenOptions& opt = {});
@@ -998,5 +1119,7 @@ std::unique_ptr<Bno055> open_bno055(const OpenOptions& opt = {});
 std::unique_ptr<Bno086> open_bno086(const OpenOptions& opt = {});
 // open_device, and WrongTypeError unless it is a VL53L 1D-family board.
 std::unique_ptr<Vl53lx> open_vl53lx(const OpenOptions& opt = {});
+// open_device, and WrongTypeError unless it is a TMF8829.
+std::unique_ptr<Tmf8829> open_tmf8829(const OpenOptions& opt = {});
 
 }  // namespace depz

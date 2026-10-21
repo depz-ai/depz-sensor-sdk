@@ -8,7 +8,7 @@ description: Mental model, installation, discovery, multi-sensor recording, and 
 TypeScript SDK for the DEPZ USB sensor line — **SR04** ultrasonic,
 the **VL53L0X / L1CX / L1CB / L3CX / L4CX** single-zone time-of-flight family
 and **VL53L4CD**, **VL53L5CX / L7CX / L7CH** and **VL53L8CX/CH** 8×8
-time-of-flight, **BNO055** and **BNO085 / BNO086** 9-axis IMUs. One codebase
+time-of-flight, **TMF8829** 8×8 … 48×32 direct time-of-flight, **BNO055** and **BNO085 / BNO086** 9-axis IMUs. One codebase
 runs in the **browser** (Web Serial) and in **Node** (via the optional
 `serialport` peer dependency).
 
@@ -29,6 +29,7 @@ the `Vl53l8ch` CNH superset; the I2C 8×8 board is three — `Vl53l5cx`,
 - VL53L7CH — [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) · [api](vl53l7ch/api.md)
 - VL53L8CX — [introduction](vl53l8cx/introduction.md) · [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
 - VL53L8CH — [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) · [api](vl53l8ch/api.md)
+- TMF8829 — [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) · [api](tmf8829/api.md)
 - BNO055 — [introduction](bno055/introduction.md) · [guide](bno055/guide.md) · [api](bno055/api.md)
 - BNO085 — [introduction](bno085/introduction.md) · [guide](bno085/guide.md) · [api](bno085/api.md)
 - BNO086 — [introduction](bno086/introduction.md) · [guide](bno086/guide.md) · [api](bno086/api.md)
@@ -56,6 +57,9 @@ driver runs on the host):
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
   driver runs **here on the host** (`sensors/vl53l8/uld.ts`). `Vl53l8ch` is the
   `Vl53l8cx` superset, adding Compact-Network-Histogram output.
+- **TMF8829** — the device is a thin SPI register bridge; the host resets the
+  sensor, downloads its firmware, loads presets and parses the frames
+  (`sensors/tmf8829`). 8×8 … 48×32 zones, up to 4 peaks per zone, histograms.
 - **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
   and the host configures it with register writes (`sensors/bno055`).
 - **BNO085 / BNO086** — the device is an SHTP pass-through; the full SH-2
@@ -138,7 +142,7 @@ button.addEventListener("click", async () => {
 
 `openDevice()` returns the correct subclass (`Sr04` / `Vl53l4cd` / `Vl53l8cx` /
 `Vl53l8ch` / `Vl53l5cx` / `Vl53l7cx` / `Vl53l7ch` / `Vl53l0x` / `Vl53l1cx` /
-`Vl53l1cb` / `Vl53l3cx` / `Vl53l4cx` / `Bno086` / `Bno055`); narrow it with
+`Vl53l1cb` / `Vl53l3cx` / `Vl53l4cx` / `Tmf8829` / `Bno086` / `Bno055`); narrow it with
 `instanceof`. Boards that share one firmware (the three I2C 8×8 boards, the
 five 1D-family boards) are told apart by their USB id, then by the device
 name stamped on the board. No candidate throws `NoDepzDeviceError`.

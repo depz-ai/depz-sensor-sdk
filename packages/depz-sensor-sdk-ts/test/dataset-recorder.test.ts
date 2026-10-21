@@ -240,14 +240,15 @@ describe("DatasetRecorder — contract 09 kinds by device class", () => {
     expect(b.calib).toEqual([s.calibration!.system, s.calibration!.gyro, s.calibration!.accel, s.calibration!.mag]);
   });
 
-  it("writes bno086 reports: snake_case, full components, host-time t, device timestamp_us", async () => {
+  it("writes bno086 reports: snake_case, full components, t = measurement time on the host clock", async () => {
     const fImu = new FakeBno086();
     const imu = new Bno086(fImu.transport, { timeoutMs: 1000 });
     await imu.open();
     const rec = new DatasetRecorder();
     await rec.add(imu);
     rec.start();
-    // One cargo, device times out of order: the records stay monotonic in t.
+    // One cargo, device times out of order: the file keeps them as they came,
+    // the reader sorts by t.
     const rv = { type: "RotationVector", sensorId: 0x05, timestampUs: 5_000_300n, seq: 7, accuracy: 3,
                  delayUs: 0, iRaw: 8192, jRaw: 0, kRaw: 0, realRaw: 14189, i: 0.5, j: 0, k: 0,
                  real: 0.866, accuracyRaw: 820, accuracyRad: 0.2 };
@@ -259,12 +260,14 @@ describe("DatasetRecorder — contract 09 kinds by device class", () => {
     await imu.close();
     await fImu.close();
 
-    const recs = new DatasetReader(rec.dump()).records.filter((r) => r.kind === "bno086");
-    expect(recs.map((r) => r.value.type)).toEqual(["RotationVector", "Acceleration"]);
-    expect(recs[0]!.tHostUs).toBeLessThanOrEqual(recs[1]!.tHostUs);
-    expect(recs[0]!.value).toEqual({ type: "RotationVector", sensor_id: 0x05, i: 0.5, j: 0, k: 0, real: 0.866,
+    const reader = new DatasetReader(rec.dump());
+    const off = Number((reader.devices["d0"]!.time_sync as { offset_us: number }).offset_us);
+    const recs = reader.records.filter((r) => r.kind === "bno086");
+    expect(recs.map((r) => r.value.type)).toEqual(["Acceleration", "RotationVector"]);
+    expect(recs.map((r) => r.tHostUs)).toEqual([5_000_100 - off, 5_000_300 - off]);
+    expect(recs[1]!.value).toEqual({ type: "RotationVector", sensor_id: 0x05, i: 0.5, j: 0, k: 0, real: 0.866,
                                      accuracy_rad: 0.2, accuracy: 3, timestamp_us: 5_000_300 });
-    expect(recs[1]!.value).toEqual({ type: "Acceleration", sensor_id: 0x01, x: 0, y: 0, z: 9.81,
+    expect(recs[0]!.value).toEqual({ type: "Acceleration", sensor_id: 0x01, x: 0, y: 0, z: 9.81,
                                      accuracy: 2, timestamp_us: 5_000_100 });
   });
 });

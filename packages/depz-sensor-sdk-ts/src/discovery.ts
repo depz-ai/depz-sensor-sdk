@@ -17,6 +17,7 @@ import { DepzError, NoDepzDeviceError } from "./errors.js";
 import { parseSoftwareName, type SensorType } from "./protocol/identity.js";
 import { isKnownDepzUsb, usbModelHint } from "./protocol/usb-ids.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
+import { Tmf8829 } from "./sensors/tmf8829/tmf8829.js";
 import { Bno086 } from "./sensors/bno086/bno086.js";
 import { Sr04 } from "./sensors/sr04.js";
 import { Vl53l4cd } from "./sensors/vl53l4/vl53l4.js";
@@ -249,6 +250,8 @@ function constructSensor(
       return new Bno086(transport, { timeoutMs });
     case "bno055":
       return new Bno055(transport, { timeoutMs });
+    case "tmf8829":
+      return new Tmf8829(transport, { timeoutMs });
     default:
       return new DepzDevice(transport, { timeoutMs });
   }

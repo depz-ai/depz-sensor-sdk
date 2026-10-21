@@ -6,7 +6,7 @@ import os
 
 class DepzSensorSdkCConan(ConanFile):
     name = "depz-sensor-sdk-c"
-    version = "0.5.0"
+    version = "0.6.0"
     license = "MIT"
     author = "DEPZ AI"
     url = "https://github.com/depz-ai/depz-sensor-sdk"
@@ -28,6 +28,7 @@ class DepzSensorSdkCConan(ConanFile):
         "cmake/*",
         "include/*",
         "src/*",
+        "licenses/*",
         "tests/*",
         "README.md",
     )
@@ -65,6 +66,9 @@ class DepzSensorSdkCConan(ConanFile):
         cmake.install()
         copy(self, "README.md", self.source_folder,
              os.path.join(self.package_folder, "licenses"))
+        # The embedded ams TMF8829 sensor firmware is MIT-licensed.
+        copy(self, "LICENSES-MIT.TXT", os.path.join(self.source_folder, "licenses", "tmf8829"),
+             os.path.join(self.package_folder, "licenses", "tmf8829"))
 
     def package_info(self):
         self.cpp_info.libs = ["depz_sensor_sdk_c"]

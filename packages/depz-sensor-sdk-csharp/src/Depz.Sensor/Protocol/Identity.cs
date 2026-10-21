@@ -47,6 +47,14 @@ public enum SensorType
     /// </summary>
     Bno055,
 
+    /// <summary>
+    /// TMF8829 multizone dToF sensor behind the thin SPI register bridge
+    /// (probe string "APP_TMF8829…", contract 14). The host runs the sensor;
+    /// wire codecs, frame decode, clock model and the sensor firmware image
+    /// live in <c>Depz.Sensor.Tmf8829</c>.
+    /// </summary>
+    Tmf8829,
+
     Unknown,
 }
 
@@ -72,6 +80,7 @@ public static class IdentityParser
         ("VL53L7", Protocol.SensorType.Vl53l7),
         ("BNO086", Protocol.SensorType.Bno086),
         ("BNO055", Protocol.SensorType.Bno055),
+        ("TMF8829", Protocol.SensorType.Tmf8829),
     };
 
     /// <summary>

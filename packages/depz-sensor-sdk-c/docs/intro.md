@@ -49,6 +49,8 @@ and API reference:
   frames.
 - **[VL53L8CH](vl53l8ch/introduction.md)** — the CX superset with CNH
   histograms.
+- **[TMF8829](tmf8829/introduction.md)** — multizone dToF: 8×8 … 48×32
+  zones, up to 4 peaks per zone, raw histograms.
 - **[BNO055](bno055/introduction.md)** — 9-axis IMU with on-chip fusion:
   orientation, gravity and linear acceleration at 100 Hz.
 - **[BNO085](bno085/introduction.md)** · **[BNO086](bno086/introduction.md)**
@@ -64,7 +66,10 @@ VL53L8CH** (the ST ULD on the host with the sensor-firmware download:
 resolution, frequency, power modes, crosstalk, thresholds, motion, CNH
 histograms on the CH, an INT-driven frame stream) have one today — the same
 multizone class also drives the **VL53L5CX / VL53L7CX / VL53L7CH** I2C boards
-— and so has the **BNO055** (mode, units, axis remap and calibration through
+— and so have the **TMF8829** (soft reset and the ams sensor-firmware
+download on the host, presets with read-back, 8×8 … 48×32 measurements with
+clock-corrected distances and capture times; checked against the vectors and
+a fake bridge) and the **BNO055** (mode, units, axis remap and calibration through
 CONFIG, status and self-test, page-1 configs and motion interrupts, scaled
 samples polled or streamed; verified on replays of real captures and live on a
 lab board) and the **BNO085 / BNO086** (the SH-2 sensor-hub protocol on the
@@ -81,7 +86,7 @@ and live on a lab VL53L4CX). Every board of the line now has its class.
 C11. The codec layer needs only libm; the live layer adds threads and the OS
 port-enumeration API (`setupapi`/`cfgmgr32` on Windows, IOKit/CoreFoundation on
 macOS) — linked for you through the CMake target. Build the static library and
-run the suite (83 tests, no hardware needed) with CMake:
+run the suite (86 tests, no hardware needed) with CMake:
 
 ```sh
 cmake -B build -S .
@@ -98,7 +103,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.5.0
+  GIT_TAG        v0.6.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -128,7 +133,8 @@ distance).
   [VL53L4CD](vl53l4cd/introduction.md) · [VL53L4CX](vl53l4cx/introduction.md) ·
   [VL53L5CX](vl53l5cx/introduction.md) · [VL53L7CX](vl53l7cx/introduction.md) ·
   [VL53L7CH](vl53l7ch/introduction.md) · [VL53L8CX](vl53l8cx/introduction.md) ·
-  [VL53L8CH](vl53l8ch/introduction.md) · [BNO055](bno055/introduction.md) ·
+  [VL53L8CH](vl53l8ch/introduction.md) · [TMF8829](tmf8829/introduction.md) ·
+  [BNO055](bno055/introduction.md) ·
   [BNO085](bno085/introduction.md) · [BNO086](bno086/introduction.md):
   introduction, hands-on guide, and the sensor's own API reference.
 - **[Guide](guide.md)** — the SDK-wide walkthrough: build, the live layer

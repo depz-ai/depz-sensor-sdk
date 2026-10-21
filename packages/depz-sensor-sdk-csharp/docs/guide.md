@@ -26,6 +26,9 @@ guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (dToF, 8×8 … 48×32 zones, up to 4 peaks) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
   [guide](bno055/guide.md) · [api](bno055/api.md)
 - **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
@@ -61,7 +64,7 @@ payloads to send back. It does not own a serial port or a reader thread; that
 transport is the host application's concern.
 
 Each sensor is a USB CDC-ACM device speaking one shared framed protocol
-(`A5 C3` header + CRC). The sensors fall into three firmware philosophies:
+(`A5 C3` header + CRC). The sensors fall into a few firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `EchoTimeUs` → distance
   (`Depz.Sensor.Protocol.Sr04`).
@@ -80,6 +83,11 @@ Each sensor is a USB CDC-ACM device speaking one shared framed protocol
   runs on the host. This SDK ports the **verifiable decode path**: results-frame
   decode and the advanced DCI payload codecs (`Depz.Sensor.Vl53l8`). CX is the
   base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
+- **TMF8829** — a thin SPI register bridge; the host runs the sensor (firmware
+  download, config page, presets). This SDK ports the wire codecs, chunk
+  reassembly, frame and pixel decode with the half-frame merge, the clock
+  model and capture time, the config-page fields and the embedded ams
+  firmware image (`Depz.Sensor.Tmf8829`).
 - **BNO055** — an I2C register bridge; Bosch's fusion runs on the chip. This
   SDK ports the wire codecs, the register codecs and the register-window
   decode (`Depz.Sensor.Bno055`).
@@ -87,8 +95,8 @@ Each sensor is a USB CDC-ACM device speaking one shared framed protocol
   host. This SDK ports SHTP framing/reassembly, the SH-2 control encoders and
   the input-report decoders (`Depz.Sensor.Bno086`).
 
-For the 1D family, the VL53L5CX / L7CX / L7CH and the BNO055, initialising
-and streaming the board is done with the Python or TypeScript SDK; this SDK decodes what they send and builds the command payloads.
+For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055,
+initialising and streaming the board is done with the Python or TypeScript SDK; this SDK decodes what they send and builds the command payloads.
 
 The public surface is every `public` type under `src/Depz.Sensor/`; the API
 reference is generated from it, so it never drifts from the code.
@@ -96,7 +104,7 @@ reference is generated from it, so it never drifts from the code.
 ## Installation
 
 Everything targets **.NET 8** (`net8.0`). It is published on NuGet as
-`Depz.Sensor` (0.5.0):
+`Depz.Sensor` (0.6.0):
 
 ```bash
 dotnet add package Depz.Sensor
@@ -323,10 +331,11 @@ throw a clearly-named exception or are declared as an explicit stub):
   sequences over `ReadReg`/`WriteReg` are host code you write
   (`Vl53l4Uld.LiveDriverStubbed`); the codec/math layer itself is complete.
   See the [VL53L4CD guide](vl53l4cd/guide.md).
-- **Live drivers of the L5/L7 boards, the 1D family and the BNO055** — the
-  firmware download and ULD configuration (L5/L7), the ST drivers (1D family)
-  and the session logic (BNO055: mode switches through CONFIG, boot and
-  fusion-start waits, page discipline). The codecs and the stateless decode
+- **Live drivers of the L5/L7 boards, the 1D family, the TMF8829 and the
+  BNO055** — the firmware download and ULD configuration (L5/L7), the ST
+  drivers (1D family), the sensor sequence (TMF8829: soft reset, firmware
+  download, configure, start/stop) and the session logic (BNO055: mode
+  switches through CONFIG, boot and fusion-start waits, page discipline). The codecs and the stateless decode
   are here; see the per-sensor guides.
 
 The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:

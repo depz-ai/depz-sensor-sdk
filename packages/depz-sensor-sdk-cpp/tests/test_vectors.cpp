@@ -1,8 +1,10 @@
 // Vector-driven parity test runner: loads contracts/vectors/*.json (including
-// vl53l4.json, vl53l7.json, vl53lx.json, bno055.json) and asserts
+// vl53l4.json, vl53l7.json, vl53lx.json, bno055.json, tmf8829.json,
+// tmf8829_frame_time.json) and asserts
 // the C++ SDK is byte-exact with the golden vectors.
 #include <stdexcept>
 #include <algorithm>
+#include <cstdio>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -21,6 +23,7 @@
 #include "depz/fwdepz.hpp"
 #include "depz/identity.hpp"
 #include "depz/sr04.hpp"
+#include "depz/tmf8829.hpp"
 #include "depz/usb_ids.hpp"
 #include "depz/vl53l4.hpp"
 #include "depz/vl53l7.hpp"
@@ -1824,6 +1827,496 @@ static void test_bno055() {
     }
 }
 
+// ---- tmf8829 ---------------------------------------------------------------
+
+// SHA-256 (FIPS 180-4), test-runner only: the TMF8829 vectors pin frame and
+// image bytes by digest.
+static std::string sha256_hex(depz::byte_span msg)
+{
+    static const std::uint32_t K[64] = {
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+    std::uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+    auto ror = [](std::uint32_t x, int n) { return (x >> n) | (x << (32 - n)); };
+    const std::size_t len = msg.size(), total = ((len + 9 + 63) / 64) * 64;
+    for (std::size_t off = 0; off < total; off += 64) {
+        std::uint32_t w[64] = {};
+        for (int i = 0; i < 64; i++) {
+            const std::size_t k = off + static_cast<std::size_t>(i);
+            std::uint8_t byte;
+            if (k < len) byte = std::to_integer<std::uint8_t>(msg[k]);
+            else if (k == len) byte = 0x80;
+            else if (k >= total - 8) byte = static_cast<std::uint8_t>((static_cast<std::uint64_t>(len) * 8) >> (8 * (total - 1 - k)));
+            else byte = 0;
+            w[i / 4] |= static_cast<std::uint32_t>(byte) << (8 * (3 - i % 4));
+        }
+        for (int i = 16; i < 64; i++) {
+            const std::uint32_t s0 = ror(w[i - 15], 7) ^ ror(w[i - 15], 18) ^ (w[i - 15] >> 3);
+            const std::uint32_t s1 = ror(w[i - 2], 17) ^ ror(w[i - 2], 19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+        }
+        std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+        for (int i = 0; i < 64; i++) {
+            const std::uint32_t t1 = hh + (ror(e, 6) ^ ror(e, 11) ^ ror(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i];
+            const std::uint32_t t2 = (ror(a, 2) ^ ror(a, 13) ^ ror(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
+            hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+        }
+        h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    }
+    char out[65];
+    for (int i = 0; i < 8; i++) std::snprintf(out + 8 * i, 9, "%08x", h[i]);
+    return std::string(out, 64);
+}
+
+// A JSON int array (null = absent) against an optional vector.
+template <class T>
+static void check_tmf_ints(const std::optional<std::vector<T>>& got, const Value& want, const std::string& what)
+{
+    if (want.is_null()) {
+        check(!got.has_value(), what + " absent");
+        return;
+    }
+    if (!got) {
+        check(false, what + " present");
+        return;
+    }
+    const auto& arr = want.as_array();
+    bool same = got->size() == arr.size();
+    for (std::size_t i = 0; same && i < arr.size(); ++i)
+        same = static_cast<std::int64_t>((*got)[i]) == arr[i].as_int();
+    check(same, what);
+}
+
+// The vectors' `_arrays(res)`: peaks, shape, every raw per-zone array.
+static void check_tmf_results(const depz::tmf8829::PixelResults& r, const Value& ex, const std::string& nm)
+{
+    const auto shape = r.shape();
+    check_eq(static_cast<std::int64_t>(r.peaks), ex.at("peaks").as_int(), "tmf8829 peaks " + nm);
+    check_eq(static_cast<std::int64_t>(shape.first), ex.at("rows").as_int(), "tmf8829 rows " + nm);
+    check_eq(static_cast<std::int64_t>(shape.second), ex.at("cols").as_int(), "tmf8829 cols " + nm);
+    check_tmf_ints(r.distance, ex.at("distance"), "tmf8829 distance " + nm);
+    check_tmf_ints(r.snr, ex.at("snr"), "tmf8829 snr " + nm);
+    check_tmf_ints(r.signal, ex.at("signal"), "tmf8829 signal " + nm);
+    check_tmf_ints(r.noise, ex.at("noise"), "tmf8829 noise " + nm);
+    check_tmf_ints(r.xtalk, ex.at("xtalk"), "tmf8829 xtalk " + nm);
+}
+
+template <class F>
+static bool throws_any(F&& f)
+{
+    try {
+        f();
+    } catch (const std::exception&) {
+        return true;
+    }
+    return false;
+}
+
+static void test_tmf8829()
+{
+    namespace T = depz::tmf8829;
+    Value v = load_vector("tmf8829.json");
+
+    // encode: 0x32..0x37 payloads.
+    for (const Value& c : v.at("encode").as_array()) {
+        const std::string nm = c.at("name").as_string();
+        const std::int64_t cmd = c.at("cmd").as_int();
+        depz::bytes got;
+        if (cmd == static_cast<std::int64_t>(T::Tmf8829Cmd::ReadReg)) {
+            got = T::pack_read_reg(static_cast<int>(c.at("addr").as_int()), static_cast<int>(c.at("len").as_int()));
+        } else if (cmd == static_cast<std::int64_t>(T::Tmf8829Cmd::WriteReg)) {
+            depz::bytes data = from_hex(c.at("data").as_string());
+            got = T::pack_write_reg(static_cast<int>(c.at("addr").as_int()), depz::as_bytes(data));
+        } else if (cmd == static_cast<std::int64_t>(T::Tmf8829Cmd::StartStream)) {
+            got = T::pack_start_stream(static_cast<int>(c.at("int_mask").as_int()),
+                                       static_cast<int>(c.at("flags").as_int()));
+        }  // STOP_STREAM / GET_INFO: empty payload
+        check_eq(to_hex(got), c.at("payload").as_string(), "tmf8829 encode " + nm);
+    }
+
+    // encode_errors: refused before anything is sent.
+    for (const Value& c : v.at("encode_errors").as_array()) {
+        const std::string nm = c.at("name").as_string(), kind = c.at("kind").as_string();
+        bool threw = false;
+        try {
+            if (kind == "read_reg") {
+                T::pack_read_reg(static_cast<int>(c.at("addr").as_int()), static_cast<int>(c.at("len").as_int()));
+            } else if (kind == "write_reg") {
+                depz::bytes data = from_hex(c.at("data").as_string());
+                T::pack_write_reg(static_cast<int>(c.at("addr").as_int()), depz::as_bytes(data));
+            } else {
+                T::pack_start_stream(static_cast<int>(c.at("int_mask").as_int()),
+                                     static_cast<int>(c.at("flags").as_int()));
+            }
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "tmf8829 encode_error " + nm);
+    }
+
+    // decode: REG_DATA 0x91, INFO 0x92 (no echoed cmd), FRAME chunk 0x93, EVENT 0x94.
+    for (const Value& c : v.at("decode").as_array()) {
+        const std::string nm = c.at("name").as_string();
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        const Value& ex = c.at("expect");
+        const std::int64_t report = c.at("report").as_int();
+        auto f = [&](const char* k, std::int64_t got) {
+            check_eq(got, ex.at(k).as_int(), std::string("tmf8829 decode.") + k + " " + nm);
+        };
+        if (report == static_cast<std::int64_t>(T::Tmf8829Rpt::RegData)) {
+            auto r = T::RegData::unpack(depz::as_bytes(payload));
+            if (!r) { check(false, "tmf8829 reg_data unpack " + nm); continue; }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(2), "tmf8829 reg_data field count " + nm);
+            f("timestamp_us", static_cast<std::int64_t>(r->timestamp_us));
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "tmf8829 reg_data.data " + nm);
+        } else if (report == static_cast<std::int64_t>(T::Tmf8829Rpt::Info)) {
+            auto r = T::Tmf8829Info::unpack(depz::as_bytes(payload));
+            if (!r) { check(false, "tmf8829 info unpack " + nm); continue; }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(10), "tmf8829 info field count " + nm);
+            f("int_edges", r->int_edges);
+            f("frames", r->frames);
+            f("frames_aborted", r->frames_aborted);
+            f("frame_errors", r->frame_errors);
+            f("spi_timeouts", r->spi_timeouts);
+            f("int_level", r->int_level);
+            check_eq(r->streaming, ex.at("streaming").as_bool(), "tmf8829 info.streaming " + nm);
+            f("int_mask", r->int_mask);
+            f("last_int_status", r->last_int_status);
+            f("last_fifo_status", r->last_fifo_status);
+        } else if (report == static_cast<std::int64_t>(T::Tmf8829Rpt::Frame)) {
+            auto r = T::FrameChunk::unpack(depz::as_bytes(payload));
+            if (!r) { check(false, "tmf8829 frame chunk unpack " + nm); continue; }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(6), "tmf8829 chunk field count " + nm);
+            f("timestamp_us", static_cast<std::int64_t>(r->timestamp_us));
+            f("full_size", r->full_size);
+            f("offset", r->offset);
+            f("frame_seq", r->frame_seq);
+            f("edge_us", static_cast<std::int64_t>(r->edge_us));
+            check_eq(to_hex(r->data), ex.at("data").as_string(), "tmf8829 chunk.data " + nm);
+        } else if (report == static_cast<std::int64_t>(T::Tmf8829Rpt::Event)) {
+            auto r = T::Tmf8829Event::unpack(depz::as_bytes(payload));
+            if (!r) { check(false, "tmf8829 event unpack " + nm); continue; }
+            check_eq(ex.as_object().size(), static_cast<std::size_t>(5), "tmf8829 event field count " + nm);
+            f("timestamp_us", static_cast<std::int64_t>(r->timestamp_us));
+            f("int_status", r->int_status);
+            f("code", r->code);
+            f("frame_id", r->frame_id);
+            f("fifo_status", r->fifo_status);
+        } else {
+            check(false, "unknown tmf8829 report " + nm);
+        }
+    }
+    // Short payloads and a wrong echoed cmd do not decode.
+    {
+        depz::bytes p = from_hex("33000000000000000000");
+        check(!T::RegData::unpack(depz::as_bytes(p)), "tmf8829 reg_data wrong cmd");
+        p.resize(8);
+        check(!T::Tmf8829Event::unpack(depz::as_bytes(p)), "tmf8829 event short");
+        check(!T::FrameChunk::unpack(depz::as_bytes(p)), "tmf8829 chunk short");
+        check(!T::Tmf8829Info::unpack(depz::as_bytes(p)), "tmf8829 info short");
+    }
+
+    // reassembly: in-order, seq change mid-frame, offset gap, ...
+    for (const Value& c : v.at("reassembly").as_array()) {
+        const std::string nm = c.at("name").as_string();
+        const Value& ex = c.at("expect");
+        T::FrameReassembler r;
+        std::vector<T::RawFrame> done;
+        for (const Value& ch : c.at("chunks").as_array()) {
+            depz::bytes p = from_hex(ch.as_string());
+            auto chunk = T::FrameChunk::unpack(depz::as_bytes(p));
+            if (!chunk) { check(false, "tmf8829 reassembly chunk " + nm); continue; }
+            if (auto f = r.feed(*chunk)) done.push_back(std::move(*f));
+        }
+        const auto& want = ex.at("frames").as_array();
+        check_eq(done.size(), want.size(), "tmf8829 reassembly frames " + nm);
+        for (std::size_t i = 0; i < done.size() && i < want.size(); ++i) {
+            const Value& w = want[i];
+            check_eq(static_cast<std::int64_t>(done[i].frame_seq), w.at("frame_seq").as_int(), "tmf8829 reassembly seq " + nm);
+            check_eq(static_cast<std::int64_t>(done[i].timestamp_us), w.at("timestamp_us").as_int(), "tmf8829 reassembly ts " + nm);
+            check_eq(static_cast<std::int64_t>(done[i].edge_us), w.at("edge_us").as_int(), "tmf8829 reassembly edge " + nm);
+            check_eq(static_cast<std::int64_t>(done[i].data.size()), w.at("size").as_int(), "tmf8829 reassembly size " + nm);
+            check_eq(sha256_hex(depz::as_bytes(done[i].data)), w.at("sha256").as_string(), "tmf8829 reassembly sha256 " + nm);
+        }
+        check_eq(r.completed, ex.at("completed").as_u64(), "tmf8829 reassembly completed " + nm);
+        check_eq(r.discarded, ex.at("discarded").as_u64(), "tmf8829 reassembly discarded " + nm);
+        check_eq(r.seq_gaps, ex.at("seq_gaps").as_u64(), "tmf8829 reassembly seq_gaps " + nm);
+    }
+
+    // frames: header / footer, problems, raw per-zone integers (or data digest).
+    for (const Value& c : v.at("frames").as_array()) {
+        const std::string nm = c.at("name").as_string();
+        depz::bytes raw = from_hex(c.at("raw").as_string());
+        const T::FrameInfo fi = T::parse_frame(depz::as_bytes(raw));
+        const Value& h = c.at("header");
+        auto f = [&](const char* k, std::int64_t got) {
+            check_eq(got, h.at(k).as_int(), std::string("tmf8829 header.") + k + " " + nm);
+        };
+        f("fifo_status", fi.fifo_status);
+        f("systick", fi.systick);
+        f("id", fi.id);
+        f("kind", fi.kind());
+        f("fp_mode", fi.fp_mode());
+        f("layout", fi.layout);
+        f("payload", fi.payload);
+        f("f_number", fi.f_number);
+        const auto& temp = h.at("temperature").as_array();
+        check(temp.size() == 3 && temp[0].as_int() == fi.temperature[0] && temp[1].as_int() == fi.temperature[1] &&
+                  temp[2].as_int() == fi.temperature[2],
+              "tmf8829 header.temperature " + nm);
+        f("bdv", fi.bdv);
+        const auto& rp = h.at("ref_pos").as_array();
+        check(rp.size() == 2 && rp[0].as_int() == fi.ref_pos[0] && rp[1].as_int() == fi.ref_pos[1],
+              "tmf8829 header.ref_pos " + nm);
+        f("t0_integration", fi.t0_integration);
+        f("t1_integration", fi.t1_integration);
+        f("frame_status", fi.frame_status);
+        f("reserved", fi.reserved);
+        f("eof", fi.eof);
+        f("size", static_cast<std::int64_t>(fi.size));
+        check_eq(h.as_object().size(), static_cast<std::size_t>(17), "tmf8829 header field count " + nm);
+        std::vector<std::string> want_problems;
+        for (const Value& p : c.at("problems").as_array()) want_problems.push_back(p.as_string());
+        check(fi.problems() == want_problems, "tmf8829 problems " + nm);
+        check_eq(depz::tmf8829::frame_size(depz::as_bytes(raw)), raw.size(), "tmf8829 frame_size " + nm);
+        if (fi.kind() == T::FID_RESULTS) {
+            check_tmf_results(T::parse_results(depz::as_bytes(raw), fi), c.at("results"), nm);
+        } else {
+            depz::byte_span data = depz::as_bytes(raw).subspan(21, raw.size() - 33);
+            check_eq(sha256_hex(data), c.at("data_sha256").as_string(), "tmf8829 data_sha256 " + nm);
+        }
+    }
+    // A frame shorter than header + footer, and a corrupt results frame.
+    {
+        depz::bytes shorty(32);
+        check(throws_any([&] { T::parse_frame(depz::as_bytes(shorty)); }), "tmf8829 short frame refused");
+        for (const Value& c : v.at("frames").as_array()) {
+            if (c.at("name").as_string() != "8x8#0") continue;
+            depz::bytes raw = from_hex(c.at("raw").as_string());
+            raw.erase(raw.begin() + 21);  // one data byte short
+            bool frame_error = false;
+            try {
+                T::parse_results(depz::as_bytes(raw));
+            } catch (const T::FrameError&) {
+                frame_error = true;
+            }
+            check(frame_error, "tmf8829 corrupt results frame refused");
+        }
+    }
+
+    // measurements: each scenario through a fresh builder.
+    std::vector<std::pair<std::string, depz::bytes>> raw_by_case;
+    for (const Value& c : v.at("frames").as_array())
+        raw_by_case.emplace_back(c.at("name").as_string(), from_hex(c.at("raw").as_string()));
+    auto raw_of = [&](const std::string& name) -> const depz::bytes* {
+        for (const auto& p : raw_by_case)
+            if (p.first == name) return &p.second;
+        return nullptr;
+    };
+    for (const Value& s : v.at("measurements").as_array()) {
+        const std::string nm = s.at("name").as_string();
+        T::MeasurementBuilder b;
+        std::vector<std::pair<T::Measurement, std::uint32_t>> got;
+        for (const Value& f : s.at("frames").as_array()) {
+            const depz::bytes* raw = raw_of(f.at("raw_case").as_string());
+            if (!raw) { check(false, "tmf8829 measurement raw_case " + nm); continue; }
+            auto m = b.add(depz::as_bytes(*raw), f.at("timestamp_us").as_int(), f.at("edge_us").as_int());
+            if (m) got.emplace_back(std::move(*m), b.clock.ratio_q16());
+        }
+        const auto& want = s.at("expect").as_array();
+        check_eq(got.size(), want.size(), "tmf8829 measurements count " + nm);
+        for (std::size_t i = 0; i < got.size() && i < want.size(); ++i) {
+            const T::Measurement& m = got[i].first;
+            const Value& e = want[i];
+            const std::string tag = nm + "[" + std::to_string(i) + "]";
+            check_eq(e.as_object().size(), static_cast<std::size_t>(19), "tmf8829 measurement field count " + tag);
+            check_eq(m.timestamp_us, e.at("timestamp_us").as_int(), "tmf8829 m.timestamp_us " + tag);
+            check_eq(static_cast<std::int64_t>(m.flags), e.at("flags").as_int(), "tmf8829 m.flags " + tag);
+            check_eq(static_cast<std::int64_t>(m.fp_mode), e.at("fp_mode").as_int(), "tmf8829 m.fp_mode " + tag);
+            check_eq(static_cast<std::int64_t>(m.f_number), e.at("f_number").as_int(), "tmf8829 m.f_number " + tag);
+            std::vector<std::int64_t> ft, tl, wft, wtl;
+            for (const auto& t : m.times) {
+                ft.push_back(t.timestamp_us);
+                tl.push_back(t.t1_len_us);
+            }
+            for (const Value& x : e.at("frame_times_us").as_array()) wft.push_back(x.as_int());
+            for (const Value& x : e.at("t1_len_us").as_array()) wtl.push_back(x.as_int());
+            check(ft == wft, "tmf8829 m.frame_times_us " + tag);
+            check(tl == wtl, "tmf8829 m.t1_len_us " + tag);
+            check_eq(static_cast<std::int64_t>(got[i].second), e.at("ratio_q16").as_int(), "tmf8829 ratio_q16 " + tag);
+            check_eq(static_cast<std::int64_t>(m.ratio_q16), e.at("ratio_q16").as_int(), "tmf8829 m.ratio_q16 " + tag);
+            check_eq(static_cast<std::int64_t>(m.histograms.size()), e.at("n_histograms").as_int(), "tmf8829 m.n_histograms " + tag);
+            check_eq(static_cast<std::int64_t>(m.n_histograms), e.at("n_histograms").as_int(), "tmf8829 m.n_histograms count " + tag);
+            check_eq(static_cast<std::int64_t>(m.ref_frames.size()), e.at("n_ref_frames").as_int(), "tmf8829 m.n_ref_frames " + tag);
+            check_eq(static_cast<std::int64_t>(m.problems.size()), e.at("n_problems").as_int(), "tmf8829 m.n_problems " + tag);
+            check_eq(m.distance_in_mm(), e.at("distance_in_mm").as_bool(), "tmf8829 m.distance_in_mm " + tag);
+            check_tmf_results(m.results, e, tag);
+            // distance_mm = raw x ratio (/ 4 in 0.25 mm units)
+            if (m.results.distance) {
+                const double ratio = static_cast<double>(m.ratio_q16) / depz::tmf8829::NOMINAL_Q16;
+                const double raw0 = (*m.results.distance)[0] * ratio;
+                check(m.distance_mm.size() == m.results.distance->size() &&
+                          m.distance_mm[0] == (m.distance_in_mm() ? raw0 : raw0 / 4.0),
+                      "tmf8829 m.distance_mm " + tag);
+            }
+        }
+    }
+    // Half-frames of different formats are dropped and logged, never merged
+    // (contract 14 §3): a 32x32 first half, then a second half of another
+    // fp_mode.
+    {
+        const depz::bytes* first = raw_of("32x32#0");
+        const depz::bytes* second = raw_of("32x32#1");
+        if (first && second) {
+            depz::bytes odd = *second;
+            // fp_mode 3 (32x32) -> 4 (32x32s): the same frame size, another format
+            odd[5] = std::byte{static_cast<std::uint8_t>(std::to_integer<std::uint8_t>(odd[5]) ^ 0x07)};
+            T::MeasurementBuilder b;
+            check(!b.add(depz::as_bytes(*first), 1000000, 0), "tmf8829 mixed pair: first half pending");
+            check(!b.add(depz::as_bytes(odd), 1033000, 0), "tmf8829 mixed pair: dropped");
+            check(!b.add(depz::as_bytes(*first), 1066000, 0), "tmf8829 mixed pair: next first half");
+            auto m = b.add(depz::as_bytes(*second), 1099000, 0);
+            bool logged = false;
+            if (m)
+                for (const auto& p : m->problems) logged |= p.find("half-frames of different formats") != std::string::npos;
+            check(m && logged, "tmf8829 mixed pair logged in the next measurement");
+        } else {
+            check(false, "tmf8829 32x32 frames present");
+        }
+    }
+
+    // config: get / set / set_errors on a captured page.
+    const Value& cfg = v.at("config");
+    const depz::bytes page = from_hex(cfg.at("page").as_string());
+    {
+        const auto& fields = cfg.at("fields").as_object();
+        check_eq(fields.size(), T::CFG_FIELDS.size(), "tmf8829 config field count");
+        for (const auto& fd : T::CFG_FIELDS) {
+            const Value& w = cfg.at("fields").at(fd.name);
+            check(w.as_array().size() == 3 && w.as_array()[0].as_int() == fd.reg &&
+                      w.as_array()[1].as_int() == fd.shift && w.as_array()[2].as_int() == fd.width,
+                  std::string("tmf8829 config field ") + fd.name);
+        }
+    }
+    for (const auto& kv : cfg.at("get").as_object())
+        check_eq(static_cast<std::int64_t>(T::cfg_get(depz::as_bytes(page), kv.first)), kv.second.as_int(),
+                 "tmf8829 cfg_get " + kv.first);
+    {
+        const auto all = T::config_fields(depz::as_bytes(page));
+        check_eq(all.size(), cfg.at("get").as_object().size(), "tmf8829 config_fields count");
+        for (const auto& kv : all)
+            check_eq(static_cast<std::int64_t>(kv.second), cfg.at("get").at(kv.first).as_int(), "tmf8829 config_fields " + kv.first);
+    }
+    for (const Value& c : cfg.at("set").as_array()) {
+        depz::bytes pg = page;
+        T::cfg_set(pg, c.at("field").as_string(), c.at("value").as_int());
+        check_eq(to_hex(pg), c.at("page").as_string(), "tmf8829 cfg_set " + c.at("field").as_string());
+    }
+    for (const Value& c : cfg.at("set_errors").as_array()) {
+        depz::bytes pg = page;
+        bool threw = false;
+        try {
+            T::cfg_set(pg, c.at("field").as_string(), c.at("value").as_int());
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw && pg == page, "tmf8829 cfg_set error " + c.at("field").as_string());
+    }
+    {
+        depz::bytes pg = page;
+        check(throws_any([&] { T::cfg_set(pg, "no_such_field", 1); }), "tmf8829 cfg_set unknown field");
+        check(throws_any([&] { T::cfg_get(depz::as_bytes(page), "no_such_field"); }), "tmf8829 cfg_get unknown field");
+    }
+    // Presets and their kilo_iterations (contract 14 §4).
+    {
+        auto p = T::find_preset("32x32");
+        check(p && p->cmd == 0x45 && p->kilo_iterations == 2344, "tmf8829 preset 32x32");
+        p = T::find_preset("8x8-xr");
+        check(p && p->cmd == 0x49 && p->kilo_iterations == 586, "tmf8829 preset 8x8-xr");
+        p = T::find_preset("48x32-ha");
+        check(p && p->cmd == 0x48 && p->kilo_iterations == 3516, "tmf8829 preset 48x32-ha");
+        check(!T::find_preset("64x64"), "tmf8829 unknown preset");
+        check(T::status_name(4) == "ERR_CONFIG_RESULT_SIZE" && T::status_name(0x0E) == "ERR_OSC_TUNE" &&
+                  T::status_name(0x0F).empty(),
+              "tmf8829 status names");
+    }
+
+    // firmware: the embedded image.
+    const Value& fw = v.at("firmware");
+    const depz::byte_span img = T::firmware_image();
+    check_eq(static_cast<std::int64_t>(T::FIRMWARE_LOAD_ADDR), fw.at("load_addr").as_int(), "tmf8829 firmware load_addr");
+    check_eq(static_cast<std::int64_t>(img.size()), fw.at("size").as_int(), "tmf8829 firmware size");
+    check_eq(static_cast<std::int64_t>(img.size() / 4), fw.at("words").as_int(), "tmf8829 firmware words");
+    check_eq(sha256_hex(img), fw.at("sha256").as_string(), "tmf8829 firmware sha256");
+}
+
+// tmf8829_frame_time.json: 27 recorded streams through SensorClock +
+// CaptureTimer, every results frame bit for bit.
+static void test_tmf8829_frame_time()
+{
+    namespace T = depz::tmf8829;
+    Value v = load_vector("tmf8829_frame_time.json");
+    std::vector<std::string> cols;
+    for (const Value& c : v.at("columns").as_array()) cols.push_back(c.as_string());
+    auto col = [&](const char* name) -> std::size_t {
+        for (std::size_t i = 0; i < cols.size(); ++i)
+            if (cols[i] == name) return i;
+        check(false, std::string("tmf8829_frame_time column ") + name);
+        return 0;
+    };
+    const std::size_t c_id = col("id"), c_ts = col("ts"), c_tick = col("systick"), c_t0 = col("t0"),
+                      c_t1 = col("t1"), c_edge = col("edge_us"), c_ets = col("exp_timestamp_us"),
+                      c_elen = col("exp_t1_len_us"), c_eflags = col("exp_flags"), c_eratio = col("exp_ratio_q16");
+    int checked = 0;
+    for (const Value& s : v.at("streams").as_array()) {
+        const std::string scen = s.at("scenario").as_string();
+        T::SensorClock clock;
+        T::CaptureTimer timer;
+        int row_no = 0;
+        for (const Value& rv : s.at("frames").as_array()) {
+            const auto& row = rv.as_array();
+            const auto fid = static_cast<unsigned>(row[c_id].as_int());
+            const std::int64_t ts = row[c_ts].as_int();
+            const auto tick = static_cast<std::uint32_t>(row[c_tick].as_int());
+            const unsigned kind = fid & 0xF0;
+            row_no++;
+            if (kind == T::FID_REF_SPAD) continue;
+            const std::uint8_t flags = clock.add(ts, tick);
+            if (kind == T::FID_HISTOGRAMS) {
+                timer.histograms();
+                continue;
+            }
+            const T::FrameTime t = timer.results(clock, fid & 0x0F, tick, static_cast<std::uint32_t>(row[c_t0].as_int()),
+                                                 static_cast<std::uint32_t>(row[c_t1].as_int()), ts,
+                                                 row[c_edge].as_int(), flags);
+            const bool same = t.timestamp_us == row[c_ets].as_int() && t.t1_len_us == row[c_elen].as_int() &&
+                              t.flags == row[c_eflags].as_int() && clock.ratio_q16() == row[c_eratio].as_int();
+            check(same, "tmf8829_frame_time " + scen + " frame " + std::to_string(row_no));
+            checked++;
+        }
+    }
+    check_eq(checked, 970, "tmf8829_frame_time results frames");
+    // Floor division / floor shift on negative operands (MCU time going back).
+    {
+        T::SensorClock c;
+        check_eq(c.to_us(1000, 100, 99), static_cast<std::int64_t>(992), "tmf8829 to_us one tick back");
+        check_eq(c.to_us(1000, 0x00000005u, 0xFFFFFFFFu), static_cast<std::int64_t>(952), "tmf8829 to_us u32 wrap back");
+        check_eq(static_cast<int>(c.add(1000000, 0)), 0, "tmf8829 clock first pair");
+        // MCU time going back is never a valid step (d_us < 0, floor-divided tolerance).
+        check_eq(static_cast<int>(c.add(1000000 - 1005, 125)), static_cast<int>(T::FT_CLOCK_RESET),
+                 "tmf8829 clock reset when time goes back");
+    }
+    check(T::flag_names(T::FT_NOMINAL | T::FT_STALLED) == std::vector<std::string>{"nominal", "stalled"},
+          "tmf8829 flag_names");
+}
+
 static int run_foundation();
 
 int main(int argc, char** argv) {
@@ -1844,6 +2337,10 @@ int main(int argc, char** argv) {
         test_vl53lx();
     } else if (suite == "bno055") {
         test_bno055();
+    } else if (suite == "tmf8829") {
+        test_tmf8829();
+    } else if (suite == "tmf8829_frame_time") {
+        test_tmf8829_frame_time();
     } else if (suite == "bno086_shtp") {
         test_bno086_shtp();
     } else if (suite == "bno086_reports") {

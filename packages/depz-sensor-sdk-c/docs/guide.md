@@ -30,6 +30,9 @@ its own **introduction** and **user guide**:
 - **VL53L8CH** (ToF superset + CNH histograms) —
   [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
   [api](vl53l8ch/api.md)
+- **TMF8829** (multizone dToF, 8×8 … 48×32 zones) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
 - **BNO055** (9-axis IMU, on-chip fusion) —
   [introduction](bno055/introduction.md) · [guide](bno055/guide.md) ·
   [api](bno055/api.md)
@@ -87,11 +90,11 @@ two layers, one public header each:
 
 The live layer covers the **common commands on every board**; full **sensor
 classes arrive one sensor at a time — the SR04, the VL53L4CD, the
-multizone ToF boards (VL53L5CX / L7CX / L7CH, VL53L8CX / CH) and the BNO055
-have one today**. The
+multizone ToF boards (VL53L5CX / L7CX / L7CH, VL53L8CX / CH, TMF8829) and the
+BNO055 have one today**. The
 [API reference](api.md) is generated straight from both headers' doc-comments.
 
-The sensors follow three firmware philosophies:
+The sensors follow a few firmware philosophies:
 
 - **SR04** — the device does the ranging; you decode `echo_time_us` → distance.
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
@@ -112,6 +115,12 @@ The sensors follow three firmware philosophies:
   the ranging frames are reassembled and decoded there — one live class for
   both. CX is the base ToF imager; CH is its superset, adding
   Compact-Network-Histogram (CNH) output.
+- **TMF8829** — the device is a thin SPI register bridge that only reads the
+  sensor's self-sized frames off its FIFO; the host runs the sensor — soft
+  reset, the 14.4 KB ams sensor-firmware download, presets and the config
+  page, start / stop — and turns the chunked frame stream into measurements
+  (half-frame merge, histogram / reference frames, the sensor-clock model and
+  capture time) in one live class.
 - **BNO055** — the device is a thin register bridge; Bosch's fusion runs on
   the chip, and the mode / unit / calibration / page logic, the register
   codecs and the window decode run **on the host** — the live class does the
@@ -127,7 +136,7 @@ The sensors follow three firmware philosophies:
 - **Not a firmware updater.** Every board of the line has a sensor class —
   the **SR04**, the **VL53L 1D family** (**VL53L0X / L1CX / L1CB / L3CX /
   L4CX**), the **VL53L4CD**, the multizone ToF boards (**VL53L5CX / VL53L7CX /
-  VL53L7CH**, **VL53L8CX / VL53L8CH**), the **BNO055** and the **BNO085 /
+  VL53L7CH**, **VL53L8CX / VL53L8CH**, **TMF8829**), the **BNO055** and the **BNO085 /
   BNO086** — but flashing firmware is left to the transport you own (see
   [Firmware container & bootloader](#firmware-container--bootloader)). A
   board of an unknown firmware opens as a *plain device*: discovery, the
@@ -154,7 +163,7 @@ CMake:
 ```sh
 cmake -B build -S .
 cmake --build build
-ctest --test-dir build          # 83/83: 24 vector/replay + 59 live-layer
+ctest --test-dir build          # 86/86: 26 vector/replay + 60 live-layer
 ```
 
 | Option | Default | Effect |
@@ -177,7 +186,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.5.0
+  GIT_TAG        v0.6.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -607,6 +616,16 @@ the per-sensor guide:
 - **[VL53L8CH](vl53l8ch/guide.md)** — the CX superset; the same class with the
   CH firmware, plus CNH setup (`depz_vl53l8_configure_cnh`) and the CNH
   histogram decode (`depz_vl53l8ch_decode_cnh`).
+- **[TMF8829](tmf8829/guide.md)** — the live sensor class (`depz_tmf8829_*`:
+  init with the sensor-firmware download, configure a preset with read-back,
+  raw registers, start / stop, measurements / raw frames / events via
+  callbacks / streams, stream counters) and, underneath, the SPI-bridge
+  codecs (`depz_tmf8829_pack_*` / `_unpack_*`), chunk reassembly
+  (`depz_tmf8829_reassembler`), frame / pixel decode with the half-frame merge
+  (`depz_tmf8829_parse_frame`, `_parse_results`, `_merge_halves`), the clock
+  model and capture time, the measurement builder
+  (`depz_tmf8829_builder`), presets and config-page fields, and the embedded
+  ams sensor firmware.
 - **[VL53L5CX](vl53l5cx/guide.md) / [VL53L7CX](vl53l7cx/guide.md) /
   [VL53L7CH](vl53l7ch/guide.md)** — the same live class with the L5/L7 models
   and the board commands (`depz_vl53l7_bridge_info`, `_set_i2c_speed_khz`,
@@ -659,14 +678,17 @@ stable merge order (by `t_host_us`, then file order).
 
 ## Testing
 
-The suite is 83 CTests, no hardware required:
+The suite is 86 CTests, no hardware required:
 
-- **Vectors (24)** — one CTest per consumed vector / replay target: the
+- **Vectors (26)** — one CTest per consumed vector / replay target: the
   transport+protocol foundation plus the sensor-decode layer. A real VL53L8CX
   capture is replayed end-to-end through the shared decode path
   (`vec_vl53l8_replay`), and live L5CX / L7CH / L8CH captures through the L5/L7
-  decode (`vec_vl53l7_replay_*`, including CNH frames).
-- **Live layer (59, `io_*`)** — the device core and the SR04 class against a
+  decode (`vec_vl53l7_replay_*`, including CNH frames). The TMF8829 decode
+  layer runs its two vectors: real frames captured on a board
+  (`vec_tmf8829`) and the capture times of 970 results frames from 27
+  recorded streams (`vec_tmf8829_frame_time`).
+- **Live layer (60, `io_*`)** — the device core and the SR04 class against a
   fake SR04 on the far end of a loopback link (identity, time sync, status
   errors, timeouts, the echo-decay clamp, single shot vs loop, `ERR_BUSY`
   during the loop, drop-oldest streams, disconnect, record → strict replay);
@@ -694,7 +716,10 @@ The suite is 83 CTests, no hardware required:
   — so the C SDK must re-issue every request byte for byte and decode the
   same values. The BNO085 / BNO086 class also runs against a fake SH-2 hub
   (`io_bno086_*`: busy retries, stale read-backs, reports and scaling,
-  commands, FRS, refusals). The ten VL53L 1D-family captures run through the
+  commands, FRS, refusals), and the TMF8829 class against a fake SPI bridge
+  playing captured frames (`io_tmf8829_fake_session`: init with the firmware
+  download, configure with read-back and its refusals, a 32×32 stream with
+  reference frames, events, raw registers, stop). The ten VL53L 1D-family captures run through the
   1D class (`io_vlx_*_replay`: `init(driver, product)`, `configure()`, the
   timing read-back and every streamed frame — distance, status, targets,
   histogram bins — for the VL53L0X API, the VL53L1X ULD on a VL53L1CX and a
@@ -704,7 +729,7 @@ The suite is 83 CTests, no hardware required:
   `short` on an L4 die).
 
 ```sh
-ctest --test-dir build            # 83/83
+ctest --test-dir build            # 86/86
 ```
 
 CI runs the suite on Linux, macOS and Windows, and the live layer again under

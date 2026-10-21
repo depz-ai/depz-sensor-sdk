@@ -15,6 +15,7 @@ class SensorType(str, Enum):
     VL53LX = "vl53lx"  # VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX board (contract 12)
     BNO086 = "bno086"
     BNO055 = "bno055"  # register bridge, fusion on chip (contract 13)
+    TMF8829 = "tmf8829"  # SPI register bridge, sensor run by the host (contract 14)
     UNKNOWN = "unknown"
 
 
@@ -39,6 +40,7 @@ _PRODUCT_TOKENS = (
     ("VL53LX", SensorType.VL53LX),
     ("BNO086", SensorType.BNO086),
     ("BNO055", SensorType.BNO055),
+    ("TMF8829", SensorType.TMF8829),
 )
 
 
