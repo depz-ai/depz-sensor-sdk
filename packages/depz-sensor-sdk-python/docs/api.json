@@ -68,7 +68,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 27
+            "line": 28
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceInfo"
@@ -153,7 +153,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 113
+            "line": 124
           },
           "exported_as": [
             "depz_sensor_sdk.list_depz_devices"
@@ -180,12 +180,12 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 76
+            "line": 94
           },
           "exported_as": [
             "depz_sensor_sdk.probe_port"
           ],
-          "doc": "Open `port`, ask GET_NAME_ACTIVE_SOFTWARE (+ name/serial), close.\n\nReturns None when nothing DEPZ-shaped answers. Note: probing opens the\nport — skip ports owned by other software via the `ports=` argument of\n`list_depz_devices`."
+          "doc": "Open `port`, run the contract 02 §4.4 probe (GET_NAME_ACTIVE_SOFTWARE,\nGET_DEVICE_NAME, GET_SERIAL), close.\n\nReturns None when nothing DEPZ-shaped answers. Note: probing opens the\nport — skip ports owned by other software via the `ports=` argument of\n`list_depz_devices`."
         },
         {
           "name": "open_device",
@@ -213,12 +213,114 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 154
+            "line": 165
           },
           "exported_as": [
             "depz_sensor_sdk.open_device"
           ],
-          "doc": "Open the right sensor class for `target`.\n\n- ``None`` (default): the DEPZ candidate port with the alphabetically\n  smallest USB serial (index 0); with ``serial=`` the candidate whose USB\n  serial matches. No candidate → `NoDepzDeviceError`.\n- ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial\n  (0-based). Out of range → `NoDepzDeviceError`.\n- ``str`` (a port path): open exactly that port; if its USB (vid, pid) is\n  not a known DEPZ id, warn but proceed.\n- ``DeviceInfo``: its ``.port``.\n- ``Link``/transport: opened directly (loopback/replay).\n\nBootloader-mode devices raise until the bootloader client lands\n(contract 06)."
+          "doc": "Open the right sensor class for `target` (contract 02 §4.3, §4.4).\n\n- ``None`` (default): the DEPZ candidate port with the alphabetically\n  smallest USB serial (index 0); with ``serial=`` the candidate whose USB\n  serial matches. No candidate → `NoDepzDeviceError`.\n- ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial\n  (0-based). Out of range → `NoDepzDeviceError`.\n- ``str`` (a port path): open exactly that port; if its USB (vid, pid) is\n  not a known DEPZ id, warn but proceed.\n- ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.\n- ``Link``/transport: `open_on_link` (probe and continue on that link).\n\nOn a port the probe runs on a connection of its own (`probe_port`), which\nis closed; the resolved class then opens the port afresh, so host packet\nsequence numbers restart at 0. Bootloader-mode devices raise (use the\ncontract 06 client)."
+        },
+        {
+          "name": "open_on_link",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "link",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.transport.link.Link"
+            },
+            {
+              "name": "usb_vid",
+              "kind": "positional_or_keyword",
+              "annotation": "int | None",
+              "default": null
+            },
+            {
+              "name": "usb_pid",
+              "kind": "positional_or_keyword",
+              "annotation": "int | None",
+              "default": null
+            },
+            {
+              "name": "timeout",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 0.2
+            }
+          ],
+          "module": "depz_sensor_sdk.discovery",
+          "source": {
+            "file": "depz_sensor_sdk/discovery.py",
+            "line": 246
+          },
+          "exported_as": [
+            "depz_sensor_sdk.open_on_link"
+          ],
+          "doc": "Open a device on an already-open `link` that cannot be reopened (a\nreplay or recording link, an adopted transport) — contract 02 §4.4.\n\nRuns the same probe as `probe_port` on that link (GET_NAME_ACTIVE_SOFTWARE,\nGET_DEVICE_NAME, GET_SERIAL), resolves the class with\n`resolve_sensor_class` from the answers and the port's USB (vid, pid) —\nwhich the caller supplies, a link knows none — and continues as that class\non the same connection (`attach_sensor_class`); host sequence numbers run\non from the probe. The returned device owns `link`: on failure it is\nclosed. No answer to GET_NAME_ACTIVE_SOFTWARE → `NoDepzDeviceError`;\na bootloader → `DepzError`."
+        },
+        {
+          "name": "resolve_sensor_class",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "software_name",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            },
+            {
+              "name": "device_name",
+              "kind": "positional_or_keyword",
+              "annotation": "str",
+              "default": ""
+            },
+            {
+              "name": "usb_vid",
+              "kind": "positional_or_keyword",
+              "annotation": "int | None",
+              "default": null
+            },
+            {
+              "name": "usb_pid",
+              "kind": "positional_or_keyword",
+              "annotation": "int | None",
+              "default": null
+            }
+          ],
+          "returns": "str",
+          "module": "depz_sensor_sdk.discovery",
+          "source": {
+            "file": "depz_sensor_sdk/discovery.py",
+            "line": 349
+          },
+          "exported_as": [
+            "depz_sensor_sdk.resolve_sensor_class"
+          ],
+          "doc": "The canonical class name for a device's probe answers and its port's\nUSB (vid, pid) — contract 02 §4.4, pure. One of `SENSOR_CLASS_NAMES`.\n\n`software_name` is the GET_NAME_ACTIVE_SOFTWARE answer, `device_name` the\nGET_DEVICE_NAME answer (\"\" when there was none); the USB id is None when\nunknown (a replay, a bridge). Vectors: ``vectors/probe.json``."
+        },
+        {
+          "name": "attach_sensor_class",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "dev",
+              "kind": "positional_or_keyword",
+              "annotation": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "class_name",
+              "kind": "positional_or_keyword",
+              "annotation": "str"
+            }
+          ],
+          "module": "depz_sensor_sdk.discovery",
+          "source": {
+            "file": "depz_sensor_sdk/discovery.py",
+            "line": 430
+          },
+          "exported_as": [
+            "depz_sensor_sdk.attach_sensor_class"
+          ],
+          "doc": "Continue the open base device `dev` as `class_name` on the same\nconnection — no reopen, sequence numbers and reader run on (contract 02\n§4.4). `dev` must be a plain `DeviceBase` (no subclass yet); returns it,\nnow an instance of that class. \"bootloader\" raises `DepzError`.\n\nState first, class swap second: the reader thread may dispatch a report\nbetween the two statements."
         }
       ]
     },
@@ -251,7 +353,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 225
+            "line": 227
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceBase"
@@ -455,6 +557,18 @@
               "returns": "str"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version."
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -617,7 +731,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 95
+            "line": 97
           },
           "exported_as": [
             "depz_sensor_sdk.TimeSync"
@@ -702,7 +816,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 102
+            "line": 104
           },
           "exported_as": [
             "depz_sensor_sdk.LinkStats"
@@ -770,7 +884,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 163
+            "line": 165
           },
           "exported_as": [
             "depz_sensor_sdk.StreamQueue"
@@ -820,7 +934,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 115
+            "line": 117
           },
           "exported_as": [
             "depz_sensor_sdk.host_now_us"
@@ -847,7 +961,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 120
+            "line": 122
           },
           "exported_as": [
             "depz_sensor_sdk.sync_time_all"
@@ -863,7 +977,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 46
+            "line": 48
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceEvent"
@@ -899,7 +1013,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 51
+            "line": 53
           },
           "exported_as": [
             "depz_sensor_sdk.SequenceErrorEvent"
@@ -942,7 +1056,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 58
+            "line": 60
           },
           "exported_as": [
             "depz_sensor_sdk.LinkCrcErrorEvent"
@@ -976,7 +1090,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 64
+            "line": 66
           },
           "exported_as": [
             "depz_sensor_sdk.TrashEvent"
@@ -1006,7 +1120,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 69
+            "line": 71
           },
           "exported_as": [
             "depz_sensor_sdk.UnsolicitedStatusEvent"
@@ -1047,7 +1161,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 78
+            "line": 80
           },
           "exported_as": [
             "depz_sensor_sdk.TextEvent"
@@ -1086,7 +1200,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 84
+            "line": 86
           },
           "exported_as": [
             "depz_sensor_sdk.TemperatureEvent"
@@ -1120,7 +1234,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 90
+            "line": 92
           },
           "exported_as": [
             "depz_sensor_sdk.DisconnectedEvent"
@@ -1156,7 +1270,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 190
+            "line": 192
           },
           "exported_as": [
             "depz_sensor_sdk.StreamIterator"
@@ -1567,6 +1681,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -2499,6 +2626,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -2777,7 +2917,7 @@
           "module": "depz_sensor_sdk.vl53l4.uld",
           "source": {
             "file": "depz_sensor_sdk/vl53l4/uld.py",
-            "line": 123
+            "line": 125
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l4.Vl53l4cdError"
@@ -2926,7 +3066,7 @@
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 148
+            "line": 150
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8",
@@ -2963,7 +3103,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "bool"
+              "returns": "bool",
+              "doc": "True when the sensor answers with its own silicon ids (a bus\nerror or a foreign id: False)."
             },
             {
               "name": "init",
@@ -3671,6 +3812,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -3847,7 +4001,7 @@
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 523
+            "line": 529
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8ch",
@@ -3910,6 +4064,7 @@
                 }
               ],
               "returns": "bool",
+              "doc": "True when the sensor answers with its own silicon ids (a bus\nerror or a foreign id: False).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4652,6 +4807,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -4876,7 +5044,7 @@
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 79
+            "line": 81
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8Frame",
@@ -5110,7 +5278,7 @@
           "module": "depz_sensor_sdk.vl53l8.uld",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/uld.py",
-            "line": 444
+            "line": 456
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l8.Vl53l8cxError"
@@ -5314,6 +5482,7 @@
                 }
               ],
               "returns": "bool",
+              "doc": "True when the sensor answers with its own silicon ids (a bus\nerror or a foreign id: False).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6022,6 +6191,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -6323,6 +6505,7 @@
                 }
               ],
               "returns": "bool",
+              "doc": "True when the sensor answers with its own silicon ids (a bus\nerror or a foreign id: False).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -7031,6 +7214,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -7364,6 +7560,7 @@
                 }
               ],
               "returns": "bool",
+              "doc": "True when the sensor answers with its own silicon ids (a bus\nerror or a foreign id: False).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -8075,6 +8272,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -8351,7 +8561,7 @@
               "doc": "Bind the (product, driver kind) pair and initialise the sensor.\n\n`product` defaults to this class's product, else the board's device\nname; `driver` defaults to the product's first kind in DRIVER_KINDS\norder (``uld``, else ``ulp``, else ``histogram``). A pair the table has\nno row for raises NotImplementedError naming what the product has."
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -8360,7 +8570,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids."
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)"
             },
             {
               "name": "notes",
@@ -8508,7 +8718,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only)."
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only)."
             },
             {
               "name": "snap_budget",
@@ -8910,6 +9120,12 @@
               "doc": "Stream reports dropped because the driver failed to decode them."
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics)."
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -9109,6 +9325,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -9287,7 +9516,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 619
+            "line": 627
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l0x",
@@ -9391,7 +9620,7 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -9400,7 +9629,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.",
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -9557,7 +9786,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -9987,6 +10216,13 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics).",
+              "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -10186,6 +10422,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -10364,7 +10613,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 627
+            "line": 635
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cx",
@@ -10468,7 +10717,7 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -10477,7 +10726,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.",
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -10634,7 +10883,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -11064,6 +11313,13 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics).",
+              "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -11263,6 +11519,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -11441,7 +11710,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 634
+            "line": 642
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cb",
@@ -11545,7 +11814,7 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -11554,7 +11823,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.",
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -11711,7 +11980,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -12141,6 +12410,13 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics).",
+              "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -12340,6 +12616,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -12518,7 +12807,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 641
+            "line": 649
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l3cx",
@@ -12622,7 +12911,7 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -12631,7 +12920,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.",
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -12788,7 +13077,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -13218,6 +13507,13 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics).",
+              "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -13417,6 +13713,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -13595,7 +13904,7 @@
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 648
+            "line": 656
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l4cx",
@@ -13699,7 +14008,7 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
-              "name": "identify",
+              "name": "identify_product",
               "kind": "method",
               "parameters": [
                 {
@@ -13708,7 +14017,7 @@
                 }
               ],
               "returns": "dict",
-              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.",
+              "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -13865,7 +14174,7 @@
                 }
               ],
               "returns": "tuple[int, ...]",
-              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
+              "doc": "The only budgets accepted right now (ascending), or () when any\ninteger in ``identify_product()['budget_ms']`` will do. Can move with the mode\n(VL53L1: 15 ms exists in short mode only).",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
@@ -14295,6 +14604,13 @@
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
             {
+              "name": "stream_dropped_counts",
+              "kind": "property",
+              "returns": "list[int]",
+              "doc": "Drop-oldest counters of all live measurement queues (diagnostics).",
+              "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
+            },
+            {
               "name": "close",
               "kind": "method",
               "parameters": [
@@ -14494,6 +14810,19 @@
                 }
               ],
               "returns": "str",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -15038,7 +15367,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 198
+            "line": 211
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829",
@@ -15072,7 +15401,7 @@
                 }
               ],
               "returns": "bytes",
-              "doc": "Read `length` bytes from `addr` in ≤1024-byte requests; reads that\nreach the FIFO port 0xFF stay there (the sensor does not auto-increment it)."
+              "doc": "Read `length` bytes from `addr` in ≤1024-byte requests; reads that\nreach the FIFO port 0xFF stay there (the sensor does not auto-increment it).\nA reply shorter or longer than asked raises `DepzError`."
             },
             {
               "name": "read_register",
@@ -15347,6 +15676,24 @@
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after `start()`."
             },
             {
+              "name": "get_measurement",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "timeout",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float",
+                  "default": 2.0
+                }
+              ],
+              "returns": "depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement",
+              "doc": "Wait for the next measurement. Raises `DepzTimeoutError` after\n`timeout`, `LinkClosedError` as soon as the device is closed."
+            },
+            {
               "name": "frames_dropped",
               "kind": "property",
               "returns": "int",
@@ -15362,6 +15709,12 @@
               "name": "frame_parse_errors",
               "kind": "property",
               "returns": "int"
+            },
+            {
+              "name": "clock_ratio_q16",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal\n8 << 16 = 8 µs per SYSTICK), for diagnostics."
             },
             {
               "name": "port",
@@ -15554,6 +15907,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -15737,7 +16103,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 182
+            "line": 184
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829Config",
@@ -15844,7 +16210,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 26
+            "line": 27
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829Measurement",
@@ -15929,7 +16295,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 169
+            "line": 171
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.Tmf8829Error"
@@ -15967,7 +16333,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 173
+            "line": 175
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.Tmf8829InterruptEvent"
@@ -16300,7 +16666,7 @@
           "module": "depz_sensor_sdk.tmf8829.clock",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/clock.py",
-            "line": 105
+            "line": 109
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.FrameTime"
@@ -16395,7 +16761,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 70
+            "line": 71
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.MeasurementBuilder"
@@ -16452,7 +16818,7 @@
           "module": "depz_sensor_sdk.tmf8829.clock",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/clock.py",
-            "line": 45
+            "line": 46
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.SensorClock"
@@ -16542,7 +16908,7 @@
           "module": "depz_sensor_sdk.tmf8829.clock",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/clock.py",
-            "line": 119
+            "line": 123
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.CaptureTimer"
@@ -16710,7 +17076,7 @@
           "module": "depz_sensor_sdk.tmf8829.config",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/config.py",
-            "line": 57
+            "line": 67
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.cfg_get"
@@ -16740,7 +17106,7 @@
           "module": "depz_sensor_sdk.tmf8829.config",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/config.py",
-            "line": 65
+            "line": 75
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.cfg_set"
@@ -16760,7 +17126,7 @@
           "module": "depz_sensor_sdk.tmf8829.config",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/config.py",
-            "line": 77
+            "line": 87
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.config_fields"
@@ -16791,7 +17157,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 62
+            "line": 63
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.distance_mm"
@@ -16812,7 +17178,7 @@
           "module": "depz_sensor_sdk.tmf8829.clock",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/clock.py",
-            "line": 41
+            "line": 42
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.flag_names"
@@ -16909,7 +17275,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 160
+            "line": 162
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.firmware_image"
@@ -16949,7 +17315,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 125
+            "line": 134
           },
           "exported_as": [
             "depz_sensor_sdk.Bno086",
@@ -17459,7 +17825,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the runtime reorientation quaternion (Q14 on the wire; all\nzeros clears). No response per SH-2."
+              "doc": "Set the runtime reorientation quaternion (Q14 on the wire; all\nzeros clears). No response per SH-2.\n\nThe rotation is applied on the board's side (new = report * r) and is\ngiven in the hub's own axes: x and y swapped and z negated relative\nto the axes of the reports — a rotation about x here turns the\nreports about y (bench, 2026-10-22, SH-2 3.12.6). The System\nOrientation record (FRS 0x2D3E) uses the same axes and is read only\nwhen the hub starts."
             },
             {
               "name": "set_calibration",
@@ -17555,6 +17921,68 @@
               ],
               "returns": "None",
               "doc": "Enable/disable the hub's periodic DCD autosave (no response)."
+            },
+            {
+              "name": "set_motion_intent",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "intent",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                }
+              ],
+              "returns": "None",
+              "doc": "Tell the hub how the device is about to move (Interactive\nCalibration, command 0x0E, see MotionIntent), so it can refine the\ngyro zero-rate offset while the device is still. No response per\nSH-2; a BNO085 ignores it. The hub's answer, if it wants the device to\nstop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST)."
+            },
+            {
+              "name": "enable_motion_request",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "hz",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float",
+                  "default": 1
+                },
+                {
+                  "name": "kw",
+                  "kind": "var_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None",
+              "doc": "Enable MotionRequest (0x2B) reports. The hub sends one when its\nrequest changes, not at `hz`; it reads the rate back late, so the\ngranted rate is not checked."
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "sensor",
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
+                },
+                {
+                  "name": "timeout",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float",
+                  "default": 1.0
+                }
+              ],
+              "returns": "None",
+              "doc": "Force Sensor Flush (0xF0): have the hub send `sensor`'s batched\nreports now instead of when its batch interval runs out. Returns once\nthe hub's Flush Completed (0xEF) for `sensor` arrives — every report\nbatched before the call has been emitted by then."
             },
             {
               "name": "frs_read",
@@ -17939,6 +18367,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -18101,7 +18542,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 23
+            "line": 25
           },
           "exported_as": [
             "depz_sensor_sdk.SensorId",
@@ -18252,6 +18693,10 @@
             {
               "name": "GYRO_INTEGRATED_RV",
               "value": 42
+            },
+            {
+              "name": "MOTION_REQUEST",
+              "value": 43
             }
           ],
           "members": [
@@ -18427,7 +18872,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 295
+            "line": 316
           },
           "exported_as": [
             "depz_sensor_sdk.RotationVector",
@@ -18563,7 +19008,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 329
+            "line": 350
           },
           "exported_as": [
             "depz_sensor_sdk.GyroIntegratedRV",
@@ -18656,7 +19101,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 158
+            "line": 179
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Report"
@@ -18711,7 +19156,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 167
+            "line": 188
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.InputReport"
@@ -18793,7 +19238,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 176
+            "line": 197
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Acceleration"
@@ -18903,7 +19348,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 197
+            "line": 218
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Gyroscope"
@@ -19013,7 +19458,7 @@
           "module": "depz_sensor_sdk.bno086.reports",
           "source": {
             "file": "depz_sensor_sdk/bno086/reports.py",
-            "line": 218
+            "line": 239
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Magnetometer"
@@ -19072,6 +19517,310 @@
           ]
         },
         {
+          "name": "MotionRequest",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.bno086.reports.InputReport"
+          ],
+          "parameters": [
+            {
+              "name": "sensor_id",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "timestamp_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "seq",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "accuracy",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "delay_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "intent",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "request",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.bno086.reports",
+          "source": {
+            "file": "depz_sensor_sdk/bno086/reports.py",
+            "line": 488
+          },
+          "exported_as": [
+            "depz_sensor_sdk.bno086.MotionRequest"
+          ],
+          "doc": "0x2B motion request (BNO086 interactive calibration): the motion\nintent the hub was last told, and what it asks of the device. Sent when\nthe request changes, not periodically, whatever the granted rate.",
+          "dataclass_fields": [
+            {
+              "name": "sensor_id",
+              "type": "int"
+            },
+            {
+              "name": "timestamp_us",
+              "type": "int"
+            },
+            {
+              "name": "seq",
+              "type": "int"
+            },
+            {
+              "name": "accuracy",
+              "type": "int"
+            },
+            {
+              "name": "delay_us",
+              "type": "int"
+            },
+            {
+              "name": "intent",
+              "type": "int"
+            },
+            {
+              "name": "request",
+              "type": "int"
+            }
+          ],
+          "members": [
+            {
+              "name": "intent_name",
+              "kind": "property",
+              "returns": "str"
+            },
+            {
+              "name": "request_name",
+              "kind": "property",
+              "returns": "str"
+            },
+            {
+              "name": "wants_stillness",
+              "kind": "property",
+              "returns": "bool",
+              "doc": "True when the hub asks the device to stop (the deprecated\noptional request 2 does not count)."
+            }
+          ]
+        },
+        {
+          "name": "MotionIntent",
+          "kind": "class",
+          "bases": [
+            "enum.IntEnum"
+          ],
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "var_positional"
+            }
+          ],
+          "module": "depz_sensor_sdk.bno086.sh2",
+          "source": {
+            "file": "depz_sensor_sdk/bno086/sh2.py",
+            "line": 338
+          },
+          "exported_as": [
+            "depz_sensor_sdk.bno086.MotionIntent"
+          ],
+          "doc": "P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 —\nwhat the host knows about the device's motion. UNKNOWN is the hub's\ninitial state.",
+          "enum_members": [
+            {
+              "name": "UNKNOWN",
+              "value": 0
+            },
+            {
+              "name": "STATIONARY_NO_VIBRATION",
+              "value": 1
+            },
+            {
+              "name": "STATIONARY_WITH_VIBRATION",
+              "value": 2
+            },
+            {
+              "name": "IN_MOTION",
+              "value": 3
+            },
+            {
+              "name": "IN_MOTION_ACCELERATING",
+              "value": 4
+            }
+          ],
+          "members": [
+            {
+              "name": "conjugate",
+              "kind": "method",
+              "doc": "Returns self, the complex conjugate of any int.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_length",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of bits necessary to represent self in binary.\n\n>>> bin(37)\n'0b100101'\n>>> (37).bit_length()\n6",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "bit_count",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Number of ones in the binary representation of the absolute value of self.\n\nAlso known as the population count.\n\n>>> bin(13)\n'0b1101'\n>>> (13).bit_count()\n3",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "to_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "length",
+                  "kind": "positional_or_keyword",
+                  "default": 1
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return an array of bytes representing an integer.\n\nlength\n  Length of bytes object to use.  An OverflowError is raised if the\n  integer is not representable with the given number of bytes.  Default\n  is length 1.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Determines whether two's complement is used to represent the integer.\n  If signed is False and a negative integer is given, an OverflowError\n  is raised.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "from_bytes",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "type",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "bytes",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "byteorder",
+                  "kind": "positional_or_keyword",
+                  "default": "big"
+                },
+                {
+                  "name": "signed",
+                  "kind": "keyword_only",
+                  "default": false
+                }
+              ],
+              "doc": "Return the integer represented by the given array of bytes.\n\nbytes\n  Holds the array of bytes to convert.  The argument must either\n  support the buffer protocol or be an iterable object producing bytes.\n  Bytes and bytearray are examples of built-in objects that support the\n  buffer protocol.\nbyteorder\n  The byte order used to represent the integer.  If byteorder is 'big',\n  the most significant byte is at the beginning of the byte array.  If\n  byteorder is 'little', the most significant byte is at the end of the\n  byte array.  To request the native byte order of the host system, use\n  `sys.byteorder' as the byte order value.  Default is to use 'big'.\nsigned\n  Indicates whether two's complement is used to represent the integer.",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "as_integer_ratio",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a pair of integers, whose ratio is equal to the original int.\n\nThe ratio is in lowest terms and has a positive denominator.\n\n>>> (10).as_integer_ratio()\n(10, 1)\n>>> (-10).as_integer_ratio()\n(-10, 1)\n>>> (0).as_integer_ratio()\n(0, 1)",
+              "defined_in": "builtins.int"
+            },
+            {
+              "name": "is_integer",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Returns True. Exists for duck type compatibility with float.is_integer.",
+              "defined_in": "builtins.int"
+            }
+          ]
+        },
+        {
+          "name": "FlushCompleted",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.bno086.reports.Report"
+          ],
+          "parameters": [
+            {
+              "name": "sensor_id",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "timestamp_us",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "flushed_sensor",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.bno086.reports",
+          "source": {
+            "file": "depz_sensor_sdk/bno086/reports.py",
+            "line": 512
+          },
+          "exported_as": [
+            "depz_sensor_sdk.bno086.FlushCompleted"
+          ],
+          "doc": "0xEF Flush Completed: every batched report of `flushed_sensor` as of\nthe matching Force Sensor Flush has been sent. `sensor_id` is 0xEF.",
+          "dataclass_fields": [
+            {
+              "name": "sensor_id",
+              "type": "int"
+            },
+            {
+              "name": "timestamp_us",
+              "type": "int"
+            },
+            {
+              "name": "flushed_sensor",
+              "type": "int"
+            }
+          ],
+          "members": []
+        },
+        {
           "name": "FeatureResponse",
           "kind": "class",
           "bases": [],
@@ -19111,7 +19860,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 209
+            "line": 212
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.FeatureResponse"
@@ -19177,7 +19926,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 167
+            "line": 170
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.FeatureFlag"
@@ -19318,7 +20067,7 @@
           "module": "depz_sensor_sdk.bno086.shtp",
           "source": {
             "file": "depz_sensor_sdk/bno086/shtp.py",
-            "line": 34
+            "line": 36
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ExecutableCommand"
@@ -19488,7 +20237,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 237
+            "line": 240
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ProductId"
@@ -19579,7 +20328,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 277
+            "line": 280
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CommandResponse"
@@ -19721,7 +20470,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 555
+            "line": 601
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.SensorMetadata"
@@ -19827,7 +20576,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 157
+            "line": 160
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.TareAxis"
@@ -19975,7 +20724,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 146
+            "line": 149
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.TareBasis"
@@ -20126,7 +20875,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 17
+            "line": 18
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Sh2Error"
@@ -20177,7 +20926,7 @@
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 115
+            "line": 124
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CalibrationConfig"
@@ -20218,7 +20967,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 80
+            "line": 83
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.OscillatorType"
@@ -20388,7 +21137,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 118
+            "line": 121
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ErrorRecord"
@@ -20454,7 +21203,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 88
+            "line": 91
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ErrorSource"
@@ -20627,7 +21376,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 135
+            "line": 138
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.Counts"
@@ -21664,6 +22413,19 @@
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
+              "name": "identify",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "depz_sensor_sdk.protocol.identity.Identity",
+              "doc": "Classify the running firmware (contract 02 §4): the software name\nparsed into mode, sensor type and version.",
+              "defined_in": "depz_sensor_sdk.device.DeviceBase"
+            },
+            {
               "name": "read_mcu_temperature",
               "kind": "method",
               "parameters": [
@@ -21992,7 +22754,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 105
+            "line": 107
           },
           "exported_as": [
             "depz_sensor_sdk.OprMode",
@@ -22208,7 +22970,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 200
+            "line": 202
           },
           "exported_as": [
             "depz_sensor_sdk.Units",
@@ -22338,7 +23100,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 354
+            "line": 358
           },
           "exported_as": [
             "depz_sensor_sdk.AxisRemap",
@@ -22460,7 +23222,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 260
+            "line": 263
           },
           "exported_as": [
             "depz_sensor_sdk.CalibStatus",
@@ -22555,7 +23317,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 283
+            "line": 287
           },
           "exported_as": [
             "depz_sensor_sdk.CalibrationProfile",
@@ -22656,7 +23418,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 127
+            "line": 129
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.PwrMode"
@@ -22801,7 +23563,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 135
+            "line": 137
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.TempSource"
@@ -22957,7 +23719,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 483
+            "line": 493
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.SystemStatus"
@@ -23027,7 +23789,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 426
+            "line": 432
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.AccelConfig"
@@ -23108,7 +23870,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 444
+            "line": 451
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.GyroConfig"
@@ -23189,7 +23951,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 462
+            "line": 471
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.MagConfig"
@@ -23306,7 +24068,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 521
+            "line": 531
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.RawBlock"
@@ -23380,7 +24142,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 537
+            "line": 547
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.decode_block"
@@ -23748,7 +24510,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 122
+            "line": 128
           },
           "exported_as": [
             "depz_sensor_sdk.SessionRecorder"
@@ -23827,7 +24589,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 395
+            "line": 401
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetReader"
@@ -23838,6 +24600,18 @@
               "name": "devices",
               "kind": "property",
               "returns": "dict[str, dict[str, typing.Any]]"
+            },
+            {
+              "name": "records",
+              "kind": "property",
+              "returns": "list[depz_sensor_sdk.dataset.DatasetRecord]",
+              "doc": "Every record, merged by host time (the order of iteration). Loaded\non first access and cached — the whole file is held in memory."
+            },
+            {
+              "name": "duration_us",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Host-time span from the first record to the last (0 when the\ndataset has fewer than two records)."
             },
             {
               "name": "play",
@@ -23872,7 +24646,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Deliver records paced by their timestamps (speed=2.0 → twice as\nfast; speed=0 → as fast as possible)."
+              "doc": "Deliver records paced by their timestamps (speed=2.0 → twice as\nfast; speed=0 → as fast as possible), blocking until the end or\n`stop`. For pause / seek / speed changes use `DatasetPlayer`."
             }
           ]
         },
@@ -23906,7 +24680,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 77
+            "line": 83
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetRecord"
@@ -23930,6 +24704,856 @@
             }
           ],
           "members": []
+        },
+        {
+          "name": "DatasetPlayer",
+          "kind": "class",
+          "bases": [],
+          "parameters": [
+            {
+              "name": "reader",
+              "kind": "positional_or_keyword",
+              "annotation": "DatasetReader | str | Path"
+            },
+            {
+              "name": "speed",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 1.0
+            },
+            {
+              "name": "clock",
+              "kind": "keyword_only",
+              "annotation": "Callable[[], float]",
+              "default": "<built-in function monotonic>"
+            },
+            {
+              "name": "threaded",
+              "kind": "keyword_only",
+              "annotation": "bool",
+              "default": true
+            }
+          ],
+          "module": "depz_sensor_sdk.dataset",
+          "source": {
+            "file": "depz_sensor_sdk/dataset.py",
+            "line": 499
+          },
+          "exported_as": [
+            "depz_sensor_sdk.DatasetPlayer"
+          ],
+          "doc": "Timeline player over a dataset: paced delivery with play / pause /\nseek / speed — the engine behind a viewer's playback mode\n(contract 09 §Player; the TS SDK's `DatasetPlayer`).\n\nUsage::\n\n    player = DatasetPlayer(DatasetReader(\"run.depzdata\"), speed=2.0)\n    player.on_record(lambda r: print(r.device_id, r.kind, r.t_host_us))\n    player.play()\n    player.wait()            # until done (or paused)\n\nTiming: playback runs on a media clock anchored to the host clock.\nRecord ``i`` is due at ``anchor_wall + (t_i - anchor_t) / speed``; the\nanchor is (now, t of the last delivered record — or of the first record\nwhen none was) at play / resume / seek, so the first record goes out at\nonce and every later one after its gap to the previous one. Pacing is\nagainst the clock, not cumulative: a slow consumer gets overdue records\nback to back and playback does not drift. ``speed=0`` delivers as fast as\npossible.\n\nThreads: by default records and the ``done`` state are delivered on a\nplayer thread (started on the first `play`); state changes made by a\ncall (`play`, `pause`, `seek_us`) are reported on the calling thread\nbefore it returns. Callbacks run under the player's lock, so they see a\nconsistent player, may call its methods, and once `pause` returns no\nrecord callback is running or will start. Like device stream callbacks\n(contract 07) they must not block — never wait in one for another thread\nthat uses this player.\n\n``threaded=False`` starts no thread: the owner calls `tick` from its own\nloop (a GUI timer, or a test with a fake ``clock``).",
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "returns": "depz_sensor_sdk.dataset.PlayerState"
+            },
+            {
+              "name": "duration_us",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Span of the timeline: last record's `t` minus the first's."
+            },
+            {
+              "name": "position_us",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Current position, µs from the first record: the `t` of the last\ndelivered record (after a seek: of the record just before the\ntarget). 0 before anything was delivered."
+            },
+            {
+              "name": "speed",
+              "kind": "property",
+              "returns": "float"
+            },
+            {
+              "name": "on_record",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cb",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Callable[[depz_sensor_sdk.dataset.DatasetRecord], NoneType]"
+                }
+              ],
+              "returns": "Callable[[], NoneType]",
+              "doc": "Subscribe to delivered records. Returns an unsubscribe function\n(idempotent)."
+            },
+            {
+              "name": "on_state",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "cb",
+                  "kind": "positional_or_keyword",
+                  "annotation": "Callable[[depz_sensor_sdk.dataset.PlayerState], NoneType]"
+                }
+              ],
+              "returns": "Callable[[], NoneType]",
+              "doc": "Subscribe to state changes (called with the new state on every\ntransition). Returns an unsubscribe function (idempotent)."
+            },
+            {
+              "name": "play",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Start, or resume after `pause`. No-op while playing. From `done`\n(or after a seek past the end) playback restarts from the first\nrecord. An empty dataset goes straight to `done`."
+            },
+            {
+              "name": "pause",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Stop delivering; `play` resumes from the next record, which then\nwaits its full gap again. No-op unless playing."
+            },
+            {
+              "name": "seek_us",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "offset_us",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float"
+                }
+              ],
+              "returns": "None",
+              "doc": "Move to `offset_us` µs from the first record: the next record\ndelivered is the first one with ``t >= t_first + offset_us`` (a\nnegative offset means the start). Records between the old and the\nnew position are skipped, not delivered. The state does not change,\nexcept that a seek past the end while playing ends playback\n(`done`); while playing, delivery continues from the new position."
+            },
+            {
+              "name": "tick",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "float | None",
+              "doc": "Deliver every record that is due now (on the calling thread).\nReturns the seconds until the next one is due, or None when not\nplaying. For ``threaded=False``; harmless with a player thread."
+            },
+            {
+              "name": "wait",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                },
+                {
+                  "name": "timeout",
+                  "kind": "positional_or_keyword",
+                  "annotation": "float | None",
+                  "default": null
+                }
+              ],
+              "returns": "bool",
+              "doc": "Block until the player is not playing (done, or paused by someone\nelse). True if so, False on timeout. Needs the player thread."
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_or_keyword"
+                }
+              ],
+              "returns": "None",
+              "doc": "Stop playback and the player thread. Idempotent."
+            }
+          ]
+        },
+        {
+          "name": "PlayerState",
+          "kind": "class",
+          "bases": [
+            "builtins.str",
+            "enum.Enum"
+          ],
+          "parameters": [
+            {
+              "name": "values",
+              "kind": "var_positional"
+            }
+          ],
+          "module": "depz_sensor_sdk.dataset",
+          "source": {
+            "file": "depz_sensor_sdk/dataset.py",
+            "line": 486
+          },
+          "exported_as": [
+            "depz_sensor_sdk.PlayerState"
+          ],
+          "doc": "`DatasetPlayer` state (contract 09 §Player). A `str` enum, so\n`player.state == \"playing\"` works too.",
+          "enum_members": [
+            {
+              "name": "IDLE",
+              "value": "idle"
+            },
+            {
+              "name": "PLAYING",
+              "value": "playing"
+            },
+            {
+              "name": "PAUSED",
+              "value": "paused"
+            },
+            {
+              "name": "DONE",
+              "value": "done"
+            }
+          ],
+          "members": [
+            {
+              "name": "encode",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "encoding",
+                  "kind": "positional_or_keyword",
+                  "default": "utf-8"
+                },
+                {
+                  "name": "errors",
+                  "kind": "positional_or_keyword",
+                  "default": "strict"
+                }
+              ],
+              "doc": "Encode the string using the codec registered for encoding.\n\nencoding\n  The encoding in which to encode the string.\nerrors\n  The error handling scheme to use for encoding errors.\n  The default is 'strict' meaning that encoding errors raise a\n  UnicodeEncodeError.  Other possible values are 'ignore', 'replace' and\n  'xmlcharrefreplace' as well as any other name registered with\n  codecs.register_error that can handle UnicodeEncodeErrors.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "old",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "new",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "count",
+                  "kind": "positional_only",
+                  "default": -1
+                }
+              ],
+              "doc": "Return a copy with all occurrences of substring old replaced by new.\n\n  count\n    Maximum number of occurrences to replace.\n    -1 (the default value) means replace all occurrences.\n\nIf the optional argument count is given, only the first count occurrences are\nreplaced.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "split",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "sep",
+                  "kind": "positional_or_keyword",
+                  "default": null
+                },
+                {
+                  "name": "maxsplit",
+                  "kind": "positional_or_keyword",
+                  "default": -1
+                }
+              ],
+              "doc": "Return a list of the substrings in the string, using sep as the separator string.\n\n  sep\n    The separator used to split the string.\n\n    When set to None (the default value), will split on any whitespace\n    character (including \\n \\r \\t \\f and spaces) and will discard\n    empty strings from the result.\n  maxsplit\n    Maximum number of splits.\n    -1 (the default value) means no limit.\n\nSplitting starts at the front of the string and works to the end.\n\nNote, str.split() is mainly useful for data that has been intentionally\ndelimited.  With natural text that includes punctuation, consider using\nthe regular expression module.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rsplit",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "sep",
+                  "kind": "positional_or_keyword",
+                  "default": null
+                },
+                {
+                  "name": "maxsplit",
+                  "kind": "positional_or_keyword",
+                  "default": -1
+                }
+              ],
+              "doc": "Return a list of the substrings in the string, using sep as the separator string.\n\n  sep\n    The separator used to split the string.\n\n    When set to None (the default value), will split on any whitespace\n    character (including \\n \\r \\t \\f and spaces) and will discard\n    empty strings from the result.\n  maxsplit\n    Maximum number of splits.\n    -1 (the default value) means no limit.\n\nSplitting starts at the end of the string and works to the front.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "join",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "iterable",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Concatenate any number of strings.\n\nThe string whose method is called is inserted in between each given string.\nThe result is returned as a new string.\n\nExample: '.'.join(['ab', 'pq', 'rs']) -> 'ab.pq.rs'",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "capitalize",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a capitalized version of the string.\n\nMore specifically, make the first character have upper case and the rest lower\ncase.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "casefold",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a version of the string suitable for caseless comparisons.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "title",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a version of the string where each word is titlecased.\n\nMore specifically, words start with uppercased characters and all remaining\ncased characters have lower case.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "center",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "width",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "fillchar",
+                  "kind": "positional_only",
+                  "default": " "
+                }
+              ],
+              "doc": "Return a centered string of length width.\n\nPadding is done using the specified fill character (default is a space).",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "count",
+              "kind": "method",
+              "doc": "Return the number of non-overlapping occurrences of substring sub in\nstring S[start:end].  Optional arguments start and end are\ninterpreted as in slice notation.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "expandtabs",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "tabsize",
+                  "kind": "positional_or_keyword",
+                  "default": 8
+                }
+              ],
+              "doc": "Return a copy where all tab characters are expanded using spaces.\n\nIf tabsize is not given, a tab size of 8 characters is assumed.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "find",
+              "kind": "method",
+              "doc": "Return the lowest index in S where substring sub is found,\nsuch that sub is contained within S[start:end].  Optional\narguments start and end are interpreted as in slice notation.\n\nReturn -1 on failure.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "partition",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "sep",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Partition the string into three parts using the given separator.\n\nThis will search for the separator in the string.  If the separator is found,\nreturns a 3-tuple containing the part before the separator, the separator\nitself, and the part after it.\n\nIf the separator is not found, returns a 3-tuple containing the original string\nand two empty strings.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "index",
+              "kind": "method",
+              "doc": "Return the lowest index in S where substring sub is found,\nsuch that sub is contained within S[start:end].  Optional\narguments start and end are interpreted as in slice notation.\n\nRaises ValueError when the substring is not found.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "ljust",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "width",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "fillchar",
+                  "kind": "positional_only",
+                  "default": " "
+                }
+              ],
+              "doc": "Return a left-justified string of length width.\n\nPadding is done using the specified fill character (default is a space).",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "lower",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a copy of the string converted to lowercase.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "lstrip",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "chars",
+                  "kind": "positional_only",
+                  "default": null
+                }
+              ],
+              "doc": "Return a copy of the string with leading whitespace removed.\n\nIf chars is given and not None, remove characters in chars instead.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rfind",
+              "kind": "method",
+              "doc": "Return the highest index in S where substring sub is found,\nsuch that sub is contained within S[start:end].  Optional\narguments start and end are interpreted as in slice notation.\n\nReturn -1 on failure.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rindex",
+              "kind": "method",
+              "doc": "Return the highest index in S where substring sub is found,\nsuch that sub is contained within S[start:end].  Optional\narguments start and end are interpreted as in slice notation.\n\nRaises ValueError when the substring is not found.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rjust",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "width",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "fillchar",
+                  "kind": "positional_only",
+                  "default": " "
+                }
+              ],
+              "doc": "Return a right-justified string of length width.\n\nPadding is done using the specified fill character (default is a space).",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rstrip",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "chars",
+                  "kind": "positional_only",
+                  "default": null
+                }
+              ],
+              "doc": "Return a copy of the string with trailing whitespace removed.\n\nIf chars is given and not None, remove characters in chars instead.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "rpartition",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "sep",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Partition the string into three parts using the given separator.\n\nThis will search for the separator in the string, starting at the end. If\nthe separator is found, returns a 3-tuple containing the part before the\nseparator, the separator itself, and the part after it.\n\nIf the separator is not found, returns a 3-tuple containing two empty strings\nand the original string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "splitlines",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "keepends",
+                  "kind": "positional_or_keyword",
+                  "default": false
+                }
+              ],
+              "doc": "Return a list of the lines in the string, breaking at line boundaries.\n\nLine breaks are not included in the resulting list unless keepends is given and\ntrue.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "strip",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "chars",
+                  "kind": "positional_only",
+                  "default": null
+                }
+              ],
+              "doc": "Return a copy of the string with leading and trailing whitespace removed.\n\nIf chars is given and not None, remove characters in chars instead.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "swapcase",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Convert uppercase characters to lowercase and lowercase characters to uppercase.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "translate",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "table",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Replace each character in the string using the given translation table.\n\n  table\n    Translation table, which must be a mapping of Unicode ordinals to\n    Unicode ordinals, strings, or None.\n\nThe table must implement lookup/indexing via __getitem__, for instance a\ndictionary or list.  If this operation raises LookupError, the character is\nleft untouched.  Characters mapped to None are deleted.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "upper",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a copy of the string converted to uppercase.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "startswith",
+              "kind": "method",
+              "doc": "Return True if S starts with the specified prefix, False otherwise.\nWith optional start, test S beginning at that position.\nWith optional end, stop comparing S at that position.\nprefix can also be a tuple of strings to try.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "endswith",
+              "kind": "method",
+              "doc": "Return True if S ends with the specified suffix, False otherwise.\nWith optional start, test S beginning at that position.\nWith optional end, stop comparing S at that position.\nsuffix can also be a tuple of strings to try.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "removeprefix",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "prefix",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a str with the given prefix string removed if present.\n\nIf the string starts with the prefix string, return string[len(prefix):].\nOtherwise, return a copy of the original string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "removesuffix",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "suffix",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return a str with the given suffix string removed if present.\n\nIf the string ends with the suffix string and that suffix is not empty,\nreturn string[:-len(suffix)]. Otherwise, return a copy of the original\nstring.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isascii",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if all characters in the string are ASCII, False otherwise.\n\nASCII characters have code points in the range U+0000-U+007F.\nEmpty string is ASCII too.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "islower",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a lowercase string, False otherwise.\n\nA string is lowercase if all cased characters in the string are lowercase and\nthere is at least one cased character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isupper",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is an uppercase string, False otherwise.\n\nA string is uppercase if all cased characters in the string are uppercase and\nthere is at least one cased character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "istitle",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a title-cased string, False otherwise.\n\nIn a title-cased string, upper- and title-case characters may only\nfollow uncased characters and lowercase characters only cased ones.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isspace",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a whitespace string, False otherwise.\n\nA string is whitespace if all characters in the string are whitespace and there\nis at least one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isdecimal",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a decimal string, False otherwise.\n\nA string is a decimal string if all characters in the string are decimal and\nthere is at least one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isdigit",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a digit string, False otherwise.\n\nA string is a digit string if all characters in the string are digits and there\nis at least one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isnumeric",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a numeric string, False otherwise.\n\nA string is numeric if all characters in the string are numeric and there is at\nleast one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isalpha",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is an alphabetic string, False otherwise.\n\nA string is alphabetic if all characters in the string are alphabetic and there\nis at least one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isalnum",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is an alpha-numeric string, False otherwise.\n\nA string is alpha-numeric if all characters in the string are alpha-numeric and\nthere is at least one character in the string.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isidentifier",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if the string is a valid Python identifier, False otherwise.\n\nCall keyword.iskeyword(s) to test whether string s is a reserved identifier,\nsuch as \"def\" or \"class\".",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "isprintable",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Return True if all characters in the string are printable, False otherwise.\n\nA character is printable if repr() may use it in its output.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "zfill",
+              "kind": "method",
+              "parameters": [
+                {
+                  "name": "self",
+                  "kind": "positional_only"
+                },
+                {
+                  "name": "width",
+                  "kind": "positional_only"
+                }
+              ],
+              "doc": "Pad a numeric string with zeros on the left, to fill a field of the given width.\n\nThe string is never truncated.",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "format",
+              "kind": "method",
+              "doc": "Return a formatted version of S, using substitutions from args and kwargs.\nThe substitutions are identified by braces ('{' and '}').",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "format_map",
+              "kind": "method",
+              "doc": "Return a formatted version of S, using substitutions from mapping.\nThe substitutions are identified by braces ('{' and '}').",
+              "defined_in": "builtins.str"
+            },
+            {
+              "name": "maketrans",
+              "kind": "staticmethod",
+              "doc": "Return a translation table usable for str.translate().\n\nIf there is only one argument, it must be a dictionary mapping Unicode\nordinals (integers) or characters to Unicode ordinals, strings or None.\nCharacter keys will be then converted to ordinals.\nIf there are two arguments, they must be strings of equal length, and\nin the resulting dictionary, each character in x will be mapped to the\ncharacter at the same position in y. If there is a third argument, it\nmust be a string, whose characters will be mapped to None in the result.",
+              "defined_in": "builtins.str"
+            }
+          ]
         }
       ]
     },
@@ -23981,7 +25605,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 22
+            "line": 23
           },
           "exported_as": [
             "depz_sensor_sdk.transport.CrcType"
@@ -24139,7 +25763,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 59
+            "line": 67
           },
           "exported_as": [
             "depz_sensor_sdk.transport.Packet"
@@ -24175,7 +25799,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 66
+            "line": 74
           },
           "exported_as": [
             "depz_sensor_sdk.transport.Trash"
@@ -24209,7 +25833,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 75
+            "line": 83
           },
           "exported_as": [
             "depz_sensor_sdk.transport.CrcError"
@@ -24247,7 +25871,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 86
+            "line": 94
           },
           "exported_as": [
             "depz_sensor_sdk.transport.PacketParser"
@@ -24304,7 +25928,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 43
+            "line": 44
           },
           "exported_as": [
             "depz_sensor_sdk.transport.build_packet"
@@ -24330,7 +25954,7 @@
           "module": "depz_sensor_sdk.transport.framing",
           "source": {
             "file": "depz_sensor_sdk/transport/framing.py",
-            "line": 32
+            "line": 33
           },
           "exported_as": [
             "depz_sensor_sdk.transport.payload_crc_bytes"
@@ -24635,7 +26259,7 @@
           "module": "depz_sensor_sdk.protocol.vl53l4",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53l4.py",
-            "line": 82
+            "line": 90
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l4Info",
@@ -24758,7 +26382,7 @@
           "module": "depz_sensor_sdk.protocol.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53l7.py",
-            "line": 62
+            "line": 85
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l7Info",
@@ -24882,7 +26506,7 @@
           "module": "depz_sensor_sdk.protocol.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53lx.py",
-            "line": 78
+            "line": 79
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53lxInfo",
@@ -25060,7 +26684,7 @@
           "module": "depz_sensor_sdk.protocol.bno055",
           "source": {
             "file": "depz_sensor_sdk/protocol/bno055.py",
-            "line": 72
+            "line": 80
           },
           "exported_as": [
             "depz_sensor_sdk.Bno055Info",
@@ -25340,7 +26964,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 14
+            "line": 16
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Cmd"
@@ -25532,7 +27156,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 32
+            "line": 34
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Rpt"
@@ -25700,7 +27324,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 44
+            "line": 46
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Status"
@@ -25872,7 +27496,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 57
+            "line": 59
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinMode"
@@ -26024,7 +27648,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 65
+            "line": 67
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinPolarity"
@@ -26174,7 +27798,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 132
+            "line": 150
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinConfig"
@@ -26243,7 +27867,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 73
+            "line": 75
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.StatusReport"
@@ -26297,7 +27921,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 84
+            "line": 87
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.TextReport"
@@ -26356,7 +27980,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 94
+            "line": 98
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncTimeReport"
@@ -26414,7 +28038,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 106
+            "line": 111
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.TemperatureReport"
@@ -26473,7 +28097,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 121
+            "line": 127
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SequenceErrorReport"
@@ -26537,7 +28161,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 147
+            "line": 172
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.pack_sync_time"
@@ -26572,7 +28196,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 151
+            "line": 176
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.sync_time_offset_rtt"
@@ -26593,7 +28217,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 164
+            "line": 189
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.strip_device_string"
@@ -27380,7 +29004,7 @@
           "module": "depz_sensor_sdk.protocol.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53l7.py",
-            "line": 26
+            "line": 28
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l7.PinAction"
@@ -27529,7 +29153,7 @@
           "module": "depz_sensor_sdk.protocol.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53l7.py",
-            "line": 36
+            "line": 38
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l7.I2cError"
@@ -28043,6 +29667,16 @@
       "title": "Top level",
       "symbols": [
         {
+          "name": "SENSOR_CLASS_NAMES",
+          "kind": "data",
+          "type": "tuple",
+          "value": "('sr04', 'vl53l4cd', 'vl53l8cx', 'vl53l8ch', 'vl53l5cx', 'vl53l7cx', 'vl53l7ch', 'vl53l0x', 'vl53l1cx', 'vl53l1cb', 'vl53l3cx', 'vl53l4cx', 'vl53lx', 'bno086', 'bno055', 'tmf8829', 'device', 'bootloader')",
+          "exported_as": [
+            "depz_sensor_sdk.SENSOR_CLASS_NAMES"
+          ],
+          "doc": "Built-in immutable sequence.\n\nIf no argument is given, the constructor returns an empty tuple.\nIf iterable is specified the tuple is initialized from iterable's items.\n\nIf the argument is a tuple, the return value is the same object."
+        },
+        {
           "name": "DEPZ_USB_VID",
           "kind": "data",
           "type": "int",
@@ -28063,10 +29697,20 @@
           "doc": "dict(mapping) -> new dictionary initialized from a mapping object's\n    (key, value) pairs\ndict(iterable) -> new dictionary initialized as if via:\n    d = {}\n    for k, v in iterable:\n        d[k] = v\ndict(**kwargs) -> new dictionary initialized with the name=value pairs\n    in the keyword argument list.  For example:  dict(one=1, two=2)"
         },
         {
+          "name": "DATASET_SCHEMA",
+          "kind": "data",
+          "type": "str",
+          "value": "depz.dataset/2",
+          "exported_as": [
+            "depz_sensor_sdk.DATASET_SCHEMA"
+          ],
+          "doc": "str(bytes_or_buffer[, encoding[, errors]]) -> str\n\nCreate a new string object from the given object. If encoding or\nerrors is specified, then the object must expose a data buffer\nthat will be decoded using the given encoding and error handler.\nOtherwise, returns the result of object.__str__() (if defined)\nor repr(object).\nencoding defaults to sys.getdefaultencoding().\nerrors defaults to 'strict'."
+        },
+        {
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.6.0",
+          "value": "0.7.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],
@@ -28096,7 +29740,7 @@
           "module": "depz_sensor_sdk.usb_ids",
           "source": {
             "file": "depz_sensor_sdk/usb_ids.py",
-            "line": 76
+            "line": 84
           },
           "exported_as": [
             "depz_sensor_sdk.is_known_depz_usb"
@@ -28122,7 +29766,7 @@
           "module": "depz_sensor_sdk.usb_ids",
           "source": {
             "file": "depz_sensor_sdk/usb_ids.py",
-            "line": 90
+            "line": 99
           },
           "exported_as": [
             "depz_sensor_sdk.usb_model_hint"

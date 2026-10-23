@@ -547,6 +547,16 @@ std::optional<std::string> detected_product();
 The product the board's device name carries ("VL53L4CX"), nullopt on
 an unstamped board (then name it at init).
 
+#### Vl53lx.sensor_class
+
+```cpp
+std::string sensor_class() const;
+```
+
+The class the board opened as, fixed at open from the USB PID / device
+name ("vl53l0x" ... "vl53l4cx"; "vl53lx" = generic, product at init).
+No traffic.
+
 #### Vl53lx.driver_kinds
 
 ```cpp

@@ -44,6 +44,17 @@ bool depz_is_known_depz_usb(int vid, int pid)
     return pid >= (int)DEPZ_PID_RANGE_LO && pid <= (int)DEPZ_PID_RANGE_HI;
 }
 
+int depz_usb_identity(int vid, int pid, bool *known, const char **model)
+{
+    if (vid < 0 || vid > 0xFFFF || pid < 0 || pid > 0xFFFF)
+        return -1; /* a USB id is a u16: invalid, not "unknown" (contract 07 §3) */
+    if (known)
+        *known = depz_is_known_depz_usb(vid, pid);
+    if (model)
+        *model = depz_usb_model_hint(vid, pid);
+    return 0;
+}
+
 const char *depz_usb_model_hint(int vid, int pid)
 {
     if (vid < 0 || pid < 0)

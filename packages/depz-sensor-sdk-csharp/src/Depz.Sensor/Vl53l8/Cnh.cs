@@ -15,11 +15,22 @@ public sealed record Vl53l8CnhConfig(int NbOfAggregates, int FeatureLength);
 /// <summary>
 /// One decoded CNH aggregate histogram. The float value of bin <c>i</c> is
 /// <c>HistRaw[i] / 2^HistScaler[i]</c> (a per-bin block-floating-point mantissa +
-/// shift). Both arrays are <see cref="Vl53l8CnhConfig.FeatureLength"/> long.
+/// shift); both arrays are <see cref="Vl53l8CnhConfig.FeatureLength"/> long. The
+/// ambient level of the aggregate is <c>AmbientRaw / 2^AmbientScaler</c> (the
+/// value ST's Example_12 prints).
 /// </summary>
 /// <param name="HistRaw">Per-bin integer mantissa (FEAT_INT, signed int32).</param>
 /// <param name="HistScaler">Per-bin base-2 scaler (FEAT_FRAC, signed int8).</param>
-public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler);
+/// <param name="AmbientRaw">Ambient mantissa (AMBIENT_INT, signed int32).</param>
+/// <param name="AmbientScaler">Ambient base-2 scaler (AMBIENT_FRAC, signed int8).</param>
+public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler, int AmbientRaw, sbyte AmbientScaler)
+{
+    /// <summary>The histogram as floating-point values.</summary>
+    public double[] Hist => HistRaw.Select((v, i) => v / Math.Pow(2.0, HistScaler[i])).ToArray();
+
+    /// <summary>The ambient level as a floating-point value.</summary>
+    public double Ambient => AmbientRaw / Math.Pow(2.0, AmbientScaler);
+}
 
 /// <summary>
 /// A decoded CNH data block: the reference-residual word plus one histogram per
@@ -30,7 +41,11 @@ public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler);
 /// MI_SFE_STORE_REF_RESIDUAL.</param>
 /// <param name="Aggregates">One entry per aggregate, length
 /// <see cref="Vl53l8CnhConfig.NbOfAggregates"/>.</param>
-public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8CnhAggregate> Aggregates);
+public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8CnhAggregate> Aggregates)
+{
+    /// <summary>The ref residual (11 fractional bits).</summary>
+    public double RefResidual => RefResidualWord / 2048.0;
+}
 
 /// <summary>
 /// VL53L8<b>CH</b>-specific CNH (Compact Network Histogram) decode.
@@ -84,32 +99,34 @@ public static class Vl53l8Cnh
     /// <param name="config">Aggregate/bin dimensions of the CNH buffer.</param>
     /// <param name="block">Raw CNH data block bytes.</param>
     /// <returns>The ref-residual word and per-aggregate histograms.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">If the config dimensions are
-    /// non-positive.</exception>
-    /// <exception cref="ArgumentException">If <paramref name="block"/> is too short
-    /// for the described layout.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A negative dimension.</exception>
+    /// <exception cref="ArgumentException">If <paramref name="block"/> is too short for the
+    /// described layout (every read of the reference decoder must fit, AMBIENT_FRAC last).</exception>
     public static Vl53l8CnhResult DecodeHistogram(Vl53l8CnhConfig config, ReadOnlySpan<byte> block)
     {
-        ArgumentNullException.ThrowIfNull(config);
+        if (config is null) throw new ArgumentNullException(nameof(config));
         int nbAgg = config.NbOfAggregates;
         int feat = config.FeatureLength;
-        if (nbAgg <= 0)
-            throw new ArgumentOutOfRangeException(nameof(config), nbAgg, "nb_of_aggregates must be positive");
-        if (feat <= 0)
-            throw new ArgumentOutOfRangeException(nameof(config), feat, "feature_length must be positive");
+        if (nbAgg < 0)
+            throw new ArgumentOutOfRangeException(nameof(config), nbAgg, "nb_of_aggregates must not be negative");
+        if (feat < 0)
+            throw new ArgumentOutOfRangeException(nameof(config), feat, "feature_length must not be negative");
 
-        // A signed int32 view of the block's leading header words (LE).
-        if (block.Length < CnhPerHeaderWords * 4)
+        // vl53lmz_cnh_get_ref_residual: raw word[2] (device value is this / 2048).
+        if (block.Length < 3 * 4)
+            throw new ArgumentException($"CNH block too short for the ref residual: {block.Length} B < 12 B", nameof(block));
+        uint refResidualWord = (uint)Word(block, 2);
+        if (nbAgg == 0)
+            return new Vl53l8CnhResult(refResidualWord, Array.Empty<Vl53l8CnhAggregate>());
+
+        // The buffer selection reads header words 0, 1 and 3.
+        if (block.Length < (CnhPerHeaderFlagsIdx + 1) * 4)
             throw new ArgumentException(
-                $"CNH block too short for header: {block.Length} B < {CnhPerHeaderWords * 4} B", nameof(block));
-
+                $"CNH block too short for its header: {block.Length} B < {(CnhPerHeaderFlagsIdx + 1) * 4} B", nameof(block));
         int state = Word(block, 0);
         uint info = (uint)Word(block, CnhPerHeaderBufferInfoIdx);
         uint headerFlags = (uint)Word(block, CnhPerHeaderFlagsIdx);
         uint ppSize = info & BufferInfoWordsMask;
-
-        // vl53lmz_cnh_get_ref_residual: raw word[2] (device value is this / 2048).
-        uint refResidualWord = (uint)Word(block, 2);
 
         // Select ping or pong buffer exactly as the C code does. With ping-pong
         // disabled the device reports a single buffer and this resolves to ping.
@@ -126,11 +143,13 @@ public static class Vl53l8Cnh
         long dataByte = (baseWords + CnhPerBufferHeaderWords) * 4;
 
         long aggXFeat = (long)nbAgg * feat;
-        long featIntBase = dataByte;                       // FEAT_INT: int32 per (agg, feat)
-        long featFracBase = featIntBase + aggXFeat * 4;    // FEAT_FRAC: sbyte per (agg, feat)
+        long featIntBase = dataByte;                              // FEAT_INT: int32 per (agg, feat)
+        long featFracBase = featIntBase + aggXFeat * 4;           // FEAT_FRAC: sbyte per (agg, feat), padded
+        long ambIntBase = featFracBase + (3 + aggXFeat) / 4 * 4;  // AMBIENT_INT: int32 per agg
+        long ambFracBase = ambIntBase + (long)nbAgg * 4;          // AMBIENT_FRAC: sbyte per agg
 
-        // Bounds: the deepest read is FEAT_FRAC of the last aggregate's last bin.
-        long need = featFracBase + aggXFeat;
+        // The deepest read is AMBIENT_FRAC of the last aggregate.
+        long need = ambFracBase + nbAgg;
         if (block.Length < need)
             throw new ArgumentException(
                 $"CNH block too short for {nbAgg} aggregates x {feat} bins: {block.Length} B < {need} B",
@@ -149,7 +168,9 @@ public static class Vl53l8Cnh
                 histRaw[i] = BinaryPrimitives.ReadInt32LittleEndian(block.Slice(intAt + i * 4, 4));
                 histScaler[i] = (sbyte)block[fracAt + i];
             }
-            aggregates[aggId] = new Vl53l8CnhAggregate(histRaw, histScaler);
+            int ambient = BinaryPrimitives.ReadInt32LittleEndian(block.Slice(checked((int)(ambIntBase + aggId * 4L)), 4));
+            var ambientScaler = (sbyte)block[checked((int)(ambFracBase + aggId))];
+            aggregates[aggId] = new Vl53l8CnhAggregate(histRaw, histScaler, ambient, ambientScaler);
         }
 
         return new Vl53l8CnhResult(refResidualWord, aggregates);

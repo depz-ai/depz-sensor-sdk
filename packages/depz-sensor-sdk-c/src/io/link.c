@@ -79,6 +79,13 @@ bool depz_link_replay_exhausted(const depz_link *l)
     return l && l->is_replay && depz_replay_exhausted_impl(l->self);
 }
 
+int depz_link_replay_pending(const depz_link *l, size_t *tx_bytes_left, size_t *rx_chunks_left)
+{
+    if (!l || !l->is_replay) return depz_fail(DEPZ_E_ARG, "replay_pending: not a replay link");
+    depz_replay_pending_impl(l->self, tx_bytes_left, rx_chunks_left);
+    return DEPZ_OK;
+}
+
 /* ── loopback ─────────────────────────────────────────────────────────── */
 
 typedef struct lb_chunk { struct lb_chunk *next; size_t len, off; uint8_t data[1]; } lb_chunk;
@@ -284,6 +291,15 @@ bool depz_replay_exhausted_impl(void *self)
     ex = r->idx >= r->n_ev;
     depz_mutex_unlock(&r->lock);
     return ex;
+}
+
+void depz_replay_pending_impl(void *self, size_t *tx_left, size_t *rx_left)
+{
+    replay *r = (replay *)self;
+    depz_mutex_lock(&r->lock);
+    if (tx_left) *tx_left = r->tx_written < r->tx_len ? r->tx_len - r->tx_written : 0;
+    if (rx_left) *rx_left = r->n_ev - r->idx;
+    depz_mutex_unlock(&r->lock);
 }
 
 static int rp_read(void *self, uint8_t *buf, size_t cap, int timeout_ms, size_t *got)

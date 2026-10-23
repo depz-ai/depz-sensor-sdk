@@ -11,6 +11,7 @@
  */
 
 import type { SensorType } from "./identity.js";
+import { checkUint } from "./wire.js";
 
 /** Production VID shared by all programmed DEPZ sensors. */
 export const DEPZ_VID = 0x1bcf; // 7119
@@ -68,6 +69,12 @@ export const DEPZ_USB_MODELS: Readonly<Record<number, DepzUsbModel>> = {
   0xee0a: { name: "bno055", sensorType: null }, // 60938
 };
 
+/** A USB id is a u16 (contract 07 §3): anything else is invalid, not "unknown". */
+function checkIds(vid: number, pid: number): void {
+  checkUint("vid", vid, 16);
+  checkUint("pid", pid, 16);
+}
+
 /**
  * True when `(vid, pid)` looks like a DEPZ sensor: the production VID with a
  * mapped PID or a PID in the recognized block, or the dev default. A match
@@ -75,6 +82,7 @@ export const DEPZ_USB_MODELS: Readonly<Record<number, DepzUsbModel>> = {
  */
 export function isKnownDepzUsb(vid: number | null | undefined, pid: number | null | undefined): boolean {
   if (vid == null || pid == null) return false;
+  checkIds(vid, pid);
   if (vid === DEV_VID && pid === DEV_PID) return true;
   if (vid !== DEPZ_VID) return false;
   if (pid in DEPZ_USB_MODELS) return true;
@@ -97,6 +105,7 @@ export function usbModelHint(
   pid: number | null | undefined,
 ): string | null {
   if (vid == null || pid == null) return null;
+  checkIds(vid, pid);
   if (vid === DEV_VID && pid === DEV_PID) return "dev";
   if (vid === DEPZ_VID) return DEPZ_USB_MODELS[pid]?.name ?? null;
   return null;

@@ -44,6 +44,7 @@ from the `///` XML-doc summaries so it never drifts from the code.
 - [What it is](#what-it-is)
 - [Installation](#installation)
 - [Getting started](#getting-started)
+- [Live devices](#live-devices)
 - [Discovery](#discovery)
 - [Mental model](#mental-model)
 - [Common protocol codecs](#common-protocol-codecs)
@@ -60,8 +61,14 @@ family. Every codec is a byte-exact port of the reference Python SDK, pinned to
 the shared golden vectors under `contracts/vectors` (`dotnet test`). It is the
 **codec layer**: you feed it bytes (from a serial port, a capture, a test
 harness) and it gives you typed, decoded results — and it encodes the command
-payloads to send back. It does not own a serial port or a reader thread; that
-transport is the host application's concern.
+payloads to send back. On top of it sits the **device layer** (contract 07):
+a connection with its reader thread, requests and replies, streams, events,
+`.depzrec` record/replay and port discovery — see [Live devices](#live-devices).
+The device layer has a class for every sensor — the **SR04**, the
+**VL53L4CD**, the **VL53L 1D family** (VL53L0X / L1CX / L1CB / L3CX / L4CX),
+the **VL53L8CX / VL53L8CH**, the **VL53L5CX / VL53L7CX / VL53L7CH**, the
+**BNO055**, the **BNO085 / BNO086** and the **TMF8829**; a board it does not
+recognise opens as a plain `DepzDevice` (common commands).
 
 Each sensor is a USB CDC-ACM device speaking one shared framed protocol
 (`A5 C3` header + CRC). The sensors fall into a few firmware philosophies:
@@ -69,42 +76,48 @@ Each sensor is a USB CDC-ACM device speaking one shared framed protocol
 - **SR04** — the device does the ranging; you decode `EchoTimeUs` → distance
   (`Depz.Sensor.Protocol.Sr04`).
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
-  for the 1D family. This SDK ports the v2.00 codecs, the product table and the
-  stateless decode of the streamed blocks (`Depz.Sensor.Vl53lx`).
+  for the 1D family; every ST driver runs on the host. `Vl53lxDevice` (and
+  `Vl53l0xDevice` … `Vl53l4cxDevice`) binds a product and a driver kind: the
+  VL53L0X PAL (`Vl53l0xUldDriver`), the VL53L1X / L4CD ULDs and the L3CX ULP
+  (`Vl53l1Die`), and ST's histogram BareDriver with its multi-target
+  post-processing (`Vl53lxHistogramDriver`, `Depz.Sensor.Vl53lx.Bare`) — over
+  the v2.00 codecs, the product table and the block decode (`Depz.Sensor.Vl53lx`).
 - **VL53L4CD** — the device is a thin I2C register bridge; the full ST ULD
-  runs on the host. This SDK ports the **verifiable codec/math layer**: the
-  wire codecs, result-block decode and the range-timing / tuning-word math
-  (`Depz.Sensor.Vl53l4`).
+  runs on the host: `Vl53l4cdDevice` with the ULD 2.2.3 port
+  (`Vl53l4cdDriver`), over the wire codecs, result-block decode and the
+  range-timing / tuning-word math (`Depz.Sensor.Vl53l4`).
 - **VL53L5CX / VL53L7CX / VL53L7CH** — one I2C register-bridge firmware for
-  three boards; frames have the VL53L8 layout. This SDK ports the board codecs,
-  class resolution and the L5/L7 frame decoder (`Depz.Sensor.Vl53l7`), with
-  CNH through `Vl53l8Cnh`.
+  three boards; frames have the VL53L8 layout. `Vl53l5cxDevice` /
+  `Vl53l7cxDevice` / `Vl53l7chDevice` run the VL53L8 ULD port on its L5/L7
+  branch, over the board codecs, class resolution and the L5/L7 frame decoder
+  (`Depz.Sensor.Vl53l7`), with CNH through `Vl53l8CnhSetup` / `Vl53l8Cnh`.
 - **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
-  runs on the host. This SDK ports the **verifiable decode path**: results-frame
-  decode and the advanced DCI payload codecs (`Depz.Sensor.Vl53l8`). CX is the
+  runs on the host: `Vl53l8cxDevice` / `Vl53l8chDevice` with the ULD port
+  (`Vl53l8Driver`, which downloads the sensor firmware embedded in the
+  assembly), over the results-frame decode and the advanced DCI payload codecs
+  (`Depz.Sensor.Vl53l8`). CX is the
   base ToF imager; CH is its superset, adding Compact-Network-Histogram output.
 - **TMF8829** — a thin SPI register bridge; the host runs the sensor (firmware
-  download, config page, presets). This SDK ports the wire codecs, chunk
+  download, config page, presets): `Tmf8829Device`, over the wire codecs, chunk
   reassembly, frame and pixel decode with the half-frame merge, the clock
   model and capture time, the config-page fields and the embedded ams
   firmware image (`Depz.Sensor.Tmf8829`).
-- **BNO055** — an I2C register bridge; Bosch's fusion runs on the chip. This
-  SDK ports the wire codecs, the register codecs and the register-window
-  decode (`Depz.Sensor.Bno055`).
+- **BNO055** — an I2C register bridge; Bosch's fusion runs on the chip.
+  `Bno055Device` runs the session logic over the wire codecs, the register
+  codecs and the register-window decode (`Depz.Sensor.Bno055`).
 - **BNO085 / BNO086** — the device is an SHTP pass-through; the SH-2 stack runs on the
-  host. This SDK ports SHTP framing/reassembly, the SH-2 control encoders and
-  the input-report decoders (`Depz.Sensor.Bno086`).
-
-For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055,
-initialising and streaming the board is done with the Python or TypeScript SDK; this SDK decodes what they send and builds the command payloads.
+  host: `Bno086Device`, over SHTP framing/reassembly, the SH-2 control
+  encoders and response decoders and the input-report decoders
+  (`Depz.Sensor.Bno086`).
 
 The public surface is every `public` type under `src/Depz.Sensor/`; the API
 reference is generated from it, so it never drifts from the code.
 
 ## Installation
 
-Everything targets **.NET 8** (`net8.0`). It is published on NuGet as
-`Depz.Sensor` (0.6.0):
+The package carries two builds: **.NET 8** (`net8.0`) and **.NET Standard 2.1**
+(`netstandard2.1`, for Unity 2021.2 and newer). It is published on NuGet as
+`Depz.Sensor`:
 
 ```bash
 dotnet add package Depz.Sensor
@@ -116,6 +129,14 @@ Or reference the project directly from a source checkout:
 dotnet add reference path/to/src/Depz.Sensor/Depz.Sensor.csproj
 ```
 
+### Unity
+
+Unity reads the `netstandard2.1` build. Either install `Depz.Sensor` with
+[NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity), or take
+`lib/netstandard2.1/Depz.Sensor.dll` out of the `.nupkg` (a zip file) and put it
+under `Assets/Plugins/`. The SDK has no dependency outside the .NET Standard 2.1
+library, so nothing else needs to be copied.
+
 ```csharp
 using Depz.Sensor.Transport;   // framing, CRC, PacketParser
 using Depz.Sensor.Protocol;    // Cmd/Rpt/Status, common reports, SR04, identity
@@ -123,7 +144,7 @@ using Depz.Sensor.Vl53l4;      // single-zone ToF register bridge + ULD math
 using Depz.Sensor.Vl53l8;      // ToF frame decode + DCI codecs
 using Depz.Sensor.Bno086;      // SHTP + SH-2
 using Depz.Sensor.Usb;         // USB identity table + discovery ordering
-using Depz.Sensor.Dataset;     // .depzdata reader
+using Depz.Sensor.Dataset;     // .depzdata record, read, replay
 ```
 
 Toolchain (this repo is developed with a user-local dotnet):
@@ -159,6 +180,105 @@ foreach (ParserEvent ev in parser.Feed(bytesFromSerialPort))
 a mix of `Packet`, `Trash` (resync bytes) and `CrcError` events. From there,
 follow the per-sensor guide linked above.
 
+## Live devices
+
+`DepzDevices` finds and opens a board as its sensor class; the class talks to
+it over a background reader thread (`Depz.Sensor.Devices`):
+
+```csharp
+using Depz.Sensor.Devices;
+
+using var dev = DepzDevices.OpenSr04();          // smallest USB serial; or OpenSr04(serial: "…")
+Console.WriteLine(dev.GetSoftwareName());        // APP_usonic_SR04_v0.97
+Sr04Measurement once = dev.MeasureOnce();
+
+using var loop = dev.Measurements();             // subscribe before Start(): nothing is missed
+dev.Start();
+for (int i = 0; i < 20; i++)
+    Console.WriteLine(loop.Take(TimeSpan.FromSeconds(1)).DistanceMm);
+dev.Stop();
+```
+
+- **Requests** block the calling thread until the reply, at most `dev.Timeout`
+  (200 ms by default). A board error throws `StatusException` (`BusyException`
+  for ERR_BUSY), no reply `DepzTimeoutException`, a lost connection
+  `DeviceLostException`; an argument outside its wire field throws
+  `ArgumentOutOfRangeException` before anything is sent.
+- **Streams** come two ways: `On…(callback)` runs on the reader thread (keep it
+  short, never block), and `Measurements()` (`Events()`, …) returns a
+  `Subscription<T>` — a bounded queue that drops the oldest item when full and
+  counts it in `DroppedCount`. `Take(timeout)` waits, `TryTake(out item)` and
+  `Drain()` never block. Dispose a subscription to stop it.
+- **Events** (`OnEvent`, `Events()`): unsolicited status (hardware fault),
+  sequence gaps, CRC errors, text, temperature, disconnect.
+- **Time**: `SyncTime()` measures device clock − host clock;
+  `ToHostTimeUs(deviceUs)` then puts device timestamps on the host clock
+  (`DepzDevice.HostNowUs()`).
+- **Record / replay**: wrap any link in `RecordingLink` to write a `.depzrec`
+  capture (contract 08); `ReplayLink` plays one back, and
+  `DepzDevices.OpenOnLink(link)` opens whatever the capture holds. The SDK's
+  tests run the shared device scenarios (contract 15) this way.
+
+### Unity
+
+Unity's `System.IO.Ports` exists only on Windows, macOS and Linux with the API
+compatibility level **.NET Framework**, so the SDK does not open ports there by
+itself: open the port in your project, wrap it in an `ILink`, and open the
+device on it. Poll the queues from `Update()` — Unity objects must not be
+touched from the reader thread.
+
+```csharp
+using System;
+using System.IO.Ports;
+using Depz.Sensor.Devices;
+
+sealed class UnitySerialLink : ILink
+{
+    readonly SerialPort _port;
+    readonly byte[] _buf = new byte[16384];
+
+    public UnitySerialLink(string port)
+    {
+        _port = new SerialPort(port, 115200) { DtrEnable = true, RtsEnable = true, ReadTimeout = 50 };
+        _port.Open();
+    }
+
+    public string Name => _port.PortName;
+    public bool IsClosed => !_port.IsOpen;
+
+    public byte[] Read(TimeSpan timeout)
+    {
+        try
+        {
+            int n = _port.Read(_buf, 0, _buf.Length);
+            var data = new byte[n];
+            Array.Copy(_buf, data, n);
+            return data;
+        }
+        catch (TimeoutException) { return Array.Empty<byte>(); }
+        catch (Exception e) { throw new DeviceLostException(e.Message, e); }
+    }
+
+    public void Write(byte[] data)
+    {
+        try { _port.Write(data, 0, data.Length); }
+        catch (Exception e) { throw new DeviceLostException(e.Message, e); }
+    }
+
+    public void Close() => _port.Close();
+}
+
+// In a MonoBehaviour:
+//   void Start()  { _dev = (Sr04Device)DepzDevices.OpenOnLink(new UnitySerialLink("COM5"));
+//                   _loop = _dev.Measurements(); _dev.Start(); }
+//   void Update() { while (_loop.TryTake(out var m)) Debug.Log(m.DistanceMm); }
+//   void OnDestroy() { _dev?.Close(); }
+```
+
+`OpenOnLink` cannot see the port's USB id, so a board that needs it to pick its
+class (VL53L8CX vs CH, VL53L5CX/L7CX/L7CH) takes it as arguments:
+`OpenOnLink(link, usbVid, usbPid)`.
+
 ## Discovery
 
 Selection is by **USB identity**: only ports whose USB (vid, pid) is a known
@@ -185,6 +305,12 @@ IReadOnlyList<UsbIds.PortCandidate> ordered = UsbIds.SerialOrdering(ports);
 Identity id = IdentityParser.ParseSoftwareName("APP_SR04_v1.2.3");
 // id.Mode == "app", id.SensorType == SensorType.Sr04, id.Version == "1.2.3"
 ```
+
+On .NET 8, `DepzDevices.ListDepzDevices()` probes every port with a known
+DEPZ USB id and returns a `DeviceInfo` per board; `OpenDevice()` /
+`OpenDevice(index)` / `OpenDevice(serial: …)` / `OpenPort(path)` open one as its
+class. Ports and their USB ids come from sysfs on Linux and the registry on
+Windows; on macOS the USB ids are not read, so open a port path explicitly.
 
 Two identical sensors are told apart by their **USB serial**: they sort
 deterministically, so index 0/1 and serial lookups are stable. The PID→model map
@@ -265,9 +391,44 @@ enforces it.
 
 ## Datasets: record and replay
 
-`DatasetReader` reads the decoded, multi-device, time-synced `.depzdata` format
-(contract 09; plain or gzip). Records from every device — including two of the
-same model — are merged strictly by host time onto one timeline:
+A `.depzdata` file (contract 09) holds **decoded** results of one or more
+devices on one host timeline: JSON Lines, plain or gzip (`.depzdata.gz`).
+
+**Record.** `SessionRecorder` hooks the result stream of every device class and
+writes one record per measurement, frame or report, stamped with the device
+time mapped onto the host clock (`t = device µs − offset`; `Add` runs
+`SyncTime` for that offset). It never configures a device — start and stop
+streaming yourself:
+
+```csharp
+using Depz.Sensor.Dataset;
+using Depz.Sensor.Devices;
+
+using var sr04 = DepzDevices.OpenSr04();
+using var tof = DepzDevices.OpenVl53l8();
+tof.Init();
+
+using (var rec = new SessionRecorder("run.depzdata", note: "desk test"))
+{
+    rec.Add(sr04);                  // d0
+    rec.Add(tof);                   // d1
+    rec.Start();
+    sr04.Start();
+    tof.StartRanging();
+    Thread.Sleep(10_000);
+    sr04.Stop();
+    tof.StopRanging();
+}                                   // Dispose: unhook, close the file
+```
+
+Every class has its kind — `sr04`, `vl53l4`, `vl53l8` (+ `vl53l8_cnh` for an
+armed CH), `vl53lx`, `bno055`, `bno086`, `tmf8829` — plus about one
+`temperature` record per second and device (`temperatureHz`; the MCU, and the
+VL53L8 die). `DatasetRecords` builds each record value, for a writer of your
+own over `DatasetWriter`.
+
+**Read.** `DatasetReader` merges the records of every device — two of the same
+model included — stably by host time:
 
 ```csharp
 using Depz.Sensor.Dataset;
@@ -278,11 +439,38 @@ foreach (DatasetRecord r in reader.Records)   // merged by ascending host time
 
 foreach (var (id, dev) in reader.Devices)      // per-device header metadata
     Console.WriteLine($"{id}: {dev.SensorType} serial={dev.Serial} sync={dev.TimeSync}");
+Console.WriteLine($"{reader.DurationUs / 1e6:F1} s");
 ```
 
-Each `DatasetRecord.Value` is a `JsonElement` carrying the kind-specific payload;
-read the fields present for the kind. The raw-byte capture layer (`.depzrec`)
-is what the VL53L8 replay test feeds through the full codec stack byte-for-byte.
+Each `DatasetRecord.Value` is the kind-specific payload as a dictionary keyed by
+the contract 09 field names; read the fields present for the kind. Values are
+plain objects — `long`, `double`, `string`, `bool`, `null`, `List<object?>` and
+nested dictionaries — as `Depz.Sensor.Json.JsonText.Parse` returns them
+(the SDK does not use System.Text.Json, which Unity lacks):
+
+```csharp
+long echoUs = (long)r.Value["echo_us"]!;   // an "sr04" record
+```
+
+**Replay.** `reader.Play(callback, speed)` delivers the records paced by their
+timestamps (2 = twice as fast, 0 = at once) and blocks. For a viewer timeline,
+`DatasetPlayer` adds play / pause / seek / speed (contract 09 §Player):
+
+```csharp
+using var player = new DatasetPlayer(reader, speed: 2.0);
+player.OnRecord(r => Console.WriteLine($"{r.Kind} {r.THostUs}"));   // player thread; don't block
+player.OnState(s => Console.WriteLine(s));
+player.Play();
+player.SeekUs(5_000_000);       // the next record is the first at >= 5 s from the start
+player.Wait();                  // until done (or paused)
+```
+
+`threaded: false` starts no thread: call `Tick()` from your own loop (a Unity
+`Update()`); it returns the seconds until the next record is due.
+
+The raw-byte capture layer (`.depzrec`, contract 08) is a different thing: one
+device's link, byte for byte, which `ReplayLink` plays back through the full
+device stack.
 
 ## Firmware update
 
@@ -323,20 +511,10 @@ A few things are deliberately **stubbed, not faked**, because they cannot be
 verified from golden vectors alone (rather than return fabricated data, they
 throw a clearly-named exception or are declared as an explicit stub):
 
-- **Live VL53L8 ULD init/config** — `Vl53l8Uld.Init`. The firmware-download +
-  register-bridge init sequence only means anything against real silicon over
-  the CDC link, so it is out of scope for a decode SDK. See the
-  [VL53L8CX guide](vl53l8cx/guide.md#advanced-dci-codecs).
-- **Live VL53L4CD ULD driver** — the `sensor_init`/calibration register
-  sequences over `ReadReg`/`WriteReg` are host code you write
-  (`Vl53l4Uld.LiveDriverStubbed`); the codec/math layer itself is complete.
-  See the [VL53L4CD guide](vl53l4cd/guide.md).
-- **Live drivers of the L5/L7 boards, the 1D family, the TMF8829 and the
-  BNO055** — the firmware download and ULD configuration (L5/L7), the ST
-  drivers (1D family), the sensor sequence (TMF8829: soft reset, firmware
-  download, configure, start/stop) and the session logic (BNO055: mode
-  switches through CONFIG, boot and fusion-start waits, page discipline). The codecs and the stateless decode
-  are here; see the per-sensor guides.
+- **Live drivers of the 1D family and the TMF8829** — the ST drivers (1D
+  family) and the sensor sequence (TMF8829: soft reset, firmware download,
+  configure, start/stop). The codecs and the stateless decode are here; see
+  the per-sensor guides.
 
 The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:
 `Vl53l8Cnh.DecodeHistogram` unpacks `Vl53l8Frame.CnhRaw` into per-aggregate

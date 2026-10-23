@@ -68,7 +68,17 @@ pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4] {
     [a[0], a[1], l[0], l[1]]
 }
 
-/// `VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes.
+/// `VL53_WRITE_REG` payload: `addr u16` followed by 1..=[`XFER_MAX`] raw
+/// register bytes; any other data length is refused (contract 07 §3).
+pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError> {
+    if data.is_empty() || data.len() > XFER_MAX {
+        return Err(CodecError("VL53_WRITE_REG: data must be 1..253 bytes"));
+    }
+    Ok(pack_write_reg(addr, data))
+}
+
+/// `VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes,
+/// unchecked — prefer [`try_pack_write_reg`].
 pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(2 + data.len());
     out.extend_from_slice(&addr.to_le_bytes());

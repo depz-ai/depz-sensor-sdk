@@ -17,6 +17,8 @@ Typical use::
 
 from __future__ import annotations
 
+import operator
+import queue
 import struct
 import threading
 import time
@@ -25,7 +27,7 @@ from importlib import resources
 from typing import Callable
 
 from ..device import DeviceBase, DeviceEvent, StreamIterator, StreamQueue
-from ..errors import DepzError
+from ..errors import DepzError, DepzTimeoutError, LinkClosedError
 from ..protocol.tmf8829 import (
     INT_HISTOGRAMS,
     INT_RESULTS,
@@ -195,6 +197,17 @@ class Tmf8829Config:
         return FP_GRID[self.fields["fp_mode"]]
 
 
+def _is_int(v: object) -> bool:
+    try:
+        operator.index(v)
+    except TypeError:
+        return False
+    return True
+
+
+_CLOSE_POLL_S = 0.05  # get_measurement(): how often a wait checks for close
+
+
 class Tmf8829(DeviceBase):
     """TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone,
     histograms). `init()` downloads the 14.4 KB sensor firmware (~0.15 s),
@@ -222,7 +235,8 @@ class Tmf8829(DeviceBase):
 
     def read_registers(self, addr: int, length: int) -> bytes:
         """Read `length` bytes from `addr` in ≤1024-byte requests; reads that
-        reach the FIFO port 0xFF stay there (the sensor does not auto-increment it)."""
+        reach the FIFO port 0xFF stay there (the sensor does not auto-increment it).
+        A reply shorter or longer than asked raises `DepzError`."""
         out = bytearray()
         with self._reg_lock:
             while length > 0:
@@ -235,6 +249,10 @@ class Tmf8829(DeviceBase):
                     ),
                     timeout=REGISTER_TIMEOUT_S,
                 )
+                if len(rep.data) != n:
+                    raise DepzError(
+                        f"READ_REG 0x{addr:02X}: expected {n}, got {len(rep.data)}"
+                    )
                 out += rep.data
                 addr = min(addr + n, REG_FIFO)
                 length -= n
@@ -410,7 +428,8 @@ class Tmf8829(DeviceBase):
             raise ValueError(f"unknown preset {preset!r}; one of {', '.join(PRESETS)}")
         if self._streaming:
             raise DepzError("configure() while streaming: stop() first")
-        if not 1 <= nr_peaks <= 4:  # the 3-bit field takes 0..7, the sensor reports at most 4
+        # The 3-bit field takes 0..7, the sensor reports at most 4.
+        if not _is_int(nr_peaks) or not 1 <= nr_peaks <= 4:
             raise ValueError(f"nr_peaks {nr_peaks}, must be 1..4")
         want = {
             "period_ms": period_ms,
@@ -521,6 +540,30 @@ class Tmf8829(DeviceBase):
         Subscribes immediately — call before or after `start()`."""
         return StreamIterator(self._meas_queues, maxsize, lambda: self.closed)
 
+    def get_measurement(self, timeout: float = 2.0) -> Tmf8829Measurement:
+        """Wait for the next measurement. Raises `DepzTimeoutError` after
+        `timeout`, `LinkClosedError` as soon as the device is closed."""
+        if self.closed:
+            raise LinkClosedError("device is closed")
+        q = StreamQueue(1)
+        self._meas_queues.append(q)
+        try:
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise DepzTimeoutError(Tmf8829Rpt.FRAME, timeout) from None
+                try:
+                    return q.get(timeout=min(_CLOSE_POLL_S, remaining))
+                except queue.Empty:
+                    # A measurement already queued wins over a concurrent close.
+                    if self.closed:
+                        raise LinkClosedError(
+                            "device closed while waiting for a measurement"
+                        ) from None
+        finally:
+            self._meas_queues.remove(q)
+
     @property
     def frames_dropped(self) -> int:
         """Frames the bridge dropped (frame_seq gaps) in this stream."""
@@ -534,6 +577,12 @@ class Tmf8829(DeviceBase):
     @property
     def frame_parse_errors(self) -> int:
         return self._builder.parse_errors
+
+    @property
+    def clock_ratio_q16(self) -> int:
+        """Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal
+        8 << 16 = 8 µs per SYSTICK), for diagnostics."""
+        return self._builder.clock.ratio_q16
 
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd == Tmf8829Rpt.FRAME:

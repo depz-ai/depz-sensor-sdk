@@ -1,4 +1,6 @@
 //! SR04 wire codecs (contracts/03_SENSOR_SR04.md).
+//!
+//! Decoders reject a short payload and ignore trailing bytes (contract 07 §3).
 
 use super::common::CodecError;
 
@@ -43,8 +45,8 @@ pub struct Sr04Data {
 
 impl Sr04Data {
     pub fn unpack(payload: &[u8]) -> Result<Sr04Data, CodecError> {
-        if payload.len() != 11 {
-            return Err(CodecError("SR04 data must be 11 bytes"));
+        if payload.len() < 11 {
+            return Err(CodecError("SR04 data needs 11 bytes"));
         }
         Ok(Sr04Data {
             source_cmd: payload[0],
@@ -64,10 +66,10 @@ pub fn pack_sample_period(period_us: u32) -> [u8; 4] {
 }
 
 pub fn unpack_sample_period(payload: &[u8]) -> Result<u32, CodecError> {
-    if payload.len() != 4 {
-        return Err(CodecError("sample period must be 4 bytes"));
+    if payload.len() < 4 {
+        return Err(CodecError("sample period needs 4 bytes"));
     }
-    Ok(u32::from_le_bytes(payload.try_into().unwrap()))
+    Ok(u32::from_le_bytes(payload[..4].try_into().unwrap()))
 }
 
 pub fn pack_echo_decay(decay_us: u16) -> [u8; 2] {
@@ -75,10 +77,10 @@ pub fn pack_echo_decay(decay_us: u16) -> [u8; 2] {
 }
 
 pub fn unpack_echo_decay(payload: &[u8]) -> Result<u16, CodecError> {
-    if payload.len() != 2 {
-        return Err(CodecError("echo decay must be 2 bytes"));
+    if payload.len() < 2 {
+        return Err(CodecError("echo decay needs 2 bytes"));
     }
-    Ok(u16::from_le_bytes(payload.try_into().unwrap()))
+    Ok(u16::from_le_bytes(payload[..2].try_into().unwrap()))
 }
 
 /// Round-trip echo time → distance in mm; `None` for the timeout sentinel.

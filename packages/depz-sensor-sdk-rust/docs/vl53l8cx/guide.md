@@ -1,6 +1,7 @@
 # VL53L8CX — user guide
 
-Hands-on guide to the ToF decode layer in [`vl53l8`](api.md). For what the
+Hands-on guide to the live device (`devices::Vl53l8cxDevice`, which runs the
+ST ULD on the host) and the ToF decode layer in [`vl53l8`](api.md) under it. For what the
 sensor is, CX vs CH, and the concepts, read the [introduction](introduction.md);
 for exact signatures see the [API reference](api.md). The **VL53L8CH** superset
 (CNH histograms) has its [own guide](../vl53l8ch/guide.md) — it shares
@@ -8,6 +9,7 @@ everything below.
 
 ## Contents
 
+- [Live device](#live-device)
 - [Reassemble a frame from chunks](#reassemble-a-frame-from-chunks)
 - [Hello-world: decode an 8×8 depth frame](#hello-world-decode-an-8x8-depth-frame)
 - [The results: fields and scaling](#the-results-fields-and-scaling)
@@ -15,6 +17,37 @@ everything below.
 - [CX vs CH: the `Variant` selector](#cx-vs-ch-the-variant-selector)
 - [Advanced DCI codecs](#advanced-dci-codecs)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::open_on_link;
+
+let tof = open_on_link(link, None, None, None)?.into_vl53l8cx()?;
+tof.init()?;                        // downloads the ~84 KB sensor firmware (about a second)
+tof.set_resolution(64)?;            // 8×8
+tof.set_ranging_frequency_hz(15)?;  // 2 Hz at least; 15 Hz at most at 8×8
+let frames = tof.frames(8);
+tof.start_ranging()?;
+let frame = frames.take(Duration::from_secs(1))?;
+println!("centre zone: {} mm", frame.distance_mm[27]);
+tof.stop_ranging()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- Configure after `init` and while not ranging: resolution, frequency, ranging
+  mode and integration time, sharpener, target order, power mode, xtalk margin
+  and calibration (`calibrate_xtalk`, `get_caldata_xtalk` / `set_caldata_xtalk`),
+  detection thresholds, `configure_motion_indicator`. While ranging they fail
+  with `DepzError::InvalidState` — the stream owns the register bank.
+- `init_with_progress` reports the init phases and the firmware write progress.
+- Frames go to `on_frame(callback)` and `frames(capacity)`; `get_frame` takes
+  the next one. `frame_parse_errors` and `reassembler_discards` count the lost
+  ones.
+- `with_uld(|u| …)` runs a closure on the driver (`Vl53l8Driver`) for DCI access.
+
+The sections below are the decode layer under the device.
 
 ## Reassemble a frame from chunks
 
@@ -50,7 +83,7 @@ let n = res.resolution();                            // 16 or 64, from the frame
 if n == RESOLUTION_8X8 {
     for z in 0..n {
         if res.target_status[z] == 5 || res.target_status[z] == 9 {
-            println!("zone {z}: {} mm", res.distance_mm[z]);   // already floor(raw/4) mm
+            println!("zone {z}: {} mm", res.distance_mm[z]);   // mm, never negative
         }
     }
     println!("silicon: {} °C", res.silicon_temp_degc);
@@ -60,18 +93,19 @@ if n == RESOLUTION_8X8 {
 ## The results: fields and scaling
 
 [`Vl53l8Results`](api.md) keeps every per-zone output as a `Vec` sized to the
-active resolution, in **raw wire fixed-point** (convert explicitly):
+active resolution, in the real units ST `GetRangingData` gives (contract 04
+§5; ST divides integers, these keep the fraction):
 
 | field | type | meaning / scaling |
 |---|---|---|
-| `distance_mm` | `Vec<i32>` | per-zone distance, mm — already `floor(raw/4)` |
+| `distance_mm` | `Vec<i32>` | distance, mm — `floor(raw/4)`, a negative one clamped to 0 |
 | `target_status` | `Vec<u8>` | 5/9 = valid, 255 = no target |
 | `nb_target_detected` | `Vec<u8>` | targets found in the zone |
-| `signal_per_spad` | `Vec<u32>` | signal rate, raw — ÷2048 for kcps/SPAD |
-| `ambient_per_spad` | `Vec<u32>` | ambient rate, raw — ÷2048 for kcps/SPAD |
+| `signal_per_spad` | `Vec<f64>` | signal rate, kcps/SPAD (`raw/2048`) |
+| `ambient_per_spad` | `Vec<f64>` | ambient rate, kcps/SPAD (`raw/2048`) |
 | `nb_spads_enabled` | `Vec<u32>` | SPADs enabled in the zone |
-| `range_sigma_mm_raw` | `Vec<u16>` | range std-dev, raw — ÷128 for mm |
-| `reflectance` | `Vec<u8>` | estimated reflectance, % |
+| `range_sigma_mm` | `Vec<f64>` | range std-dev, mm (`raw/128`) |
+| `reflectance` | `Vec<f64>` | estimated reflectance, % (`raw/2`) |
 | `silicon_temp_degc` | `i8` | per-frame sensor temperature, °C |
 | `cnh_raw` | `Option<Vec<u8>>` | raw CH histogram block (CH only; see below) |
 
@@ -121,24 +155,31 @@ register bridge that writes them over the wire is a documented extension point.
 
 ```rust
 use depz_sensor_sdk::vl53l8::advanced::{
-    default_motion_config, xtalk_margin_to_raw,
-    pack_detection_thresholds, DetectionThreshold, DIST_MM,
+    try_default_motion_config, try_xtalk_margin_to_raw,
+    try_pack_detection_thresholds, AdvancedError, DetectionThreshold, DIST_MM,
 };
 
-// Motion-indicator config (156-byte DCI payload) for a resolution:
-let cfg = default_motion_config(64);
+// (inside a fn returning Result<_, AdvancedError>)
+// Motion-indicator config (156-byte DCI payload) for a resolution (16 or 64):
+let cfg = try_default_motion_config(64)?;
 let bytes = cfg.pack();
 
-// Crosstalk margin (kcps/SPAD) → raw DCI value:
-let raw = xtalk_margin_to_raw(50.0);       // round(kcps * 2048)
+// Crosstalk margin (kcps/SPAD, 0..=10000) → raw DCI value:
+let raw = try_xtalk_margin_to_raw(50.0)?;  // round(kcps * 2048)
 
-// Up to 64 detection thresholds → their two DCI blocks (low/high scaled per measurement):
-let blocks = pack_detection_thresholds(&[DetectionThreshold {
+// Up to 64 detection thresholds → their two DCI blocks (low/high scaled per
+// measurement; a scaled value that overflows i32 is an error, never wrapped):
+let blocks = try_pack_detection_thresholds(&[DetectionThreshold {
     low_thresh: 200, high_thresh: 600, measurement: DIST_MM,
     type_: 0, zone_num: 128, operation: 0,
-}]);
+}])?;
 // blocks.start (64×12 bytes) + blocks.valid (8 bytes of 0x05)
 ```
+
+The `try_` forms carry the driver's parameter checks (contract 07 §3: an
+argument out of range is refused before anything is written). The older
+`default_motion_config` / `xtalk_margin_to_raw` / `pack_detection_thresholds`
+cannot report an error and are deprecated.
 
 Measurement selectors ([`DIST_MM`](api.md), [`SIGNAL_PER_SPAD_KCPS`](api.md), …)
 and power-mode constants ([`POWER_MODE_SLEEP`](api.md) …) live in the same
@@ -152,12 +193,12 @@ module.
 - **`parse_frame` can fail** — it returns [`Vl53l8Error`](api.md):
   `ShortFrame` (< 16 bytes) or `CorruptedFrame` (header/footer id mismatch).
   Pick the `Variant` that matches the footer geometry.
-- **Values are raw fixed-point** — divide (`/2048`, `/128`) for real units;
-  distance is the exception (already `floor(raw/4)` mm).
+- **Values are in real units already** — no scaling left to do; a negative
+  distance (status 4, unreliable) comes out as 0, as ST gives it.
 - **Resolution comes from the frame**, not your config — size loops by
   `res.resolution()`.
 - **CNH is CH-only** — `cnh_raw` is `None` on CX frames; decoding it is a
   not-yet-implemented extension point (see the
   [VL53L8CH guide](../vl53l8ch/guide.md)).
-- **No live init/config here** — the firmware download and DCI register bridge
-  are out of scope; this crate decodes frames and packs DCI payloads.
+- **Configure before ranging** — every setter refuses while the stream runs;
+  `stop_ranging()`, change, `start_ranging()` again.

@@ -26,9 +26,10 @@ pub mod advanced;
 pub mod cnh;
 pub mod codecs;
 pub mod decode;
+pub mod driver;
 pub mod framing;
 
 pub use cnh::{decode_cnh, CnhAggregate, CnhData, CnhDecodeConfig, CnhError};
-pub use codecs::{pack_read_reg, pack_start_stream, pack_write_reg, RegData, Vl53l8Cmd, Vl53l8Rpt};
+pub use codecs::{pack_read_reg, pack_start_stream, pack_write_reg, try_pack_write_reg, RegData, Vl53l8Cmd, Vl53l8Rpt};
 pub use decode::{parse_frame, Variant, Vl53l8Error, Vl53l8Results, RESOLUTION_4X4, RESOLUTION_8X8};
 pub use framing::{unpack_frame_chunk, CompletedFrame, FrameChunk, FrameReassembler};

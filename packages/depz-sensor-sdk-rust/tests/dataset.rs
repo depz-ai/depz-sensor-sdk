@@ -4,24 +4,16 @@
 //! No `.expected.json` sidecar exists; the dataset is validated against the
 //! contract's own invariants and the golden fixture's known contents.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::dataset::{Dataset, RecordValue};
 use serde_json::Value;
 
-fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-        .join("recordings")
-        .join("dataset_dual_sr04.depzdata")
-}
+use common::{recordings_dir, seen};
 
 #[test]
 fn dataset_dual_sr04() {
-    let text = std::fs::read_to_string(fixture()).unwrap();
+    let text = std::fs::read_to_string(recordings_dir().join("dataset_dual_sr04.depzdata")).unwrap();
     let ds = Dataset::parse(&text).expect("dataset parses");
 
     // Header.
@@ -77,6 +69,7 @@ fn dataset_dual_sr04() {
 
     // The whole file merges into 10 records; the interleaving is d0/d1 per t.
     assert!(ds.records.iter().all(|r| r.t > 0));
+    seen("recordings/dataset_dual_sr04.depzdata");
     eprintln!(
         "dataset: {} devices, {} records parsed",
         ds.devices.len(),

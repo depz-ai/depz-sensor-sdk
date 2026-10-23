@@ -1,331 +1,16 @@
 //! Target 4 — BNO086 SH-2 report parsers (Q-points + 0xFB timebase) vs
 //! `contracts/vectors/bno086_reports.json`.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::bno086::reports::{
-    parse_gyro_rv_cargo, parse_input_cargo, Report, Vector3Kind,
+    parse_gyro_rv_cargo, parse_input_cargo, q_point, Report, GYRO_RV_ANGVEL_Q,
+    RV_ACCURACY_Q,
 };
-use serde_json::{json, Map, Value};
+use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap())
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{:02x}", x));
-    }
-    s
-}
-
-/// Report → (type string, field map) with the vector's field naming.
-fn report_repr(r: &Report) -> (&'static str, Map<String, Value>) {
-    let mut m = Map::new();
-    let ty = match r {
-        Report::Vector3 {
-            kind,
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            x_raw,
-            y_raw,
-            z_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("x_raw".into(), json!(x_raw));
-            m.insert("y_raw".into(), json!(y_raw));
-            m.insert("z_raw".into(), json!(z_raw));
-            match kind {
-                Vector3Kind::Acceleration => "Acceleration",
-                Vector3Kind::Gyroscope => "Gyroscope",
-                Vector3Kind::Magnetometer => "Magnetometer",
-            }
-        }
-        Report::Vector3WithBias {
-            is_gyro,
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            x_raw,
-            y_raw,
-            z_raw,
-            bias_x_raw,
-            bias_y_raw,
-            bias_z_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("x_raw".into(), json!(x_raw));
-            m.insert("y_raw".into(), json!(y_raw));
-            m.insert("z_raw".into(), json!(z_raw));
-            m.insert("bias_x_raw".into(), json!(bias_x_raw));
-            m.insert("bias_y_raw".into(), json!(bias_y_raw));
-            m.insert("bias_z_raw".into(), json!(bias_z_raw));
-            if *is_gyro {
-                "UncalibratedGyroscope"
-            } else {
-                "UncalibratedMagnetometer"
-            }
-        }
-        Report::RotationVector {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            i_raw,
-            j_raw,
-            k_raw,
-            real_raw,
-            accuracy_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("i_raw".into(), json!(i_raw));
-            m.insert("j_raw".into(), json!(j_raw));
-            m.insert("k_raw".into(), json!(k_raw));
-            m.insert("real_raw".into(), json!(real_raw));
-            m.insert("accuracy_raw".into(), json!(accuracy_raw));
-            "RotationVector"
-        }
-        Report::Scalar {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            value_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("value_raw".into(), json!(value_raw));
-            "ScalarReport"
-        }
-        Report::TapDetector {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            flags,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("flags".into(), json!(flags));
-            "TapDetector"
-        }
-        Report::StepCounter {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            latency_us,
-            steps,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("latency_us".into(), json!(latency_us));
-            m.insert("steps".into(), json!(steps));
-            "StepCounter"
-        }
-        Report::StepDetector {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            latency_us,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("latency_us".into(), json!(latency_us));
-            "StepDetector"
-        }
-        Report::SignificantMotion {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            motion,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("motion".into(), json!(motion));
-            "SignificantMotion"
-        }
-        Report::StabilityClassifier {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            classification,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("classification".into(), json!(classification));
-            "StabilityClassifier"
-        }
-        Report::ShakeDetector {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            flags,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("flags".into(), json!(flags));
-            "ShakeDetector"
-        }
-        Report::PersonalActivityClassifier {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            page_number,
-            end_of_sequence,
-            most_likely_state,
-            confidences,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("page_number".into(), json!(page_number));
-            m.insert("end_of_sequence".into(), json!(*end_of_sequence as u8));
-            m.insert("most_likely_state".into(), json!(most_likely_state));
-            m.insert("confidences".into(), json!(confidences));
-            "PersonalActivityClassifier"
-        }
-        Report::RawSensor {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            x_raw,
-            y_raw,
-            z_raw,
-            sensor_timestamp_us,
-            temperature_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("x_raw".into(), json!(x_raw));
-            m.insert("y_raw".into(), json!(y_raw));
-            m.insert("z_raw".into(), json!(z_raw));
-            m.insert("sensor_timestamp_us".into(), json!(sensor_timestamp_us));
-            m.insert("temperature_raw".into(), json!(temperature_raw));
-            "RawSensor"
-        }
-        Report::GenericEvent {
-            sensor_id,
-            timestamp_us,
-            seq,
-            accuracy,
-            delay_us,
-            value_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("seq".into(), json!(seq));
-            m.insert("accuracy".into(), json!(accuracy));
-            m.insert("delay_us".into(), json!(delay_us));
-            m.insert("value_raw".into(), json!(value_raw));
-            "GenericEvent"
-        }
-        Report::GyroIntegratedRv {
-            sensor_id,
-            timestamp_us,
-            i_raw,
-            j_raw,
-            k_raw,
-            real_raw,
-            vx_raw,
-            vy_raw,
-            vz_raw,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("i_raw".into(), json!(i_raw));
-            m.insert("j_raw".into(), json!(j_raw));
-            m.insert("k_raw".into(), json!(k_raw));
-            m.insert("real_raw".into(), json!(real_raw));
-            m.insert("vx_raw".into(), json!(vx_raw));
-            m.insert("vy_raw".into(), json!(vy_raw));
-            m.insert("vz_raw".into(), json!(vz_raw));
-            "GyroIntegratedRV"
-        }
-        Report::Unknown {
-            sensor_id,
-            timestamp_us,
-            data,
-        } => {
-            m.insert("sensor_id".into(), json!(sensor_id));
-            m.insert("timestamp_us".into(), json!(timestamp_us));
-            m.insert("data".into(), json!(hex_encode(data)));
-            "UnknownReport"
-        }
-    };
-    (ty, m)
-}
+use common::shapes::report_repr;
+use common::{hex_decode, load, recorded_text, recording_packets, seen};
 
 /// Assert every field in `want` is present and equal in the parsed report.
 fn assert_fields(got: &Report, ty: &str, want: &Value, ctx: &str) {
@@ -345,14 +30,13 @@ fn assert_fields(got: &Report, ty: &str, want: &Value, ctx: &str) {
 
 #[test]
 fn bno086_reports_vectors() {
-    let doc: Value = serde_json::from_str(
-        &std::fs::read_to_string(vectors_dir().join("bno086_reports.json")).unwrap(),
-    )
-    .unwrap();
+    let doc = load("bno086_reports.json");
 
-    // ── channel-3/4 input cargos ─────────────────────────────────────────────
+    // ── channel-3/4 input cargos (+ interactive_and_flush: MotionRequest 0x2B
+    // and the bare 0xEF Flush Completed, same shape) ──────────────────────────
     let mut cargos = 0;
-    for c in doc["input_cargos"].as_array().unwrap() {
+    let groups = [&doc["input_cargos"], &doc["interactive_and_flush"]];
+    for c in groups.iter().flat_map(|g| g.as_array().unwrap()) {
         let payload = hex_decode(c["cargo"].as_str().unwrap());
         let capture = c["capture_timestamp_us"].as_i64().unwrap();
         let reports = parse_input_cargo(&payload, capture);
@@ -366,6 +50,7 @@ fn bno086_reports_vectors() {
                 &format!("{}[{}]", c["name"], i),
             );
         }
+        seen(c);
         cargos += 1;
     }
 
@@ -382,9 +67,134 @@ fn bno086_reports_vectors() {
             &expect["fields"],
             c["name"].as_str().unwrap(),
         );
+        seen(c);
         gyro += 1;
     }
 
     assert!(cargos > 0 && gyro > 0);
     eprintln!("bno086_reports.json: {} input cargos + {} gyro_rv", cargos, gyro);
+}
+
+#[test]
+fn bno086_q_point_vectors() {
+    let doc = load("bno086_reports.json");
+    // The primary-field Q table, both ways: every listed sensor at its Q, and
+    // no sensor outside the table with a non-zero Q.
+    let table = doc["q_points"].as_object().unwrap();
+    for (k, v) in table {
+        let id = u8::from_str_radix(k.trim_start_matches("0x"), 16).unwrap();
+        assert_eq!(q_point(id) as u64, v.as_u64().unwrap(), "q_point {}", k);
+    }
+    for id in 0..=255u8 {
+        if q_point(id) != 0 {
+            assert!(table.contains_key(&format!("0x{:02X}", id)), "q_point 0x{:02X} not in vector", id);
+        }
+    }
+    seen("bno086_reports/q_points");
+    assert_eq!(doc["rv_accuracy_q"].as_u64().unwrap(), RV_ACCURACY_Q as u64);
+    seen("bno086_reports/rv_accuracy_q");
+    assert_eq!(doc["gyro_rv_angvel_q"].as_u64().unwrap(), GYRO_RV_ANGVEL_Q as u64);
+    seen("bno086_reports/gyro_rv_angvel_q");
+}
+
+// ---- recordings/bno086_session.depzrec -------------------------------------
+
+/// The live capture decoded rx-side only (no device layer to re-issue the tx
+/// half): every RPT_DATA (0x91: cmd u8, capture timestamp_us u64 LE, raw SHTP
+/// frame) through the SHTP layer, input-channel cargos (3 normal, 4 wake) and
+/// gyro-RV cargos (5) through the SH-2 parsers, vs the sidecar's reports
+/// field by field.
+#[test]
+fn bno086_session_recording() {
+    use depz_sensor_sdk::bno086::shtp::{ShtpChannel, ShtpLayer};
+
+    let exp = load("recordings/bno086_session.expected.json");
+    let mut layer = ShtpLayer::new();
+    let mut got = Vec::new();
+    for p in recording_packets("bno086_session.depzrec") {
+        if !p.rx || p.cmd != 0x91 || p.payload.len() < 9 {
+            continue;
+        }
+        let capture = u64::from_le_bytes(p.payload[1..9].try_into().unwrap());
+        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else { continue };
+        match cargo.channel {
+            c if c == ShtpChannel::InputNormal as u8 || c == ShtpChannel::InputWake as u8 => {
+                got.extend(parse_input_cargo(&cargo.payload, cargo.capture_us as i64))
+            }
+            c if c == ShtpChannel::GyroRv as u8 => {
+                got.extend(parse_gyro_rv_cargo(&cargo.payload, cargo.capture_us as i64))
+            }
+            _ => {}
+        }
+    }
+    let want = exp["reports"].as_array().unwrap();
+    assert!(got.len() >= want.len(), "decoded {} reports, need >= {}", got.len(), want.len());
+    for (i, (g, w)) in got.iter().zip(want).enumerate() {
+        let mut fields = w.as_object().unwrap().clone();
+        let ty = fields.remove("type").unwrap();
+        let (got_ty, got_map) = report_repr(g);
+        assert_eq!(got_ty, ty.as_str().unwrap(), "report {} type", i);
+        assert_eq!(got_map, fields, "report {}", i);
+    }
+    seen("recordings/bno086_session.depzrec");
+}
+
+// ---- recordings/bno086_canonical.depzrec -----------------------------------
+
+/// The canonical capture (contract 15 `bno086_canonical`, opened the §4.4 way)
+/// decoded rx-side only, like `bno086_session`: its sidecar's `results` hold
+/// the probe answers (software name first, then device name) and, at the
+/// scenario's `collect` step, the 50 reports the subscription saw — compared
+/// field by field against the first 50 SH-2 reports of the rx stream.
+#[test]
+fn bno086_canonical_recording() {
+    use depz_sensor_sdk::bno086::shtp::{ShtpChannel, ShtpLayer};
+    use depz_sensor_sdk::protocol::common::Cmd;
+    use depz_sensor_sdk::{resolve_sensor_class, usb_model_hint};
+
+    let exp = load("recordings/bno086_canonical.expected.json");
+    let pkts = recording_packets("bno086_canonical.depzrec");
+    // The probe (contract 02 §4.4): its two text answers, then the class.
+    let text = |cmd| {
+        recorded_text(&pkts, cmd).map(|t| t.trim_end_matches('\0').trim().to_string())
+    };
+    let sw = text(Cmd::GetNameActiveSoftware).expect("GET_NAME_ACTIVE_SOFTWARE answer");
+    let name = text(Cmd::GetDeviceName).unwrap_or_default();
+    assert_eq!(sw, exp["software_name"].as_str().unwrap());
+    assert_eq!(name, exp["device_name"].as_str().unwrap());
+    let vid = exp["usb_vid"].as_u64().map(|v| v as u16);
+    let pid = exp["usb_pid"].as_u64().map(|v| v as u16);
+    assert_eq!(usb_model_hint(vid, pid), exp["usb_model"].as_str());
+    assert_eq!(resolve_sensor_class(&sw, &name, vid, pid), exp["class"].as_str().unwrap());
+
+    let mut layer = ShtpLayer::new();
+    let mut got = Vec::new();
+    for p in pkts {
+        if !p.rx || p.cmd != 0x91 || p.payload.len() < 9 {
+            continue;
+        }
+        let capture = u64::from_le_bytes(p.payload[1..9].try_into().unwrap());
+        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else { continue };
+        match cargo.channel {
+            c if c == ShtpChannel::InputNormal as u8 || c == ShtpChannel::InputWake as u8 => {
+                got.extend(parse_input_cargo(&cargo.payload, cargo.capture_us as i64))
+            }
+            c if c == ShtpChannel::GyroRv as u8 => {
+                got.extend(parse_gyro_rv_cargo(&cargo.payload, cargo.capture_us as i64))
+            }
+            _ => {}
+        }
+    }
+    let want = exp["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find_map(|r| r.as_array().filter(|a| !a.is_empty()))
+        .expect("a non-empty reports result");
+    assert!(got.len() >= want.len(), "decoded {} reports, need >= {}", got.len(), want.len());
+    for (i, (g, w)) in got.iter().zip(want).enumerate() {
+        let (_, got_map) = report_repr(g);
+        assert_eq!(&got_map, w.as_object().unwrap(), "report {}", i);
+    }
+    seen("recordings/bno086_canonical.depzrec");
 }

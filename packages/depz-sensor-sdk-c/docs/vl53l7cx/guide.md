@@ -402,8 +402,8 @@ void on_frame_chunk(const depz_event *ev)
 `depz_vl53l7_decode_frame()` returns `0` on success, `-1` on a header/footer
 id mismatch (corrupt frame), `-2` on a bad length and `-3` when a CNH block
 does not fit the buffer you passed (VL53L7CH only — see its
-[guide](../vl53l7ch/guide.md)). The frame fields, their raw fixed-point
-scaling and the status values are exactly the VL53L8 ones — see the
+[guide](../vl53l7ch/guide.md)). The frame fields, their real units
+(as ST's `GetRangingData`) and the status values are exactly the VL53L8 ones — see the
 [VL53L8CX guide](../vl53l8cx/guide.md#the-frame).
 
 ### What differs from the VL53L8 decode

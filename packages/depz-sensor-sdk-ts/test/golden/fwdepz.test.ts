@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FwDepzError, fwDepzPayloadCrcOk, parseFwDepz } from "../../src/index.js";
-import { fromHex, loadVectors } from "./vectors.js";
+import { fromHex, loadVectors, seen } from "./vectors.js";
 
 const data = loadVectors("fwdepz.json");
 
@@ -10,6 +10,7 @@ describe("fwdepz vectors", () => {
       const blob = fromHex(c.file);
       if (c.error) {
         expect(() => parseFwDepz(blob)).toThrow(FwDepzError);
+        seen(c);
         return;
       }
       const img = parseFwDepz(blob);
@@ -19,6 +20,7 @@ describe("fwdepz vectors", () => {
       expect(img.curSec).toBe(c.expect.cur_sec);
       expect(img.totSec).toBe(c.expect.tot_sec);
       expect(fwDepzPayloadCrcOk(img)).toBe(c.expect.payload_crc_ok);
+      seen(c);
     });
   }
 });

@@ -17,6 +17,7 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import checked_pack
 from .vl53l4 import (  # noqa: F401  (re-exported: identical on the wire)
     I2C_KHZ_STEPS,
     SF_INT_ACT_HIGH,
@@ -63,9 +64,9 @@ def pack_start_stream(
     played by the bridge after every block read (0..4 steps)."""
     if len(clear) > CLEAR_STEPS_MAX:
         raise ValueError(f"at most {CLEAR_STEPS_MAX} interrupt-release steps")
-    out = struct.pack("<HHBB", addr, length, flags, len(clear))
+    out = checked_pack("<HHBB", addr=addr, length=length, flags=flags, steps=len(clear))
     for step_addr, value in clear:
-        out += struct.pack("<HB", step_addr, value)
+        out += checked_pack("<HB", step_addr=step_addr, value=value)
     return out
 
 

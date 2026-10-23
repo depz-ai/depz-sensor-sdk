@@ -1,14 +1,15 @@
 # VL53L4CD — user guide
 
-Hands-on guide to the `Vl53l4Wire` wire codecs and the `Vl53l4Uld` host-ULD
-math (`Depz.Sensor.Vl53l4`). For what the sensor is and its concepts, read the
-[introduction](introduction.md); for exact signatures see the
-[API reference](api.md). This is a decode layer — the snippets build request
-payloads and decode reply/report payloads; you supply the transport that
-carries them (see the [common guide](../guide.md#getting-started)).
+Hands-on guide to the VL53L4CD: the live device
+(`Depz.Sensor.Devices.Vl53l4cdDevice`, which runs the ST ULD 2.2.3 on the host
+as `Vl53l4cdDriver`) and the layers under it — the `Vl53l4Wire` wire codecs and
+the `Vl53l4Uld` register math (`Depz.Sensor.Vl53l4`). For what the sensor is and
+its concepts, read the [introduction](introduction.md); for exact signatures
+see the [API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The codec surface](#the-codec-surface)
 - [Read and write registers](#read-and-write-registers)
 - [Stream the result block](#stream-the-result-block)
@@ -16,6 +17,35 @@ carries them (see the [common guide](../guide.md#getting-started)).
 - [Range timing](#range-timing)
 - [Tuning words](#tuning-words)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+
+using var tof = DepzDevices.OpenVl53l4cd();
+tof.Init();                                   // config block at 400 kHz, VHV calibration, then 1 MHz
+tof.SetRangeTiming(33);                       // 33 ms budget, continuous
+Vl53l4Measurement m = tof.MeasureOnce();      // polled: start, data ready, read, stop
+Console.WriteLine($"{m.DistanceMm} mm ({m.StatusText})");
+
+using var stream = tof.Measurements();
+tof.StartRanging();                           // one result per INT edge, pushed by the board
+for (int i = 0; i < 20; i++)
+    Console.WriteLine(stream.Take(TimeSpan.FromSeconds(1)).DistanceMm);
+tof.StopRanging();
+```
+
+- Configuration (`SetRangeTiming`, `SetOffsetMm`, thresholds, calibration)
+  needs `Init()` and throws `InvalidOperationException` while ranging: the
+  stream owns the register bank.
+- `CalibrateOffset(targetMm)` / `CalibrateXtalk(targetMm)` run ST's
+  calibration against a target at a known distance and return what they
+  programmed.
+- `Xshut(...)` / `ResetSensor()` power-cycle the sensor; `Init()` again after.
+- A stream report whose result block does not decode is dropped and counted
+  in `StreamParseErrors`; streaming goes on.
+- `tof.Uld` is the driver itself, for raw register access.
 
 ## The codec surface
 
@@ -143,6 +173,6 @@ Vl53l4Uld.SigmaThresholdRaw(15);                 // RANGE_CONFIG__SIGMA_THRESH (
   counters (`SlotsSkipped`, `I2cErrors`) and gaps in `TimestampUs`;
   `StreamCount` tells a frame the host never received from one the sensor
   never produced.
-- **The live driver is host code you write** — `Vl53l4Uld` is the pure math
-  only; `sensor_init`, calibration loops and waits are an extension point
-  (`Vl53l4Uld.LiveDriverStubbed`), driven over `ReadReg`/`WriteReg`.
+- **The driver is host code** — `Vl53l4Uld` is the pure math; the register
+  sequences (`sensor_init`, calibration loops, waits) are `Vl53l4cdDriver`,
+  which runs over any `IVl53l4Platform` (the board bridge, or a test map).

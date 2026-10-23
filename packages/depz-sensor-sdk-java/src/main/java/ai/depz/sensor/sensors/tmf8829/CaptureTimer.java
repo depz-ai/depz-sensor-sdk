@@ -53,6 +53,11 @@ public final class CaptureTimer {
 
     public FrameTime results(int fpMode, long systick, long t0Tick, long t1Tick,
                              long pairUs, long edgeUs, int flags) {
+        // contract 07 §3: fpMode a u8, the ticks u32 (the µs times are u64 longs)
+        ai.depz.sensor.protocol.Wire.checkUint("fpMode", fpMode, 8);
+        ai.depz.sensor.protocol.Wire.checkUint("systick", systick, 32);
+        ai.depz.sensor.protocol.Wire.checkUint("t0Tick", t0Tick, 32);
+        ai.depz.sensor.protocol.Wire.checkUint("t1Tick", t1Tick, 32);
         SensorClock c = clock;
         if (c.nominal) {
             flags |= FT_NOMINAL;

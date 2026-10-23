@@ -1,24 +1,60 @@
 # VL53L0X — user guide
 
-Hands-on guide to the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
+Hands-on guide to the live device (`ai.depz.sensor.devices.Vl53lxDevice`,
+which runs ST's drivers on the host) and the layers under it: the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
 table ([`Vl53lxProducts`](api.md#vl53lxproducts)) and block decode
 ([`Vl53lxDecode`](api.md#vl53lxdecode)) for the VL53L0X. For what the sensor
 is and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
-This SDK does not drive the sensor: the ST driver (initialisation,
-reference SPADs, profiles, calibration, the PAL status) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
 - [Decode the result block](#decode-the-result-block)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxTarget;
+import java.time.Duration;
+
+try (Vl53lxDevice tof = DepzDevices.openVl53lx()) { // a Vl53l0xDevice for this board
+    tof.init();                                   // the PAL on the host: reference SPADs, VHV / phase calibration
+    tof.configure(33, 0, "long-range");           // default / long-range / high-speed / high-accuracy, 20..200 ms
+
+    try (Subscription<Vl53lxMeasurement> frames = tof.measurements()) {
+        tof.startRanging();
+        Vl53lxMeasurement m = frames.take(Duration.ofSeconds(1));
+        System.out.println(m.distanceMm() + " mm, " + m.statusText() + ", sigma " + m.sigmaMm() + " mm, dmax "
+                + m.extra().get("dmax_mm") + " mm");
+        tof.stopRanging();
+    }
+}
+```
+
+- One driver kind, `uld` (`Vl53l0xUldDriver`): ST's VL53L0X API 1.0.4 on the
+  host. The PAL range status (0 valid … 5 hardware fail, 255 no update), the
+  sigma estimate and Dmax come from the 12-byte block **and** the state the
+  driver cached at init — which is why a capture decodes fully only through it.
+- Calibration: `calibrateOffset(targetDistMm)` (a target at 100..400 mm) and
+  `calibrateXtalk(targetDistMm)`; keep the results and hand them back with
+  `configure(budgetMs, interMs, mode, offsetMm, xtalkKcps, null)`.
+  `performRefSpadManagement()` re-measures the reference SPADs on a live session.
+- No ROI and no detection thresholds on this die.
+- `configure` re-initialises the sensor and applies the mode and budget; it
+  and every setting throw `IllegalStateException` while ranging. Ask
+  `tof.supports("offset")` (…) before an optional group: a missing one throws
+  `UnsupportedOperationException`.
+- `tof.driver()` is the driver itself; `measureOnce()` is one polled range.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## Which board is it
 
@@ -119,9 +155,9 @@ for (Event ev : parser.feed(rxBytes)) {
 | `signalRateMcps1616` / `ambientRateMcps1616` | rates, FixPoint16.16 Mcps (the wire's 9.7 shifted left by 9) |
 | `effectiveSpadCount88` | effective SPAD count, 8.8 |
 
-The PAL range status, sigma and maximum distance the full drivers report need
-device data cached at init (reference SPADs, calibration), so they are not in
-this SDK. The family's plottable rule (statuses 0, 6, 11) applies to that
+The PAL range status, sigma and maximum distance the driver reports need
+device data cached at init (reference SPADs, calibration): they come from the
+live device (`Vl53l0xUldDriver`), not from this block decode. The family's plottable rule (statuses 0, 6, 11) applies to that
 driver status, not to `deviceRangeStatus`.
 
 ## Reset and bridge diagnostics

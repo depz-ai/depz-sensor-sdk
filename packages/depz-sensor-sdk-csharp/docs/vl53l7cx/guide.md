@@ -7,13 +7,9 @@ scaling, the grid, the advanced DCI codecs — is the VL53L8 one: see the
 [VL53L8CX guide](../vl53l8cx/guide.md). For concepts read the
 [introduction](introduction.md); for signatures the [API reference](api.md).
 
-This SDK does not drive the board: initialising the sensor (firmware
-download, default configuration) and starting a ranging session is done with
-the Python or TypeScript SDK. What follows is everything you need to build the
-board's commands and decode what it sends.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [Board commands](#board-commands)
 - [The bridge info report](#the-bridge-info-report)
@@ -21,6 +17,33 @@ board's commands and decode what it sends.
 - [Reassemble and decode a frame](#reassemble-and-decode-a-frame)
 - [What differs from the VL53L8 decode](#what-differs-from-the-vl53l8-decode)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+
+using var tof = DepzDevices.OpenVl53l7();        // a Vl53l7cxDevice, Vl53l5cxDevice or Vl53l7chDevice
+tof.Init();                                      // L5/L7 firmware over I2C, ~1.4 s at the board's 1 MHz
+Console.WriteLine(tof.ModuleType);               // 1 = MZEVO (VL53L7), 0 = MZ (VL53L5)
+tof.SetResolution(64);
+tof.SetRangingFrequencyHz(1);                    // the L5/L7 stream down to 1 Hz
+
+using var frames = tof.Frames();
+tof.StartRanging();
+var f = frames.Take(TimeSpan.FromSeconds(2));
+tof.StopRanging();
+Console.WriteLine(tof.GetBridgeInfo());          // counters and pin levels: before / after a run
+```
+
+The device is a `Vl53l8cxDevice` underneath: every configuration method of
+the [VL53L8CX guide](../vl53l8cx/guide.md#live-device) works the same, except
+that L5CX / L7CX have no deep sleep and no threshold auto-stop. The board adds
+`SetI2cSpeedKhz` and `PinCtrl` (after `LpnOff` or `SoftCycle`, `Init()` again).
+A board whose sensor reports another module type than its class expects is
+traced as a warning: it still ranges, the firmware is shared.
+
+The sections below are the layers under the device.
 
 ## Which board is it
 

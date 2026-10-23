@@ -14,6 +14,8 @@ using detail::u8;
 // ── SHTP framing ────────────────────────────────────────────────────────────
 
 bytes ShtpHeader::pack() const {
+    // bits 14:0: a longer length is refused, never masked (contract 07 §3)
+    if (length > LENGTH_MASK) throw std::invalid_argument("ShtpHeader: length over 15 bits");
     std::uint16_t word = (length & LENGTH_MASK) | (continuation ? CONTINUATION_BIT : 0);
     bytes out;
     detail::wr_le(out, word, 2);
@@ -34,6 +36,9 @@ ShtpHeader ShtpHeader::unpack(byte_span data) {
 }
 
 bytes shtp_build_frame(int channel, byte_span payload, std::uint8_t seq) {
+    if (channel < 0 || channel > 0xFF) throw std::out_of_range("SHTP channel is a byte");
+    if (SHTP_HEADER_SIZE + payload.size() > LENGTH_MASK)
+        throw std::invalid_argument("SHTP frame length over 15 bits");
     ShtpHeader h;
     h.length = static_cast<std::uint16_t>(SHTP_HEADER_SIZE + payload.size());
     h.channel = static_cast<std::uint8_t>(channel);
@@ -72,12 +77,15 @@ std::vector<bytes> shtp_fragment_cargo(int channel, byte_span payload, std::uint
 bytes ShtpLayer::next_frame(int channel, byte_span payload) {
     if (SHTP_HEADER_SIZE + payload.size() > MAX_TX_FRAME)
         throw std::invalid_argument("TX cargo exceeds the MCU slot");
+    // the per-channel seq table has NUM_CHANNELS entries: refuse, never index past it
+    if (channel < 0 || channel >= NUM_CHANNELS)
+        throw std::out_of_range("SHTP channel out of range 0..5");
     int seq = tx_seq_[channel];
     tx_seq_[channel] = (seq + 1) & 0xFF;
     return shtp_build_frame(channel, payload, static_cast<std::uint8_t>(seq));
 }
 
-std::optional<ShtpCargo> ShtpLayer::feed(byte_span frame) {
+std::optional<ShtpCargo> ShtpLayer::feed(byte_span frame, std::uint64_t capture_us) {
     if (frame.size() < SHTP_HEADER_SIZE) return std::nullopt;
     ShtpHeader hdr = ShtpHeader::unpack(frame);
     if (hdr.channel >= NUM_CHANNELS || hdr.length < SHTP_HEADER_SIZE) return std::nullopt;
@@ -88,6 +96,7 @@ std::optional<ShtpCargo> ShtpLayer::feed(byte_span frame) {
         rx.buf.assign(chunk.begin(), chunk.end());
         rx.expected = hdr.length - SHTP_HEADER_SIZE;
         rx.seq = hdr.seq;
+        rx.capture_us = capture_us;
     } else {
         if (!rx.expected) {
             ++discarded;
@@ -106,6 +115,7 @@ std::optional<ShtpCargo> ShtpLayer::feed(byte_span frame) {
     cargo.channel = hdr.channel;
     cargo.seq = rx.seq;
     cargo.payload = std::move(rx.buf);
+    cargo.capture_us = rx.capture_us;
     rx.buf.clear();
     rx.expected = 0;
     return cargo;
@@ -221,6 +231,7 @@ enum Sid : std::uint8_t {
     ARVR_STABILIZED_RV = 0x28,
     ARVR_STABILIZED_GAME_RV = 0x29,
     GYRO_INTEGRATED_RV = 0x2A,
+    MOTION_REQUEST = 0x2B,  // interactive calibration, BNO086 only
 };
 
 // Total report length on the wire, 4-byte SH-2 header included.
@@ -262,6 +273,7 @@ int report_length(std::uint8_t rid) {
         case ARVR_STABILIZED_RV: return 14;
         case ARVR_STABILIZED_GAME_RV: return 12;
         case GYRO_INTEGRATED_RV: return 14;
+        case MOTION_REQUEST: return 6;
         default: return -1;
     }
 }
@@ -373,6 +385,11 @@ Report decode_report(std::uint8_t rid, byte_span rep, std::int64_t ts, int seq, 
             r.type = ReportType::StabilityClassifier;
             r.classification = u8(rep[4]);
             return r;
+        case MOTION_REQUEST:
+            r.type = ReportType::MotionRequest;
+            r.intent = u8(rep[4]);
+            r.request = u8(rep[5]);
+            return r;
         case SHAKE_DETECTOR:
             r.type = ReportType::ShakeDetector;
             r.flags = rd_u16(rep, 4);
@@ -410,6 +427,8 @@ Report decode_report(std::uint8_t rid, byte_span rep, std::int64_t ts, int seq, 
 }  // namespace
 
 std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_timestamp_us) {
+    // the capture time is the MCU uptime, a u64 (contract 07 §3)
+    if (capture_timestamp_us < 0) throw std::invalid_argument("capture_timestamp_us must not be negative");
     std::vector<Report> out;
     std::int64_t base_us = capture_timestamp_us;
     std::size_t pos = 0;
@@ -426,6 +445,16 @@ std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_ti
             std::int32_t delta = static_cast<std::int32_t>(rd_u32(payload, pos + 1));
             base_us += static_cast<std::int64_t>(delta) * 100;
             pos += 5;
+            continue;
+        }
+        if (rid == FLUSH_COMPLETED && pos + 2 <= n) {  // no SH-2 header
+            Report r;
+            r.type = ReportType::FlushCompleted;
+            r.sensor_id = rid;
+            r.timestamp_us = base_us;
+            r.flushed_sensor = u8(payload[pos + 1]);
+            out.push_back(std::move(r));
+            pos += 2;
             continue;
         }
         int length = report_length(rid);
@@ -452,6 +481,7 @@ std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_ti
 }
 
 std::optional<Report> parse_gyro_rv_cargo(byte_span payload, std::int64_t capture_timestamp_us) {
+    if (capture_timestamp_us < 0) throw std::invalid_argument("capture_timestamp_us must not be negative");
     std::int64_t ts = capture_timestamp_us;
     byte_span body = payload;
     if (!payload.empty() && u8(payload[0]) == BASE_TIMESTAMP_REF) {

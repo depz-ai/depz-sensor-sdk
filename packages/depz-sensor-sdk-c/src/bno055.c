@@ -257,6 +257,14 @@ void depz_bno055_unpack_gyro_config(const uint8_t bytes[2], depz_bno055_gyro_con
     out->power     = (uint8_t)(bytes[1] & 7);
 }
 
+int depz_bno055_unpack_gyro_config_n(const uint8_t *bytes, size_t len, depz_bno055_gyro_config *out)
+{
+    if (len < 2)
+        return -1;
+    depz_bno055_unpack_gyro_config(bytes, out);
+    return 0;
+}
+
 size_t depz_bno055_pack_gyro_config(const depz_bno055_gyro_config *c, uint8_t out[2])
 {
     out[0] = (uint8_t)((c->bandwidth & 7) << 3 | (c->range & 7));

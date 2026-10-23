@@ -52,17 +52,18 @@ you need raw return histograms.
 
 ## Key concepts
 
-- **Host-side ULD, decode only** — this SDK is the verifiable half: frame decode
-  and DCI payload codecs. The live register-bridge init/config that produces the
-  frames is hardware-dependent and out of scope (`Vl53l8Uld`, a throwing stub).
+- **Host-side ULD** — the board is a thin SPI bridge; the ST driver
+  (`Vl53l8Driver`, a 1:1 port of the reference SDK's) runs here, downloads the
+  sensor firmware at `Init()` and configures the sensor over the bridge.
 - **Chunk reassembly** — `FrameReassembler` resets on offset 0, requires
   contiguous chunks (a gap discards the frame in progress), and completes when
   the accumulated bytes equal `FullSize`. It exposes `Completed` / `Discarded`
   counters.
 - **`Vl53l8Frame`** — one parsed frame. Per-zone arrays are sized to the active
   resolution (16 or 64), row-major; `TargetStatus` 5/9 = valid, 255 = no target.
-  Raw wire integers are preserved with the ST fixed-point scaling applied
-  (`DistanceMm` ÷4, `RangeSigmaMm` ÷128).
+  Values are in ST's real units (`DistanceMm` mm, a negative one clamped to 0;
+  `SignalPerSpad`/`AmbientPerSpad` kcps/SPAD; `RangeSigmaMm` mm;
+  `Reflectance` %), with the fraction kept.
 - **Corrupt-frame guard** — `Vl53l8FrameDecoder.ParseFrame` throws
   `CorruptedFrameException` when the header/footer frame-id words disagree.
 

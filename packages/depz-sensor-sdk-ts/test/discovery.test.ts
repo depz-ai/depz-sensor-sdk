@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   Bno086,
   CrcType,
+  DepzDevice,
   DEPZ_VID,
   DEV_PID,
   DEV_VID,
@@ -21,6 +22,7 @@ import {
   listDepzDevicesFrom,
   openDeviceByDeviceSerial,
   openDeviceFrom,
+  openOnTransport,
   orderDevicesBySerial,
   pidToModel,
   type DepzPortInfo,
@@ -75,7 +77,11 @@ class FakeFirmware {
     }
   }
 
+  /** Every request opcode received, in order. */
+  readonly log: number[] = [];
+
   private async handle(pkt: PacketEvent): Promise<void> {
+    this.log.push(pkt.cmd);
     if (pkt.cmd === 0x03) await this.text(0x03, this.deviceName);
     else if (pkt.cmd === 0x04) await this.text(0x04, this.softwareName);
     else if (pkt.cmd === 0x05) await this.text(0x05, this.serial);
@@ -426,5 +432,51 @@ describe("duplicate model types and serials", () => {
     } finally {
       await dev.close();
     }
+  });
+});
+
+describe("openOnTransport (contract 02 §4.4)", () => {
+  it("probes with exactly three requests, then continues as the class", async () => {
+    const fw = new FakeFirmware("APP_usonic_SR04_v0.95", "DEPZ Usonic SR04", "SN0042");
+    const dev = await openOnTransport(fw.transport, { usbVid: DEPZ_VID, usbPid: 0xec78, timeoutMs: 500 });
+    try {
+      expect(dev).toBeInstanceOf(Sr04);
+      expect(fw.log).toEqual([0x04, 0x03, 0x05]);
+      // The same connection goes on: no reopen, requests still answered.
+      expect(await dev.getSerialNumber()).toBe("SN0042");
+      expect(dev.stats.txPackets).toBe(4);
+    } finally {
+      await dev.close();
+      await fw.close();
+    }
+  });
+
+  it("resolves VL53L8CH by the given USB PID", async () => {
+    const fw = new FakeFirmware("APP_VL53L8_v0.92", "", "");
+    const dev = await openOnTransport(fw.transport, { usbVid: DEPZ_VID, usbPid: 0xed40, timeoutMs: 500 });
+    try {
+      expect(dev).toBeInstanceOf(Vl53l8ch);
+    } finally {
+      await dev.close();
+      await fw.close();
+    }
+  });
+
+  it("keeps an unknown application as the base device", async () => {
+    const fw = new FakeFirmware("APP_NEWSENSOR_v1.2", "", "");
+    const dev = await openOnTransport(fw.transport, { timeoutMs: 500 });
+    try {
+      expect(dev.constructor).toBe(DepzDevice);
+      expect(fw.log).toEqual([0x04, 0x03, 0x05]);
+    } finally {
+      await dev.close();
+      await fw.close();
+    }
+  });
+
+  it("refuses a bootloader and closes the transport", async () => {
+    const fw = new FakeFirmware("BOOTDEPZ_v1.1", "", "");
+    await expect(openOnTransport(fw.transport, { timeoutMs: 500 })).rejects.toThrow(/bootloader/);
+    await fw.close();
   });
 });

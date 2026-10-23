@@ -88,9 +88,11 @@ histograms.
 - **Stream vs configuration** — while ranging, the board's streaming FSM owns
   the sensor's register bank. Configuration is refused with `DEPZ_E_ARG` until
   `depz_vl53l8_stop_ranging()`.
-- **Raw fixed-point frame values** — the frame arrays hold the wire integers
-  (`range_sigma_mm = raw/128`, signal and ambient in raw kcps/SPAD); only
-  `distance_mm` is pre-scaled to millimetres. `target_status` 5 or 9 means a
+- **Frame values in real units, as ST** — the frame arrays hold what ST's
+  `GetRangingData` gives: `distance_mm` in mm (a negative distance comes out
+  as 0), `signal_per_spad` / `ambient_per_spad` in kcps/SPAD,
+  `range_sigma_mm` in mm, `reflectance` in %. The floating-point fields keep
+  the fraction ST's integer division drops. `target_status` 5 or 9 means a
   valid range, 255 no target.
 
 ## See also

@@ -27,6 +27,8 @@
 //!   the embedded ams sensor-firmware image (MIT).
 //! - [`bno086`] — SHTP framing, SH-2 report parsers, control request builders.
 //! - [`dataset`] — `.depzdata` decoded multi-device dataset reader (contract 09).
+//! - [`discovery`] — class resolution from probe answers + USB id
+//!   (contract 02 §4.4): [`resolve_sensor_class`], [`SENSOR_CLASS_NAMES`].
 //!
 //! Everything here is byte-exact with the golden vectors in
 //! `contracts/vectors/` and the Python/Java/C/C++ reference SDKs.
@@ -35,6 +37,8 @@ pub mod bno055;
 pub mod bno086;
 pub mod crc;
 pub mod dataset;
+pub mod devices;
+pub mod discovery;
 pub mod framing;
 pub mod fwdepz;
 pub mod json;
@@ -50,4 +54,5 @@ pub use framing::{
     build_packet, CrcType, Event, FramingError, Packet, PacketParser, HEADER_SIZE, MAGIC,
     MAX_PAYLOAD,
 };
+pub use discovery::{resolve_sensor_class, SENSOR_CLASS_NAMES};
 pub use usb_ids::{is_known_depz_usb, usb_model_hint};

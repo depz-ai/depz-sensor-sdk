@@ -9,6 +9,7 @@
  */
 
 import { DepzError } from "../../errors.js";
+import { checkUint } from "../../protocol/wire.js";
 
 /** SH-2 level failure (bad response status, FRS error, ...). */
 export class Sh2Error extends DepzError {}
@@ -27,6 +28,8 @@ export enum ControlReport {
   GetFeatureResponse = 0xfc,
   SetFeatureCommand = 0xfd,
   GetFeatureRequest = 0xfe,
+  /** Host → hub; answered by Flush Completed (0xEF). */
+  ForceSensorFlush = 0xf0,
 }
 
 /**
@@ -73,6 +76,8 @@ export enum Sh2Command {
   PeriodicDcdConfig = 0x09,
   GetOscillatorType = 0x0a,
   ClearDcdAndReset = 0x0b,
+  /** BNO086 only; no response. */
+  InteractiveCalibration = 0x0e,
 }
 
 /** Get-Oscillator-Type (command 0x0A) result (r[0]). */
@@ -200,18 +205,18 @@ export function buildSetFeature(
   const out = new Uint8Array(17);
   const v = new DataView(out.buffer);
   v.setUint8(0, ControlReport.SetFeatureCommand);
-  v.setUint8(1, sensorId);
-  v.setUint8(2, flags & 0xff);
-  v.setUint16(3, sensitivity & 0xffff, true);
-  v.setUint32(5, intervalUs >>> 0, true);
-  v.setUint32(9, batchUs >>> 0, true);
-  v.setUint32(13, cfgWord >>> 0, true);
+  v.setUint8(1, checkUint("sensorId", sensorId, 8));
+  v.setUint8(2, checkUint("flags", flags, 8));
+  v.setUint16(3, checkUint("sensitivity", sensitivity, 16), true);
+  v.setUint32(5, checkUint("intervalUs", intervalUs, 32), true);
+  v.setUint32(9, checkUint("batchUs", batchUs, 32), true);
+  v.setUint32(13, checkUint("cfgWord", cfgWord, 32), true);
   return out;
 }
 
 /** Get Feature Request (0xFE), 2 bytes. */
 export function buildGetFeatureRequest(sensorId: number): Uint8Array {
-  return Uint8Array.of(ControlReport.GetFeatureRequest, sensorId);
+  return Uint8Array.of(ControlReport.GetFeatureRequest, checkUint("sensorId", sensorId, 8));
 }
 
 /** Get Feature Response (0xFC), 17 bytes — the rates in effect. */
@@ -297,8 +302,8 @@ export function buildCommandRequest(
   }
   const out = new Uint8Array(12);
   out[0] = ControlReport.CommandRequest;
-  out[1] = seq & 0xff;
-  out[2] = command;
+  out[1] = checkUint("seq", seq, 8);
+  out[2] = checkUint("command", command, 8);
   out.set(params, 3);
   return out;
 }
@@ -392,6 +397,37 @@ export function periodicDcdParams(enable: boolean): Uint8Array {
   return Uint8Array.of(enable ? 0x00 : 0x01);
 }
 
+/**
+ * P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 — what the
+ * host knows about the device's motion. Unknown is the hub's initial state.
+ */
+export enum MotionIntent {
+  Unknown = 0,
+  StationaryNoVibration = 1,
+  StationaryWithVibration = 2,
+  InMotion = 3,
+  InMotionAccelerating = 4,
+}
+
+/**
+ * Interactive Calibration (command 0x0E, BNO086 only): P0 = motion intent,
+ * P1..P8 reserved. No command response is generated.
+ */
+export function interactiveCalibrationParams(intent: number): Uint8Array {
+  checkUint("intent", intent, 8);
+  return Uint8Array.of(intent);
+}
+
+/**
+ * Force Sensor Flush (0xF0, SH-2 §6.5.6): flush `sensorId`'s batched data
+ * now. The hub answers with Flush Completed (0xEF) — on the input channel, as
+ * the lab BNO086 does (SH-2 3.12.6, 2026-10-22).
+ */
+export function buildForceFlush(sensorId: number): Uint8Array {
+  checkUint("sensor_id", sensorId, 8);
+  return Uint8Array.of(ControlReport.ForceSensorFlush, sensorId);
+}
+
 // ── FRS (flash record system) ────────────────────────────────────────────────
 
 /** FRS record IDs used by this SDK (SH-2 figure 28; metadata records). */
@@ -407,6 +443,10 @@ export enum FrsRecordId {
   MagnetometerOrientation = 0x2d4c,
   ArvrStabilizationRv = 0x3e2d,
   ArvrStabilizationGrv = 0x3e2e,
+  /** One 32-bit word; empty unless programmed. */
+  SerialNumber = 0x4b4b,
+  /** Free for the user, up to 64 words. */
+  UserRecord = 0x74b4,
   // Feature configuration records (SH-2 §5.1; write to tune detectors).
   SigMotionDetectConfig = 0xc274,
   ShakeDetectConfig = 0x7d7d,
@@ -440,6 +480,7 @@ export const METADATA_RECORDS: Record<number, number> = {
   0x28: 0xe322, // ARVR-stabilized RV
   0x29: 0xe323, // ARVR-stabilized game RV
   0x2a: 0xe324, // gyro-integrated RV
+  0x2b: 0xe325, // motion request (BNO086 only)
 };
 
 /** FRS Read Response status (low nibble of the len/status byte). */
@@ -474,9 +515,9 @@ export function buildFrsReadRequest(frsType: number, offsetWords = 0, blockWords
   const v = new DataView(out.buffer);
   v.setUint8(0, ControlReport.FrsReadRequest);
   v.setUint8(1, 0);
-  v.setUint16(2, offsetWords, true);
-  v.setUint16(4, frsType, true);
-  v.setUint16(6, blockWords, true);
+  v.setUint16(2, checkUint("offsetWords", offsetWords, 16), true);
+  v.setUint16(4, checkUint("frsType", frsType, 16), true);
+  v.setUint16(6, checkUint("blockWords", blockWords, 16), true);
   return out;
 }
 
@@ -515,8 +556,8 @@ export function buildFrsWriteRequest(frsType: number, lengthWords: number): Uint
   const v = new DataView(out.buffer);
   v.setUint8(0, ControlReport.FrsWriteRequest);
   v.setUint8(1, 0);
-  v.setUint16(2, lengthWords, true);
-  v.setUint16(4, frsType, true);
+  v.setUint16(2, checkUint("lengthWords", lengthWords, 16), true);
+  v.setUint16(4, checkUint("frsType", frsType, 16), true);
   return out;
 }
 
@@ -529,9 +570,9 @@ export function buildFrsWriteData(offsetWords: number, words: number[]): Uint8Ar
   const v = new DataView(out.buffer);
   v.setUint8(0, ControlReport.FrsWriteData);
   v.setUint8(1, 0);
-  v.setUint16(2, offsetWords, true);
-  v.setUint32(4, words[0]! >>> 0, true);
-  v.setUint32(8, (words[1] ?? 0) >>> 0, true);
+  v.setUint16(2, checkUint("offsetWords", offsetWords, 16), true);
+  v.setUint32(4, checkUint("words[0]", words[0]!, 32), true);
+  v.setUint32(8, checkUint("words[1]", words[1] ?? 0, 32), true);
   return out;
 }
 

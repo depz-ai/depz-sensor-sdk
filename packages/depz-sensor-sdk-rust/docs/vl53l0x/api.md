@@ -14,10 +14,3702 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L0X (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`pack_set_addr_width`](#pack_set_addr_width), [`pack_start_stream`](#pack_start_stream), [`Vl53lxInfo`](#vl53lxinfo), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`DieVariant`](#dievariant), [`ShortBlock`](#shortblock), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw), [`DriverKind`](#driverkind), [`DRIVER_KINDS`](#driver_kinds), [`BusParams`](#busparams), [`Product`](#product), [`PRODUCTS`](#products), [`product`](#product), [`product_from_board_name`](#product_from_board_name), [`Vl53lxClass`](#vl53lxclass), [`resolve_product`](#resolve_product), [`resolve_class`](#resolve_class)
+- **VL53L0X (ToF)**: [`PLOTTABLE_STATUSES`](#plottable_statuses), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lxProductInfo`](#vl53lxproductinfo), [`Vl53lxDevice`](#vl53lxdevice), [`Vl53l0xDevice`](#vl53l0xdevice), [`Vl53l1cxDevice`](#vl53l1cxdevice), [`Vl53l1cbDevice`](#vl53l1cbdevice), [`Vl53l3cxDevice`](#vl53l3cxdevice), [`Vl53l4cxDevice`](#vl53l4cxdevice), [`BareDriver`](#baredriver), [`HistConfig`](#histconfig), [`HistPostProcessConfig`](#histpostprocessconfig), [`HistogramBinData`](#histogrambindata), [`BareDeviceState`](#baredevicestate), [`LlState`](#llstate), [`RangeData`](#rangedata), [`RangeResults`](#rangeresults), [`MAX_BIN_SEQUENCE_LENGTH`](#max_bin_sequence_length), [`MAX_BIN_SEQUENCE_CODE`](#max_bin_sequence_code), [`MAX_PULSES`](#max_pulses), [`MAX_RANGE_RESULTS`](#max_range_results), [`MAX_ALLOWED_PHASE`](#max_allowed_phase), [`SPAD_TOTAL_COUNT_MAX`](#spad_total_count_max), [`SPAD_TOTAL_COUNT_RES_THRES`](#spad_total_count_res_thres), [`SPEED_OF_LIGHT_IN_AIR_DIV8`](#speed_of_light_in_air_div8), [`SIGMA_INVALID`](#sigma_invalid), [`DEVICE_ERROR_NO_UPDATE`](#device_error_no_update), [`DEVICE_ERROR_RANGE_PHASE_CHECK`](#device_error_range_phase_check), [`DEVICE_ERROR_SIGMA_THRESHOLD_CHECK`](#device_error_sigma_threshold_check), [`DEVICE_ERROR_PHASE_CONSISTENCY`](#device_error_phase_consistency), [`DEVICE_ERROR_RANGE_COMPLETE`](#device_error_range_complete), [`DEVICE_ERROR_RANGE_COMPLETE_NO_WRAP_CHECK`](#device_error_range_complete_no_wrap_check), [`DEVICE_ERROR_EVENT_CONSISTENCY`](#device_error_event_consistency), [`DEVICE_ERROR_RANGE_COMPLETE_MERGED_PULSE`](#device_error_range_complete_merged_pulse), [`DEVICE_ERROR_PREV_RANGE_NO_TARGETS`](#device_error_prev_range_no_targets), [`HIST_TARGET_ORDER_STRONGEST_FIRST`](#hist_target_order_strongest_first), [`HIST_TARGET_ORDER_CLOSEST_FIRST`](#hist_target_order_closest_first), [`RANGE_STATUS_RANGE_VALID`](#range_status_range_valid), [`RANGE_STATUS_SIGMA_FAIL`](#range_status_sigma_fail), [`RANGE_STATUS_OUT_OF_BOUNDS_FAIL`](#range_status_out_of_bounds_fail), [`RANGE_STATUS_RANGE_VALID_NO_WRAP_CHECK`](#range_status_range_valid_no_wrap_check), [`RANGE_STATUS_WRAP_TARGET_FAIL`](#range_status_wrap_target_fail), [`RANGE_STATUS_RANGE_VALID_MERGED_PULSE`](#range_status_range_valid_merged_pulse), [`RANGE_STATUS_TARGET_PRESENT_LACK_OF_SIGNAL`](#range_status_target_present_lack_of_signal), [`RANGE_STATUS_NONE`](#range_status_none), [`status_name`](#status_name), [`PrevTarget`](#prevtarget), [`py_mod`](#py_mod), [`isqrt`](#isqrt), [`calc_pll_period_mm`](#calc_pll_period_mm), [`rate_maths`](#rate_maths), [`rate_per_spad_maths`](#rate_per_spad_maths), [`events_per_spad_maths`](#events_per_spad_maths), [`range_maths`](#range_maths), [`average_repeated_bins`](#average_repeated_bins), [`calc_zero_distance_phase`](#calc_zero_distance_phase), [`estimate_ambient_from_thresholded_bins`](#estimate_ambient_from_thresholded_bins), [`estimate_ambient_from_ambient_bins`](#estimate_ambient_from_ambient_bins), [`remove_ambient_bins`](#remove_ambient_bins), [`process_data`](#process_data), [`process_data_merged`](#process_data_merged), [`events_consistency_check`](#events_consistency_check), [`merged_pulse_check`](#merged_pulse_check), [`convert_status`](#convert_status), [`to_range`](#to_range), [`Vl53lxHistogramDriver`](#vl53lxhistogramdriver), [`FrameHistory`](#framehistory), [`RegField`](#regfield), [`RegBlockDef`](#regblockdef), [`block_def`](#block_def), [`tuning_default`](#tuning_default), [`header_default`](#header_default), [`RegBlock`](#regblock), [`RANGE_START_BLOCKS`](#range_start_blocks), [`DeviceImage`](#deviceimage), [`encode_row_col`](#encode_row_col), [`decode_row_col`](#decode_row_col), [`decode_zone_size`](#decode_zone_size), [`encode_zone_size`](#encode_zone_size), [`decode_zone_limits`](#decode_zone_limits), [`is_aperture_location`](#is_aperture_location), [`calc_mm_effective_spads`](#calc_mm_effective_spads), [`combine_mm1_mm2_offsets`](#combine_mm1_mm2_offsets), [`rtn_good_spads`](#rtn_good_spads), [`calc_pll_period_us`](#calc_pll_period_us), [`decode_vcsel_period`](#decode_vcsel_period), [`calc_macro_period_us`](#calc_macro_period_us), [`calc_timeout_mclks`](#calc_timeout_mclks), [`encode_timeout`](#encode_timeout), [`decode_timeout`](#decode_timeout), [`calc_encoded_timeout`](#calc_encoded_timeout), [`duration_maths`](#duration_maths), [`calc_timeout_register_values`](#calc_timeout_register_values), [`OpticalCentre`](#opticalcentre), [`CalPeakRateMap`](#calpeakratemap), [`AdditionalOffsetCalData`](#additionaloffsetcaldata), [`FmtRangeData`](#fmtrangedata), [`FMT_OPTICAL_CENTRE`](#fmt_optical_centre), [`FMT_CAL_PEAK_RATE_MAP`](#fmt_cal_peak_rate_map), [`FMT_ADDITIONAL_OFFSET_CAL`](#fmt_additional_offset_cal), [`FMT_RANGE_RESULTS_140MM_DARK`](#fmt_range_results_140mm_dark), [`read_region`](#read_region), [`read_optical_centre`](#read_optical_centre), [`read_cal_peak_rate_map`](#read_cal_peak_rate_map), [`read_additional_offset_cal_data`](#read_additional_offset_cal_data), [`read_fmt_range_results`](#read_fmt_range_results), [`POWER_MANAGEMENT_GO1_POWER_FORCE`](#power_management_go1_power_force), [`FIRMWARE_ENABLE`](#firmware_enable), [`RESULT_OSC_CALIBRATE_VAL`](#result_osc_calibrate_val), [`PATCH_CTRL`](#patch_ctrl), [`PATCH_JMP_ENABLES`](#patch_jmp_enables), [`PATCH_DATA_ENABLES`](#patch_data_enables), [`PATCH_OFFSET_0`](#patch_offset_0), [`PATCH_ADDRESS_0`](#patch_address_0), [`HISTOGRAM_BIN_DATA_I2C_INDEX`](#histogram_bin_data_i2c_index), [`RESULT_HISTOGRAM_BIN_0_2`](#result_histogram_bin_0_2), [`RESULT_HISTOGRAM_BIN_23_0`](#result_histogram_bin_23_0), [`PHASECAL_RESULT_REFERENCE_PHASE`](#phasecal_result_reference_phase), [`PHASECAL_RESULT_VCSEL_START`](#phasecal_result_vcsel_start), [`RESULT_HISTOGRAM_BIN_23_0_MSB`](#result_histogram_bin_23_0_msb), [`RESULT_HISTOGRAM_BIN_23_0_LSB`](#result_histogram_bin_23_0_lsb), [`HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES`](#histogram_bin_data_i2c_size_bytes), [`DEVICE_MEASUREMENT_MODE_BACK_TO_BACK`](#device_measurement_mode_back_to_back), [`DEVICE_MEASUREMENT_MODE_ABORT`](#device_measurement_mode_abort), [`DEVICE_MEASUREMENT_MODE_STOP_MASK`](#device_measurement_mode_stop_mask), [`DEVICE_MEASUREMENT_MODE_MODE_MASK`](#device_measurement_mode_mode_mask), [`DEVICE_SCHEDULER_MODE_STREAMING`](#device_scheduler_mode_streaming), [`DEVICE_SCHEDULER_MODE_HISTOGRAM`](#device_scheduler_mode_histogram), [`DEVICE_READOUT_MODE_SINGLE_SD`](#device_readout_mode_single_sd), [`DEVICE_READOUT_MODE_DUAL_SD`](#device_readout_mode_dual_sd), [`GROUPED_PARAMETER_HOLD_ID_MASK`](#grouped_parameter_hold_id_mask), [`INTERRUPT_CONFIG_NEW_SAMPLE_READY`](#interrupt_config_new_sample_ready), [`CLEAR_RANGE_INT`](#clear_range_int), [`RANGE_STATUS_MASK`](#range_status_mask), [`DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW`](#device_interrupt_polarity_active_low), [`DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS`](#device_gpio_mode_output_range_and_error_interrupts), [`DEVICE_DSS_MODE_TARGET_RATE`](#device_dss_mode_target_rate), [`SEQUENCE_VHV_EN`](#sequence_vhv_en), [`SEQUENCE_PHASECAL_EN`](#sequence_phasecal_en), [`SEQUENCE_DSS1_EN`](#sequence_dss1_en), [`SEQUENCE_DSS2_EN`](#sequence_dss2_en), [`SEQUENCE_MM1_EN`](#sequence_mm1_en), [`SEQUENCE_MM2_EN`](#sequence_mm2_en), [`SEQUENCE_RANGE_EN`](#sequence_range_en), [`SPAD_ARRAY_WIDTH`](#spad_array_width), [`SPAD_ARRAY_HEIGHT`](#spad_array_height), [`RTN_SPAD_APERTURE_TRANSMISSION`](#rtn_spad_aperture_transmission), [`RTN_SPAD_UNITY_TRANSMISSION`](#rtn_spad_unity_transmission), [`AMBIENT_WINDOW_VCSEL_PERIODS`](#ambient_window_vcsel_periods), [`RANGING_WINDOW_VCSEL_PERIODS`](#ranging_window_vcsel_periods), [`MACRO_PERIOD_VCSEL_PERIODS`](#macro_period_vcsel_periods), [`HISTOGRAM_BUFFER_SIZE`](#histogram_buffer_size), [`DISTANCE_MODES`](#distance_modes), [`L4_DISTANCE_MODES`](#l4_distance_modes), [`TIMING_GUARD_US`](#timing_guard_us), [`TIMING_DIVISOR`](#timing_divisor), [`FDA_MAX_TIMING_BUDGET_US`](#fda_max_timing_budget_us), [`L4_FDA_MAX_TIMING_BUDGET_US`](#l4_fda_max_timing_budget_us), [`BLOCKS`](#blocks), [`TUNING`](#tuning), [`DEFAULTS`](#defaults), [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`pack_set_addr_width`](#pack_set_addr_width), [`pack_start_stream`](#pack_start_stream), [`Vl53lxInfo`](#vl53lxinfo), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`DieVariant`](#dievariant), [`ShortBlock`](#shortblock), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw), [`Vl53lxPlatform`](#vl53lxplatform), [`Vl53lxTarget`](#vl53lxtarget), [`ExtraValue`](#extravalue), [`Vl53lxRange`](#vl53lxrange), [`Thresholds`](#thresholds), [`BinData`](#bindata), [`Vl53lxDriver`](#vl53lxdriver), [`DriverKind`](#driverkind), [`DRIVER_KINDS`](#driver_kinds), [`BusParams`](#busparams), [`Product`](#product), [`PRODUCTS`](#products), [`product`](#product), [`product_from_board_name`](#product_from_board_name), [`Vl53lxClass`](#vl53lxclass), [`resolve_product`](#resolve_product), [`resolve_class`](#resolve_class), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE_DEVICE_ADDRESS`](#i2c_slave_device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config_timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX_CTRL`](#gpio_hv_mux_ctrl), [`GPIO_TIO_HV_STATUS`](#gpio_tio_hv_status), [`SYSTEM_INTERRUPT_CONFIG_GPIO`](#system_interrupt_config_gpio), [`PHASECAL_CONFIG_TIMEOUT_MACROP`](#phasecal_config_timeout_macrop), [`RANGE_CONFIG_TIMEOUT_MACROP_A_HI`](#range_config_timeout_macrop_a_hi), [`RANGE_CONFIG_VCSEL_PERIOD_A`](#range_config_vcsel_period_a), [`RANGE_CONFIG_TIMEOUT_MACROP_B_HI`](#range_config_timeout_macrop_b_hi), [`RANGE_CONFIG_VCSEL_PERIOD_B`](#range_config_vcsel_period_b), [`RANGE_CONFIG_SIGMA_THRESH`](#range_config_sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`RANGE_CONFIG_VALID_PHASE_HIGH`](#range_config_valid_phase_high), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SD_CONFIG_WOI_SD0`](#sd_config_woi_sd0), [`SD_CONFIG_INITIAL_PHASE_SD0`](#sd_config_initial_phase_sd0), [`ROI_CONFIG_USER_ROI_CENTRE_SPAD`](#roi_config_user_roi_centre_spad), [`ROI_CONFIG_USER_ROI_XY_SIZE`](#roi_config_user_roi_xy_size), [`SYSTEM_INTERRUPT_CLEAR`](#system_interrupt_clear), [`SYSTEM_MODE_START`](#system_mode_start), [`RESULT_RANGE_STATUS`](#result_range_status), [`RESULT_OSC_CALIBRATE_VAL`](#result_osc_calibrate_val), [`FIRMWARE_SYSTEM_STATUS`](#firmware_system_status), [`IDENTIFICATION_MODEL_ID`](#identification_model_id), [`ROI_CONFIG_MODE_ROI_CENTRE_SPAD`](#roi_config_mode_roi_centre_spad), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`DieConfig`](#dieconfig), [`phase_window_mm`](#phase_window_mm), [`status_text`](#status_text), [`Die`](#die), [`MODEL_ID_VL53L0X`](#model_id_vl53l0x), [`RefCalibration`](#refcalibration), [`RefSpads`](#refspads), [`isqrt`](#isqrt), [`Vl53l0xUldDriver`](#vl53l0xulddriver), [`Vl53l1UldDriver`](#vl53l1ulddriver), [`Vl53l4UldDriver`](#vl53l4ulddriver), [`Vl53l3UlpDriver`](#vl53l3ulpdriver), [`DriverCtor`](#driverctor), [`HIST_CAVEAT`](#hist_caveat), [`driver_kinds`](#driver_kinds), [`create_driver`](#create_driver)
 - **Contract-10 codecs (re-exported from `vl53l4`)**: [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`StreamData`](#streamdata), [`i2c_error_name`](#i2c_error_name), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
 
 ## VL53L0X (ToF)
+
+### PLOTTABLE_STATUSES
+
+```rust
+pub const PLOTTABLE_STATUSES: [i32; 3] = [0, 6, 11];
+```
+
+Statuses that mean "this distance is real": a histogram product reports 6 on the first frame of a
+stream and 11 for two merged targets. Prefer [`Vl53lxMeasurement::plottable`] over
+[`Vl53lxMeasurement::valid`] there.
+
+### Vl53lxMeasurement
+
+```rust
+pub struct Vl53lxMeasurement {
+    pub timestamp_us: u64,
+    pub distance_mm: i32,
+    pub status: i32,
+    pub status_text: String,
+    pub signal_kcps: f64,
+    pub ambient_kcps: f64,
+    pub sigma_mm: f64,
+    pub spads: f64,
+    pub targets: Vec<Vl53lxTarget>,
+    pub extra: BTreeMap<String, ExtraValue>,
+    pub bins: Option<Arc<HistogramBinData>>,
+}
+```
+
+One ranging result of the 1D family, the same shape for every product. On the histogram driver
+`targets` holds every return, strongest first, the top level repeats the first and `bins` carries
+the raw 24-bin histogram; the light drivers leave both empty.
+
+#### Vl53lxMeasurement::valid
+
+```rust
+pub fn valid(&self) -> bool
+```
+
+#### Vl53lxMeasurement::plottable
+
+```rust
+pub fn plottable(&self) -> bool
+```
+
+#### Vl53lxMeasurement::plot_distances
+
+```rust
+pub fn plot_distances(&self) -> Vec<i32>
+```
+
+The distances a chart draws: the plottable targets in driver order, or the single distance.
+
+#### Vl53lxMeasurement::primary_target
+
+```rust
+pub fn primary_target(&self) -> Option<&Vl53lxTarget>
+```
+
+The one target a single-number readout shows, or `None`.
+
+### Vl53lxProductInfo
+
+```rust
+pub struct Vl53lxProductInfo {
+    /// The board's device name.
+    pub board: String,
+    /// The product the device name carries, or `None` on an unstamped board.
+    pub detected: Option<&'static str>,
+    /// The product [`Vl53lxDevice::init`] bound.
+    pub product: &'static str,
+    pub driver: &'static str,
+    /// The driver's own name ("Vl53l1UldDriver", …).
+    pub driver_class: &'static str,
+    /// The driver kinds the bound product has.
+    pub kinds: Vec<&'static str>,
+    pub model_id: u16,
+    /// A cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+    pub model_id_ok: bool,
+    pub supports: Vec<&'static str>,
+    pub modes: Vec<&'static str>,
+    /// The board's rated reach, mm.
+    pub reach_mm: Option<u32>,
+    /// How far the loaded configuration can measure, mm.
+    pub driver_reach_mm: Option<i32>,
+    pub budget_ms: (u32, u32),
+    pub budget_choices: Vec<u32>,
+    pub histogram: bool,
+    pub max_khz: u16,
+    pub caveat: Option<&'static str>,
+}
+```
+
+Everything about what is connected ([`Vl53lxDevice::identify_product`]).
+
+### Vl53lxDevice
+
+```rust
+pub struct Vl53lxDevice {
+    dev: DepzDevice,
+    fixed_product: Option<&'static str>,
+    streams: Arc<Streams>,
+    platform: Arc<BridgePlatform>,
+    bound: Arc<Mutex<Option<Bound>>>,
+    board_name: Mutex<Option<String>>,
+    ranging: AtomicBool,
+}
+```
+
+A board of the VL53L 1D family on the `APP_VL53L0_4` register bridge (contract 12): VL53L0X,
+VL53L1CX, VL53L1CB, VL53L3CX, VL53L4CD, VL53L4CX. Every ULD runs here; two axes pick how a board
+is driven — the product (whose parameter set: the board's own, or a sibling's to borrow its
+driver) and the driver kind (`uld`, `ulp`, `histogram`). [`Vl53lxDevice::init`] binds the pair,
+[`Vl53lxDevice::configure`] re-initialises and applies a ranging configuration (before every
+run), then [`Vl53lxDevice::start_ranging`] and read [`Vl53lxDevice::measurements`]. Ask
+[`Vl53lxDevice::supports`] before an optional group; a missing one fails with
+[`DepzError::Unsupported`]. This generic class reads the product from the board's name; the
+per-product classes ([`Vl53l0xDevice`], …) fix it. Configuration while ranging fails with
+[`DepzError::InvalidState`] — the stream owns the bus.
+
+#### Vl53lxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53lxDevice
+```
+
+Continue the open connection `dev` as a 1D-family board; the product comes from its name.
+
+#### Vl53lxDevice::board_name
+
+```rust
+pub fn board_name(&self) -> Result<String>
+```
+
+The board's device name, e.g. `DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523` (asked once).
+
+#### Vl53lxDevice::detected
+
+```rust
+pub fn detected(&self) -> Result<Option<&'static str>>
+```
+
+The product the device name carries, or `None` on an unstamped board.
+
+#### Vl53lxDevice::product
+
+```rust
+pub fn product(&self) -> Option<&'static str>
+```
+
+The product [`Vl53lxDevice::init`] bound (`None` before).
+
+#### Vl53lxDevice::driver_kind
+
+```rust
+pub fn driver_kind(&self) -> Option<&'static str>
+```
+
+#### Vl53lxDevice::caveat
+
+```rust
+pub fn caveat(&self) -> Option<&'static str>
+```
+
+#### Vl53lxDevice::with_driver
+
+```rust
+pub fn with_driver<R>(&self, f: impl FnOnce(&mut dyn Vl53lxDriver) -> Result<R>) -> Result<R>
+```
+
+The ULD port in use — escape hatch for product-specific calls: `f` runs with the driver (do
+not call this device's driver-backed methods from `f`: the driver is held).
+[`DepzError::InvalidState`] before [`Vl53lxDevice::init`].
+
+#### Vl53lxDevice::initialized
+
+```rust
+pub fn initialized(&self) -> bool
+```
+
+#### Vl53lxDevice::ranging
+
+```rust
+pub fn ranging(&self) -> bool
+```
+
+#### Vl53lxDevice::driver_kinds
+
+```rust
+pub fn driver_kinds(&self, product: Option<&str>) -> Result<Vec<&'static str>>
+```
+
+The driver kinds a product has (`None`: this board's; empty when it carries no product).
+
+#### Vl53lxDevice::init
+
+```rust
+pub fn init(&self, driver: Option<&str>, product: Option<&str>) -> Result<()>
+```
+
+Bind the (product, driver kind) pair and initialise the sensor. `product` `None`: this
+class's, else the board name's; `driver` `None`: the product's first kind. A pair the table
+lacks fails with [`DepzError::Unsupported`] naming what the product has.
+
+#### Vl53lxDevice::identify_product
+
+```rust
+pub fn identify_product(&self) -> Result<Vl53lxProductInfo>
+```
+
+Everything about what is connected (needs [`Vl53lxDevice::init`]).
+
+#### Vl53lxDevice::notes
+
+```rust
+pub fn notes(&self) -> Result<Vec<String>>
+```
+
+The lines a UI shows about the chosen pair: a product named by hand, a borrowed driver, a pair
+that reaches less than the board is rated for, the driver's caveat.
+
+#### Vl53lxDevice::supports
+
+```rust
+pub fn supports(&self, group: &str) -> Result<bool>
+```
+
+Whether this product / driver serves an optional group.
+
+#### Vl53lxDevice::modes
+
+```rust
+pub fn modes(&self) -> Result<Vec<&'static str>>
+```
+
+Named ranging modes, the first being what init leaves; empty if none.
+
+#### Vl53lxDevice::budget_range
+
+```rust
+pub fn budget_range(&self) -> Result<(u32, u32)>
+```
+
+The (min, max) budget the driver offers, ms.
+
+#### Vl53lxDevice::driver_reach_mm
+
+```rust
+pub fn driver_reach_mm(&self) -> Result<Option<i32>>
+```
+
+How far the loaded configuration can measure, mm, or `None`.
+
+#### Vl53lxDevice::xshut
+
+```rust
+pub fn xshut(&self, action: u8) -> Result<()>
+```
+
+Drive XSHUT: off (0) / on (1) / reset (2). Off and reset stop the stream; the sensor then holds
+none of the configuration — [`Vl53lxDevice::init`] again.
+
+#### Vl53lxDevice::bridge_info
+
+```rust
+pub fn bridge_info(&self) -> Result<Vl53lxInfo>
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; safe while streaming.
+
+#### Vl53lxDevice::configure
+
+```rust
+pub fn configure(
+    &self,
+    budget_ms: u32,
+    inter_ms: u32,
+    mode: Option<&str>,
+    offset_mm: Option<i32>,
+    xtalk_kcps: Option<i32>,
+    signal_kcps: Option<u32>,
+) -> Result<()>
+```
+
+Re-initialise the sensor and apply a ranging configuration. The re-init is deliberate: it is
+the only way to know what the configuration registers hold. `mode` goes on before the budget;
+`offset_mm` / `xtalk_kcps` re-apply a stored calibration; `signal_kcps` replaces the blob's
+signal threshold (each `None`: leave it). `inter_ms` 0 = continuous. An unsupported group is
+refused before the re-init.
+
+#### Vl53lxDevice::get_range_timing
+
+```rust
+pub fn get_range_timing(&self) -> Result<(u32, u32)>
+```
+
+(timing budget ms, inter-measurement ms) read back from the sensor; 0 = continuous.
+
+#### Vl53lxDevice::get_mode
+
+```rust
+pub fn get_mode(&self) -> Result<Option<String>>
+```
+
+The mode in use, or `None` on a product without modes.
+
+#### Vl53lxDevice::budget_choices
+
+```rust
+pub fn budget_choices(&self) -> Result<Vec<u32>>
+```
+
+The only budgets accepted right now, or empty when any in [`Vl53lxDevice::budget_range`] will do.
+
+#### Vl53lxDevice::snap_budget
+
+```rust
+pub fn snap_budget(&self, budget_ms: u32) -> Result<u32>
+```
+
+The nearest budget this product accepts.
+
+#### Vl53lxDevice::get_offset_mm
+
+```rust
+pub fn get_offset_mm(&self) -> Result<i32>
+```
+
+#### Vl53lxDevice::set_offset_mm
+
+```rust
+pub fn set_offset_mm(&self, offset_mm: i32) -> Result<()>
+```
+
+#### Vl53lxDevice::get_xtalk_kcps
+
+```rust
+pub fn get_xtalk_kcps(&self) -> Result<i32>
+```
+
+#### Vl53lxDevice::set_xtalk_kcps
+
+```rust
+pub fn set_xtalk_kcps(&self, xtalk_kcps: i32) -> Result<()>
+```
+
+#### Vl53lxDevice::calibrate_offset
+
+```rust
+pub fn calibrate_offset(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32>
+```
+
+Offset calibration against a flat target; returns the offset programmed (store it on the host).
+`nb_samples` `None`: the driver's default.
+
+#### Vl53lxDevice::calibrate_xtalk
+
+```rust
+pub fn calibrate_xtalk(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32>
+```
+
+Crosstalk calibration; returns the xtalk programmed, kcps (store it on the host).
+
+#### Vl53lxDevice::get_detection_thresholds
+
+```rust
+pub fn get_detection_thresholds(&self) -> Result<Thresholds>
+```
+
+#### Vl53lxDevice::set_detection_thresholds
+
+```rust
+pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+```
+
+The distance-window interrupt; stays armed until the next init / configure.
+
+#### Vl53lxDevice::get_signal_threshold_kcps
+
+```rust
+pub fn get_signal_threshold_kcps(&self) -> Result<u32>
+```
+
+#### Vl53lxDevice::set_signal_threshold_kcps
+
+```rust
+pub fn set_signal_threshold_kcps(&self, signal_kcps: u32) -> Result<()>
+```
+
+#### Vl53lxDevice::get_sigma_threshold_mm
+
+```rust
+pub fn get_sigma_threshold_mm(&self) -> Result<u32>
+```
+
+#### Vl53lxDevice::set_sigma_threshold_mm
+
+```rust
+pub fn set_sigma_threshold_mm(&self, sigma_mm: u32) -> Result<()>
+```
+
+#### Vl53lxDevice::get_roi
+
+```rust
+pub fn get_roi(&self) -> Result<(u8, u8)>
+```
+
+(x, y) SPADs.
+
+#### Vl53lxDevice::set_roi
+
+```rust
+pub fn set_roi(&self, x: u8, y: u8) -> Result<()>
+```
+
+#### Vl53lxDevice::get_roi_center
+
+```rust
+pub fn get_roi_center(&self) -> Result<u8>
+```
+
+#### Vl53lxDevice::set_roi_center
+
+```rust
+pub fn set_roi_center(&self, center_spad: u8) -> Result<()>
+```
+
+#### Vl53lxDevice::start_temperature_update
+
+```rust
+pub fn start_temperature_update(&self) -> Result<()>
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53lxDevice::perform_ref_spad_management
+
+```rust
+pub fn perform_ref_spad_management(&self) -> Result<(u32, bool)>
+```
+
+VL53L0X: re-measure the reference SPADs → (count, is_aperture).
+
+#### Vl53lxDevice::start_ranging
+
+```rust
+pub fn start_ranging(&self) -> Result<()>
+```
+
+Start the sensor and arm the board's stream: one report per INT edge, followed on the MCU by
+the driver's interrupt-release writes.
+
+#### Vl53lxDevice::stop_ranging
+
+```rust
+pub fn stop_ranging(&self) -> Result<()>
+```
+
+#### Vl53lxDevice::measure_once
+
+```rust
+pub fn measure_once(&self, timeout: Option<Duration>) -> Result<Vl53lxMeasurement>
+```
+
+One polled measurement: start, data ready, read, release the interrupt, stop. Not while
+streaming. `timeout` `None`: 1 s.
+
+#### Vl53lxDevice::on_measurement
+
+```rust
+pub fn on_measurement(&self, callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every streamed measurement (reader thread, or the thread of a call that
+held the driver while the frame came in).
+
+#### Vl53lxDevice::measurements
+
+```rust
+pub fn measurements(&self, capacity: usize) -> Subscription<Vl53lxMeasurement>
+```
+
+A pull queue of streamed measurements (bounded, drop-oldest).
+
+#### Vl53lxDevice::get_measurement
+
+```rust
+pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Vl53lxMeasurement>
+```
+
+The next streamed measurement (contract 07 §3); `timeout` `None`: 2 s.
+
+#### Vl53lxDevice::stream_parse_errors
+
+```rust
+pub fn stream_parse_errors(&self) -> u64
+```
+
+Stream reports dropped because the driver did not decode them.
+
+#### Vl53lxDevice::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
+
+### Vl53l0xDevice
+
+```rust
+pub struct Vl53l0xDevice(Vl53lxDevice);
+```
+
+VL53L0X (2 m, 1-byte register addresses, 400 kHz): ULD API 1.0.4 with ranging profiles.
+
+#### Vl53l0xDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l0xDevice
+```
+
+Continue the open connection `dev` as a VL53L0X.
+
+#### Vl53l0xDevice::into_inner
+
+```rust
+pub fn into_inner(self) -> Vl53lxDevice
+```
+
+The family class underneath (the product stays fixed).
+
+### Vl53l1cxDevice
+
+```rust
+pub struct Vl53l1cxDevice(Vl53lxDevice);
+```
+
+VL53L1CX (4 m): the VL53L1X ULD (short / long) or the histogram driver.
+
+#### Vl53l1cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l1cxDevice
+```
+
+Continue the open connection `dev` as a VL53L1CX.
+
+#### Vl53l1cxDevice::into_inner
+
+```rust
+pub fn into_inner(self) -> Vl53lxDevice
+```
+
+The family class underneath (the product stays fixed).
+
+### Vl53l1cbDevice
+
+```rust
+pub struct Vl53l1cbDevice(Vl53lxDevice);
+```
+
+VL53L1CB (8 m, cover-glass module): the VL53L1CX die and drivers; usually needs a crosstalk
+calibration.
+
+#### Vl53l1cbDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l1cbDevice
+```
+
+Continue the open connection `dev` as a VL53L1CB.
+
+#### Vl53l1cbDevice::into_inner
+
+```rust
+pub fn into_inner(self) -> Vl53lxDevice
+```
+
+The family class underneath (the product stays fixed).
+
+### Vl53l3cxDevice
+
+```rust
+pub struct Vl53l3cxDevice(Vl53lxDevice);
+```
+
+VL53L3CX (3 m): ST's ULP driver (single target) or the histogram driver (several per frame).
+
+#### Vl53l3cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l3cxDevice
+```
+
+Continue the open connection `dev` as a VL53L3CX.
+
+#### Vl53l3cxDevice::into_inner
+
+```rust
+pub fn into_inner(self) -> Vl53lxDevice
+```
+
+The family class underneath (the product stays fixed).
+
+### Vl53l4cxDevice
+
+```rust
+pub struct Vl53l4cxDevice(Vl53lxDevice);
+```
+
+VL53L4CX (6 m): the histogram driver only — to run it light, borrow a sibling's with
+`init(Some("uld"), Some("VL53L4CD"))`.
+
+#### Vl53l4cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l4cxDevice
+```
+
+Continue the open connection `dev` as a VL53L4CX.
+
+#### Vl53l4cxDevice::into_inner
+
+```rust
+pub fn into_inner(self) -> Vl53lxDevice
+```
+
+The family class underneath (the product stays fixed).
+
+### BareDriver
+
+```rust
+pub struct BareDriver {
+    p: Arc<dyn Vl53lxPlatform>,
+    img: DeviceImage,
+    tuning: BTreeMap<&'static str, i64>,
+    hist_cfg: HistConfig,
+    hpp: HistPostProcessConfig,
+    state: LlState,
+
+    // Carried from frame to frame: the C driver keeps one bin_data struct and reads last frame's ambient
+    // out of it when it picks the bin sequence, before this frame's ambient is estimated.
+    ambient_events_sum: i64,
+
+    // Factory data with no register of its own (read_p2p_data).
+    rtn_good_spads_map: [u8; 32],
+    optical_centre: Option<OpticalCentre>,
+    cal_peak_rate_map: Option<CalPeakRateMap>,
+    add_off_cal_data: Option<AdditionalOffsetCalData>,
+    fmt_dmax_cal: Vec<(&'static str, i64)>,
+    mm_roi: Vec<(&'static str, i64)>,
+    result_osc_calibrate_val: i64,
+
+    preset_mode: &'static str,
+    phasecal_config_timeout_us: i64,
+    mm_config_timeout_us: i64,
+    range_config_timeout_us: i64,
+    inter_measurement_period_ms: i64,
+    measurement_mode: i64,
+}
+```
+
+ST's VL53LX BareDriver ranging path, on top of [`DeviceImage`]: `VL53LX_read_p2p_data()`, the
+histogram preset modes, `VL53LX_set_timeouts_us()`, `VL53LX_init_and_start_range()` and
+`VL53LX_get_histogram_bin_data()`. Nothing here writes a register on its own: the preset builders
+edit the host-side image and the whole span 0x0001..0x0087 goes out as one transfer when ranging
+starts.
+
+#### BareDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>) -> BareDriver
+```
+
+A driver over `platform`, nothing read yet.
+
+#### BareDriver::img
+
+```rust
+pub fn img(&self) -> &DeviceImage
+```
+
+The host-side register image.
+
+#### BareDriver::img_mut
+
+```rust
+pub fn img_mut(&mut self) -> &mut DeviceImage
+```
+
+The host-side register image, to edit.
+
+#### BareDriver::tuning
+
+```rust
+pub fn tuning(&self) -> &BTreeMap<&'static str, i64>
+```
+
+The tuning parameters, a mutable copy of [`TUNING`].
+
+#### BareDriver::tuning_mut
+
+```rust
+pub fn tuning_mut(&mut self) -> &mut BTreeMap<&'static str, i64>
+```
+
+The tuning parameters, to edit (takes effect at the next preset).
+
+#### BareDriver::hist_cfg
+
+```rust
+pub fn hist_cfg(&self) -> &HistConfig
+```
+
+The histogram (bin sequence) configuration.
+
+#### BareDriver::hpp
+
+```rust
+pub fn hpp(&self) -> &HistPostProcessConfig
+```
+
+The post-processing configuration.
+
+#### BareDriver::hpp_mut
+
+```rust
+pub fn hpp_mut(&mut self) -> &mut HistPostProcessConfig
+```
+
+The post-processing configuration, to edit.
+
+#### BareDriver::state
+
+```rust
+pub fn state(&self) -> &LlState
+```
+
+The ll-driver state machine.
+
+#### BareDriver::state_mut
+
+```rust
+pub fn state_mut(&mut self) -> &mut LlState
+```
+
+The ll-driver state machine, to step.
+
+#### BareDriver::rtn_good_spads_map
+
+```rust
+pub fn rtn_good_spads_map(&self) -> &[u8; 32]
+```
+
+The good return SPADs, one bit each.
+
+#### BareDriver::optical_centre
+
+```rust
+pub fn optical_centre(&self) -> Option<OpticalCentre>
+```
+
+The optical centre (after [`BareDriver::read_p2p_data`]).
+
+#### BareDriver::cal_peak_rate_map
+
+```rust
+pub fn cal_peak_rate_map(&self) -> Option<&CalPeakRateMap>
+```
+
+The calibration peak-rate map (after [`BareDriver::read_p2p_data`]).
+
+#### BareDriver::add_off_cal_data
+
+```rust
+pub fn add_off_cal_data(&self) -> Option<AdditionalOffsetCalData>
+```
+
+The mode-mitigation offset calibration, or ST's fallback (after [`BareDriver::read_p2p_data`]).
+
+#### BareDriver::fmt_dmax_cal
+
+```rust
+pub fn fmt_dmax_cal(&self) -> &[(&'static str, i64)]
+```
+
+The dmax calibration inputs, by the reference's key.
+
+#### BareDriver::mm_roi
+
+```rust
+pub fn mm_roi(&self) -> &[(&'static str, i64)]
+```
+
+The mode-mitigation ROI: x_centre, y_centre, width, height.
+
+#### BareDriver::result_osc_calibrate_val
+
+```rust
+pub fn result_osc_calibrate_val(&self) -> i64
+```
+
+`result__osc_calibrate_val`.
+
+#### BareDriver::preset_mode
+
+```rust
+pub fn preset_mode(&self) -> &'static str
+```
+
+The distance mode of the last preset.
+
+#### BareDriver::phasecal_config_timeout_us
+
+```rust
+pub fn phasecal_config_timeout_us(&self) -> i64
+```
+
+The phasecal timeout, µs.
+
+#### BareDriver::mm_config_timeout_us
+
+```rust
+pub fn mm_config_timeout_us(&self) -> i64
+```
+
+The MM timeout, µs.
+
+#### BareDriver::range_config_timeout_us
+
+```rust
+pub fn range_config_timeout_us(&self) -> i64
+```
+
+The range timeout, µs (how long one range actually runs).
+
+#### BareDriver::inter_measurement_period_ms
+
+```rust
+pub fn inter_measurement_period_ms(&self) -> i64
+```
+
+The inter-measurement period, ms.
+
+#### BareDriver::measurement_mode
+
+```rust
+pub fn measurement_mode(&self) -> i64
+```
+
+The measurement mode of the last start.
+
+#### BareDriver::read_p2p_data
+
+```rust
+pub fn read_p2p_data(&mut self) -> Result<()>
+```
+
+`VL53LX_read_p2p_data()`: three register blocks and four NVM regions (~0.1 s over USB).
+
+#### BareDriver::data_init
+
+```rust
+pub fn data_init(&mut self) -> Result<()>
+```
+
+`VL53LX_data_init` + `VL53LX_DataInit`: the factory data, the default preset mode and timing
+budget. Leaves the sensor untouched apart from the reads.
+
+#### BareDriver::set_preset_mode
+
+```rust
+pub fn set_preset_mode(&mut self, mode: &str) -> Result<()>
+```
+
+`VL53LX_set_preset_mode()` for the three histogram ranging modes, by distance mode.
+
+#### BareDriver::set_preset_mode_with
+
+```rust
+pub fn set_preset_mode_with(
+    &mut self,
+    mode: &str,
+    dss_target_mcps: Option<i64>,
+    inter_measurement_period_ms: Option<i64>,
+) -> Result<()>
+```
+
+`VL53LX_set_preset_mode()` for the three histogram ranging modes, by distance mode; a `None`
+DSS target or period keeps the tuning default / the current period.
+
+#### BareDriver::is_l4
+
+```rust
+pub fn is_l4(&self) -> bool
+```
+
+`IsL4()` of the L4CX BareDriver: the die, read from NVM, not the product name. 0xEC is the L4ED.
+
+#### BareDriver::distance_modes_for_die
+
+```rust
+pub fn distance_modes_for_die(&self) -> &'static [&'static str]
+```
+
+The distance modes this die offers.
+
+#### BareDriver::fda_max_timing_budget_us
+
+```rust
+pub fn fda_max_timing_budget_us(&self) -> i64
+```
+
+The budget ceiling of this die, µs.
+
+#### BareDriver::set_distance_mode
+
+```rust
+pub fn set_distance_mode(&mut self, mode: &str) -> Result<()>
+```
+
+`VL53LX_SetDistanceMode()`: the preset mode with the caller's timeouts put back. Short is
+refused on an L4 die, as the L4CX BareDriver does (the A frame of the pair ranges on the wrong
+side of the wrap).
+
+#### BareDriver::set_timeouts_us
+
+```rust
+pub fn set_timeouts_us(&mut self, phasecal_us: i64, mm_us: i64, range_us: i64) -> Result<()>
+```
+
+`VL53LX_set_timeouts_us()`: the three timeouts into the timing registers.
+
+#### BareDriver::set_inter_measurement_period_ms
+
+```rust
+pub fn set_inter_measurement_period_ms(&mut self, period_ms: i64) -> Result<()>
+```
+
+The period between two measurements, ms (0: back to back).
+
+#### BareDriver::set_measurement_timing_budget_us
+
+```rust
+pub fn set_measurement_timing_budget_us(&mut self, budget_us: i64) -> Result<()>
+```
+
+`VL53LX_SetMeasurementTimingBudgetMicroSeconds()`: the range timeout is one sixth of the budget
+after a fixed guard comes off.
+
+#### BareDriver::load_patch
+
+```rust
+pub fn load_patch(&mut self) -> Result<()>
+```
+
+`VL53LX_load_patch()`: a six-instruction phasecal patch, written with the firmware stopped.
+
+#### BareDriver::unload_patch
+
+```rust
+pub fn unload_patch(&mut self) -> Result<()>
+```
+
+`VL53LX_unload_patch()`.
+
+#### BareDriver::init_and_start_range
+
+```rust
+pub fn init_and_start_range(&mut self) -> Result<()>
+```
+
+`VL53LX_init_and_start_range()` with every block: write the whole configuration and start.
+
+#### BareDriver::init_and_start_range_blocks
+
+```rust
+pub fn init_and_start_range_blocks(&mut self, blocks: &[&str]) -> Result<()>
+```
+
+`VL53LX_init_and_start_range()`: write the configuration and start. `blocks` is ST's config
+level — all of them to start, general_config onwards to let the next frame run.
+
+#### BareDriver::clear_interrupt_and_start_next_range
+
+```rust
+pub fn clear_interrupt_and_start_next_range(&mut self) -> Result<()>
+```
+
+`VL53LX_clear_interrupt_and_enable_next_range()`: in histogram mode the interrupt is cleared by
+rewriting general_config onwards.
+
+#### BareDriver::stop_range
+
+```rust
+pub fn stop_range(&mut self) -> Result<()>
+```
+
+`VL53LX_stop_range()`.
+
+#### BareDriver::get_histogram_bin_data
+
+```rust
+pub fn get_histogram_bin_data(&mut self, raw: Option<&[u8]>) -> Result<HistogramBinData>
+```
+
+`VL53LX_get_histogram_bin_data()`: one frame, 83 bytes, decoded into bins plus the metadata the
+post-processing needs. `raw` is bytes that arrived some other way (a stream report); `None`
+reads them here.
+
+### HistConfig
+
+```rust
+pub struct HistConfig {
+    pub low_amb_even_bin_0_1: i64,
+    pub low_amb_even_bin_2_3: i64,
+    pub low_amb_even_bin_4_5: i64,
+    pub low_amb_odd_bin_0_1: i64,
+    pub low_amb_odd_bin_2_3: i64,
+    pub low_amb_odd_bin_4_5: i64,
+    pub mid_amb_even_bin_0_1: i64,
+    pub mid_amb_even_bin_2_3: i64,
+    pub mid_amb_even_bin_4_5: i64,
+    pub mid_amb_odd_bin_0_1: i64,
+    pub mid_amb_odd_bin_2: i64,
+    pub mid_amb_odd_bin_3_4: i64,
+    pub mid_amb_odd_bin_5: i64,
+    pub user_bin_offset: i64,
+    pub high_amb_even_bin_0_1: i64,
+    pub high_amb_even_bin_2_3: i64,
+    pub high_amb_even_bin_4_5: i64,
+    pub high_amb_odd_bin_0_1: i64,
+    pub high_amb_odd_bin_2_3: i64,
+    pub high_amb_odd_bin_4_5: i64,
+    pub amb_thresh_low: i64,
+    pub amb_thresh_high: i64,
+    pub spad_array_selection: i64,
+}
+```
+
+`VL53LX_histogram_config_t`. It has no registers of its own: the bin sequence is smuggled into
+static_config and timing_config fields that mean something else in lite mode
+([`HistConfig::copy_to_static_cfg`]).
+
+#### HistConfig::set_bin_sequence
+
+```rust
+pub fn set_bin_sequence(&mut self, even: &[i64; 6], odd: &[i64; 6])
+```
+
+`VL53LX_init_histogram_config_structure()`: six even and six odd bin codes, packed two to a
+byte, repeated across the three ambient levels.
+
+#### HistConfig::copy_to_static_cfg
+
+```rust
+pub fn copy_to_static_cfg(&self, img: &mut DeviceImage)
+```
+
+`VL53LX_copy_hist_cfg_to_static_cfg()`: lite-mode fields the firmware reads as the bin
+sequence.
+
+#### HistConfig::bin_sequence
+
+```rust
+pub fn bin_sequence(&self, stream_count: i64, ambient_events_sum: i64) -> [i64; 6]
+```
+
+`VL53LX_hist_get_bin_sequence_config()`: which sequence the device used for this frame, even
+or odd by the stream count.
+
+### HistPostProcessConfig
+
+```rust
+pub struct HistPostProcessConfig {
+    pub hist_algo_select: i64,
+    pub hist_target_order: i64,
+    pub filter_woi0: i64,
+    pub filter_woi1: i64,
+    pub hist_amb_est_method: i64,
+    pub ambient_thresh_sigma0: i64,
+    pub ambient_thresh_sigma1: i64,
+    pub ambient_thresh_events_scaler: i64,
+    pub min_ambient_thresh_events: i64,
+    pub noise_threshold: i64,
+    pub signal_total_events_limit: i64,
+    pub sigma_estimator_sigma_ref_mm: i64,
+    pub sigma_thresh: i64,
+    /// The MM1/MM2 offset, quarter millimetres.
+    pub range_offset_mm: i64,
+    pub gain_factor: i64,
+    pub valid_phase_low: i64,
+    pub valid_phase_high: i64,
+    pub consistency_phase_tolerance: i64,
+    pub consistency_event_sigma: i64,
+    pub consistency_event_min_spad_count: i64,
+    pub consistency_min_max_tolerance: i64,
+    pub crosstalk_compensation_enable: i64,
+    pub crosstalk_detect_min_valid_range_mm: i64,
+    pub crosstalk_detect_max_valid_range_mm: i64,
+    pub crosstalk_detect_max_valid_rate_kcps: i64,
+    pub crosstalk_detect_max_sigma_mm: i64,
+    pub crosstalk_detect_event_sigma: i64,
+    pub crosstalk_detect_min_max_tolerance: i64,
+    /// Filled in by `read_p2p_data()` from the customer NVM block.
+    pub crosstalk_compensation_plane_offset_kcps: i64,
+    pub crosstalk_compensation_x_plane_gradient_kcps: i64,
+    pub crosstalk_compensation_y_plane_gradient_kcps: i64,
+}
+```
+
+`VL53LX_hist_post_process_config_t`, as `VL53LX_init_hist_post_process_config_struct()` leaves
+it; the preset modes set the valid phase window here.
+
+### HistogramBinData
+
+```rust
+pub struct HistogramBinData {
+    /// `result__interrupt_status`.
+    pub result_interrupt_status: i64,
+    /// `result__range_status`.
+    pub result_range_status: i64,
+    /// `result__report_status`.
+    pub result_report_status: i64,
+    /// `result__stream_count`: the device's frame counter.
+    pub result_stream_count: i64,
+    /// `result__dss_actual_effective_spads`, 1/256 SPAD.
+    pub result_dss_actual_effective_spads: i64,
+    /// `phasecal_result__reference_phase`.
+    pub phasecal_result_reference_phase: i64,
+    /// `phasecal_result__vcsel_start`.
+    pub phasecal_result_vcsel_start: i64,
+    /// The photon counts (always [`regs::HISTOGRAM_BUFFER_SIZE`] long; `bins_in_data` are in use).
+    pub bin_data: Vec<i64>,
+    /// `zone_id`.
+    pub zone_id: i64,
+    /// `VL53LX_p_019`: the first bin.
+    pub first_bin: i64,
+    /// `VL53LX_p_020`: bins in the buffer.
+    pub number_of_bins: i64,
+    /// `VL53LX_p_021`: bins in use.
+    pub bins_in_data: i64,
+    /// `cal_config__vcsel_start`.
+    pub cal_config_vcsel_start: i64,
+    /// The VCSEL pulse width.
+    pub vcsel_width: i64,
+    /// `VL53LX_p_015`: the fast oscillator frequency.
+    pub fast_osc_frequency: i64,
+    /// `VL53LX_p_005`: the VCSEL period register value the frame ran at.
+    pub vcsel_period: i64,
+    /// The bin-sequence codes.
+    pub bin_seq: [i64; 6],
+    /// How often each code was sampled.
+    pub bin_rep: [i64; 6],
+    /// The smallest bin.
+    pub min_bin_value: i64,
+    /// The largest bin.
+    pub max_bin_value: i64,
+    /// Ambient-only bins at the front.
+    pub number_of_ambient_bins: i64,
+    /// Samples the ambient estimate is over.
+    pub number_of_ambient_samples: i64,
+    /// Their sum.
+    pub ambient_events_sum: i64,
+    /// `VL53LX_p_028`: ambient events per bin.
+    pub ambient_per_bin: i64,
+    /// Macro periods the frame ran for.
+    pub total_periods_elapsed: i64,
+    /// Peak window duration, µs.
+    pub peak_duration_us: i64,
+    /// Window-of-interest duration, µs.
+    pub woi_duration_us: i64,
+    /// The phase of zero distance.
+    pub zero_distance_phase: i64,
+    /// `roi_config__user_roi_centre_spad`.
+    pub roi_config_user_roi_centre_spad: i64,
+    /// `roi_config__user_roi_requested_global_xy_size`.
+    pub roi_config_user_roi_requested_global_xy_size: i64,
+}
+```
+
+`VL53LX_histogram_bin_data_t`: 24 bins plus everything the post-processing needs to read them —
+the VCSEL period they were taken at, the phase of zero distance, the bin sequence and the ambient
+estimate. Field names are the reference's (the C names, `__` folded to `_`);
+[`HistogramBinData::fields`] gives them under the exact reference keys.
+
+#### HistogramBinData::range_status
+
+```rust
+pub fn range_status(&self) -> i64
+```
+
+The device's range status (`result__range_status` masked).
+
+#### HistogramBinData::fields
+
+```rust
+pub fn fields(&self) -> Vec<(&'static str, Value)>
+```
+
+The fields under the C driver's (and the Python SDK's) names, in the reference's order.
+
+#### HistogramBinData::set_field
+
+```rust
+pub fn set_field(&mut self, key: &str, value: &Value) -> bool
+```
+
+Set one field by its reference key (the inverse of [`HistogramBinData::fields`]); `false` when
+the key is unknown or the value has the wrong shape.
+
+### BareDeviceState
+
+```rust
+pub enum BareDeviceState {
+    /// Not ranging.
+    #[default]
+    SwStandby,
+    /// Waiting for the grouped-parameter-hold handshake.
+    RangingWaitGphSync,
+    /// Ranging, frames valid.
+    RangingOutputData,
+    /// Ranging, DSS automatic.
+    RangingDssAuto,
+}
+```
+
+The ll-driver device states, single-zone case.
+
+### LlState
+
+```rust
+pub struct LlState {
+    pub cfg_device_state: BareDeviceState,
+    pub cfg_stream_count: i64,
+    pub cfg_gph_id: i64,
+    pub cfg_timing_status: i64,
+    pub rd_device_state: BareDeviceState,
+    pub rd_stream_count: i64,
+    pub rd_gph_id: i64,
+    pub rd_timing_status: i64,
+}
+```
+
+`VL53LX_update_ll_driver_{rd,cfg}_state()`, reduced to one zone: the GPH handshake (the id stamped
+into the dynamic config tells the device a configuration is new) and the timing-status flip
+(whether a frame ran on VCSEL period A or B, which the post-processing has to know).
+
+#### LlState::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+Back to standby.
+
+#### LlState::update_rd
+
+```rust
+pub fn update_rd(&mut self, mode_start: i64, grouped_parameter_hold: i64)
+```
+
+`VL53LX_update_ll_driver_rd_state()`: one frame read.
+
+#### LlState::update_cfg
+
+```rust
+pub fn update_cfg(&mut self, mode_start: i64)
+```
+
+`VL53LX_update_ll_driver_cfg_state()`: one configuration written.
+
+### RangeData
+
+```rust
+pub struct RangeData {
+    pub range_id: i64,
+    /// `VL53LX_p_012`, window start.
+    pub start_bin: i64,
+    /// `VL53LX_p_019`, first bin over threshold.
+    pub first_bin: i64,
+    /// `VL53LX_p_023`.
+    pub peak_bin: i64,
+    /// `VL53LX_p_024`.
+    pub last_bin: i64,
+    /// `VL53LX_p_013`.
+    pub end_bin: i64,
+    /// `VL53LX_p_025`, bins over threshold.
+    pub width_bins: i64,
+    /// `VL53LX_p_029`, bins in the window.
+    pub window_bins: i64,
+    pub vcsel_width: i64,
+    pub fast_osc_frequency: i64,
+    pub zero_distance_phase: i64,
+    /// `VL53LX_p_004`, 1/256 SPAD.
+    pub spads: i64,
+    pub total_periods_elapsed: i64,
+    pub peak_duration_us: i64,
+    pub woi_duration_us: i64,
+    /// `VL53LX_p_016`.
+    pub ambient_events: i64,
+    /// `VL53LX_p_017`.
+    pub total_events: i64,
+    /// `VL53LX_p_010`.
+    pub signal_events: i64,
+    pub peak_signal_count_rate_mcps: i64,
+    pub avg_signal_count_rate_mcps: i64,
+    pub ambient_count_rate_mcps: i64,
+    pub total_rate_per_spad_mcps: i64,
+    /// `VL53LX_p_009`.
+    pub signal_events_per_spad_kcps: i64,
+    /// `VL53LX_p_002`, 9.7 fixed point mm.
+    pub sigma: i64,
+    /// `VL53LX_p_026`.
+    pub phase_start: i64,
+    /// `VL53LX_p_011`.
+    pub phase_mean: i64,
+    /// `VL53LX_p_027`.
+    pub phase_end: i64,
+    pub min_range_mm: i64,
+    pub median_range_mm: i64,
+    pub max_range_mm: i64,
+    /// A `VL53LX_DeviceError` (the `DEVICE_ERROR_*` constants of [`super::hist`]).
+    pub range_status: i64,
+}
+```
+
+`VL53LX_range_data_t`: one target. The event sums and phases are what the algorithm produced; the
+`*_range_mm` fields and the rates are what they mean.
+
+#### RangeData::sigma_mm
+
+```rust
+pub fn sigma_mm(&self) -> i64
+```
+
+Sigma, whole mm.
+
+#### RangeData::signal_kcps
+
+```rust
+pub fn signal_kcps(&self) -> i64
+```
+
+The peak signal rate (9.7 Mcps) in kcps.
+
+#### RangeData::ambient_kcps
+
+```rust
+pub fn ambient_kcps(&self) -> i64
+```
+
+The ambient rate (9.7 Mcps) in kcps.
+
+#### RangeData::fields
+
+```rust
+pub fn fields(&self) -> Vec<(&'static str, i64)>
+```
+
+Every field under the reference's name, in its order.
+
+### RangeResults
+
+```rust
+pub struct RangeResults {
+    /// The frame's `result__stream_count`.
+    pub stream_count: i64,
+    /// `VL53LX_p_003`: the active results, at most four.
+    pub targets: Vec<RangeData>,
+    /// `VL53LX_p_022`: the ambient dmax per reflectance (zero: not ported).
+    pub ambient_dmax_mm: [i64; 5],
+    /// The wrap dmax.
+    pub wrap_dmax_mm: i64,
+}
+```
+
+`VL53LX_range_results_t`, reduced to the single-zone case.
+
+### MAX_BIN_SEQUENCE_LENGTH
+
+```rust
+pub const MAX_BIN_SEQUENCE_LENGTH: usize = 6;
+```
+
+Codes in one bin sequence.
+
+### MAX_BIN_SEQUENCE_CODE
+
+```rust
+pub const MAX_BIN_SEQUENCE_CODE: i64 = 15;
+```
+
+The largest bin-sequence code.
+
+### MAX_PULSES
+
+```rust
+pub const MAX_PULSES: usize = 8;
+```
+
+`VL53LX_D_001`: pulses tracked per frame.
+
+### MAX_RANGE_RESULTS
+
+```rust
+pub const MAX_RANGE_RESULTS: usize = 4;
+```
+
+Targets reported per frame.
+
+### MAX_ALLOWED_PHASE
+
+```rust
+pub const MAX_ALLOWED_PHASE: i64 = 0xFFFF;
+```
+
+The phase ceiling.
+
+### SPAD_TOTAL_COUNT_MAX
+
+```rust
+pub const SPAD_TOTAL_COUNT_MAX: i64 = (1 << 29) - 1;
+```
+
+The event-count ceiling of the rate maths.
+
+### SPAD_TOTAL_COUNT_RES_THRES
+
+```rust
+pub const SPAD_TOTAL_COUNT_RES_THRES: i64 = 1 << 24;
+```
+
+Above this many events the rate maths drops resolution.
+
+### SPEED_OF_LIGHT_IN_AIR_DIV8
+
+```rust
+pub const SPEED_OF_LIGHT_IN_AIR_DIV8: i64 = 299704 >> 3;
+```
+
+The speed of light in air / 8, mm/µs-ish units of the C driver.
+
+### SIGMA_INVALID
+
+```rust
+pub const SIGMA_INVALID: i64 = 0xFFFF;
+```
+
+`VL53LX_D_002`: an invalid sigma.
+
+### DEVICE_ERROR_NO_UPDATE
+
+```rust
+pub const DEVICE_ERROR_NO_UPDATE: i64 = 0;
+```
+
+`VL53LX_DEVICEERROR_NOUPDATE`.
+
+### DEVICE_ERROR_RANGE_PHASE_CHECK
+
+```rust
+pub const DEVICE_ERROR_RANGE_PHASE_CHECK: i64 = 5;
+```
+
+`VL53LX_DEVICEERROR_RANGEPHASECHECK`.
+
+### DEVICE_ERROR_SIGMA_THRESHOLD_CHECK
+
+```rust
+pub const DEVICE_ERROR_SIGMA_THRESHOLD_CHECK: i64 = 6;
+```
+
+`VL53LX_DEVICEERROR_SIGMATHRESHOLDCHECK`.
+
+### DEVICE_ERROR_PHASE_CONSISTENCY
+
+```rust
+pub const DEVICE_ERROR_PHASE_CONSISTENCY: i64 = 7;
+```
+
+`VL53LX_DEVICEERROR_PHASECONSISTENCY`.
+
+### DEVICE_ERROR_RANGE_COMPLETE
+
+```rust
+pub const DEVICE_ERROR_RANGE_COMPLETE: i64 = 9;
+```
+
+`VL53LX_DEVICEERROR_RANGECOMPLETE`.
+
+### DEVICE_ERROR_RANGE_COMPLETE_NO_WRAP_CHECK
+
+```rust
+pub const DEVICE_ERROR_RANGE_COMPLETE_NO_WRAP_CHECK: i64 = 19;
+```
+
+`VL53LX_DEVICEERROR_RANGECOMPLETE_NO_WRAP_CHECK`.
+
+### DEVICE_ERROR_EVENT_CONSISTENCY
+
+```rust
+pub const DEVICE_ERROR_EVENT_CONSISTENCY: i64 = 20;
+```
+
+`VL53LX_DEVICEERROR_EVENTCONSISTENCY`.
+
+### DEVICE_ERROR_RANGE_COMPLETE_MERGED_PULSE
+
+```rust
+pub const DEVICE_ERROR_RANGE_COMPLETE_MERGED_PULSE: i64 = 22;
+```
+
+`VL53LX_DEVICEERROR_RANGECOMPLETE_MERGED_PULSE`.
+
+### DEVICE_ERROR_PREV_RANGE_NO_TARGETS
+
+```rust
+pub const DEVICE_ERROR_PREV_RANGE_NO_TARGETS: i64 = 23;
+```
+
+`VL53LX_DEVICEERROR_PREV_RANGE_NO_TARGETS`.
+
+### HIST_TARGET_ORDER_STRONGEST_FIRST
+
+```rust
+pub const HIST_TARGET_ORDER_STRONGEST_FIRST: i64 = 1;
+```
+
+Target order: strongest first.
+
+### HIST_TARGET_ORDER_CLOSEST_FIRST
+
+```rust
+pub const HIST_TARGET_ORDER_CLOSEST_FIRST: i64 = 2;
+```
+
+Target order: closest first.
+
+### RANGE_STATUS_RANGE_VALID
+
+```rust
+pub const RANGE_STATUS_RANGE_VALID: i32 = 0;
+```
+
+`VL53LX_RANGESTATUS_RANGE_VALID`.
+
+### RANGE_STATUS_SIGMA_FAIL
+
+```rust
+pub const RANGE_STATUS_SIGMA_FAIL: i32 = 1;
+```
+
+`VL53LX_RANGESTATUS_SIGMA_FAIL`.
+
+### RANGE_STATUS_OUT_OF_BOUNDS_FAIL
+
+```rust
+pub const RANGE_STATUS_OUT_OF_BOUNDS_FAIL: i32 = 4;
+```
+
+`VL53LX_RANGESTATUS_OUTOFBOUNDS_FAIL`.
+
+### RANGE_STATUS_RANGE_VALID_NO_WRAP_CHECK
+
+```rust
+pub const RANGE_STATUS_RANGE_VALID_NO_WRAP_CHECK: i32 = 6;
+```
+
+`VL53LX_RANGESTATUS_RANGE_VALID_NO_WRAP_CHECK_FAIL`.
+
+### RANGE_STATUS_WRAP_TARGET_FAIL
+
+```rust
+pub const RANGE_STATUS_WRAP_TARGET_FAIL: i32 = 7;
+```
+
+`VL53LX_RANGESTATUS_WRAP_TARGET_FAIL`.
+
+### RANGE_STATUS_RANGE_VALID_MERGED_PULSE
+
+```rust
+pub const RANGE_STATUS_RANGE_VALID_MERGED_PULSE: i32 = 11;
+```
+
+`VL53LX_RANGESTATUS_RANGE_VALID_MERGED_PULSE`.
+
+### RANGE_STATUS_TARGET_PRESENT_LACK_OF_SIGNAL
+
+```rust
+pub const RANGE_STATUS_TARGET_PRESENT_LACK_OF_SIGNAL: i32 = 12;
+```
+
+`VL53LX_RANGESTATUS_TARGET_PRESENT_LACK_OF_SIGNAL`.
+
+### RANGE_STATUS_NONE
+
+```rust
+pub const RANGE_STATUS_NONE: i32 = 255;
+```
+
+`VL53LX_RANGESTATUS_NONE`.
+
+### status_name
+
+```rust
+pub fn status_name(status: i32) -> Option<&'static str>
+```
+
+UM2931 range status name, or `None` for a status the histogram path does not produce.
+
+### PrevTarget
+
+```rust
+pub struct PrevTarget {
+    /// Its ambient events.
+    pub ambient_events: i64,
+    /// Its total events.
+    pub total_events: i64,
+    /// Its mean phase.
+    pub phase_mean: i64,
+    /// Its device error.
+    pub range_status: i64,
+}
+```
+
+One target of the frame before, reduced to what the consistency checks read.
+
+### py_mod
+
+```rust
+pub fn py_mod(a: i64, b: i64) -> i64
+```
+
+The modulo of the reference (the sign of the divisor).
+
+### isqrt
+
+```rust
+pub fn isqrt(num: i64) -> i64
+```
+
+`VL53LX_isqrt()`: the floor of the square root of a uint32 argument.
+
+### calc_pll_period_mm
+
+```rust
+pub fn calc_pll_period_mm(fast_osc_frequency: i64) -> i64
+```
+
+`VL53LX_calc_pll_period_mm()`.
+
+### rate_maths
+
+```rust
+pub fn rate_maths(events: i64, time_us: i64) -> i64
+```
+
+`VL53LX_rate_maths()`: events over a duration → count rate in 9.7 Mcps.
+
+### rate_per_spad_maths
+
+```rust
+pub fn rate_per_spad_maths(frac_bits: u32, peak_count_rate: i64, num_spads: i64, max_output_value: i64) -> i64
+```
+
+`VL53LX_rate_per_spad_maths()`.
+
+### events_per_spad_maths
+
+```rust
+pub fn events_per_spad_maths(events: i64, num_spads: i64, duration: i64) -> i64
+```
+
+`VL53LX_events_per_spad_maths()` → kcps per SPAD.
+
+### range_maths
+
+```rust
+pub fn range_maths(
+    fast_osc_frequency: i64,
+    phase: i64,
+    zero_distance_phase: i64,
+    fractional_bits: i32,
+    gain_factor: i64,
+    range_offset_mm: i64,
+) -> i64
+```
+
+`VL53LX_range_maths()`: phase → millimetres.
+
+### average_repeated_bins
+
+```rust
+pub fn average_repeated_bins(src: &HistogramBinData) -> HistogramBinData
+```
+
+`VL53LX_f_031`: fold the six bin-sequence codes together. Repeats of a code land on the same four
+output bins and are averaged, so what comes out is one bin per distinct code.
+
+### calc_zero_distance_phase
+
+```rust
+pub fn calc_zero_distance_phase(bins: &mut HistogramBinData)
+```
+
+`VL53LX_hist_calc_zero_distance_phase`.
+
+### estimate_ambient_from_thresholded_bins
+
+```rust
+pub fn estimate_ambient_from_thresholded_bins(ambient_threshold_sigma: i64, bins: &mut HistogramBinData)
+```
+
+`VL53LX_hist_estimate_ambient_from_thresholded_bins()`: the floor from every bin near the
+quietest.
+
+### estimate_ambient_from_ambient_bins
+
+```rust
+pub fn estimate_ambient_from_ambient_bins(bins: &mut HistogramBinData)
+```
+
+`VL53LX_hist_estimate_ambient_from_ambient_bins()`: the better estimate, from the VCSEL-off bins.
+
+### remove_ambient_bins
+
+```rust
+pub fn remove_ambient_bins(bins: &mut HistogramBinData)
+```
+
+`VL53LX_hist_remove_ambient_bins`: drop the ambient-only bins off the front, so bin 0 is phase
+zero.
+
+### process_data
+
+```rust
+pub fn process_data(bins_input: &HistogramBinData, hpp: &HistPostProcessConfig) -> Result<RangeResults>
+```
+
+`VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off, one merged frame.
+
+### process_data_merged
+
+```rust
+pub fn process_data_merged(
+    bins_input: &HistogramBinData,
+    hpp: &HistPostProcessConfig,
+    merge_nb: i64,
+) -> Result<RangeResults>
+```
+
+`VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off, `merge_nb` frames merged.
+
+### events_consistency_check
+
+```rust
+pub fn events_consistency_check(
+    event_sigma: i64,
+    min_effective_spad_count: i64,
+    prev_frame: &FrameHistory,
+    prev: &PrevTarget,
+    target: &RangeData,
+) -> i64
+```
+
+`VL53LX_hist_events_consistency_check()`: scale the previous frame's events onto this exposure and
+ask whether the difference fits inside the shot noise of the pair, `event_sigma` sixty-fourths
+wide. → a device error.
+
+### merged_pulse_check
+
+```rust
+pub fn merged_pulse_check(min_max_tolerance_mm: i64, target: &RangeData) -> i64
+```
+
+`VL53LX_hist_merged_pulse_check()`: a pulse far wider than one target should be is two targets in
+one. → a device error.
+
+### convert_status
+
+```rust
+pub fn convert_status(device_error: i64) -> i32
+```
+
+`ConvertStatusHisto()` (vl53lx_api.c), the cases the histogram path produces here.
+
+### to_range
+
+```rust
+pub fn to_range(results: &RangeResults, bins: &HistogramBinData) -> Vl53lxRange
+```
+
+The frame's results as the family-wide range: every return in `targets`, the first one also the
+range itself. Effective SPADs come in 1/256 and are reported whole, as the rest of the family
+does. `extra`: `stream_count`, `ambient_per_bin`, and with a target `min_range_mm`,
+`max_range_mm`, `peak_bin`.
+
+### Vl53lxHistogramDriver
+
+```rust
+pub struct Vl53lxHistogramDriver {
+    p: Arc<dyn Vl53lxPlatform>,
+    product: String,
+    bare: BareDriver,
+    mode: &'static str,
+    budget_ms: u32,
+    inter_ms: u32,
+    modes: &'static [&'static str],
+    budget_range: (u32, u32),
+    // The A/B alternation rides on the ll-driver state, which the polled C loop advances in the call
+    // that clears the interrupt. Here the bridge clears it, so the state is advanced when a new frame
+    // arrives — told by the device's own result__stream_count, so decoding the same sample twice does
+    // not step it twice.
+    last_stream_count: Option<u8>,
+    // The phase and event consistency checks read the frame before this one.
+    history: FrameHistory,
+}
+```
+
+ST's VL53LX BareDriver on the host — the histogram driver of VL53L1CX / L1CB / L3CX / L4CD /
+L4CX: the die hands over 24 raw photon-count bins per frame and [`hist`] turns them into up to
+four targets. What it costs against the light drivers: no calibrations and no detection
+thresholds, and the first frame of a stream reports status 6 (no wrap check done) because the
+check needs the frame before. [`Vl53lxDriver::bin_data`] hands out a [`HistogramBinData`].
+
+#### Vl53lxHistogramDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Self
+```
+
+A driver for `product` over `platform`; nothing touches the bus until
+[`Vl53lxDriver::sensor_init`].
+
+#### Vl53lxHistogramDriver::bare
+
+```rust
+pub fn bare(&self) -> &BareDriver
+```
+
+The BareDriver underneath: device image, factory data, preset and post-processing config.
+
+#### Vl53lxHistogramDriver::bare_mut
+
+```rust
+pub fn bare_mut(&mut self) -> &mut BareDriver
+```
+
+The BareDriver underneath, to tune.
+
+#### Vl53lxHistogramDriver::history
+
+```rust
+pub fn history(&self) -> &FrameHistory
+```
+
+The frame history the consistency checks read.
+
+#### Vl53lxHistogramDriver::wait_boot
+
+```rust
+pub fn wait_boot(&self, timeout: Duration) -> Result<()>
+```
+
+Poll `FIRMWARE__SYSTEM_STATUS` until the die has booted.
+
+### FrameHistory
+
+```rust
+pub struct FrameHistory {
+    rd_device_state: Option<BareDeviceState>,
+    targets: Vec<PrevTarget>,
+    total_periods_elapsed: i64,
+    spads: i64,
+}
+```
+
+The frame before this one, reduced to what the consistency checks read (`VL53LX_zone_hist_info_t`
+and `VL53LX_zone_objects_t` for one zone). The engine alternates two VCSEL periods, so one frame
+cannot say whether a target is inside the unambiguous range or an echo wrapped into it; the API
+compares consecutive frames. The BareDriver keeps no history, so the driver owns one of these and
+hands it every frame.
+
+#### FrameHistory::new
+
+```rust
+pub fn new() -> FrameHistory
+```
+
+An empty history: the first [`FrameHistory::apply`] only remembers.
+
+#### FrameHistory::total_periods_elapsed
+
+```rust
+pub fn total_periods_elapsed(&self) -> i64
+```
+
+Macro periods the remembered frame ran for.
+
+#### FrameHistory::spads
+
+```rust
+pub fn spads(&self) -> i64
+```
+
+Effective SPADs of the remembered frame, 1/256.
+
+#### FrameHistory::targets
+
+```rust
+pub fn targets(&self) -> &[PrevTarget]
+```
+
+The remembered frame's targets.
+
+#### FrameHistory::reset
+
+```rust
+pub fn reset(&mut self)
+```
+
+Forget the stream so far: the next [`FrameHistory::apply`] only remembers.
+
+#### FrameHistory::apply
+
+```rust
+pub fn apply(
+    &mut self,
+    results: &mut RangeResults,
+    bins: &HistogramBinData,
+    rd_device_state: BareDeviceState,
+    hpp: &HistPostProcessConfig,
+)
+```
+
+Check `results` against the remembered frame, then remember it — C's order: both checks run
+before hist_data and range_results are copied into the zone history.
+
+### RegField
+
+```rust
+pub struct RegField {
+    /// The C field name.
+    pub name: &'static str,
+    /// Byte offset inside the block.
+    pub off: usize,
+    /// Width in bytes, big-endian on the wire.
+    pub width: usize,
+    /// Two's complement over `width` bytes.
+    pub signed: bool,
+    /// The bits the C codec keeps.
+    pub mask: Option<i64>,
+}
+```
+
+One field of a register block: byte offset, width in bytes, signedness and the mask the C codec
+applies (`None`: none).
+
+### RegBlockDef
+
+```rust
+pub struct RegBlockDef {
+    /// The block's name (the C struct without `VL53LX_` / `_t`).
+    pub name: &'static str,
+    /// First register address.
+    pub base: u16,
+    /// Bytes in the block, reserved holes included.
+    pub size: usize,
+    /// Whether the driver may write it.
+    pub writable: bool,
+    /// The named fields, in block order.
+    pub fields: &'static [RegField],
+}
+```
+
+One contiguous I2C block of the device image (a `VL53LX_*_t` struct of the C driver).
+
+### block_def
+
+```rust
+pub fn block_def(name: &str) -> Option<&'static RegBlockDef>
+```
+
+The layout of the block `name`, or `None` when there is none.
+
+### tuning_default
+
+```rust
+pub fn tuning_default(name: &str) -> Option<i64>
+```
+
+A tuning parameter by its C field name (`tp_*`), as [`TUNING`] holds it after init.
+
+### header_default
+
+```rust
+pub fn header_default(name: &str) -> Option<i64>
+```
+
+A raw tuning-header value (`TUNINGPARM_*_DEFAULT`) from [`DEFAULTS`].
+
+### RegBlock
+
+```rust
+pub struct RegBlock {
+    def: &'static RegBlockDef,
+    values: Vec<i64>,
+    raw: Vec<u8>,
+}
+```
+
+One register block's worth of device image, addressed by the C field name:
+`img.static_config().get("dss_config__target_total_rate_mcps")`. Bytes no field names (the
+reserved holes) keep whatever was read, so a read-modify-write round trip is byte-exact.
+
+#### RegBlock::from_def
+
+```rust
+pub fn from_def(def: &'static RegBlockDef) -> RegBlock
+```
+
+A zeroed block of the layout `def`.
+
+#### RegBlock::named
+
+```rust
+pub fn named(name: &str) -> Option<RegBlock>
+```
+
+A zeroed block by name, or `None` when there is no such block.
+
+#### RegBlock::name
+
+```rust
+pub fn name(&self) -> &'static str
+```
+
+The block's name.
+
+#### RegBlock::def
+
+```rust
+pub fn def(&self) -> &'static RegBlockDef
+```
+
+The block's layout.
+
+#### RegBlock::base
+
+```rust
+pub fn base(&self) -> u16
+```
+
+First register address.
+
+#### RegBlock::size
+
+```rust
+pub fn size(&self) -> usize
+```
+
+Bytes in the block.
+
+#### RegBlock::try_get
+
+```rust
+pub fn try_get(&self, field: &str) -> Option<i64>
+```
+
+The field by its C name, or `None` when the block has none.
+
+#### RegBlock::get
+
+```rust
+pub fn get(&self, field: &str) -> i64
+```
+
+The field by its C name.
+
+# Panics
+When the block has no such field (the driver only names fields of the generated layout).
+
+#### RegBlock::try_set
+
+```rust
+pub fn try_set(&mut self, field: &str, value: i64) -> bool
+```
+
+Set a field (the value is clipped only on [`RegBlock::encode`]); `false` when there is no such
+field.
+
+#### RegBlock::set
+
+```rust
+pub fn set(&mut self, field: &str, value: i64)
+```
+
+Set a field (the value is clipped only on [`RegBlock::encode`]).
+
+# Panics
+When the block has no such field.
+
+#### RegBlock::items
+
+```rust
+pub fn items(&self) -> Vec<(&'static str, i64)>
+```
+
+Every field in block order, `(name, value)`.
+
+#### RegBlock::decode
+
+```rust
+pub fn decode(&mut self, raw: &[u8]) -> Result<()>
+```
+
+Take the block's bytes (at least [`RegBlock::size`] of them) into the fields.
+
+#### RegBlock::encode
+
+```rust
+pub fn encode(&self) -> Vec<u8>
+```
+
+The block's bytes: every field masked and clipped to its width the way the C codec does, the
+holes as last decoded.
+
+### RANGE_START_BLOCKS
+
+```rust
+pub const RANGE_START_BLOCKS: &[&str] = &[
+    "static_nvm_managed",
+    "customer_nvm_managed",
+    "static_config",
+    "general_config",
+    "timing_config",
+    "dynamic_config",
+    "system_control",
+];
+```
+
+The blocks `init_and_start_range` pushes, in address order: one transfer.
+
+### DeviceImage
+
+```rust
+pub struct DeviceImage {
+    blocks: Vec<RegBlock>,
+}
+```
+
+The device's register image, block by block. The C driver never reads a configuration register
+on its own: it edits the structs, then pushes whole blocks — ranging start writes 0x0001..0x0087
+in a single 135-byte transfer. Every transfer costs a USB round trip, so block moves keep the
+count where the C driver has it. Editing a field only touches the host copy; [`DeviceImage::push`]
+reaches the sensor.
+
+#### DeviceImage::new
+
+```rust
+pub fn new() -> DeviceImage
+```
+
+Every block of [`BLOCKS`], zeroed.
+
+#### DeviceImage::try_block
+
+```rust
+pub fn try_block(&self, name: &str) -> Option<&RegBlock>
+```
+
+The block `name`, or `None` when there is none.
+
+#### DeviceImage::block
+
+```rust
+pub fn block(&self, name: &str) -> &RegBlock
+```
+
+The block `name`.
+
+# Panics
+When there is no such block.
+
+#### DeviceImage::block_mut
+
+```rust
+pub fn block_mut(&mut self, name: &str) -> &mut RegBlock
+```
+
+The block `name`, to edit.
+
+# Panics
+When there is no such block.
+
+#### DeviceImage::pull
+
+```rust
+pub fn pull(&mut self, p: &dyn Vl53lxPlatform, name: &str) -> Result<()>
+```
+
+Read one block off the sensor into the image.
+
+#### DeviceImage::push
+
+```rust
+pub fn push(&self, p: &dyn Vl53lxPlatform, name: &str) -> Result<()>
+```
+
+Write one block from the image to the sensor.
+
+#### DeviceImage::pull_range
+
+```rust
+pub fn pull_range(&mut self, p: &dyn Vl53lxPlatform, names: &[&str]) -> Result<()>
+```
+
+Read the named blocks as one transfer.
+
+#### DeviceImage::push_range
+
+```rust
+pub fn push_range(&self, p: &dyn Vl53lxPlatform, names: &[&str]) -> Result<()>
+```
+
+The named blocks as one transfer; a hole between them goes out as 0x00, as in the C driver.
+
+#### DeviceImage::dump
+
+```rust
+pub fn dump(&self, names: &[&str]) -> String
+```
+
+Every field of the named blocks, one per line.
+
+#### DeviceImage::dump_all
+
+```rust
+pub fn dump_all(&self) -> String
+```
+
+Every field of every block, one per line.
+
+### encode_row_col
+
+```rust
+pub fn encode_row_col(row: i64, col: i64) -> i64
+```
+
+A SPAD's (row, col) → its number.
+
+### decode_row_col
+
+```rust
+pub fn decode_row_col(spad_number: i64) -> (i64, i64)
+```
+
+A SPAD number → (row, col).
+
+### decode_zone_size
+
+```rust
+pub fn decode_zone_size(encoded_xy_size: i64) -> (i64, i64)
+```
+
+An encoded zone size → (width, height).
+
+### encode_zone_size
+
+```rust
+pub fn encode_zone_size(width: i64, height: i64) -> i64
+```
+
+(width, height) → the encoded zone size.
+
+### decode_zone_limits
+
+```rust
+pub fn decode_zone_limits(encoded_xy_centre: i64, encoded_xy_size: i64) -> (i64, i64, i64, i64)
+```
+
+→ (x_ll, y_ll, x_ur, y_ur), clipped to the SPAD array.
+
+### is_aperture_location
+
+```rust
+pub fn is_aperture_location(row: i64, col: i64) -> bool
+```
+
+Whether the SPAD at (row, col) sits under the aperture.
+
+### calc_mm_effective_spads
+
+```rust
+pub fn calc_mm_effective_spads(
+    encoded_mm_roi_centre: i64,
+    encoded_mm_roi_size: i64,
+    encoded_zone_centre: i64,
+    encoded_zone_size: i64,
+    good_spads: &[u8; 32],
+    aperture_attenuation: i64,
+) -> (i64, i64)
+```
+
+→ (mm inner, mm outer) effective SPADs, in 1/256 of a SPAD. Needed because our boards ship
+without the FMT offset calibration: the driver works out the SPAD counts the nominal rates apply
+to.
+
+### combine_mm1_mm2_offsets
+
+```rust
+pub fn combine_mm1_mm2_offsets(
+    mm1_offset_mm: i64,
+    mm2_offset_mm: i64,
+    encoded_mm_roi_centre: i64,
+    encoded_mm_roi_size: i64,
+    encoded_zone_centre: i64,
+    encoded_zone_size: i64,
+    cal: &AdditionalOffsetCalData,
+    good_spads: &[u8; 32],
+    aperture_attenuation: i64,
+) -> i64
+```
+
+`VL53LX_hist_combine_mm1_mm2_offsets()` → `range_offset_mm`, in quarter millimetres: the MM1
+(inner) and MM2 (outer) offsets weighted by the share of each region the ROI covers.
+
+### rtn_good_spads
+
+```rust
+pub fn rtn_good_spads(nvm_copy_data: &RegBlock) -> [u8; 32]
+```
+
+The 32 `global_config__spad_enables_rtn_*` bytes as one bitmap.
+
+### calc_pll_period_us
+
+```rust
+pub fn calc_pll_period_us(fast_osc_frequency: i64) -> i64
+```
+
+The PLL period, 2^-30 s units (0 for a zero frequency).
+
+### decode_vcsel_period
+
+```rust
+pub fn decode_vcsel_period(vcsel_period_reg: i64) -> i64
+```
+
+A VCSEL period register value → PLL clocks.
+
+### calc_macro_period_us
+
+```rust
+pub fn calc_macro_period_us(fast_osc_frequency: i64, vcsel_period_reg: i64) -> i64
+```
+
+The macro period, 12.12 µs.
+
+### calc_timeout_mclks
+
+```rust
+pub fn calc_timeout_mclks(timeout_us: i64, macro_period_us: i64) -> i64
+```
+
+A timeout in µs → macro periods.
+
+### encode_timeout
+
+```rust
+pub fn encode_timeout(timeout_mclks: i64) -> i64
+```
+
+Macro periods → the (mantissa, exponent) register encoding.
+
+### decode_timeout
+
+```rust
+pub fn decode_timeout(encoded: i64) -> i64
+```
+
+The register encoding → macro periods. The exponent shift wraps at 64 as Java's does (a real
+register never comes near it).
+
+### calc_encoded_timeout
+
+```rust
+pub fn calc_encoded_timeout(timeout_us: i64, macro_period_us: i64) -> i64
+```
+
+A timeout in µs → its register encoding.
+
+### duration_maths
+
+```rust
+pub fn duration_maths(pll_period_us: i64, vcsel_parm_pclks: i64, window_vclks: i64, elapsed_mclks: i64) -> i64
+```
+
+`VL53LX_duration_maths()`: a window duration, µs.
+
+### calc_timeout_register_values
+
+```rust
+pub fn calc_timeout_register_values(
+    phasecal_us: i64,
+    mm_us: i64,
+    range_us: i64,
+    fast_osc_frequency: i64,
+    img: &mut DeviceImage,
+) -> Option<()>
+```
+
+Fill the six timeout registers, for VCSEL period A and then B. `None` when the oscillator
+frequency is 0.
+
+### OpticalCentre
+
+```rust
+pub struct OpticalCentre {
+    /// X centre, 4.4 fixed point SPADs.
+    pub x_centre: i64,
+    /// Y centre, 4.4 fixed point SPADs.
+    pub y_centre: i64,
+}
+```
+
+`VL53LX_optical_centre_t`.
+
+### CalPeakRateMap
+
+```rust
+pub struct CalPeakRateMap {
+    /// Calibration distance, mm.
+    pub cal_distance_mm: i64,
+    /// Calibration reflectance, %.
+    pub cal_reflectance_pc: i64,
+    /// Samples in the map.
+    pub max_samples: i64,
+    /// Map width.
+    pub width: i64,
+    /// Map height.
+    pub height: i64,
+    /// The peak rates, 9.7 Mcps, row by row.
+    pub peak_rate_mcps: Vec<i64>,
+}
+```
+
+`VL53LX_cal_peak_rate_map_t`.
+
+### AdditionalOffsetCalData
+
+```rust
+pub struct AdditionalOffsetCalData {
+    /// MM1 effective SPADs, 1/256.
+    pub mm_inner_actual_effective_spads: i64,
+    /// MM2 effective SPADs, 1/256.
+    pub mm_outer_actual_effective_spads: i64,
+    /// MM1 peak signal rate, 9.7 Mcps.
+    pub mm_inner_peak_signal_count_rtn_mcps: i64,
+    /// MM2 peak signal rate, 9.7 Mcps.
+    pub mm_outer_peak_signal_count_rtn_mcps: i64,
+}
+```
+
+`VL53LX_additional_offset_cal_data_t`.
+
+### FmtRangeData
+
+```rust
+pub struct FmtRangeData {
+    /// Effective return SPADs, 1/256.
+    pub actual_effective_rtn_spads: i64,
+    /// Requested reference SPADs.
+    pub num_requested_ref_spads: i64,
+    /// Reference SPAD location.
+    pub ref_location: i64,
+    /// Return peak signal rate, 9.7 Mcps.
+    pub peak_signal_count_rate_rtn_mcps: i64,
+    /// Return ambient rate, 9.7 Mcps.
+    pub ambient_count_rate_rtn_mcps: i64,
+    /// Reference peak signal rate, 9.7 Mcps.
+    pub peak_signal_count_rate_ref_mcps: i64,
+    /// Reference ambient rate, 9.7 Mcps.
+    pub ambient_count_rate_ref_mcps: i64,
+    /// Measured distance, mm.
+    pub measured_distance_mm: i64,
+    /// Its standard deviation, mm.
+    pub measured_distance_stdev_mm: i64,
+}
+```
+
+`VL53LX_decoded_nvm_fmt_range_data_t`.
+
+### FMT_OPTICAL_CENTRE
+
+```rust
+pub const FMT_OPTICAL_CENTRE: (usize, usize) = (0x00B8, 4);
+```
+
+NVM region of the optical centre, (byte index, byte size).
+
+### FMT_CAL_PEAK_RATE_MAP
+
+```rust
+pub const FMT_CAL_PEAK_RATE_MAP: (usize, usize) = (0x015C, 56);
+```
+
+NVM region of the peak-rate map.
+
+### FMT_ADDITIONAL_OFFSET_CAL
+
+```rust
+pub const FMT_ADDITIONAL_OFFSET_CAL: (usize, usize) = (0x0194, 8);
+```
+
+NVM region of the mode-mitigation offset calibration.
+
+### FMT_RANGE_RESULTS_140MM_DARK
+
+```rust
+pub const FMT_RANGE_RESULTS_140MM_DARK: (usize, usize) = (0x01AC, 16);
+```
+
+NVM region of the FMT range results at 140 mm, dark.
+
+### read_region
+
+```rust
+pub fn read_region(p: &dyn Vl53lxPlatform, img: &mut DeviceImage, region: (usize, usize)) -> Result<Vec<u8>>
+```
+
+`VL53LX_read_nvm_raw_data()`: (byte index, byte size), both word-aligned → the bytes. The image
+is passed so the firmware / power-force fields it toggles stay truthful.
+
+### read_optical_centre
+
+```rust
+pub fn read_optical_centre(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<OpticalCentre>
+```
+
+The optical centre (zeroed on a never-programmed part).
+
+### read_cal_peak_rate_map
+
+```rust
+pub fn read_cal_peak_rate_map(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<CalPeakRateMap>
+```
+
+The 5x5 calibration peak-rate map.
+
+### read_additional_offset_cal_data
+
+```rust
+pub fn read_additional_offset_cal_data(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+) -> Result<AdditionalOffsetCalData>
+```
+
+The mode-mitigation offset calibration.
+
+### read_fmt_range_results
+
+```rust
+pub fn read_fmt_range_results(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+    region: (usize, usize),
+) -> Result<FmtRangeData>
+```
+
+The FMT range results of `region` ([`FMT_RANGE_RESULTS_140MM_DARK`] is the one the driver reads).
+
+### POWER_MANAGEMENT_GO1_POWER_FORCE
+
+```rust
+pub const POWER_MANAGEMENT_GO1_POWER_FORCE: u16 = 0x0083;
+```
+
+`POWER_MANAGEMENT__GO1_POWER_FORCE`.
+
+### FIRMWARE_ENABLE
+
+```rust
+pub const FIRMWARE_ENABLE: u16 = 0x0085;
+```
+
+`FIRMWARE__ENABLE`.
+
+### RESULT_OSC_CALIBRATE_VAL
+
+```rust
+pub const RESULT_OSC_CALIBRATE_VAL: u16 = 0x00DE;
+```
+
+`RESULT__OSC_CALIBRATE_VAL`.
+
+### PATCH_CTRL
+
+```rust
+pub const PATCH_CTRL: u16 = 0x0470;
+```
+
+`PATCH__CTRL`.
+
+### PATCH_JMP_ENABLES
+
+```rust
+pub const PATCH_JMP_ENABLES: u16 = 0x0472;
+```
+
+`PATCH__JMP_ENABLES`.
+
+### PATCH_DATA_ENABLES
+
+```rust
+pub const PATCH_DATA_ENABLES: u16 = 0x0474;
+```
+
+`PATCH__DATA_ENABLES`.
+
+### PATCH_OFFSET_0
+
+```rust
+pub const PATCH_OFFSET_0: u16 = 0x0476;
+```
+
+`PATCH__OFFSET_0`.
+
+### PATCH_ADDRESS_0
+
+```rust
+pub const PATCH_ADDRESS_0: u16 = 0x0496;
+```
+
+`PATCH__ADDRESS_0`.
+
+### HISTOGRAM_BIN_DATA_I2C_INDEX
+
+```rust
+pub const HISTOGRAM_BIN_DATA_I2C_INDEX: u16 = 0x0088;
+```
+
+First byte of the histogram frame (`RESULT__INTERRUPT_STATUS`).
+
+### RESULT_HISTOGRAM_BIN_0_2
+
+```rust
+pub const RESULT_HISTOGRAM_BIN_0_2: u16 = 0x008E;
+```
+
+`RESULT__HISTOGRAM_BIN_0_2`.
+
+### RESULT_HISTOGRAM_BIN_23_0
+
+```rust
+pub const RESULT_HISTOGRAM_BIN_23_0: u16 = 0x00D5;
+```
+
+`RESULT__HISTOGRAM_BIN_23_0`.
+
+### PHASECAL_RESULT_REFERENCE_PHASE
+
+```rust
+pub const PHASECAL_RESULT_REFERENCE_PHASE: u16 = 0x00D6;
+```
+
+`PHASECAL_RESULT__REFERENCE_PHASE`.
+
+### PHASECAL_RESULT_VCSEL_START
+
+```rust
+pub const PHASECAL_RESULT_VCSEL_START: u16 = 0x00D8;
+```
+
+`PHASECAL_RESULT__VCSEL_START`.
+
+### RESULT_HISTOGRAM_BIN_23_0_MSB
+
+```rust
+pub const RESULT_HISTOGRAM_BIN_23_0_MSB: u16 = 0x00D9;
+```
+
+`RESULT__HISTOGRAM_BIN_23_0_MSB`.
+
+### RESULT_HISTOGRAM_BIN_23_0_LSB
+
+```rust
+pub const RESULT_HISTOGRAM_BIN_23_0_LSB: u16 = 0x00DA;
+```
+
+`RESULT__HISTOGRAM_BIN_23_0_LSB`.
+
+### HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES
+
+```rust
+pub const HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES: u16 = RESULT_HISTOGRAM_BIN_23_0_LSB - HISTOGRAM_BIN_DATA_I2C_INDEX + 1;
+```
+
+Bytes in one histogram frame (83).
+
+### DEVICE_MEASUREMENT_MODE_BACK_TO_BACK
+
+```rust
+pub const DEVICE_MEASUREMENT_MODE_BACK_TO_BACK: i64 = 0x20;
+```
+
+`VL53LX_DEVICEMEASUREMENTMODE_BACKTOBACK`.
+
+### DEVICE_MEASUREMENT_MODE_ABORT
+
+```rust
+pub const DEVICE_MEASUREMENT_MODE_ABORT: i64 = 0x80;
+```
+
+`VL53LX_DEVICEMEASUREMENTMODE_ABORT`.
+
+### DEVICE_MEASUREMENT_MODE_STOP_MASK
+
+```rust
+pub const DEVICE_MEASUREMENT_MODE_STOP_MASK: i64 = 0x0F;
+```
+
+`VL53LX_DEVICEMEASUREMENTMODE_STOP_MASK`.
+
+### DEVICE_MEASUREMENT_MODE_MODE_MASK
+
+```rust
+pub const DEVICE_MEASUREMENT_MODE_MODE_MASK: i64 = 0xF0;
+```
+
+`VL53LX_DEVICEMEASUREMENTMODE_MODE_MASK`.
+
+### DEVICE_SCHEDULER_MODE_STREAMING
+
+```rust
+pub const DEVICE_SCHEDULER_MODE_STREAMING: i64 = 0x01;
+```
+
+`VL53LX_DEVICESCHEDULERMODE_STREAMING`.
+
+### DEVICE_SCHEDULER_MODE_HISTOGRAM
+
+```rust
+pub const DEVICE_SCHEDULER_MODE_HISTOGRAM: i64 = 0x02;
+```
+
+`VL53LX_DEVICESCHEDULERMODE_HISTOGRAM`.
+
+### DEVICE_READOUT_MODE_SINGLE_SD
+
+```rust
+pub const DEVICE_READOUT_MODE_SINGLE_SD: i64 = 0x00 << 2;
+```
+
+`VL53LX_DEVICEREADOUTMODE_SINGLE_SD`.
+
+### DEVICE_READOUT_MODE_DUAL_SD
+
+```rust
+pub const DEVICE_READOUT_MODE_DUAL_SD: i64 = 0x01 << 2;
+```
+
+`VL53LX_DEVICEREADOUTMODE_DUAL_SD`.
+
+### GROUPED_PARAMETER_HOLD_ID_MASK
+
+```rust
+pub const GROUPED_PARAMETER_HOLD_ID_MASK: i64 = 0x02;
+```
+
+`VL53LX_GROUPEDPARAMETERHOLD_ID_MASK`.
+
+### INTERRUPT_CONFIG_NEW_SAMPLE_READY
+
+```rust
+pub const INTERRUPT_CONFIG_NEW_SAMPLE_READY: i64 = 0x20;
+```
+
+`VL53LX_INTERRUPT_CONFIG_NEW_SAMPLE_READY`.
+
+### CLEAR_RANGE_INT
+
+```rust
+pub const CLEAR_RANGE_INT: u8 = 0x01;
+```
+
+`VL53LX_CLEAR_RANGE_INT`.
+
+### RANGE_STATUS_MASK
+
+```rust
+pub const RANGE_STATUS_MASK: i64 = 0x1F;
+```
+
+`VL53LX_RANGE_STATUS__RANGE_STATUS_MASK`.
+
+### DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW
+
+```rust
+pub const DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW: i64 = 0x10;
+```
+
+`VL53LX_DEVICEINTERRUPTPOLARITY_ACTIVE_LOW`.
+
+### DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS
+
+```rust
+pub const DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS: i64 = 0x01;
+```
+
+`VL53LX_DEVICEGPIOMODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS`.
+
+### DEVICE_DSS_MODE_TARGET_RATE
+
+```rust
+pub const DEVICE_DSS_MODE_TARGET_RATE: i64 = 1;
+```
+
+`VL53LX_DEVICEDSSMODE__TARGET_RATE`.
+
+### SEQUENCE_VHV_EN
+
+```rust
+pub const SEQUENCE_VHV_EN: i64 = 0x01;
+```
+
+`VL53LX_SEQUENCE_VHV_EN`.
+
+### SEQUENCE_PHASECAL_EN
+
+```rust
+pub const SEQUENCE_PHASECAL_EN: i64 = 0x02;
+```
+
+`VL53LX_SEQUENCE_PHASECAL_EN`.
+
+### SEQUENCE_DSS1_EN
+
+```rust
+pub const SEQUENCE_DSS1_EN: i64 = 0x08;
+```
+
+`VL53LX_SEQUENCE_DSS1_EN`.
+
+### SEQUENCE_DSS2_EN
+
+```rust
+pub const SEQUENCE_DSS2_EN: i64 = 0x10;
+```
+
+`VL53LX_SEQUENCE_DSS2_EN`.
+
+### SEQUENCE_MM1_EN
+
+```rust
+pub const SEQUENCE_MM1_EN: i64 = 0x20;
+```
+
+`VL53LX_SEQUENCE_MM1_EN`.
+
+### SEQUENCE_MM2_EN
+
+```rust
+pub const SEQUENCE_MM2_EN: i64 = 0x40;
+```
+
+`VL53LX_SEQUENCE_MM2_EN`.
+
+### SEQUENCE_RANGE_EN
+
+```rust
+pub const SEQUENCE_RANGE_EN: i64 = 0x80;
+```
+
+`VL53LX_SEQUENCE_RANGE_EN`.
+
+### SPAD_ARRAY_WIDTH
+
+```rust
+pub const SPAD_ARRAY_WIDTH: i64 = 16;
+```
+
+SPAD array columns.
+
+### SPAD_ARRAY_HEIGHT
+
+```rust
+pub const SPAD_ARRAY_HEIGHT: i64 = 16;
+```
+
+SPAD array rows.
+
+### RTN_SPAD_APERTURE_TRANSMISSION
+
+```rust
+pub const RTN_SPAD_APERTURE_TRANSMISSION: i64 = 0x0038;
+```
+
+Transmission of an aperture SPAD, 1/256.
+
+### RTN_SPAD_UNITY_TRANSMISSION
+
+```rust
+pub const RTN_SPAD_UNITY_TRANSMISSION: i64 = 0x0100;
+```
+
+Transmission of an ordinary SPAD, 1/256.
+
+### AMBIENT_WINDOW_VCSEL_PERIODS
+
+```rust
+pub const AMBIENT_WINDOW_VCSEL_PERIODS: i64 = 256;
+```
+
+VCSEL periods of the ambient window.
+
+### RANGING_WINDOW_VCSEL_PERIODS
+
+```rust
+pub const RANGING_WINDOW_VCSEL_PERIODS: i64 = 2048;
+```
+
+VCSEL periods of the ranging window.
+
+### MACRO_PERIOD_VCSEL_PERIODS
+
+```rust
+pub const MACRO_PERIOD_VCSEL_PERIODS: i64 = AMBIENT_WINDOW_VCSEL_PERIODS + RANGING_WINDOW_VCSEL_PERIODS;
+```
+
+VCSEL periods of one macro period.
+
+### HISTOGRAM_BUFFER_SIZE
+
+```rust
+pub const HISTOGRAM_BUFFER_SIZE: usize = 24;
+```
+
+Bins in one frame.
+
+### DISTANCE_MODES
+
+```rust
+pub const DISTANCE_MODES: &[&str] = &["short", "medium", "long"];
+```
+
+The three preset modes VL53L3CX/VL53L4CX expose, by the distance mode that picks them.
+
+### L4_DISTANCE_MODES
+
+```rust
+pub const L4_DISTANCE_MODES: &[&str] = &["medium", "long"];
+```
+
+The L4CX BareDriver (STSW-IMG029) has no short mode on an L4 die.
+
+### TIMING_GUARD_US
+
+```rust
+pub const TIMING_GUARD_US: i64 = 1700;
+```
+
+`VL53LX_SetMeasurementTimingBudgetMicroSeconds`: the fixed guard that comes off the budget, µs.
+
+### TIMING_DIVISOR
+
+```rust
+pub const TIMING_DIVISOR: i64 = 6;
+```
+
+… and the rest splits six ways.
+
+### FDA_MAX_TIMING_BUDGET_US
+
+```rust
+pub const FDA_MAX_TIMING_BUDGET_US: i64 = 550000;
+```
+
+The budget ceiling, µs.
+
+### L4_FDA_MAX_TIMING_BUDGET_US
+
+```rust
+pub const L4_FDA_MAX_TIMING_BUDGET_US: i64 = 200000;
+```
+
+The budget ceiling on an L4 die, µs.
+
+### BLOCKS
+
+```rust
+pub static BLOCKS: &[RegBlockDef] = &[
+    RegBlockDef {
+        name: "static_nvm_managed",
+        base: 0x0001,
+        size: 11,
+        writable: true,
+        fields: &[
+            f("i2c_slave__device_address", 0, 1, false, Some(0x7F)),
+            f("ana_config__vhv_ref_sel_vddpix", 1, 1, false, Some(0xF)),
+            f("ana_config__vhv_ref_sel_vquench", 2, 1, false, Some(0x7F)),
+            f("ana_config__reg_avdd1v2_sel", 3, 1, false, Some(0x3)),
+            f("ana_config__fast_osc__trim", 4, 1, false, Some(0x7F)),
+            f("osc_measured__fast_osc__frequency", 5, 2, false, None),
+            f("vhv_config__timeout_macrop_loop_bound", 7, 1, false, None),
+            f("vhv_config__count_thresh", 8, 1, false, None),
+            f("vhv_config__offset", 9, 1, false, Some(0x3F)),
+            f("vhv_config__init", 10, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "customer_nvm_managed",
+        base: 0x000D,
+        size: 23,
+        writable: true,
+        fields: &[
+            f("global_config__spad_enables_ref_0", 0, 1, false, None),
+            f("global_config__spad_enables_ref_1", 1, 1, false, None),
+            f("global_config__spad_enables_ref_2", 2, 1, false, None),
+            f("global_config__spad_enables_ref_3", 3, 1, false, None),
+            f("global_config__spad_enables_ref_4", 4, 1, false, None),
+            f("global_config__spad_enables_ref_5", 5, 1, false, Some(0xF)),
+            f("global_config__ref_en_start_select", 6, 1, false, None),
+            f("ref_spad_man__num_requested_ref_spads", 7, 1, false, Some(0x3F)),
+            f("ref_spad_man__ref_location", 8, 1, false, Some(0x3)),
+            f("algo__crosstalk_compensation_plane_offset_kcps", 9, 2, false, None),
+            f("algo__crosstalk_compensation_x_plane_gradient_kcps", 11, 2, true, None),
+            f("algo__crosstalk_compensation_y_plane_gradient_kcps", 13, 2, true, None),
+            f("ref_spad_char__total_rate_target_mcps", 15, 2, false, None),
+            f("algo__part_to_part_range_offset_mm", 17, 2, true, Some(0x1FFF)),
+            f("mm_config__inner_offset_mm", 19, 2, true, None),
+            f("mm_config__outer_offset_mm", 21, 2, true, None),
+        ],
+    },
+    RegBlockDef {
+        name: "static_config",
+        base: 0x0024,
+        size: 32,
+        writable: true,
+        fields: &[
+            f("dss_config__target_total_rate_mcps", 0, 2, false, None),
+            f("debug__ctrl", 2, 1, false, Some(0x1)),
+            f("test_mode__ctrl", 3, 1, false, Some(0xF)),
+            f("clk_gating__ctrl", 4, 1, false, Some(0xF)),
+            f("nvm_bist__ctrl", 5, 1, false, Some(0x1F)),
+            f("nvm_bist__num_nvm_words", 6, 1, false, Some(0x7F)),
+            f("nvm_bist__start_address", 7, 1, false, Some(0x7F)),
+            f("host_if__status", 8, 1, false, Some(0x1)),
+            f("pad_i2c_hv__config", 9, 1, false, None),
+            f("pad_i2c_hv__extsup_config", 10, 1, false, Some(0x1)),
+            f("gpio_hv_pad__ctrl", 11, 1, false, Some(0x3)),
+            f("gpio_hv_mux__ctrl", 12, 1, false, Some(0x1F)),
+            f("gpio__tio_hv_status", 13, 1, false, Some(0x3)),
+            f("gpio__fio_hv_status", 14, 1, false, Some(0x3)),
+            f("ana_config__spad_sel_pswidth", 15, 1, false, Some(0x7)),
+            f("ana_config__vcsel_pulse_width_offset", 16, 1, false, Some(0x1F)),
+            f("ana_config__fast_osc__config_ctrl", 17, 1, false, Some(0x1)),
+            f("sigma_estimator__effective_pulse_width_ns", 18, 1, false, None),
+            f("sigma_estimator__effective_ambient_width_ns", 19, 1, false, None),
+            f("sigma_estimator__sigma_ref_mm", 20, 1, false, None),
+            f("algo__crosstalk_compensation_valid_height_mm", 21, 1, false, None),
+            f("spare_host_config__static_config_spare_0", 22, 1, false, None),
+            f("spare_host_config__static_config_spare_1", 23, 1, false, None),
+            f("algo__range_ignore_threshold_mcps", 24, 2, false, None),
+            f("algo__range_ignore_valid_height_mm", 26, 1, false, None),
+            f("algo__range_min_clip", 27, 1, false, None),
+            f("algo__consistency_check__tolerance", 28, 1, false, Some(0xF)),
+            f("spare_host_config__static_config_spare_2", 29, 1, false, None),
+            f("sd_config__reset_stages_msb", 30, 1, false, Some(0xF)),
+            f("sd_config__reset_stages_lsb", 31, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "general_config",
+        base: 0x0044,
+        size: 22,
+        writable: true,
+        fields: &[
+            f("gph_config__stream_count_update_value", 0, 1, false, None),
+            f("global_config__stream_divider", 1, 1, false, None),
+            f("system__interrupt_config_gpio", 2, 1, false, None),
+            f("cal_config__vcsel_start", 3, 1, false, Some(0x7F)),
+            f("cal_config__repeat_rate", 4, 2, false, Some(0xFFF)),
+            f("global_config__vcsel_width", 6, 1, false, Some(0x7F)),
+            f("phasecal_config__timeout_macrop", 7, 1, false, None),
+            f("phasecal_config__target", 8, 1, false, None),
+            f("phasecal_config__override", 9, 1, false, Some(0x1)),
+            f("dss_config__roi_mode_control", 11, 1, false, Some(0x7)),
+            f("system__thresh_rate_high", 12, 2, false, None),
+            f("system__thresh_rate_low", 14, 2, false, None),
+            f("dss_config__manual_effective_spads_select", 16, 2, false, None),
+            f("dss_config__manual_block_select", 18, 1, false, None),
+            f("dss_config__aperture_attenuation", 19, 1, false, None),
+            f("dss_config__max_spads_limit", 20, 1, false, None),
+            f("dss_config__min_spads_limit", 21, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "timing_config",
+        base: 0x005A,
+        size: 23,
+        writable: true,
+        fields: &[
+            f("mm_config__timeout_macrop_a_hi", 0, 1, false, Some(0xF)),
+            f("mm_config__timeout_macrop_a_lo", 1, 1, false, None),
+            f("mm_config__timeout_macrop_b_hi", 2, 1, false, Some(0xF)),
+            f("mm_config__timeout_macrop_b_lo", 3, 1, false, None),
+            f("range_config__timeout_macrop_a_hi", 4, 1, false, Some(0xF)),
+            f("range_config__timeout_macrop_a_lo", 5, 1, false, None),
+            f("range_config__vcsel_period_a", 6, 1, false, Some(0x3F)),
+            f("range_config__timeout_macrop_b_hi", 7, 1, false, Some(0xF)),
+            f("range_config__timeout_macrop_b_lo", 8, 1, false, None),
+            f("range_config__vcsel_period_b", 9, 1, false, Some(0x3F)),
+            f("range_config__sigma_thresh", 10, 2, false, None),
+            f("range_config__min_count_rate_rtn_limit_mcps", 12, 2, false, None),
+            f("range_config__valid_phase_low", 14, 1, false, None),
+            f("range_config__valid_phase_high", 15, 1, false, None),
+            f("system__intermeasurement_period", 18, 4, false, None),
+            f("system__fractional_enable", 22, 1, false, Some(0x1)),
+        ],
+    },
+    RegBlockDef {
+        name: "dynamic_config",
+        base: 0x0071,
+        size: 18,
+        writable: true,
+        fields: &[
+            f("system__grouped_parameter_hold_0", 0, 1, false, Some(0x3)),
+            f("system__thresh_high", 1, 2, false, None),
+            f("system__thresh_low", 3, 2, false, None),
+            f("system__enable_xtalk_per_quadrant", 5, 1, false, Some(0x1)),
+            f("system__seed_config", 6, 1, false, Some(0x7)),
+            f("sd_config__woi_sd0", 7, 1, false, None),
+            f("sd_config__woi_sd1", 8, 1, false, None),
+            f("sd_config__initial_phase_sd0", 9, 1, false, Some(0x7F)),
+            f("sd_config__initial_phase_sd1", 10, 1, false, Some(0x7F)),
+            f("system__grouped_parameter_hold_1", 11, 1, false, Some(0x3)),
+            f("sd_config__first_order_select", 12, 1, false, Some(0x3)),
+            f("sd_config__quantifier", 13, 1, false, Some(0xF)),
+            f("roi_config__user_roi_centre_spad", 14, 1, false, None),
+            f("roi_config__user_roi_requested_global_xy_size", 15, 1, false, None),
+            f("system__sequence_config", 16, 1, false, None),
+            f("system__grouped_parameter_hold", 17, 1, false, Some(0x3)),
+        ],
+    },
+    RegBlockDef {
+        name: "system_control",
+        base: 0x0083,
+        size: 5,
+        writable: true,
+        fields: &[
+            f("power_management__go1_power_force", 0, 1, false, Some(0x1)),
+            f("system__stream_count_ctrl", 1, 1, false, Some(0x1)),
+            f("firmware__enable", 2, 1, false, Some(0x1)),
+            f("system__interrupt_clear", 3, 1, false, Some(0x3)),
+            f("system__mode_start", 4, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "system_results",
+        base: 0x0088,
+        size: 44,
+        writable: true,
+        fields: &[
+            f("result__interrupt_status", 0, 1, false, Some(0x3F)),
+            f("result__range_status", 1, 1, false, None),
+            f("result__report_status", 2, 1, false, Some(0xF)),
+            f("result__stream_count", 3, 1, false, None),
+            f("result__dss_actual_effective_spads_sd0", 4, 2, false, None),
+            f("result__peak_signal_count_rate_mcps_sd0", 6, 2, false, None),
+            f("result__ambient_count_rate_mcps_sd0", 8, 2, false, None),
+            f("result__sigma_sd0", 10, 2, false, None),
+            f("result__phase_sd0", 12, 2, false, None),
+            f("result__final_crosstalk_corrected_range_mm_sd0", 14, 2, false, None),
+            f("result__peak_signal_count_rate_crosstalk_corrected_mcps_sd0", 16, 2, false, None),
+            f("result__mm_inner_actual_effective_spads_sd0", 18, 2, false, None),
+            f("result__mm_outer_actual_effective_spads_sd0", 20, 2, false, None),
+            f("result__avg_signal_count_rate_mcps_sd0", 22, 2, false, None),
+            f("result__dss_actual_effective_spads_sd1", 24, 2, false, None),
+            f("result__peak_signal_count_rate_mcps_sd1", 26, 2, false, None),
+            f("result__ambient_count_rate_mcps_sd1", 28, 2, false, None),
+            f("result__sigma_sd1", 30, 2, false, None),
+            f("result__phase_sd1", 32, 2, false, None),
+            f("result__final_crosstalk_corrected_range_mm_sd1", 34, 2, false, None),
+            f("result__spare_0_sd1", 36, 2, false, None),
+            f("result__spare_1_sd1", 38, 2, false, None),
+            f("result__spare_2_sd1", 40, 2, false, None),
+            f("result__spare_3_sd1", 42, 1, false, None),
+            f("result__thresh_info", 43, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "core_results",
+        base: 0x00B4,
+        size: 33,
+        writable: true,
+        fields: &[
+            f("result_core__ambient_window_events_sd0", 0, 4, false, None),
+            f("result_core__ranging_total_events_sd0", 4, 4, false, None),
+            f("result_core__signal_total_events_sd0", 8, 4, true, None),
+            f("result_core__total_periods_elapsed_sd0", 12, 4, false, None),
+            f("result_core__ambient_window_events_sd1", 16, 4, false, None),
+            f("result_core__ranging_total_events_sd1", 20, 4, false, None),
+            f("result_core__signal_total_events_sd1", 24, 4, true, None),
+            f("result_core__total_periods_elapsed_sd1", 28, 4, false, None),
+            f("result_core__spare_0", 32, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "debug_results",
+        base: 0x00D6,
+        size: 56,
+        writable: true,
+        fields: &[
+            f("phasecal_result__reference_phase", 0, 2, false, None),
+            f("phasecal_result__vcsel_start", 2, 1, false, Some(0x7F)),
+            f("ref_spad_char_result__num_actual_ref_spads", 3, 1, false, Some(0x3F)),
+            f("ref_spad_char_result__ref_location", 4, 1, false, Some(0x3)),
+            f("vhv_result__coldboot_status", 5, 1, false, Some(0x1)),
+            f("vhv_result__search_result", 6, 1, false, Some(0x3F)),
+            f("vhv_result__latest_setting", 7, 1, false, Some(0x3F)),
+            f("result__osc_calibrate_val", 8, 2, false, Some(0x3FF)),
+            f("ana_config__powerdown_go1", 10, 1, false, Some(0x3)),
+            f("ana_config__ref_bg_ctrl", 11, 1, false, Some(0x3)),
+            f("ana_config__regdvdd1v2_ctrl", 12, 1, false, Some(0xF)),
+            f("ana_config__osc_slow_ctrl", 13, 1, false, Some(0x7)),
+            f("test_mode__status", 14, 1, false, Some(0x1)),
+            f("firmware__system_status", 15, 1, false, Some(0x3)),
+            f("firmware__mode_status", 16, 1, false, None),
+            f("firmware__secondary_mode_status", 17, 1, false, None),
+            f("firmware__cal_repeat_rate_counter", 18, 2, false, Some(0xFFF)),
+            f("gph__system__thresh_high", 22, 2, false, None),
+            f("gph__system__thresh_low", 24, 2, false, None),
+            f("gph__system__enable_xtalk_per_quadrant", 26, 1, false, Some(0x1)),
+            f("gph__spare_0", 27, 1, false, Some(0x7)),
+            f("gph__sd_config__woi_sd0", 28, 1, false, None),
+            f("gph__sd_config__woi_sd1", 29, 1, false, None),
+            f("gph__sd_config__initial_phase_sd0", 30, 1, false, Some(0x7F)),
+            f("gph__sd_config__initial_phase_sd1", 31, 1, false, Some(0x7F)),
+            f("gph__sd_config__first_order_select", 32, 1, false, Some(0x3)),
+            f("gph__sd_config__quantifier", 33, 1, false, Some(0xF)),
+            f("gph__roi_config__user_roi_centre_spad", 34, 1, false, None),
+            f("gph__roi_config__user_roi_requested_global_xy_size", 35, 1, false, None),
+            f("gph__system__sequence_config", 36, 1, false, None),
+            f("gph__gph_id", 37, 1, false, Some(0x1)),
+            f("system__interrupt_set", 38, 1, false, Some(0x3)),
+            f("interrupt_manager__enables", 39, 1, false, Some(0x1F)),
+            f("interrupt_manager__clear", 40, 1, false, Some(0x1F)),
+            f("interrupt_manager__status", 41, 1, false, Some(0x1F)),
+            f("mcu_to_host_bank__wr_access_en", 42, 1, false, Some(0x1)),
+            f("power_management__go1_reset_status", 43, 1, false, Some(0x1)),
+            f("pad_startup_mode__value_ro", 44, 1, false, Some(0x3)),
+            f("pad_startup_mode__value_ctrl", 45, 1, false, Some(0x3F)),
+            f("pll_period_us", 46, 4, false, Some(0x3FFFF)),
+            f("interrupt_scheduler__data_out", 50, 4, false, None),
+            f("nvm_bist__complete", 54, 1, false, Some(0x1)),
+            f("nvm_bist__status", 55, 1, false, Some(0x1)),
+        ],
+    },
+    RegBlockDef {
+        name: "nvm_copy_data",
+        base: 0x010F,
+        size: 49,
+        writable: true,
+        fields: &[
+            f("identification__model_id", 0, 1, false, None),
+            f("identification__module_type", 1, 1, false, None),
+            f("identification__revision_id", 2, 1, false, None),
+            f("identification__module_id", 3, 2, false, None),
+            f("ana_config__fast_osc__trim_max", 5, 1, false, Some(0x7F)),
+            f("ana_config__fast_osc__freq_set", 6, 1, false, Some(0x7)),
+            f("ana_config__vcsel_trim", 7, 1, false, Some(0x7)),
+            f("ana_config__vcsel_selion", 8, 1, false, Some(0x3F)),
+            f("ana_config__vcsel_selion_max", 9, 1, false, Some(0x3F)),
+            f("protected_laser_safety__lock_bit", 10, 1, false, Some(0x1)),
+            f("laser_safety__key", 11, 1, false, Some(0x7F)),
+            f("laser_safety__key_ro", 12, 1, false, Some(0x1)),
+            f("laser_safety__clip", 13, 1, false, Some(0x3F)),
+            f("laser_safety__mult", 14, 1, false, Some(0x3F)),
+            f("global_config__spad_enables_rtn_0", 15, 1, false, None),
+            f("global_config__spad_enables_rtn_1", 16, 1, false, None),
+            f("global_config__spad_enables_rtn_2", 17, 1, false, None),
+            f("global_config__spad_enables_rtn_3", 18, 1, false, None),
+            f("global_config__spad_enables_rtn_4", 19, 1, false, None),
+            f("global_config__spad_enables_rtn_5", 20, 1, false, None),
+            f("global_config__spad_enables_rtn_6", 21, 1, false, None),
+            f("global_config__spad_enables_rtn_7", 22, 1, false, None),
+            f("global_config__spad_enables_rtn_8", 23, 1, false, None),
+            f("global_config__spad_enables_rtn_9", 24, 1, false, None),
+            f("global_config__spad_enables_rtn_10", 25, 1, false, None),
+            f("global_config__spad_enables_rtn_11", 26, 1, false, None),
+            f("global_config__spad_enables_rtn_12", 27, 1, false, None),
+            f("global_config__spad_enables_rtn_13", 28, 1, false, None),
+            f("global_config__spad_enables_rtn_14", 29, 1, false, None),
+            f("global_config__spad_enables_rtn_15", 30, 1, false, None),
+            f("global_config__spad_enables_rtn_16", 31, 1, false, None),
+            f("global_config__spad_enables_rtn_17", 32, 1, false, None),
+            f("global_config__spad_enables_rtn_18", 33, 1, false, None),
+            f("global_config__spad_enables_rtn_19", 34, 1, false, None),
+            f("global_config__spad_enables_rtn_20", 35, 1, false, None),
+            f("global_config__spad_enables_rtn_21", 36, 1, false, None),
+            f("global_config__spad_enables_rtn_22", 37, 1, false, None),
+            f("global_config__spad_enables_rtn_23", 38, 1, false, None),
+            f("global_config__spad_enables_rtn_24", 39, 1, false, None),
+            f("global_config__spad_enables_rtn_25", 40, 1, false, None),
+            f("global_config__spad_enables_rtn_26", 41, 1, false, None),
+            f("global_config__spad_enables_rtn_27", 42, 1, false, None),
+            f("global_config__spad_enables_rtn_28", 43, 1, false, None),
+            f("global_config__spad_enables_rtn_29", 44, 1, false, None),
+            f("global_config__spad_enables_rtn_30", 45, 1, false, None),
+            f("global_config__spad_enables_rtn_31", 46, 1, false, None),
+            f("roi_config__mode_roi_centre_spad", 47, 1, false, None),
+            f("roi_config__mode_roi_xy_size", 48, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "patch_debug",
+        base: 0x0F20,
+        size: 2,
+        writable: true,
+        fields: &[
+            f("result__debug_status", 0, 1, false, None),
+            f("result__debug_stage", 1, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "gph_general_config",
+        base: 0x0F24,
+        size: 5,
+        writable: true,
+        fields: &[
+            f("gph__system__thresh_rate_high", 0, 2, false, None),
+            f("gph__system__thresh_rate_low", 2, 2, false, None),
+            f("gph__system__interrupt_config_gpio", 4, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "gph_static_config",
+        base: 0x0F2F,
+        size: 6,
+        writable: true,
+        fields: &[
+            f("gph__dss_config__roi_mode_control", 0, 1, false, Some(0x7)),
+            f("gph__dss_config__manual_effective_spads_select", 1, 2, false, None),
+            f("gph__dss_config__manual_block_select", 3, 1, false, None),
+            f("gph__dss_config__max_spads_limit", 4, 1, false, None),
+            f("gph__dss_config__min_spads_limit", 5, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "gph_timing_config",
+        base: 0x0F36,
+        size: 16,
+        writable: true,
+        fields: &[
+            f("gph__mm_config__timeout_macrop_a_hi", 0, 1, false, Some(0xF)),
+            f("gph__mm_config__timeout_macrop_a_lo", 1, 1, false, None),
+            f("gph__mm_config__timeout_macrop_b_hi", 2, 1, false, Some(0xF)),
+            f("gph__mm_config__timeout_macrop_b_lo", 3, 1, false, None),
+            f("gph__range_config__timeout_macrop_a_hi", 4, 1, false, Some(0xF)),
+            f("gph__range_config__timeout_macrop_a_lo", 5, 1, false, None),
+            f("gph__range_config__vcsel_period_a", 6, 1, false, Some(0x3F)),
+            f("gph__range_config__vcsel_period_b", 7, 1, false, Some(0x3F)),
+            f("gph__range_config__timeout_macrop_b_hi", 8, 1, false, Some(0xF)),
+            f("gph__range_config__timeout_macrop_b_lo", 9, 1, false, None),
+            f("gph__range_config__sigma_thresh", 10, 2, false, None),
+            f("gph__range_config__min_count_rate_rtn_limit_mcps", 12, 2, false, None),
+            f("gph__range_config__valid_phase_low", 14, 1, false, None),
+            f("gph__range_config__valid_phase_high", 15, 1, false, None),
+        ],
+    },
+    RegBlockDef {
+        name: "fw_internal",
+        base: 0x0F46,
+        size: 2,
+        writable: true,
+        fields: &[
+            f("firmware__internal_stream_count_div", 0, 1, false, None),
+            f("firmware__internal_stream_counter_val", 1, 1, false, None),
+        ],
+    },
+];
+```
+
+The register blocks of the device image (one `VL53LX_*_t` struct of the C driver each), in
+address order: base, size, writable and the fields with offset, width, signedness and the mask
+the C codec applies (`None`: none).
+
+### TUNING
+
+```rust
+pub static TUNING: &[(&str, i64)] = &[
+    ("tp_tuning_parm_version", 30),
+    ("tp_tuning_parm_key_table_version", 14),
+    ("tp_tuning_parm_lld_version", 12180),
+    ("tp_init_phase_rtn_lite_long", 14),
+    ("tp_init_phase_rtn_lite_med", 10),
+    ("tp_init_phase_rtn_lite_short", 6),
+    ("tp_init_phase_ref_lite_long", 14),
+    ("tp_init_phase_ref_lite_med", 10),
+    ("tp_init_phase_ref_lite_short", 6),
+    ("tp_init_phase_rtn_hist_long", 9),
+    ("tp_init_phase_rtn_hist_med", 5),
+    ("tp_init_phase_rtn_hist_short", 3),
+    ("tp_init_phase_ref_hist_long", 6),
+    ("tp_init_phase_ref_hist_med", 6),
+    ("tp_init_phase_ref_hist_short", 6),
+    ("tp_consistency_lite_phase_tolerance", 2),
+    ("tp_phasecal_target", 33),
+    ("tp_cal_repeat_rate", 0),
+    ("tp_lite_min_clip", 0),
+    ("tp_lite_long_sigma_thresh_mm", 60),
+    ("tp_lite_med_sigma_thresh_mm", 60),
+    ("tp_lite_short_sigma_thresh_mm", 60),
+    ("tp_lite_long_min_count_rate_rtn_mcps", 128),
+    ("tp_lite_med_min_count_rate_rtn_mcps", 128),
+    ("tp_lite_short_min_count_rate_rtn_mcps", 128),
+    ("tp_lite_sigma_est_pulse_width_ns", 8),
+    ("tp_lite_sigma_est_amb_width_ns", 16),
+    ("tp_lite_sigma_ref_mm", 1),
+    ("tp_lite_seed_cfg", 2),
+    ("tp_timed_seed_cfg", 1),
+    ("tp_lite_quantifier", 2),
+    ("tp_lite_first_order_select", 0),
+    ("tp_uwr_enable", 1),
+    ("tp_uwr_med_z_1_min", 2000),
+    ("tp_uwr_med_z_1_max", 2750),
+    ("tp_uwr_med_z_2_min", 250),
+    ("tp_uwr_med_z_2_max", 1000),
+    ("tp_uwr_med_z_3_min", 1250),
+    ("tp_uwr_med_z_3_max", 1750),
+    ("tp_uwr_med_z_4_min", 1250),
+    ("tp_uwr_med_z_4_max", 1750),
+    ("tp_uwr_med_z_5_min", -200),
+    ("tp_uwr_med_z_5_max", 200),
+    ("tp_uwr_med_corr_z_1_rangea", 2300),
+    ("tp_uwr_med_corr_z_1_rangeb", 0),
+    ("tp_uwr_med_corr_z_2_rangea", 2300),
+    ("tp_uwr_med_corr_z_2_rangeb", 3050),
+    ("tp_uwr_med_corr_z_3_rangea", 4600),
+    ("tp_uwr_med_corr_z_3_rangeb", 3050),
+    ("tp_uwr_med_corr_z_4_rangea", 4600),
+    ("tp_uwr_med_corr_z_4_rangeb", 6200),
+    ("tp_uwr_med_corr_z_5_rangea", 0),
+    ("tp_uwr_med_corr_z_5_rangeb", 0),
+    ("tp_uwr_lng_z_1_min", 250),
+    ("tp_uwr_lng_z_1_max", 1250),
+    ("tp_uwr_lng_z_2_min", 3250),
+    ("tp_uwr_lng_z_2_max", 4500),
+    ("tp_uwr_lng_z_3_min", -200),
+    ("tp_uwr_lng_z_3_max", 200),
+    ("tp_uwr_lng_z_4_min", 0),
+    ("tp_uwr_lng_z_4_max", 0),
+    ("tp_uwr_lng_z_5_min", 0),
+    ("tp_uwr_lng_z_5_max", 0),
+    ("tp_uwr_lng_corr_z_1_rangea", 3850),
+    ("tp_uwr_lng_corr_z_1_rangeb", 4600),
+    ("tp_uwr_lng_corr_z_2_rangea", 3850),
+    ("tp_uwr_lng_corr_z_2_rangeb", 0),
+    ("tp_uwr_lng_corr_z_3_rangea", 0),
+    ("tp_uwr_lng_corr_z_3_rangeb", 0),
+    ("tp_uwr_lng_corr_z_4_rangea", 0),
+    ("tp_uwr_lng_corr_z_4_rangeb", 0),
+    ("tp_uwr_lng_corr_z_5_rangea", 0),
+    ("tp_uwr_lng_corr_z_5_rangeb", 0),
+    ("tp_dss_target_lite_mcps", 2560),
+    ("tp_dss_target_histo_mcps", 5120),
+    ("tp_dss_target_histo_mz_mcps", 5120),
+    ("tp_dss_target_timed_mcps", 2560),
+    ("tp_phasecal_timeout_lite_us", 1000),
+    ("tp_phasecal_timeout_hist_long_us", 15000),
+    ("tp_phasecal_timeout_hist_med_us", 9000),
+    ("tp_phasecal_timeout_hist_short_us", 6000),
+    ("tp_phasecal_timeout_mz_long_us", 15000),
+    ("tp_phasecal_timeout_mz_med_us", 9000),
+    ("tp_phasecal_timeout_mz_short_us", 6000),
+    ("tp_phasecal_timeout_timed_us", 1000),
+    ("tp_mm_timeout_lite_us", 2000),
+    ("tp_mm_timeout_histo_us", 2000),
+    ("tp_mm_timeout_mz_us", 2000),
+    ("tp_mm_timeout_timed_us", 2000),
+    ("tp_range_timeout_lite_us", 63000),
+    ("tp_range_timeout_histo_us", 2500),
+    ("tp_range_timeout_mz_us", 2500),
+    ("tp_range_timeout_timed_us", 13000),
+    ("tp_mm_timeout_lpa_us", 1),
+    ("tp_range_timeout_lpa_us", 8000),
+    ("tp_dss_target_very_short_mcps", 10240),
+    ("tp_phasecal_patch_power", 0),
+    ("tp_hist_merge", 1),
+    ("tp_reset_merge_threshold", 15000),
+    ("tp_hist_merge_max_size", 6),
+];
+```
+
+`VL53LX_tuning_parm_storage_t` after initialisation, keyed by the C field name.
+
+### DEFAULTS
+
+```rust
+pub static DEFAULTS: &[(&str, i64)] = &[
+    ("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_DEFAULT", 0),
+    ("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_MIN_SPAD_LIMIT_DEFAULT", 2048),
+    ("TUNINGPARM_CONSISTENCY_HIST_MIN_MAX_TOLERANCE_MM_DEFAULT", 0),
+    ("TUNINGPARM_CONSISTENCY_HIST_PHASE_TOLERANCE_DEFAULT", 8),
+    ("TUNINGPARM_CONSISTENCY_LITE_PHASE_TOLERANCE_DEFAULT", 2),
+    ("TUNINGPARM_DMAX_CFG_REFLECTANCE_ARRAY_0_DEFAULT", 15),
+    ("TUNINGPARM_DMAX_CFG_REFLECTANCE_ARRAY_1_DEFAULT", 52),
+    ("TUNINGPARM_DMAX_CFG_REFLECTANCE_ARRAY_2_DEFAULT", 200),
+    ("TUNINGPARM_DMAX_CFG_REFLECTANCE_ARRAY_3_DEFAULT", 364),
+    ("TUNINGPARM_DMAX_CFG_REFLECTANCE_ARRAY_4_DEFAULT", 400),
+    ("TUNINGPARM_DMAX_CFG_SIGNAL_THRESH_SIGMA_DEFAULT", 32),
+    ("TUNINGPARM_DYNXTALK_AVERAGED_XTALK_DELTA_DEFAULT", 308),
+    ("TUNINGPARM_DYNXTALK_CLIP_LIMIT_DEFAULT", 10240),
+    ("TUNINGPARM_DYNXTALK_MAX_SMUDGE_FACTOR_DEFAULT", 2000),
+    ("TUNINGPARM_DYNXTALK_NODETECT_AMB_THRESHOLD_KCPS_DEFAULT", 57671680),
+    ("TUNINGPARM_DYNXTALK_NODETECT_MIN_RANGE_MM_DEFAULT", 900),
+    ("TUNINGPARM_DYNXTALK_NODETECT_SAMPLE_LIMIT_DEFAULT", 40),
+    ("TUNINGPARM_DYNXTALK_NODETECT_XTALK_OFFSET_KCPS_DEFAULT", 410),
+    ("TUNINGPARM_DYNXTALK_NOISE_MARGIN_DEFAULT", 100),
+    ("TUNINGPARM_DYNXTALK_SAMPLE_LIMIT_DEFAULT", 200),
+    ("TUNINGPARM_DYNXTALK_SCALER_CALC_METHOD_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_SINGLE_XTALK_DELTA_DEFAULT", 2048),
+    ("TUNINGPARM_DYNXTALK_SMUDGE_COR_SINGLE_APPLY_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_SMUDGE_MARGIN_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_USER_SCALER_SET_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_XGRADIENT_SCALER_DEFAULT", 256),
+    ("TUNINGPARM_DYNXTALK_XTALK_AMB_THRESHOLD_DEFAULT", 128),
+    ("TUNINGPARM_DYNXTALK_XTALK_OFFSET_LIMIT_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_XTALK_OFFSET_LIMIT_HI_DEFAULT", 0),
+    ("TUNINGPARM_DYNXTALK_YGRADIENT_SCALER_DEFAULT", 256),
+    ("TUNINGPARM_HIST_ALGO_SELECT_DEFAULT", 4),
+    ("TUNINGPARM_HIST_AMB_EST_METHOD_DEFAULT", 1),
+    ("TUNINGPARM_HIST_AMB_EVENTS_SCALER_DEFAULT", 4157),
+    ("TUNINGPARM_HIST_AMB_THRESH_SIGMA_0_DEFAULT", 80),
+    ("TUNINGPARM_HIST_AMB_THRESH_SIGMA_1_DEFAULT", 100),
+    ("TUNINGPARM_HIST_FILTER_WOI_0_DEFAULT", 1),
+    ("TUNINGPARM_HIST_FILTER_WOI_1_DEFAULT", 2),
+    ("TUNINGPARM_HIST_GAIN_FACTOR_DEFAULT", 1987),
+    ("TUNINGPARM_HIST_MERGE_DEFAULT", 1),
+    ("TUNINGPARM_HIST_MERGE_MAX_SIZE_DEFAULT", 6),
+    ("TUNINGPARM_HIST_MIN_AMB_THRESH_EVENTS_DEFAULT", 16),
+    ("TUNINGPARM_HIST_NOISE_THRESHOLD_DEFAULT", 50),
+    ("TUNINGPARM_HIST_SIGMA_EST_REF_MM_DEFAULT", 1),
+    ("TUNINGPARM_HIST_SIGMA_THRESH_MM_DEFAULT", 180),
+    ("TUNINGPARM_HIST_SIGNAL_TOTAL_EVENTS_LIMIT_DEFAULT", 100),
+    ("TUNINGPARM_HIST_TARGET_ORDER_DEFAULT", 1),
+    ("TUNINGPARM_HIST_XTALK_MARGIN_KCPS_DEFAULT", 0),
+    ("TUNINGPARM_INITIAL_PHASE_REF_HISTO_LONG_RANGE_DEFAULT", 6),
+    ("TUNINGPARM_INITIAL_PHASE_REF_HISTO_MED_RANGE_DEFAULT", 6),
+    ("TUNINGPARM_INITIAL_PHASE_REF_HISTO_SHORT_RANGE_DEFAULT", 6),
+    ("TUNINGPARM_INITIAL_PHASE_REF_LITE_LONG_RANGE_DEFAULT", 14),
+    ("TUNINGPARM_INITIAL_PHASE_REF_LITE_MED_RANGE_DEFAULT", 10),
+    ("TUNINGPARM_INITIAL_PHASE_REF_LITE_SHORT_RANGE_DEFAULT", 6),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_HISTO_LONG_RANGE_DEFAULT", 9),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_HISTO_MED_RANGE_DEFAULT", 5),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_HISTO_SHORT_RANGE_DEFAULT", 3),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_LITE_LONG_RANGE_DEFAULT", 14),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_LITE_MED_RANGE_DEFAULT", 10),
+    ("TUNINGPARM_INITIAL_PHASE_RTN_LITE_SHORT_RANGE_DEFAULT", 6),
+    ("TUNINGPARM_KEY_TABLE_VERSION_DEFAULT", 14),
+    ("TUNINGPARM_LITE_CAL_REPEAT_RATE_DEFAULT", 0),
+    ("TUNINGPARM_LITE_DSS_CONFIG_TARGET_TOTAL_RATE_MCPS_DEFAULT", 2560),
+    ("TUNINGPARM_LITE_FIRST_ORDER_SELECT_DEFAULT", 0),
+    ("TUNINGPARM_LITE_LONG_MIN_COUNT_RATE_RTN_MCPS_DEFAULT", 128),
+    ("TUNINGPARM_LITE_LONG_SIGMA_THRESH_MM_DEFAULT", 60),
+    ("TUNINGPARM_LITE_MED_MIN_COUNT_RATE_RTN_MCPS_DEFAULT", 128),
+    ("TUNINGPARM_LITE_MED_SIGMA_THRESH_MM_DEFAULT", 60),
+    ("TUNINGPARM_LITE_MIN_CLIP_MM_DEFAULT", 0),
+    ("TUNINGPARM_LITE_MM_CONFIG_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_LITE_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 1000),
+    ("TUNINGPARM_LITE_QUANTIFIER_DEFAULT", 2),
+    ("TUNINGPARM_LITE_RANGE_CONFIG_TIMEOUT_US_DEFAULT", 63000),
+    ("TUNINGPARM_LITE_RANGING_GAIN_FACTOR_DEFAULT", 2011),
+    ("TUNINGPARM_LITE_RIT_MULT_DEFAULT", 64),
+    ("TUNINGPARM_LITE_SEED_CONFIG_DEFAULT", 2),
+    ("TUNINGPARM_LITE_SHORT_MIN_COUNT_RATE_RTN_MCPS_DEFAULT", 128),
+    ("TUNINGPARM_LITE_SHORT_SIGMA_THRESH_MM_DEFAULT", 60),
+    ("TUNINGPARM_LITE_SIGMA_EST_AMB_WIDTH_NS_DEFAULT", 16),
+    ("TUNINGPARM_LITE_SIGMA_EST_PULSE_WIDTH_DEFAULT", 8),
+    ("TUNINGPARM_LITE_SIGMA_REF_MM_DEFAULT", 1),
+    ("TUNINGPARM_LITE_XTALK_MARGIN_KCPS_DEFAULT", 0),
+    ("TUNINGPARM_LLD_VERSION_DEFAULT", 12180),
+    ("TUNINGPARM_LOWPOWERAUTO_MM_CONFIG_TIMEOUT_US_DEFAULT", 1),
+    ("TUNINGPARM_LOWPOWERAUTO_RANGE_CONFIG_TIMEOUT_US_DEFAULT", 8000),
+    ("TUNINGPARM_LOWPOWERAUTO_VHV_LOOP_BOUND_DEFAULT", 3),
+    ("TUNINGPARM_MZ_DSS_CONFIG_TARGET_TOTAL_RATE_MCPS_DEFAULT", 5120),
+    ("TUNINGPARM_MZ_LONG_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 15000),
+    ("TUNINGPARM_MZ_MED_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 9000),
+    ("TUNINGPARM_MZ_MM_CONFIG_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_MZ_RANGE_CONFIG_TIMEOUT_US_DEFAULT", 2500),
+    ("TUNINGPARM_MZ_SHORT_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 6000),
+    ("TUNINGPARM_OFFSET_CAL_DSS_RATE_MCPS_DEFAULT", 2560),
+    ("TUNINGPARM_OFFSET_CAL_MM1_SAMPLES_DEFAULT", 40),
+    ("TUNINGPARM_OFFSET_CAL_MM2_SAMPLES_DEFAULT", 9),
+    ("TUNINGPARM_OFFSET_CAL_MM_TIMEOUT_US_DEFAULT", 13000),
+    ("TUNINGPARM_OFFSET_CAL_PHASECAL_TIMEOUT_US_DEFAULT", 15000),
+    ("TUNINGPARM_OFFSET_CAL_PRE_SAMPLES_DEFAULT", 8),
+    ("TUNINGPARM_OFFSET_CAL_RANGE_TIMEOUT_US_DEFAULT", 13000),
+    ("TUNINGPARM_PHASECAL_PATCH_POWER_DEFAULT", 0),
+    ("TUNINGPARM_PHASECAL_TARGET_DEFAULT", 33),
+    ("TUNINGPARM_RANGING_DSS_CONFIG_TARGET_TOTAL_RATE_MCPS_DEFAULT", 5120),
+    ("TUNINGPARM_RANGING_LONG_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 15000),
+    ("TUNINGPARM_RANGING_MED_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 9000),
+    ("TUNINGPARM_RANGING_MM_CONFIG_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_RANGING_RANGE_CONFIG_TIMEOUT_US_DEFAULT", 2500),
+    ("TUNINGPARM_RANGING_SHORT_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 6000),
+    ("TUNINGPARM_REFSPADCHAR_DEVICE_TEST_MODE_DEFAULT", 8),
+    ("TUNINGPARM_REFSPADCHAR_MAX_COUNTRATE_LIMIT_MCPS_DEFAULT", 5120),
+    ("TUNINGPARM_REFSPADCHAR_MIN_COUNTRATE_LIMIT_MCPS_DEFAULT", 1280),
+    ("TUNINGPARM_REFSPADCHAR_PHASECAL_TIMEOUT_US_DEFAULT", 1000),
+    ("TUNINGPARM_REFSPADCHAR_TARGET_COUNT_RATE_MCPS_DEFAULT", 2560),
+    ("TUNINGPARM_REFSPADCHAR_VCSEL_PERIOD_DEFAULT", 11),
+    ("TUNINGPARM_RESET_MERGE_THRESHOLD_DEFAULT", 15000),
+    ("TUNINGPARM_SPADMAP_RATE_LIMIT_MCPS_DEFAULT", 12),
+    ("TUNINGPARM_SPADMAP_VCSEL_PERIOD_DEFAULT", 18),
+    ("TUNINGPARM_SPADMAP_VCSEL_START_DEFAULT", 15),
+    ("TUNINGPARM_TIMED_DSS_CONFIG_TARGET_TOTAL_RATE_MCPS_DEFAULT", 2560),
+    ("TUNINGPARM_TIMED_MM_CONFIG_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_TIMED_PHASECAL_CONFIG_TIMEOUT_US_DEFAULT", 1000),
+    ("TUNINGPARM_TIMED_RANGE_CONFIG_TIMEOUT_US_DEFAULT", 13000),
+    ("TUNINGPARM_TIMED_SEED_CONFIG_DEFAULT", 1),
+    ("TUNINGPARM_UWR_ENABLE_DEFAULT", 1),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_1_RANGEA_DEFAULT", 3850),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_1_RANGEB_DEFAULT", 4600),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_2_RANGEA_DEFAULT", 3850),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_2_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_3_RANGEA_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_3_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_4_RANGEA_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_4_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_5_RANGEA_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_CORRECTION_ZONE_5_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_ZONE_1_MAX_DEFAULT", 1250),
+    ("TUNINGPARM_UWR_LONG_ZONE_1_MIN_DEFAULT", 250),
+    ("TUNINGPARM_UWR_LONG_ZONE_2_MAX_DEFAULT", 4500),
+    ("TUNINGPARM_UWR_LONG_ZONE_2_MIN_DEFAULT", 3250),
+    ("TUNINGPARM_UWR_LONG_ZONE_3_MAX_DEFAULT", 200),
+    ("TUNINGPARM_UWR_LONG_ZONE_3_MIN_DEFAULT", -200),
+    ("TUNINGPARM_UWR_LONG_ZONE_4_MAX_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_ZONE_4_MIN_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_ZONE_5_MAX_DEFAULT", 0),
+    ("TUNINGPARM_UWR_LONG_ZONE_5_MIN_DEFAULT", 0),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_1_RANGEA_DEFAULT", 2300),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_1_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_2_RANGEA_DEFAULT", 2300),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_2_RANGEB_DEFAULT", 3050),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_3_RANGEA_DEFAULT", 4600),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_3_RANGEB_DEFAULT", 3050),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_4_RANGEA_DEFAULT", 4600),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_4_RANGEB_DEFAULT", 6200),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_5_RANGEA_DEFAULT", 0),
+    ("TUNINGPARM_UWR_MEDIUM_CORRECTION_ZONE_5_RANGEB_DEFAULT", 0),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_1_MAX_DEFAULT", 2750),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_1_MIN_DEFAULT", 2000),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_2_MAX_DEFAULT", 1000),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_2_MIN_DEFAULT", 250),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_3_MAX_DEFAULT", 1750),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_3_MIN_DEFAULT", 1250),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_4_MAX_DEFAULT", 1750),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_4_MIN_DEFAULT", 1250),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_5_MAX_DEFAULT", 200),
+    ("TUNINGPARM_UWR_MEDIUM_ZONE_5_MIN_DEFAULT", -200),
+    ("TUNINGPARM_VERSION_DEFAULT", 30),
+    ("TUNINGPARM_VERY_SHORT_DSS_RATE_MCPS_DEFAULT", 10240),
+    ("TUNINGPARM_VHV_LOOPBOUND_DEFAULT", 129),
+    ("TUNINGPARM_XTALK_DETECT_EVENT_SIGMA_DEFAULT", 80),
+    ("TUNINGPARM_XTALK_DETECT_MAX_SIGMA_MM_DEFAULT", 140),
+    ("TUNINGPARM_XTALK_DETECT_MAX_VALID_RANGE_MM_DEFAULT", 50),
+    ("TUNINGPARM_XTALK_DETECT_MAX_VALID_RATE_KCPS_DEFAULT", 400),
+    ("TUNINGPARM_XTALK_DETECT_MIN_MAX_TOLERANCE_DEFAULT", 50),
+    ("TUNINGPARM_XTALK_DETECT_MIN_VALID_RANGE_MM_DEFAULT", -50),
+    ("TUNINGPARM_XTALK_EXTRACT_BIN_TIMEOUT_US_DEFAULT", 10000),
+    ("TUNINGPARM_XTALK_EXTRACT_DSS_RATE_MCPS_DEFAULT", 5120),
+    ("TUNINGPARM_XTALK_EXTRACT_DSS_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_XTALK_EXTRACT_MAX_FILTER_THRESH_MM_DEFAULT", 70),
+    ("TUNINGPARM_XTALK_EXTRACT_MAX_VALID_RATE_KCPS_DEFAULT", 640),
+    ("TUNINGPARM_XTALK_EXTRACT_MIN_FILTER_THRESH_MM_DEFAULT", -70),
+    ("TUNINGPARM_XTALK_EXTRACT_NUM_OF_SAMPLES_DEFAULT", 7),
+    ("TUNINGPARM_XTALK_EXTRACT_PHASECAL_TIMEOUT_US_DEFAULT", 15000),
+    ("TUNINGPARM_XTALK_EXTRACT_SIGMA_THRESHOLD_MM_DEFAULT", 140),
+    ("TUNINGPARM_ZONE_CAL_DSS_RATE_MCPS_DEFAULT", 5120),
+    ("TUNINGPARM_ZONE_CAL_DSS_TIMEOUT_US_DEFAULT", 2000),
+    ("TUNINGPARM_ZONE_CAL_PHASECAL_NUM_SAMPLES_DEFAULT", 16),
+    ("TUNINGPARM_ZONE_CAL_PHASECAL_TIMEOUT_US_DEFAULT", 15000),
+    ("TUNINGPARM_ZONE_CAL_RANGE_TIMEOUT_US_DEFAULT", 1000),
+    ("TUNINGPARM_ZONE_CAL_ZONE_NUM_SAMPLES_DEFAULT", 8),
+];
+```
+
+The raw tuning header, for the parameters the post-processing reads without a `tp_` field.
 
 ### Vl53lxCmd
 
@@ -310,6 +4002,341 @@ The 83-byte histogram block at 0x0088: status bytes and the 24 bins
 (bin 23's low byte is carried in a separate MSB/LSB pair and patched in as
 `(MSB << 2) + LSB` before the bins are read).
 
+### Vl53lxPlatform
+
+```rust
+pub trait Vl53lxPlatform: Send + Sync {
+    fn read_multi(&self, addr: u16, size: usize) -> Result<Vec<u8>>;
+
+    fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()>;
+
+    /// The bridge's bus timing (not part of the C platform layer).
+    fn set_i2c_speed(&self, khz: u16) -> Result<()>;
+
+    /// How wide a register address the bridge puts on the wire; sticky.
+    fn set_addr_width(&self, width: u8) -> Result<()>;
+
+    /// Reset through XSHUT, for a sensor that no longer acknowledges writes.
+    fn xshut_reset(&self) -> Result<()>;
+
+    fn sleep_ms(&self, ms: u32) {
+        std::thread::sleep(Duration::from_millis(ms as u64));
+    }
+
+    fn read_byte(&self, addr: u16) -> Result<u8> {
+        Ok(self.read_multi(addr, 1)?[0])
+    }
+
+    fn read_word(&self, addr: u16) -> Result<u16> {
+        let b = self.read_multi(addr, 2)?;
+        Ok(u16::from_be_bytes([b[0], b[1]]))
+    }
+
+    fn read_dword(&self, addr: u16) -> Result<u32> {
+        let b = self.read_multi(addr, 4)?;
+        Ok(u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
+    }
+
+    fn write_byte(&self, addr: u16, value: u8) -> Result<()> {
+        self.write_multi(addr, &[value])
+    }
+
+    fn write_word(&self, addr: u16, value: u16) -> Result<()> {
+        self.write_multi(addr, &value.to_be_bytes())
+    }
+
+    fn write_dword(&self, addr: u16, value: u32) -> Result<()> {
+        self.write_multi(addr, &value.to_be_bytes())
+    }
+}
+```
+
+ST's platform layer (RdByte / WrWord / WaitMs …) for the 1D family, plus what the bridge owns: bus
+speed, register-address width and the XSHUT line. Register values are big-endian, as the C drivers
+assume. The device class implements it over the board; a test can script it.
+
+### Vl53lxTarget
+
+```rust
+pub struct Vl53lxTarget {
+    pub distance_mm: i32,
+    pub status: i32,
+    pub status_text: String,
+    pub signal_kcps: f64,
+    pub ambient_kcps: f64,
+    pub sigma_mm: f64,
+    pub min_range_mm: i32,
+    pub max_range_mm: i32,
+}
+```
+
+One return of a multi-target frame. `min_range_mm` / `max_range_mm` are the edges of the target's
+own pulse, which only the histogram driver knows.
+
+### ExtraValue
+
+```rust
+pub enum ExtraValue {
+    Int(i64),
+    Float(f64),
+}
+```
+
+A value of [`Vl53lxRange::extra`] / [`Vl53lxDriver::driver_info`]: driver-specific numbers.
+
+### Vl53lxRange
+
+```rust
+pub struct Vl53lxRange {
+    pub distance_mm: i32,
+    pub status: i32,
+    pub status_text: String,
+    pub signal_kcps: f64,
+    pub ambient_kcps: f64,
+    pub sigma_mm: f64,
+    pub spads: f64,
+    pub targets: Vec<Vl53lxTarget>,
+    pub extra: BTreeMap<String, ExtraValue>,
+}
+```
+
+One range result as a driver reports it, the same shape for every product of the family. On the
+histogram driver `targets` holds every return and the top level repeats the first; the light
+drivers leave it empty. `extra` is driver-specific (keys as the reference SDK spells them) — show
+it, don't branch on it.
+
+#### Vl53lxRange::valid
+
+```rust
+pub fn valid(&self) -> bool
+```
+
+### Thresholds
+
+```rust
+pub struct Thresholds {
+    pub distance_low_mm: u16,
+    pub distance_high_mm: u16,
+    pub window: u8,
+}
+```
+
+The distance-window interrupt: `window` is one of the `WINDOW_*` constants of the die.
+
+### BinData
+
+```rust
+pub type BinData = Box<dyn std::any::Any + Send>;
+```
+
+A raw histogram frame of the histogram driver (its concrete type is the driver's).
+
+### Vl53lxDriver
+
+```rust
+pub trait Vl53lxDriver: Send {
+    /// The product this driver was bound for (one driver serves several).
+    fn product(&self) -> &str;
+
+    /// The driver's own name, for messages ("Vl53l1UldDriver", …).
+    fn driver_name(&self) -> &'static str;
+
+    /// Bytes of register address on the wire.
+    fn addr_width(&self) -> u8 {
+        2
+    }
+
+    /// The interrupt-release writes handed to START_STREAM, `(addr, value)` each.
+    fn clear_steps(&self) -> Vec<(u16, u8)> {
+        Vec::new()
+    }
+
+    /// The bus ceiling; the driver runs the bus there itself.
+    fn max_khz(&self) -> u16 {
+        400
+    }
+
+    fn supports(&self) -> &'static [&'static str] {
+        &[]
+    }
+
+    /// The named ranging modes, the first being what init leaves; empty when there are none.
+    fn modes(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
+    /// The (min, max) budget a UI should offer, ms; see [`Vl53lxDriver::budget_choices`].
+    fn budget_ms(&self) -> (u32, u32) {
+        (10, 200)
+    }
+
+    /// The frame is a raw histogram (the histogram driver).
+    fn histogram(&self) -> bool {
+        false
+    }
+
+    fn model_id(&mut self) -> Result<u16>;
+
+    /// Reset and configure the sensor; leaves the bus at [`Vl53lxDriver::max_khz`]. Safe to re-run.
+    fn sensor_init(&mut self) -> Result<()>;
+
+    fn start_ranging(&mut self) -> Result<()>;
+
+    fn stop_ranging(&mut self) -> Result<()>;
+
+    fn check_for_data_ready(&mut self) -> Result<bool>;
+
+    /// Poll [`Vl53lxDriver::check_for_data_ready`] every 1 ms up to `timeout`.
+    fn wait_data_ready(&mut self, timeout: Duration) -> Result<()> {
+        let deadline = Instant::now() + timeout;
+        while !self.check_for_data_ready()? {
+            if Instant::now() > deadline {
+                return Err(DepzError::Sensor("timeout waiting for data ready".into()));
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Ok(())
+    }
+
+    fn clear_interrupt(&mut self) -> Result<()>;
+
+    /// (addr, len) — the register block the bridge streams on each INT.
+    fn stream_block(&self) -> (u16, u16);
+
+    /// Streamed block bytes → a range.
+    fn decode(&mut self, raw: &[u8]) -> Result<Vl53lxRange>;
+
+    /// One polled result: the stream block read and decoded.
+    fn read_measurement(&mut self) -> Result<Vl53lxRange>;
+
+    /// Budget of one measurement and the period between two; a period of 0 means continuous.
+    fn set_range_timing(&mut self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()>;
+
+    /// (timing budget ms, inter-measurement ms).
+    fn get_range_timing(&mut self) -> Result<(u32, u32)>;
+
+    /// The only budgets accepted right now (ascending), or empty when any integer of
+    /// [`Vl53lxDriver::budget_ms`] will do.
+    fn budget_choices(&self) -> Vec<u32> {
+        Vec::new()
+    }
+
+    fn set_mode(&mut self, _name: &str) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "mode"))
+    }
+
+    fn get_mode(&mut self) -> Result<String> {
+        Err(unsupported(self.product(), self.driver_name(), "mode"))
+    }
+
+    /// How far the loaded configuration can measure, mm, or `None` when not characterised.
+    fn reach_mm(&mut self) -> Result<Option<i32>> {
+        Ok(None)
+    }
+
+    /// Numbers this driver shows that the contract has no field for.
+    fn driver_info(&mut self) -> Result<BTreeMap<String, ExtraValue>> {
+        Ok(BTreeMap::new())
+    }
+
+    // ── optional groups ──────────────────────────────────────────────────────
+
+    fn get_offset(&mut self) -> Result<i32> {
+        Err(unsupported(self.product(), self.driver_name(), "offset"))
+    }
+
+    fn set_offset(&mut self, _offset_mm: i32) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "offset"))
+    }
+
+    fn get_xtalk(&mut self) -> Result<i32> {
+        Err(unsupported(self.product(), self.driver_name(), "xtalk"))
+    }
+
+    fn set_xtalk(&mut self, _xtalk_kcps: i32) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "xtalk"))
+    }
+
+    /// `nb_samples` `None`: the driver's default.
+    fn calibrate_offset(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
+        Err(unsupported(self.product(), self.driver_name(), "calib_offset"))
+    }
+
+    fn calibrate_xtalk(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
+        Err(unsupported(self.product(), self.driver_name(), "calib_xtalk"))
+    }
+
+    fn get_detection_thresholds(&mut self) -> Result<Thresholds> {
+        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+    }
+
+    fn set_detection_thresholds(&mut self, _distance_low_mm: u16, _distance_high_mm: u16, _window: u8) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+    }
+
+    fn get_signal_threshold(&mut self) -> Result<u32> {
+        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+    }
+
+    fn set_signal_threshold(&mut self, _signal_kcps: u32) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+    }
+
+    fn get_sigma_threshold(&mut self) -> Result<u32> {
+        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+    }
+
+    fn set_sigma_threshold(&mut self, _sigma_mm: u32) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+    }
+
+    /// (x, y) SPADs.
+    fn get_roi(&mut self) -> Result<(u8, u8)> {
+        Err(unsupported(self.product(), self.driver_name(), "roi"))
+    }
+
+    fn set_roi(&mut self, _x: u8, _y: u8) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "roi"))
+    }
+
+    fn get_roi_center(&mut self) -> Result<u8> {
+        Err(unsupported(self.product(), self.driver_name(), "roi"))
+    }
+
+    fn set_roi_center(&mut self, _center_spad: u8) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "roi"))
+    }
+
+    fn start_temperature_update(&mut self) -> Result<()> {
+        Err(unsupported(self.product(), self.driver_name(), "temp_update"))
+    }
+
+    /// VL53L0X: re-measure the reference SPADs → (count, is_aperture).
+    fn perform_ref_spad_management(&mut self) -> Result<(u32, bool)> {
+        Err(unsupported(self.product(), self.driver_name(), "refspad"))
+    }
+
+    // ── histogram driver ─────────────────────────────────────────────────────
+
+    /// The raw histogram of a frame (read from the sensor when `raw` is `None`).
+    fn bin_data(&mut self, _raw: Option<&[u8]>) -> Result<BinData> {
+        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+    }
+
+    /// A histogram frame → a range (the host-side ranging of the histogram driver).
+    fn to_measurement(&mut self, _bins: &BinData) -> Result<Vl53lxRange> {
+        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+    }
+}
+```
+
+The contract every driver of the 1D family implements (`uld/base.py`). The methods say what the
+product is as far as the bridge is concerned and which optional groups it serves
+([`Vl53lxDriver::supports`]): mode, timing, offset, xtalk, calib_offset, calib_xtalk,
+thresholds, signal_thresh, sigma_thresh, roi, temp_update, refspad. A group a driver lacks fails
+with [`DepzError::Unsupported`]. Methods that touch the sensor take `&mut self`: a driver may keep
+state (the histogram driver keeps the frame pair).
+
 ### DriverKind
 
 ```rust
@@ -542,6 +4569,1052 @@ Resolve the 1D-family class (contract 12 §1, pinned by `vl53lx.json`
 `model`): PID model if it is a family product, else the device-name
 product, else the generic [`Vl53lxClass::Vl53lx`].
 
+### SOFT_RESET
+
+```rust
+pub const SOFT_RESET: u16 = 0x0000;
+```
+
+`SOFT_RESET`.
+
+### I2C_SLAVE_DEVICE_ADDRESS
+
+```rust
+pub const I2C_SLAVE_DEVICE_ADDRESS: u16 = 0x0001;
+```
+
+`I2C_SLAVE__DEVICE_ADDRESS`.
+
+### OSC_FREQUENCY
+
+```rust
+pub const OSC_FREQUENCY: u16 = 0x0006;
+```
+
+`OSC_MEASURED__FAST_OSC__FREQUENCY`.
+
+### VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND
+
+```rust
+pub const VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND: u16 = 0x0008;
+```
+
+`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`.
+
+### XTALK_PLANE_OFFSET_KCPS
+
+```rust
+pub const XTALK_PLANE_OFFSET_KCPS: u16 = 0x0016;
+```
+
+`ALGO__CROSSTALK_COMPENSATION_PLANE_OFFSET_KCPS`.
+
+### XTALK_X_PLANE_GRADIENT_KCPS
+
+```rust
+pub const XTALK_X_PLANE_GRADIENT_KCPS: u16 = 0x0018;
+```
+
+`ALGO__CROSSTALK_COMPENSATION_X_PLANE_GRADIENT_KCPS`.
+
+### XTALK_Y_PLANE_GRADIENT_KCPS
+
+```rust
+pub const XTALK_Y_PLANE_GRADIENT_KCPS: u16 = 0x001A;
+```
+
+`ALGO__CROSSTALK_COMPENSATION_Y_PLANE_GRADIENT_KCPS`.
+
+### RANGE_OFFSET_MM
+
+```rust
+pub const RANGE_OFFSET_MM: u16 = 0x001E;
+```
+
+`ALGO__PART_TO_PART_RANGE_OFFSET_MM`.
+
+### INNER_OFFSET_MM
+
+```rust
+pub const INNER_OFFSET_MM: u16 = 0x0020;
+```
+
+`MM_CONFIG__INNER_OFFSET_MM`.
+
+### OUTER_OFFSET_MM
+
+```rust
+pub const OUTER_OFFSET_MM: u16 = 0x0022;
+```
+
+`MM_CONFIG__OUTER_OFFSET_MM`.
+
+### GPIO_HV_MUX_CTRL
+
+```rust
+pub const GPIO_HV_MUX_CTRL: u16 = 0x0030;
+```
+
+`GPIO_HV_MUX__CTRL`.
+
+### GPIO_TIO_HV_STATUS
+
+```rust
+pub const GPIO_TIO_HV_STATUS: u16 = 0x0031;
+```
+
+`GPIO__TIO_HV_STATUS`.
+
+### SYSTEM_INTERRUPT_CONFIG_GPIO
+
+```rust
+pub const SYSTEM_INTERRUPT_CONFIG_GPIO: u16 = 0x0046;
+```
+
+`SYSTEM__INTERRUPT_CONFIG_GPIO`.
+
+### PHASECAL_CONFIG_TIMEOUT_MACROP
+
+```rust
+pub const PHASECAL_CONFIG_TIMEOUT_MACROP: u16 = 0x004B;
+```
+
+`PHASECAL_CONFIG__TIMEOUT_MACROP`.
+
+### RANGE_CONFIG_TIMEOUT_MACROP_A_HI
+
+```rust
+pub const RANGE_CONFIG_TIMEOUT_MACROP_A_HI: u16 = 0x005E;
+```
+
+`RANGE_CONFIG__TIMEOUT_MACROP_A_HI`.
+
+### RANGE_CONFIG_VCSEL_PERIOD_A
+
+```rust
+pub const RANGE_CONFIG_VCSEL_PERIOD_A: u16 = 0x0060;
+```
+
+`RANGE_CONFIG__VCSEL_PERIOD_A`.
+
+### RANGE_CONFIG_TIMEOUT_MACROP_B_HI
+
+```rust
+pub const RANGE_CONFIG_TIMEOUT_MACROP_B_HI: u16 = 0x0061;
+```
+
+`RANGE_CONFIG__TIMEOUT_MACROP_B_HI`.
+
+### RANGE_CONFIG_VCSEL_PERIOD_B
+
+```rust
+pub const RANGE_CONFIG_VCSEL_PERIOD_B: u16 = 0x0063;
+```
+
+`RANGE_CONFIG__VCSEL_PERIOD_B`.
+
+### RANGE_CONFIG_SIGMA_THRESH
+
+```rust
+pub const RANGE_CONFIG_SIGMA_THRESH: u16 = 0x0064;
+```
+
+`RANGE_CONFIG__SIGMA_THRESH`.
+
+### MIN_COUNT_RATE_RTN_LIMIT_MCPS
+
+```rust
+pub const MIN_COUNT_RATE_RTN_LIMIT_MCPS: u16 = 0x0066;
+```
+
+`RANGE_CONFIG__MIN_COUNT_RATE_RTN_LIMIT_MCPS`.
+
+### RANGE_CONFIG_VALID_PHASE_HIGH
+
+```rust
+pub const RANGE_CONFIG_VALID_PHASE_HIGH: u16 = 0x0069;
+```
+
+`RANGE_CONFIG__VALID_PHASE_HIGH`.
+
+### INTERMEASUREMENT_MS
+
+```rust
+pub const INTERMEASUREMENT_MS: u16 = 0x006C;
+```
+
+`SYSTEM__INTERMEASUREMENT_PERIOD`.
+
+### THRESH_HIGH
+
+```rust
+pub const THRESH_HIGH: u16 = 0x0072;
+```
+
+`SYSTEM__THRESH_HIGH`.
+
+### THRESH_LOW
+
+```rust
+pub const THRESH_LOW: u16 = 0x0074;
+```
+
+`SYSTEM__THRESH_LOW`.
+
+### SD_CONFIG_WOI_SD0
+
+```rust
+pub const SD_CONFIG_WOI_SD0: u16 = 0x0078;
+```
+
+`SD_CONFIG__WOI_SD0`.
+
+### SD_CONFIG_INITIAL_PHASE_SD0
+
+```rust
+pub const SD_CONFIG_INITIAL_PHASE_SD0: u16 = 0x007A;
+```
+
+`SD_CONFIG__INITIAL_PHASE_SD0`.
+
+### ROI_CONFIG_USER_ROI_CENTRE_SPAD
+
+```rust
+pub const ROI_CONFIG_USER_ROI_CENTRE_SPAD: u16 = 0x007F;
+```
+
+`ROI_CONFIG__USER_ROI_CENTRE_SPAD`.
+
+### ROI_CONFIG_USER_ROI_XY_SIZE
+
+```rust
+pub const ROI_CONFIG_USER_ROI_XY_SIZE: u16 = 0x0080;
+```
+
+`ROI_CONFIG__USER_ROI_REQUESTED_GLOBAL_XY_SIZE`.
+
+### SYSTEM_INTERRUPT_CLEAR
+
+```rust
+pub const SYSTEM_INTERRUPT_CLEAR: u16 = 0x0086;
+```
+
+`SYSTEM__INTERRUPT_CLEAR`.
+
+### SYSTEM_MODE_START
+
+```rust
+pub const SYSTEM_MODE_START: u16 = 0x0087;
+```
+
+`SYSTEM__MODE_START`.
+
+### RESULT_RANGE_STATUS
+
+```rust
+pub const RESULT_RANGE_STATUS: u16 = 0x0089;
+```
+
+`RESULT__RANGE_STATUS`.
+
+### RESULT_OSC_CALIBRATE_VAL
+
+```rust
+pub const RESULT_OSC_CALIBRATE_VAL: u16 = 0x00DE;
+```
+
+`RESULT__OSC_CALIBRATE_VAL`.
+
+### FIRMWARE_SYSTEM_STATUS
+
+```rust
+pub const FIRMWARE_SYSTEM_STATUS: u16 = 0x00E5;
+```
+
+`FIRMWARE__SYSTEM_STATUS`.
+
+### IDENTIFICATION_MODEL_ID
+
+```rust
+pub const IDENTIFICATION_MODEL_ID: u16 = 0x010F;
+```
+
+`IDENTIFICATION__MODEL_ID`.
+
+### ROI_CONFIG_MODE_ROI_CENTRE_SPAD
+
+```rust
+pub const ROI_CONFIG_MODE_ROI_CENTRE_SPAD: u16 = 0x013E;
+```
+
+`ROI_CONFIG__MODE_ROI_CENTRE_SPAD`.
+
+### WINDOW_BELOW
+
+```rust
+pub const WINDOW_BELOW: u8 = 0;
+```
+
+Detection-threshold window: interrupt below `distance_low_mm`.
+
+### WINDOW_ABOVE
+
+```rust
+pub const WINDOW_ABOVE: u8 = 1;
+```
+
+Detection-threshold window: interrupt above `distance_high_mm`.
+
+### WINDOW_OUT
+
+```rust
+pub const WINDOW_OUT: u8 = 2;
+```
+
+Detection-threshold window: interrupt outside the window.
+
+### WINDOW_IN
+
+```rust
+pub const WINDOW_IN: u8 = 3;
+```
+
+Detection-threshold window: interrupt inside the window.
+
+### CONFIG_ADDR
+
+```rust
+pub const CONFIG_ADDR: u16 = 0x002D;
+```
+
+The configuration blob spans 0x2D..0x87 on every part.
+
+### CONFIG_END
+
+```rust
+pub const CONFIG_END: u16 = 0x0087;
+```
+
+End (exclusive) of the configuration blob.
+
+### CONFIG_FMP_BYTE
+
+```rust
+pub const CONFIG_FMP_BYTE: u8 = 0x12;
+```
+
+Byte 0 of the blob, always: the Fast Mode Plus byte.
+
+### RESULT_BLOCK_ADDR
+
+```rust
+pub const RESULT_BLOCK_ADDR: u16 = RESULT_RANGE_STATUS;
+```
+
+Start of the streamed result block (`RESULT__RANGE_STATUS`).
+
+### RESULT_BLOCK_LEN
+
+```rust
+pub const RESULT_BLOCK_LEN: usize = 17;
+```
+
+Length of the streamed result block, bytes.
+
+### DieConfig
+
+```rust
+pub struct DieConfig {
+    /// The 91-byte blob written at [`CONFIG_ADDR`] (byte 0 is replaced by [`CONFIG_FMP_BYTE`]).
+    pub configuration: &'static [u8; 91],
+    /// What stop_ranging writes: the L4CD ULD 0x80, the L3CX ULP and the L1X ULD 0x00.
+    pub stop_mode: u8,
+    /// Where the signal rate comes from in the block: 0x008E (offset 5) on the L4CD ULD, 0x0098 (15)
+    /// on the L1X ULD.
+    pub signal_at: usize,
+    /// Per-SPAD scale: 256 on the L4CD ULD, 25 on the L1X ULD (ST's own difference, kept).
+    pub per_spad_k: i64,
+}
+```
+
+What differs between the drivers on the die (the overridable constants of the Java
+`Vl53l1Die`).
+
+### phase_window_mm
+
+```rust
+pub fn phase_window_mm(fast_osc_frequency: i64, valid_phase_high: i64) -> i64
+```
+
+How far a target can be before the die fails it with status 4, mm.
+
+### status_text
+
+```rust
+pub fn status_text(status: i32) -> String
+```
+
+The ULD status text: `"unknown (N)"` for a code the table lacks.
+
+### Die
+
+```rust
+pub struct Die {
+    p: Arc<dyn Vl53lxPlatform>,
+    product: String,
+    cfg: DieConfig,
+}
+```
+
+The VL53L1 die one of the three die drivers runs: the platform it is reached through, the product
+it was bound for and the per-driver constants. Each driver exposes it ([`super::Vl53l4UldDriver::die`]
+…) for the die-level calls the contract has no method for (boot state, reset, interrupt polarity).
+
+#### Die::platform
+
+```rust
+pub fn platform(&self) -> &Arc<dyn Vl53lxPlatform>
+```
+
+The platform the die is reached through.
+
+#### Die::product
+
+```rust
+pub fn product(&self) -> &str
+```
+
+The product the driver was bound for.
+
+#### Die::config
+
+```rust
+pub fn config(&self) -> &DieConfig
+```
+
+The per-driver constants.
+
+#### Die::decode
+
+```rust
+pub fn decode(&self, raw: &[u8]) -> Result<Vl53lxRange>
+```
+
+The 17-byte result block → a range.
+
+#### Die::get_result
+
+```rust
+pub fn get_result(&self) -> Result<Vl53lxRange>
+```
+
+One block read instead of the C driver's six register reads; the decoding is identical.
+
+#### Die::model_id
+
+```rust
+pub fn model_id(&self) -> Result<u16>
+```
+
+`IDENTIFICATION__MODEL_ID`.
+
+#### Die::boot_state
+
+```rust
+pub fn boot_state(&self) -> Result<u8>
+```
+
+`FIRMWARE__SYSTEM_STATUS` (0x03 = booted).
+
+#### Die::wait_boot
+
+```rust
+pub fn wait_boot(&self, timeout_ms: u64) -> Result<()>
+```
+
+Poll the boot state every 1 ms until 0x03, up to `timeout_ms`.
+
+#### Die::reset_device
+
+```rust
+pub fn reset_device(&self, timeout_ms: u64) -> Result<()>
+```
+
+The die's soft reset; a part that no longer acknowledges writes is reset through XSHUT.
+
+#### Die::clear_interrupt
+
+```rust
+pub fn clear_interrupt(&self) -> Result<()>
+```
+
+`SYSTEM__INTERRUPT_CLEAR` ← 1.
+
+#### Die::start_ranging
+
+```rust
+pub fn start_ranging(&self) -> Result<()>
+```
+
+The L4CD ULD start: continuous when the period register is 0, else autonomous low power.
+
+#### Die::stop_ranging
+
+```rust
+pub fn stop_ranging(&self) -> Result<()>
+```
+
+`SYSTEM__MODE_START` ← the driver's stop mode.
+
+#### Die::get_interrupt_polarity
+
+```rust
+pub fn get_interrupt_polarity(&self) -> Result<u8>
+```
+
+1 = active high, 0 = active low (`GPIO_HV_MUX__CTRL` bit 4, inverted).
+
+#### Die::set_interrupt_polarity
+
+```rust
+pub fn set_interrupt_polarity(&self, polarity: u8) -> Result<()>
+```
+
+Set the interrupt polarity (1 = active high), keeping the other bits.
+
+#### Die::check_for_data_ready
+
+```rust
+pub fn check_for_data_ready(&self) -> Result<bool>
+```
+
+The polarity first, as both C drivers read it, then `GPIO__TIO_HV_STATUS` bit 0.
+
+#### Die::wait_data_ready
+
+```rust
+pub fn wait_data_ready(&self, timeout_ms: u64) -> Result<()>
+```
+
+Poll [`Die::check_for_data_ready`] every 1 ms (the platform's sleep) up to `timeout_ms`.
+
+#### Die::set_range_timing
+
+```rust
+pub fn set_range_timing(&self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()>
+```
+
+The L4CD ULD timing: any budget of 10..200 ms; `inter_measurement_ms` 0 = continuous, else it
+must exceed the budget (autonomous low power).
+
+#### Die::get_range_timing
+
+```rust
+pub fn get_range_timing(&self) -> Result<(u32, u32)>
+```
+
+The L4CD ULD read-back: (budget ms, inter-measurement ms).
+
+#### Die::reach_mm
+
+```rust
+pub fn reach_mm(&self) -> Result<Option<i32>>
+```
+
+Read off the loaded configuration: 1388 mm for the 0x38 window, 4563 mm for 0xB8.
+
+#### Die::set_detection_thresholds
+
+```rust
+pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+```
+
+The L4CD ULD thresholds: the window byte written whole.
+
+#### Die::get_detection_thresholds
+
+```rust
+pub fn get_detection_thresholds(&self) -> Result<Thresholds>
+```
+
+The distance window and its mode.
+
+#### Die::set_signal_threshold
+
+```rust
+pub fn set_signal_threshold(&self, signal_kcps: u32) -> Result<()>
+```
+
+Minimum signal, kcps (the register keeps kcps / 8).
+
+#### Die::get_signal_threshold
+
+```rust
+pub fn get_signal_threshold(&self) -> Result<u32>
+```
+
+Minimum signal, kcps.
+
+#### Die::set_sigma_threshold
+
+```rust
+pub fn set_sigma_threshold(&self, sigma_mm: u32) -> Result<()>
+```
+
+Maximum sigma, mm (≤ 16383).
+
+#### Die::get_sigma_threshold
+
+```rust
+pub fn get_sigma_threshold(&self) -> Result<u32>
+```
+
+Maximum sigma, mm.
+
+#### Die::set_offset
+
+```rust
+pub fn set_offset(&self, offset_mm: i32) -> Result<()>
+```
+
+The range offset, mm (the inner / outer offsets are zeroed).
+
+#### Die::get_offset
+
+```rust
+pub fn get_offset(&self) -> Result<i32>
+```
+
+The range offset, mm.
+
+#### Die::set_xtalk
+
+```rust
+pub fn set_xtalk(&self, xtalk_kcps: i32) -> Result<()>
+```
+
+The crosstalk plane offset, kcps (the gradients are zeroed).
+
+#### Die::get_xtalk
+
+```rust
+pub fn get_xtalk(&self) -> Result<i32>
+```
+
+The crosstalk plane offset, kcps.
+
+#### Die::set_roi
+
+```rust
+pub fn set_roi(&self, x: u8, y: u8) -> Result<()>
+```
+
+An X by Y window of SPADs, 4..16 each way.
+
+#### Die::get_roi
+
+```rust
+pub fn get_roi(&self) -> Result<(u8, u8)>
+```
+
+(x, y) SPADs.
+
+#### Die::set_roi_center
+
+```rust
+pub fn set_roi_center(&self, center_spad: u8) -> Result<()>
+```
+
+The ROI centre SPAD.
+
+#### Die::get_roi_center
+
+```rust
+pub fn get_roi_center(&self) -> Result<u8>
+```
+
+The ROI centre SPAD.
+
+### MODEL_ID_VL53L0X
+
+```rust
+pub const MODEL_ID_VL53L0X: u8 = 0xEE;
+```
+
+`IDENTIFICATION_MODEL_ID` (0xC0) of a VL53L0X.
+
+### RefCalibration
+
+```rust
+pub struct RefCalibration {
+    /// VHV setting.
+    pub vhv: u8,
+    /// Phase setting.
+    pub phase: u8,
+}
+```
+
+The VHV and phase settings the reference calibration found.
+
+### RefSpads
+
+```rust
+pub struct RefSpads {
+    /// Number of reference SPADs.
+    pub count: i32,
+    /// 1 = aperture SPADs, 0 = not.
+    pub is_aperture: i32,
+}
+```
+
+The reference SPAD set: how many and whether they are aperture SPADs (1) or not (0).
+
+### isqrt
+
+```rust
+pub fn isqrt(mut num: i64) -> i64
+```
+
+VL53L0X_isqrt(): the bit-by-bit integer square root.
+
+### Vl53l0xUldDriver
+
+```rust
+pub struct Vl53l0xUldDriver {
+    p: Arc<dyn Vl53lxPlatform>,
+    product: String,
+    // PALDevData / DeviceSpecificParameters: the state the C driver keeps beside the sensor.
+    read_data_from_device_done: i32,
+    xtalk_compensation_rate_mega_cps: i64,
+    xtalk_compensation_enable: i32,
+    stop_variable: u8,
+    sequence_config: u8,
+    range_fractional_enable: i32,
+    device_mode: i32,
+    continuous_mode: Option<i32>, // not in the C driver: resumed after a single shot
+    measurement_timing_budget_us: i64,
+    pin0_gpio_functionality: u8,
+    reference_spad_count: i32,
+    reference_spad_type: i32,
+    ref_good_spad_map: [u8; REF_SPAD_BUFFER_SIZE],
+    #[allow(dead_code)] // kept as the C driver keeps it
+    ref_spad_enables: [u8; REF_SPAD_BUFFER_SIZE],
+    pre_range_vcsel_pulse_period: i32,
+    final_range_vcsel_pulse_period: i32,
+    pre_range_timeout_us: i64,
+    final_range_timeout_us: i64,
+    target_ref_rate: i32,
+    limit_checks_enable: [i32; CHECK_NUMBER_OF_CHECKS],
+    limit_checks_value: [i64; CHECK_NUMBER_OF_CHECKS],
+    mode: String,
+
+    ref_spads_from_nvm: bool,
+    module_id: u8,
+    revision: u8,
+    product_id_string: String,
+    part_uid_upper: i64,
+    part_uid_lower: i64,
+    signal_rate_meas_fixed_400mm: i64,
+    part2part_offset_adjustment_nvm_um: i64,
+    osc_frequency_mhz: i64,
+}
+```
+
+The VL53L0X API 1.0.4 ranging path: 8-bit register addresses, no Fast Mode Plus, four ST ranging
+profiles as modes, offset / crosstalk calibration and reference SPAD management. There is no ROI
+and there are no detection thresholds on this die.
+
+#### Vl53l0xUldDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l0xUldDriver
+```
+
+A driver over `platform`, bound for `product`.
+
+#### Vl53l0xUldDriver::ref_spads_from_nvm
+
+```rust
+pub fn ref_spads_from_nvm(&self) -> bool
+```
+
+False when the NVM reference-SPAD record was out of range and was measured instead.
+
+#### Vl53l0xUldDriver::module_id
+
+```rust
+pub fn module_id(&self) -> u8
+```
+
+NVM module id.
+
+#### Vl53l0xUldDriver::revision
+
+```rust
+pub fn revision(&self) -> u8
+```
+
+NVM revision.
+
+#### Vl53l0xUldDriver::product_id_string
+
+```rust
+pub fn product_id_string(&self) -> &str
+```
+
+NVM product id string.
+
+#### Vl53l0xUldDriver::part_uid_upper
+
+```rust
+pub fn part_uid_upper(&self) -> i64
+```
+
+NVM part UID, upper 32 bits.
+
+#### Vl53l0xUldDriver::part_uid_lower
+
+```rust
+pub fn part_uid_lower(&self) -> i64
+```
+
+NVM part UID, lower 32 bits.
+
+#### Vl53l0xUldDriver::signal_rate_meas_fixed_400mm
+
+```rust
+pub fn signal_rate_meas_fixed_400mm(&self) -> i64
+```
+
+Factory signal rate at 400 mm, Mcps 16.16.
+
+#### Vl53l0xUldDriver::part2part_offset_adjustment_nvm_um
+
+```rust
+pub fn part2part_offset_adjustment_nvm_um(&self) -> i64
+```
+
+Factory part-to-part offset, µm.
+
+#### Vl53l0xUldDriver::osc_frequency_mhz
+
+```rust
+pub fn osc_frequency_mhz(&self) -> i64
+```
+
+Oscillator frequency, MHz 16.16.
+
+#### Vl53l0xUldDriver::get_reference_spads
+
+```rust
+pub fn get_reference_spads(&self) -> RefSpads
+```
+
+The reference SPAD set in use.
+
+#### Vl53l0xUldDriver::wait_boot
+
+```rust
+pub fn wait_boot(&self, timeout_ms: u64) -> Result<()>
+```
+
+No firmware-status register: the model id answering says the die is up.
+
+#### Vl53l0xUldDriver::reset_device
+
+```rust
+pub fn reset_device(&self, timeout_ms: u64) -> Result<()>
+```
+
+VL53L0X_ResetDevice(): a sensor left configured by a previous session ranges nothing without it.
+
+#### Vl53l0xUldDriver::perform_ref_calibration
+
+```rust
+pub fn perform_ref_calibration(&mut self) -> Result<RefCalibration>
+```
+
+VL53L0X_PerformRefCalibration(): VHV, then phase → (vhv, phase). Not optional in practice.
+
+#### Vl53l0xUldDriver::get_info_from_device
+
+```rust
+pub fn get_info_from_device(&mut self, option: i32) -> Result<()>
+```
+
+VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product
+identification (2), the part UID and factory offset (4).
+
+#### Vl53l0xUldDriver::set_offset_um
+
+```rust
+pub fn set_offset_um(&self, offset_um: i64) -> Result<()>
+```
+
+The register is 10.2 format in mm: steps of 250 µm.
+
+#### Vl53l0xUldDriver::get_offset_um
+
+```rust
+pub fn get_offset_um(&self) -> Result<i64>
+```
+
+The part-to-part offset, µm.
+
+#### Vl53l0xUldDriver::perform_offset_calibration
+
+```rust
+pub fn perform_offset_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+```
+
+VL53L0X_perform_offset_calibration() → µm (the contract's default is 50 samples). TCC and the
+range-ignore threshold are off for the run.
+
+#### Vl53l0xUldDriver::perform_xtalk_calibration
+
+```rust
+pub fn perform_xtalk_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+```
+
+VL53L0X_perform_xtalk_calibration() → the rate, Mcps 16.16 (the contract's default is 50
+samples).
+
+### Vl53l1UldDriver
+
+```rust
+pub struct Vl53l1UldDriver {
+    die: Die,
+    // The mode last applied: budget_choices answers from it (PHASECAL reads 0 before init).
+    applied_mode: &'static str,
+}
+```
+
+VL53L1X ULD 3.5.5 for VL53L1CX and VL53L1CB: a tabulated timing budget, short / long distance
+modes, an init that resets the die first. Crosstalk is in kcps, the register's own unit (ST's
+wrapper converts to cps).
+
+#### Vl53l1UldDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l1UldDriver
+```
+
+A driver over `platform`, bound for `product`.
+
+#### Vl53l1UldDriver::die
+
+```rust
+pub fn die(&self) -> &Die
+```
+
+The die underneath (boot state, reset, interrupt polarity).
+
+#### Vl53l1UldDriver::set_detection_thresholds_ext
+
+```rust
+pub fn set_detection_thresholds_ext(
+    &mut self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+    int_on_no_target: bool,
+) -> Result<()>
+```
+
+VL53L1X_SetDistanceThreshold(): a read-modify-write keeping the bits outside 0x6F;
+`int_on_no_target` sets bit 6.
+
+### Vl53l4UldDriver
+
+```rust
+pub struct Vl53l4UldDriver {
+    die: Die,
+}
+```
+
+VL53L4CD ULD 2.2.3 for VL53L4CD and VL53L4CX alike.
+
+#### Vl53l4UldDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l4UldDriver
+```
+
+A driver over `platform`, bound for `product`.
+
+#### Vl53l4UldDriver::die
+
+```rust
+pub fn die(&self) -> &Die
+```
+
+The die underneath (boot state, reset, interrupt polarity).
+
+### Vl53l3UlpDriver
+
+```rust
+pub struct Vl53l3UlpDriver {
+    die: Die,
+}
+```
+
+VL53L3CX ULP 1.0.0: plain single-target ranging on the histogram part.
+
+#### Vl53l3UlpDriver::new
+
+```rust
+pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l3UlpDriver
+```
+
+A driver over `platform`, bound for `product`.
+
+#### Vl53l3UlpDriver::die
+
+```rust
+pub fn die(&self) -> &Die
+```
+
+The die underneath (boot state, reset, interrupt polarity).
+
+### DriverCtor
+
+```rust
+pub type DriverCtor = fn(Arc<dyn Vl53lxPlatform>, &str) -> Box<dyn Vl53lxDriver>;
+```
+
+Builds a driver over a platform, bound for a product.
+
+### HIST_CAVEAT
+
+```rust
+pub const HIST_CAVEAT: &str =
+    "the histogram driver has no calibrations and no detection thresholds - the light drivers are the ones with those";
+```
+
+What the UI says about every histogram pair.
+
+### driver_kinds
+
+```rust
+pub fn driver_kinds(product: &str) -> Result<Vec<&'static str>>
+```
+
+The driver kinds `product` has, in [`DRIVER_KINDS`] order; [`DepzError::Unsupported`] for no such
+product. Empty for a product whose only kinds this crate does not run yet.
+
+### create_driver
+
+```rust
+pub fn create_driver(
+    product: &str,
+    kind: &str,
+    platform: Arc<dyn Vl53lxPlatform>,
+) -> Result<(Box<dyn Vl53lxDriver>, Option<&'static str>)>
+```
+
+The driver for one (product, kind) pair, and the caveat a UI shows about the pair (or `None`).
+[`DepzError::Unsupported`] for a pair the table has no row for, naming the kinds the product has.
+
 ## Contract-10 codecs (re-exported from `vl53l4`)
 
 ### pack_read_reg
@@ -558,7 +5631,8 @@ pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
 pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8>
 ```
 
-`VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes.
+`VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes,
+unchecked — prefer [`try_pack_write_reg`].
 
 ### pack_xshut
 

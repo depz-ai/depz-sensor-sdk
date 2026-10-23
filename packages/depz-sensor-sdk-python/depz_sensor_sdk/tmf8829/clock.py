@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..protocol._wire import check_uint
 from .frames import FrameInfo
 
 NOMINAL_Q16 = 8 << 16  # SYSTICK 125 kHz = 8 MCU µs per tick, Q16
@@ -73,6 +74,9 @@ class SensorClock:
     def add(self, us: int, tick: int) -> int:
         """Add a pair → FT_CLOCK_RESET if it does not fit the model (which then
         restarts from it), else 0."""
+        # contract 07 §3: an MCU µs time is a u64, a SYSTICK a u32
+        check_uint("us", us, 64)
+        check_uint("tick", tick, 32)
         flags = 0
         if self._valid and not self._step_ok(
             us - self._last[0], (tick - self._last[1]) & _U32
@@ -145,6 +149,12 @@ class CaptureTimer:
         edge_us: int,
         flags: int,
     ) -> FrameTime:
+        check_uint("fp_mode", fp_mode, 8)
+        check_uint("systick", systick, 32)
+        check_uint("t0_tick", t0_tick, 32)
+        check_uint("t1_tick", t1_tick, 32)
+        check_uint("pair_us", pair_us, 64)
+        check_uint("edge_us", edge_us, 64)
         c = self.clock
         if c.nominal:
             flags |= FT_NOMINAL

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildPacket, PacketParser, type ParserEvent } from "../../src/index.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { buildPacket, PacketParser } from "../../src/index.js";
+import { framingCollect } from "./shapes.js";
+import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const encodeVectors = loadVectors("framing_encode.json");
 const decodeVectors = loadVectors("framing_decode.json");
@@ -10,38 +11,12 @@ describe("framing encode vectors", () => {
     it(c.name, () => {
       const frame = buildPacket(c.cmd, fromHex(c.payload), c.seq, c.crc_type);
       expect(toHex(frame)).toBe(c.frame);
+      seen(c);
     });
   }
 });
 
-interface Collected {
-  events: Array<Record<string, unknown>>;
-  trash: string;
-  residue: string;
-  header_errors: number;
-}
-
-function collect(parser: PacketParser, chunks: Uint8Array[]): Collected {
-  const events: Array<Record<string, unknown>> = [];
-  const trash: number[] = [];
-  for (const chunk of chunks) {
-    for (const ev of parser.feed(chunk) as ParserEvent[]) {
-      if (ev.type === "packet") {
-        events.push({ type: "packet", cmd: ev.cmd, seq: ev.seq, payload: toHex(ev.payload) });
-      } else if (ev.type === "crcError") {
-        events.push({ type: "crc_error", cmd: ev.cmd, seq: ev.seq });
-      } else {
-        trash.push(...ev.data);
-      }
-    }
-  }
-  return {
-    events,
-    trash: toHex(Uint8Array.from(trash)),
-    residue: toHex(parser.residue),
-    header_errors: parser.headerErrors,
-  };
-}
+const collect = framingCollect;
 
 function randomChunks(stream: Uint8Array, seedState: { s: number }): Uint8Array[] {
   // Tiny LCG so the test is deterministic without extra deps.
@@ -78,6 +53,7 @@ describe("framing decode vectors — chunking invariance", () => {
         const split = collect(new PacketParser(), randomChunks(stream, seed));
         expect(split).toEqual(expected);
       }
+      seen(c);
     });
   }
 });

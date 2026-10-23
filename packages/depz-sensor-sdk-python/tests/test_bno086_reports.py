@@ -10,10 +10,12 @@ import pytest
 
 from depz_sensor_sdk.bno086.reports import (
     Acceleration,
+    FlushCompleted,
     GenericEvent,
     GyroIntegratedRV,
     Gyroscope,
     Magnetometer,
+    MotionRequest,
     PersonalActivityClassifier,
     RawSensor,
     RotationVector,
@@ -180,6 +182,25 @@ def test_raw_accelerometer_and_gyro_temperature():
     assert isinstance(acc, RawSensor) and acc.sensor_timestamp_us == 999
     assert acc.temperature_raw == 0
     assert isinstance(gyr, RawSensor) and gyr.temperature_raw == 42
+
+
+def test_motion_request_names():
+    # bytes captured from the lab BNO086 (SH-2 3.12.6), 2026-10-22
+    r = _one(bytes.fromhex("2b0003000000"))
+    assert isinstance(r, MotionRequest) and r.sensor_id == SensorId.MOTION_REQUEST
+    assert (r.intent_name, r.request_name, r.wants_stillness) == ("unknown", "no_constraint", False)
+    urgent = _one(_timebase(0) + _report(0x2B, bytes([3, 4])))
+    assert (urgent.intent_name, urgent.request_name, urgent.wants_stillness) == (
+        "in_motion", "stationary_urgent", True)
+    assert _one(_report(0x2B, bytes([0, 2]))).wants_stillness is False  # deprecated optional
+    assert _one(_report(0x2B, bytes([9, 9]))).request_name == "9"
+
+
+def test_flush_completed_has_no_header_and_parsing_continues():
+    # the lab BNO086 sent bare `ef 01` on channel 3 after Force Sensor Flush
+    assert _one(bytes.fromhex("ef01"), capture=CAP) == FlushCompleted(0xEF, CAP, 0x01)
+    reps = parse_input_cargo(bytes.fromhex("ef01") + _report(0x13, bytes([2, 0])), CAP)
+    assert isinstance(reps[0], FlushCompleted) and isinstance(reps[1], StabilityClassifier)
 
 
 def test_unknown_report_stops_parsing():

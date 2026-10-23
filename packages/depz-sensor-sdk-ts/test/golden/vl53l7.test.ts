@@ -7,7 +7,8 @@ import {
   unpackVl53l7Info,
 } from "../../src/protocol/vl53l7.js";
 import { packReadReg, packWriteReg } from "../../src/protocol/vl53l8.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { vl53l7Info } from "./shapes.js";
+import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const v = loadVectors<any>("vl53l7.json");
 
@@ -20,17 +21,13 @@ describe("vl53l7.json", () => {
     else if (c.kind === "set_i2c_speed") got = packVl53l7SetI2cSpeed(c.khz);
     else throw new Error(`unknown encode kind ${c.kind}`);
     expect(toHex(got)).toBe(c.payload);
+    seen(c);
   });
 
   for (const c of v.decode) it(`decode ${c.name}`, () => {
     expect(c.report).toBe(0x92);
-    const got = unpackVl53l7Info(fromHex(c.payload));
-    expect({
-      int_edges: got.intEdges, frames_dropped: got.framesDropped,
-      i2c_errors: got.i2cErrors, last_i2c_error: got.lastI2cError,
-      lpn_level: got.lpnLevel, int_level: got.intLevel, i2c_khz: got.i2cKhz,
-      frame_size: got.frameSize, streaming: got.streaming,
-    }).toEqual(c.expect);
+    expect(vl53l7Info(fromHex(c.payload))).toEqual(c.expect);
+    seen(c);
   });
 
   it("RPT_VL53_INFO rejects a short payload", () => {
@@ -39,5 +36,6 @@ describe("vl53l7.json", () => {
 
   for (const c of v.model) it(`model ${c.name}`, () => {
     expect(resolveVl53l7Model(c.usb_model, c.device_name)).toBe(c.expect);
+    seen(c);
   });
 });

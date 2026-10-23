@@ -42,11 +42,10 @@ the family's verifiable **decode and codec layer**:
   (`Vl53lxDecode.decodeL0xRaw`): distance, the raw device status
   byte, signal and ambient rates, effective SPAD count.
 
-What it does **not** do: initialise the sensor (reference SPADs, calibration,
-profiles), or compute the PAL range status, sigma and maximum distance — those
-need device data the driver caches at init. Initialising and streaming the
-board is done today with the Python or TypeScript SDK; this SDK decodes what
-the board streams and builds the command payloads.
+On top of them, the live device `ai.depz.sensor.devices.Vl53l0xDevice` runs
+ST's VL53L0X API 1.0.4 on the host (`Vl53l0xUldDriver`): initialisation
+(reference SPADs, calibration, profiles) and the PAL range status, sigma and
+maximum distance, which need the device data the driver caches at init.
 
 ## Key concepts
 

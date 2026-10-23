@@ -57,7 +57,7 @@ export class RecordingTransport implements SerialTransport {
     this.lines.push(JSON.stringify({ t, dir, data: bytesToHex(data) }));
   }
 
-  open(opts?: { baudRate?: number }): Promise<void> {
+  async open(opts?: { baudRate?: number }): Promise<void> {
     return this.inner.open(opts);
   }
 
@@ -75,7 +75,7 @@ export class RecordingTransport implements SerialTransport {
     }
   }
 
-  close(): Promise<void> {
+  async close(): Promise<void> {
     return this.inner.close();
   }
 
@@ -147,6 +147,11 @@ export class ReplayTransport implements SerialTransport {
     return this.rxIdx >= this.rx.length;
   }
 
+  /** Recorded tx bytes the host has not written yet (0 = whole tx stream re-issued). */
+  get txRemaining(): number {
+    return this.txStream.length - this.txWritten;
+  }
+
   async open(): Promise<void> {}
 
   private notifyAll(): void {
@@ -155,7 +160,7 @@ export class ReplayTransport implements SerialTransport {
     for (const w of waiters) w();
   }
 
-  private waitChange(): Promise<void> {
+  private async waitChange(): Promise<void> {
     return new Promise((resolve) => this.waiters.push(resolve));
   }
 

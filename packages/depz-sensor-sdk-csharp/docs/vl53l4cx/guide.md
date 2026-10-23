@@ -1,17 +1,14 @@
 # VL53L4CX — user guide
 
-Hands-on guide to the 1D-family codecs, product table and block decode
-(`Depz.Sensor.Vl53lx`) for the VL53L4CX. For what the sensor is and its
-concepts, read the [introduction](introduction.md); for exact signatures see
-the [API reference](api.md).
-
-This SDK does not drive the sensor: the ST driver (initialisation, modes,
-budgets, histogram target extraction) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
+Hands-on guide to the VL53L4CX: the live device
+(`Depz.Sensor.Devices.Vl53l4cxDevice`, which runs the histogram driver on the host) and the
+codecs, product table and block decode under it (`Depz.Sensor.Vl53lx`). For
+what the sensor is and its concepts, read the [introduction](introduction.md);
+for exact signatures see the [API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
@@ -20,6 +17,47 @@ commands and decode what the board streams.
 - [Which statuses to plot](#which-statuses-to-plot)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+using Depz.Sensor.Vl53lx;
+
+using Vl53lxDevice tof = DepzDevices.OpenVl53lx();   // a Vl53l4cxDevice for this board
+Console.WriteLine(string.Join(", ", tof.DriverKinds()));   // histogram
+tof.Init();                                    // the histogram driver, the only kind
+tof.Configure(budgetMs: 33, mode: "medium");     // medium / long, 2..200 ms on an L4 die
+
+using var frames = tof.Measurements();
+tof.StartRanging();
+Vl53lxMeasurement m = frames.Take(TimeSpan.FromSeconds(1));
+foreach (Vl53lxTarget t in m.Targets)
+    Console.WriteLine($"{t.DistanceMm} mm ({t.MinRangeMm}..{t.MaxRangeMm}), {t.StatusText}");
+tof.StopRanging();
+```
+
+- To run the board light, borrow the VL53L4CD's ULD:
+  `tof.Init("uld", product: "VL53L4CD")` (~1.4 m reach, calibrations,
+  thresholds, one target).
+- `histogram` — ST's BareDriver (`Vl53lxHistogramDriver`), its post-processing
+  on the host: up to four targets per frame in `Targets` (strongest first, the
+  top level repeats the first, `MinRangeMm`..`MaxRangeMm` is the pulse's
+  extent) and the raw 24 bins in `Bins` (a `HistogramBinData`). It has no
+  calibrations and no detection thresholds.
+- The first frame of a histogram stream reports status 6 (no wrap check: there
+  is no frame before it), a target with nothing in the frame before reports 12;
+  draw `m.PlotDistances()` (statuses 0, 6, 11).
+- Every streamed frame is decoded once, in order, on the reader thread: the
+  histogram driver keeps the A/B frame pair and the previous frame's targets.
+- `Configure` re-initialises the sensor and applies the mode and budget; it
+  and every setting throw `InvalidOperationException` while ranging. Ask
+  `tof.Supports("offset")` (…) before an optional group: a missing one throws
+  `NotSupportedException`.
+- `tof.Driver` is the driver itself; `MeasureOnce()` is one polled range.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## Which board is it
 
@@ -118,7 +156,8 @@ foreach (ParserEvent ev in parser.Feed(rxBytes))
 ```
 
 Turning bins into up to four targets (preset, VCSEL period, the A/B frame
-pairs, phase history) is the full driver's job and is not in this SDK. The
+pairs, phase history) is the histogram driver's job — `Vl53lxHistogramDriver`, which the
+live device runs. The
 driver keeps state from frame to frame, so a stream fed to it must be decoded
 **exactly once, in order** — replaying or skipping frames changes its output.
 
@@ -168,7 +207,7 @@ driver's target status — the rule does not apply to it.
 
 There is no `short` histogram preset on an L4 die (VL53L4CD / L4CX), and the
 budget ceiling there is 200 ms: the SDKs that run the driver (Python, TS, C,
-C++) refuse both, as ST's own L4CX driver does — the A frame of the short pair
+C++, C#) refuse both, as ST's own L4CX driver does — the A frame of the short pair
 ranges on the wrong side of the phase wrap, one frame in two (flat wall,
 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4). A
 driver of your own should refuse it too; `medium` and `long` are clean.

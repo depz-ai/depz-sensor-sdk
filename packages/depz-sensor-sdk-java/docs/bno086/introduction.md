@@ -3,10 +3,12 @@
 The **BNO086** is a CEVA/Hillcrest 9-axis IMU with an on-chip sensor-fusion hub
 (SH-2). It fuses accelerometer, gyroscope and magnetometer into ready-to-use
 orientation, motion and activity outputs. On the DEPZ sensor line the MCU is an
-**SHTP pass-through bridge** — the full SH-2 host stack runs on the host. This
-Java SDK ports that stack's verifiable half: SHTP framing/reassembly
-(`Shtp`), the SH-2 control-channel encoders (`Sh2`), and the input-report
-decoders (`Reports`), all under `ai.depz.sensor.sensors.bno086`.
+**SHTP pass-through bridge** — the full SH-2 host stack runs on the host. The
+Java SDK runs it: the live device `ai.depz.sensor.devices.Bno086Device`
+(requests correlated at the SH-2 layer, feature read-back, calibration, FRS,
+flush), over SHTP framing/reassembly (`Shtp`), the SH-2 control-channel encoders
+and response decoders (`Sh2`, `Sh2Hub`), and the input-report decoders
+(`Reports`), all under `ai.depz.sensor.sensors.bno086`.
 
 ## What it does
 
@@ -55,8 +57,10 @@ things are*, the BNO086 tells you *how the device itself is moving and facing*.
   `Reports.parseInputCargo`.
 - **Raw integers are authoritative; scaling is derived downstream.** Each decoded
   report is a `Reports.Report` (`type` tag + a `fields` map) whose values are the
-  wire integers (`x_raw`, `i_raw`, …). Q-point scaling (accel Q8, gyro Q9, mag
-  Q4, quaternions Q14, …) is applied by the consumer, not here.
+  wire integers (`x_raw`, `i_raw`, …). `Reports.scaled` applies the Q points
+  (accel Q8, gyro Q9, mag Q4, quaternions Q14, …; `Reports.Q_POINTS`) and
+  returns the physical values under the reference SDK's names (`x`, `i`,
+  `accuracy_rad`, `bias`, …).
 - **Timestamps fold two references.** Channel-3/4 cargos start with a Base
   Timestamp Reference (`0xFB`) and optional rebases (`0xFA`), and each report
   adds its own 14-bit delay; `parseInputCargo` folds all of them into an absolute

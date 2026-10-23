@@ -209,13 +209,13 @@ export class Bno055 extends DepzDevice {
 
   constructor(transport: SerialTransport, opts?: Bno055Options) {
     super(transport, opts);
-    this.sleepImpl = opts?.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   // ── identity & bridge diagnostics ──────────────────────────────────────────
 
   /** RPT_BNO_INFO: chip ids, sensor firmware revision and bridge counters. */
-  bridgeInfo(): Promise<Bno055Info> {
+  async bridgeInfo(): Promise<Bno055Info> {
     return this.request(Bno055Cmd.GetInfo, undefined, {
       matcher: DepzDevice.expectReport(Bno055Rpt.Info, unpackBno055Info),
     });
@@ -237,7 +237,7 @@ export class Bno055 extends DepzDevice {
    * (contract 13 §5). Stops any stream; the sensor comes back in CONFIG with
    * power-on units — call configure() or restoreConfiguration().
    */
-  resetSensor(): Promise<void> {
+  async resetSensor(): Promise<void> {
     return this.locked(async () => {
       await this.request(Bno055Cmd.Reset, undefined, {
         okCompletes: true,
@@ -252,20 +252,20 @@ export class Bno055 extends DepzDevice {
   // ── raw register access ────────────────────────────────────────────────────
 
   /** Read `length` bytes at `addr` on `page` (page 1 refused while streaming). */
-  readRegisters(addr: number, length: number, page = 0): Promise<Uint8Array> {
-    return this.locked(() => this.onPage(page, async () => (await this.rd(addr, length)).data));
+  async readRegisters(addr: number, length: number, page = 0): Promise<Uint8Array> {
+    return this.locked(async () => this.onPage(page, async () => (await this.rd(addr, length)).data));
   }
 
   /** Write `data` at `addr` on `page`. Most config registers need CONFIG mode. */
-  writeRegisters(addr: number, data: Uint8Array, page = 0): Promise<void> {
-    return this.locked(() => this.onPage(page, () => this.wr(addr, data)));
+  async writeRegisters(addr: number, data: Uint8Array, page = 0): Promise<void> {
+    return this.locked(async () => this.onPage(page, async () => this.wr(addr, data)));
   }
 
   async readRegister(addr: number, page = 0): Promise<number> {
     return (await this.readRegisters(addr, 1, page))[0]!;
   }
 
-  writeRegister(addr: number, value: number, page = 0): Promise<void> {
+  async writeRegister(addr: number, value: number, page = 0): Promise<void> {
     return this.writeRegisters(addr, Uint8Array.of(value & 0xff), page);
   }
 
@@ -281,7 +281,7 @@ export class Bno055 extends DepzDevice {
    * sensor ignores a direct write from one operating mode to another
    * (measured: NDOF → AMG stays NDOF), so such a switch goes through CONFIG.
    */
-  setOperationMode(mode: Bno055OprMode): Promise<void> {
+  async setOperationMode(mode: Bno055OprMode): Promise<void> {
     return this.locked(async () => {
       if (mode !== Bno055OprMode.Config) {
         const current = ((await this.rd(BNO055_REG_OPR_MODE, 1)).data[0]! & 0x0f) as Bno055OprMode;
@@ -302,7 +302,7 @@ export class Bno055 extends DepzDevice {
    * the operating mode is kept here and put back on wake-up — NDOF if the chip
    * was already asleep when we connected (contract 13 §4.6).
    */
-  setPowerMode(mode: Bno055PwrMode): Promise<void> {
+  async setPowerMode(mode: Bno055PwrMode): Promise<void> {
     return this.locked(async () => {
       const opr = ((await this.rd(BNO055_REG_OPR_MODE, 1)).data[0]! & 0x0f) as Bno055OprMode;
       const pwr = (await this.rd(BNO055_REG_PWR_MODE, 1)).data[0]! & 0x03;
@@ -331,8 +331,8 @@ export class Bno055 extends DepzDevice {
     return u;
   }
 
-  setUnits(units: Bno055Units): Promise<void> {
-    return this.locked(() =>
+  async setUnits(units: Bno055Units): Promise<void> {
+    return this.locked(async () =>
       this.inConfig(async () => {
         await this.wr(BNO055_REG_UNIT_SEL, Uint8Array.of(packBno055Units(units)));
         this.unitsCache = units;
@@ -346,19 +346,19 @@ export class Bno055 extends DepzDevice {
   }
 
   /** An AxisRemap, or a datasheet placement "P0".."P7" (P1 = default). */
-  setAxisRemap(remap: Bno055AxisRemap | string): Promise<void> {
+  async setAxisRemap(remap: Bno055AxisRemap | string): Promise<void> {
     const r = typeof remap === "string" ? bno055Placement(remap) : remap;
     const bytes = Uint8Array.from(packBno055AxisRemap(r));
-    return this.locked(() => this.inConfig(() => this.wr(BNO055_REG_AXIS_MAP_CONFIG, bytes)));
+    return this.locked(async () => this.inConfig(async () => this.wr(BNO055_REG_AXIS_MAP_CONFIG, bytes)));
   }
 
   async getTemperatureSource(): Promise<Bno055TempSource> {
     return ((await this.readRegister(BNO055_REG_TEMP_SOURCE)) & 0x03) as Bno055TempSource;
   }
 
-  setTemperatureSource(source: Bno055TempSource): Promise<void> {
-    return this.locked(() =>
-      this.inConfig(() => this.wr(BNO055_REG_TEMP_SOURCE, Uint8Array.of(source))),
+  async setTemperatureSource(source: Bno055TempSource): Promise<void> {
+    return this.locked(async () =>
+      this.inConfig(async () => this.wr(BNO055_REG_TEMP_SOURCE, Uint8Array.of(source))),
     );
   }
 
@@ -367,7 +367,7 @@ export class Bno055 extends DepzDevice {
    * profile → mode (default NDOF). In a fusion mode it resolves once the
    * fusion outputs are live. Remembered for restoreConfiguration().
    */
-  configure(opts: Bno055ConfigureOptions = {}): Promise<void> {
+  async configure(opts: Bno055ConfigureOptions = {}): Promise<void> {
     const mode = opts.mode ?? Bno055OprMode.Ndof;
     const units = opts.units ?? BNO055_DEFAULT_UNITS;
     const axis = typeof opts.axisRemap === "string" ? bno055Placement(opts.axisRemap) : opts.axisRemap;
@@ -392,7 +392,7 @@ export class Bno055 extends DepzDevice {
    * Re-apply the last configure() — after resetSensor(), or when
    * bridgeInfo().sensorResets rose (the bridge's bus recovery pulses nRESET).
    */
-  restoreConfiguration(): Promise<void> {
+  async restoreConfiguration(): Promise<void> {
     if (this.configured === null) {
       return Promise.reject(new DepzError("configure() has not been called"));
     }
@@ -402,15 +402,15 @@ export class Bno055 extends DepzDevice {
   // ── status, self-test, calibration ────────────────────────────────────────
 
   /** ST_RESULT, SYS_CLK_STATUS, SYS_STATUS, SYS_ERR (INT_STA skipped). */
-  systemStatus(): Promise<Bno055SystemStatus> {
-    return this.locked(() => this.readSystemStatus());
+  async systemStatus(): Promise<Bno055SystemStatus> {
+    return this.locked(async () => this.readSystemStatus());
   }
 
   /**
    * Built-in self-test (datasheet §3.9.2): CONFIG, SYS_TRIGGER SELF_TEST,
    * ~400 ms, then read the verdict. The mode is restored. Not while streaming.
    */
-  selfTest(): Promise<Bno055SystemStatus> {
+  async selfTest(): Promise<Bno055SystemStatus> {
     this.requireNotStreaming();
     return this.locked(async () => {
       const previous = ((await this.rd(BNO055_REG_OPR_MODE, 1)).data[0]! & 0x0f) as Bno055OprMode;
@@ -434,8 +434,8 @@ export class Bno055 extends DepzDevice {
   }
 
   /** Offsets and radii (0x55..0x6A) — CONFIG only; the driver switches there and back. */
-  readCalibrationProfile(): Promise<Bno055CalibrationProfile> {
-    return this.locked(() =>
+  async readCalibrationProfile(): Promise<Bno055CalibrationProfile> {
+    return this.locked(async () =>
       this.inConfig(async () =>
         unpackBno055CalibrationProfile(
           (await this.rd(BNO055_REG_CALIB_PROFILE, BNO055_CALIB_PROFILE_LEN)).data,
@@ -448,9 +448,9 @@ export class Bno055 extends DepzDevice {
    * Restore a stored profile: CONFIG, all 22 bytes, back to the previous
    * mode. A starting point — fusion refines it as soon as it resumes.
    */
-  writeCalibrationProfile(profile: Bno055CalibrationProfile): Promise<void> {
-    return this.locked(() =>
-      this.inConfig(() => this.wr(BNO055_REG_CALIB_PROFILE, packBno055CalibrationProfile(profile))),
+  async writeCalibrationProfile(profile: Bno055CalibrationProfile): Promise<void> {
+    return this.locked(async () =>
+      this.inConfig(async () => this.wr(BNO055_REG_CALIB_PROFILE, packBno055CalibrationProfile(profile))),
     );
   }
 
@@ -458,8 +458,8 @@ export class Bno055 extends DepzDevice {
     return unpackBno055SicMatrix(await this.readRegisters(BNO055_REG_SIC_MATRIX, 18));
   }
 
-  setSicMatrix(matrix: readonly number[] = BNO055_SIC_IDENTITY): Promise<void> {
-    return this.locked(() => this.inConfig(() => this.wr(BNO055_REG_SIC_MATRIX, packBno055SicMatrix(matrix))));
+  async setSicMatrix(matrix: readonly number[] = BNO055_SIC_IDENTITY): Promise<void> {
+    return this.locked(async () => this.inConfig(async () => this.wr(BNO055_REG_SIC_MATRIX, packBno055SicMatrix(matrix))));
   }
 
   // ── page 1: raw sensor configuration (non-fusion modes) ────────────────────
@@ -468,7 +468,7 @@ export class Bno055 extends DepzDevice {
     return unpackBno055AccelConfig(await this.readRegister(BNO055_REG1_ACC_CONFIG, 1));
   }
 
-  setAccelConfig(c: Bno055AccelConfig): Promise<void> {
+  async setAccelConfig(c: Bno055AccelConfig): Promise<void> {
     return this.writePage1Config(BNO055_REG1_ACC_CONFIG, Uint8Array.of(packBno055AccelConfig(c)));
   }
 
@@ -476,7 +476,7 @@ export class Bno055 extends DepzDevice {
     return unpackBno055GyroConfig(await this.readRegisters(BNO055_REG1_GYR_CONFIG_0, 2, 1));
   }
 
-  setGyroConfig(c: Bno055GyroConfig): Promise<void> {
+  async setGyroConfig(c: Bno055GyroConfig): Promise<void> {
     return this.writePage1Config(BNO055_REG1_GYR_CONFIG_0, packBno055GyroConfig(c));
   }
 
@@ -484,35 +484,35 @@ export class Bno055 extends DepzDevice {
     return unpackBno055MagConfig(await this.readRegister(BNO055_REG1_MAG_CONFIG, 1));
   }
 
-  setMagConfig(c: Bno055MagConfig): Promise<void> {
+  async setMagConfig(c: Bno055MagConfig): Promise<void> {
     return this.writePage1Config(BNO055_REG1_MAG_CONFIG, Uint8Array.of(packBno055MagConfig(c)));
   }
 
   /** The chip's 16-byte unique id (page 1, 0x50..0x5F). */
-  uniqueId(): Promise<Uint8Array> {
+  async uniqueId(): Promise<Uint8Array> {
     return this.readRegisters(BNO055_REG1_UNIQUE_ID, BNO055_UNIQUE_ID_LEN, 1);
   }
 
   // ── interrupts (motion only on SW rev 03.11) ───────────────────────────────
 
-  getInterruptEnable(): Promise<number> {
+  async getInterruptEnable(): Promise<number> {
     return this.readRegister(BNO055_REG1_INT_EN, 1);
   }
 
-  setInterruptEnable(mask: number): Promise<void> {
+  async setInterruptEnable(mask: number): Promise<void> {
     return this.writeRegister(BNO055_REG1_INT_EN, mask, 1);
   }
 
-  getInterruptMask(): Promise<number> {
+  async getInterruptMask(): Promise<number> {
     return this.readRegister(BNO055_REG1_INT_MSK, 1);
   }
 
-  setInterruptMask(mask: number): Promise<void> {
+  async setInterruptMask(mask: number): Promise<void> {
     return this.writeRegister(BNO055_REG1_INT_MSK, mask, 1);
   }
 
   /** One raw motion-interrupt setting (page 1, 0x11..0x1F). Not while streaming. */
-  setInterruptSetting(register: number, value: number): Promise<void> {
+  async setInterruptSetting(register: number, value: number): Promise<void> {
     if (register < BNO055_REG1_INT_SETTINGS_FIRST || register > BNO055_REG1_INT_SETTINGS_LAST) {
       return Promise.reject(new RangeError(`0x${register.toString(16)} is not a page-1 interrupt setting`));
     }
@@ -520,12 +520,12 @@ export class Bno055 extends DepzDevice {
   }
 
   /** INT_STA — which interrupts fired. Clears on read. */
-  readInterruptStatus(): Promise<number> {
+  async readInterruptStatus(): Promise<number> {
     return this.readRegister(BNO055_REG_INT_STA);
   }
 
   /** SYS_TRIGGER RST_INT: reset the interrupt status bits and the INT pin. */
-  clearInterrupt(): Promise<void> {
+  async clearInterrupt(): Promise<void> {
     return this.locked(async () => {
       const clk = (await this.rd(BNO055_REG_SYS_TRIGGER, 1)).data[0]! & BNO055_SYS_TRIGGER_CLK_SEL;
       await this.wr(BNO055_REG_SYS_TRIGGER, Uint8Array.of(clk | BNO055_SYS_TRIGGER_RST_INT));
@@ -535,7 +535,7 @@ export class Bno055 extends DepzDevice {
   // ── data ───────────────────────────────────────────────────────────────────
 
   /** Poll one register block (default the full 46-byte block) and decode it. */
-  readSample(block: readonly [number, number] = BNO055_FULL_BLOCK): Promise<Bno055Sample> {
+  async readSample(block: readonly [number, number] = BNO055_FULL_BLOCK): Promise<Bno055Sample> {
     return this.locked(async () => {
       const units = await this.currentUnits();
       const r = await this.rd(block[0], block[1]);
@@ -553,7 +553,7 @@ export class Bno055 extends DepzDevice {
    * 100 Hz, so 10 ms is the useful floor. `trigger = BNO055_TRIGGER_INT`
    * reads on the INT edge with `periodMs` as a watchdog. Replaces a stream.
    */
-  startStream(
+  async startStream(
     periodMs = 10,
     block: readonly [number, number] = BNO055_FULL_BLOCK,
     trigger = BNO055_TRIGGER_TIMER,
@@ -639,7 +639,7 @@ export class Bno055 extends DepzDevice {
   // ── internal ───────────────────────────────────────────────────────────────
 
   /** Run `fn` after every previously queued sequence (non-reentrant). */
-  private locked<T>(fn: () => Promise<T>): Promise<T> {
+  private async locked<T>(fn: () => Promise<T>): Promise<T> {
     const run = this.chain.then(fn, fn);
     this.chain = run.catch(() => undefined);
     return run;
@@ -702,9 +702,9 @@ export class Bno055 extends DepzDevice {
     }
   }
 
-  private writePage1Config(addr: number, data: Uint8Array): Promise<void> {
+  private async writePage1Config(addr: number, data: Uint8Array): Promise<void> {
     this.requireNotStreaming();
-    return this.locked(() => this.inConfig(() => this.onPage(1, () => this.wr(addr, data))));
+    return this.locked(async () => this.inConfig(async () => this.onPage(1, async () => this.wr(addr, data))));
   }
 
   private async readSystemStatus(): Promise<Bno055SystemStatus> {
@@ -769,8 +769,12 @@ export class Bno055 extends DepzDevice {
       this.streamParseErrorCount += 1;
       return true;
     }
-    const s = unpackBno055Stream(pkt.payload);
-    if (s.data.length !== s.length) {
+    let s: ReturnType<typeof unpackBno055Stream>;
+    try {
+      // Throws when the block is shorter than its own length field; a throw
+      // here would end the read pump and close the device.
+      s = unpackBno055Stream(pkt.payload);
+    } catch {
       this.streamParseErrorCount += 1;
       return true;
     }

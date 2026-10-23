@@ -1,17 +1,41 @@
 # SR04 — user guide
 
-Hands-on guide to the SR04 codecs (`Depz.Sensor.Protocol.Sr04`). For what the
-sensor is and its concepts, read the [introduction](introduction.md); for exact
+Hands-on guide to the SR04: the live device (`Depz.Sensor.Devices.Sr04Device`)
+and the codecs under it (`Depz.Sensor.Protocol.Sr04`). For what the sensor is
+and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [Decode a measurement](#decode-a-measurement)
 - [Echo time to distance](#echo-time-to-distance)
 - [Configuration payloads](#configuration-payloads)
 - [Encoding commands](#encoding-commands)
 - [Temperature-compensated distance](#temperature-compensated-distance)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+
+using var sr04 = DepzDevices.OpenSr04();
+sr04.SetSamplePeriodUs(20_000);                  // at most one start every 20 ms
+int decay = sr04.SetEchoDecayUs(5_000);          // the board clamps to 4000..65000; returns what it kept
+
+Sr04Measurement m = sr04.MeasureOnce();          // waits for the echo (up to ~65 ms)
+Console.WriteLine(m.Valid ? $"{m.DistanceMm:F0} mm" : "no echo");
+
+using var loop = sr04.Measurements();
+sr04.Start();
+Sr04Measurement next = loop.Take(TimeSpan.FromSeconds(1));   // Source == "loop"
+sr04.Stop();
+```
+
+`MeasureOnce` while the loop runs throws `BusyException`. The stream also
+carries the single shots an edge on the AUX SYNC_IN pin triggers
+(`Source == "once"`).
 
 ## Decode a measurement
 

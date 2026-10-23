@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import ai.depz.sensor.protocol.Wire;
+
 /**
  * SHTP framing layer for the BNO086 (contracts/05_SENSOR_BNO086.md §3).
  *
@@ -39,7 +41,11 @@ public final class Shtp {
 
     public record ShtpHeader(int length, int channel, int seq, boolean continuation) {}
 
+    /** Fields out of their widths (length u15, channel u8, seq u8) → IllegalArgumentException. */
     public static byte[] packShtpHeader(ShtpHeader hdr) {
+        Wire.checkUint("length", hdr.length(), 15);
+        Wire.checkUint("channel", hdr.channel(), 8);
+        Wire.checkUint("seq", hdr.seq(), 8);
         int word = (hdr.length() & LENGTH_MASK) | (hdr.continuation() ? CONTINUATION_BIT : 0);
         return new byte[] {
             (byte) word, (byte) (word >>> 8), (byte) hdr.channel(), (byte) hdr.seq()
@@ -47,13 +53,24 @@ public final class Shtp {
     }
 
     public static ShtpHeader unpackShtpHeader(byte[] data) {
+        Wire.needBytes("SHTP header", data, SHTP_HEADER_SIZE);
         int word = (data[0] & 0xFF) | ((data[1] & 0xFF) << 8);
         return new ShtpHeader(
                 word & LENGTH_MASK, data[2] & 0xFF, data[3] & 0xFF, (word & CONTINUATION_BIT) != 0);
     }
 
-    /** One reassembled cargo: {@code payload} excludes all SHTP headers. */
-    public record ShtpCargo(int channel, int seq, byte[] payload) {}
+    /**
+     * One reassembled cargo: {@code payload} excludes all SHTP headers; {@code seq}
+     * and {@code captureUs} are the FIRST fragment's — {@code captureUs} is its
+     * {@code RPT_DATA.timestamp_us}, the capture the cargo's 0xFB base delta
+     * refers to (contract 05 §3).
+     */
+    public record ShtpCargo(int channel, int seq, byte[] payload, long captureUs) {
+        /** A cargo without a capture time ({@code captureUs} = 0). */
+        public ShtpCargo(int channel, int seq, byte[] payload) {
+            this(channel, seq, payload, 0);
+        }
+    }
 
     /** Single-fragment frame: length = header + payload. */
     public static byte[] buildFrame(int channel, byte[] payload, int seq) {
@@ -70,6 +87,7 @@ public final class Shtp {
         int received = 0;
         int expected = 0;
         int seq = 0;
+        long captureUs = 0;
 
         void clear() {
             chunks.reset();
@@ -98,6 +116,10 @@ public final class Shtp {
                 throw new IllegalArgumentException(
                         "TX cargo " + payload.length + "B exceeds the " + MAX_TX_FRAME + "B MCU slot");
             }
+            if (channel < 0 || channel >= NUM_CHANNELS) {
+                throw new IllegalArgumentException(
+                        "SHTP channel " + channel + " out of range 0.." + (NUM_CHANNELS - 1));
+            }
             int seq = txSeqs[channel];
             txSeqs[channel] = (seq + 1) & 0xff;
             return buildFrame(channel, payload, seq);
@@ -107,8 +129,18 @@ public final class Shtp {
             return txSeqs[channel];
         }
 
-        /** Consume one inbound frame; return the cargo when complete, else null. */
+        /** {@link #feed(byte[], long)} with capture 0 (cargo {@code captureUs} = 0). */
         public ShtpCargo feed(byte[] frame) {
+            return feed(frame, 0);
+        }
+
+        /**
+         * Consume one inbound frame; return the cargo when complete, else null.
+         * {@code captureUs} is the frame's {@code RPT_DATA.timestamp_us}; the cargo
+         * carries the FIRST fragment's — the base its 0xFB timestamps refer to
+         * (contract 05 §3), not the fragment that completed it.
+         */
+        public ShtpCargo feed(byte[] frame, long captureUs) {
             if (frame.length < SHTP_HEADER_SIZE) {
                 return null;
             }
@@ -127,6 +159,7 @@ public final class Shtp {
                 r.received = chunkLen;
                 r.expected = hdr.length() - SHTP_HEADER_SIZE;
                 r.seq = hdr.seq();
+                r.captureUs = captureUs;
             } else {
                 if (r.expected == 0) {
                     discarded += 1;
@@ -143,7 +176,7 @@ public final class Shtp {
                 r.clear();
                 return null;
             }
-            ShtpCargo cargo = new ShtpCargo(hdr.channel(), r.seq, r.chunks.toByteArray());
+            ShtpCargo cargo = new ShtpCargo(hdr.channel(), r.seq, r.chunks.toByteArray(), r.captureUs);
             r.clear();
             return cargo;
         }

@@ -52,10 +52,10 @@ layer** for all three boards:
   [`Vl53l7Frames.CreateDecoder`](api.md#vl53l7frames) — footer id at
   `size-4`, every per-zone array trimmed to the frame's resolution.
 
-What it does **not** do: open a port, download the sensor firmware, or run
-the ULD configuration and ranging control. Initialising and streaming the
-board is done today with the Python or TypeScript SDK; this SDK decodes what
-the board sends and builds the command payloads.
+On top of that, the live device `Vl53l7cxDevice` opens the board, downloads
+the sensor firmware and runs the ST ULD (the `Vl53l8Driver` port, L5/L7
+branch) for configuration and ranging: see the
+[guide](guide.md#live-device).
 
 ## Key concepts
 

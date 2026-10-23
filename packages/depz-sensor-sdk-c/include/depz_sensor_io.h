@@ -115,6 +115,9 @@ void depz_link_free(depz_link *l);
 
 /* Replay only: true once every recorded rx chunk has been served. */
 bool depz_link_replay_exhausted(const depz_link *l);
+/* Replay only: recorded tx bytes not yet written and rx chunks not yet served
+ * (both 0 = the whole capture was played). DEPZ_E_ARG on another link. */
+int  depz_link_replay_pending(const depz_link *l, size_t *tx_bytes_left, size_t *rx_chunks_left);
 
 /* ======================================================================== */
 /* Bounded drop-oldest streams (contract 07 §3)                              */
@@ -153,10 +156,36 @@ typedef struct {
 int depz_device_open(const char *port, depz_device **out);
 int depz_device_open_link(depz_link *link, depz_device **out);
 
-/* Ask GET_NAME_ACTIVE_SOFTWARE and attach the matching sensor class, as
- * depz_open_device() does after its probe. DEPZ_E_BOOTLOADER in bootloader
- * mode. */
+/* The in-place probe captures older than contract 02 §4.4 hold (contract 15
+ * `probe: "legacy"`): ask GET_NAME_ACTIVE_SOFTWARE — plus GET_DEVICE_NAME
+ * for the L5/L7 and 1D families only — then attach the class
+ * depz_resolve_sensor_class() picks, in place. DEPZ_E_BOOTLOADER in
+ * bootloader mode. New code opens with depz_open_device() or
+ * depz_open_on_link() (the §4.4 probe). */
 int depz_device_promote(depz_device *dev);
+/* depz_device_promote() with the board's USB id (-1 = unknown), which picks
+ * the class the probe alone cannot (VL53L8CX vs VL53L8CH, the L5/L7 and
+ * 1D-family models); *ident (optional) receives the parsed answer. */
+int depz_device_promote_ex(depz_device *dev, int usb_vid, int usb_pid, depz_identity *ident);
+
+/* Continue the open plain device `dev` as the class `class_name` (one of
+ * depz_sensor_class_name(), as from depz_resolve_sensor_class()) on the same
+ * connection — contract 02 §4.4 attach_sensor_class: no reopen, the reader
+ * and the host sequence numbers run on. `dev` must have no class yet and no
+ * request in flight (DEPZ_E_ARG otherwise); "device" leaves it the base
+ * device; "bootloader" fails with DEPZ_E_BOOTLOADER. */
+int depz_attach_sensor_class(depz_device *dev, const char *class_name);
+
+/* Open a device on a connection that cannot be reopened — a replay or
+ * recording link, an adopted transport (contract 02 §4.4 open_on_link).
+ * Takes ownership of `link` (also on failure), runs the probe
+ * depz_probe_port() runs — GET_NAME_ACTIVE_SOFTWARE, GET_DEVICE_NAME,
+ * GET_SERIAL — on it, resolves the class with depz_resolve_sensor_class()
+ * from the answers and (`usb_vid`, `usb_pid`) (-1 = unknown), and continues
+ * as that class on the same link. `timeout_ms` <= 0 = default. No answer to
+ * GET_NAME_ACTIVE_SOFTWARE -> DEPZ_E_NO_DEVICE; a bootloader ->
+ * DEPZ_E_BOOTLOADER. */
+int depz_open_on_link(depz_link *link, int usb_vid, int usb_pid, int timeout_ms, depz_device **out);
 
 /* Stop the reader, close the link, free everything. NULL is a no-op. */
 void depz_device_close(depz_device *dev);
@@ -191,8 +220,11 @@ int depz_device_get_serial_number(depz_device *dev, char *out, size_t cap);
 /* Last cached MCU temperature, °C (the device refreshes it ~2 Hz). */
 int depz_device_read_mcu_temperature(depz_device *dev, double *celsius);
 int depz_device_get_payload_crc_type(depz_device *dev, depz_crc_type *out);
-/* Device->host payload CRC; host->device CRC is per packet. */
+/* Device->host payload CRC; host->device CRC is per packet. DEPZ_E_ARG for a
+ * value that is not a listed depz_crc_type. */
 int depz_device_set_payload_crc_type(depz_device *dev, depz_crc_type t);
+/* Sync pins 1..5, mode 0..4, polarity 0..1 (contract 02 §6): DEPZ_E_ARG
+ * outside, nothing sent. */
 int depz_device_get_sync_pin(depz_device *dev, uint8_t pin, depz_sync_pin_config *out);
 int depz_device_set_sync_pin(depz_device *dev, const depz_sync_pin_config *c);
 /* DEVICE_RESET: the device acknowledges, then reboots; the link drops. */
@@ -277,7 +309,8 @@ typedef struct {
     char usb_serial[128];
 } depz_device_info;
 
-/* Open `port`, ask the software name (+ device name, serial), close.
+/* Open `port`, run the contract 02 §4.4 probe (GET_NAME_ACTIVE_SOFTWARE,
+ * then GET_DEVICE_NAME and GET_SERIAL, each optional), close.
  * DEPZ_E_NO_DEVICE when nothing DEPZ-shaped answers. */
 int depz_probe_port(const char *port, int timeout_ms, depz_device_info *out);
 
@@ -298,7 +331,10 @@ typedef struct {
 #define DEPZ_OPEN_OPTIONS_INIT { NULL, NULL, -1, 0 }
 
 /* Find, probe and open a DEPZ device with its sensor class attached.
- * `opt` NULL = the candidate with the smallest USB serial. */
+ * `opt` NULL = the candidate with the smallest USB serial. Contract 02
+ * §4.4: the probe runs on a connection of its own, which is closed; the
+ * class (depz_resolve_sensor_class() of the answers and the port's USB id)
+ * then opens the port afresh. */
 int depz_open_device(const depz_open_options *opt, depz_device **out);
 
 /* ======================================================================== */
@@ -397,9 +433,11 @@ int depz_vl53l4cd_set_i2c_speed_khz(depz_device *dev, uint16_t khz);
 /* Budget 10..200 ms; inter 0 = continuous, > budget = autonomous low power. */
 int depz_vl53l4cd_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t inter_ms);
 int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32_t *inter_ms);
+/* Offset -1024..1023 mm, xtalk 0..127 kcps (0 = off): DEPZ_E_ARG outside,
+ * nothing written. */
 int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm);
 int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm);
-int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps); /* 0 = off */
+int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps);
 int depz_vl53l4cd_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps);
 /* INT fires only when the window condition holds (DEPZ_VL53L4CD_WINDOW_*). */
 int depz_vl53l4cd_set_detection_thresholds(depz_device *dev, uint16_t low_mm, uint16_t high_mm,
@@ -519,10 +557,17 @@ typedef struct {
     uint8_t  indicator_format_1[32], indicator_format_2[32];
 } depz_vl53l8_cnh_setup;
 
-/* vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin. */
+/* vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+ * bin. num_bins / sub_sample are u8 fields: this form masks them to 8 bits;
+ * the _checked form (preferred, contract 07 §3) answers DEPZ_E_ARG outside
+ * 0..255 and leaves `s` untouched. */
 void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins,
                                  int sub_sample);
-/* vl53lmz_cnh_create_agg_map: map zones (resolution 16 | 64) to aggregates. */
+int  depz_vl53l8_cnh_init_config_checked(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins,
+                                         int sub_sample);
+/* vl53lmz_cnh_create_agg_map: map zones (resolution 16 | 64) to aggregates.
+ * DEPZ_E_ARG for another resolution, start_x / start_y < 0, merge_x /
+ * merge_y / cols / rows < 1, or a map past the zone grid. */
 int  depz_vl53l8_cnh_create_agg_map(depz_vl53l8_cnh_setup *s, int resolution, int start_x,
                                     int start_y, int merge_x, int merge_y, int cols, int rows);
 /* On-device CNH buffer bytes; DEPZ_E_ARG when blank or above the cap. */
@@ -567,7 +612,7 @@ int depz_vl53l8_set_target_order(depz_device *dev, uint8_t order);
 int depz_vl53l8_get_power_mode(depz_device *dev, uint8_t *mode);
 int depz_vl53l8_set_power_mode(depz_device *dev, uint8_t mode);
 int depz_vl53l8_get_xtalk_margin(depz_device *dev, double *kcps_per_spad);
-int depz_vl53l8_set_xtalk_margin(depz_device *dev, double kcps_per_spad); /* <= 10000 */
+int depz_vl53l8_set_xtalk_margin(depz_device *dev, double kcps_per_spad); /* 0..10000 */
 /* Crosstalk calibration against a flat target (reflectance 1..99 %,
  * nb_samples 1..16, distance 600..3000 mm); blocks several seconds. With no
  * cover glass the firmware answers "nothing to calibrate": *failed (optional)
@@ -1025,6 +1070,8 @@ unsigned depz_vl53lx_driver_kinds(depz_vl53lx_product product);
 int  depz_vl53lx_init(depz_device *dev, depz_vl53lx_driver driver, depz_vl53lx_product product);
 bool depz_vl53lx_initialized(const depz_device *dev);
 depz_vl53lx_product depz_vl53lx_product_bound(const depz_device *dev);
+/* The class the board opened as (fixed at open: PID / device name). */
+depz_vl53lx_class   depz_vl53lx_get_class(const depz_device *dev);
 depz_vl53lx_driver  depz_vl53lx_driver_bound(const depz_device *dev);
 /* The driver's caveat for the pair ("" when none). */
 const char *depz_vl53lx_caveat(const depz_device *dev);

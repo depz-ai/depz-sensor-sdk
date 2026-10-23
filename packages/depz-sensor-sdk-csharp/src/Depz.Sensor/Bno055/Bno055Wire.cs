@@ -66,9 +66,12 @@ public static class Bno055Wire
     /// <summary>BNO_READ_REG payload: addr u8, len u8.</summary>
     public static byte[] PackReadReg(byte addr, byte len) => new[] { addr, len };
 
-    /// <summary>BNO_WRITE_REG payload: addr u8, then data[1..128].</summary>
+    /// <summary>BNO_WRITE_REG payload: addr u8, then data[1..<see cref="XferMax"/>].</summary>
+    /// <exception cref="ArgumentOutOfRangeException">data is empty or longer than <see cref="XferMax"/>.</exception>
     public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
     {
+        if (data.Length < 1 || data.Length > XferMax)
+            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes");
         var buf = new byte[1 + data.Length];
         buf[0] = addr;
         data.CopyTo(buf.AsSpan(1));
@@ -111,7 +114,9 @@ public sealed record Bno055StreamData(ulong TimestampUs, byte Addr, byte Length,
     /// <summary>Parse a RPT_BNO_REG_STREAM payload: timestamp u64 LE, addr u8, len u8, data[len].</summary>
     public static Bno055StreamData Unpack(ReadOnlySpan<byte> payload)
     {
+        Protocol.Wire.NeedBytes("RPT_BNO_REG_STREAM", payload, 10);
         byte len = payload[9];
+        Protocol.Wire.NeedBytes("RPT_BNO_REG_STREAM data", payload, 10 + len);
         return new(
             BinaryPrimitives.ReadUInt64LittleEndian(payload),
             payload[8],

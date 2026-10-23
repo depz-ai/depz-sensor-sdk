@@ -18,6 +18,8 @@
  * Mirrors the Python reference `depz_sensor_sdk.bno086.shtp`.
  */
 
+import { checkU64, checkUint } from "../../protocol/wire.js";
+
 export enum ShtpChannel {
   /** SHTP command channel (advertisements). */
   Command = 0,
@@ -63,12 +65,12 @@ export interface ShtpHeader {
 }
 
 export function packShtpHeader(hdr: ShtpHeader): Uint8Array {
-  const word = (hdr.length & LENGTH_MASK) | (hdr.continuation ? CONTINUATION_BIT : 0);
+  const word = checkUint("length", hdr.length, 15) | (hdr.continuation ? CONTINUATION_BIT : 0);
   const out = new Uint8Array(SHTP_HEADER_SIZE);
   const v = new DataView(out.buffer);
   v.setUint16(0, word, true);
-  v.setUint8(2, hdr.channel);
-  v.setUint8(3, hdr.seq);
+  v.setUint8(2, checkUint("channel", hdr.channel, 8));
+  v.setUint8(3, checkUint("seq", hdr.seq, 8));
   return out;
 }
 
@@ -89,6 +91,11 @@ export interface ShtpCargo {
   /** seq of the first fragment. */
   seq: number;
   payload: Uint8Array;
+  /**
+   * Capture time (µs, MCU clock) of the FIRST fragment — the base the cargo's
+   * 0xFB timestamps refer to (contract 05 §3). 0 when the caller fed none.
+   */
+  captureUs: bigint;
 }
 
 /** Single-fragment frame: length = header + payload. */
@@ -145,10 +152,12 @@ interface ChannelRx {
   /** Total cargo payload bytes (headers excluded). */
   expected: number;
   seq: number;
+  /** Capture of the fragment that started the cargo. */
+  captureUs: bigint;
 }
 
 function emptyRx(): ChannelRx {
-  return { chunks: [], received: 0, expected: 0, seq: 0 };
+  return { chunks: [], received: 0, expected: 0, seq: 0, captureUs: 0n };
 }
 
 function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
@@ -188,6 +197,9 @@ export class ShtpLayer {
     if (SHTP_HEADER_SIZE + payload.length > MAX_TX_FRAME) {
       throw new Error(`TX cargo ${payload.length}B exceeds the ${MAX_TX_FRAME}B MCU slot`);
     }
+    if (!Number.isInteger(channel) || channel < 0 || channel >= NUM_CHANNELS) {
+      throw new RangeError(`SHTP channel ${channel} out of range 0..${NUM_CHANNELS - 1}`);
+    }
     const seq = this.txSeqs[channel]!;
     this.txSeqs[channel] = (seq + 1) & 0xff;
     return buildFrame(channel, payload, seq);
@@ -206,8 +218,12 @@ export class ShtpLayer {
    * (discarding any partial one on that channel); a continuation without a
    * cargo in progress is dropped; the cargo completes when the accumulated
    * bytes reach the first fragment's advertised total.
+   *
+   * `captureUs` is the frame's RPT_DATA capture time; the cargo carries the
+   * FIRST fragment's — the base its 0xFB timestamps refer to.
    */
-  feed(frame: Uint8Array): ShtpCargo | null {
+  feed(frame: Uint8Array, captureUs: bigint = 0n): ShtpCargo | null {
+    checkU64("captureUs", captureUs); // MCU uptime µs (contract 05 §3)
     if (frame.length < SHTP_HEADER_SIZE) return null;
     const hdr = unpackShtpHeader(frame);
     if (hdr.channel >= NUM_CHANNELS || hdr.length < SHTP_HEADER_SIZE) {
@@ -221,6 +237,7 @@ export class ShtpLayer {
       rx.received = chunk.length;
       rx.expected = hdr.length - SHTP_HEADER_SIZE;
       rx.seq = hdr.seq;
+      rx.captureUs = captureUs;
     } else {
       if (rx.expected === 0) {
         this.discarded += 1;
@@ -242,6 +259,7 @@ export class ShtpLayer {
       channel: hdr.channel,
       seq: rx.seq,
       payload: concatChunks(rx.chunks, rx.received),
+      captureUs: rx.captureUs,
     };
     rx.chunks = [];
     rx.received = 0;

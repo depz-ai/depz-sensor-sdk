@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { crc8Maxim, crc16Modbus, crc32IsoHdlc, crc16CcittFalse } from "../../src/index.js";
-import { fromHex, loadVectors } from "./vectors.js";
+import { fromHex, loadVectors, seen } from "./vectors.js";
 
 const data = loadVectors("crc.json");
 
@@ -12,6 +12,7 @@ describe("crc vectors", () => {
       expect(crc16Modbus(raw)).toBe(c.crc16_modbus);
       expect(crc32IsoHdlc(raw)).toBe(c.crc32_iso_hdlc);
       expect(crc16CcittFalse(raw)).toBe(c.crc16_ccitt_false);
+      seen(c);
     });
   }
 });

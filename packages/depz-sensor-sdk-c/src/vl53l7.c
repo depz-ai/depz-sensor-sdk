@@ -85,21 +85,28 @@ const char *depz_vl53l7_model_str(depz_vl53l7_model m)
     }
 }
 
-depz_vl53l7_model depz_vl53l7_resolve_model(const char *usb_model,
-                                            const char *device_name)
+static bool span_is(const char *s, size_t n, const char *w)
+{
+    size_t k = strlen(w);
+    return n == k && memcmp(s, w, k) == 0;
+}
+
+depz_vl53l7_model depz_vl53l7_resolve_model_n(const char *usb_model, size_t usb_model_len,
+                                              const char *device_name, size_t device_name_len)
 {
     /* 1. the production USB PID model. */
     if (usb_model) {
-        if (strcmp(usb_model, "vl53l5cx") == 0) return DEPZ_VL53L7_MODEL_L5CX;
-        if (strcmp(usb_model, "vl53l7cx") == 0) return DEPZ_VL53L7_MODEL_L7CX;
-        if (strcmp(usb_model, "vl53l7ch") == 0) return DEPZ_VL53L7_MODEL_L7CH;
+        if (span_is(usb_model, usb_model_len, "vl53l5cx")) return DEPZ_VL53L7_MODEL_L5CX;
+        if (span_is(usb_model, usb_model_len, "vl53l7cx")) return DEPZ_VL53L7_MODEL_L7CX;
+        if (span_is(usb_model, usb_model_len, "vl53l7ch")) return DEPZ_VL53L7_MODEL_L7CH;
     }
     /* 2. the first match of `VL53L([57])(CX|CH)` in the device name. A match
      *    naming a part with no class (VL53L5CH) resolves to the default; the
      *    scan does not continue past the first match (regex `search`). */
     if (device_name) {
-        for (const char *p = device_name; *p; p++) {
-            if (strncmp(p, "VL53L", 5) != 0)
+        for (size_t i = 0; i + 8 <= device_name_len; i++) {
+            const char *p = device_name + i;
+            if (memcmp(p, "VL53L", 5) != 0)
                 continue;
             char digit = p[5];
             if (digit != '5' && digit != '7')
@@ -113,4 +120,11 @@ depz_vl53l7_model depz_vl53l7_resolve_model(const char *usb_model,
     }
     /* 3. the CX base — its blob runs on every L5/L7 part. */
     return DEPZ_VL53L7_MODEL_L7CX;
+}
+
+depz_vl53l7_model depz_vl53l7_resolve_model(const char *usb_model,
+                                            const char *device_name)
+{
+    return depz_vl53l7_resolve_model_n(usb_model, usb_model ? strlen(usb_model) : 0,
+                                       device_name, device_name ? strlen(device_name) : 0);
 }

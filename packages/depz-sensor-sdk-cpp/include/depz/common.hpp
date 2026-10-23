@@ -107,6 +107,8 @@ struct SyncPinConfig {
     std::uint8_t pin;  // 1..5
     SyncPinMode mode;
     SyncPinPolarity polarity;
+    // std::out_of_range unless pin is 1..5, mode a listed SyncPinMode and
+    // polarity a listed SyncPinPolarity (contract 02 §6).
     bytes pack() const;
     static SyncPinConfig unpack(byte_span payload);
 };
@@ -120,7 +122,9 @@ bytes pack_set_payload_crc_type(std::uint8_t crc_type);
 std::pair<std::int64_t, std::int64_t> sync_time_offset_rtt(std::int64_t t1, std::int64_t t2,
                                                            std::int64_t t3, std::int64_t t4);
 
-// Decode an ASCII device string, dropping trailing NUL/0xFF filler.
+// Decode an ASCII device string, dropping trailing NUL/0xFF filler (contract
+// 02 §4.1): every byte >= 0x80 becomes U+FFFD (UTF-8 "\xEF\xBF\xBD"); an
+// embedded 0x00 before the filler is kept as a character.
 std::string strip_device_string(byte_span raw);
 
 }  // namespace depz

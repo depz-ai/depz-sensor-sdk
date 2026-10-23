@@ -9,34 +9,15 @@
 //! - `vl53l7ch_cnh_8x8_15hz` — 3156-byte CNH frames over the chunked stream;
 //!   `cnh_raw` must match byte-exact (and non-CNH frames carry none).
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::framing::{Event, PacketParser};
 use depz_sensor_sdk::vl53l8::{parse_frame, unpack_frame_chunk, FrameReassembler, Variant};
 use serde_json::Value;
 
+use common::{hex_decode, hex_encode, recordings_dir, seen};
+
 const RPT_VL53_FRAME: u8 = 0x93;
-
-fn recordings_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-        .join("recordings")
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "odd hex length");
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{:02x}", x)).collect()
-}
 
 #[derive(Debug, PartialEq, Eq)]
 struct DecodedFrame {
@@ -94,7 +75,7 @@ fn replay(stem: &str, resolution: usize, with_cnh: bool) {
                 assert_eq!(r.signal_per_spad.len(), n, "{} signal_per_spad len", stem);
                 assert_eq!(r.ambient_per_spad.len(), n, "{} ambient_per_spad len", stem);
                 assert_eq!(r.nb_spads_enabled.len(), n, "{} nb_spads_enabled len", stem);
-                assert_eq!(r.range_sigma_mm_raw.len(), n, "{} range_sigma len", stem);
+                assert_eq!(r.range_sigma_mm.len(), n, "{} range_sigma len", stem);
                 assert_eq!(r.reflectance.len(), n, "{} reflectance len", stem);
                 frames.push(DecodedFrame {
                     timestamp_us: done.timestamp_us as i64,
@@ -140,6 +121,7 @@ fn replay(stem: &str, resolution: usize, with_cnh: bool) {
     }
 
     assert_eq!(reasm.discarded, 0, "{}: no frames discarded", stem);
+    seen(&format!("recordings/{}.depzrec", stem));
     eprintln!(
         "{}: {} frames verified vs sidecar ({} produced total)",
         stem,

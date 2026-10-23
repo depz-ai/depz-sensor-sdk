@@ -723,8 +723,10 @@ class Bno055(DeviceBase):
         if len(pkt.payload) < 10:
             self._stream_parse_errors += 1
             return True
-        s = StreamData.unpack(pkt.payload)
-        if len(s.data) != s.length:
+        try:
+            # shorter than its own length field: refused (ValueError)
+            s = StreamData.unpack(pkt.payload)
+        except ValueError:
             self._stream_parse_errors += 1
             return True
         sample = Bno055Sample.decode(s.timestamp_us, s.addr, s.data, self._stream_units)

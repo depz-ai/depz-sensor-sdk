@@ -9,30 +9,15 @@
 //! variant-specific, so this path is exactly what a CH device exercises too
 //! (with [`Variant::Ch`]). CNH histogram decode is covered by `vl53l8_cnh.rs`.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::framing::{Event, PacketParser};
 use depz_sensor_sdk::vl53l8::{parse_frame, unpack_frame_chunk, FrameReassembler, Variant};
 use serde_json::Value;
 
+use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, recordings_dir, seen};
+
 const RPT_VL53_FRAME: u8 = 0x93;
-
-fn recordings_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-        .join("recordings")
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "odd hex length");
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
 
 #[derive(Debug, PartialEq, Eq)]
 struct DecodedFrame {
@@ -133,9 +118,79 @@ fn vl53l8_recording_replay() {
     }
 
     assert_eq!(reasm.discarded, 0, "no frames discarded");
+    seen("recordings/vl53l8_8x8_15hz_3s.depzrec");
     eprintln!(
         "vl53l8 recording: {} frames verified byte-exact vs sidecar ({} produced total)",
         exp_frames.len(),
         frames.len()
     );
+}
+
+// ---- VL53L8CH captures ------------------------------------------------------
+
+/// VL53L8CH captures (APP_VL53L8_v0.92, VL53LMZ firmware): footer at size-4
+/// ([`Variant::Ch`]); the CNH capture carries the raw CNH block in every
+/// frame, byte-exact vs the sidecar.
+fn vl53l8ch_replay(stem: &str, with_cnh: bool) {
+    use depz_sensor_sdk::protocol::common::Cmd;
+
+    let exp = load(&format!("recordings/{}.expected.json", stem));
+    let pkts = recording_packets(&format!("{}.depzrec", stem));
+    assert_eq!(
+        recorded_text(&pkts, Cmd::GetNameActiveSoftware).as_deref(),
+        exp["software_name"].as_str(),
+        "{}",
+        stem
+    );
+    let mut reasm = FrameReassembler::new();
+    let mut frames = Vec::new();
+    for p in pkts.iter().filter(|p| p.rx && p.cmd == RPT_VL53_FRAME) {
+        if let Some(done) = reasm.feed(unpack_frame_chunk(&p.payload).unwrap()) {
+            let r = parse_frame(&done.frame, Variant::Ch)
+                .unwrap_or_else(|e| panic!("{}: frame decodes: {}", stem, e));
+            frames.push((done.timestamp_us, r));
+        }
+    }
+    let want = exp["frames"].as_array().unwrap();
+    // The capture may stream past the sidecar; match the first N.
+    assert!(frames.len() >= want.len(), "{}: {} < {} frames", stem, frames.len(), want.len());
+    let ints = |v: &Value| -> Vec<i64> { v.as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect() };
+    for (idx, ((ts, r), w)) in frames.iter().zip(want).enumerate() {
+        let got = DecodedFrame {
+            timestamp_us: *ts as i64,
+            resolution: r.resolution(),
+            silicon_temp_degc: r.silicon_temp_degc as i64,
+            distance_mm: r.distance_mm.iter().map(|&x| x as i64).collect(),
+            target_status: r.target_status.iter().map(|&x| x as i64).collect(),
+            nb_target_detected: r.nb_target_detected.iter().map(|&x| x as i64).collect(),
+        };
+        let want_frame = DecodedFrame {
+            timestamp_us: w["timestamp_us"].as_i64().unwrap(),
+            resolution: w["resolution"].as_u64().unwrap() as usize,
+            silicon_temp_degc: w["silicon_temp_degc"].as_i64().unwrap(),
+            distance_mm: ints(&w["distance_mm"]),
+            target_status: ints(&w["target_status"]),
+            nb_target_detected: ints(&w["nb_target_detected"]),
+        };
+        assert_eq!(got, want_frame, "{} frame {}", stem, idx);
+        let want_cnh = if with_cnh {
+            Some(w["cnh_raw"].as_str().expect("sidecar cnh_raw"))
+        } else {
+            assert!(w.get("cnh_raw").is_none(), "{} frame {}: unexpected cnh_raw", stem, idx);
+            None
+        };
+        assert_eq!(r.cnh_raw.as_deref().map(hex_encode).as_deref(), want_cnh, "{} frame {} cnh", stem, idx);
+    }
+    assert_eq!(reasm.discarded, 0, "{}: no frames discarded", stem);
+    seen(&format!("recordings/{}.depzrec", stem));
+}
+
+#[test]
+fn vl53l8ch_8x8_recording_replay() {
+    vl53l8ch_replay("vl53l8ch_8x8_15hz_3s", false);
+}
+
+#[test]
+fn vl53l8ch_cnh_recording_replay() {
+    vl53l8ch_replay("vl53l8ch_cnh_8x8_15hz", true);
 }

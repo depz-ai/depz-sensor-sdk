@@ -49,10 +49,9 @@ layer**:
 - `Bno055Regs.DecodeBlock`: any streamed or read register window → the raw
   channel integers it covers.
 
-What it does **not** do: open a port or run the session logic — mode switches
-through CONFIG, waiting for the boot and for the fusion to start, page
-switching, scaled samples. That is done today with the Python or TypeScript
-SDK; this SDK builds the command payloads and decodes what the board sends.
+On top of the codecs, the live device `Bno055Device` runs the session logic —
+mode switches through CONFIG, waiting for the boot and for the fusion to
+start, page switching, scaled samples: see the [guide](guide.md#live-device).
 
 ## Key concepts
 

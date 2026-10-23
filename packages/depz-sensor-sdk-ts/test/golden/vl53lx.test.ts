@@ -16,23 +16,16 @@ import {
   packWriteReg,
   packXshut,
 } from "../../src/protocol/vl53l4.js";
-import { decodeDieBlock, decodeHistogramRaw, decodeL0xRaw } from "../../src/sensors/vl53lx/decode.js";
+import { decodeDieBlock, decodeHistogramRaw } from "../../src/sensors/vl53lx/decode.js";
 import * as registry from "../../src/sensors/vl53lx/uld/registry.js";
 import { resolveVl53lxClass } from "../../src/sensors/vl53lx/vl53lx.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { snake, vl53lxInfo, vl53lxL0xRaw } from "./shapes.js";
+import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const v = loadVectors<any>("vl53lx.json");
 
 /** The Bare Driver (uld/bare/driver.ts) fills the histogram rows once it lands. */
 const HISTOGRAM_READY = registry.TABLE.VL53L4CX!.drivers.histogram !== undefined;
-
-function snake(o: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, val] of Object.entries(o)) {
-    out[k.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase()).replace(/(\d+)/g, "_$1")] = val;
-  }
-  return out;
-}
 
 describe("vl53lx.json", () => {
   for (const c of v.encode) {
@@ -52,6 +45,7 @@ describe("vl53lx.json", () => {
         );
       } else throw new Error(`unknown encode kind ${c.kind}`);
       expect(toHex(got)).toBe(c.payload);
+      seen(c);
     });
   }
 
@@ -66,19 +60,8 @@ describe("vl53lx.json", () => {
   for (const c of v.decode) {
     it(`decode ${c.name}`, () => {
       expect(c.report).toBe(0x92);
-      const got = unpackVl53lxInfo(fromHex(c.payload));
-      expect({
-        int_edges: got.intEdges,
-        slots_skipped: got.slotsSkipped,
-        i2c_errors: got.i2cErrors,
-        last_i2c_error: got.lastI2cError,
-        xshut_level: got.xshutLevel,
-        int_level: got.intLevel,
-        i2c_khz: got.i2cKhz,
-        addr_width: got.addrWidth,
-        n_clear: got.nClear,
-        frames_dropped: got.framesDropped,
-      }).toEqual(c.expect);
+      expect(vl53lxInfo(fromHex(c.payload))).toEqual(c.expect);
+      seen(c);
     });
   }
 
@@ -110,6 +93,9 @@ describe("vl53lx.json", () => {
       const drv = row.drivers[r.default_driver]!;
       expect([drv.ADDR_WIDTH, drv.MAX_KHZ]).toEqual([r.addr_width, r.max_khz]);
       expect(drv.CLEAR_STEPS.map((s) => [...s])).toEqual(r.clear_steps);
+      expect(row.modelId).toBe(r.model_id);
+      expect(row.reachMm).toBe(r.reach_mm);
+      seen(r);
     });
   }
 
@@ -117,31 +103,28 @@ describe("vl53lx.json", () => {
     it(`model ${c.name}`, () => {
       expect(resolveVl53lxClass(c.usb_model, c.device_name).name).toBe(c.expect_class);
       expect(registry.productFromBoardName(c.device_name)).toBe(c.expect_product);
+      seen(c);
     });
   }
 
   for (const c of v.die_block) {
     it(`die_block ${c.name}`, () => {
       expect(snake({ ...decodeDieBlock(fromHex(c.raw), c.variant) })).toEqual(c.expect);
+      seen(c);
     });
   }
 
   for (const c of v.l0x_raw) {
     it(`l0x_raw ${c.name}`, () => {
-      const got = decodeL0xRaw(fromHex(c.raw));
-      expect({
-        distance_raw: got.distanceRaw,
-        device_range_status: got.deviceRangeStatus,
-        signal_rate_mcps_1616: got.signalRateMcps1616,
-        ambient_rate_mcps_1616: got.ambientRateMcps1616,
-        effective_spad_count_88: got.effectiveSpadCount88,
-      }).toEqual(c.expect);
+      expect(vl53lxL0xRaw(fromHex(c.raw))).toEqual(c.expect);
+      seen(c);
     });
   }
 
   for (const c of v.histogram_raw) {
     it(`histogram_raw ${c.name}`, () => {
       expect(snake({ ...decodeHistogramRaw(fromHex(c.raw)) })).toEqual(c.expect);
+      seen(c);
     });
   }
 });

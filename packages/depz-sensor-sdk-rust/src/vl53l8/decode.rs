@@ -99,20 +99,20 @@ impl std::error::Error for Vl53l8Error {}
 /// actually present in the frame (`resolution` = `nb_target_detected.len()`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Vl53l8Results {
-    /// mm, already scaled `floor(raw/4)` per ST `GetRangingData`.
+    /// mm: `floor(raw/4)`, a negative distance clamped to 0, as ST `GetRangingData`.
     pub distance_mm: Vec<i32>,
     /// 5/9 = valid; 255 = no target detected in the zone.
     pub target_status: Vec<u8>,
     pub nb_target_detected: Vec<u8>,
-    /// kcps/SPAD, raw fixed-point (÷2048 for real units).
-    pub signal_per_spad: Vec<u32>,
-    /// kcps/SPAD, raw fixed-point.
-    pub ambient_per_spad: Vec<u32>,
+    /// Signal rate, kcps/SPAD (`raw / 2048`).
+    pub signal_per_spad: Vec<f64>,
+    /// Ambient rate, kcps/SPAD (`raw / 2048`).
+    pub ambient_per_spad: Vec<f64>,
     pub nb_spads_enabled: Vec<u32>,
-    /// mm, raw fixed-point (÷128 for real units).
-    pub range_sigma_mm_raw: Vec<u16>,
-    /// reflectance %.
-    pub reflectance: Vec<u8>,
+    /// Measurement noise, mm (`raw / 128`).
+    pub range_sigma_mm: Vec<f64>,
+    /// Estimated target reflectance, % (`raw / 2`).
+    pub reflectance: Vec<f64>,
     pub silicon_temp_degc: i8,
     /// Raw compact-network-histogram block bytes, present only on **VL53L8CH**
     /// frames that carry a CNH output block. Pass this to
@@ -268,10 +268,17 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
         }
     }
 
-    // Fixed-point scaling per ST GetRangingData: distance is /4 (floor).
+    // Real units, as ST GetRangingData: distance /4 with a negative distance clamped to 0;
+    // reflectance /2 (%); signal and ambient /2048 (kcps/SPAD); sigma /128 (mm). ST divides
+    // integers; the scaled values keep their fraction (contract 04 §5).
     for d in distance_mm.iter_mut() {
-        *d = d.div_euclid(4);
+        *d = d.div_euclid(4).max(0);
     }
+    let scale = |v: &[u32], n: f64| v.iter().map(|&x| x as f64 / n).collect::<Vec<f64>>();
+    let signal_per_spad = scale(&signal_per_spad, 2048.0);
+    let ambient_per_spad = scale(&ambient_per_spad, 2048.0);
+    let range_sigma_mm: Vec<f64> = range_sigma_mm_raw.iter().map(|&x| x as f64 / 128.0).collect();
+    let reflectance: Vec<f64> = reflectance.iter().map(|&x| x as f64 / 2.0).collect();
 
     // No target detected -> status 255. Iterate zones actually present.
     let nzones = nb_target_detected.len();
@@ -303,7 +310,7 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
         signal_per_spad,
         ambient_per_spad,
         nb_spads_enabled,
-        range_sigma_mm_raw,
+        range_sigma_mm,
         reflectance,
         silicon_temp_degc,
         cnh_raw,

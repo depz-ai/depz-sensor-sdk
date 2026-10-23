@@ -9,9 +9,153 @@ source, not this file.
 
 ## Contents
 
-- **SR04**: [`Sr04`](#sr04), [`Sr04.Sr04Cmd`](#sr04sr04cmd), [`Sr04.Sr04Rpt`](#sr04sr04rpt), [`Sr04.Sr04Data`](#sr04sr04data)
+- **SR04**: [`Sr04Device`](#sr04device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Sr04.Sr04Cmd`](#sr04sr04cmd), [`Sr04.Sr04Rpt`](#sr04sr04rpt), [`Sr04.Sr04Data`](#sr04sr04data)
 
 ## SR04
+
+### Sr04Device
+
+```java
+public final class Sr04Device extends DepzDevice
+```
+
+HC-SR04 ultrasonic ranger (contract 03). Measurements stream to `onMeasurement`
+callbacks and `measurements` queues: loop samples and the single shots an AUX SYNC_IN
+edge triggers.
+
+#### Sr04Device.getSamplePeriodUs
+
+```java
+public long getSamplePeriodUs()
+```
+
+The stored minimum interval between measurement starts, µs (default 50000) — not the
+effective rate, which the echo window throttles (contract 03 §3).
+
+#### Sr04Device.setSamplePeriodUs
+
+```java
+public void setSamplePeriodUs(long periodUs)
+```
+
+Set the minimum interval between measurement starts, µs (u32 wire field).
+
+#### Sr04Device.getEchoDecayUs
+
+```java
+public int getEchoDecayUs()
+```
+
+The post-echo settle pause, µs (4000–65000).
+
+#### Sr04Device.setEchoDecayUs
+
+```java
+public int setEchoDecayUs(int decayUs)
+```
+
+Set the settle pause. The device clamps it to 4000–65000 µs silently, so this reads it back
+and returns the value in effect. Must fit the u16 wire field.
+
+#### Sr04Device.measureOnce
+
+```java
+public Sr04Measurement measureOnce(Duration timeout)
+```
+
+One shot. The reply comes when the echo completes (or times out at ~65.5 ms), hence the 1 s
+default. `BusyException` while the loop runs.
+
+#### Sr04Device.measureOnce
+
+```java
+public Sr04Measurement measureOnce()
+```
+
+#### Sr04Device.start
+
+```java
+public void start()
+```
+
+Start the measurement loop (idempotent).
+
+#### Sr04Device.stop
+
+```java
+public void stop()
+```
+
+Stop the measurement loop (idempotent).
+
+#### Sr04Device.onMeasurement
+
+```java
+public AutoCloseable onMeasurement(Consumer<Sr04Measurement> callback)
+```
+
+Call `callback` for every measurement (reader thread). Close the result to stop.
+
+#### Sr04Device.measurements
+
+```java
+public Subscription<Sr04Measurement> measurements(int capacity)
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Sr04Device.measurements
+
+```java
+public Subscription<Sr04Measurement> measurements()
+```
+
+#### Sr04Device.getMeasurement
+
+```java
+public Sr04Measurement getMeasurement(Duration timeout)
+```
+
+The next measurement (contract 07 §3).
+
+#### Sr04Device.streamDroppedCounts
+
+```java
+public List<Long> streamDroppedCounts()
+```
+
+The drop counter of each open `measurements` queue.
+
+### Sr04Measurement
+
+```java
+public record Sr04Measurement(long timestampUs, int echoTimeUs, String source)
+```
+
+One SR04 ranging result. `source` is `"once"` (a host command or a SYNC_IN edge) or
+`"loop"`; `valid()` is false for the no-echo timeout.
+
+#### Sr04Measurement.valid
+
+```java
+public boolean valid()
+```
+
+#### Sr04Measurement.distanceMm
+
+```java
+public Double distanceMm()
+```
+
+Distance at 343 m/s, or null when no echo came back.
+
+#### Sr04Measurement.distanceMmAt
+
+```java
+public Double distanceMmAt(double airTempC)
+```
+
+Distance with the speed of sound for `airTempC` °C.
 
 ### Sr04
 
@@ -59,6 +203,8 @@ public static final int ECHO_DECAY_MAX_US = 65_000
 public static byte[] packSamplePeriod(long periodUs)
 ```
 
+`periodUs`: u32; outside 0..2^32-1 → IllegalArgumentException.
+
 #### Sr04.unpackSamplePeriod
 
 ```java
@@ -72,6 +218,8 @@ Reads the u32 sample period as an unsigned value in a long.
 ```java
 public static byte[] packEchoDecay(int decayUs)
 ```
+
+`decayUs`: u16; outside 0..65535 → IllegalArgumentException.
 
 #### Sr04.unpackEchoDecay
 

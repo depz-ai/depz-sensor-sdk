@@ -34,9 +34,9 @@ Everything the [VL53L7CX](../vl53l7cx/introduction.md) page lists — the
 per-aggregate histograms.
 The CNH decode is the one the VL53L8CH uses (same blob, same layout).
 
-Initialising the sensor, arming a CNH configuration and running a ranging
-session is done today with the Python or TypeScript SDK; this SDK decodes
-what the board streams.
+The live device `ai.depz.sensor.devices.Vl53l7chDevice` initialises the
+sensor, arms a CNH configuration (`configureCnh` with a `Vl53l8CnhSetup`) and
+streams the frames.
 
 ## Key concepts
 

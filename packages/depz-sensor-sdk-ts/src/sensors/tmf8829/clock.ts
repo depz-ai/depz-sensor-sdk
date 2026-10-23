@@ -8,6 +8,8 @@
  * exact. `>>` in JS is 32-bit, so the Q16 shifts are divisions by 65536.
  */
 
+import { checkU64Number, checkUint } from "../../protocol/wire.js";
+
 export const TMF8829_NOMINAL_Q16 = 8 * 65536;
 const CLOCK_WINDOW_MIN_US = 200_000;
 const CLOCK_WINDOW_SLIDE_US = 1_000_000;
@@ -83,6 +85,9 @@ export class Tmf8829SensorClock {
 
   /** Add a pair → TMF8829_FT_CLOCK_RESET if it does not fit the model, else 0. */
   add(us: number, tick: number): number {
+    // contract 07 §3: an MCU µs time is a u64, a SYSTICK a u32
+    checkU64Number("us", us);
+    checkUint("tick", tick, 32);
     let flags = 0;
     if (this.valid && !Tmf8829SensorClock.stepOk(us - this.last[0], u32(tick - this.last[1]))) {
       this.valid = false;
@@ -166,6 +171,12 @@ export class Tmf8829CaptureTimer {
     edgeUs: number,
     flagsIn: number,
   ): Tmf8829FrameTime {
+    checkUint("fpMode", fpMode, 8);
+    checkUint("systick", systick, 32);
+    checkUint("t0Tick", t0Tick, 32);
+    checkUint("t1Tick", t1Tick, 32);
+    checkU64Number("pairUs", pairUs);
+    checkU64Number("edgeUs", edgeUs);
     const c = this.clock;
     let flags = flagsIn;
     if (c.nominal) flags |= TMF8829_FT_NOMINAL;

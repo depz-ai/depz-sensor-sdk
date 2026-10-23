@@ -4,44 +4,27 @@
 //! These codecs are shared by both ToF variants (VL53L8CX and VL53L8CH): the
 //! advanced DCI byte layouts are identical, so this coverage applies to both.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::vl53l8::advanced::{
-    default_motion_config, pack_detection_thresholds, xtalk_margin_to_raw, DetectionThreshold,
+    try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw, DetectionThreshold,
 };
-use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{:02x}", x));
-    }
-    s
-}
+use common::{hex_encode, load, seen};
 
 #[test]
 fn vl53l8_advanced_vectors() {
-    let doc: Value = serde_json::from_str(
-        &std::fs::read_to_string(vectors_dir().join("vl53l8_advanced.json")).unwrap(),
-    )
-    .unwrap();
+    let doc = load("vl53l8_advanced.json");
 
     // ── motion-indicator default config (156-byte pack) ──────────────────────
     let mut motion = 0;
     for c in doc["motion"].as_array().unwrap() {
         let resolution = c["resolution"].as_u64().unwrap() as usize;
-        let cfg = default_motion_config(resolution);
+        let cfg = try_default_motion_config(resolution).unwrap();
         let packed = cfg.pack();
         assert_eq!(packed.len(), 156, "motion pack length {}", c["name"]);
         assert_eq!(hex_encode(&packed), c["pack"].as_str().unwrap(), "motion {}", c["name"]);
+        seen(c);
         motion += 1;
     }
 
@@ -61,7 +44,7 @@ fn vl53l8_advanced_vectors() {
                 operation: t["operation"].as_u64().unwrap() as u8,
             })
             .collect();
-        let blocks = pack_detection_thresholds(&entries);
+        let blocks = try_pack_detection_thresholds(&entries).unwrap();
         assert_eq!(
             hex_encode(&blocks.start),
             c["start_block"].as_str().unwrap(),
@@ -74,6 +57,7 @@ fn vl53l8_advanced_vectors() {
             "threshold valid {}",
             c["name"]
         );
+        seen(c);
         thresholds += 1;
     }
 
@@ -82,11 +66,12 @@ fn vl53l8_advanced_vectors() {
     for c in doc["xtalk_margin"].as_array().unwrap() {
         let kcps = c["kcps"].as_f64().unwrap();
         assert_eq!(
-            xtalk_margin_to_raw(kcps) as u64,
+            try_xtalk_margin_to_raw(kcps).unwrap() as u64,
             c["raw"].as_u64().unwrap(),
             "xtalk margin {}",
             c["name"]
         );
+        seen(c);
         xtalk += 1;
     }
 

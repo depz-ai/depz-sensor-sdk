@@ -45,10 +45,10 @@ the family's verifiable **decode and codec layer**:
   die block (`Vl53lxDecode.decodeDieBlock` with
   `DieVariant.L4`) when running as a VL53L4CD.
 
-What it does **not** do: initialise the sensor, apply presets and budgets, or
-turn the 24 bins into targets — that is the full driver. Initialising and
-streaming the board is done today with the Python or TypeScript SDK; this
-SDK decodes what the board streams and builds the command payloads.
+On top of them, the live device `ai.depz.sensor.devices.Vl53l4cxDevice` runs
+ST's BareDriver on the host with its histogram post-processing (presets,
+budgets, up to four targets per frame); `init("uld", "VL53L4CD")` borrows the
+light VL53L4CD ULD instead.
 
 ## Key concepts
 

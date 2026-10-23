@@ -7,7 +7,7 @@ from depz_sensor_sdk.protocol.sr04 import (
 )
 
 
-def test_sr04_encode_vectors(vectors):
+def test_sr04_encode_vectors(vectors, seen):
     for case in vectors("sr04.json")["encode"]:
         if case["kind"] == "set_sample_period":
             assert pack_sample_period(case["period_us"]).hex() == case["payload"]
@@ -15,9 +15,10 @@ def test_sr04_encode_vectors(vectors):
             assert pack_echo_decay(case["decay_us"]).hex() == case["payload"]
         else:
             raise AssertionError(case["kind"])
+        seen(case)
 
 
-def test_sr04_decode_vectors(vectors):
+def test_sr04_decode_vectors(vectors, seen):
     for case in vectors("sr04.json")["decode"]:
         payload = bytes.fromhex(case["payload"])
         expect = case["expect"]
@@ -32,3 +33,4 @@ def test_sr04_decode_vectors(vectors):
             assert unpack_echo_decay(payload) == expect["decay_us"]
         else:
             raise AssertionError(hex(case["report"]))
+        seen(case)

@@ -1,18 +1,14 @@
 # BNO055 — user guide
 
-Hands-on guide to the BNO055 wire codecs ([`Bno055`](api.md#bno055)) and
+Hands-on guide to the BNO055 live device
+(`ai.depz.sensor.devices.Bno055Device`) and the layers under it: the wire codecs ([`Bno055`](api.md#bno055)) and
 register codecs ([`Bno055Regs`](api.md#bno055regs)). For what the sensor is
 and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
-This SDK does not drive the sensor. The session logic — going through CONFIG
-for every mode change, waiting for the boot and the fusion start, page
-discipline — runs in the Python or TypeScript SDK. What follows is everything
-you need to build the commands and decode what the board sends; the rules the
-sensor imposes are listed where they matter.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Commands](#commands)
 - [Hello-world: decode the stream](#hello-world-decode-the-stream)
 - [Units and scaling](#units-and-scaling)
@@ -22,6 +18,38 @@ sensor imposes are listed where they matter.
 - [Page 1: sensor configs](#page-1-sensor-configs)
 - [Bridge info](#bridge-info)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.bno055.Bno055Regs.*;
+import java.time.Duration;
+import java.util.Arrays;
+
+try (Bno055Device imu = DepzDevices.openBno055();
+        Subscription<Bno055Sample> samples = imu.samples()) {
+    imu.configure(OprMode.NDOF, Units.DEFAULT, AxisRemap.placement("P1"), null); // returns once fusion runs
+    imu.startStream(10);                                        // the full 46-byte block at 100 Hz
+    Bno055Sample s = samples.take(Duration.ofSeconds(1));
+    System.out.println("q = " + Arrays.toString(s.quaternion()) + "  calib " + s.calibration());
+    imu.stopStream();
+}
+```
+
+The device does the session logic the sensor imposes: every mode change goes
+through CONFIG with the datasheet settle times, `configure` waits for the boot
+and the fusion start, page 1 is entered and left around each access (and
+refused while streaming), settings that need CONFIG (`setUnits`,
+`setAxisRemap`, the calibration profile, the SIC matrix) switch there and back.
+`setPowerMode(PwrMode.SUSPEND)` remembers the mode and puts it back on wake-up;
+`selfTest()` runs the built-in test; `resetSensor()` pulses nRESET and
+`restoreConfiguration()` re-applies the last `configure`. Streamed samples
+use the units in effect when the stream started; a short report is dropped and
+counted in `streamParseErrors()`.
+
+The sections below are the layers under the device; the rules the sensor
+imposes are listed where they matter.
 
 ## Commands
 

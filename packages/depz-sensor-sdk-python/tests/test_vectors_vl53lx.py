@@ -19,7 +19,7 @@ from depz_sensor_sdk.vl53lx import decode as D
 from depz_sensor_sdk.vl53lx.uld import registry
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for c in vectors("vl53lx.json")["encode"]:
         kind = c["kind"]
         if kind == "set_addr_width":
@@ -38,6 +38,7 @@ def test_encode_vectors(vectors):
         else:
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == c["payload"], c["name"]
+        seen(c)
 
 
 def test_start_stream_refuses_five_clear_steps():
@@ -45,14 +46,15 @@ def test_start_stream_refuses_five_clear_steps():
         pack_start_stream(0x0089, 17, ((0x86, 1),) * 5)
 
 
-def test_decode_vectors(vectors):
+def test_decode_vectors(vectors, seen):
     for c in vectors("vl53lx.json")["decode"]:
         assert asdict(Vl53lxInfo.unpack(bytes.fromhex(c["payload"]))) == c["expect"], c["name"]
+        seen(c)
     with pytest.raises(ValueError):
         Vl53lxInfo.unpack(bytes(INFO_SIZE - 1))
 
 
-def test_product_table(vectors):
+def test_product_table(vectors, seen):
     rows = vectors("vl53lx.json")["products"]
     assert [r["product"] for r in rows] == list(registry.PRODUCTS)
     for r in rows:
@@ -62,22 +64,27 @@ def test_product_table(vectors):
         drv = row.drivers[r["default_driver"]]
         assert (drv.ADDR_WIDTH, drv.MAX_KHZ) == (r["addr_width"], r["max_khz"])
         assert [list(s) for s in drv.CLEAR_STEPS] == r["clear_steps"]
+        seen(r)
 
 
-def test_model_vectors(vectors):
+def test_model_vectors(vectors, seen):
     for c in vectors("vl53lx.json")["model"]:
         assert _vl53lx_class(c["usb_model"], c["device_name"]).__name__ == c["expect_class"], c["name"]
         assert registry.product_from_board_name(c["device_name"]) == c["expect_product"], c["name"]
+        seen(c)
 
 
-def test_block_decoders(vectors):
+def test_block_decoders(vectors, seen):
     v = vectors("vl53lx.json")
     for c in v["die_block"]:
         got = D.decode_die_block(bytes.fromhex(c["raw"]), c["variant"])
         assert asdict(got) == c["expect"], c["name"]
+        seen(c)
     for c in v["l0x_raw"]:
         assert asdict(D.decode_l0x_raw(bytes.fromhex(c["raw"]))) == c["expect"], c["name"]
+        seen(c)
     for c in v["histogram_raw"]:
         got = asdict(D.decode_histogram_raw(bytes.fromhex(c["raw"])))
         got["bins"] = list(got["bins"])
         assert got == c["expect"], c["name"]
+        seen(c)

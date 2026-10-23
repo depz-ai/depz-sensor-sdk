@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <typeinfo>
 
 #include <depz_sensor_io.h>
 
@@ -249,7 +250,7 @@ Vl53l8LiveFrame l8_from_c(const depz_vl53l8_live_frame& c)
     f.signal_per_spad.assign(c.f.signal_per_spad, c.f.signal_per_spad + n);
     f.ambient_per_spad.assign(c.f.ambient_per_spad, c.f.ambient_per_spad + n);
     f.nb_spads_enabled.assign(c.f.nb_spads_enabled, c.f.nb_spads_enabled + n);
-    f.range_sigma_mm_raw.assign(c.f.range_sigma_mm_raw, c.f.range_sigma_mm_raw + n);
+    f.range_sigma_mm.assign(c.f.range_sigma_mm, c.f.range_sigma_mm + n);
     f.reflectance.assign(c.f.reflectance, c.f.reflectance + n);
     if (c.cnh_len) {
         const auto* b = reinterpret_cast<const std::byte*>(c.cnh);
@@ -392,6 +393,8 @@ bno086::ReportType report_type_from_c(depz_bno_report_type t)
     case DEPZ_BNO_RAW_SENSOR: return T::RawSensor;
     case DEPZ_BNO_GENERIC_EVENT: return T::GenericEvent;
     case DEPZ_BNO_GYRO_INTEGRATED_RV: return T::GyroIntegratedRV;
+    case DEPZ_BNO_MOTION_REQUEST: return T::MotionRequest;
+    case DEPZ_BNO_FLUSH_COMPLETED_REPORT: return T::FlushCompleted;
     default: return T::UnknownReport;
     }
 }
@@ -419,6 +422,9 @@ Bno086Report bno086_from_c(const depz_bno_report& c)
     r.page_number = c.page_number;
     r.end_of_sequence = c.end_of_sequence;
     r.most_likely_state = c.most_likely_state;
+    r.intent = c.intent;
+    r.request = c.request;
+    r.flushed_sensor = c.flushed_sensor;
     if (c.type == DEPZ_BNO_ACTIVITY_CLASSIFIER) r.confidences.assign(c.confidences, c.confidences + 10);
     r.sensor_timestamp_us = c.sensor_timestamp_us;
     r.temperature_raw = c.temperature_raw;
@@ -606,10 +612,9 @@ std::unique_ptr<Device> Device::open(Link link)
     return wrap_device(d);
 }
 
-std::unique_ptr<Device> Device::promote(std::unique_ptr<Device> dev)
+std::unique_ptr<Device> Device::rewrap(std::unique_ptr<Device> dev)
 {
     depz_device* d = dev->handle();
-    check(depz_device_promote(d));
     auto out = wrap_device(d);
     {
         std::lock_guard<std::mutex> g(dev->held_lock_);
@@ -617,6 +622,31 @@ std::unique_ptr<Device> Device::promote(std::unique_ptr<Device> dev)
     }
     dev->d_ = nullptr;  // the new wrapper owns the handle now
     return out;
+}
+
+std::unique_ptr<Device> Device::promote(std::unique_ptr<Device> dev)
+{
+    check(depz_device_promote(dev->handle()));
+    return rewrap(std::move(dev));
+}
+
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name)
+{
+    if (!dev) throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class: no device");
+    if (typeid(*dev) != typeid(Device))
+        throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class needs a plain Device (it already has a class)");
+    check(depz_attach_sensor_class(dev->handle(), class_name.c_str()));
+    if (class_name == "device") return dev;
+    return Device::rewrap(std::move(dev));
+}
+
+std::unique_ptr<Device> open_on_link(Link link, std::optional<std::uint16_t> usb_vid,
+                                     std::optional<std::uint16_t> usb_pid, std::chrono::milliseconds timeout)
+{
+    depz_device* d = nullptr;
+    check(depz_open_on_link(link.release(), usb_vid ? *usb_vid : -1, usb_pid ? *usb_pid : -1,
+                            ms(timeout), &d));
+    return wrap_device(d);
 }
 
 Device::~Device() { close(); }
@@ -1065,7 +1095,7 @@ std::optional<Vl53l8LiveFrame> Vl53l8LiveFrame::pull(detail::StreamHandle& h, st
 void CnhSetup::init_config(int start_bin, int num_bins, int sub_sample)
 {
     depz_vl53l8_cnh_setup c{};
-    depz_vl53l8_cnh_init_config(&c, start_bin, num_bins, sub_sample);
+    check(depz_vl53l8_cnh_init_config_checked(&c, start_bin, num_bins, sub_sample));
     cnh_from_c(c, *this);
 }
 
@@ -1906,9 +1936,16 @@ void Bno086::frs_write(std::uint16_t record, const std::vector<std::uint32_t>& w
 
 bno086::SensorMetadata Bno086::metadata(bno086::SensorId sensor)
 {
+    // depz_bno086_get_metadata() is this FRS read + parse; done here to keep the words.
+    const std::uint16_t record = depz_bno_metadata_record(static_cast<std::uint8_t>(sensor));
     depz_bno_metadata c{};
-    check(depz_bno086_get_metadata(handle(), static_cast<std::uint8_t>(sensor), &c));
+    if (!record) check(depz_bno086_get_metadata(handle(), static_cast<std::uint8_t>(sensor), &c));  // DEPZ_E_ARG
+    std::uint32_t words[64];
+    std::size_t n = 0;
+    check(depz_bno086_frs_read(handle(), record, words, sizeof words / sizeof words[0], &n));
+    depz_bno_metadata_from_words(words, n, &c);
     bno086::SensorMetadata m;
+    m.raw_words.assign(words, words + n);
     m.me_version = c.me_version;
     m.mh_version = c.mh_version;
     m.sh_version = c.sh_version;
@@ -2015,6 +2052,8 @@ std::optional<std::string> Vl53lx::detected_product()
 {
     return vlx_product_name(depz_vl53lx_detected_product(handle()));
 }
+
+std::string Vl53lx::sensor_class() const { return depz_vl53lx_class_str(depz_vl53lx_get_class(handle())); }
 
 std::vector<vl53lx::DriverKind> Vl53lx::driver_kinds(const std::string& product)
 {

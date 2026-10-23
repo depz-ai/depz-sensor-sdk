@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(depz_sensor_sdk_cpp VERSION 0.6.0 LANGUAGES CXX)
+project(depz_sensor_sdk_cpp VERSION 0.7.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -154,12 +154,30 @@ endif()
 if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   enable_testing()
 
-  add_executable(depz_test_vectors tests/test_vectors.cpp)
+  # Coverage gate (scripts/check_vector_coverage.py): the C SDK's header-only
+  # vector_seen.h, compiled once as C (tests/vector_seen.c) so <windows.h>
+  # stays out of the C++ test sources. Without the sibling C tree it is a no-op.
+  set(_depz_c_tests "${CMAKE_CURRENT_SOURCE_DIR}/../depz-sensor-sdk-c/tests")
+  set(_depz_seen_src "")
+  if(EXISTS "${_depz_c_tests}/vector_seen.h")
+    enable_language(C)
+    set(_depz_seen_src tests/vector_seen.c)
+  endif()
+
+  add_executable(depz_test_vectors tests/test_vectors.cpp ${_depz_seen_src})
   target_link_libraries(depz_test_vectors PRIVATE depz_sensor_sdk)
   target_include_directories(depz_test_vectors PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(depz_test_vectors PRIVATE
     DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}"
     DEPZ_RECORDINGS_DIR="${DEPZ_VECTORS_DIR}/recordings")
+  if(_depz_seen_src)
+    target_include_directories(depz_test_vectors PRIVATE "${_depz_c_tests}")
+    target_compile_definitions(depz_test_vectors PRIVATE DEPZ_TEST_VECTOR_SEEN=1)
+  endif()
+  # The BNO086 SI scaling (bno086_reports records, q_points) is in depz/device.hpp.
+  if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
+    target_compile_definitions(depz_test_vectors PRIVATE DEPZ_TEST_HAS_IO=1)
+  endif()
   if(NOT MSVC)
     target_compile_options(depz_test_vectors PRIVATE -Wall -Wextra)
   endif()
@@ -167,8 +185,19 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   # The foundation parity suite (crc/framing/usb/common/identity/sr04/fwdepz).
   add_test(NAME vectors COMMAND depz_test_vectors)
 
+  # Contract 16 differential-testing adapter: a JSON-lines process the driver
+  # (scripts/difftest.py) builds and starts. Not part of `all`.
+  add_executable(depz_difftest_adapter EXCLUDE_FROM_ALL tests/difftest_adapter.cpp)
+  target_link_libraries(depz_difftest_adapter PRIVATE depz_sensor_sdk)
+  target_include_directories(depz_difftest_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
+    target_compile_definitions(depz_difftest_adapter PRIVATE DEPZ_DIFFTEST_HAS_IO=1)
+  endif()
+  if(NOT MSVC)
+    target_compile_options(depz_difftest_adapter PRIVATE -Wall -Wextra)
+  endif()
+
   # The live-hardware wrapper against the C SDK's fake SR04 over loopback.
-  set(_depz_c_tests "${CMAKE_CURRENT_SOURCE_DIR}/../depz-sensor-sdk-c/tests")
   if(DEPZ_SENSOR_SDK_CPP_BUILD_IO AND EXISTS "${_depz_c_tests}/fake_sr04.c")
     enable_language(C)
     add_executable(depz_test_device tests/test_device.cpp "${_depz_c_tests}/fake_sr04.c"
@@ -179,11 +208,33 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
     target_compile_definitions(depz_test_device PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
     foreach(t identity_and_types errors_are_typed timeout_when_silent
               measure_stream_and_callbacks disconnect_ends_streams promote_and_record_replay
-              sr04_session_replay l4_fake_roundtrips_and_guards l4_session_replay l8ch_cnh_replay
-              bno_ndof_replay bno086_session_replay bno086_fake_errors_and_reports
-              vlx_l4cd_uld_replay vlx_l1cx_uld_replay vlx_l3cx_ulp_replay vlx_l0x_uld_replay
-              vlx_l4cx_hist_short_replay tmf8829_fake_session)
+              l4_fake_roundtrips_and_guards bno086_fake_errors_and_reports
+              cnh_required_memory vlx_refusal_before_traffic tmf8829_fake_session)
       add_test(NAME device_${t} COMMAND depz_test_device ${t})
+    endforeach()
+  endif()
+
+  # Contract 15 device scenarios (contracts/scenarios/*.json): one ctest
+  # target per scenario, all through the live layer over strict-tx replay.
+  set(DEPZ_SCENARIOS_DIR "${DEPZ_VECTORS_DIR}/../scenarios" CACHE PATH "Path to the device-scenario tree")
+  if(DEPZ_SENSOR_SDK_CPP_BUILD_IO AND EXISTS "${DEPZ_SCENARIOS_DIR}")
+    add_executable(depz_test_scenarios tests/test_scenarios.cpp ${_depz_seen_src})
+    target_link_libraries(depz_test_scenarios PRIVATE depz_sensor_sdk)
+    target_include_directories(depz_test_scenarios PRIVATE tests)
+    target_compile_definitions(depz_test_scenarios PRIVATE
+      DEPZ_SCENARIOS_DIR="${DEPZ_SCENARIOS_DIR}"
+      DEPZ_RECORDINGS_DIR="${DEPZ_VECTORS_DIR}/recordings")
+    if(_depz_seen_src)
+      target_include_directories(depz_test_scenarios PRIVATE "${_depz_c_tests}")
+      target_compile_definitions(depz_test_scenarios PRIVATE DEPZ_TEST_VECTOR_SEEN=1)
+    endif()
+    if(NOT MSVC)
+      target_compile_options(depz_test_scenarios PRIVATE -Wall -Wextra)
+    endif()
+    file(GLOB _depz_scenarios CONFIGURE_DEPENDS "${DEPZ_SCENARIOS_DIR}/*.json")
+    foreach(_sc ${_depz_scenarios})
+      get_filename_component(_id "${_sc}" NAME_WE)
+      add_test(NAME scenario_${_id} COMMAND depz_test_scenarios ${_id})
     endforeach()
   endif()
 
@@ -202,4 +253,5 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   add_test(NAME bno086_shtp     COMMAND depz_test_vectors bno086_shtp)
   add_test(NAME bno086_reports  COMMAND depz_test_vectors bno086_reports)
   add_test(NAME dataset         COMMAND depz_test_vectors dataset)
+  add_test(NAME input_rules     COMMAND depz_test_vectors input_rules)
 endif()

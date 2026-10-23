@@ -236,8 +236,11 @@ public:
     std::optional<TimeSync> time_sync() const;
     std::int64_t to_host_time_us(std::uint64_t device_us) const;
 
-    // Identify (GET_NAME_ACTIVE_SOFTWARE) and return the matching class,
-    // consuming this plain device — what open_device() does after its probe.
+    // The in-place probe captures older than contract 02 §4.4 hold (contract
+    // 15 `probe: "legacy"`): GET_NAME_ACTIVE_SOFTWARE — plus GET_DEVICE_NAME
+    // for the L5/L7 and 1D families only — then the class
+    // resolve_sensor_class() picks (no USB id), consuming this plain device.
+    // New code opens with open_device() or open_on_link() (the §4.4 probe).
     static std::unique_ptr<Device> promote(std::unique_ptr<Device> dev);
 
     // Escape hatch: send `cmd` and wait for RPT_STATUS(cmd, OK) ...
@@ -267,7 +270,11 @@ protected:
 private:
     std::mutex held_lock_;
     std::vector<std::unique_ptr<detail::CallbackHolder>> held_;
+    // The wrapper of the class now attached to `dev`'s handle; `dev` is spent.
+    static std::unique_ptr<Device> rewrap(std::unique_ptr<Device> dev);
     friend std::unique_ptr<Device> wrap_device(depz_device* d);
+    friend std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev,
+                                                       const std::string& class_name);
 };
 
 // ── SR04 ultrasonic ranger (contract 03) ────────────────────────────────────
@@ -417,7 +424,8 @@ struct Vl53l8Motion {
     std::array<std::uint32_t, 32> motion;
 };
 
-// One streamed frame: the zone arrays in `frame` (distance_mm in mm; CH with
+// One streamed frame: the zone arrays in `frame` (real units as ST
+// GetRangingData — distance_mm in mm, see vl53l8::Vl53l8Frame; CH with
 // CNH armed: frame.cnh_raw, decode with vl53l8::decode_cnh()), plus motion.
 struct Vl53l8LiveFrame {
     vl53l8::Vl53l8Frame frame;
@@ -440,9 +448,13 @@ struct CnhSetup {
     std::array<std::int8_t, 64> map_id{};
     std::array<std::uint8_t, 32> indicator_format_1{}, indicator_format_2{};
 
-    // vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+    // vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+    // bin. ArgumentError when num_bins or sub_sample is outside 0..255 (u8
+    // fields, never masked — contract 07 §3).
     void init_config(int start_bin, int num_bins, int sub_sample);
     // vl53lmz_cnh_create_agg_map: zones (resolution 16 | 64) -> aggregates.
+    // ArgumentError for another resolution, a negative start, merge / cols /
+    // rows < 1, or a map past the zone grid.
     void create_agg_map(int resolution, int start_x, int start_y, int merge_x, int merge_y, int cols,
                         int rows);
     // On-device CNH buffer bytes; ArgumentError when blank or above the cap.
@@ -707,6 +719,10 @@ public:
     // The product the board's device name carries ("VL53L4CX"), nullopt on
     // an unstamped board (then name it at init).
     std::optional<std::string> detected_product();
+    // The class the board opened as, fixed at open from the USB PID / device
+    // name ("vl53l0x" ... "vl53l4cx"; "vl53lx" = generic, product at init).
+    // No traffic.
+    std::string sensor_class() const;
     // The driver kinds a product has (UI order).
     static std::vector<vl53lx::DriverKind> driver_kinds(const std::string& product);
 
@@ -795,6 +811,7 @@ enum class SensorId : std::uint8_t {
     PersonalActivityClassifier = 0x1E, SleepDetector = 0x1F, TiltDetector = 0x20, PocketDetector = 0x21,
     CircleDetector = 0x22, HeartRateMonitor = 0x23, ArvrStabilizedRv = 0x28,
     ArvrStabilizedGameRv = 0x29, GyroIntegratedRv = 0x2A,
+    MotionRequest = 0x2B,  // interactive calibration, BNO086 only
 };
 
 enum class TareBasis : std::uint8_t {
@@ -853,6 +870,7 @@ struct SensorMetadata {
     std::uint32_t min_period_us = 0, max_period_us = 0;
     std::uint16_t fifo_max = 0, fifo_reserved = 0, batch_buffer_bytes = 0;
     std::uint16_t q_point_1 = 0, q_point_2 = 0, q_point_3 = 0;
+    std::vector<std::uint32_t> raw_words;  // the FRS record as read; authoritative
     double power_ma() const { return power_ma_q10 / 1024.0; }
 };
 
@@ -1103,7 +1121,30 @@ struct OpenOptions {
 
 // Find, probe and open with the right class: dynamic_cast<Sr04*> (or
 // <Vl53l4cd*>, <Vl53l8*>, <Bno055*>, <Bno086*>, <Vl53lx*>, <Tmf8829*>) tells.
+// Contract 02 §4.4: the probe runs on a connection of its own, which is
+// closed; the class (resolve_sensor_class() of the answers and the port's
+// USB id) then opens the port afresh.
 std::unique_ptr<Device> open_device(const OpenOptions& opt = {});
+
+// Continue the open plain Device `dev` as `class_name` (one of
+// sensor_class_names(), as from resolve_sensor_class()) on the same
+// connection — contract 02 §4.4: no reopen, the reader and the host sequence
+// numbers run on. `dev` must be a plain Device (no class yet) with no request
+// in flight (ArgumentError otherwise); it is consumed — use the result.
+// "device" returns `dev` itself; "bootloader" throws BootloaderModeError.
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name);
+
+// Open a device on a connection that cannot be reopened — a replay or
+// recording link, an adopted transport (contract 02 §4.4). Runs the probe
+// probe_port() runs (GET_NAME_ACTIVE_SOFTWARE, GET_DEVICE_NAME, GET_SERIAL)
+// on `link`, resolves the class with resolve_sensor_class() from the answers
+// and the given USB id (nullopt = unknown), and continues as that class on
+// the same link (attach_sensor_class). `timeout` 0 = default 200 ms. No
+// answer to GET_NAME_ACTIVE_SOFTWARE -> NoDeviceError; a bootloader ->
+// BootloaderModeError.
+std::unique_ptr<Device> open_on_link(Link link, std::optional<std::uint16_t> usb_vid = std::nullopt,
+                                     std::optional<std::uint16_t> usb_pid = std::nullopt,
+                                     std::chrono::milliseconds timeout = std::chrono::milliseconds(0));
 // open_device, and WrongTypeError unless it is an SR04.
 std::unique_ptr<Sr04> open_sr04(const OpenOptions& opt = {});
 // open_device, and WrongTypeError unless it is a VL53L4CD.

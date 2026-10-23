@@ -3,7 +3,7 @@
 The common guide to the Rust SDK for the DEPZ USB sensor line. It covers what
 the crate is, how to depend on it, the shared mental model, and the
 cross-sensor building blocks (framing & CRC, USB-id discovery, firmware-name
-identity, the `.fwdepz` container, and the `.depzdata` dataset reader). Each
+identity, the `.fwdepz` container, and the `.depzdata` datasets). Each
 sensor then has its own **introduction** and **user guide**:
 
 - **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
@@ -43,6 +43,7 @@ from the source `///` doc-comments so it never drifts from the code.
 
 - [What it is](#what-it-is)
 - [What it is not](#what-it-is-not)
+- [Live devices](#live-devices)
 - [Add the crate](#add-the-crate)
 - [Getting started](#getting-started)
 - [Mental model](#mental-model)
@@ -51,7 +52,6 @@ from the source `///` doc-comments so it never drifts from the code.
 - [Per-sensor decode](#per-sensor-decode)
 - [Firmware container (`.fwdepz`)](#firmware-container-fwdepz)
 - [Datasets (record & replay)](#datasets-record--replay)
-- [Extension points](#extension-points)
 - [Testing & golden vectors](#testing--golden-vectors)
 
 ## What it is
@@ -60,7 +60,7 @@ Every DEPZ sensor is a USB CDC-ACM device speaking one shared framed protocol
 (`A5 C3` header + CRC). This crate is the **contract-first, transport-agnostic
 foundation**: the byte-exact codecs, framing/parsing, CRCs, USB-id table,
 firmware-name identity, per-sensor frame/report decoders, the `.fwdepz`
-firmware-container parser, and the `.depzdata` dataset reader — everything you
+firmware-container parser, and the `.depzdata` datasets — everything you
 need to turn bytes on the wire into typed values, verified against the shared
 golden vectors in `contracts/vectors/` and byte-for-byte identical to the
 Python / TypeScript / Java / C / C++ reference SDKs.
@@ -71,7 +71,9 @@ The sensors fall into a few firmware philosophies:
   ([`protocol::sr04`](sr04/api.md)).
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — one I2C register-bridge firmware
   for the 1D family; the v2.00 codecs, the product table and the stateless
-  decode of the streamed blocks are in [`vl53lx`](vl53l1cx/api.md).
+  decode of the streamed blocks are in [`vl53lx`](vl53l1cx/api.md), and ST's
+  drivers (light ULDs, the L0X API, the histogram driver) **run on the host**
+  under the live class `devices::Vl53lxDevice`.
 - **VL53L4CD** — the device is a thin I2C register bridge; the ST ULD 2.2.3
   math (result block, range timing, tuning words) runs **on the host**
   ([`vl53l4`](vl53l4cd/api.md)).
@@ -97,31 +99,79 @@ returned `Vec`s), no runtime dependencies.
 
 ## What it is not
 
-This crate is the **verifiable decode + protocol layer only**. It deliberately
-carries **no live serial-I/O layer**: no port enumeration, no reader thread, no
-`open_device()`. You bring the bytes (from a `serialport` crate, a socket, a
-capture file, a test vector) and feed them to the parsers here; you take the
-frames these builders produce and write them to your transport. The
-**live drivers** are documented extension points, present in shape but not
-here:
-
-- **Live ULD init/config** (VL53L5 / VL53L7 / VL53L8 firmware download + the
-  DCI register bridge over the wire) — hardware-dependent.
-- **The 1D family's ST drivers** (init, modes, budgets, calibration, histogram
-  target extraction) and the **BNO055 session logic** (mode switches through
-  CONFIG, boot and fusion-start waits, page discipline). Initialising and
-  streaming these boards is done today with the Python or TypeScript SDK; this
-  crate decodes what they send.
-- **The TMF8829 driver** (soft reset, sensor-firmware download, presets and
-  the config page, start/stop over the port). The firmware image, the presets
-  and config fields, the frame decode and the clock model are here; the ready
-  driver is in the Python, TypeScript, C and C++ SDKs.
+The crate has **no serial-port dependency**: the live layer
+([`devices`](#live-devices)) runs on any byte pipe you hand it — a port opened
+with the crate of your choice, a socket, a `.depzrec` replay. It has no
+dependency at all: JSON, gzip and base64 are its own.
 
 The crate never fabricates a decode it cannot verify against a golden vector.
 
+## Live devices
+
+`depz_sensor_sdk::devices` is the contract 07 device layer: a [`DepzDevice`] owns
+a [`Link`] and a reader thread, correlates replies to requests by echoed opcode
+(one request in flight per opcode), raises events and runs the common commands
+(name, serial, MCU temperature, time sync, payload CRC, sync pins). Each sensor
+class wraps it (and derefs to it) — the **SR04**, the **VL53L4CD**, the **VL53L8CX / CH**, the **VL53L5CX /
+L7CX / L7CH**, the **BNO055**, the **BNO085 / BNO086**, the **TMF8829** and the **VL53L 1D family**
+(VL53L0X / L1CX / L1CB / L3CX / L4CX).
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::{open_on_link, AnyDevice, ReplayLink};
+
+// Any `Link` works: here a capture, replayed; on hardware, a serial port (below).
+let link = ReplayLink::open("sr04.depzrec", true, false)?;
+let AnyDevice::Sr04(sr04) = open_on_link(link, None, None, None)? else { panic!("not an SR04") };
+println!("{}", sr04.get_device_name()?);
+let loop_ = sr04.measurements(256);         // a bounded, drop-oldest pull queue
+sr04.start()?;
+let m = loop_.take(Duration::from_secs(1))?;
+println!("{:?} mm", m.distance_mm());
+sr04.stop()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+`open_on_link` runs the contract 02 §4.4 probe (software name, device name,
+serial), resolves the class and continues the same connection as it. A link is
+four methods — `read` with a timeout, `write`, `close`, `is_closed` (plus a
+`name`) — so a serial port is a few lines over the port crate you already use,
+e.g. `serialport`:
+
+```rust,ignore
+struct Port(std::sync::Mutex<Box<dyn serialport::SerialPort>>, std::sync::atomic::AtomicBool);
+
+impl depz_sensor_sdk::devices::Link for Port {
+    fn read(&self, timeout: Duration) -> depz_sensor_sdk::devices::Result<Vec<u8>> {
+        let mut p = self.0.lock().unwrap();
+        p.set_timeout(timeout)?;
+        let mut buf = [0u8; 4096];
+        match p.read(&mut buf) {
+            Ok(n) => Ok(buf[..n].to_vec()),
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(Vec::new()),
+            Err(e) => Err(e.into()),
+        }
+    }
+    fn write(&self, data: &[u8]) -> depz_sensor_sdk::devices::Result<()> {
+        Ok(self.0.lock().unwrap().write_all(data)?)
+    }
+    fn close(&self) { self.1.store(true, std::sync::atomic::Ordering::SeqCst) }
+    fn is_closed(&self) -> bool { self.1.load(std::sync::atomic::Ordering::SeqCst) }
+    fn name(&self) -> String { self.0.lock().unwrap().name().unwrap_or_default() }
+}
+```
+
+`RecordingLink` wraps any link and writes a `.depzrec` capture (contract 08);
+`ReplayLink` plays one back causally, with `strict_tx` failing any byte the host
+writes that the capture does not hold — how the contract 15 scenarios run.
+Callbacks (`on_measurement`, `on_event`) run on the reader thread and return a
+`Hook` that unregisters when dropped; `measurements(capacity)` /
+`events(capacity)` are pull queues. Errors are one enum, `DepzError`
+(`Timeout`, `Status`, `DeviceLost`, `InvalidArgument`, …).
+
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.6.0):
+Published on crates.io as `depz-sensor-sdk` (0.7.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -293,16 +343,16 @@ verifies the container.
 
 ## Datasets (record & replay)
 
-[`dataset::Dataset::parse`](api.md#datasets-record--replay) reads a `.depzdata`
+[`dataset::Dataset`](api.md#datasets-record--replay) reads a `.depzdata`
 document — UTF-8 JSON Lines, a header describing devices on a shared host
-timeline followed by one decoded record per line — using the crate's own
-dependency-free [`json`](api.md#json) parser:
+timeline followed by one decoded record per line (`.depzdata.gz`: the same,
+gzipped) — using the crate's own dependency-free [`json`](api.md#json) parser:
 
 ```rust
 use depz_sensor_sdk::dataset::{Dataset, RecordValue};
 
-let ds = Dataset::parse(&text)?;
-for rec in &ds.records {                       // file order (already merged by host time)
+let ds = Dataset::read("session.depzdata")?;   // or Dataset::parse(&text)
+for rec in &ds.records {                       // sorted by host time
     if let RecordValue::Sr04 { echo_us, source } = &rec.value {
         println!("{} {} echo={}", rec.device, source, echo_us);
     }
@@ -315,25 +365,29 @@ that device's `time_sync.offset_us`, so records from every device (including
 two of the same model) share one timeline. Unknown record kinds keep their raw
 JSON as `RecordValue::Other`.
 
-## Extension points
+Recording: [`SessionRecorder`](api.md#datasets-record--replay) takes open
+devices (any class, or an `AnyDevice`), syncs their clocks and writes a record
+per result; it never reconfigures a device — start and stop streaming yourself.
 
-Truthfully, the live drivers are present in shape but not here (see
-[What it is not](#what-it-is-not)):
+```rust
+use depz_sensor_sdk::dataset::SessionRecorder;
 
-- **Live ULD init/config** — the VL53L5 / VL53L7 / VL53L8 firmware download
-  and the DCI register bridge that performs writes over the wire. The pure DCI
-  byte layouts are here (`vl53l8::advanced`); the bridge that ships them is
-  not.
-- **The 1D family's drivers and the BNO055 session logic** — the codecs and
-  the stateless decode are here; initialising and streaming those boards is
-  done with the Python or TypeScript SDK.
-- **The TMF8829 driver** — init (firmware download), configure, start/stop
-  are register writes you send yourself; the Python, TypeScript, C and C++
-  SDKs have them ready.
+let mut rec = SessionRecorder::new("session.depzdata.gz", Some("bench run"), false, Some(1.0));
+rec.add(&tof, None, 5)?;   // "d0"; 5 time-sync rounds
+rec.add(&imu, None, 5)?;   // "d1"
+rec.start()?;
+// … stream …
+rec.stop()?;
+```
 
-The CNH histogram block of the VL53L7CH / VL53L8CH is decoded:
-`parse_frame` surfaces it as `Vl53l8Results::cnh_raw` and `vl53l8::decode_cnh`
-unpacks it into per-aggregate histograms.
+A `.gz` file is written as a gzip container of stored (uncompressed) blocks —
+every gzip reader opens it; the crate has no compression dependency.
+`DatasetWriter` writes records of your own; `dataset::records` builds each
+kind's value.
+
+Playback: [`DatasetPlayer`](api.md#datasets-record--replay) delivers the
+records paced by their times, with play / pause / seek / speed (contract 09
+§Player) — on a player thread, or from your own timer through `tick()`.
 
 ## Testing & golden vectors
 

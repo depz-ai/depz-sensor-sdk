@@ -11,6 +11,8 @@ Values from depz-ai-website/src/lib/admin/sensorApi.ts + product metadata.
 
 from __future__ import annotations
 
+from .protocol._wire import check_uint
+
 # Production VID shared by every DEPZ sensor.
 DEPZ_USB_VID = 0x1BCF  # 7119
 
@@ -73,10 +75,17 @@ DEV_USB_VID = 0x0483  # 1155
 DEV_USB_PID = 0x56DC  # 22236
 
 
+def _check_ids(vid: int, pid: int) -> None:
+    """A USB id is a u16 (contract 07 §3): anything else is invalid, not "unknown"."""
+    check_uint("vid", vid, 16)
+    check_uint("pid", pid, 16)
+
+
 def is_known_depz_usb(vid: int | None, pid: int | None) -> bool:
     """True when (vid, pid) is a recognized DEPZ (or dev-default) USB id."""
     if vid is None or pid is None:
         return False
+    _check_ids(vid, pid)
     if vid == DEV_USB_VID and pid == DEV_USB_PID:
         return True
     if vid != DEPZ_USB_VID:
@@ -95,6 +104,7 @@ def usb_model_hint(vid: int | None, pid: int | None) -> str | None:
     """
     if vid is None or pid is None:
         return None
+    _check_ids(vid, pid)
     if vid == DEV_USB_VID and pid == DEV_USB_PID:
         return "dev"
     if vid == DEPZ_USB_VID:

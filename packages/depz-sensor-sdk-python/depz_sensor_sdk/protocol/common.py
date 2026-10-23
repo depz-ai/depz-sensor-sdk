@@ -10,6 +10,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import check_uint, need_bytes
+
 
 class Cmd(IntEnum):
     BOOTLOADER = 0x01
@@ -77,7 +79,8 @@ class StatusReport:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "StatusReport":
-        c, s = struct.unpack("<BB", payload)
+        need_bytes("RPT_STATUS", payload, 2)
+        c, s = struct.unpack_from("<BB", payload)
         return cls(c, s)
 
 
@@ -88,6 +91,7 @@ class TextReport:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "TextReport":
+        need_bytes("RPT_TEXT", payload, 1)
         return cls(payload[0], strip_device_string(payload[1:]))
 
 
@@ -99,7 +103,8 @@ class SyncTimeReport:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "SyncTimeReport":
-        t1, t2, t3 = struct.unpack("<QQQ", payload)
+        need_bytes("RPT_SYNC_TIME", payload, 24)
+        t1, t2, t3 = struct.unpack_from("<QQQ", payload)
         return cls(t1, t2, t3)
 
 
@@ -110,7 +115,8 @@ class TemperatureReport:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "TemperatureReport":
-        ts, t = struct.unpack("<Qh", payload)
+        need_bytes("RPT_TEMPERATURE", payload, 10)
+        ts, t = struct.unpack_from("<Qh", payload)
         return cls(ts, t)
 
     @property
@@ -125,8 +131,20 @@ class SequenceErrorReport:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "SequenceErrorReport":
-        e, r = struct.unpack("<BB", payload)
+        need_bytes("RPT_SEQUENCE_ERROR", payload, 2)
+        e, r = struct.unpack_from("<BB", payload)
         return cls(e, r)
+
+
+SYNC_PIN_MIN = 1  # logical AUX sync pins (contract 02 §6)
+SYNC_PIN_MAX = 5
+
+
+def check_sync_pin(pin: int) -> int:
+    """`pin` as a logical AUX sync pin 1..5 (contract 02 §6), else ValueError."""
+    if not SYNC_PIN_MIN <= check_uint("pin", pin, 8) <= SYNC_PIN_MAX:
+        raise ValueError(f"pin: {pin} is not a sync pin {SYNC_PIN_MIN}..{SYNC_PIN_MAX}")
+    return pin
 
 
 @dataclass(frozen=True)
@@ -136,16 +154,23 @@ class SyncPinConfig:
     polarity: SyncPinPolarity
 
     def pack(self) -> bytes:
-        return struct.pack("<BBB", self.pin, self.mode, self.polarity)
+        mode = check_uint("mode", self.mode, 8)
+        if mode > SyncPinMode.OUT_BOTH:
+            raise ValueError(f"mode: {mode} is not a SyncPinMode")
+        polarity = check_uint("polarity", self.polarity, 8)
+        if polarity > SyncPinPolarity.IDLE_HIGH:
+            raise ValueError(f"polarity: {polarity} is not a SyncPinPolarity")
+        return struct.pack("<BBB", check_sync_pin(self.pin), mode, polarity)
 
     @classmethod
     def unpack(cls, payload: bytes) -> "SyncPinConfig":
-        p, m, pol = struct.unpack("<BBB", payload)
+        need_bytes("RPT_SYNC_PIN_CONFIG", payload, 3)
+        p, m, pol = struct.unpack_from("<BBB", payload)
         return cls(p, SyncPinMode(m), SyncPinPolarity(pol))
 
 
 def pack_sync_time(pc_timestamp_us: int) -> bytes:
-    return struct.pack("<Q", pc_timestamp_us)
+    return struct.pack("<Q", check_uint("pc_timestamp_us", pc_timestamp_us, 64))
 
 
 def sync_time_offset_rtt(t1: int, t2: int, t3: int, t4: int) -> tuple[int, int]:

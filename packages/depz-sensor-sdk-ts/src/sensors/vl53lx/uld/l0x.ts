@@ -435,7 +435,7 @@ export class VL53L0X extends SensorDriver {
   }
 
   // ── identity ──
-  modelId(): Promise<number> {
+  async modelId(): Promise<number> {
     return this.p.rdByte(IDENTIFICATION_MODEL_ID);
   }
 
@@ -1423,7 +1423,7 @@ export class VL53L0X extends SensorDriver {
     return register > 2047 ? (register - 4096) * 250 : register * 250;
   }
 
-  setOffset(offsetMm: number): Promise<void> {
+  async setOffset(offsetMm: number): Promise<void> {
     return this.setOffsetUm(offsetMm * 1000);
   }
 
@@ -1560,7 +1560,7 @@ export class VL53L0X extends SensorDriver {
     return [this.d.ReferenceSpadCount, this.d.ReferenceSpadType];
   }
 
-  private setRefSpadMap(spadArray: number[]): Promise<void> {
+  private async setRefSpadMap(spadArray: number[]): Promise<void> {
     return this.p.wrMulti(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, Uint8Array.from(spadArray));
   }
 

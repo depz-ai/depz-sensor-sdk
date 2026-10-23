@@ -47,6 +47,15 @@ pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8> {
     out
 }
 
+/// [`pack_write_reg`] that refuses empty data (contract 04 §2: at least one
+/// data byte).
+pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError> {
+    if data.is_empty() {
+        return Err(CodecError("VL53_WRITE_REG: data must be at least 1 byte"));
+    }
+    Ok(pack_write_reg(addr, data))
+}
+
 /// `VL53_START_STREAM` payload: `frame_size u16`.
 pub fn pack_start_stream(frame_size: u16) -> [u8; 2] {
     frame_size.to_le_bytes()

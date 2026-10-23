@@ -6,10 +6,12 @@
 The **BNO085** is a CEVA/Hillcrest 9-axis IMU with an on-chip sensor-fusion hub
 (SH-2). It fuses accelerometer, gyroscope and magnetometer into ready-to-use
 orientation, motion and activity outputs. On the DEPZ sensor line the MCU is an
-**SHTP pass-through bridge** — the SH-2 host stack is decoded **on the host**,
-and this crate provides that verifiable layer ([`bno086`](api.md)): SHTP framing
-and cargo reassembly, the SH-2 input-report parsers, and the control-request
-builders.
+**SHTP pass-through bridge** — the SH-2 host stack runs **on the host**: the
+live device `devices::Bno086Device` (requests correlated at the SH-2 layer,
+feature read-back, calibration, FRS, flush), over the verifiable layer
+([`bno086`](api.md)): SHTP framing and cargo reassembly, the SH-2 input-report
+parsers, the control-request builders and the hub's response decoders
+(`bno086::hub`).
 
 ## What it does
 

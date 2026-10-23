@@ -24,12 +24,12 @@ from depz_sensor_sdk import Vl53l4cx, open_device
 dev = open_device("/dev/ttyACM0")   # returns a Vl53l4cx (from the board name)
 assert isinstance(dev, Vl53l4cx)
 dev.init()                          # driver "histogram"
-print(dev.identify()["driver_class"], dev.notes())
+print(dev.identify_product()["driver_class"], dev.notes())
 ```
 
 `open_device()` picks the class from the board's USB id or its device name
 (`… VL53L4CX USB v2.1 …`) — every 1D board runs the same firmware, so the
-firmware name cannot tell them apart. `identify()` returns everything about
+firmware name cannot tell them apart. `identify_product()` returns everything about
 the bound pair: product, driver, model id, reach, supported groups, modes and
 budgets.
 
@@ -161,5 +161,5 @@ own address for a moment, so the SDK clears the counter once `init()` /
   nothing from an earlier session carries over.
 - **Configuration while ranging raises** — stop, reconfigure, restart.
 - **Prefer `plottable` over `valid`** — non-zero statuses are data, not errors.
-- **No `short` preset on this die** — the histogram driver offers `medium` and `long` only, with budgets 2–200 ms (`modes` and `identify()` show it after `init()`); asking for `short` raises `Vl53Error`. ST's own L4CX driver refuses it too: on an L4 die the A frame of the short pair ranges on the wrong side of the phase wrap, one frame in two (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4).
+- **No `short` preset on this die** — the histogram driver offers `medium` and `long` only, with budgets 2–200 ms (`modes` and `identify_product()` show it after `init()`); asking for `short` raises `Vl53Error`. ST's own L4CX driver refuses it too: on an L4 die the A frame of the short pair ranges on the wrong side of the phase wrap, one frame in two (flat wall, 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4).
 - **Callbacks run on the reader thread** — keep them short.

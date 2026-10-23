@@ -44,11 +44,9 @@ codec layer**:
   `Vl53lxDieVariant.L1`) and the histogram block's status bytes and 24 bins
   (`Vl53lxDecode.DecodeHistogramRaw`).
 
-What it does **not** do: initialise the sensor, apply modes, budgets,
-calibrations, or turn histogram bins into targets — that is the full driver.
-Initialising and streaming the board is done today with the Python or
-TypeScript SDK; this SDK decodes what the board streams and builds the
-command payloads.
+On top of it, the live device (`Depz.Sensor.Devices.Vl53l1cbDevice`) runs the VL53L1X ULD or the histogram driver
+on the host over the register bridge: initialisation, modes and budgets,
+streaming, and the driver's own result — see the [user guide](guide.md#live-device).
 
 ## Key concepts
 

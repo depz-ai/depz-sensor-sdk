@@ -5,7 +5,7 @@ protocol codecs and other cross-sensor symbols shared by every sensor
 live in the [top-level API reference](../api.md).
 
 `VL53L8CH` is a decode-superset of the VL53L8CX: it shares the entire
-results-frame decode and advanced-DCI surface, so only the CH-specific
+results-frame decode, advanced-DCI surface and live driver, so only the CH-specific
 additions are listed here. For the frame decoder, the reassembler and
 every advanced-DCI codec, see the
 [VL53L8CX API reference](../vl53l8cx/api.md).
@@ -19,7 +19,7 @@ source, not this file.
 
 ## Contents
 
-- **VL53L8CH (ToF + CNH)**: [`Vl53l8Uld.Variant`](#vl53l8uldvariant), [`Vl53l8Uld.decodeCnh`](#vl53l8ulddecodecnh), [`Vl53l8Uld.CnhResult`](#vl53l8uldcnhresult), [`Vl53l8Uld.CnhAggregate`](#vl53l8uldcnhaggregate)
+- **VL53L8CH (ToF + CNH)**: [`Vl53l8Uld.Variant`](#vl53l8uldvariant), [`Vl53l8Uld.decodeCnh`](#vl53l8ulddecodecnh), [`Vl53l8Uld.CnhResult`](#vl53l8uldcnhresult), [`Vl53l8Uld.CnhAggregate`](#vl53l8uldcnhaggregate), [`Vl53l8chDevice`](#vl53l8chdevice), [`Vl53l8CnhSetup`](#vl53l8cnhsetup)
 
 ## VL53L8CH (ToF + CNH)
 
@@ -108,3 +108,163 @@ public final int[] histScaler
 ```
 
 int8 scaler per CNH bin (len == featureLength); value = histRaw / 2^scaler.
+
+### Vl53l8chDevice
+
+```java
+public class Vl53l8chDevice extends Vl53l8cxDevice
+```
+
+VL53L8CH: the VL53L8CX superset (every CX method) plus CNH, compact network histograms — each
+frame can carry a per-aggregate distance histogram. `init()` downloads the CH firmware
+(VL53LMZ ULD 2.0.16).
+
+#### Vl53l8chDevice.cnhSetup
+
+```java
+public Vl53l8CnhSetup cnhSetup()
+```
+
+The CNH setup armed by `configureCnh`, or null; recorders keep it next to the raw blocks to decode them later.
+
+#### Vl53l8chDevice.configureCnh
+
+```java
+public void configureCnh(Vl53l8CnhSetup setup)
+```
+
+Arm CNH for the next `startRanging()`: every frame then carries
+`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`.
+
+### Vl53l8CnhSetup
+
+```java
+public final class Vl53l8CnhSetup
+```
+
+The CNH (compact network histogram) configuration of a VL53L8CH / VL53L7CH: a mirror of
+`VL53LMZ_Motion_Configuration` with the plugin helpers that fill it
+(`vl53lmz_plugin_cnh.c`, ULD 2.0.16), ported from the reference Python `CnhConfig`.
+Build it with `initConfig` and `createAggMap`, check `requiredMemory()`,
+then arm it with the device's `configureCnh`. The flags are fixed to ping-pong and variance
+off (`Example_12_cnh_data.c`), which `Vl53l8Uld#decodeCnh` assumes. Arguments outside
+their fields throw `IllegalArgumentException`, never wrap.
+
+#### Vl53l8CnhSetup.MI_CFG_DEV_IDX *(field)*
+
+```java
+public static final int MI_CFG_DEV_IDX = 0xBFAC
+```
+
+#### Vl53l8CnhSetup.CNH_MAX_DATA_BYTES *(field)*
+
+```java
+public static final int CNH_MAX_DATA_BYTES
+```
+
+#### Vl53l8CnhSetup.PULSE_WIDTH_BIN *(field)*
+
+```java
+public static final int PULSE_WIDTH_BIN = 10
+```
+
+#### Vl53l8CnhSetup.BIN_WIDTH_MM *(field)*
+
+```java
+public static final double BIN_WIDTH_MM
+```
+
+#### Vl53l8CnhSetup.refBinOffset
+
+```java
+public int refBinOffset()
+```
+
+#### Vl53l8CnhSetup.sumSpan
+
+```java
+public int sumSpan()
+```
+
+#### Vl53l8CnhSetup.featureLength
+
+```java
+public int featureLength()
+```
+
+#### Vl53l8CnhSetup.nbOfAggregates
+
+```java
+public int nbOfAggregates()
+```
+
+#### Vl53l8CnhSetup.cnhCfg
+
+```java
+public int cnhCfg()
+```
+
+#### Vl53l8CnhSetup.cnhFlexShift
+
+```java
+public int cnhFlexShift()
+```
+
+#### Vl53l8CnhSetup.mapId
+
+```java
+public int[] mapId()
+```
+
+Device zone → CNH aggregate, −1 for a zone in none (64 entries).
+
+#### Vl53l8CnhSetup.initConfig
+
+```java
+public void initConfig(int startBin, int numBins, int subSample)
+```
+
+vl53lmz_cnh_init_config. `startBin`: first device histogram bin; `numBins`: CNH
+bins; `subSample`: device bins summed per CNH bin.
+
+#### Vl53l8CnhSetup.createAggMap
+
+```java
+public void createAggMap(int resolution, int startX, int startY, int mergeX, int mergeY, int cols, int rows)
+```
+
+vl53lmz_cnh_create_agg_map: aggregates of `mergeX`×`mergeY` zones, `cols`×
+`rows` of them from (`startX`, `startY`). `resolution` (16 or 64) must
+be the sensor's.
+
+#### Vl53l8CnhSetup.requiredMemory
+
+```java
+public int requiredMemory()
+```
+
+vl53lmz_cnh_calc_required_memory: the on-device CNH buffer, bytes.
+
+#### Vl53l8CnhSetup.minMaxDistanceMm
+
+```java
+public int[] minMaxDistanceMm()
+```
+
+{min, max} target distance, mm, the histogram captures whole.
+
+#### Vl53l8CnhSetup.binCenterMm
+
+```java
+public double binCenterMm(int binIdx)
+```
+
+Distance, mm, at the centre of CNH bin `binIdx`.
+
+#### Vl53l8CnhSetup.pack
+
+```java
+public byte[] pack()
+```
+
+The 156-byte VL53LMZ_Motion_Configuration struct for the device (DCI 0xBFAC).

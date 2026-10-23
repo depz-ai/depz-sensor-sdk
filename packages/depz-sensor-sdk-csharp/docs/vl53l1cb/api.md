@@ -15,7 +15,7 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L1CB (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`Vl53lxClearStep`](#vl53lxclearstep), [`Vl53lxWire`](#vl53lxwire), [`Vl53lxInfo`](#vl53lxinfo), [`Vl53lxDriverKind`](#vl53lxdriverkind), [`Vl53lxClass`](#vl53lxclass), [`Vl53lxProduct`](#vl53lxproduct), [`Vl53lxProducts`](#vl53lxproducts), [`Vl53lxDieVariant`](#vl53lxdievariant), [`Vl53lxDieResult`](#vl53lxdieresult), [`Vl53lxL0xRaw`](#vl53lxl0xraw), [`Vl53lxHistogramRaw`](#vl53lxhistogramraw), [`Vl53lxDecode`](#vl53lxdecode)
+- **VL53L1CB (ToF)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`Vl53lxClearStep`](#vl53lxclearstep), [`Vl53lxWire`](#vl53lxwire), [`Vl53lxInfo`](#vl53lxinfo), [`Vl53lxDriverKind`](#vl53lxdriverkind), [`Vl53lxClass`](#vl53lxclass), [`Vl53lxProduct`](#vl53lxproduct), [`Vl53lxProducts`](#vl53lxproducts), [`Vl53lxDieVariant`](#vl53lxdievariant), [`Vl53lxDieResult`](#vl53lxdieresult), [`Vl53lxL0xRaw`](#vl53lxl0xraw), [`Vl53lxHistogramRaw`](#vl53lxhistogramraw), [`Vl53lxDecode`](#vl53lxdecode), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lxDevice`](#vl53lxdevice), [`Vl53l0xDevice`](#vl53l0xdevice), [`Vl53l1cxDevice`](#vl53l1cxdevice), [`Vl53l1cbDevice`](#vl53l1cbdevice), [`Vl53l3cxDevice`](#vl53l3cxdevice), [`Vl53l4cxDevice`](#vl53l4cxdevice), [`BareRegs`](#bareregs), [`BareMath`](#baremath), [`HistConfig`](#histconfig), [`HistPostProcessConfig`](#histpostprocessconfig), [`HistogramBinData`](#histogrambindata), [`BareDeviceState`](#baredevicestate), [`LlState`](#llstate), [`BareDriver`](#baredriver), [`BareTables`](#baretables), [`RegField`](#regfield), [`RegBlockDef`](#regblockdef), [`RegBlock`](#regblock), [`DeviceImage`](#deviceimage), [`OpticalCentre`](#opticalcentre), [`CalPeakRateMap`](#calpeakratemap), [`AdditionalOffsetCalData`](#additionaloffsetcaldata), [`FmtRangeData`](#fmtrangedata), [`NvmReader`](#nvmreader), [`RangeData`](#rangedata), [`RangeResults`](#rangeresults), [`FrameHistory`](#framehistory), [`Hist`](#hist), [`Vl53l0xUldDriver`](#vl53l0xulddriver), [`Vl53l1Die`](#vl53l1die), [`Vl53l4UldDriver`](#vl53l4ulddriver), [`Vl53l3UlpDriver`](#vl53l3ulpdriver), [`Vl53l1UldDriver`](#vl53l1ulddriver), [`Vl53lxException`](#vl53lxexception), [`Vl53lxProtocolException`](#vl53lxprotocolexception), [`Vl53lxPlatform`](#vl53lxplatform), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxRange`](#vl53lxrange), [`Vl53lxDriver`](#vl53lxdriver), [`Vl53lxHistogramDriver`](#vl53lxhistogramdriver)
 - **Contract-10 records (from `Depz.Sensor.Vl53l4`)**: [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Xshut`](#vl53l4xshut)
 
 ## VL53L1CB (ToF)
@@ -249,6 +249,30 @@ public static bool ModelIdOk(string product, int value)
 
 Cross-check the id the sensor answered against the product asked for. True only says "not something else entirely".
 
+#### Vl53lxProducts.DriverKindNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> DriverKindNames = new[] { "uld", "ulp", "histogram" }
+```
+
+The driver kinds in the order a UI lists them (uld/registry.py DRIVER_KINDS).
+
+#### Vl53lxProducts.DriverKinds
+
+```csharp
+public static IReadOnlyList<string> DriverKinds(string product)
+```
+
+The driver kinds `product` has, in `DriverKindNames` order.
+
+#### Vl53lxProducts.static
+
+```csharp
+public static (Vl53lxDriver Driver, string? Caveat) CreateDriver(string product, string kind, Vl53lxPlatform platform)
+```
+
+The driver for one (product, kind) pair, and its caveat or null.
+
 ### Vl53lxDieVariant
 
 ```csharp
@@ -380,6 +404,4424 @@ public static Vl53lxHistogramRaw DecodeHistogramRaw(ReadOnlySpan<byte> raw)
 ```
 
 The 83-byte histogram block at 0x0088: status bytes and the 24 bins of 3 big-endian bytes. Bin 23's low byte is carried separately as an MSB/LSB pair — `((MSB << 2) + LSB) & 0xFF` — and patched in (on a copy; the input is not modified) before the bins are read.
+
+### Vl53lxMeasurement
+
+```csharp
+public sealed record Vl53lxMeasurement(ulong TimestampUs, int DistanceMm, int Status, string StatusText, double SignalKcps, double AmbientKcps, double SigmaMm, double Spads, IReadOnlyList<Vl53lxTarget> Targets, IReadOnlyDictionary<string, object?> Extra, object? Bins)
+```
+
+One ranging result of the 1D family, the same shape for every product. On the histogram driver `Targets` holds every return, strongest first, the top level repeats the first and `Bins` carries the raw 24-bin histogram; the light drivers leave both empty.
+
+#### Vl53lxMeasurement.PlottableStatuses *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> PlottableStatuses = new[] { 0, 6, 11 }
+```
+
+Statuses that mean "this distance is real": a histogram product reports 6 on the first frame of a stream and 11 for two merged targets. Prefer `Plottable` over `Valid` there.
+
+#### Vl53lxMeasurement.Valid *(property)*
+
+```csharp
+public bool Valid
+```
+
+#### Vl53lxMeasurement.Plottable *(property)*
+
+```csharp
+public bool Plottable
+```
+
+#### Vl53lxMeasurement.PlotDistances
+
+```csharp
+public IReadOnlyList<int> PlotDistances()
+```
+
+The distances a chart draws: the plottable targets in driver order, or the single distance.
+
+#### Vl53lxMeasurement.PrimaryTarget
+
+```csharp
+public Vl53lxTarget? PrimaryTarget()
+```
+
+The one target a single-number readout shows, or null.
+
+### Vl53lxDevice
+
+```csharp
+public class Vl53lxDevice : DepzDevice
+```
+
+A board of the VL53L 1D family on the `APP_VL53L0_4` register bridge (contract 12): VL53L0X, VL53L1CX, VL53L1CB, VL53L3CX, VL53L4CD, VL53L4CX. Every ULD runs here; two axes pick how a board is driven — the product (whose parameter set: the board's own, or a sibling's to borrow its driver) and the driver kind (`uld`, `ulp`, `histogram`). `Init` binds the pair, `Configure` re-initialises and applies a ranging configuration (before every run), then `StartRanging` and read `Measurements`. Ask `Supports` before an optional group; a missing one throws `NotSupportedException`. This generic class reads the product from the board's name; the per-product classes fix it.
+
+#### Vl53lxDevice.Vl53lxDevice *(constructor)*
+
+```csharp
+public Vl53lxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53lxDevice.Vl53lxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53lxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Vl53lxDevice.BoardName *(property)*
+
+```csharp
+public string BoardName
+```
+
+The board's device name, e.g. `DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523`.
+
+#### Vl53lxDevice.Detected *(property)*
+
+```csharp
+public string? Detected
+```
+
+The product the device name carries, or null on an unstamped board.
+
+#### Vl53lxDevice.Product *(property)*
+
+```csharp
+public string? Product
+```
+
+The product `Init` bound (null before).
+
+#### Vl53lxDevice.DriverKind *(property)*
+
+```csharp
+public string? DriverKind
+```
+
+#### Vl53lxDevice.Caveat *(property)*
+
+```csharp
+public string? Caveat
+```
+
+#### Vl53lxDevice.Driver *(property)*
+
+```csharp
+public Vl53lxDriver Driver
+```
+
+The ULD port in use — escape hatch for product-specific calls.
+
+#### Vl53lxDevice.Initialized *(property)*
+
+```csharp
+public bool Initialized
+```
+
+#### Vl53lxDevice.Ranging *(property)*
+
+```csharp
+public bool Ranging
+```
+
+#### Vl53lxDevice.DriverKinds
+
+```csharp
+public IReadOnlyList<string> DriverKinds(string? product = null)
+```
+
+The driver kinds a product has (default: this board's).
+
+#### Vl53lxDevice.Init
+
+```csharp
+public void Init(string? driver = null, string? product = null)
+```
+
+Bind the (product, driver kind) pair and initialise the sensor. `product` defaults to this class's, else the board name's; `driver` to the product's first kind. A pair the table lacks throws `NotSupportedException` naming what the product has.
+
+#### Vl53lxDevice.IdentifyProduct
+
+```csharp
+public IReadOnlyDictionary<string, object?> IdentifyProduct()
+```
+
+Everything about what is connected (needs `Init`). `model_id_ok` is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+
+#### Vl53lxDevice.Notes
+
+```csharp
+public IReadOnlyList<string> Notes()
+```
+
+The lines a UI shows about the chosen pair: a product named by hand, a borrowed driver, a pair that reaches less than the board is rated for, the driver's caveat.
+
+#### Vl53lxDevice.Supports
+
+```csharp
+public bool Supports(string group)
+```
+
+Whether this product / driver serves an optional group.
+
+#### Vl53lxDevice.Modes *(property)*
+
+```csharp
+public IReadOnlyList<string> Modes
+```
+
+Named ranging modes, the first being what init leaves; empty if none.
+
+#### Vl53lxDevice.public
+
+```csharp
+public (int Min, int Max) BudgetRange
+```
+
+The (min, max) budget the driver offers, ms.
+
+#### Vl53lxDevice.DriverReachMm
+
+```csharp
+public int? DriverReachMm()
+```
+
+How far the loaded configuration can measure, mm, or null.
+
+#### Vl53lxDevice.Xshut
+
+```csharp
+public void Xshut(byte action)
+```
+
+Drive XSHUT (`Vl53l4Xshut`). Off and Reset stop the stream; the sensor then holds none of the configuration — `Init` again.
+
+#### Vl53lxDevice.BridgeInfo
+
+```csharp
+public Vl53lxInfo BridgeInfo()
+```
+
+RPT_VL53_INFO — the bridge's own counters and settings; safe while streaming.
+
+#### Vl53lxDevice.Configure
+
+```csharp
+public void Configure(int budgetMs = 50, int interMs = 0, string? mode = null, int? offsetMm = null, int? xtalkKcps = null, int? signalKcps = null)
+```
+
+Re-initialise the sensor and apply a ranging configuration. The re-init is deliberate: it is the only way to know what the configuration registers hold. `mode` goes on before the budget; `offsetMm` / `xtalkKcps` re-apply a stored calibration; `signalKcps` replaces the blob's signal threshold. `interMs` 0 = continuous. An unsupported group is refused before the re-init.
+
+#### Vl53lxDevice.public
+
+```csharp
+public (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+(timing budget ms, inter-measurement ms) read back from the sensor; 0 = continuous.
+
+#### Vl53lxDevice.GetMode
+
+```csharp
+public string? GetMode()
+```
+
+The mode in use, or null on a product without modes.
+
+#### Vl53lxDevice.BudgetChoices
+
+```csharp
+public IReadOnlyList<int> BudgetChoices()
+```
+
+The only budgets accepted right now, or empty when any in `BudgetRange` will do.
+
+#### Vl53lxDevice.SnapBudget
+
+```csharp
+public int SnapBudget(int budgetMs)
+```
+
+The nearest budget this product accepts.
+
+#### Vl53lxDevice.GetOffsetMm
+
+```csharp
+public int GetOffsetMm()
+```
+
+#### Vl53lxDevice.SetOffsetMm
+
+```csharp
+public void SetOffsetMm(int offsetMm)
+```
+
+#### Vl53lxDevice.GetXtalkKcps
+
+```csharp
+public int GetXtalkKcps()
+```
+
+#### Vl53lxDevice.SetXtalkKcps
+
+```csharp
+public void SetXtalkKcps(int xtalkKcps)
+```
+
+#### Vl53lxDevice.CalibrateOffset
+
+```csharp
+public int CalibrateOffset(int targetDistMm, int? nbSamples = null)
+```
+
+Offset calibration against a flat target; returns the offset programmed (store it on the host).
+
+#### Vl53lxDevice.CalibrateXtalk
+
+```csharp
+public int CalibrateXtalk(int targetDistMm, int? nbSamples = null)
+```
+
+Crosstalk calibration; returns the xtalk programmed, kcps (store it on the host).
+
+#### Vl53lxDevice.public
+
+```csharp
+public (int DistanceLowMm, int DistanceHighMm, int Window) GetDetectionThresholds()
+```
+
+#### Vl53lxDevice.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt; stays armed until the next init / configure.
+
+#### Vl53lxDevice.GetSignalThresholdKcps
+
+```csharp
+public int GetSignalThresholdKcps()
+```
+
+#### Vl53lxDevice.SetSignalThresholdKcps
+
+```csharp
+public void SetSignalThresholdKcps(int signalKcps)
+```
+
+#### Vl53lxDevice.GetSigmaThresholdMm
+
+```csharp
+public int GetSigmaThresholdMm()
+```
+
+#### Vl53lxDevice.SetSigmaThresholdMm
+
+```csharp
+public void SetSigmaThresholdMm(int sigmaMm)
+```
+
+#### Vl53lxDevice.public
+
+```csharp
+public (int X, int Y) GetRoi()
+```
+
+#### Vl53lxDevice.SetRoi
+
+```csharp
+public void SetRoi(int x, int y)
+```
+
+#### Vl53lxDevice.GetRoiCenter
+
+```csharp
+public int GetRoiCenter()
+```
+
+#### Vl53lxDevice.SetRoiCenter
+
+```csharp
+public void SetRoiCenter(int centerSpad)
+```
+
+#### Vl53lxDevice.StartTemperatureUpdate
+
+```csharp
+public void StartTemperatureUpdate()
+```
+
+Re-run VHV after an ambient change over 8 °C.
+
+#### Vl53lxDevice.PerformRefSpadManagement
+
+```csharp
+public object PerformRefSpadManagement()
+```
+
+VL53L0X: re-measure the reference SPADs.
+
+#### Vl53lxDevice.StartRanging
+
+```csharp
+public void StartRanging()
+```
+
+Start the sensor and arm the board's stream: one report per INT edge, followed on the MCU by the driver's interrupt-release writes.
+
+#### Vl53lxDevice.StopRanging
+
+```csharp
+public void StopRanging()
+```
+
+#### Vl53lxDevice.MeasureOnce
+
+```csharp
+public Vl53lxMeasurement MeasureOnce(TimeSpan? timeout = null)
+```
+
+One polled measurement: start, data ready, read, release the interrupt, stop. Not while streaming.
+
+#### Vl53lxDevice.OnMeasurement
+
+```csharp
+public IDisposable OnMeasurement(Action<Vl53lxMeasurement> callback)
+```
+
+#### Vl53lxDevice.Measurements
+
+```csharp
+public Subscription<Vl53lxMeasurement> Measurements(int capacity = 64)
+```
+
+#### Vl53lxDevice.GetMeasurement
+
+```csharp
+public Vl53lxMeasurement GetMeasurement(TimeSpan? timeout = null)
+```
+
+#### Vl53lxDevice.StreamParseErrors *(property)*
+
+```csharp
+public long StreamParseErrors
+```
+
+Stream reports dropped because the driver did not decode them.
+
+#### Vl53lxDevice.StreamDroppedCounts *(property)*
+
+```csharp
+public IReadOnlyList<long> StreamDroppedCounts
+```
+
+### Vl53l0xDevice
+
+```csharp
+public sealed class Vl53l0xDevice : Vl53lxDevice
+```
+
+VL53L0X (2 m, 1-byte register addresses, 400 kHz): ULD API 1.0.4 with ranging profiles.
+
+#### Vl53l0xDevice.Vl53l0xDevice *(constructor)*
+
+```csharp
+public Vl53l0xDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l0xDevice.Vl53l0xDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l0xDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### Vl53l1cxDevice
+
+```csharp
+public sealed class Vl53l1cxDevice : Vl53lxDevice
+```
+
+VL53L1CX (4 m): the VL53L1X ULD (short / long) or the histogram driver.
+
+#### Vl53l1cxDevice.Vl53l1cxDevice *(constructor)*
+
+```csharp
+public Vl53l1cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l1cxDevice.Vl53l1cxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l1cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### Vl53l1cbDevice
+
+```csharp
+public sealed class Vl53l1cbDevice : Vl53lxDevice
+```
+
+VL53L1CB (8 m, cover-glass module): the VL53L1CX die and drivers; usually needs a crosstalk calibration.
+
+#### Vl53l1cbDevice.Vl53l1cbDevice *(constructor)*
+
+```csharp
+public Vl53l1cbDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l1cbDevice.Vl53l1cbDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l1cbDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### Vl53l3cxDevice
+
+```csharp
+public sealed class Vl53l3cxDevice : Vl53lxDevice
+```
+
+VL53L3CX (3 m): ST's ULP driver (single target) or the histogram driver (several per frame).
+
+#### Vl53l3cxDevice.Vl53l3cxDevice *(constructor)*
+
+```csharp
+public Vl53l3cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l3cxDevice.Vl53l3cxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l3cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### Vl53l4cxDevice
+
+```csharp
+public sealed class Vl53l4cxDevice : Vl53lxDevice
+```
+
+VL53L4CX (6 m): the histogram driver only — to run it light, borrow a sibling's with `Init(product: "VL53L4CD")`.
+
+#### Vl53l4cxDevice.Vl53l4cxDevice *(constructor)*
+
+```csharp
+public Vl53l4cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l4cxDevice.Vl53l4cxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l4cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### BareRegs
+
+```csharp
+public static class BareRegs
+```
+
+Register addresses and settings of the BareDriver (vl53lx_register_map.h, vl53lx_ll_device.h).
+
+#### BareRegs.PowerManagementGo1PowerForce *(constant)*
+
+```csharp
+public const int PowerManagementGo1PowerForce = 0x0083
+```
+
+#### BareRegs.FirmwareEnable *(constant)*
+
+```csharp
+public const int FirmwareEnable = 0x0085
+```
+
+#### BareRegs.ResultOscCalibrateVal *(constant)*
+
+```csharp
+public const int ResultOscCalibrateVal = 0x00DE
+```
+
+#### BareRegs.PatchCtrl *(constant)*
+
+```csharp
+public const int PatchCtrl = 0x0470
+```
+
+#### BareRegs.PatchJmpEnables *(constant)*
+
+```csharp
+public const int PatchJmpEnables = 0x0472
+```
+
+#### BareRegs.PatchDataEnables *(constant)*
+
+```csharp
+public const int PatchDataEnables = 0x0474
+```
+
+#### BareRegs.PatchOffset0 *(constant)*
+
+```csharp
+public const int PatchOffset0 = 0x0476
+```
+
+#### BareRegs.PatchAddress0 *(constant)*
+
+```csharp
+public const int PatchAddress0 = 0x0496
+```
+
+#### BareRegs.HistogramBinDataI2cIndex *(constant)*
+
+```csharp
+public const int HistogramBinDataI2cIndex = 0x0088
+```
+
+#### BareRegs.ResultHistogramBin0_2 *(constant)*
+
+```csharp
+public const int ResultHistogramBin0_2 = 0x008E
+```
+
+#### BareRegs.ResultHistogramBin23_0 *(constant)*
+
+```csharp
+public const int ResultHistogramBin23_0 = 0x00D5
+```
+
+#### BareRegs.PhasecalResultReferencePhase *(constant)*
+
+```csharp
+public const int PhasecalResultReferencePhase = 0x00D6
+```
+
+#### BareRegs.PhasecalResultVcselStart *(constant)*
+
+```csharp
+public const int PhasecalResultVcselStart = 0x00D8
+```
+
+#### BareRegs.ResultHistogramBin23_0Msb *(constant)*
+
+```csharp
+public const int ResultHistogramBin23_0Msb = 0x00D9
+```
+
+#### BareRegs.ResultHistogramBin23_0Lsb *(constant)*
+
+```csharp
+public const int ResultHistogramBin23_0Lsb = 0x00DA
+```
+
+#### BareRegs.HistogramBinDataI2cSizeBytes *(constant)*
+
+```csharp
+public const int HistogramBinDataI2cSizeBytes = ResultHistogramBin23_0Lsb - HistogramBinDataI2cIndex + 1
+```
+
+#### BareRegs.DeviceMeasurementModeBackToBack *(constant)*
+
+```csharp
+public const int DeviceMeasurementModeBackToBack = 0x20
+```
+
+#### BareRegs.DeviceMeasurementModeAbort *(constant)*
+
+```csharp
+public const int DeviceMeasurementModeAbort = 0x80
+```
+
+#### BareRegs.DeviceMeasurementModeStopMask *(constant)*
+
+```csharp
+public const int DeviceMeasurementModeStopMask = 0x0F
+```
+
+#### BareRegs.DeviceMeasurementModeModeMask *(constant)*
+
+```csharp
+public const int DeviceMeasurementModeModeMask = 0xF0
+```
+
+#### BareRegs.DeviceSchedulerModeStreaming *(constant)*
+
+```csharp
+public const int DeviceSchedulerModeStreaming = 0x01
+```
+
+#### BareRegs.DeviceSchedulerModeHistogram *(constant)*
+
+```csharp
+public const int DeviceSchedulerModeHistogram = 0x02
+```
+
+#### BareRegs.DeviceReadoutModeSingleSd *(constant)*
+
+```csharp
+public const int DeviceReadoutModeSingleSd = 0x00 << 2
+```
+
+#### BareRegs.DeviceReadoutModeDualSd *(constant)*
+
+```csharp
+public const int DeviceReadoutModeDualSd = 0x01 << 2
+```
+
+#### BareRegs.GroupedParameterHoldIdMask *(constant)*
+
+```csharp
+public const int GroupedParameterHoldIdMask = 0x02
+```
+
+#### BareRegs.InterruptConfigNewSampleReady *(constant)*
+
+```csharp
+public const int InterruptConfigNewSampleReady = 0x20
+```
+
+#### BareRegs.ClearRangeInt *(constant)*
+
+```csharp
+public const int ClearRangeInt = 0x01
+```
+
+#### BareRegs.RangeStatusMask *(constant)*
+
+```csharp
+public const int RangeStatusMask = 0x1F
+```
+
+#### BareRegs.DeviceInterruptPolarityActiveLow *(constant)*
+
+```csharp
+public const int DeviceInterruptPolarityActiveLow = 0x10
+```
+
+#### BareRegs.DeviceGpioModeOutputRangeAndErrorInterrupts *(constant)*
+
+```csharp
+public const int DeviceGpioModeOutputRangeAndErrorInterrupts = 0x01
+```
+
+#### BareRegs.DeviceDssModeTargetRate *(constant)*
+
+```csharp
+public const int DeviceDssModeTargetRate = 1
+```
+
+#### BareRegs.SequenceVhvEn *(constant)*
+
+```csharp
+public const int SequenceVhvEn = 0x01
+```
+
+#### BareRegs.SequencePhasecalEn *(constant)*
+
+```csharp
+public const int SequencePhasecalEn = 0x02
+```
+
+#### BareRegs.SequenceDss1En *(constant)*
+
+```csharp
+public const int SequenceDss1En = 0x08
+```
+
+#### BareRegs.SequenceDss2En *(constant)*
+
+```csharp
+public const int SequenceDss2En = 0x10
+```
+
+#### BareRegs.SequenceMm1En *(constant)*
+
+```csharp
+public const int SequenceMm1En = 0x20
+```
+
+#### BareRegs.SequenceMm2En *(constant)*
+
+```csharp
+public const int SequenceMm2En = 0x40
+```
+
+#### BareRegs.SequenceRangeEn *(constant)*
+
+```csharp
+public const int SequenceRangeEn = 0x80
+```
+
+#### BareRegs.SpadArrayWidth *(constant)*
+
+```csharp
+public const int SpadArrayWidth = 16
+```
+
+#### BareRegs.SpadArrayHeight *(constant)*
+
+```csharp
+public const int SpadArrayHeight = 16
+```
+
+#### BareRegs.RtnSpadApertureTransmission *(constant)*
+
+```csharp
+public const int RtnSpadApertureTransmission = 0x0038
+```
+
+#### BareRegs.RtnSpadUnityTransmission *(constant)*
+
+```csharp
+public const int RtnSpadUnityTransmission = 0x0100
+```
+
+#### BareRegs.AmbientWindowVcselPeriods *(constant)*
+
+```csharp
+public const int AmbientWindowVcselPeriods = 256
+```
+
+#### BareRegs.RangingWindowVcselPeriods *(constant)*
+
+```csharp
+public const int RangingWindowVcselPeriods = 2048
+```
+
+#### BareRegs.MacroPeriodVcselPeriods *(constant)*
+
+```csharp
+public const int MacroPeriodVcselPeriods = AmbientWindowVcselPeriods + RangingWindowVcselPeriods
+```
+
+#### BareRegs.HistogramBufferSize *(constant)*
+
+```csharp
+public const int HistogramBufferSize = 24
+```
+
+#### BareRegs.DistanceModes *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> DistanceModes = new[] { "short", "medium", "long" }
+```
+
+The three preset modes VL53L3CX/VL53L4CX expose, by the distance mode that picks them.
+
+#### BareRegs.L4DistanceModes *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> L4DistanceModes = new[] { "medium", "long" }
+```
+
+The L4CX BareDriver (STSW-IMG029) has no short mode on an L4 die.
+
+#### BareRegs.TimingGuardUs *(constant)*
+
+```csharp
+public const int TimingGuardUs = 1700
+```
+
+#### BareRegs.TimingDivisor *(constant)*
+
+```csharp
+public const int TimingDivisor = 6
+```
+
+#### BareRegs.FdaMaxTimingBudgetUs *(constant)*
+
+```csharp
+public const int FdaMaxTimingBudgetUs = 550000
+```
+
+#### BareRegs.L4FdaMaxTimingBudgetUs *(constant)*
+
+```csharp
+public const int L4FdaMaxTimingBudgetUs = 200000
+```
+
+### BareMath
+
+```csharp
+public static class BareMath
+```
+
+SPAD geometry and timing maths (vl53lx_core.c, vl53lx_core_support.c).
+
+#### BareMath.EncodeRowCol
+
+```csharp
+public static int EncodeRowCol(int row, int col)
+```
+
+#### BareMath.static
+
+```csharp
+public static (int Row, int Col) DecodeRowCol(int spadNumber)
+```
+
+→ (row, col).
+
+#### BareMath.static
+
+```csharp
+public static (int Width, int Height) DecodeZoneSize(int encodedXySize)
+```
+
+→ (width, height).
+
+#### BareMath.EncodeZoneSize
+
+```csharp
+public static int EncodeZoneSize(int width, int height)
+```
+
+#### BareMath.static
+
+```csharp
+public static (int XLl, int YLl, int XUr, int YUr) DecodeZoneLimits(int encodedXyCentre, int encodedXySize)
+```
+
+→ (x_ll, y_ll, x_ur, y_ur), clipped to the SPAD array.
+
+#### BareMath.IsApertureLocation
+
+```csharp
+public static bool IsApertureLocation(int row, int col)
+```
+
+#### BareMath.static
+
+```csharp
+public static (long Inner, long Outer) CalcMmEffectiveSpads(int encodedMmRoiCentre, int encodedMmRoiSize, int encodedZoneCentre, int encodedZoneSize, byte[] goodSpads, long apertureAttenuation)
+```
+
+→ (mm inner, mm outer) effective SPADs, in 1/256 of a SPAD. Needed because our boards ship without the FMT offset calibration: the driver works out the SPAD counts the nominal rates apply to.
+
+#### BareMath.CombineMm1Mm2Offsets
+
+```csharp
+public static long CombineMm1Mm2Offsets(long mm1OffsetMm, long mm2OffsetMm, int encodedMmRoiCentre, int encodedMmRoiSize, int encodedZoneCentre, int encodedZoneSize, AdditionalOffsetCalData cal, byte[] goodSpads, long apertureAttenuation)
+```
+
+`VL53LX_hist_combine_mm1_mm2_offsets()` → `range_offset_mm`, in quarter millimetres: the MM1 (inner) and MM2 (outer) offsets weighted by the share of each region the ROI covers.
+
+#### BareMath.RtnGoodSpads
+
+```csharp
+public static byte[] RtnGoodSpads(RegBlock nvmCopyData)
+```
+
+The 32 `global_config__spad_enables_rtn_*` bytes as one bitmap.
+
+#### BareMath.CalcPllPeriodUs
+
+```csharp
+public static long CalcPllPeriodUs(long fastOscFrequency)
+```
+
+#### BareMath.DecodeVcselPeriod
+
+```csharp
+public static long DecodeVcselPeriod(long vcselPeriodReg)
+```
+
+#### BareMath.CalcMacroPeriodUs
+
+```csharp
+public static long CalcMacroPeriodUs(long fastOscFrequency, long vcselPeriodReg)
+```
+
+#### BareMath.CalcTimeoutMclks
+
+```csharp
+public static long CalcTimeoutMclks(long timeoutUs, long macroPeriodUs)
+```
+
+#### BareMath.EncodeTimeout
+
+```csharp
+public static long EncodeTimeout(long timeoutMclks)
+```
+
+#### BareMath.DecodeTimeout
+
+```csharp
+public static long DecodeTimeout(long encoded)
+```
+
+#### BareMath.CalcEncodedTimeout
+
+```csharp
+public static long CalcEncodedTimeout(long timeoutUs, long macroPeriodUs)
+```
+
+#### BareMath.DurationMaths
+
+```csharp
+public static long DurationMaths(long pllPeriodUs, long vcselParmPclks, long windowVclks, long elapsedMclks)
+```
+
+#### BareMath.CalcTimeoutRegisterValues
+
+```csharp
+public static void CalcTimeoutRegisterValues(long phasecalUs, long mmUs, long rangeUs, long fastOscFrequency, RegBlock gen, RegBlock tim)
+```
+
+Fill the six timeout registers, for VCSEL period A and then B.
+
+### HistConfig
+
+```csharp
+public sealed class HistConfig
+```
+
+`VL53LX_histogram_config_t`. It has no registers of its own: the bin sequence is smuggled into static_config and timing_config fields that mean something else in lite mode (`CopyToStaticCfg`).
+
+#### HistConfig.LowAmbEvenBin01 *(field)*
+
+```csharp
+public long LowAmbEvenBin01
+```
+
+#### HistConfig.LowAmbEvenBin23 *(field)*
+
+```csharp
+public long LowAmbEvenBin23
+```
+
+#### HistConfig.LowAmbEvenBin45 *(field)*
+
+```csharp
+public long LowAmbEvenBin45
+```
+
+#### HistConfig.LowAmbOddBin01 *(field)*
+
+```csharp
+public long LowAmbOddBin01
+```
+
+#### HistConfig.LowAmbOddBin23 *(field)*
+
+```csharp
+public long LowAmbOddBin23
+```
+
+#### HistConfig.LowAmbOddBin45 *(field)*
+
+```csharp
+public long LowAmbOddBin45
+```
+
+#### HistConfig.MidAmbEvenBin01 *(field)*
+
+```csharp
+public long MidAmbEvenBin01
+```
+
+#### HistConfig.MidAmbEvenBin23 *(field)*
+
+```csharp
+public long MidAmbEvenBin23
+```
+
+#### HistConfig.MidAmbEvenBin45 *(field)*
+
+```csharp
+public long MidAmbEvenBin45
+```
+
+#### HistConfig.MidAmbOddBin01 *(field)*
+
+```csharp
+public long MidAmbOddBin01
+```
+
+#### HistConfig.MidAmbOddBin2 *(field)*
+
+```csharp
+public long MidAmbOddBin2
+```
+
+#### HistConfig.MidAmbOddBin34 *(field)*
+
+```csharp
+public long MidAmbOddBin34
+```
+
+#### HistConfig.MidAmbOddBin5 *(field)*
+
+```csharp
+public long MidAmbOddBin5
+```
+
+#### HistConfig.UserBinOffset *(field)*
+
+```csharp
+public long UserBinOffset
+```
+
+#### HistConfig.HighAmbEvenBin01 *(field)*
+
+```csharp
+public long HighAmbEvenBin01
+```
+
+#### HistConfig.HighAmbEvenBin23 *(field)*
+
+```csharp
+public long HighAmbEvenBin23
+```
+
+#### HistConfig.HighAmbEvenBin45 *(field)*
+
+```csharp
+public long HighAmbEvenBin45
+```
+
+#### HistConfig.HighAmbOddBin01 *(field)*
+
+```csharp
+public long HighAmbOddBin01
+```
+
+#### HistConfig.HighAmbOddBin23 *(field)*
+
+```csharp
+public long HighAmbOddBin23
+```
+
+#### HistConfig.HighAmbOddBin45 *(field)*
+
+```csharp
+public long HighAmbOddBin45
+```
+
+#### HistConfig.AmbThreshLow *(field)*
+
+```csharp
+public long AmbThreshLow
+```
+
+#### HistConfig.AmbThreshHigh *(field)*
+
+```csharp
+public long AmbThreshHigh
+```
+
+#### HistConfig.SpadArraySelection *(field)*
+
+```csharp
+public long SpadArraySelection
+```
+
+#### HistConfig.SetBinSequence
+
+```csharp
+public void SetBinSequence(IReadOnlyList<int> even, IReadOnlyList<int> odd)
+```
+
+VL53LX_init_histogram_config_structure(): six even and six odd bin codes, packed two to a byte, repeated across the three ambient levels.
+
+#### HistConfig.CopyToStaticCfg
+
+```csharp
+public void CopyToStaticCfg(RegBlock stat, RegBlock timing, RegBlock dynamic)
+```
+
+VL53LX_copy_hist_cfg_to_static_cfg(): lite-mode fields the firmware reads as the bin sequence.
+
+#### HistConfig.BinSequence
+
+```csharp
+public int[] BinSequence(long streamCount, long ambientEventsSum)
+```
+
+VL53LX_hist_get_bin_sequence_config(): which sequence the device used for this frame, even or odd by the stream count.
+
+### HistPostProcessConfig
+
+```csharp
+public sealed class HistPostProcessConfig
+```
+
+`VL53LX_hist_post_process_config_t`, as `VL53LX_init_hist_post_process_config_struct()` leaves it; the preset modes set the valid phase window here.
+
+#### HistPostProcessConfig.HistAlgoSelect *(field)*
+
+```csharp
+public long HistAlgoSelect = D("TUNINGPARM_HIST_ALGO_SELECT_DEFAULT")
+```
+
+#### HistPostProcessConfig.HistTargetOrder *(field)*
+
+```csharp
+public long HistTargetOrder = D("TUNINGPARM_HIST_TARGET_ORDER_DEFAULT")
+```
+
+#### HistPostProcessConfig.FilterWoi0 *(field)*
+
+```csharp
+public long FilterWoi0 = D("TUNINGPARM_HIST_FILTER_WOI_0_DEFAULT")
+```
+
+#### HistPostProcessConfig.FilterWoi1 *(field)*
+
+```csharp
+public long FilterWoi1 = D("TUNINGPARM_HIST_FILTER_WOI_1_DEFAULT")
+```
+
+#### HistPostProcessConfig.HistAmbEstMethod *(field)*
+
+```csharp
+public long HistAmbEstMethod = D("TUNINGPARM_HIST_AMB_EST_METHOD_DEFAULT")
+```
+
+#### HistPostProcessConfig.AmbientThreshSigma0 *(field)*
+
+```csharp
+public long AmbientThreshSigma0 = D("TUNINGPARM_HIST_AMB_THRESH_SIGMA_0_DEFAULT")
+```
+
+#### HistPostProcessConfig.AmbientThreshSigma1 *(field)*
+
+```csharp
+public long AmbientThreshSigma1 = D("TUNINGPARM_HIST_AMB_THRESH_SIGMA_1_DEFAULT")
+```
+
+#### HistPostProcessConfig.AmbientThreshEventsScaler *(field)*
+
+```csharp
+public long AmbientThreshEventsScaler = D("TUNINGPARM_HIST_AMB_EVENTS_SCALER_DEFAULT")
+```
+
+#### HistPostProcessConfig.MinAmbientThreshEvents *(field)*
+
+```csharp
+public long MinAmbientThreshEvents = D("TUNINGPARM_HIST_MIN_AMB_THRESH_EVENTS_DEFAULT")
+```
+
+#### HistPostProcessConfig.NoiseThreshold *(field)*
+
+```csharp
+public long NoiseThreshold = D("TUNINGPARM_HIST_NOISE_THRESHOLD_DEFAULT")
+```
+
+#### HistPostProcessConfig.SignalTotalEventsLimit *(field)*
+
+```csharp
+public long SignalTotalEventsLimit = D("TUNINGPARM_HIST_SIGNAL_TOTAL_EVENTS_LIMIT_DEFAULT")
+```
+
+#### HistPostProcessConfig.SigmaEstimatorSigmaRefMm *(field)*
+
+```csharp
+public long SigmaEstimatorSigmaRefMm = D("TUNINGPARM_HIST_SIGMA_EST_REF_MM_DEFAULT")
+```
+
+#### HistPostProcessConfig.SigmaThresh *(field)*
+
+```csharp
+public long SigmaThresh = D("TUNINGPARM_HIST_SIGMA_THRESH_MM_DEFAULT")
+```
+
+#### HistPostProcessConfig.RangeOffsetMm *(field)*
+
+```csharp
+public long RangeOffsetMm
+```
+
+#### HistPostProcessConfig.GainFactor *(field)*
+
+```csharp
+public long GainFactor = D("TUNINGPARM_HIST_GAIN_FACTOR_DEFAULT")
+```
+
+#### HistPostProcessConfig.ValidPhaseLow *(field)*
+
+```csharp
+public long ValidPhaseLow = 0x08
+```
+
+#### HistPostProcessConfig.ValidPhaseHigh *(field)*
+
+```csharp
+public long ValidPhaseHigh = 0x88
+```
+
+#### HistPostProcessConfig.ConsistencyPhaseTolerance *(field)*
+
+```csharp
+public long ConsistencyPhaseTolerance = D("TUNINGPARM_CONSISTENCY_HIST_PHASE_TOLERANCE_DEFAULT")
+```
+
+#### HistPostProcessConfig.ConsistencyEventSigma *(field)*
+
+```csharp
+public long ConsistencyEventSigma = D("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_DEFAULT")
+```
+
+#### HistPostProcessConfig.ConsistencyEventMinSpadCount *(field)*
+
+```csharp
+public long ConsistencyEventMinSpadCount = …
+```
+
+#### HistPostProcessConfig.ConsistencyMinMaxTolerance *(field)*
+
+```csharp
+public long ConsistencyMinMaxTolerance = …
+```
+
+#### HistPostProcessConfig.CrosstalkCompensationEnable *(field)*
+
+```csharp
+public long CrosstalkCompensationEnable
+```
+
+#### HistPostProcessConfig.CrosstalkDetectMinValidRangeMm *(field)*
+
+```csharp
+public long CrosstalkDetectMinValidRangeMm = D("TUNINGPARM_XTALK_DETECT_MIN_VALID_RANGE_MM_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkDetectMaxValidRangeMm *(field)*
+
+```csharp
+public long CrosstalkDetectMaxValidRangeMm = D("TUNINGPARM_XTALK_DETECT_MAX_VALID_RANGE_MM_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkDetectMaxValidRateKcps *(field)*
+
+```csharp
+public long CrosstalkDetectMaxValidRateKcps = D("TUNINGPARM_XTALK_DETECT_MAX_VALID_RATE_KCPS_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkDetectMaxSigmaMm *(field)*
+
+```csharp
+public long CrosstalkDetectMaxSigmaMm = D("TUNINGPARM_XTALK_DETECT_MAX_SIGMA_MM_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkDetectEventSigma *(field)*
+
+```csharp
+public long CrosstalkDetectEventSigma = D("TUNINGPARM_XTALK_DETECT_EVENT_SIGMA_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkDetectMinMaxTolerance *(field)*
+
+```csharp
+public long CrosstalkDetectMinMaxTolerance = D("TUNINGPARM_XTALK_DETECT_MIN_MAX_TOLERANCE_DEFAULT")
+```
+
+#### HistPostProcessConfig.CrosstalkCompensationPlaneOffsetKcps *(field)*
+
+```csharp
+public long CrosstalkCompensationPlaneOffsetKcps
+```
+
+#### HistPostProcessConfig.CrosstalkCompensationXPlaneGradientKcps *(field)*
+
+```csharp
+public long CrosstalkCompensationXPlaneGradientKcps
+```
+
+#### HistPostProcessConfig.CrosstalkCompensationYPlaneGradientKcps *(field)*
+
+```csharp
+public long CrosstalkCompensationYPlaneGradientKcps
+```
+
+### HistogramBinData
+
+```csharp
+public sealed class HistogramBinData
+```
+
+`VL53LX_histogram_bin_data_t`: 24 bins plus everything the post-processing needs to read them — the VCSEL period they were taken at, the phase of zero distance, the bin sequence and the ambient estimate.
+
+#### HistogramBinData.ResultInterruptStatus *(field)*
+
+```csharp
+public long ResultInterruptStatus
+```
+
+#### HistogramBinData.ResultRangeStatus *(field)*
+
+```csharp
+public long ResultRangeStatus
+```
+
+#### HistogramBinData.ResultReportStatus *(field)*
+
+```csharp
+public long ResultReportStatus
+```
+
+#### HistogramBinData.ResultStreamCount *(field)*
+
+```csharp
+public long ResultStreamCount
+```
+
+#### HistogramBinData.ResultDssActualEffectiveSpads *(field)*
+
+```csharp
+public long ResultDssActualEffectiveSpads
+```
+
+#### HistogramBinData.PhasecalResultReferencePhase *(field)*
+
+```csharp
+public long PhasecalResultReferencePhase
+```
+
+#### HistogramBinData.PhasecalResultVcselStart *(field)*
+
+```csharp
+public long PhasecalResultVcselStart
+```
+
+#### HistogramBinData.BinData *(field)*
+
+```csharp
+public long[] BinData = new long[BareRegs.HistogramBufferSize]
+```
+
+#### HistogramBinData.ZoneId *(field)*
+
+```csharp
+public long ZoneId
+```
+
+#### HistogramBinData.VL53LX_p_019 *(field)*
+
+```csharp
+public long FirstBin
+```
+
+#### HistogramBinData.NumberOfBins *(field)*
+
+```csharp
+public long NumberOfBins = BareRegs.HistogramBufferSize
+```
+
+#### HistogramBinData.BinsInData *(field)*
+
+```csharp
+public long BinsInData = BareRegs.HistogramBufferSize
+```
+
+#### HistogramBinData.CalConfigVcselStart *(field)*
+
+```csharp
+public long CalConfigVcselStart
+```
+
+#### HistogramBinData.VcselWidth *(field)*
+
+```csharp
+public long VcselWidth
+```
+
+#### HistogramBinData.VL53LX_p_015 *(field)*
+
+```csharp
+public long FastOscFrequency
+```
+
+#### HistogramBinData.value *(field)*
+
+```csharp
+public long VcselPeriod
+```
+
+#### HistogramBinData.BinSeq *(field)*
+
+```csharp
+public int[] BinSeq = new int[6]
+```
+
+#### HistogramBinData.BinRep *(field)*
+
+```csharp
+public long[] BinRep = new long[6]
+```
+
+#### HistogramBinData.MinBinValue *(field)*
+
+```csharp
+public long MinBinValue
+```
+
+#### HistogramBinData.MaxBinValue *(field)*
+
+```csharp
+public long MaxBinValue
+```
+
+#### HistogramBinData.NumberOfAmbientBins *(field)*
+
+```csharp
+public long NumberOfAmbientBins
+```
+
+#### HistogramBinData.NumberOfAmbientSamples *(field)*
+
+```csharp
+public long NumberOfAmbientSamples
+```
+
+#### HistogramBinData.AmbientEventsSum *(field)*
+
+```csharp
+public long AmbientEventsSum
+```
+
+#### HistogramBinData.VL53LX_p_028 *(field)*
+
+```csharp
+public long AmbientPerBin
+```
+
+#### HistogramBinData.TotalPeriodsElapsed *(field)*
+
+```csharp
+public long TotalPeriodsElapsed
+```
+
+#### HistogramBinData.PeakDurationUs *(field)*
+
+```csharp
+public long PeakDurationUs
+```
+
+#### HistogramBinData.WoiDurationUs *(field)*
+
+```csharp
+public long WoiDurationUs
+```
+
+#### HistogramBinData.ZeroDistancePhase *(field)*
+
+```csharp
+public long ZeroDistancePhase
+```
+
+#### HistogramBinData.RoiConfigUserRoiCentreSpad *(field)*
+
+```csharp
+public long RoiConfigUserRoiCentreSpad
+```
+
+#### HistogramBinData.RoiConfigUserRoiRequestedGlobalXySize *(field)*
+
+```csharp
+public long RoiConfigUserRoiRequestedGlobalXySize
+```
+
+#### HistogramBinData.RangeStatus *(property)*
+
+```csharp
+public long RangeStatus
+```
+
+#### HistogramBinData.Clone
+
+```csharp
+public HistogramBinData Clone()
+```
+
+#### HistogramBinData.Fields
+
+```csharp
+public IReadOnlyDictionary<string, object?> Fields()
+```
+
+The fields under the C driver's (and the Python SDK's) names.
+
+#### HistogramBinData.ToString
+
+```csharp
+public override string ToString()
+```
+
+### BareDeviceState
+
+```csharp
+public enum BareDeviceState
+{
+    SwStandby,
+    RangingWaitGphSync,
+    RangingOutputData,
+    RangingDssAuto,
+}
+```
+
+The ll-driver device states, single-zone case.
+
+### LlState
+
+```csharp
+public sealed class LlState
+```
+
+`VL53LX_update_ll_driver_{rd,cfg}_state()`, reduced to one zone: the GPH handshake (the id stamped into the dynamic config tells the device a configuration is new) and the timing-status flip (whether a frame ran on VCSEL period A or B, which the post-processing has to know).
+
+#### LlState.CfgDeviceState *(field)*
+
+```csharp
+public BareDeviceState CfgDeviceState
+```
+
+#### LlState.CfgStreamCount *(field)*
+
+```csharp
+public long CfgStreamCount
+```
+
+#### LlState.CfgGphId *(field)*
+
+```csharp
+public long CfgGphId
+```
+
+#### LlState.CfgTimingStatus *(field)*
+
+```csharp
+public long CfgTimingStatus
+```
+
+#### LlState.RdDeviceState *(field)*
+
+```csharp
+public BareDeviceState RdDeviceState
+```
+
+#### LlState.RdStreamCount *(field)*
+
+```csharp
+public long RdStreamCount
+```
+
+#### LlState.RdGphId *(field)*
+
+```csharp
+public long RdGphId
+```
+
+#### LlState.RdTimingStatus *(field)*
+
+```csharp
+public long RdTimingStatus
+```
+
+#### LlState.LlState *(constructor)*
+
+```csharp
+public LlState()
+```
+
+#### LlState.Reset
+
+```csharp
+public void Reset()
+```
+
+#### LlState.UpdateRd
+
+```csharp
+public void UpdateRd(long modeStart, long groupedParameterHold)
+```
+
+#### LlState.UpdateCfg
+
+```csharp
+public void UpdateCfg(long modeStart)
+```
+
+### BareDriver
+
+```csharp
+public sealed class BareDriver
+```
+
+ST's VL53LX BareDriver ranging path, on top of `DeviceImage`: `VL53LX_read_p2p_data()`, the histogram preset modes, `VL53LX_set_timeouts_us()`, `VL53LX_init_and_start_range()` and `VL53LX_get_histogram_bin_data()`. Nothing here writes a register on its own: the preset builders edit the host-side image and the whole span 0x0001..0x0087 goes out as one transfer when ranging starts.
+
+#### BareDriver.BareDriver *(constructor)*
+
+```csharp
+public BareDriver(Vl53lxPlatform platform)
+```
+
+#### BareDriver.Img *(property)*
+
+```csharp
+public DeviceImage Img
+```
+
+#### BareDriver.Nvm *(property)*
+
+```csharp
+public NvmReader Nvm
+```
+
+#### BareDriver.Tuning *(property)*
+
+```csharp
+public Dictionary<string, long> Tuning
+```
+
+#### BareDriver.HistCfg *(property)*
+
+```csharp
+public HistConfig HistCfg
+```
+
+#### BareDriver.Hpp *(property)*
+
+```csharp
+public HistPostProcessConfig Hpp
+```
+
+#### BareDriver.RtnGoodSpadsMap *(property)*
+
+```csharp
+public byte[] RtnGoodSpadsMap
+```
+
+#### BareDriver.OpticalCentre *(property)*
+
+```csharp
+public OpticalCentre? OpticalCentre
+```
+
+#### BareDriver.CalPeakRateMap *(property)*
+
+```csharp
+public CalPeakRateMap? CalPeakRateMap
+```
+
+#### BareDriver.AddOffCalData *(property)*
+
+```csharp
+public AdditionalOffsetCalData? AddOffCalData
+```
+
+#### BareDriver.FmtDmaxCal *(property)*
+
+```csharp
+public IReadOnlyDictionary<string, long>? FmtDmaxCal
+```
+
+#### BareDriver.MmRoi *(property)*
+
+```csharp
+public IReadOnlyDictionary<string, long>? MmRoi
+```
+
+#### BareDriver.ResultOscCalibrateVal *(property)*
+
+```csharp
+public long ResultOscCalibrateVal
+```
+
+#### BareDriver.PresetMode *(property)*
+
+```csharp
+public string PresetMode
+```
+
+#### BareDriver.PhasecalConfigTimeoutUs *(property)*
+
+```csharp
+public long PhasecalConfigTimeoutUs
+```
+
+#### BareDriver.MmConfigTimeoutUs *(property)*
+
+```csharp
+public long MmConfigTimeoutUs
+```
+
+#### BareDriver.RangeConfigTimeoutUs *(property)*
+
+```csharp
+public long RangeConfigTimeoutUs
+```
+
+#### BareDriver.InterMeasurementPeriodMs *(property)*
+
+```csharp
+public long InterMeasurementPeriodMs
+```
+
+#### BareDriver.MeasurementMode *(property)*
+
+```csharp
+public long MeasurementMode
+```
+
+#### BareDriver.State *(property)*
+
+```csharp
+public LlState State
+```
+
+#### BareDriver.ReadP2pData
+
+```csharp
+public void ReadP2pData()
+```
+
+VL53LX_read_p2p_data(): three register blocks and four NVM regions (~0.1 s over USB).
+
+#### BareDriver.DataInit
+
+```csharp
+public void DataInit()
+```
+
+VL53LX_data_init + VL53LX_DataInit: the factory data, the default preset mode and timing budget. Leaves the sensor untouched apart from the reads.
+
+#### BareDriver.SetPresetMode
+
+```csharp
+public void SetPresetMode(string mode = "medium", long? dssTargetMcps = null, long? interMeasurementPeriodMs = null)
+```
+
+VL53LX_set_preset_mode() for the three histogram ranging modes, by distance mode.
+
+#### BareDriver.IsL4
+
+```csharp
+public bool IsL4()
+```
+
+`IsL4()` of the L4CX BareDriver: the die, read from NVM, not the product name. 0xEC is the L4ED.
+
+#### BareDriver.DistanceModesForDie
+
+```csharp
+public IReadOnlyList<string> DistanceModesForDie()
+```
+
+#### BareDriver.FdaMaxTimingBudgetUs
+
+```csharp
+public long FdaMaxTimingBudgetUs()
+```
+
+#### BareDriver.SetDistanceMode
+
+```csharp
+public void SetDistanceMode(string mode)
+```
+
+VL53LX_SetDistanceMode(): the preset mode with the caller's timeouts put back. Short is refused on an L4 die, as the L4CX BareDriver does (the A frame of the pair ranges on the wrong side of the wrap).
+
+#### BareDriver.SetTimeoutsUs
+
+```csharp
+public void SetTimeoutsUs(long phasecalUs, long mmUs, long rangeUs)
+```
+
+#### BareDriver.SetInterMeasurementPeriodMs
+
+```csharp
+public void SetInterMeasurementPeriodMs(long periodMs)
+```
+
+#### BareDriver.SetMeasurementTimingBudgetUs
+
+```csharp
+public void SetMeasurementTimingBudgetUs(long budgetUs)
+```
+
+VL53LX_SetMeasurementTimingBudgetMicroSeconds(): the range timeout is one sixth of the budget after a fixed guard comes off.
+
+#### BareDriver.LoadPatch
+
+```csharp
+public void LoadPatch()
+```
+
+VL53LX_load_patch(): a six-instruction phasecal patch, written with the firmware stopped.
+
+#### BareDriver.UnloadPatch
+
+```csharp
+public void UnloadPatch()
+```
+
+#### BareDriver.InitAndStartRange
+
+```csharp
+public void InitAndStartRange(IReadOnlyList<string>? blocks = null)
+```
+
+VL53LX_init_and_start_range(): write the configuration and start. `blocks` is ST's config level — all of them to start, general_config onwards to let the next frame run.
+
+#### BareDriver.ClearInterruptAndStartNextRange
+
+```csharp
+public void ClearInterruptAndStartNextRange()
+```
+
+VL53LX_clear_interrupt_and_enable_next_range(): in histogram mode the interrupt is cleared by rewriting general_config onwards.
+
+#### BareDriver.StopRange
+
+```csharp
+public void StopRange()
+```
+
+#### BareDriver.GetHistogramBinData
+
+```csharp
+public HistogramBinData GetHistogramBinData(byte[]? raw = null)
+```
+
+VL53LX_get_histogram_bin_data(): one frame, 83 bytes, decoded into bins plus the metadata the post-processing needs. `raw` is bytes that arrived some other way (a stream report).
+
+### BareTables
+
+```csharp
+public static partial class BareTables
+```
+
+#### BareTables.Blocks *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<string, RegBlockDef> Blocks = …
+```
+
+The register blocks of the device image: base, size, writable and the fields with offset, width, signedness and the mask the C codec applies (null: none).
+
+#### BareTables.Tuning *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<string, long> Tuning = …
+```
+
+`VL53LX_tuning_parm_storage_t` after initialisation, keyed by the C field name.
+
+#### BareTables.Defaults *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<string, long> Defaults = …
+```
+
+The raw tuning header, for the parameters the post-processing reads without a `tp_` field.
+
+### RegField
+
+```csharp
+public sealed record RegField(string Name, int Off, int Width, bool Signed, long? Mask)
+```
+
+One field of a register block: byte offset, width in bytes, signedness and the mask the C codec applies (null: none).
+
+### RegBlockDef
+
+```csharp
+public sealed record RegBlockDef(int Base, int Size, bool Writable, IReadOnlyList<RegField> Fields)
+```
+
+One contiguous I2C block of the device image (a `VL53LX_*_t` struct of the C driver).
+
+### RegBlock
+
+```csharp
+public sealed class RegBlock
+```
+
+One register block's worth of device image, addressed by the C field name: `img.StaticConfig["dss_config__target_total_rate_mcps"]`. Bytes no field names (the reserved holes) keep whatever was read, so a read-modify-write round trip is byte-exact.
+
+#### RegBlock.RegBlock *(constructor)*
+
+```csharp
+public RegBlock(string name)
+```
+
+#### RegBlock.Name *(property)*
+
+```csharp
+public string Name
+```
+
+#### RegBlock.Def *(property)*
+
+```csharp
+public RegBlockDef Def
+```
+
+#### RegBlock.Base *(property)*
+
+```csharp
+public int Base
+```
+
+#### RegBlock.Size *(property)*
+
+```csharp
+public int Size
+```
+
+#### RegBlock.field *(property)*
+
+```csharp
+public long this[string field]
+```
+
+#### RegBlock.Items
+
+```csharp
+public IEnumerable<KeyValuePair<string, long>> Items()
+```
+
+#### RegBlock.Decode
+
+```csharp
+public RegBlock Decode(byte[] raw)
+```
+
+#### RegBlock.Encode
+
+```csharp
+public byte[] Encode()
+```
+
+#### RegBlock.ToString
+
+```csharp
+public override string ToString()
+```
+
+### DeviceImage
+
+```csharp
+public sealed class DeviceImage
+```
+
+The device's register image, block by block. The C driver never reads a configuration register on its own: it edits the structs, then pushes whole blocks — ranging start writes 0x0001..0x0087 in a single 135-byte transfer. Every transfer costs a USB round trip, so block moves keep the count where the C driver has it. Editing a field only touches the host copy; `Push` reaches the sensor.
+
+#### DeviceImage.RangeStartBlocks *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> RangeStartBlocks = …
+```
+
+The blocks `init_and_start_range` pushes, in address order: one transfer.
+
+#### DeviceImage.DeviceImage *(constructor)*
+
+```csharp
+public DeviceImage(Vl53lxPlatform platform)
+```
+
+#### DeviceImage.name *(property)*
+
+```csharp
+public RegBlock this[string name]
+```
+
+#### DeviceImage.StaticNvm *(property)*
+
+```csharp
+public RegBlock StaticNvm
+```
+
+#### DeviceImage.CustomerNvm *(property)*
+
+```csharp
+public RegBlock CustomerNvm
+```
+
+#### DeviceImage.StaticConfig *(property)*
+
+```csharp
+public RegBlock StaticConfig
+```
+
+#### DeviceImage.GeneralConfig *(property)*
+
+```csharp
+public RegBlock GeneralConfig
+```
+
+#### DeviceImage.TimingConfig *(property)*
+
+```csharp
+public RegBlock TimingConfig
+```
+
+#### DeviceImage.DynamicConfig *(property)*
+
+```csharp
+public RegBlock DynamicConfig
+```
+
+#### DeviceImage.SystemControl *(property)*
+
+```csharp
+public RegBlock SystemControl
+```
+
+#### DeviceImage.NvmCopyData *(property)*
+
+```csharp
+public RegBlock NvmCopyData
+```
+
+#### DeviceImage.Pull
+
+```csharp
+public RegBlock Pull(string name)
+```
+
+Read one block off the sensor into the image.
+
+#### DeviceImage.Push
+
+```csharp
+public void Push(string name)
+```
+
+Write one block from the image to the sensor.
+
+#### DeviceImage.PullRange
+
+```csharp
+public void PullRange(IReadOnlyList<string> names)
+```
+
+#### DeviceImage.PushRange
+
+```csharp
+public void PushRange(IReadOnlyList<string> names)
+```
+
+The named blocks as one transfer; a hole between them goes out as 0x00, as in the C driver.
+
+#### DeviceImage.Dump
+
+```csharp
+public string Dump(IEnumerable<string>? names = null)
+```
+
+Every field of the named blocks (default: all), one per line.
+
+### OpticalCentre
+
+```csharp
+public sealed record OpticalCentre(int XCentre, int YCentre)
+```
+
+`VL53LX_optical_centre_t`.
+
+### CalPeakRateMap
+
+```csharp
+public sealed record CalPeakRateMap(int CalDistanceMm, int CalReflectancePc, int MaxSamples, int Width, int Height, IReadOnlyList<int> PeakRateMcps)
+```
+
+`VL53LX_cal_peak_rate_map_t`.
+
+### AdditionalOffsetCalData
+
+```csharp
+public sealed record AdditionalOffsetCalData(long MmInnerActualEffectiveSpads, long MmOuterActualEffectiveSpads, long MmInnerPeakSignalCountRtnMcps, long MmOuterPeakSignalCountRtnMcps)
+```
+
+`VL53LX_additional_offset_cal_data_t`.
+
+### FmtRangeData
+
+```csharp
+public sealed record FmtRangeData(int ActualEffectiveRtnSpads, int NumRequestedRefSpads, int RefLocation, int PeakSignalCountRateRtnMcps, int AmbientCountRateRtnMcps, int PeakSignalCountRateRefMcps, int AmbientCountRateRefMcps, int MeasuredDistanceMm, int MeasuredDistanceStdevMm)
+```
+
+`VL53LX_decoded_nvm_fmt_range_data_t`.
+
+### NvmReader
+
+```csharp
+public sealed class NvmReader
+```
+
+The raw NVM, which the register blocks do not cover: the optical centre, the 5x5 peak-rate map, the mode-mitigation offset calibration and the FMT range results. Each word costs four writes and a read, so only the regions the driver wants are read, each inside its own enable/disable pair so the sensor is never left with its firmware stopped (vl53lx_nvm.c).
+
+#### NvmReader.readonly
+
+```csharp
+public static readonly (int Index, int Size) FmtOpticalCentre = (0x00B8, 4)
+```
+
+#### NvmReader.readonly
+
+```csharp
+public static readonly (int Index, int Size) FmtCalPeakRateMap = (0x015C, 56)
+```
+
+#### NvmReader.readonly
+
+```csharp
+public static readonly (int Index, int Size) FmtAdditionalOffsetCal = (0x0194, 8)
+```
+
+#### NvmReader.readonly
+
+```csharp
+public static readonly (int Index, int Size) FmtRangeResults140mmDark = (0x01AC, 16)
+```
+
+#### NvmReader.NvmReader *(constructor)*
+
+```csharp
+public NvmReader(Vl53lxPlatform platform, DeviceImage image)
+```
+
+#### NvmReader.ReadRegion
+
+```csharp
+public byte[] ReadRegion((int Index, int Size) region)
+```
+
+VL53LX_read_nvm_raw_data(): (byte index, byte size), both word-aligned → the bytes.
+
+#### NvmReader.ReadOpticalCentre
+
+```csharp
+public OpticalCentre ReadOpticalCentre()
+```
+
+#### NvmReader.ReadCalPeakRateMap
+
+```csharp
+public CalPeakRateMap ReadCalPeakRateMap()
+```
+
+#### NvmReader.ReadAdditionalOffsetCalData
+
+```csharp
+public AdditionalOffsetCalData ReadAdditionalOffsetCalData()
+```
+
+#### NvmReader.ReadFmtRangeResults
+
+```csharp
+public FmtRangeData ReadFmtRangeResults((int Index, int Size)? region = null)
+```
+
+### RangeData
+
+```csharp
+public sealed class RangeData
+```
+
+`VL53LX_range_data_t`: one target. The event sums and phases are what the algorithm produced; the `*RangeMm` fields and the rates are what they mean.
+
+#### RangeData.RangeId *(field)*
+
+```csharp
+public long RangeId
+```
+
+#### RangeData.start *(field)*
+
+```csharp
+public long StartBin
+```
+
+#### RangeData.threshold *(field)*
+
+```csharp
+public long FirstBin
+```
+
+#### RangeData.VL53LX_p_023 *(field)*
+
+```csharp
+public long PeakBin
+```
+
+#### RangeData.VL53LX_p_024 *(field)*
+
+```csharp
+public long LastBin
+```
+
+#### RangeData.VL53LX_p_013 *(field)*
+
+```csharp
+public long EndBin
+```
+
+#### RangeData.threshold *(field)*
+
+```csharp
+public long WidthBins
+```
+
+#### RangeData.window *(field)*
+
+```csharp
+public long WindowBins
+```
+
+#### RangeData.VcselWidth *(field)*
+
+```csharp
+public long VcselWidth
+```
+
+#### RangeData.FastOscFrequency *(field)*
+
+```csharp
+public long FastOscFrequency
+```
+
+#### RangeData.ZeroDistancePhase *(field)*
+
+```csharp
+public long ZeroDistancePhase
+```
+
+#### RangeData.VL53LX_p_004 *(field)*
+
+```csharp
+public long Spads
+```
+
+#### RangeData.TotalPeriodsElapsed *(field)*
+
+```csharp
+public long TotalPeriodsElapsed
+```
+
+#### RangeData.PeakDurationUs *(field)*
+
+```csharp
+public long PeakDurationUs
+```
+
+#### RangeData.WoiDurationUs *(field)*
+
+```csharp
+public long WoiDurationUs
+```
+
+#### RangeData.VL53LX_p_016 *(field)*
+
+```csharp
+public long AmbientEvents
+```
+
+#### RangeData.VL53LX_p_017 *(field)*
+
+```csharp
+public long TotalEvents
+```
+
+#### RangeData.VL53LX_p_010 *(field)*
+
+```csharp
+public long SignalEvents
+```
+
+#### RangeData.PeakSignalCountRateMcps *(field)*
+
+```csharp
+public long PeakSignalCountRateMcps
+```
+
+#### RangeData.AvgSignalCountRateMcps *(field)*
+
+```csharp
+public long AvgSignalCountRateMcps
+```
+
+#### RangeData.AmbientCountRateMcps *(field)*
+
+```csharp
+public long AmbientCountRateMcps
+```
+
+#### RangeData.TotalRatePerSpadMcps *(field)*
+
+```csharp
+public long TotalRatePerSpadMcps
+```
+
+#### RangeData.VL53LX_p_009 *(field)*
+
+```csharp
+public long SignalEventsPerSpadKcps
+```
+
+#### RangeData.mm *(field)*
+
+```csharp
+public long Sigma
+```
+
+#### RangeData.VL53LX_p_026 *(field)*
+
+```csharp
+public long PhaseStart
+```
+
+#### RangeData.VL53LX_p_011 *(field)*
+
+```csharp
+public long PhaseMean
+```
+
+#### RangeData.VL53LX_p_027 *(field)*
+
+```csharp
+public long PhaseEnd
+```
+
+#### RangeData.MinRangeMm *(field)*
+
+```csharp
+public long MinRangeMm
+```
+
+#### RangeData.MedianRangeMm *(field)*
+
+```csharp
+public long MedianRangeMm
+```
+
+#### RangeData.MaxRangeMm *(field)*
+
+```csharp
+public long MaxRangeMm
+```
+
+#### RangeData.RangeStatus *(field)*
+
+```csharp
+public long RangeStatus = Hist.DeviceErrorNoUpdate
+```
+
+#### RangeData.SigmaMm *(property)*
+
+```csharp
+public long SigmaMm
+```
+
+#### RangeData.SignalKcps *(property)*
+
+```csharp
+public long SignalKcps
+```
+
+The peak signal rate is 9.7 Mcps.
+
+#### RangeData.AmbientKcps *(property)*
+
+```csharp
+public long AmbientKcps
+```
+
+#### RangeData.ToString
+
+```csharp
+public override string ToString()
+```
+
+### RangeResults
+
+```csharp
+public sealed class RangeResults
+```
+
+`VL53LX_range_results_t`, reduced to the single-zone case.
+
+#### RangeResults.StreamCount *(field)*
+
+```csharp
+public long StreamCount
+```
+
+#### RangeResults.Targets *(property)*
+
+```csharp
+public List<RangeData> Targets
+```
+
+#### RangeResults.AmbientDmaxMm *(field)*
+
+```csharp
+public long[] AmbientDmaxMm = new long[5]
+```
+
+#### RangeResults.WrapDmaxMm *(field)*
+
+```csharp
+public long WrapDmaxMm
+```
+
+### FrameHistory
+
+```csharp
+public sealed class FrameHistory
+```
+
+The frame before this one, reduced to what the consistency checks read (`VL53LX_zone_hist_info_t` and `VL53LX_zone_objects_t` for one zone). The engine alternates two VCSEL periods, so one frame cannot say whether a target is inside the unambiguous range or an echo wrapped into it; the API compares consecutive frames. The BareDriver keeps no history, so the driver owns one of these and hands it every frame.
+
+#### FrameHistory.Reset
+
+```csharp
+public void Reset()
+```
+
+Forget the stream so far: the next `Apply` only remembers.
+
+#### FrameHistory.Apply
+
+```csharp
+public void Apply(RangeResults results, HistogramBinData bins, BareDeviceState rdDeviceState, HistPostProcessConfig hpp)
+```
+
+Check `results` against the remembered frame, then remember it — C's order: both checks run before hist_data and range_results are copied into the zone history.
+
+### Hist
+
+```csharp
+public static class Hist
+```
+
+Histogram post-processing: 24 bins → targets, on the host alone, as `VL53LX_hist_process_data()` does in C. Fold repeated bin codes, estimate the ambient floor, drop the ambient-only bins, threshold each bin, take the runs of marked bins as pulses; each pulse is isolated, filtered with a three-tap window and its zero crossing interpolated to a sub-bin phase, which converts to millimetres. ST's source names its functions `VL53LX_f_NNN`; the names here are ours, the C name is in the comment. Crosstalk compensation and the ambient dmax are not ported (dmax needs FMT data our boards ship blank, so it would be zero anyway). Arithmetic is the C driver's: truncating division, and saturation where it caps an intermediate.
+
+#### Hist.MaxBinSequenceLength *(constant)*
+
+```csharp
+public const int MaxBinSequenceLength = 6
+```
+
+#### Hist.MaxBinSequenceCode *(constant)*
+
+```csharp
+public const int MaxBinSequenceCode = 15
+```
+
+#### Hist.MaxPulses *(constant)*
+
+```csharp
+public const int MaxPulses = 8
+```
+
+#### Hist.MaxRangeResults *(constant)*
+
+```csharp
+public const int MaxRangeResults = 4
+```
+
+#### Hist.MaxAllowedPhase *(constant)*
+
+```csharp
+public const long MaxAllowedPhase = 0xFFFF
+```
+
+#### Hist.SpadTotalCountMax *(constant)*
+
+```csharp
+public const long SpadTotalCountMax = (1L << 29) - 1
+```
+
+#### Hist.SpadTotalCountResThres *(constant)*
+
+```csharp
+public const long SpadTotalCountResThres = 1L << 24
+```
+
+#### Hist.SpeedOfLightInAirDiv8 *(constant)*
+
+```csharp
+public const long SpeedOfLightInAirDiv8 = 299704 >> 3
+```
+
+#### Hist.SigmaInvalid *(constant)*
+
+```csharp
+public const long SigmaInvalid = 0xFFFF
+```
+
+#### Hist.DeviceErrorNoUpdate *(constant)*
+
+```csharp
+public const long DeviceErrorNoUpdate = 0
+```
+
+#### Hist.DeviceErrorRangePhaseCheck *(constant)*
+
+```csharp
+public const long DeviceErrorRangePhaseCheck = 5
+```
+
+#### Hist.DeviceErrorSigmaThresholdCheck *(constant)*
+
+```csharp
+public const long DeviceErrorSigmaThresholdCheck = 6
+```
+
+#### Hist.DeviceErrorPhaseConsistency *(constant)*
+
+```csharp
+public const long DeviceErrorPhaseConsistency = 7
+```
+
+#### Hist.DeviceErrorRangeComplete *(constant)*
+
+```csharp
+public const long DeviceErrorRangeComplete = 9
+```
+
+#### Hist.DeviceErrorRangeCompleteNoWrapCheck *(constant)*
+
+```csharp
+public const long DeviceErrorRangeCompleteNoWrapCheck = 19
+```
+
+#### Hist.DeviceErrorEventConsistency *(constant)*
+
+```csharp
+public const long DeviceErrorEventConsistency = 20
+```
+
+#### Hist.DeviceErrorRangeCompleteMergedPulse *(constant)*
+
+```csharp
+public const long DeviceErrorRangeCompleteMergedPulse = 22
+```
+
+#### Hist.DeviceErrorPrevRangeNoTargets *(constant)*
+
+```csharp
+public const long DeviceErrorPrevRangeNoTargets = 23
+```
+
+#### Hist.HistTargetOrderStrongestFirst *(constant)*
+
+```csharp
+public const long HistTargetOrderStrongestFirst = 1
+```
+
+#### Hist.HistTargetOrderClosestFirst *(constant)*
+
+```csharp
+public const long HistTargetOrderClosestFirst = 2
+```
+
+#### Hist.RangeStatusRangeValid *(constant)*
+
+```csharp
+public const int RangeStatusRangeValid = 0
+```
+
+#### Hist.RangeStatusSigmaFail *(constant)*
+
+```csharp
+public const int RangeStatusSigmaFail = 1
+```
+
+#### Hist.RangeStatusOutOfBoundsFail *(constant)*
+
+```csharp
+public const int RangeStatusOutOfBoundsFail = 4
+```
+
+#### Hist.RangeStatusRangeValidNoWrapCheck *(constant)*
+
+```csharp
+public const int RangeStatusRangeValidNoWrapCheck = 6
+```
+
+#### Hist.RangeStatusWrapTargetFail *(constant)*
+
+```csharp
+public const int RangeStatusWrapTargetFail = 7
+```
+
+#### Hist.RangeStatusRangeValidMergedPulse *(constant)*
+
+```csharp
+public const int RangeStatusRangeValidMergedPulse = 11
+```
+
+#### Hist.RangeStatusTargetPresentLackOfSignal *(constant)*
+
+```csharp
+public const int RangeStatusTargetPresentLackOfSignal = 12
+```
+
+#### Hist.RangeStatusNone *(constant)*
+
+```csharp
+public const int RangeStatusNone = 255
+```
+
+#### Hist.StatusNames *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<int, string> StatusNames = …
+```
+
+UM2931 range status names.
+
+#### Hist.PyMod
+
+```csharp
+public static long PyMod(long a, long b)
+```
+
+The modulo of the reference (sign of the divisor).
+
+#### Hist.Isqrt
+
+```csharp
+public static long Isqrt(long num)
+```
+
+VL53LX_isqrt(): floor of the square root of a uint32 argument.
+
+#### Hist.CalcPllPeriodMm
+
+```csharp
+public static long CalcPllPeriodMm(long fastOscFrequency)
+```
+
+VL53LX_calc_pll_period_mm().
+
+#### Hist.RateMaths
+
+```csharp
+public static long RateMaths(long events, long timeUs)
+```
+
+VL53LX_rate_maths(): events over a duration → count rate in 9.7 Mcps.
+
+#### Hist.RatePerSpadMaths
+
+```csharp
+public static long RatePerSpadMaths(int fracBits, long peakCountRate, long numSpads, long maxOutputValue)
+```
+
+VL53LX_rate_per_spad_maths().
+
+#### Hist.EventsPerSpadMaths
+
+```csharp
+public static long EventsPerSpadMaths(long events, long numSpads, long duration)
+```
+
+VL53LX_events_per_spad_maths() → kcps per SPAD.
+
+#### Hist.RangeMaths
+
+```csharp
+public static long RangeMaths(long fastOscFrequency, long phase, long zeroDistancePhase, int fractionalBits, long gainFactor, long rangeOffsetMm)
+```
+
+VL53LX_range_maths(): phase → millimetres.
+
+#### Hist.AverageRepeatedBins
+
+```csharp
+public static HistogramBinData AverageRepeatedBins(HistogramBinData src)
+```
+
+VL53LX_f_031: fold the six bin-sequence codes together. Repeats of a code land on the same four output bins and are averaged, so what comes out is one bin per distinct code.
+
+#### Hist.CalcZeroDistancePhase
+
+```csharp
+public static void CalcZeroDistancePhase(HistogramBinData bins)
+```
+
+VL53LX_hist_calc_zero_distance_phase.
+
+#### Hist.EstimateAmbientFromThresholdedBins
+
+```csharp
+public static void EstimateAmbientFromThresholdedBins(long ambientThresholdSigma, HistogramBinData bins)
+```
+
+VL53LX_hist_estimate_ambient_from_thresholded_bins(): the floor from every bin near the quietest.
+
+#### Hist.EstimateAmbientFromAmbientBins
+
+```csharp
+public static void EstimateAmbientFromAmbientBins(HistogramBinData bins)
+```
+
+VL53LX_hist_estimate_ambient_from_ambient_bins(): the better estimate, from the VCSEL-off bins.
+
+#### Hist.RemoveAmbientBins
+
+```csharp
+public static void RemoveAmbientBins(HistogramBinData bins)
+```
+
+VL53LX_hist_remove_ambient_bins: drop the ambient-only bins off the front, so bin 0 is phase zero.
+
+#### Hist.ProcessData
+
+```csharp
+public static RangeResults ProcessData(HistogramBinData binsInput, HistPostProcessConfig hpp, long mergeNb = 1)
+```
+
+`VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off.
+
+#### Hist.ConvertStatus
+
+```csharp
+public static int ConvertStatus(long deviceError)
+```
+
+ConvertStatusHisto() (vl53lx_api.c), the cases the histogram path produces here.
+
+#### Hist.ToRange
+
+```csharp
+public static Vl53lxRange ToRange(RangeResults results, HistogramBinData bins)
+```
+
+The frame's results as the family-wide range: every return in `Targets`, the first one also the range itself. Effective SPADs come in 1/256 and are reported whole, as the rest of the family does.
+
+### Vl53l0xUldDriver
+
+```csharp
+public sealed class Vl53l0xUldDriver : Vl53lxDriver
+```
+
+The VL53L0X API 1.0.4 ranging path (vl53l0x_api.c / _api_core.c / _api_calibration.c), ported from the reference Python driver: DataInit, StaticInit (reference SPADs from NVM, tuning settings), the timing-budget arithmetic, start / stop, GetRangingMeasurementData with its PAL range status (sigma estimate included), the reference calibration, PerformRefSpadManagement, offset and crosstalk calibration and the four ST ranging profiles. Register sequences, integer widths and the deliberate uint32 overflows are the C driver's. There is no ROI on this die.
+
+#### Vl53l0xUldDriver.ModelIdVl53l0x *(constant)*
+
+```csharp
+public const int ModelIdVl53l0x = 0xEE
+```
+
+#### Vl53l0xUldDriver.Vl53l0xUldDriver *(constructor)*
+
+```csharp
+public Vl53l0xUldDriver(Vl53lxPlatform platform, string product) : base(platform, product)
+```
+
+#### Vl53l0xUldDriver.AddrWidth *(property)*
+
+```csharp
+public override int AddrWidth
+```
+
+#### Vl53l0xUldDriver.ClearSteps *(property)*
+
+```csharp
+public override IReadOnlyList<Vl53lxClearStep> ClearSteps
+```
+
+#### Vl53l0xUldDriver.MaxKhz *(property)*
+
+```csharp
+public override int MaxKhz
+```
+
+#### Vl53l0xUldDriver.Supports *(property)*
+
+```csharp
+public override IReadOnlyCollection<string> Supports
+```
+
+#### Vl53l0xUldDriver.Modes *(property)*
+
+```csharp
+public override IReadOnlyList<string> Modes
+```
+
+#### Vl53l0xUldDriver.override
+
+```csharp
+public override (int Min, int Max) BudgetMs
+```
+
+#### Vl53l0xUldDriver.RefSpadsFromNvm *(property)*
+
+```csharp
+public bool RefSpadsFromNvm
+```
+
+False when the NVM reference-SPAD record was out of range and was measured instead.
+
+#### Vl53l0xUldDriver.ModuleId *(property)*
+
+```csharp
+public int ModuleId
+```
+
+#### Vl53l0xUldDriver.Revision *(property)*
+
+```csharp
+public int Revision
+```
+
+#### Vl53l0xUldDriver.ProductIdString *(property)*
+
+```csharp
+public string ProductIdString
+```
+
+#### Vl53l0xUldDriver.PartUidUpper *(property)*
+
+```csharp
+public long PartUidUpper
+```
+
+#### Vl53l0xUldDriver.PartUidLower *(property)*
+
+```csharp
+public long PartUidLower
+```
+
+#### Vl53l0xUldDriver.SignalRateMeasFixed400mm *(property)*
+
+```csharp
+public long SignalRateMeasFixed400mm
+```
+
+#### Vl53l0xUldDriver.Part2PartOffsetAdjustmentNvmUm *(property)*
+
+```csharp
+public long Part2PartOffsetAdjustmentNvmUm
+```
+
+#### Vl53l0xUldDriver.OscFrequencyMHz *(property)*
+
+```csharp
+public long OscFrequencyMHz
+```
+
+#### Vl53l0xUldDriver.Isqrt
+
+```csharp
+public static long Isqrt(long num)
+```
+
+VL53L0X_isqrt(): the bit-by-bit integer square root.
+
+#### Vl53l0xUldDriver.override
+
+```csharp
+public override (int Addr, int Len) StreamBlock()
+```
+
+#### Vl53l0xUldDriver.Decode
+
+```csharp
+public override Vl53lxRange Decode(byte[] raw)
+```
+
+#### Vl53l0xUldDriver.ReadMeasurement
+
+```csharp
+public override Vl53lxRange ReadMeasurement()
+```
+
+#### Vl53l0xUldDriver.ModelId
+
+```csharp
+public override int ModelId()
+```
+
+#### Vl53l0xUldDriver.WaitBoot
+
+```csharp
+public void WaitBoot(TimeSpan? timeout = null)
+```
+
+No firmware-status register: the model id answering says the die is up.
+
+#### Vl53l0xUldDriver.SensorInit
+
+```csharp
+public override void SensorInit()
+```
+
+DataInit + StaticInit, the reference calibration, continuous mode; the bus stays at 400 kHz.
+
+#### Vl53l0xUldDriver.ResetDevice
+
+```csharp
+public void ResetDevice(TimeSpan? timeout = null)
+```
+
+VL53L0X_ResetDevice(): a sensor left configured by a previous session ranges nothing without it.
+
+#### Vl53l0xUldDriver.public
+
+```csharp
+public (int Vhv, int Phase) PerformRefCalibration()
+```
+
+VL53L0X_PerformRefCalibration(): VHV, then phase → (vhv, phase). Not optional in practice.
+
+#### Vl53l0xUldDriver.GetInfoFromDevice
+
+```csharp
+public void GetInfoFromDevice(int option)
+```
+
+VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product identification (2), the part UID and factory offset (4).
+
+#### Vl53l0xUldDriver.ClearInterrupt
+
+```csharp
+public override void ClearInterrupt()
+```
+
+VL53L0X_ClearInterruptMask(): two writes, then confirm — up to three rounds.
+
+#### Vl53l0xUldDriver.CheckForDataReady
+
+```csharp
+public override bool CheckForDataReady()
+```
+
+#### Vl53l0xUldDriver.SetRangeTiming
+
+```csharp
+public override void SetRangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+Budget and period as the family asks for them: a period of 0 means back-to-back continuous, anything else the timed continuous mode.
+
+#### Vl53l0xUldDriver.override
+
+```csharp
+public override (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+#### Vl53l0xUldDriver.StartRanging
+
+```csharp
+public override void StartRanging()
+```
+
+VL53L0X_StartMeasurement() for the continuous modes; a single shot in between is resumed from.
+
+#### Vl53l0xUldDriver.StopRanging
+
+```csharp
+public override void StopRanging()
+```
+
+VL53L0X_StopMeasurement().
+
+#### Vl53l0xUldDriver.SetMode
+
+```csharp
+public override void SetMode(string name)
+```
+
+Apply one of `Modes`: the sigma and signal limits, the budget and both VCSEL periods.
+
+#### Vl53l0xUldDriver.GetMode
+
+```csharp
+public override string GetMode()
+```
+
+#### Vl53l0xUldDriver.ReachMm
+
+```csharp
+public override int? ReachMm()
+```
+
+By the final-range VCSEL period read from the sensor; null for a period no profile sets.
+
+#### Vl53l0xUldDriver.DriverInfo
+
+```csharp
+public override IReadOnlyDictionary<string, object?> DriverInfo()
+```
+
+#### Vl53l0xUldDriver.SetOffsetUm
+
+```csharp
+public void SetOffsetUm(long offsetUm)
+```
+
+The register is 10.2 format in mm: steps of 250 µm.
+
+#### Vl53l0xUldDriver.GetOffsetUm
+
+```csharp
+public long GetOffsetUm()
+```
+
+#### Vl53l0xUldDriver.SetOffset
+
+```csharp
+public override void SetOffset(int offsetMm)
+```
+
+#### Vl53l0xUldDriver.GetOffset
+
+```csharp
+public override int GetOffset()
+```
+
+#### Vl53l0xUldDriver.PerformOffsetCalibration
+
+```csharp
+public long PerformOffsetCalibration(int calDistanceMm, int nbSamples = 50)
+```
+
+VL53L0X_perform_offset_calibration() → µm. TCC and the range-ignore threshold are off for the run.
+
+#### Vl53l0xUldDriver.CalibrateOffset
+
+```csharp
+public override int CalibrateOffset(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53l0xUldDriver.SetXtalk
+
+```csharp
+public override void SetXtalk(int xtalkKcps)
+```
+
+#### Vl53l0xUldDriver.GetXtalk
+
+```csharp
+public override int GetXtalk()
+```
+
+#### Vl53l0xUldDriver.PerformXtalkCalibration
+
+```csharp
+public long PerformXtalkCalibration(int calDistanceMm, int nbSamples = 50)
+```
+
+VL53L0X_perform_xtalk_calibration() → the rate, Mcps 16.16.
+
+#### Vl53l0xUldDriver.CalibrateXtalk
+
+```csharp
+public override int CalibrateXtalk(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53l0xUldDriver.public
+
+```csharp
+public (int Count, int IsAperture) GetReferenceSpads()
+```
+
+#### Vl53l0xUldDriver.PerformRefSpadManagement
+
+```csharp
+public override object PerformRefSpadManagement()
+```
+
+Re-measure the reference SPADs on a live session → (count, is aperture). The stop variable goes back first (a stopped session leaves register 0x91 at 0, and the rate then reads far too high).
+
+### Vl53l1Die
+
+```csharp
+public abstract class Vl53l1Die : Vl53lxDriver
+```
+
+The VL53L1 die (uld/vl53l1_die.py): register map, the 17-byte result block every part of it shares, and the body of the VL53L4CD ULD that `Vl53l4UldDriver` and `Vl53l3UlpDriver` fill in; `Vl53l1UldDriver` (ST's VL53L1X ULD) overrides where that driver differs. A faithful port: register sequences and integer widths as in the C drivers.
+
+#### Vl53l1Die.SoftReset *(constant)*
+
+```csharp
+public const int SoftReset = 0x0000
+```
+
+#### Vl53l1Die.I2cSlaveDeviceAddress *(constant)*
+
+```csharp
+public const int I2cSlaveDeviceAddress = 0x0001
+```
+
+#### Vl53l1Die.OscFrequency *(constant)*
+
+```csharp
+public const int OscFrequency = 0x0006
+```
+
+#### Vl53l1Die.VhvConfigTimeoutMacropLoopBound *(constant)*
+
+```csharp
+public const int VhvConfigTimeoutMacropLoopBound = 0x0008
+```
+
+#### Vl53l1Die.XtalkPlaneOffsetKcps *(constant)*
+
+```csharp
+public const int XtalkPlaneOffsetKcps = 0x0016
+```
+
+#### Vl53l1Die.XtalkXPlaneGradientKcps *(constant)*
+
+```csharp
+public const int XtalkXPlaneGradientKcps = 0x0018
+```
+
+#### Vl53l1Die.XtalkYPlaneGradientKcps *(constant)*
+
+```csharp
+public const int XtalkYPlaneGradientKcps = 0x001A
+```
+
+#### Vl53l1Die.RangeOffsetMm *(constant)*
+
+```csharp
+public const int RangeOffsetMm = 0x001E
+```
+
+#### Vl53l1Die.InnerOffsetMm *(constant)*
+
+```csharp
+public const int InnerOffsetMm = 0x0020
+```
+
+#### Vl53l1Die.OuterOffsetMm *(constant)*
+
+```csharp
+public const int OuterOffsetMm = 0x0022
+```
+
+#### Vl53l1Die.GpioHvMuxCtrl *(constant)*
+
+```csharp
+public const int GpioHvMuxCtrl = 0x0030
+```
+
+#### Vl53l1Die.GpioTioHvStatus *(constant)*
+
+```csharp
+public const int GpioTioHvStatus = 0x0031
+```
+
+#### Vl53l1Die.SystemInterruptConfigGpio *(constant)*
+
+```csharp
+public const int SystemInterruptConfigGpio = 0x0046
+```
+
+#### Vl53l1Die.PhasecalConfigTimeoutMacrop *(constant)*
+
+```csharp
+public const int PhasecalConfigTimeoutMacrop = 0x004B
+```
+
+#### Vl53l1Die.RangeConfigTimeoutMacropAHi *(constant)*
+
+```csharp
+public const int RangeConfigTimeoutMacropAHi = 0x005E
+```
+
+#### Vl53l1Die.RangeConfigVcselPeriodA *(constant)*
+
+```csharp
+public const int RangeConfigVcselPeriodA = 0x0060
+```
+
+#### Vl53l1Die.RangeConfigTimeoutMacropBHi *(constant)*
+
+```csharp
+public const int RangeConfigTimeoutMacropBHi = 0x0061
+```
+
+#### Vl53l1Die.RangeConfigVcselPeriodB *(constant)*
+
+```csharp
+public const int RangeConfigVcselPeriodB = 0x0063
+```
+
+#### Vl53l1Die.RangeConfigSigmaThresh *(constant)*
+
+```csharp
+public const int RangeConfigSigmaThresh = 0x0064
+```
+
+#### Vl53l1Die.MinCountRateRtnLimitMcps *(constant)*
+
+```csharp
+public const int MinCountRateRtnLimitMcps = 0x0066
+```
+
+#### Vl53l1Die.RangeConfigValidPhaseHigh *(constant)*
+
+```csharp
+public const int RangeConfigValidPhaseHigh = 0x0069
+```
+
+#### Vl53l1Die.IntermeasurementMs *(constant)*
+
+```csharp
+public const int IntermeasurementMs = 0x006C
+```
+
+#### Vl53l1Die.ThreshHigh *(constant)*
+
+```csharp
+public const int ThreshHigh = 0x0072
+```
+
+#### Vl53l1Die.ThreshLow *(constant)*
+
+```csharp
+public const int ThreshLow = 0x0074
+```
+
+#### Vl53l1Die.SdConfigWoiSd0 *(constant)*
+
+```csharp
+public const int SdConfigWoiSd0 = 0x0078
+```
+
+#### Vl53l1Die.SdConfigInitialPhaseSd0 *(constant)*
+
+```csharp
+public const int SdConfigInitialPhaseSd0 = 0x007A
+```
+
+#### Vl53l1Die.RoiConfigUserRoiCentreSpad *(constant)*
+
+```csharp
+public const int RoiConfigUserRoiCentreSpad = 0x007F
+```
+
+#### Vl53l1Die.RoiConfigUserRoiXySize *(constant)*
+
+```csharp
+public const int RoiConfigUserRoiXySize = 0x0080
+```
+
+#### Vl53l1Die.SystemInterruptClear *(constant)*
+
+```csharp
+public const int SystemInterruptClear = 0x0086
+```
+
+#### Vl53l1Die.SystemModeStart *(constant)*
+
+```csharp
+public const int SystemModeStart = 0x0087
+```
+
+#### Vl53l1Die.ResultRangeStatus *(constant)*
+
+```csharp
+public const int ResultRangeStatus = 0x0089
+```
+
+#### Vl53l1Die.ResultOscCalibrateVal *(constant)*
+
+```csharp
+public const int ResultOscCalibrateVal = 0x00DE
+```
+
+#### Vl53l1Die.FirmwareSystemStatus *(constant)*
+
+```csharp
+public const int FirmwareSystemStatus = 0x00E5
+```
+
+#### Vl53l1Die.IdentificationModelId *(constant)*
+
+```csharp
+public const int IdentificationModelId = 0x010F
+```
+
+#### Vl53l1Die.RoiConfigModeRoiCentreSpad *(constant)*
+
+```csharp
+public const int RoiConfigModeRoiCentreSpad = 0x013E
+```
+
+#### Vl53l1Die.WindowBelow *(constant)*
+
+```csharp
+public const int WindowBelow = 0, WindowAbove = 1, WindowOut = 2, WindowIn = 3
+```
+
+#### Vl53l1Die.ConfigAddr *(constant)*
+
+```csharp
+public const int ConfigAddr = 0x002D
+```
+
+The configuration blob spans 0x2D..0x87 on every part; byte 0 is always the Fast Mode Plus byte.
+
+#### Vl53l1Die.ConfigEnd *(constant)*
+
+```csharp
+public const int ConfigEnd = 0x0087
+```
+
+#### Vl53l1Die.ConfigFmpByte *(constant)*
+
+```csharp
+public const byte ConfigFmpByte = 0x12
+```
+
+#### Vl53l1Die.ResultBlockAddr *(constant)*
+
+```csharp
+public const int ResultBlockAddr = ResultRangeStatus
+```
+
+#### Vl53l1Die.ResultBlockLen *(constant)*
+
+```csharp
+public const int ResultBlockLen = 17
+```
+
+#### Vl53l1Die.AddrWidth *(property)*
+
+```csharp
+public override int AddrWidth
+```
+
+#### Vl53l1Die.ClearSteps *(property)*
+
+```csharp
+public override IReadOnlyList<Vl53lxClearStep> ClearSteps
+```
+
+#### Vl53l1Die.MaxKhz *(property)*
+
+```csharp
+public override int MaxKhz
+```
+
+#### Vl53l1Die.PhaseWindowMm
+
+```csharp
+public static long PhaseWindowMm(long fastOscFrequency, long validPhaseHigh)
+```
+
+How far a target can be before the die fails it with status 4, mm.
+
+#### Vl53l1Die.override
+
+```csharp
+public override (int Addr, int Len) StreamBlock()
+```
+
+#### Vl53l1Die.Decode
+
+```csharp
+public override Vl53lxRange Decode(byte[] raw)
+```
+
+#### Vl53l1Die.StatusText
+
+```csharp
+public static string StatusText(int status)
+```
+
+#### Vl53l1Die.GetResult
+
+```csharp
+public Vl53lxRange GetResult()
+```
+
+One block read instead of the C driver's six register reads; the decoding is identical.
+
+#### Vl53l1Die.ReadMeasurement
+
+```csharp
+public override Vl53lxRange ReadMeasurement()
+```
+
+#### Vl53l1Die.ModelId
+
+```csharp
+public override int ModelId()
+```
+
+#### Vl53l1Die.BootState
+
+```csharp
+public int BootState()
+```
+
+#### Vl53l1Die.WaitBoot
+
+```csharp
+public void WaitBoot(TimeSpan? timeout = null)
+```
+
+#### Vl53l1Die.ResetDevice
+
+```csharp
+public void ResetDevice(TimeSpan? timeout = null)
+```
+
+The die's soft reset; a part that no longer acknowledges writes is reset through XSHUT.
+
+#### Vl53l1Die.SensorInit
+
+```csharp
+public override void SensorInit()
+```
+
+Configuration at 400 kHz (the only speed an unconfigured sensor is specified for), Fast Mode Plus byte first, then the bus at `MaxKhz`, VHV, and 50 ms continuous.
+
+#### Vl53l1Die.ClearInterrupt
+
+```csharp
+public override void ClearInterrupt()
+```
+
+#### Vl53l1Die.StartRanging
+
+```csharp
+public override void StartRanging()
+```
+
+#### Vl53l1Die.StopRanging
+
+```csharp
+public override void StopRanging()
+```
+
+#### Vl53l1Die.GetInterruptPolarity
+
+```csharp
+public int GetInterruptPolarity()
+```
+
+#### Vl53l1Die.SetInterruptPolarity
+
+```csharp
+public void SetInterruptPolarity(int polarity)
+```
+
+#### Vl53l1Die.CheckForDataReady
+
+```csharp
+public override bool CheckForDataReady()
+```
+
+#### Vl53l1Die.SetRangeTiming
+
+```csharp
+public override void SetRangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+#### Vl53l1Die.override
+
+```csharp
+public override (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+#### Vl53l1Die.ReachMm
+
+```csharp
+public override int? ReachMm()
+```
+
+Read off the loaded configuration: 1388 mm for the 0x38 window, 4563 mm for 0xB8.
+
+#### Vl53l1Die.SetDetectionThresholds
+
+```csharp
+public override void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+#### Vl53l1Die.override
+
+```csharp
+public override (int DistanceLowMm, int DistanceHighMm, int Window) GetDetectionThresholds()
+```
+
+#### Vl53l1Die.SetSignalThreshold
+
+```csharp
+public override void SetSignalThreshold(int signalKcps)
+```
+
+#### Vl53l1Die.GetSignalThreshold
+
+```csharp
+public override int GetSignalThreshold()
+```
+
+#### Vl53l1Die.SetSigmaThreshold
+
+```csharp
+public override void SetSigmaThreshold(int sigmaMm)
+```
+
+#### Vl53l1Die.GetSigmaThreshold
+
+```csharp
+public override int GetSigmaThreshold()
+```
+
+#### Vl53l1Die.SetOffset
+
+```csharp
+public override void SetOffset(int offsetMm)
+```
+
+#### Vl53l1Die.GetOffset
+
+```csharp
+public override int GetOffset()
+```
+
+#### Vl53l1Die.SetXtalk
+
+```csharp
+public override void SetXtalk(int xtalkKcps)
+```
+
+#### Vl53l1Die.GetXtalk
+
+```csharp
+public override int GetXtalk()
+```
+
+#### Vl53l1Die.SetRoi
+
+```csharp
+public override void SetRoi(int x, int y)
+```
+
+An X by Y window of SPADs, 4..16 each way.
+
+#### Vl53l1Die.override
+
+```csharp
+public override (int X, int Y) GetRoi()
+```
+
+#### Vl53l1Die.SetRoiCenter
+
+```csharp
+public override void SetRoiCenter(int centerSpad)
+```
+
+#### Vl53l1Die.GetRoiCenter
+
+```csharp
+public override int GetRoiCenter()
+```
+
+#### Vl53l1Die.StartTemperatureUpdate
+
+```csharp
+public override void StartTemperatureUpdate()
+```
+
+Recommended after a >8 °C ambient change.
+
+### Vl53l4UldDriver
+
+```csharp
+public sealed class Vl53l4UldDriver : Vl53l1Die
+```
+
+VL53L4CD ULD 2.2.3 (VL53L4CD_api.c + VL53L4CD_calibration.c) for VL53L4CD and VL53L4CX alike.
+
+#### Vl53l4UldDriver.Vl53l4UldDriver *(constructor)*
+
+```csharp
+public Vl53l4UldDriver(Vl53lxPlatform platform, string product) : base(platform, product)
+```
+
+#### Vl53l4UldDriver.Supports *(property)*
+
+```csharp
+public override IReadOnlyCollection<string> Supports
+```
+
+#### Vl53l4UldDriver.CalibrateOffset
+
+```csharp
+public override int CalibrateOffset(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53l4UldDriver.CalibrateXtalk
+
+```csharp
+public override int CalibrateXtalk(int targetDistMm, int? nbSamples = null)
+```
+
+### Vl53l3UlpDriver
+
+```csharp
+public sealed class Vl53l3UlpDriver : Vl53l1Die
+```
+
+VL53L3CX ULP 1.0.0: plain single-target ranging on the histogram part.
+
+#### Vl53l3UlpDriver.Vl53l3UlpDriver *(constructor)*
+
+```csharp
+public Vl53l3UlpDriver(Vl53lxPlatform platform, string product) : base(platform, product)
+```
+
+#### Vl53l3UlpDriver.Supports *(property)*
+
+```csharp
+public override IReadOnlyCollection<string> Supports
+```
+
+### Vl53l1UldDriver
+
+```csharp
+public sealed class Vl53l1UldDriver : Vl53l1Die
+```
+
+VL53L1X ULD 3.5.5 (VL53L1X_api.c + VL53L1X_calibration.c) for VL53L1CX and VL53L1CB: a tabulated timing budget, short / long distance modes, an init that resets the die first. Crosstalk is in kcps, the register's own unit (ST's wrapper converts to cps).
+
+#### Vl53l1UldDriver.Vl53l1UldDriver *(constructor)*
+
+```csharp
+public Vl53l1UldDriver(Vl53lxPlatform platform, string product) : base(platform, product)
+```
+
+#### Vl53l1UldDriver.Supports *(property)*
+
+```csharp
+public override IReadOnlyCollection<string> Supports
+```
+
+#### Vl53l1UldDriver.Modes *(property)*
+
+```csharp
+public override IReadOnlyList<string> Modes
+```
+
+#### Vl53l1UldDriver.override
+
+```csharp
+public override (int Min, int Max) BudgetMs
+```
+
+#### Vl53l1UldDriver.StartRanging
+
+```csharp
+public override void StartRanging()
+```
+
+Timed mode only: this part has no free-running mode under the ULD configuration.
+
+#### Vl53l1UldDriver.SetMode
+
+```csharp
+public override void SetMode(string name)
+```
+
+"short" or "long"; the budget is re-applied (the VCSEL periods change what it means).
+
+#### Vl53l1UldDriver.GetMode
+
+```csharp
+public override string GetMode()
+```
+
+#### Vl53l1UldDriver.SetRangeTiming
+
+```csharp
+public override void SetRangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+Only the tabulated budgets of the mode exist; a period of 0 is written as the budget itself (this part has no free-running mode).
+
+#### Vl53l1UldDriver.BudgetChoices
+
+```csharp
+public override IReadOnlyList<int> BudgetChoices()
+```
+
+#### Vl53l1UldDriver.override
+
+```csharp
+public override (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+#### Vl53l1UldDriver.SetDetectionThresholds
+
+```csharp
+public override void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+VL53L1X_SetDistanceThreshold(): a read-modify-write keeping the bits outside 0x6F.
+
+#### Vl53l1UldDriver.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window, bool intOnNoTarget)
+```
+
+#### Vl53l1UldDriver.CalibrateOffset
+
+```csharp
+public override int CalibrateOffset(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53l1UldDriver.CalibrateXtalk
+
+```csharp
+public override int CalibrateXtalk(int targetDistMm, int? nbSamples = null)
+```
+
+VL53L1X_CalibrateXtalk(); returns kcps, not the C driver's cps.
+
+### Vl53lxException
+
+```csharp
+public class Vl53lxException : DepzException
+```
+
+A ULD-level failure: the sensor did not do what the driver needed (a timeout waiting for data ready or boot, a calibration that failed, a mode the driver lacks…).
+
+#### Vl53lxException.Vl53lxException *(constructor)*
+
+```csharp
+public Vl53lxException(string message) : base(message)
+```
+
+### Vl53lxProtocolException
+
+```csharp
+public sealed class Vl53lxProtocolException : DepzException
+```
+
+The bridge refused a register command or did not answer it. The drivers catch it where a sensor legitimately NACKs for a while (right after a soft reset).
+
+#### Vl53lxProtocolException.Vl53lxProtocolException *(constructor)*
+
+```csharp
+public Vl53lxProtocolException(string message, Exception? inner = null) : base(message, inner ?? new Exception(message))
+```
+
+### Vl53lxPlatform
+
+```csharp
+public abstract class Vl53lxPlatform
+```
+
+ST's platform layer (RdByte / WrWord / WaitMs …) for the 1D family, plus what the bridge owns: bus speed, register-address width and the XSHUT line. Register values are big-endian, as the C drivers assume. `Vl53lxDevice` implements it over the board; a test can script it.
+
+#### Vl53lxPlatform.ReadMulti
+
+```csharp
+public abstract byte[] ReadMulti(int addr, int size)
+```
+
+#### Vl53lxPlatform.WriteMulti
+
+```csharp
+public abstract void WriteMulti(int addr, byte[] data)
+```
+
+#### Vl53lxPlatform.SetI2cSpeed
+
+```csharp
+public abstract void SetI2cSpeed(int khz)
+```
+
+The bridge's bus timing (not part of the C platform layer).
+
+#### Vl53lxPlatform.SetAddrWidth
+
+```csharp
+public abstract void SetAddrWidth(int width)
+```
+
+How wide a register address the bridge puts on the wire; sticky.
+
+#### Vl53lxPlatform.XshutReset
+
+```csharp
+public abstract void XshutReset()
+```
+
+Reset through XSHUT, for a sensor that no longer acknowledges writes.
+
+#### Vl53lxPlatform.SleepMs
+
+```csharp
+public virtual void SleepMs(int ms)
+```
+
+#### Vl53lxPlatform.ReadByte
+
+```csharp
+public int ReadByte(int addr)
+```
+
+#### Vl53lxPlatform.ReadWord
+
+```csharp
+public int ReadWord(int addr)
+```
+
+#### Vl53lxPlatform.ReadDword
+
+```csharp
+public uint ReadDword(int addr)
+```
+
+#### Vl53lxPlatform.WriteByte
+
+```csharp
+public void WriteByte(int addr, int value)
+```
+
+#### Vl53lxPlatform.WriteWord
+
+```csharp
+public void WriteWord(int addr, int value)
+```
+
+#### Vl53lxPlatform.WriteDword
+
+```csharp
+public void WriteDword(int addr, long value)
+```
+
+### Vl53lxTarget
+
+```csharp
+public sealed record Vl53lxTarget(int DistanceMm, int Status, string StatusText, double SignalKcps, double AmbientKcps, double SigmaMm, int MinRangeMm, int MaxRangeMm)
+```
+
+One return of a multi-target frame. `MinRangeMm` / `MaxRangeMm` are the edges of the target's own pulse, which only the histogram driver knows.
+
+### Vl53lxRange
+
+```csharp
+public sealed record Vl53lxRange(int DistanceMm, int Status, string StatusText, double SignalKcps, double AmbientKcps, double SigmaMm, double Spads, IReadOnlyList<Vl53lxTarget> Targets, IReadOnlyDictionary<string, object?> Extra)
+```
+
+One range result as a driver reports it, the same shape for every product of the family. On the histogram driver `Targets` holds every return and the top level repeats the first; the light drivers leave it empty. `Extra` is driver-specific — show it, don't branch on it.
+
+#### Vl53lxRange.Valid *(property)*
+
+```csharp
+public bool Valid
+```
+
+### Vl53lxDriver
+
+```csharp
+public abstract class Vl53lxDriver
+```
+
+The contract every driver of the 1D family implements (uld/base.py). The class properties say what the product is as far as the bridge is concerned and which optional groups it serves (`Supports`): mode, timing, offset, xtalk, calib_offset, calib_xtalk, thresholds, signal_thresh, sigma_thresh, roi, temp_update, refspad. A group a driver lacks throws `NotSupportedException`.
+
+#### Vl53lxDriver.Product *(property)*
+
+```csharp
+public string Product
+```
+
+The product this driver was bound for (one driver serves several).
+
+#### Vl53lxDriver.AddrWidth *(property)*
+
+```csharp
+public virtual int AddrWidth
+```
+
+Bytes of register address on the wire.
+
+#### Vl53lxDriver.ClearSteps *(property)*
+
+```csharp
+public virtual IReadOnlyList<Vl53lxClearStep> ClearSteps
+```
+
+The interrupt-release writes handed to START_STREAM.
+
+#### Vl53lxDriver.MaxKhz *(property)*
+
+```csharp
+public virtual int MaxKhz
+```
+
+The bus ceiling; the driver runs the bus there itself.
+
+#### Vl53lxDriver.Supports *(property)*
+
+```csharp
+public virtual IReadOnlyCollection<string> Supports
+```
+
+#### Vl53lxDriver.Modes *(property)*
+
+```csharp
+public virtual IReadOnlyList<string> Modes
+```
+
+The named ranging modes, the first being what init leaves; empty when there are none.
+
+#### Vl53lxDriver.virtual
+
+```csharp
+public virtual (int Min, int Max) BudgetMs
+```
+
+The (min, max) budget a UI should offer, ms; see `BudgetChoices`.
+
+#### Vl53lxDriver.Histogram *(property)*
+
+```csharp
+public virtual bool Histogram
+```
+
+The frame is a raw histogram (the histogram driver).
+
+#### Vl53lxDriver.ModelId
+
+```csharp
+public abstract int ModelId()
+```
+
+#### Vl53lxDriver.SensorInit
+
+```csharp
+public abstract void SensorInit()
+```
+
+Reset and configure the sensor; leaves the bus at `MaxKhz`. Safe to re-run.
+
+#### Vl53lxDriver.StartRanging
+
+```csharp
+public abstract void StartRanging()
+```
+
+#### Vl53lxDriver.StopRanging
+
+```csharp
+public abstract void StopRanging()
+```
+
+#### Vl53lxDriver.CheckForDataReady
+
+```csharp
+public abstract bool CheckForDataReady()
+```
+
+#### Vl53lxDriver.WaitDataReady
+
+```csharp
+public virtual void WaitDataReady(TimeSpan timeout)
+```
+
+#### Vl53lxDriver.ClearInterrupt
+
+```csharp
+public abstract void ClearInterrupt()
+```
+
+#### Vl53lxDriver.abstract
+
+```csharp
+public abstract (int Addr, int Len) StreamBlock()
+```
+
+(addr, len) — the register block the bridge streams on each INT.
+
+#### Vl53lxDriver.Decode
+
+```csharp
+public abstract Vl53lxRange Decode(byte[] raw)
+```
+
+Streamed block bytes → a range.
+
+#### Vl53lxDriver.ReadMeasurement
+
+```csharp
+public virtual Vl53lxRange ReadMeasurement()
+```
+
+One polled result: the stream block read and decoded.
+
+#### Vl53lxDriver.SetRangeTiming
+
+```csharp
+public abstract void SetRangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+Budget of one measurement and the period between two; a period of 0 means continuous.
+
+#### Vl53lxDriver.abstract
+
+```csharp
+public abstract (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+#### Vl53lxDriver.BudgetChoices
+
+```csharp
+public virtual IReadOnlyList<int> BudgetChoices()
+```
+
+The only budgets accepted right now (ascending), or empty when any integer of `BudgetMs` will do.
+
+#### Vl53lxDriver.SetMode
+
+```csharp
+public virtual void SetMode(string name)
+```
+
+#### Vl53lxDriver.GetMode
+
+```csharp
+public virtual string GetMode()
+```
+
+#### Vl53lxDriver.ReachMm
+
+```csharp
+public virtual int? ReachMm()
+```
+
+How far the loaded configuration can measure, mm, or null when not characterised.
+
+#### Vl53lxDriver.DriverInfo
+
+```csharp
+public virtual IReadOnlyDictionary<string, object?> DriverInfo()
+```
+
+Numbers this driver shows that the contract has no field for.
+
+#### Vl53lxDriver.GetOffset
+
+```csharp
+public virtual int GetOffset()
+```
+
+#### Vl53lxDriver.SetOffset
+
+```csharp
+public virtual void SetOffset(int offsetMm)
+```
+
+#### Vl53lxDriver.GetXtalk
+
+```csharp
+public virtual int GetXtalk()
+```
+
+#### Vl53lxDriver.SetXtalk
+
+```csharp
+public virtual void SetXtalk(int xtalkKcps)
+```
+
+#### Vl53lxDriver.CalibrateOffset
+
+```csharp
+public virtual int CalibrateOffset(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53lxDriver.CalibrateXtalk
+
+```csharp
+public virtual int CalibrateXtalk(int targetDistMm, int? nbSamples = null)
+```
+
+#### Vl53lxDriver.virtual
+
+```csharp
+public virtual (int DistanceLowMm, int DistanceHighMm, int Window) GetDetectionThresholds()
+```
+
+#### Vl53lxDriver.SetDetectionThresholds
+
+```csharp
+public virtual void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+#### Vl53lxDriver.GetSignalThreshold
+
+```csharp
+public virtual int GetSignalThreshold()
+```
+
+#### Vl53lxDriver.SetSignalThreshold
+
+```csharp
+public virtual void SetSignalThreshold(int signalKcps)
+```
+
+#### Vl53lxDriver.GetSigmaThreshold
+
+```csharp
+public virtual int GetSigmaThreshold()
+```
+
+#### Vl53lxDriver.SetSigmaThreshold
+
+```csharp
+public virtual void SetSigmaThreshold(int sigmaMm)
+```
+
+#### Vl53lxDriver.virtual
+
+```csharp
+public virtual (int X, int Y) GetRoi()
+```
+
+#### Vl53lxDriver.SetRoi
+
+```csharp
+public virtual void SetRoi(int x, int y)
+```
+
+#### Vl53lxDriver.GetRoiCenter
+
+```csharp
+public virtual int GetRoiCenter()
+```
+
+#### Vl53lxDriver.SetRoiCenter
+
+```csharp
+public virtual void SetRoiCenter(int centerSpad)
+```
+
+#### Vl53lxDriver.StartTemperatureUpdate
+
+```csharp
+public virtual void StartTemperatureUpdate()
+```
+
+#### Vl53lxDriver.PerformRefSpadManagement
+
+```csharp
+public virtual object PerformRefSpadManagement()
+```
+
+#### Vl53lxDriver.BinData
+
+```csharp
+public virtual object BinData(byte[]? raw = null)
+```
+
+The raw histogram of a frame (read from the sensor when `raw` is null).
+
+#### Vl53lxDriver.ToMeasurement
+
+```csharp
+public virtual Vl53lxRange ToMeasurement(object bins)
+```
+
+A histogram frame → a range (the host-side ranging of the histogram driver).
+
+### Vl53lxHistogramDriver
+
+```csharp
+public sealed class Vl53lxHistogramDriver : Vl53lxDriver
+```
+
+ST's VL53LX BareDriver on the host — the histogram driver of VL53L1CX / L1CB / L3CX / L4CD / L4CX: the die hands over 24 raw photon-count bins per frame and `Hist` turns them into up to four targets. What it costs against the light drivers: no calibrations and no detection thresholds, and the first frame of a stream reports status 6 (no wrap check done) because the check needs the frame before.
+
+#### Vl53lxHistogramDriver.Vl53lxHistogramDriver *(constructor)*
+
+```csharp
+public Vl53lxHistogramDriver(Vl53lxPlatform platform, string product) : base(platform, product)
+```
+
+#### Vl53lxHistogramDriver.Bare *(property)*
+
+```csharp
+public BareDriver Bare
+```
+
+The BareDriver underneath: device image, factory data, preset and post-processing config.
+
+#### Vl53lxHistogramDriver.AddrWidth *(property)*
+
+```csharp
+public override int AddrWidth
+```
+
+#### Vl53lxHistogramDriver.ClearSteps *(property)*
+
+```csharp
+public override IReadOnlyList<Vl53lxClearStep> ClearSteps
+```
+
+#### Vl53lxHistogramDriver.MaxKhz *(property)*
+
+```csharp
+public override int MaxKhz
+```
+
+#### Vl53lxHistogramDriver.Supports *(property)*
+
+```csharp
+public override IReadOnlyCollection<string> Supports
+```
+
+#### Vl53lxHistogramDriver.Modes *(property)*
+
+```csharp
+public override IReadOnlyList<string> Modes
+```
+
+short / medium / long, narrowed per die by `SensorInit` (an L4 has no short).
+
+#### Vl53lxHistogramDriver.override
+
+```csharp
+public override (int Min, int Max) BudgetMs
+```
+
+The guard comes off the budget before it is divided and the range timeout is capped: 2..550 ms, 2..200 on an L4 die.
+
+#### Vl53lxHistogramDriver.Histogram *(property)*
+
+```csharp
+public override bool Histogram
+```
+
+#### Vl53lxHistogramDriver.ModelId
+
+```csharp
+public override int ModelId()
+```
+
+#### Vl53lxHistogramDriver.WaitBoot
+
+```csharp
+public void WaitBoot(TimeSpan? timeout = null)
+```
+
+#### Vl53lxHistogramDriver.SensorInit
+
+```csharp
+public override void SensorInit()
+```
+
+Reset the part (whatever ran before left it ranging under another configuration), configure it for histogram ranging and raise the bus only after the FM+ pad byte has reached the device.
+
+#### Vl53lxHistogramDriver.SetMode
+
+```csharp
+public override void SetMode(string name)
+```
+
+The device preset mode: the VCSEL period, which sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid phase window inside it (`ReachMm`). The bin is 199 mm wide in all three.
+
+#### Vl53lxHistogramDriver.GetMode
+
+```csharp
+public override string GetMode()
+```
+
+#### Vl53lxHistogramDriver.ReachMm
+
+```csharp
+public override int? ReachMm()
+```
+
+The valid phase window the post-processing applies: 992 / 1785 / 3373 mm for short / medium / long at the usual oscillator. Past it the target is status 4.
+
+#### Vl53lxHistogramDriver.DriverInfo
+
+```csharp
+public override IReadOnlyDictionary<string, object?> DriverInfo()
+```
+
+How long one range actually runs, and the MM1/MM2 offset the post-processing applies.
+
+#### Vl53lxHistogramDriver.StartRanging
+
+```csharp
+public override void StartRanging()
+```
+
+#### Vl53lxHistogramDriver.StopRanging
+
+```csharp
+public override void StopRanging()
+```
+
+#### Vl53lxHistogramDriver.override
+
+```csharp
+public override (int Addr, int Len) StreamBlock()
+```
+
+#### Vl53lxHistogramDriver.Decode
+
+```csharp
+public override Vl53lxRange Decode(byte[] raw)
+```
+
+#### Vl53lxHistogramDriver.ReadMeasurement
+
+```csharp
+public override Vl53lxRange ReadMeasurement()
+```
+
+#### Vl53lxHistogramDriver.BinData
+
+```csharp
+public override object BinData(byte[]? raw = null)
+```
+
+The raw frame as a `HistogramBinData`; read here when `raw` is null.
+
+#### Vl53lxHistogramDriver.ToMeasurement
+
+```csharp
+public override Vl53lxRange ToMeasurement(object bins)
+```
+
+A frame → its range. Once per frame: the history is a state machine and would step twice.
+
+#### Vl53lxHistogramDriver.CheckForDataReady
+
+```csharp
+public override bool CheckForDataReady()
+```
+
+#### Vl53lxHistogramDriver.ClearInterrupt
+
+```csharp
+public override void ClearInterrupt()
+```
+
+#### Vl53lxHistogramDriver.SetRangeTiming
+
+```csharp
+public override void SetRangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+The budget covers the whole measurement; the range timeout is one sixth of it after a fixed guard.
+
+#### Vl53lxHistogramDriver.override
+
+```csharp
+public override (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
 
 ## Contract-10 records (from `Depz.Sensor.Vl53l4`)
 

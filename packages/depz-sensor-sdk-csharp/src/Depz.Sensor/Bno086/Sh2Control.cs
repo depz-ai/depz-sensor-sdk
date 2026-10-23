@@ -40,9 +40,14 @@ public static class Sh2Control
     /// id, flags, u16 change-sensitivity, u32 report interval µs, u32 batch
     /// interval µs, u32 sensor-specific config.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="sensorId"/> / <paramref name="flags"/>
+    /// outside u8 or <paramref name="sensitivity"/> outside u16 — nothing is written.</exception>
     public static byte[] SetFeature(
         int sensorId, uint intervalUs, uint batchUs = 0, int sensitivity = 0, int flags = 0, uint cfgWord = 0)
     {
+        Protocol.Wire.CheckUint("sensorId", sensorId, 8);
+        Protocol.Wire.CheckUint("flags", flags, 8);
+        Protocol.Wire.CheckUint("sensitivity", sensitivity, 16);
         var p = new byte[17];
         p[0] = SetFeatureCommand;
         p[1] = (byte)sensorId;
@@ -55,7 +60,9 @@ public static class Sh2Control
     }
 
     /// <summary>0xFE Get Feature Request.</summary>
-    public static byte[] GetFeature(int sensorId) => new[] { GetFeatureRequest, (byte)sensorId };
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="sensorId"/> outside u8.</exception>
+    public static byte[] GetFeature(int sensorId) =>
+        new[] { GetFeatureRequest, (byte)Protocol.Wire.CheckUint("sensorId", sensorId, 8) };
 
     /// <summary>0xF9 Product ID Request.</summary>
     public static byte[] ProductId() => new byte[] { ProductIdRequest, 0x00 };
@@ -91,6 +98,8 @@ public static class Sh2Control
     {
         if (parameters.Length > 9)
             throw new ArgumentException("command params must be <= 9 bytes", nameof(parameters));
+        Protocol.Wire.CheckUint("seq", seq, 8);
+        Protocol.Wire.CheckUint("command", command, 8);
         var p = new byte[12];
         p[0] = CommandRequest;
         p[1] = (byte)seq;
@@ -103,8 +112,12 @@ public static class Sh2Control
     /// 0xF4 FRS Read Request: reserved, u16 read offset (words), u16 FRS type,
     /// u16 block size (words). 8-byte payload.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">an argument outside u16.</exception>
     public static byte[] FrsRead(int frsType, int offsetWords = 0, int blockWords = 0)
     {
+        Protocol.Wire.CheckUint("offsetWords", offsetWords, 16);
+        Protocol.Wire.CheckUint("frsType", frsType, 16);
+        Protocol.Wire.CheckUint("blockWords", blockWords, 16);
         var p = new byte[8];
         p[0] = FrsReadRequest;
         p[1] = 0x00;
@@ -115,8 +128,11 @@ public static class Sh2Control
     }
 
     /// <summary>0xF7 FRS Write Request: reserved, u16 length (words), u16 FRS type. 6-byte payload.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">an argument outside u16.</exception>
     public static byte[] FrsWrite(int frsType, int lengthWords)
     {
+        Protocol.Wire.CheckUint("lengthWords", lengthWords, 16);
+        Protocol.Wire.CheckUint("frsType", frsType, 16);
         var p = new byte[6];
         p[0] = FrsWriteRequest;
         p[1] = 0x00;
@@ -126,11 +142,17 @@ public static class Sh2Control
     }
 
     /// <summary>
-    /// 0xF6 FRS Write Data: reserved, u16 word offset, then the u32 data words.
+    /// 0xF6 FRS Write Data: reserved, u16 word offset, then two u32 data words —
+    /// always 12 bytes (contract 05 §6); one word leaves the second slot zero.
     /// </summary>
+    /// <exception cref="ArgumentException">not 1 or 2 words.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="offsetWords"/> outside u16.</exception>
     public static byte[] FrsWriteDataReport(int offsetWords, IReadOnlyList<uint> words)
     {
-        var p = new byte[4 + words.Count * 4];
+        if (words.Count < 1 || words.Count > 2)
+            throw new ArgumentException("FRS write data carries 1 or 2 words", nameof(words));
+        Protocol.Wire.CheckUint("offsetWords", offsetWords, 16);
+        var p = new byte[12];
         p[0] = FrsWriteData;
         p[1] = 0x00;
         BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(2), (ushort)offsetWords);

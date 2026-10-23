@@ -766,7 +766,8 @@ std::uint8_t add(std::int64_t us, std::uint32_t tick);
 ```
 
 Add a pair -> FT_CLOCK_RESET when it does not fit the model (which then
-restarts from it), else 0.
+restarts from it), else 0. std::out_of_range for a negative `us` (a u64
+MCU time, contract 07 §3).
 
 #### SensorClock.to_us
 
@@ -851,7 +852,8 @@ A histogram frame was seen in the stream.
 FrameTime results(const SensorClock& clock, unsigned fp_mode, std::uint32_t systick, std::uint32_t t0_tick, std::uint32_t t1_tick, std::int64_t pair_us, std::int64_t edge_us, std::uint8_t flags);
 ```
 
-`flags` = what clock.add() returned for this frame.
+`flags` = what clock.add() returned for this frame. std::out_of_range for
+fp_mode > 255 or a negative pair_us / edge_us.
 
 #### CaptureTimer.results_frame
 
@@ -965,7 +967,8 @@ std::optional<Measurement> add(byte_span raw, std::int64_t timestamp_us, std::in
 ```
 
 One frame with the MCU time of its header read and its INT edge (0 =
-none) -> the measurement it completes, or nullopt.
+none) -> the measurement it completes, or nullopt. std::out_of_range for
+a negative timestamp_us / edge_us (u64 MCU times, contract 07 §3).
 
 ### REG_APP_ID
 
@@ -1187,8 +1190,9 @@ The field called `name`, or nullopt.
 std::uint32_t cfg_get(byte_span page, const std::string& name);
 ```
 
-Read a field of a 190-byte config page. std::out_of_range for an unknown
-name, std::invalid_argument for a page shorter than CFG_SIZE.
+Read a field of a config page (CFG_SIZE bytes, or a partial read from its
+start that holds the field). std::out_of_range for an unknown name,
+std::invalid_argument for a page too short to hold the field.
 
 ### cfg_set
 
@@ -1197,8 +1201,8 @@ void cfg_set(bytes& page, const std::string& name, std::int64_t value);
 ```
 
 Set a field in place. std::out_of_range for an unknown name,
-std::invalid_argument for a value outside 0 .. 2^width - 1 (page untouched)
-or a page shorter than CFG_SIZE.
+std::invalid_argument for a value outside 0 .. 2^width - 1 or a page too
+short to hold the field (page untouched either way).
 
 ### config_fields
 
@@ -1206,7 +1210,8 @@ or a page shorter than CFG_SIZE.
 std::vector<std::pair<std::string, std::uint32_t>> config_fields(byte_span page);
 ```
 
-Every named field of a config page, in CFG_FIELDS order.
+Every named field of a config page, in CFG_FIELDS order (std::invalid_argument
+when the page is too short for one of them).
 
 ### FIRMWARE_LOAD_ADDR
 

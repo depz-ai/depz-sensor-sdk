@@ -91,6 +91,16 @@ public final class Vl53lx {
             throw new IllegalArgumentException(
                 "at most " + CLEAR_STEPS_MAX + " interrupt-release steps, got " + clear.length);
         }
+        Wire.checkUint("addr", addr, 16);
+        Wire.checkUint("length", len, 16);
+        Wire.checkUint("flags", flags, 8);
+        for (int[] step : clear) {
+            if (step == null || step.length != 2) {
+                throw new IllegalArgumentException("a clear step is {addr, value}");
+            }
+            Wire.checkUint("stepAddr", step[0], 16);
+            Wire.checkUint("value", step[1], 8);
+        }
         byte[] out = new byte[6 + 3 * clear.length];
         out[0] = (byte) addr;
         out[1] = (byte) (addr >>> 8);

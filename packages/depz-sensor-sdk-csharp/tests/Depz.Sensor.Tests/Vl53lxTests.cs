@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Depz.Sensor.Protocol;
+using Depz.Sensor.Vl53l4;
 using Depz.Sensor.Vl53lx;
 using Xunit;
 
@@ -58,6 +59,7 @@ public class Vl53lxVectorTests
             if (kind == "start_stream")
                 Assert.Equal(6 + 3 * c.GetProperty("clear").GetArrayLength(), payload.Length);
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -99,6 +101,7 @@ public class Vl53lxVectorTests
                 ["frames_dropped"] = info.FramesDropped,
             });
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Throws<ArgumentException>(() => Vl53lxInfo.Unpack(new byte[Vl53lxWire.InfoSize - 1]));
@@ -127,6 +130,7 @@ public class Vl53lxVectorTests
             Assert.True(Vl53lxProducts.ModelIdOk(name, p.ModelId), name);
             // The USB PID in the table matches the production PID hint.
             Assert.Equal(name.ToLowerInvariant(), Usb.UsbIds.UsbModelHint(Usb.UsbIds.DepzUsbVid, p.UsbPid));
+            Vectors.Seen(r);
         }
         Assert.False(Vl53lxProducts.ModelIdOk("VL53L0X", 0xEACC));
         Assert.False(Vl53lxProducts.ModelIdOk("VL53L4ED", 0xEBAA));
@@ -148,6 +152,7 @@ public class Vl53lxVectorTests
                 $"{name}: class");
             Assert.True(expectProduct == Vl53lxProducts.ProductFromBoardName(deviceName), $"{name}: product");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -174,6 +179,7 @@ public class Vl53lxVectorTests
                 ["number_of_spad"] = r.NumberOfSpad,
                 ["stream_count"] = r.StreamCount,
             });
+            Vectors.Seen(c);
         }
         Assert.Equal(2, seen.Count);
         Assert.Throws<ArgumentException>(() => Vl53lxDecode.DecodeDieBlock(new byte[Vl53lxDecode.DieBlockLen - 1]));
@@ -196,6 +202,7 @@ public class Vl53lxVectorTests
                 ["effective_spad_count_88"] = r.EffectiveSpadCount88,
             });
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Throws<ArgumentException>(() => Vl53lxDecode.DecodeL0xRaw(new byte[Vl53lxDecode.L0xBlockLen - 1]));
@@ -231,6 +238,7 @@ public class Vl53lxVectorTests
             foreach (var f in fields)
                 Assert.True(f.Value.GetInt64() == got[f.Name], $"{name}: {f.Name}");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Throws<ArgumentException>(() => Vl53lxDecode.DecodeHistogramRaw(new byte[Vl53lxDecode.HistogramBlockLen - 1]));
@@ -254,5 +262,41 @@ public class Vl53lxVectorTests
         Assert.Equal(SensorType.Vl53lx, IdentityParser.ParseSoftwareName("APP_VL53L0_4_v0.23").SensorType);
         Assert.Equal(SensorType.Vl53lx, IdentityParser.ParseSoftwareName("APP_VL53LX_v0.20").SensorType);
         Assert.Equal(SensorType.Vl53l4, IdentityParser.ParseSoftwareName("APP_VL53L4_v1.00").SensorType);
+    }
+}
+
+// recordings/vl53l*_{uld,ulp}_*.depzrec decoded rx-side only (the C# SDK has no
+// device layer to re-issue the tx half): every streamed 0x0089 die block
+// through DecodeDieBlock, against the sidecar's distance and status. The
+// histogram and VL53L0X captures need the ST ranging drivers (not in this SDK).
+public class Vl53lxRecordingTests
+{
+    [Theory]
+    [InlineData("vl53l1cb_uld_short_50ms", "l1")]
+    [InlineData("vl53l1cx_uld_long_33ms", "l1")]
+    [InlineData("vl53l3cx_ulp_33ms", "l4")]
+    [InlineData("vl53l4cx_uld_as_l4cd_50ms", "l4")]
+    public void DieBlockStream_RxDecode_MatchesSidecar(string stem, string variantName)
+    {
+        var exp = JsonDocument.Parse(File.ReadAllText(Vectors.RecordingPath(stem + ".expected.json"))).RootElement;
+        var variant = Vl53lxDecode.ParseDieVariant(variantName);
+        var frames = Vectors.RxPackets(stem + ".depzrec").Where(p => p.Cmd == (int)Vl53lxRpt.Stream)
+            .Select(p => Vl53l4StreamData.Unpack(p.Payload)).ToList();
+        var want = exp.GetProperty("frames").EnumerateArray().ToList();
+        Assert.NotEmpty(want);
+        Assert.True(frames.Count >= want.Count, $"{stem}: {frames.Count} frames, expected >= {want.Count}");
+        for (int i = 0; i < want.Count; i++)
+        {
+            var w = want[i];
+            Assert.Equal(5, w.EnumerateObject().Count());
+            Assert.True(w.GetProperty("timestamp_us").GetUInt64() == frames[i].TimestampUs, $"{stem}[{i}]: timestamp_us");
+            Assert.Equal(Vl53lxDecode.DieBlockAddr, frames[i].Addr);
+            Assert.True(w.GetProperty("raw").GetString() == Vectors.ToHex(frames[i].Data), $"{stem}[{i}]: raw");
+            var r = Vl53lxDecode.DecodeDieBlock(frames[i].Data, variant);
+            Assert.True(w.GetProperty("distance_mm").GetInt32() == r.DistanceMm, $"{stem}[{i}]: distance_mm got {r.DistanceMm}");
+            Assert.True(w.GetProperty("status").GetInt32() == r.RangeStatus, $"{stem}[{i}]: status got {r.RangeStatus}");
+            Assert.Equal(0, w.GetProperty("targets").GetArrayLength()); // single-target drivers
+        }
+        Vectors.Seen($"recordings/{stem}.depzrec");
     }
 }

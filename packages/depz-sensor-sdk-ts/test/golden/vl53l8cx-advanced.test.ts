@@ -12,9 +12,10 @@ import {
   packDetectionThresholds,
   xtalkMarginToRaw,
 } from "../../src/index.js";
-import { loadVectors, toHex } from "./vectors.js";
+import { loadVectors, toHex, seen } from "./vectors.js";
 
 interface MotionCase {
+  id: string;
   name: string;
   resolution: number;
   pack: string;
@@ -28,12 +29,14 @@ interface ThreshEntry {
   operation: number;
 }
 interface ThreshCase {
+  id: string;
   name: string;
   thresholds: ThreshEntry[];
   start_block: string;
   valid_status: string;
 }
 interface XtalkMarginCase {
+  id: string;
   name: string;
   kcps: number;
   raw: number;
@@ -51,6 +54,7 @@ describe("vl53l8 advanced: motion-indicator config pack", () => {
     it(c.name, () => {
       const cfg = defaultMotionConfig(c.resolution);
       expect(toHex(cfg.pack())).toBe(c.pack);
+      seen(c);
     });
   }
 });
@@ -69,6 +73,7 @@ describe("vl53l8 advanced: detection thresholds", () => {
       const { start, valid } = packDetectionThresholds(thresholds);
       expect(toHex(start)).toBe(c.start_block);
       expect(toHex(valid)).toBe(c.valid_status);
+      seen(c);
     });
   }
 });
@@ -77,6 +82,7 @@ describe("vl53l8 advanced: xtalk margin raw scaling", () => {
   for (const c of data.xtalk_margin) {
     it(c.name, () => {
       expect(xtalkMarginToRaw(c.kcps)).toBe(c.raw);
+      seen(c);
     });
   }
 });

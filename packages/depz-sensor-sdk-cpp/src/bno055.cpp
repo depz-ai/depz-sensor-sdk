@@ -1,6 +1,7 @@
 #include "depz/bno055.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 
 #include "depz/detail/byteio.hpp"
 
@@ -24,6 +25,9 @@ bytes pack_read_reg(std::uint8_t addr, std::uint8_t len) {
 }
 
 bytes pack_write_reg(std::uint8_t addr, byte_span data) {
+    // contract 13 §2: data 1..128 bytes (refused, never sent)
+    if (data.empty() || data.size() > XFER_MAX)
+        throw std::invalid_argument("BNO_WRITE_REG: data must be 1..128 bytes");
     bytes out;
     out.reserve(1 + data.size());
     wr_le(out, addr, 1);
@@ -87,8 +91,9 @@ std::optional<StreamData> StreamData::unpack(byte_span payload) {
     r.timestamp_us = rd_u64(payload, 0);
     r.addr = u8(payload[8]);
     r.len = u8(payload[9]);
-    const std::size_t n = std::min<std::size_t>(r.len, payload.size() - 10);
-    r.data.assign(payload.begin() + 10, payload.begin() + 10 + n);
+    // checked against its own len field; trailing bytes ignored (contract 07 §3)
+    if (payload.size() < 10u + r.len) return std::nullopt;
+    r.data.assign(payload.begin() + 10, payload.begin() + 10 + r.len);
     return r;
 }
 

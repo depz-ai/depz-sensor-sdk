@@ -76,15 +76,33 @@ public final class Vl53l7 {
 
     // ── command payload encoders ─────────────────────────────────────────────
 
-    /** VL53_READ_REG payload: {@code addr u16, len u16} little-endian. */
+    /**
+     * VL53_READ_REG payload: {@code addr u16, len u16} little-endian, with
+     * {@code len} 1..{@link #READ_MAX_LEN} and {@code addr+len <= 0x10000}
+     * (contract 11 §2), else IllegalArgumentException.
+     */
     public static byte[] packReadReg(int addr, int len) {
+        Wire.checkUint("addr", addr, 16);
+        Wire.checkUint("length", len, 16);
+        if (len < 1 || len > READ_MAX_LEN || addr + len > 0x10000) {
+            throw new IllegalArgumentException(
+                "READ_REG length must be 1.." + READ_MAX_LEN + " and addr+length <= 0x10000");
+        }
         return new byte[] {
             (byte) addr, (byte) (addr >>> 8), (byte) len, (byte) (len >>> 8)
         };
     }
 
-    /** VL53_WRITE_REG payload: {@code addr u16, data[1..2048]}. */
+    /**
+     * VL53_WRITE_REG payload: {@code addr u16, data[1..2048]} with
+     * {@code addr+N <= 0x10000} (contract 11 §2), else IllegalArgumentException.
+     */
     public static byte[] packWriteReg(int addr, byte[] data) {
+        Wire.checkUint("addr", addr, 16);
+        if (data.length < 1 || data.length > WRITE_MAX_LEN || addr + data.length > 0x10000) {
+            throw new IllegalArgumentException(
+                "WRITE_REG data must be 1.." + WRITE_MAX_LEN + " bytes and addr+N <= 0x10000");
+        }
         byte[] out = new byte[2 + data.length];
         out[0] = (byte) addr;
         out[1] = (byte) (addr >>> 8);
@@ -94,12 +112,13 @@ public final class Vl53l7 {
 
     /** VL53_START_STREAM payload: {@code frame_size u16}. */
     public static byte[] packStartStream(int frameSize) {
+        Wire.checkUint("frameSize", frameSize, 16);
         return new byte[] {(byte) frameSize, (byte) (frameSize >>> 8)};
     }
 
     /** VL53_PIN_CTRL payload: {@code action u8} (see {@link PinAction}). */
     public static byte[] packPinCtrl(int action) {
-        return new byte[] {(byte) action};
+        return new byte[] {(byte) Wire.checkUintI("action", action, 8)};
     }
 
     /** VL53_PIN_CTRL payload for a {@link PinAction}. */
@@ -109,6 +128,7 @@ public final class Vl53l7 {
 
     /** VL53_SET_I2C_SPEED payload: {@code khz u16}. */
     public static byte[] packSetI2cSpeed(int khz) {
+        Wire.checkUint("khz", khz, 16);
         return new byte[] {(byte) khz, (byte) (khz >>> 8)};
     }
 

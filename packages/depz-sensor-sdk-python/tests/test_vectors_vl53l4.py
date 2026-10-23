@@ -13,7 +13,7 @@ from depz_sensor_sdk.protocol.vl53l4 import (
 from depz_sensor_sdk.vl53l4 import uld
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for case in vectors("vl53l4.json")["encode"]:
         kind = case["kind"]
         if kind == "read_reg":
@@ -29,9 +29,10 @@ def test_encode_vectors(vectors):
         else:
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == case["payload"], case["name"]
+        seen(case)
 
 
-def test_decode_vectors(vectors):
+def test_decode_vectors(vectors, seen):
     for case in vectors("vl53l4.json")["decode"]:
         payload = bytes.fromhex(case["payload"])
         expect = case["expect"]
@@ -52,16 +53,18 @@ def test_decode_vectors(vectors):
             assert sd.data.hex() == expect["data"], case["name"]
         else:
             raise AssertionError(f"unknown report {case['report']:#x}")
+        seen(case)
 
 
-def test_result_block_vectors(vectors):
+def test_result_block_vectors(vectors, seen):
     for case in vectors("vl53l4.json")["result_block"]:
         r = uld.parse_result_block(bytes.fromhex(case["raw"]))
         for field, value in case["expect"].items():
             assert getattr(r, field) == value, (case["name"], field)
+        seen(case)
 
 
-def test_timing_encode_vectors(vectors):
+def test_timing_vectors(vectors, seen):
     for case in vectors("vl53l4.json")["timing"]["encode"]:
         a, b, im = uld.range_timing_registers(
             case["timing_budget_ms"],
@@ -72,9 +75,6 @@ def test_timing_encode_vectors(vectors):
         assert a == case["range_config_a"], case["name"]
         assert b == case["range_config_b"], case["name"]
         assert im == case["intermeasurement_raw"], case["name"]
-
-
-def test_timing_decode_vectors(vectors):
     for case in vectors("vl53l4.json")["timing"]["decode"]:
         budget, inter = uld.decode_range_timing(
             case["intermeasurement_raw"],
@@ -84,9 +84,10 @@ def test_timing_decode_vectors(vectors):
         )
         assert budget == case["timing_budget_ms"], case["name"]
         assert inter == case["inter_measurement_ms"], case["name"]
+    seen("vl53l4/timing")
 
 
-def test_tuning_vectors(vectors):
+def test_tuning_vectors(vectors, seen):
     encoders = {
         "offset": uld.offset_raw,
         "xtalk": uld.xtalk_raw,
@@ -102,18 +103,21 @@ def test_tuning_vectors(vectors):
     for case in vectors("vl53l4.json")["tuning"]:
         assert encoders[case["kind"]](case["value"]) == case["raw"], case["name"]
         assert decoders[case["kind"]](case["raw"]) == case["value"], case["name"]
+        seen(case)
 
 
-def test_xtalk_decode_vectors(vectors):
+def test_xtalk_decode_vectors(vectors, seen):
     # C round(): an exact .5 goes away from zero (256 -> 1), as ST's GetXtalk
     for case in vectors("vl53l4.json")["xtalk_decode"]:
         assert uld.decode_xtalk(case["raw"]) == case["kcps"], case["raw"]
+        seen(case)
 
 
-def test_config_block_vector(vectors):
+def test_config_block_vector(vectors, seen):
     block = vectors("vl53l4.json")["config_block"]
     assert block["addr"] == uld.CONFIG_ADDR
     assert uld.config_block().hex() == block["data"]
     # byte 0 is the FM+ pad override; the tail matches ST's stock table
     assert uld.config_block()[0] == uld.CONFIG_FMP_BYTE
     assert uld.config_block()[1:] == uld.DEFAULT_CONFIGURATION[1:]
+    seen("vl53l4/config_block")

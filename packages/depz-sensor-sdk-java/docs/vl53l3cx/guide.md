@@ -1,18 +1,15 @@
 # VL53L3CX — user guide
 
-Hands-on guide to the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
+Hands-on guide to the live device (`ai.depz.sensor.devices.Vl53lxDevice`,
+which runs ST's drivers on the host) and the layers under it: the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
 table ([`Vl53lxProducts`](api.md#vl53lxproducts)) and block decode
 ([`Vl53lxDecode`](api.md#vl53lxdecode)) for the VL53L3CX. For what the sensor
 is and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
-This SDK does not drive the sensor: the ST driver (initialisation, modes,
-budgets, histogram target extraction) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
@@ -21,6 +18,50 @@ commands and decode what the board streams.
 - [Which statuses to plot](#which-statuses-to-plot)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxTarget;
+import java.time.Duration;
+
+try (Vl53lxDevice tof = DepzDevices.openVl53lx()) { // a Vl53l3cxDevice for this board
+    System.out.println(tof.driverKinds());          // ulp, histogram
+    tof.init("histogram");                        // or init() for the ULP
+    tof.configure(33, 0, "medium");               // short / medium / long, 2..550 ms
+
+    try (Subscription<Vl53lxMeasurement> frames = tof.measurements()) {
+        tof.startRanging();
+        Vl53lxMeasurement m = frames.take(Duration.ofSeconds(1));
+        for (Vl53lxTarget t : m.targets()) {
+            System.out.println(t.distanceMm() + " mm (" + t.minRangeMm() + ".." + t.maxRangeMm() + "), " + t.statusText());
+        }
+        tof.stopRanging();
+    }
+}
+```
+
+- `ulp` — ST's ULP (`Vl53l3UlpDriver`): one target, timing, detection
+  thresholds, signal and sigma thresholds, ROI; no modes, no calibrations.
+- `histogram` — ST's BareDriver (`Vl53lxHistogramDriver`), its post-processing
+  on the host: up to four targets per frame in `targets()` (strongest first,
+  the top level repeats the first, `minRangeMm()`..`maxRangeMm()` is the
+  pulse's extent) and the raw 24 bins in `bins()` (a `bare.HistogramBinData`). It has no
+  calibrations and no detection thresholds.
+- The first frame of a histogram stream reports status 6 (no wrap check: there
+  is no frame before it), a target with nothing in the frame before reports 12;
+  draw `m.plotDistances()` (statuses 0, 6, 11).
+- Every streamed frame is decoded once, in order, on the reader thread: the
+  histogram driver keeps the A/B frame pair and the previous frame's targets.
+- `configure` re-initialises the sensor and applies the mode and budget; it
+  and every setting throw `IllegalStateException` while ranging. Ask
+  `tof.supports("offset")` (…) before an optional group: a missing one throws
+  `UnsupportedOperationException`.
+- `tof.driver()` is the driver itself; `measureOnce()` is one polled range.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## Which board is it
 
@@ -160,8 +201,8 @@ if (s.addr() == Vl53lxDecode.HISTOGRAM_BLOCK_ADDR) {
 The histogram driver is what makes the L3CX a multi-target ranger: a glass
 pane and the object behind it, or two people at different distances. Turning
 bins into up to four targets (preset, VCSEL period, the A/B frame
-pairs, phase history) is the full driver's job and is not in this SDK. The
-driver keeps state from frame to frame, so a stream fed to it must be decoded
+pairs, phase history) is the histogram driver's job (`Vl53lxHistogramDriver`,
+see [Live device](#live-device)). The driver keeps state from frame to frame, so a stream fed to it must be decoded
 **exactly once, in order** — replaying or skipping frames changes its output.
 
 ## Which statuses to plot

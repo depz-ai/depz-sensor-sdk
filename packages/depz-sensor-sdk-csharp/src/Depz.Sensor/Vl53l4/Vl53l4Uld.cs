@@ -31,9 +31,8 @@ public sealed record Vl53l4Results(
 /// configuration block — ported byte-exact from the reference Python
 /// <c>vl53l4/uld.py</c> and pinned to the golden vectors.
 ///
-/// The live register-sequence driver (init/calibration over the CDC link) is
-/// hardware-dependent and out of scope for the decode SDK, mirroring
-/// <see cref="Vl53l8.Vl53l8Uld"/> (<see cref="LiveDriverStubbed"/>).
+/// The register sequences on top of it (init, ranging, calibration) are
+/// <see cref="Vl53l4cdDriver"/>; <see cref="Devices.Vl53l4cdDevice"/> runs them over the board.
 /// </summary>
 public static class Vl53l4Uld
 {
@@ -136,13 +135,24 @@ public static class Vl53l4Uld
         255, 255, 11, 12,
     };
 
-    /// <summary>
-    /// The live ULD register-sequence driver (sensor_init / calibration over
-    /// the CDC link) is deliberately stubbed: it only means anything against
-    /// real silicon and cannot be verified from golden vectors. The verifiable
-    /// codec/math layer below is what this SDK ships.
-    /// </summary>
-    public static bool LiveDriverStubbed => true;
+    /// <summary>Range status (after the ST mapping) → its meaning; 0 is a valid measurement.</summary>
+    public static readonly IReadOnlyDictionary<int, string> RangeStatusNames = new Dictionary<int, string>
+    {
+        [0] = "valid",
+        [1] = "sigma above threshold",
+        [2] = "signal below threshold",
+        [3] = "distance below detection threshold",
+        [4] = "phase out of valid limit",
+        [5] = "hardware fail",
+        [6] = "no wrap-around check done",
+        [7] = "wrapped target, phase mismatch",
+        [8] = "processing fail",
+        [9] = "crosstalk signal fail",
+        [10] = "interrupt error",
+        [11] = "merged target",
+        [12] = "signal too low",
+        [255] = "other error",
+    };
 
     /// <summary>
     /// The 91-byte block sensor_init() writes at <see cref="ConfigAddr"/>: the
@@ -197,14 +207,20 @@ public static class Vl53l4Uld
     /// ULD, 32-bit truncations and the 1.055 PLL factor included.
     /// </summary>
     /// <exception cref="Vl53l4Exception">osc reads 0, budget outside 10..200 ms,
-    /// or inter-measurement neither 0 nor &gt; budget.</exception>
+    /// inter-measurement neither 0 nor &gt; budget, or a register word out of
+    /// range — never wrapped: <paramref name="oscFrequency"/> 1..65535,
+    /// <paramref name="clockPll"/> 0..65535, <paramref name="interMeasurementMs"/>
+    /// a u32, and an INTERMEASUREMENT_MS dword that would overflow u32.</exception>
     public static (ushort RangeConfigA, ushort RangeConfigB, uint IntermeasurementRaw) RangeTimingRegisters(
-        int timingBudgetMs, int interMeasurementMs, int oscFrequency, int clockPll = 0)
+        int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll = 0)
     {
         if (oscFrequency == 0)
             throw new Vl53l4Exception("osc_frequency reads 0");
         if (timingBudgetMs < 10 || timingBudgetMs > 200)
             throw new Vl53l4Exception("timing_budget_ms must be 10..200");
+        InRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        InRange("clockPll", clockPll, 0, 0xFFFF);
+        InRange("interMeasurementMs", interMeasurementMs, 0, 0xFFFFFFFFL);
 
         ulong timingBudgetUs = (ulong)timingBudgetMs * 1000;
         ulong macroPeriodUs = ((2304ul * (0x40000000ul / (uint)oscFrequency)) & 0xFFFFFFFFul) >> 6;
@@ -219,8 +235,10 @@ public static class Vl53l4Uld
         else if (interMeasurementMs > timingBudgetMs)
         {
             // Autonomous low power: PLL factor in double, truncated toward zero.
-            double factor = 1.055 * interMeasurementMs * (clockPll & 0x3FF);
-            intermeasurementRaw = (uint)(long)factor;
+            double factor = Math.Floor(1.055 * interMeasurementMs * (clockPll & 0x3FF));
+            if (factor > 0xFFFFFFFFL)
+                throw new Vl53l4Exception($"interMeasurementMs {interMeasurementMs}: INTERMEASUREMENT_MS overflows u32");
+            intermeasurementRaw = (uint)factor;
             timingBudgetUs = (timingBudgetUs - 4300) / 2;
         }
         else
@@ -252,12 +270,16 @@ public static class Vl53l4Uld
     /// RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
     /// word. Bit-exact port (1.065 PLL factor, 32-bit wrap of the ms-byte).
     /// </summary>
-    /// <exception cref="Vl53l4Exception">when <paramref name="oscFrequency"/> reads 0.</exception>
+    /// <exception cref="Vl53l4Exception">when <paramref name="oscFrequency"/> reads 0, or a word
+    /// is wider than its u16 register.</exception>
     public static (int TimingBudgetMs, int InterMeasurementMs) DecodeRangeTiming(
         uint intermeasurementRaw, int clockPll, int oscFrequency, int rangeConfigA)
     {
         if (oscFrequency == 0)
             throw new Vl53l4Exception("osc_frequency reads 0");
+        InRange("clockPll", clockPll, 0, 0xFFFF);
+        InRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        InRange("rangeConfigA", rangeConfigA, 0, 0xFFFF);
 
         int pll = (int)((long)(1.065 * (clockPll & 0x3FF)) & 0xFFFF);
         int interMeasurementMs = pll == 0 ? 0 : (int)((intermeasurementRaw / (uint)pll) & 0xFFFF);
@@ -279,7 +301,9 @@ public static class Vl53l4Uld
     // ── Threshold / offset / xtalk raw codecs (register word ↔ user units) ──
 
     /// <summary>RANGE_OFFSET_MM word for SetOffset (INNER/OUTER are zeroed alongside).</summary>
-    public static ushort OffsetRaw(int offsetMm) => (ushort)((offsetMm * 4) & 0xFFFF);
+    /// <exception cref="Vl53l4Exception"><paramref name="offsetMm"/> outside the 11-bit −1024..1023.</exception>
+    public static ushort OffsetRaw(int offsetMm) =>
+        (ushort)((InRange("offsetMm", offsetMm, -1024, 1023) * 4) & 0xFFFF);
 
     /// <summary>GetOffset: RANGE_OFFSET_MM word → signed millimetres.</summary>
     public static int DecodeOffset(ushort raw)
@@ -289,17 +313,20 @@ public static class Vl53l4Uld
     }
 
     /// <summary>XTALK_PLANE_OFFSET_KCPS word for SetXtalk.</summary>
-    public static ushort XtalkRaw(int xtalkKcps) => (ushort)((xtalkKcps << 9) & 0xFFFF);
+    /// <exception cref="Vl53l4Exception"><paramref name="xtalkKcps"/> outside 0..127.</exception>
+    public static ushort XtalkRaw(int xtalkKcps) => (ushort)(InRange("xtalkKcps", xtalkKcps, 0, 0xFFFF >> 9) << 9);
 
     /// <summary>GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps.</summary>
     public static int DecodeXtalk(ushort raw) =>
         (int)Math.Round(raw / 512.0, MidpointRounding.AwayFromZero);
 
     /// <summary>MIN_COUNT_RATE_RTN_LIMIT_MCPS word for SetSignalThreshold.</summary>
-    public static int SignalThresholdRaw(int signalKcps) => signalKcps >> 3;
+    /// <exception cref="Vl53l4Exception"><paramref name="signalKcps"/> outside 0..65535.</exception>
+    public static int SignalThresholdRaw(int signalKcps) => InRange("signalKcps", signalKcps, 0, 0xFFFF) >> 3;
 
     /// <summary>GetSignalThreshold: MIN_COUNT_RATE_RTN_LIMIT_MCPS word → kcps.</summary>
-    public static int DecodeSignalThreshold(int raw) => (raw << 3) & 0xFFFF;
+    /// <exception cref="Vl53l4Exception"><paramref name="raw"/> outside 0..65535.</exception>
+    public static int DecodeSignalThreshold(int raw) => (InRange("rawWord", raw, 0, 0xFFFF) << 3) & 0xFFFF;
 
     /// <summary>RANGE_CONFIG__SIGMA_THRESH word for SetSigmaThreshold.</summary>
     /// <exception cref="Vl53l4Exception">when <paramref name="sigmaMm"/> &gt; 16383.</exception>
@@ -307,9 +334,14 @@ public static class Vl53l4Uld
     {
         if (sigmaMm > 0xFFFF >> 2)
             throw new Vl53l4Exception("sigma_mm must be <= 16383");
-        return sigmaMm << 2;
+        return InRange("sigmaMm", sigmaMm, 0, 0xFFFF >> 2) << 2;
     }
 
     /// <summary>GetSigmaThreshold: RANGE_CONFIG__SIGMA_THRESH word → mm.</summary>
-    public static int DecodeSigmaThreshold(int raw) => raw >> 2;
+    /// <exception cref="Vl53l4Exception"><paramref name="raw"/> outside 0..65535.</exception>
+    public static int DecodeSigmaThreshold(int raw) => InRange("rawWord", raw, 0, 0xFFFF) >> 2;
+
+    /// <summary>A register-derived argument outside <c>lo..hi</c> → <see cref="Vl53l4Exception"/> (never wrapped).</summary>
+    private static int InRange(string name, long v, long lo, long hi) =>
+        v < lo || v > hi ? throw new Vl53l4Exception($"{name} {v} out of range {lo}..{hi}") : (int)v;
 }

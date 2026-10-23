@@ -6,9 +6,8 @@ namespace Depz.Sensor.Vl53l8;
 /// VL53L8 advanced-feature DCI codecs — pure, verifiable ports of the ST ULD
 /// (BSD-3-Clause) plugin encoders: motion-indicator configuration,
 /// detection-threshold block, and xtalk-margin scaling. Shared across both ToF
-/// variants (VL53L8CX and VL53L8CH; see <see cref="Vl53l8Variant"/>). The live
-/// DCI read/write transport that carries these to the sensor is
-/// hardware-dependent and out of scope (see <see cref="Vl53l8Uld"/>).
+/// variants (VL53L8CX and VL53L8CH; see <see cref="Vl53l8Variant"/>). The DCI
+/// read/write that carries these to the sensor is <see cref="Vl53l8Driver"/>.
 /// </summary>
 public static class Vl53l8Advanced
 {
@@ -36,9 +35,17 @@ public static class Vl53l8Advanced
 
     public const int NbThresholds = 64;
 
-    /// <summary>Xtalk margin raw DCI value: round(kcps × 2048).</summary>
+    /// <summary>
+    /// Xtalk margin raw DCI value: round(kcps × 2048). The margin is 0..10000
+    /// kcps (set_xtalk_margin's own limit); anything else, NaN included, is
+    /// refused — never wrapped (contract 07 §3).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">margin outside 0..10000.</exception>
     public static uint XtalkMarginRaw(double marginKcps) =>
-        (uint)(long)Math.Round(marginKcps * 2048.0, MidpointRounding.AwayFromZero);
+        marginKcps >= 0 && marginKcps <= 10000
+            ? (uint)Math.Round(marginKcps * 2048.0, MidpointRounding.AwayFromZero)
+            : throw new ArgumentOutOfRangeException(nameof(marginKcps), marginKcps,
+                "VL53L8CX INVALID_PARAM set_xtalk_margin: margin must be 0..10000");
 
     /// <summary>One detection threshold (raw real-unit low/high, before scaling).</summary>
     public sealed record DetectionThreshold(
@@ -51,18 +58,30 @@ public static class Vl53l8Advanced
     /// Encode the 64×12-byte DCI_DET_THRESH_START block. Each entry is packed as
     /// (i32 low, i32 high, u8 measurement, u8 type, u8 zone, u8 op) with low/high
     /// multiplied by the measurement's scale factor; missing entries are zeros.
+    /// Anything out of its field's range (measurement/type/zone/operation u8,
+    /// scaled low/high i32) or more than 64 entries throws, never wrapped or
+    /// dropped (contract 07 §3).
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">a field out of range — nothing is returned.</exception>
     public static byte[] PackDetectionThresholds(IReadOnlyList<DetectionThreshold> thresholds)
     {
+        if (thresholds.Count > NbThresholds)
+            throw new ArgumentOutOfRangeException(nameof(thresholds), thresholds.Count,
+                $"thresholds: {thresholds.Count} entries, at most {NbThresholds}");
         var packed = new byte[NbThresholds * 12];
         for (int k = 0; k < NbThresholds; k++)
         {
             if (k >= thresholds.Count)
                 continue;
             DetectionThreshold t = thresholds[k];
-            int scale = ThreshScale.TryGetValue(t.Measurement, out int sc) ? sc : 1;
-            int lo = t.LowThresh * scale;
-            int hi = t.HighThresh * scale;
+            string at = $"thresholds[{k}].";
+            Protocol.Wire.CheckUint(at + "measurement", t.Measurement, 8);
+            long scale = ThreshScale.TryGetValue(t.Measurement, out int sc) ? sc : 1;
+            int lo = Protocol.Wire.CheckInt(at + "lowThresh", t.LowThresh * scale, 32);
+            int hi = Protocol.Wire.CheckInt(at + "highThresh", t.HighThresh * scale, 32);
+            Protocol.Wire.CheckUint(at + "type", t.Type, 8);
+            Protocol.Wire.CheckUint(at + "zoneNum", t.ZoneNum, 8);
+            Protocol.Wire.CheckUint(at + "operation", t.Operation, 8);
             int b = k * 12;
             BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(b), lo);
             BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(b + 4), hi);

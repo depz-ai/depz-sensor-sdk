@@ -52,10 +52,11 @@ histograms, the [VL53L7CH](../vl53l7ch/introduction.md).
   geometry (`Vl53l7Uld.parseFrame`) — footer id at `size-4`, every per-zone
   array trimmed to the frame's resolution.
 
-What it does **not** do: open a port, download the sensor firmware, or run
-the ULD configuration and ranging control. Initialising and streaming the
-board is done today with the Python or TypeScript SDK; this SDK decodes what
-the board sends and builds the command payloads.
+On top of them, the live device `ai.depz.sensor.devices.Vl53l7cxDevice`
+runs the L5/L7 ULD (2.0.1) on the host — the same `Vl53l8Driver` with the L5/L7
+firmware set, downloaded over I2C at `init()` — and streams the frames as
+`Vl53l8Frame`s. `Vl53l5cxDevice` and `Vl53l7chDevice` are its siblings for the
+other two boards.
 
 ## Key concepts
 

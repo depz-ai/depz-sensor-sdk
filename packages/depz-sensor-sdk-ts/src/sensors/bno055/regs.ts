@@ -7,6 +7,8 @@
  * values and back, so they are what `vectors/bno055.json` pins.
  */
 
+import { checkUint } from "../../protocol/wire.js";
+
 // ── page 0 ────────────────────────────────────────────────────────────────────
 export const BNO055_REG_CHIP_ID = 0x00;
 export const BNO055_REG_PAGE_ID = 0x07;
@@ -205,6 +207,7 @@ export function packBno055Units(u: Bno055Units): number {
 }
 
 export function unpackBno055Units(value: number): Bno055Units {
+  checkUint("UNIT_SEL", value, 8);
   return {
     accelMg: (value & UNIT_ACC_MG) !== 0,
     gyroRps: (value & UNIT_GYR_RPS) !== 0,
@@ -240,6 +243,7 @@ export interface Bno055CalibStatus {
 }
 
 export function unpackBno055CalibStatus(v: number): Bno055CalibStatus {
+  checkUint("CALIB_STAT", v, 8);
   return { system: (v >> 6) & 3, gyro: (v >> 4) & 3, accel: (v >> 2) & 3, mag: v & 3 };
 }
 
@@ -350,6 +354,8 @@ export function packBno055AxisRemap(a: Bno055AxisRemap): [number, number] {
 }
 
 export function unpackBno055AxisRemap(config: number, sign: number): Bno055AxisRemap {
+  checkUint("AXIS_MAP_CONFIG", config, 8);
+  checkUint("AXIS_MAP_SIGN", sign, 8);
   return {
     x: config & 3,
     y: (config >> 2) & 3,
@@ -398,6 +404,7 @@ export function packBno055AccelConfig(c: Bno055AccelConfig): number {
 }
 
 export function unpackBno055AccelConfig(v: number): Bno055AccelConfig {
+  checkUint("ACC_CONFIG", v, 8);
   return { range: v & 3, bandwidth: (v >> 2) & 7, power: (v >> 5) & 7 };
 }
 
@@ -412,6 +419,7 @@ export function packBno055GyroConfig(c: Bno055GyroConfig): Uint8Array {
 }
 
 export function unpackBno055GyroConfig(b: Uint8Array): Bno055GyroConfig {
+  if (b.length < 2) throw new RangeError(`GYR_CONFIG is 2 bytes, got ${b.length}`);
   return { range: b[0]! & 7, bandwidth: (b[0]! >> 3) & 7, power: b[1]! & 7 };
 }
 
@@ -426,6 +434,7 @@ export function packBno055MagConfig(c: Bno055MagConfig): number {
 }
 
 export function unpackBno055MagConfig(v: number): Bno055MagConfig {
+  checkUint("MAG_CONFIG", v, 8);
   return { rate: v & 7, mode: (v >> 3) & 3, power: (v >> 5) & 3 };
 }
 
@@ -491,6 +500,7 @@ const CHANNELS: ReadonlyArray<[keyof Bno055RawBlock, number, number]> = [
 
 /** Unpack whatever channels the register window starting at `addr` holds. */
 export function decodeBno055Block(addr: number, data: Uint8Array): Bno055RawBlock {
+  checkUint("addr", addr, 8);
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const end = addr + data.length;
   const out: Bno055RawBlock = {

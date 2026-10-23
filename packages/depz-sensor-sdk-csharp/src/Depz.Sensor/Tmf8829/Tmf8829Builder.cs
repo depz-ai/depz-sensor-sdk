@@ -102,8 +102,12 @@ public sealed class Tmf8829MeasurementBuilder
     /// One frame with the MCU time of its header read and its INT edge
     /// (0 = none) → the measurement it completes, or null.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">a negative µs time (a u64, contract 07 §3),
+    /// checked before the frame is parsed.</exception>
     public Tmf8829Measurement? Add(byte[] raw, long timestampUs, long edgeUs = 0)
     {
+        Protocol.Wire.CheckUint("timestampUs", timestampUs, 63);
+        Protocol.Wire.CheckUint("edgeUs", edgeUs, 63);
         Tmf8829FrameInfo f;
         try
         {

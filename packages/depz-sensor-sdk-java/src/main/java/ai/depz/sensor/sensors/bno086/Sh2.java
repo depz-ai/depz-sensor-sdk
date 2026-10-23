@@ -1,9 +1,11 @@
 package ai.depz.sensor.sensors.bno086;
 
+import ai.depz.sensor.protocol.Wire;
+
 /**
  * SH-2 control-channel encoders (contracts/05_SENSOR_BNO086.md §6). Pure
- * codecs; mirror of the TS/Python {@code sh2} references. Report/response
- * decoders that require a live hub are out of the verifiable-vector scope.
+ * codecs; mirror of the TS/Python {@code sh2} references. The response
+ * decoders and the hub session helpers are {@link Sh2Hub}.
  */
 public final class Sh2 {
     private Sh2() {}
@@ -39,6 +41,12 @@ public final class Sh2 {
     /** Set Feature Command (0xFD), 17 bytes. intervalUs = 0 disables. */
     public static byte[] buildSetFeature(
             int sensorId, long intervalUs, long batchUs, int sensitivity, int flags, long cfgWord) {
+        Wire.checkUint("sensorId", sensorId, 8);
+        Wire.checkUint("flags", flags, 8);
+        Wire.checkUint("sensitivity", sensitivity, 16);
+        Wire.checkUint("intervalUs", intervalUs, 32);
+        Wire.checkUint("batchUs", batchUs, 32);
+        Wire.checkUint("cfgWord", cfgWord, 32);
         byte[] out = new byte[17];
         out[0] = (byte) SET_FEATURE_COMMAND;
         out[1] = (byte) sensorId;
@@ -52,7 +60,7 @@ public final class Sh2 {
 
     /** Get Feature Request (0xFE), 2 bytes. */
     public static byte[] buildGetFeatureRequest(int sensorId) {
-        return new byte[] {(byte) GET_FEATURE_REQUEST, (byte) sensorId};
+        return new byte[] {(byte) GET_FEATURE_REQUEST, (byte) Wire.checkUintI("sensorId", sensorId, 8)};
     }
 
     /** Product ID Request (0xF9), 2 bytes. */
@@ -92,6 +100,8 @@ public final class Sh2 {
         if (params.length > 9) {
             throw new IllegalArgumentException("command request carries at most 9 parameter bytes");
         }
+        Wire.checkUint("seq", seq, 8);
+        Wire.checkUint("command", command, 8);
         byte[] out = new byte[12];
         out[0] = (byte) COMMAND_REQUEST;
         out[1] = (byte) seq;
@@ -102,6 +112,9 @@ public final class Sh2 {
 
     /** FRS Read Request (0xF4), 8 bytes. blockWords = 0 reads the record. */
     public static byte[] buildFrsReadRequest(int frsType, int offsetWords, int blockWords) {
+        Wire.checkUint("offsetWords", offsetWords, 16);
+        Wire.checkUint("frsType", frsType, 16);
+        Wire.checkUint("blockWords", blockWords, 16);
         byte[] out = new byte[8];
         out[0] = (byte) FRS_READ_REQUEST;
         out[1] = 0;
@@ -113,6 +126,8 @@ public final class Sh2 {
 
     /** FRS Write Request (0xF7), 6 bytes. lengthWords = 0 erases the record. */
     public static byte[] buildFrsWriteRequest(int frsType, int lengthWords) {
+        Wire.checkUint("lengthWords", lengthWords, 16);
+        Wire.checkUint("frsType", frsType, 16);
         byte[] out = new byte[6];
         out[0] = (byte) FRS_WRITE_REQUEST;
         out[1] = 0;
@@ -125,6 +140,10 @@ public final class Sh2 {
     public static byte[] buildFrsWriteData(int offsetWords, long[] words) {
         if (words.length < 1 || words.length > 2) {
             throw new IllegalArgumentException("FRS write data carries 1 or 2 words");
+        }
+        Wire.checkUint("offsetWords", offsetWords, 16);
+        for (int i = 0; i < words.length; i++) {
+            Wire.checkUint("words[" + i + "]", words[i], 32);
         }
         byte[] out = new byte[12];
         out[0] = (byte) FRS_WRITE_DATA;

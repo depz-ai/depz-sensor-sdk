@@ -84,7 +84,7 @@ def test_open_device_resolves_the_product(tof):
     assert type(tof) is CLASS_BY_PRODUCT[tof.product]
     assert tof.detected == tof.product
     assert tof.get_software_name().startswith("APP_VL53L0_4_")
-    idf = tof.identify()
+    idf = tof.identify_product()
     assert idf["model_id_ok"], hex(idf["model_id"])
     assert idf["kinds"] == registry.driver_kinds(tof.product)
 

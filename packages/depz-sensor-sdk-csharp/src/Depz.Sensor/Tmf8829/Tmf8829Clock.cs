@@ -87,8 +87,11 @@ public sealed class Tmf8829SensorClock
     /// Add a pair → <see cref="Tmf8829TimeFlags.ClockReset"/> if it does not
     /// fit the model (which then restarts from it), else 0.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="us"/> negative (an MCU µs
+    /// time is a u64, contract 07 §3).</exception>
     public int Add(long us, uint tick)
     {
+        Protocol.Wire.CheckUint("us", us, 63);
         int flags = 0;
         if (_valid && !StepOk(us - _last.Us, unchecked(tick - _last.Tick)))
         {
@@ -185,6 +188,10 @@ public sealed class Tmf8829CaptureTimer
     public Tmf8829FrameTime Results(
         int fpMode, uint systick, uint t0Tick, uint t1Tick, long pairUs, long edgeUs, int flags)
     {
+        // contract 07 §3: fpMode a u8, the µs times u64 (non-negative longs)
+        Protocol.Wire.CheckUint("fpMode", fpMode, 8);
+        Protocol.Wire.CheckUint("pairUs", pairUs, 63);
+        Protocol.Wire.CheckUint("edgeUs", edgeUs, 63);
         var c = Clock;
         if (c.Nominal)
             flags |= Tmf8829TimeFlags.Nominal;

@@ -20,7 +20,7 @@ in the header, not this file.
 
 ## Contents
 
-- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`depz_vl53l7_model`](#depz_vl53l7_model), [`DEPZ_VL53L7_CMD_PIN_CTRL`](#depz_vl53l7_cmd_pin_ctrl), [`DEPZ_VL53L7_CMD_GET_INFO`](#depz_vl53l7_cmd_get_info), [`DEPZ_VL53L7_CMD_SET_I2C_SPEED`](#depz_vl53l7_cmd_set_i2c_speed), [`DEPZ_VL53L7_RPT_INFO`](#depz_vl53l7_rpt_info), [`DEPZ_VL53L7_PIN_LPN_OFF`](#depz_vl53l7_pin_lpn_off), [`DEPZ_VL53L7_PIN_LPN_ON`](#depz_vl53l7_pin_lpn_on), [`DEPZ_VL53L7_PIN_I2C_RST`](#depz_vl53l7_pin_i2c_rst), [`DEPZ_VL53L7_PIN_SOFT_CYCLE`](#depz_vl53l7_pin_soft_cycle), [`DEPZ_VL53L7_I2C_OK`](#depz_vl53l7_i2c_ok), [`DEPZ_VL53L7_I2C_NACK`](#depz_vl53l7_i2c_nack), [`DEPZ_VL53L7_I2C_TIMEOUT`](#depz_vl53l7_i2c_timeout), [`DEPZ_VL53L7_I2C_BUS_ERROR`](#depz_vl53l7_i2c_bus_error), [`DEPZ_VL53L7_READ_MAX_LEN`](#depz_vl53l7_read_max_len), [`DEPZ_VL53L7_WRITE_MAX_LEN`](#depz_vl53l7_write_max_len), [`DEPZ_VL53L7_STREAM_CHUNK_MAX`](#depz_vl53l7_stream_chunk_max), [`DEPZ_VL53L7_INFO_SIZE`](#depz_vl53l7_info_size), [`DEPZ_VL53L7_FOOTER_ID_OFFSET`](#depz_vl53l7_footer_id_offset), [`depz_vl53l7_pack_read_reg`](#depz_vl53l7_pack_read_reg), [`depz_vl53l7_pack_write_reg`](#depz_vl53l7_pack_write_reg), [`depz_vl53l7_pack_pin_ctrl`](#depz_vl53l7_pack_pin_ctrl), [`depz_vl53l7_pack_set_i2c_speed`](#depz_vl53l7_pack_set_i2c_speed), [`depz_vl53l7_info`](#depz_vl53l7_info), [`depz_vl53l7_unpack_info`](#depz_vl53l7_unpack_info), [`depz_vl53l7_resolve_model`](#depz_vl53l7_resolve_model), [`depz_vl53l7_model_str`](#depz_vl53l7_model_str), [`depz_vl53l7_decode_frame`](#depz_vl53l7_decode_frame)
+- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`depz_vl53l7_model`](#depz_vl53l7_model), [`DEPZ_VL53L7_CMD_PIN_CTRL`](#depz_vl53l7_cmd_pin_ctrl), [`DEPZ_VL53L7_CMD_GET_INFO`](#depz_vl53l7_cmd_get_info), [`DEPZ_VL53L7_CMD_SET_I2C_SPEED`](#depz_vl53l7_cmd_set_i2c_speed), [`DEPZ_VL53L7_RPT_INFO`](#depz_vl53l7_rpt_info), [`DEPZ_VL53L7_PIN_LPN_OFF`](#depz_vl53l7_pin_lpn_off), [`DEPZ_VL53L7_PIN_LPN_ON`](#depz_vl53l7_pin_lpn_on), [`DEPZ_VL53L7_PIN_I2C_RST`](#depz_vl53l7_pin_i2c_rst), [`DEPZ_VL53L7_PIN_SOFT_CYCLE`](#depz_vl53l7_pin_soft_cycle), [`DEPZ_VL53L7_I2C_OK`](#depz_vl53l7_i2c_ok), [`DEPZ_VL53L7_I2C_NACK`](#depz_vl53l7_i2c_nack), [`DEPZ_VL53L7_I2C_TIMEOUT`](#depz_vl53l7_i2c_timeout), [`DEPZ_VL53L7_I2C_BUS_ERROR`](#depz_vl53l7_i2c_bus_error), [`DEPZ_VL53L7_READ_MAX_LEN`](#depz_vl53l7_read_max_len), [`DEPZ_VL53L7_WRITE_MAX_LEN`](#depz_vl53l7_write_max_len), [`DEPZ_VL53L7_STREAM_CHUNK_MAX`](#depz_vl53l7_stream_chunk_max), [`DEPZ_VL53L7_INFO_SIZE`](#depz_vl53l7_info_size), [`DEPZ_VL53L7_FOOTER_ID_OFFSET`](#depz_vl53l7_footer_id_offset), [`depz_vl53l7_pack_read_reg`](#depz_vl53l7_pack_read_reg), [`depz_vl53l7_pack_write_reg`](#depz_vl53l7_pack_write_reg), [`depz_vl53l7_pack_pin_ctrl`](#depz_vl53l7_pack_pin_ctrl), [`depz_vl53l7_pack_set_i2c_speed`](#depz_vl53l7_pack_set_i2c_speed), [`depz_vl53l7_info`](#depz_vl53l7_info), [`depz_vl53l7_unpack_info`](#depz_vl53l7_unpack_info), [`depz_vl53l7_resolve_model`](#depz_vl53l7_resolve_model), [`depz_vl53l7_resolve_model_n`](#depz_vl53l7_resolve_model_n), [`depz_vl53l7_model_str`](#depz_vl53l7_model_str), [`depz_vl53l7_decode_frame`](#depz_vl53l7_decode_frame)
 - **CNH decode (shared with VL53L8CH)**: [`DEPZ_VL53L8_CNH_MAX_AGGREGATES`](#depz_vl53l8_cnh_max_aggregates), [`DEPZ_VL53L8_CNH_MAX_FEATURE`](#depz_vl53l8_cnh_max_feature), [`depz_vl53l8ch_cnh_config`](#depz_vl53l8ch_cnh_config), [`depz_vl53l8ch_cnh_frame`](#depz_vl53l8ch_cnh_frame), [`depz_vl53l8ch_decode_cnh`](#depz_vl53l8ch_decode_cnh)
 - **L5/L7 board commands (live layer)**: [`depz_vl53l8_module_type`](#depz_vl53l8_module_type), [`depz_vl53l7_bridge_info`](#depz_vl53l7_bridge_info), [`depz_vl53l7_set_i2c_speed_khz`](#depz_vl53l7_set_i2c_speed_khz), [`depz_vl53l7_pin_ctrl`](#depz_vl53l7_pin_ctrl)
 
@@ -237,6 +237,14 @@ model (`usb_model` as returned by depz_usb_model_hint(): "vl53l5cx" |
 match of `VL53L([57])(CX|CH)` in GET_DEVICE_NAME (`device_name`, may be
 NULL), else DEPZ_VL53L7_MODEL_L7CX.
 
+### depz_vl53l7_resolve_model_n
+
+```c
+depz_vl53l7_model depz_vl53l7_resolve_model_n(const char *usb_model, size_t usb_model_len, const char *device_name, size_t device_name_len);
+```
+
+The same with explicit lengths (strings may hold embedded NULs; NULL = none).
+
 ### depz_vl53l7_model_str
 
 ```c
@@ -288,7 +296,7 @@ CNH feature_length is packed as a uint8 on the device (num_bins & 0xFF).
 ```c
 typedef struct {
     int nb_of_aggregates; /* 1..DEPZ_VL53L8_CNH_MAX_AGGREGATES */
-    int feature_length;   /* 1..DEPZ_VL53L8_CNH_MAX_FEATURE    */
+    int feature_length;   /* 0..DEPZ_VL53L8_CNH_MAX_FEATURE (0: empty histograms) */
 } depz_vl53l8ch_cnh_config;
 ```
 

@@ -7,22 +7,29 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  DEPZ_SENSOR_PID_MAX,
+  DEPZ_SENSOR_PID_MIN,
+  DEPZ_VID,
+  DEV_PID,
+  DEV_VID,
   isKnownDepzUsb,
   orderPortsBySerial,
   usbModelHint,
   type DepzPortInfo,
 } from "../../src/index.js";
-import { loadVectors } from "./vectors.js";
+import { loadVectors, seen } from "./vectors.js";
 
 const VECTOR_FILE = "usb_ids.json";
 
 interface IdentityCase {
+  id: string;
   vid: number;
   pid: number;
   known: boolean;
   model: string | null;
 }
 interface OrderingCase {
+  id: string;
   name: string;
   ports: { port: string; serial: string | null }[];
   order: string[];
@@ -43,6 +50,7 @@ describe("usb_ids identity table", () => {
     it(`0x${c.vid.toString(16)}:0x${c.pid.toString(16)} known=${c.known} model=${c.model}`, () => {
       expect(isKnownDepzUsb(c.vid, c.pid)).toBe(c.known);
       expect(usbModelHint(c.vid, c.pid)).toBe(c.model);
+      seen(c);
     });
   }
 });
@@ -55,6 +63,20 @@ describe("usb_ids serial-ordering cases", () => {
         serialNumber: p.serial ?? undefined,
       }));
       expect(orderPortsBySerial(ports).map((p) => p.path)).toEqual(oc.order);
+      seen(oc);
     });
   }
+});
+
+describe("usb_ids constants", () => {
+  it("production VID, dev VID:PID and the sensor PID block", () => {
+    expect(DEPZ_VID).toBe(data.vid);
+    seen("usb_ids/vid");
+    expect(DEV_VID).toBe(data.dev_vid);
+    seen("usb_ids/dev_vid");
+    expect(DEV_PID).toBe(data.dev_pid);
+    seen("usb_ids/dev_pid");
+    expect([DEPZ_SENSOR_PID_MIN, DEPZ_SENSOR_PID_MAX]).toEqual(data.pid_range);
+    seen("usb_ids/pid_range");
+  });
 });

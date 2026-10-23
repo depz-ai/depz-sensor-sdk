@@ -1237,7 +1237,7 @@ export class BareDriver {
    * VL53LX_clear_interrupt_and_enable_next_range(): in histogram mode the
    * interrupt is cleared by rewriting general_config onwards.
    */
-  clearInterruptAndStartNextRange(): Promise<void> {
+  async clearInterruptAndStartNextRange(): Promise<void> {
     return this.initAndStartRange([
       "general_config", "timing_config", "dynamic_config", "system_control",
     ]);

@@ -4,7 +4,7 @@
 //! the product table, class/product resolution, and the three stateless block
 //! decoders (die block l4/l1, VL53L0X raw, histogram raw).
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::protocol::identity::{self, SensorType};
 use depz_sensor_sdk::usb_ids::DEPZ_USB_VID;
@@ -17,33 +17,7 @@ use depz_sensor_sdk::vl53lx::{
 };
 use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR = packages/depz-sensor-sdk-rust
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn load(name: &str) -> Value {
-    let p = vectors_dir().join(name);
-    let txt =
-        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {}", p.display(), e));
-    serde_json::from_str(&txt).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len().is_multiple_of(2), "odd hex length: {:?}", s);
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{:02x}", x)).collect()
-}
+use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, seen};
 
 fn u(v: &Value) -> u64 {
     v.as_u64().unwrap_or_else(|| panic!("not an unsigned int: {}", v))
@@ -88,6 +62,7 @@ fn vl53lx_encode_vectors() {
             k => panic!("{}: unknown encode kind {:?}", name, k),
         };
         assert_eq!(hex_encode(&got), c["payload"].as_str().unwrap(), "{}", name);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 11);
@@ -128,6 +103,7 @@ fn vl53lx_decode_vectors() {
         for (k, v) in got {
             assert_eq!(v, u(&e[k]), "{}.{}", name, k);
         }
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 3);
@@ -165,6 +141,7 @@ fn vl53lx_product_table() {
             "{} pid",
             name
         );
+        seen(r);
     }
     // A missing pair is a refusal, never a fallback.
     assert!(product("VL53L4CX").unwrap().bus_params(DriverKind::Uld).is_none());
@@ -198,6 +175,7 @@ fn vl53lx_model_vectors() {
             "{} product",
             name
         );
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 7);
@@ -229,6 +207,7 @@ fn vl53lx_die_block_vectors() {
         for (k, v) in got {
             assert_eq!(v, u(&e[k]), "{}.{}", name, k);
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -259,6 +238,7 @@ fn vl53lx_l0x_raw_vectors() {
         for (k, v) in got {
             assert_eq!(v, u(&e[k]), "{}.{}", name, k);
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -289,6 +269,7 @@ fn vl53lx_histogram_raw_vectors() {
         let bins: Vec<u64> = e["bins"].as_array().unwrap().iter().map(u).collect();
         let ours: Vec<u64> = r.bins.iter().map(|&b| b as u64).collect();
         assert_eq!(ours, bins, "{}.bins", name);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -309,4 +290,64 @@ fn vl53lx_identity() {
         identity::parse_software_name("APP_VL53L4_v1.00").sensor_type,
         Some(SensorType::Vl53l4)
     );
+}
+
+// ---- recordings: die-block captures ----------------------------------------
+
+/// Captures whose driver streams the 17-byte 0x0089 die block (ULD on
+/// L1CX/L1CB = `l1`, ULD/ULP on an L4-type die = `l4`): every streamed block
+/// decodes to the sidecar's distance and status (no device layer: rx decode
+/// only). Histogram and L0X captures need driver state this crate lacks.
+fn vl53lx_die_recording(stem: &str, variant: &str) {
+    use depz_sensor_sdk::protocol::common::Cmd;
+    use depz_sensor_sdk::vl53lx::{StreamData, DIE_BLOCK_ADDR};
+
+    let exp = load(&format!("recordings/{}.expected.json", stem));
+    let pkts = recording_packets(&format!("{}.depzrec", stem));
+    let sw = recorded_text(&pkts, Cmd::GetNameActiveSoftware).expect("software name");
+    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(SensorType::Vl53lx), "{}", stem);
+    assert_eq!(sw, exp["software_name"].as_str().unwrap(), "{}", stem);
+    let dev = recorded_text(&pkts, Cmd::GetDeviceName).expect("device name");
+    assert_eq!(resolve_class(None, &dev).as_str(), exp["class"].as_str().unwrap(), "{}", stem);
+
+    let variant = DieVariant::from_name(variant).unwrap();
+    let blocks: Vec<StreamData> = pkts
+        .iter()
+        .filter(|p| p.rx && p.cmd == 0x93)
+        .map(|p| StreamData::unpack(&p.payload).unwrap())
+        .collect();
+    let want = exp["frames"].as_array().unwrap();
+    // The stream may run past the sidecar before the stop lands; match the first N.
+    assert!(blocks.len() >= want.len(), "{}: {} < {} blocks", stem, blocks.len(), want.len());
+    for (idx, (s, w)) in blocks.iter().zip(want).enumerate() {
+        let ctx = format!("{} frame {}", stem, idx);
+        assert_eq!((s.addr, s.len as usize), (DIE_BLOCK_ADDR, DIE_BLOCK_LEN), "{}", ctx);
+        assert_eq!(s.timestamp_us, u(&w["timestamp_us"]), "{}", ctx);
+        assert_eq!(hex_encode(&s.data), w["raw"].as_str().unwrap(), "{}", ctx);
+        let r = decode_die_block(&s.data, variant).unwrap();
+        assert_eq!(r.distance_mm as u64, u(&w["distance_mm"]), "{}", ctx);
+        assert_eq!(r.range_status as u64, u(&w["status"]), "{}", ctx);
+        assert!(w["targets"].as_array().unwrap().is_empty() && w.get("bins").is_none(), "{}", ctx);
+    }
+    seen(&format!("recordings/{}.depzrec", stem));
+}
+
+#[test]
+fn vl53l1cb_uld_recording() {
+    vl53lx_die_recording("vl53l1cb_uld_short_50ms", "l1");
+}
+
+#[test]
+fn vl53l1cx_uld_recording() {
+    vl53lx_die_recording("vl53l1cx_uld_long_33ms", "l1");
+}
+
+#[test]
+fn vl53l3cx_ulp_recording() {
+    vl53lx_die_recording("vl53l3cx_ulp_33ms", "l4");
+}
+
+#[test]
+fn vl53l4cx_uld_as_l4cd_recording() {
+    vl53lx_die_recording("vl53l4cx_uld_as_l4cd_50ms", "l4");
 }

@@ -28,7 +28,13 @@ struct json_value {
     bool     b;
     int64_t  i;
     double   d;
+    /* JSON_INT range: 0 = fits int64 (in `i`); 1 = above INT64_MAX but fits
+     * uint64 (exact value in `u`, `i` saturated); 2 = outside both (`i`
+     * saturated). Lets a caller read u64 inputs exactly (difftest adapter). */
+    int      range;
+    uint64_t u;
     char    *s;      /* NUL-terminated (JSON_STRING) */
+    size_t   slen;   /* its length: < strlen(s) never, > when it holds a \u0000 */
     /* array / object */
     json_value **items;   /* array elements or object values */
     char       **keys;    /* object keys (JSON_OBJECT only) */

@@ -13,10 +13,11 @@ ALGOS = {
 }
 
 
-def test_crc_vectors(vectors):
+def test_crc_vectors(vectors, seen):
     data = vectors("crc.json")
     assert data["schema"].startswith("depz.vectors.crc/")
     for case in data["cases"]:
         raw = bytes.fromhex(case["input"])
         for name, fn in ALGOS.items():
             assert fn(raw) == case[name], f"{case['name']}: {name}"
+        seen(case)

@@ -6,7 +6,7 @@ import {
   unpackSamplePeriod,
   unpackSr04Data,
 } from "../../src/index.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const data = loadVectors("sr04.json");
 
@@ -20,6 +20,7 @@ describe("sr04 encode vectors", () => {
       } else {
         throw new Error(c.kind);
       }
+      seen(c);
     });
   }
 });
@@ -40,6 +41,7 @@ describe("sr04 decode vectors", () => {
       } else {
         throw new Error(String(c.report));
       }
+      seen(c);
     });
   }
 });

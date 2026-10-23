@@ -1,13 +1,14 @@
 # BNO086 — user guide
 
-Hands-on guide to the BNO086 codecs (`Shtp`, `Sh2`, `Reports`). For what the
-sensor is and its concepts, read the [introduction](introduction.md); for exact
-signatures see the [API reference](api.md). This is a decode layer — the
-snippets build SH-2 cargos, frame them for SHTP, and decode the input reports the
-hub streams back; you supply the transport.
+Hands-on guide to the BNO086: the live device
+(`ai.depz.sensor.devices.Bno086Device`, which runs the SH-2 host stack) and the
+codecs under it (`Shtp`, `Sh2`, `Sh2Hub`, `Reports`). For what the sensor is and
+its concepts, read the [introduction](introduction.md); for exact signatures see
+the [API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [SHTP reassembly](#shtp-reassembly)
 - [Enabling a report](#enabling-a-report)
 - [Sleep and power on](#sleep-and-power-on)
@@ -15,6 +16,49 @@ hub streams back; you supply the transport.
 - [Report catalog](#report-catalog)
 - [Gyro-integrated RV](#gyro-integrated-rv)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.bno086.Reports;
+import ai.depz.sensor.sensors.bno086.Sh2Hub;
+import java.time.Duration;
+import java.util.List;
+
+try (Bno086Device imu = DepzDevices.openBno086()) {
+    imu.hardwareReset();
+    System.out.println(imu.productId().swPartNumber());  // 10004563 = BNO086, 10004148 = BNO085
+
+    try (Subscription<Reports.Report> reports = imu.reports(List.of(Reports.ROTATION_VECTOR), 256)) {
+        Sh2Hub.FeatureResponse granted = imu.enable(Reports.ROTATION_VECTOR, 100); // the rate the hub granted
+        Reports.Report rv = reports.take(Duration.ofSeconds(1));
+        System.out.println(rv.fields());                  // i_raw, j_raw, k_raw, real_raw, accuracy_raw, …
+        imu.disable(Reports.ROTATION_VECTOR);
+    }
+}
+```
+
+- `enable(sensor, hz)` (or `enableInterval(sensor, intervalUs, batchUs,
+  sensitivity, flags, …)`) sends Set Feature and reads the rate back; a rate the
+  hub granted outside 0.9–2.1 × the request is logged as a warning.
+  `getFeature`, `disable`.
+- Reports stream to `onReport(callback, sensors)` and `reports(sensors,
+  capacity)` (filter by sensor id, or `null` for all). Batched sensors:
+  `flush(sensor)` returns once the hub's Flush Completed arrives.
+- Calibration: `setCalibration` / `getCalibration`, `saveDcd`,
+  `configurePeriodicDcd`, `clearDcdAndReset`; tare: `tareNow`, `persistTare`,
+  `setReorientation`; `setMotionIntent` and `enableMotionRequest` (interactive
+  calibration, BNO086 only).
+- FRS records: `frsRead` / `frsWrite` (`Sh2Hub.FRS_*` record ids),
+  `getMetadata(sensor)`.
+- Hub state: `sleep` / `powerOn` (SH-2), `wake` (the WAKE pin),
+  `getOscillatorType`, `getErrors`, `getCounts` / `clearCounts`.
+- Every request goes as one SHTP frame through the bridge; when both of its
+  transmit slots are full the bridge answers ERR_BUSY and the device backs off
+  200 ms and resends (`setBusyRetries`, `setBusyBackoff`).
+
+The sections below are the layers under the device.
 
 ## SHTP reassembly
 
@@ -153,8 +197,9 @@ if (rv != null) {
   `ShtpLayer.feed`; the `Sh2`/`Reports` decoders expect whole cargo payloads.
 - **TX frames must fit one MCU slot** — `nextFrame` throws if the cargo exceeds
   `Shtp.MAX_TX_FRAME` (64 bytes); this is ERRATA E2.
-- **Raw integers are authoritative** — apply Q-point scaling downstream
-  (`value = raw / 2^Q`); the decoders never scale for you.
+- **Raw integers are authoritative** — the decoders never scale;
+  `Reports.scaled(report)` gives the physical values (`value = raw / 2^Q`, Q
+  from `Reports.Q_POINTS`).
 - **Game / AR-VR-game rotation vectors have no accuracy** — `accuracy_raw` is
   `null` for those two report ids.
 - **Unknown / truncated reports don't throw** — they come back as

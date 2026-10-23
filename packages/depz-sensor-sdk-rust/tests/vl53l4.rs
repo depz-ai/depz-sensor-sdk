@@ -3,49 +3,19 @@
 //! SetRangeTiming/GetRangeTiming register math, tuning codecs (both
 //! directions) and the 91-byte init config block.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::protocol::identity::{self, SensorType};
 use depz_sensor_sdk::vl53l4::{
     config_block, decode_offset, decode_range_timing, decode_sigma_threshold,
-    decode_signal_threshold, decode_xtalk, offset_raw, pack_read_reg, pack_set_i2c_speed,
+    decode_signal_threshold, decode_xtalk, try_offset_raw, pack_read_reg, pack_set_i2c_speed,
     pack_start_stream, pack_write_reg, pack_xshut, parse_result_block, range_timing_registers,
-    sigma_threshold_raw, signal_threshold_raw, xtalk_raw, RegData, StreamData, Vl53l4Info,
+    sigma_threshold_raw, signal_threshold_raw, try_xtalk_raw, RegData, StreamData, Vl53l4Info,
     CONFIG_ADDR, DEFAULT_CONFIGURATION,
 };
 use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR = packages/depz-sensor-sdk-rust
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn load(name: &str) -> Value {
-    let p = vectors_dir().join(name);
-    let txt =
-        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {}", p.display(), e));
-    serde_json::from_str(&txt).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len().is_multiple_of(2), "odd hex length: {:?}", s);
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{:02x}", x));
-    }
-    s
-}
+use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, reg_reads, seen};
 
 // ---- vl53l4.json: "encode" -------------------------------------------------
 
@@ -76,6 +46,7 @@ fn vl53l4_encode_vectors() {
             other => panic!("unknown vl53l4 encode kind {}", other),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -121,6 +92,7 @@ fn vl53l4_decode_vectors() {
             }
             other => panic!("unhandled vl53l4 report 0x{:02x} in {}", other, c["name"]),
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -171,6 +143,7 @@ fn vl53l4_result_block_vectors() {
         );
         assert_eq!(r.sigma_mm as u64, expect["sigma_mm"].as_u64().unwrap(), "{}", c["name"]);
         assert_eq!(r.stream_count as u64, expect["stream_count"].as_u64().unwrap(), "{}", c["name"]);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -226,6 +199,7 @@ fn vl53l4_timing_vectors() {
     assert!(range_timing_registers(50, 50, 14720, 0).is_err());
     assert!(decode_range_timing(0, 2652, 0, 403).is_err());
     eprintln!("vl53l4.json: {} timing encode + {} timing decode", enc, dec);
+    seen("vl53l4/timing");
 }
 
 // ---- vl53l4.json: "tuning" (both directions) -------------------------------
@@ -239,11 +213,11 @@ fn vl53l4_tuning_vectors() {
         let raw = c["raw"].as_u64().unwrap() as u16;
         match c["kind"].as_str().unwrap() {
             "offset" => {
-                assert_eq!(offset_raw(value as i32), raw, "offset raw {}", c["name"]);
+                assert_eq!(try_offset_raw(value as i32).unwrap(), raw, "offset raw {}", c["name"]);
                 assert_eq!(decode_offset(raw) as i64, value, "offset decode {}", c["name"]);
             }
             "xtalk" => {
-                assert_eq!(xtalk_raw(value as u16), raw, "xtalk raw {}", c["name"]);
+                assert_eq!(try_xtalk_raw(value as u16).unwrap(), raw, "xtalk raw {}", c["name"]);
                 assert_eq!(decode_xtalk(raw) as i64, value, "xtalk decode {}", c["name"]);
             }
             "signal_threshold" => {
@@ -266,6 +240,7 @@ fn vl53l4_tuning_vectors() {
             }
             other => panic!("unknown vl53l4 tuning kind {}", other),
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -284,6 +259,7 @@ fn vl53l4_xtalk_decode_vectors() {
     for c in cases {
         let raw = c["raw"].as_u64().unwrap() as u16;
         assert_eq!(decode_xtalk(raw) as u64, c["kcps"].as_u64().unwrap(), "xtalk decode {}", raw);
+        seen(c);
     }
 }
 
@@ -300,6 +276,7 @@ fn vl53l4_config_block_vector() {
     // the ST default configuration untouched.
     assert_eq!(block[0], 0x12);
     assert_eq!(block[1..], DEFAULT_CONFIGURATION[1..]);
+    seen("vl53l4/config_block");
     eprintln!("vl53l4.json: config_block ok ({} bytes)", block.len());
 }
 
@@ -312,4 +289,129 @@ fn vl53l4_identity_parse() {
     assert_eq!(id.sensor_type, Some(SensorType::Vl53l4));
     assert_eq!(id.sensor_type.unwrap().as_str(), "vl53l4");
     assert_eq!(id.version, "0.80");
+}
+
+// ---- recordings/vl53l4cd_session.depzrec -----------------------------------
+
+/// A sidecar measurement (timestamp + the nine result fields) vs a decoded
+/// result block.
+fn assert_measurement(raw: &[u8], timestamp_us: u64, want: &Value, ctx: &str) {
+    let r = parse_result_block(raw).unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
+    let got = [
+        ("timestamp_us", timestamp_us),
+        ("range_status", r.range_status as u64),
+        ("distance_mm", r.distance_mm as u64),
+        ("sigma_mm", r.sigma_mm as u64),
+        ("signal_rate_kcps", r.signal_rate_kcps as u64),
+        ("ambient_rate_kcps", r.ambient_rate_kcps as u64),
+        ("signal_per_spad_kcps", r.signal_per_spad_kcps as u64),
+        ("ambient_per_spad_kcps", r.ambient_per_spad_kcps as u64),
+        ("number_of_spad", r.number_of_spad as u64),
+        ("stream_count", r.stream_count as u64),
+    ];
+    assert_eq!(want.as_object().unwrap().len(), got.len(), "{}", ctx);
+    for (k, v) in got {
+        assert_eq!(v, want[k].as_u64().unwrap(), "{}.{}", ctx, k);
+    }
+}
+
+/// Every rx report of the live capture through framing + the VL53L4 decoders
+/// and the ULD register math, vs the `.expected.json` sidecar (no device
+/// layer: not a strict tx replay). Read-backs are paired with their READ_REG.
+#[test]
+fn vl53l4cd_session_recording() {
+    use depz_sensor_sdk::protocol::common::Cmd;
+    use depz_sensor_sdk::vl53l4::uld_math::{
+        INTERMEASUREMENT_MS, OSC_FREQUENCY, RANGE_CONFIG_A, RANGE_OFFSET_MM, RESULT_BLOCK_ADDR,
+        RESULT_BLOCK_LEN, RESULT__OSC_CALIBRATE_VAL, XTALK_PLANE_OFFSET_KCPS,
+    };
+
+    let exp = load("recordings/vl53l4cd_session.expected.json");
+    let pkts = recording_packets("vl53l4cd_session.depzrec");
+    let sw = recorded_text(&pkts, Cmd::GetNameActiveSoftware).expect("software name");
+    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(SensorType::Vl53l4));
+    assert_eq!(sw, exp["software_name"].as_str().unwrap());
+    assert_eq!(recorded_text(&pkts, Cmd::GetDeviceName).as_deref(), exp["device_name"].as_str());
+
+    let mut info = None;
+    let mut stream = Vec::new();
+    for p in pkts.iter().filter(|p| p.rx) {
+        match p.cmd {
+            0x92 if info.is_none() => info = Some(Vl53l4Info::unpack(&p.payload).unwrap()),
+            0x93 => {
+                let s = StreamData::unpack(&p.payload).unwrap();
+                assert_eq!((s.addr, s.len), (RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN), "stream block");
+                stream.push(s);
+            }
+            _ => {}
+        }
+    }
+    let info = info.expect("RPT_VL53_INFO");
+    let wi = &exp["info"];
+    assert_eq!(wi.as_object().unwrap().len(), 3);
+    assert_eq!(info.model_id as u64, wi["model_id"].as_u64().unwrap());
+    assert_eq!(info.fw_status as u64, wi["fw_status"].as_u64().unwrap());
+    assert_eq!(info.i2c_khz as u64, wi["i2c_khz"].as_u64().unwrap());
+
+    // Read-backs: the last read of each register is what the getters saw.
+    let be = |b: &[u8]| b.iter().fold(0u64, |v, &x| (v << 8) | x as u64);
+    let mut last = std::collections::HashMap::new();
+    let mut once = Vec::new();
+    for r in reg_reads(&pkts, true) {
+        let d = RegData::unpack(&r.reply).unwrap();
+        assert_eq!(d.data.len(), r.len as usize, "read {:#06x}", r.addr);
+        if (r.addr, r.len) == (RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN) {
+            once.push(d.clone());
+        }
+        last.insert(r.addr, d.data);
+    }
+    let reg = |addr: u16| be(&last[&addr]);
+    let (budget, inter) = decode_range_timing(
+        reg(INTERMEASUREMENT_MS) as u32,
+        reg(RESULT__OSC_CALIBRATE_VAL) as u16,
+        reg(OSC_FREQUENCY) as u16,
+        reg(RANGE_CONFIG_A) as u16,
+    )
+    .unwrap();
+    let timing: Vec<u64> = exp["timing"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    assert_eq!(vec![budget as u64, inter as u64], timing, "timing");
+    assert_eq!(decode_offset(reg(RANGE_OFFSET_MM) as u16) as i64, exp["offset_mm"].as_i64().unwrap());
+    assert_eq!(
+        decode_xtalk(reg(XTALK_PLANE_OFFSET_KCPS) as u16) as u64,
+        exp["xtalk_kcps"].as_u64().unwrap()
+    );
+
+    let want_once = exp["once"].as_array().unwrap();
+    assert_eq!(once.len(), want_once.len(), "once reads");
+    for (idx, (d, w)) in once.iter().zip(want_once).enumerate() {
+        assert_measurement(&d.data, d.timestamp_us, w, &format!("once {}", idx));
+    }
+    // The stream may run past the sidecar before the stop lands; match the first N.
+    let want = exp["frames"].as_array().unwrap();
+    assert!(stream.len() >= want.len(), "{} < {} frames", stream.len(), want.len());
+    for (idx, (s, w)) in stream.iter().zip(want).enumerate() {
+        assert_measurement(&s.data, s.timestamp_us, w, &format!("frame {}", idx));
+    }
+    seen("recordings/vl53l4cd_session.depzrec");
+}
+
+/// Regression (difftest): an `osc_frequency` so small that the macro period
+/// truncates to 0 used to divide by zero (panic); an autonomous period whose
+/// register overflows u32 used to saturate; out-of-range tuning values used
+/// to wrap. All are errors now (contract 07 §3).
+#[test]
+fn vl53l4_math_rejects_instead_of_panicking() {
+    use depz_sensor_sdk::vl53l4::Vl53l4Error;
+    for osc in [1u16, 2, 4, 8] {
+        assert_eq!(range_timing_registers(50, 0, osc, 0), Err(Vl53l4Error::MacroPeriodZero), "osc {}", osc);
+    }
+    assert_eq!(
+        range_timing_registers(87, 2_147_483_647, 13927, 2559),
+        Err(Vl53l4Error::InterMeasurementOverflow)
+    );
+    assert_eq!(try_offset_raw(-1024), Ok(61440));
+    assert_eq!(try_offset_raw(1024), Err(Vl53l4Error::OffsetOutOfRange));
+    assert_eq!(try_offset_raw(-1025), Err(Vl53l4Error::OffsetOutOfRange));
+    assert_eq!(try_xtalk_raw(127), Ok(127 << 9));
+    assert_eq!(try_xtalk_raw(128), Err(Vl53l4Error::XtalkOutOfRange));
 }

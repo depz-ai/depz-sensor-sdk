@@ -222,6 +222,18 @@ with SessionRecorder("run.depzdata", note="lab run") as rec:
 reader = DatasetReader("run.depzdata")
 for record in reader:                  # merged by host time across all devices
     print(record.device_id, record.kind, record.t_host_us)
+
+# interactive playback: pause / resume, seek, speed, position (contract 09)
+from depz_sensor_sdk import DatasetPlayer
+
+player = DatasetPlayer(reader, speed=2.0)   # records arrive on a player thread
+player.on_record(lambda r: print(r.kind, r.t_host_us))
+player.on_state(lambda s: print("state:", s.value))
+player.play()
+player.seek_us(5_000_000)              # jump to 5 s into the timeline
+player.speed = 0.5                     # applies at once
+player.wait()                          # until done; player.position_us / duration_us
+player.close()
 ```
 
 Records from every device — including two of the same model — land on one

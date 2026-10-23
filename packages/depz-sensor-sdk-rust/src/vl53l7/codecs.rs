@@ -63,6 +63,31 @@ pub fn i2c_error_name(code: u8) -> &'static str {
     }
 }
 
+/// `VL53_READ_REG` payload: `addr u16, len u16` (little-endian), with the
+/// L5/L7 limits (contract 11 §2): `len` 1..=[`READ_MAX_LEN`] and
+/// `addr + len <= 0x10000`.
+pub fn pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError> {
+    if len == 0 || len as usize > READ_MAX_LEN || addr as usize + len as usize > 0x10000 {
+        return Err(CodecError("VL53_READ_REG: len must be 1..1536 and addr+len <= 0x10000"));
+    }
+    let a = addr.to_le_bytes();
+    let l = len.to_le_bytes();
+    Ok([a[0], a[1], l[0], l[1]])
+}
+
+/// `VL53_WRITE_REG` payload: `addr u16` + the raw register bytes, with the
+/// L5/L7 limits (contract 11 §2): 1..=[`WRITE_MAX_LEN`] bytes and
+/// `addr + N <= 0x10000`.
+pub fn pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError> {
+    if data.is_empty() || data.len() > WRITE_MAX_LEN || addr as usize + data.len() > 0x10000 {
+        return Err(CodecError("VL53_WRITE_REG: data must be 1..2048 bytes and addr+N <= 0x10000"));
+    }
+    let mut out = Vec::with_capacity(2 + data.len());
+    out.extend_from_slice(&addr.to_le_bytes());
+    out.extend_from_slice(data);
+    Ok(out)
+}
+
 /// `VL53_PIN_CTRL` payload: `action u8` ([`PIN_LPN_OFF`] .. [`PIN_SOFT_CYCLE`]).
 pub fn pack_pin_ctrl(action: u8) -> [u8; 1] {
     [action]

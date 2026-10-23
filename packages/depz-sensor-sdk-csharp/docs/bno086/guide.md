@@ -1,11 +1,14 @@
 # BNO086 — user guide
 
-Hands-on guide to the BNO086 codecs (`Depz.Sensor.Bno086`). For what the sensor
-is and its concepts, read the [introduction](introduction.md); for exact
-signatures see the [API reference](api.md).
+Hands-on guide to the BNO086: the live device
+(`Depz.Sensor.Devices.Bno086Device`, the SH-2 host stack) and the codecs under
+it (`Depz.Sensor.Bno086`). For what the sensor is and its concepts, read the
+[introduction](introduction.md); for exact signatures see the
+[API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The decode pipeline](#the-decode-pipeline)
 - [Reassembling SHTP cargos](#reassembling-shtp-cargos)
 - [Decoding input reports](#decoding-input-reports)
@@ -14,6 +17,41 @@ signatures see the [API reference](api.md).
 - [Encoding control reports](#encoding-control-reports)
 - [Sleep and power on](#sleep-and-power-on)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Bno086;
+using Depz.Sensor.Devices;
+
+using var imu = DepzDevices.OpenBno086();
+imu.HardwareReset();
+Console.WriteLine(imu.ProductId().SwPartNumber);       // 10004563 = BNO086, 10004148 = BNO085
+
+using var reports = imu.Reports(new[] { (int)SensorId.RotationVector });
+FeatureResponse? granted = imu.Enable((int)SensorId.RotationVector, hz: 100);   // the rate the hub granted
+var rv = (RotationVector)reports.Take(TimeSpan.FromSeconds(1));
+imu.Disable((int)SensorId.RotationVector);
+```
+
+- `Enable(sensor, hz)` (or `intervalUs:`, `batchUs:`, `flags:` …) sends Set
+  Feature and reads the rate back; a rate the hub granted outside 0.9–2.1 × the
+  request is traced as a warning. `GetFeature`, `Disable`.
+- Reports stream to `OnReport(callback, sensors)` and `Reports(sensors)`
+  (filter by sensor id, or all). Batched sensors: `Flush(sensor)` returns once
+  the hub's Flush Completed arrives.
+- Calibration: `SetCalibration` / `GetCalibration`, `SaveDcd`,
+  `ConfigurePeriodicDcd`, `ClearDcdAndReset`; tare: `TareNow`, `PersistTare`,
+  `SetReorientation`; `SetMotionIntent` and `EnableMotionRequest` (interactive
+  calibration, BNO086 only).
+- FRS records: `FrsRead` / `FrsWrite` (`FrsRecordId`), `GetMetadata(sensor)`.
+- Hub state: `Sleep` / `PowerOn` (SH-2), `Wake` (the WAKE pin),
+  `GetOscillatorType`, `GetErrors`, `GetCounts` / `ClearCounts`.
+- Every request goes as one SHTP frame through the bridge; when both of its
+  transmit slots are full the bridge answers ERR_BUSY and the device backs off
+  200 ms and resends (`BusyRetries`, `BusyBackoff`).
+
+The sections below are the layers under the device.
 
 ## The decode pipeline
 
@@ -99,24 +137,24 @@ for logging or generic serialization. Unrecognised report IDs surface as
 
 ## Report types and units
 
-Raw wire integers are authoritative; apply the fixed **Q point**
-(`value = raw / 2^Q`) yourself. The common ones:
+Raw wire integers are authoritative; each record also gives them scaled by the
+fixed **Q point** (`value = raw / 2^Q`, table `Bno086Q`). The common ones:
 
 | SensorId | record | fields (units) | Q |
 |---|---|---|---|
-| `Accelerometer` / `LinearAcceleration` / `Gravity` | `Acceleration` | `XRaw/YRaw/ZRaw` → m/s² | Q8 |
-| `Gyroscope` | `Gyroscope` | `XRaw/YRaw/ZRaw` → rad/s | Q9 |
-| `Magnetometer` | `Magnetometer` | `XRaw/YRaw/ZRaw` → µT | Q4 |
-| `RotationVector` / `Geomagnetic…` / `ArvrStabilizedRv` | `RotationVector` | `IRaw/JRaw/KRaw/RealRaw` + `AccuracyRaw` | Q14 quat, Q12 (rad) accuracy |
-| `GameRotationVector` / `ArvrStabilizedGameRv` | `RotationVector` | `IRaw/JRaw/KRaw/RealRaw`; `AccuracyRaw` is `null` | Q14 |
-| `GyroIntegratedRv` | `GyroIntegratedRV` | quaternion + `VxRaw/VyRaw/VzRaw` → rad/s | Q14 quat, Q10 velocity |
+| `Accelerometer` / `LinearAcceleration` / `Gravity` | `Acceleration` | `XRaw/YRaw/ZRaw`; `X/Y/Z` m/s² | Q8 |
+| `Gyroscope` | `Gyroscope` | `XRaw/YRaw/ZRaw`; `X/Y/Z` rad/s | Q9 |
+| `Magnetometer` | `Magnetometer` | `XRaw/YRaw/ZRaw`; `X/Y/Z` µT | Q4 |
+| `RotationVector` / `Geomagnetic…` / `ArvrStabilizedRv` | `RotationVector` | `IRaw/JRaw/KRaw/RealRaw` + `AccuracyRaw`; `I/J/K/Real`, `AccuracyRad` | Q14 quat, Q12 (rad) accuracy |
+| `GameRotationVector` / `ArvrStabilizedGameRv` | `RotationVector` | as above; `AccuracyRaw` / `AccuracyRad` are `null` | Q14 |
+| `GyroIntegratedRv` | `GyroIntegratedRV` | quaternion + `VxRaw/VyRaw/VzRaw`; `AngularVelocity` rad/s | Q14 quat, Q10 velocity |
 | `StepCounter` | `StepCounter` | `Steps`, `LatencyUs` | — |
 | `TapDetector` | `TapDetector` | `Flags` | — |
 | `StabilityClassifier` | `StabilityClassifier` | `Classification` | — |
 | `PersonalActivityClassifier` | `PersonalActivityClassifier` | `MostLikelyState`, `Confidences[]` | — |
 
 Pressure/light/humidity/proximity/temperature and other scalar reports decode to
-`ScalarReport` (`ValueRaw`); unmapped IDs to `GenericEvent`.
+`ScalarReport` (`ValueRaw`, scaled `Value`); unmapped IDs to `GenericEvent`.
 
 ## The gyro-integrated RV
 
@@ -184,9 +222,9 @@ the WAKE pin, a hardware signal. "On" is the SH-2 command that ends sleep.
   decode a returned `ShtpCargo`; a partial cargo returns `null`.
 - **Dispatch by channel** — channels 3/4 use `ParseInputCargo`; channel 5 uses
   `ParseGyroRvCargo`. They are different formats.
-- **Scaling is yours** — reports keep raw integers; apply the Q point. Watch the
-  units: rotation-vector accuracy is Q12 **radians**, and game/AR-VR-game vectors
-  have `AccuracyRaw == null`.
+- **Mind the units** — the scaled values follow the SH-2 Q points: rotation-vector
+  accuracy is Q12 **radians**, and game/AR-VR-game vectors have
+  `AccuracyRaw == null`.
 - **TX cargo fits one MCU slot** — `NextFrame` rejects payloads over
   `ShtpLayer.MaxTxFrame` (64 B incl. header, ERRATA E2); use `FragmentCargo` for
   anything larger.

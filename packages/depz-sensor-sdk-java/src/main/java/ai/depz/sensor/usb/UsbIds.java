@@ -68,6 +68,7 @@ public final class UsbIds {
         if (vid == null || pid == null) {
             return false;
         }
+        checkIds(vid, pid);
         if (vid == DEV_USB_VID && pid == DEV_USB_PID) {
             return true;
         }
@@ -85,6 +86,7 @@ public final class UsbIds {
         if (vid == null || pid == null) {
             return null;
         }
+        checkIds(vid, pid);
         if (vid == DEV_USB_VID && pid == DEV_USB_PID) {
             return "dev";
         }
@@ -122,5 +124,11 @@ public final class UsbIds {
         List<PortRef> sorted = new ArrayList<>(ports);
         sorted.sort(SERIAL_ORDER);
         return sorted;
+    }
+
+    /** A USB id is a u16 (contract 07 §3): anything else is IllegalArgumentException, not "unknown". */
+    private static void checkIds(int vid, int pid) {
+        ai.depz.sensor.protocol.Wire.checkUint("vid", vid, 16);
+        ai.depz.sensor.protocol.Wire.checkUint("pid", pid, 16);
     }
 }

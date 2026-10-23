@@ -43,6 +43,9 @@ const PID_MODEL: &[(u16, &str)] = &[
     (0xEE0A, "bno055"), // 60938
 ];
 
+/// The DEPZ production PIDs and the sensor model each names (contract 02 §4.2).
+pub const DEPZ_PID_MODEL: &[(u16, &str)] = PID_MODEL;
+
 fn model_for_pid(pid: u16) -> Option<&'static str> {
     PID_MODEL
         .iter()

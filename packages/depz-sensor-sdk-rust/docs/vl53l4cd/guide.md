@@ -1,14 +1,15 @@
 # VL53L4CD — user guide
 
-Hands-on guide to the [`vl53l4`](api.md) wire codecs and the host-ULD math. For
-what the sensor is and its concepts, read the [introduction](introduction.md);
-for exact signatures see the [API reference](api.md). This is a decode layer —
-the snippets build command payloads and decode reply/report payloads; you
-supply the transport that carries them (see the
-[common guide](../guide.md#getting-started)).
+Hands-on guide to the VL53L4CD: the live device (`devices::Vl53l4cdDevice`,
+which runs the ST ULD 2.2.3 on the host as `vl53l4::driver::Vl53l4cdDriver`)
+and the layers under it — the [`vl53l4`](api.md) wire codecs and the ULD
+register math. For what the sensor is and its concepts, read the
+[introduction](introduction.md); for exact signatures see the
+[API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The codec surface](#the-codec-surface)
 - [Read and write registers](#read-and-write-registers)
 - [Stream the result block](#stream-the-result-block)
@@ -16,6 +17,39 @@ supply the transport that carries them (see the
 - [Range timing](#range-timing)
 - [Tuning words](#tuning-words)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::{open_on_link, AnyDevice};
+
+let tof = open_on_link(link, None, None, None)?.into_vl53l4cd()?;
+tof.init(None)?;                           // default config block + VHV, bus left at 1 MHz
+tof.set_range_timing(33, 0)?;              // 33 ms budget, continuous
+let (budget, inter) = tof.get_range_timing()?; // what the sensor holds: (32, 0)
+let once = tof.measure_once(None)?;        // polled: start, data ready, read, stop
+println!("{} mm, {}", once.distance_mm, once.status_text());
+
+let frames = tof.measurements(64);
+tof.start_ranging()?;                      // the board streams the result block on every INT edge
+let m = frames.take(Duration::from_secs(1))?;
+tof.stop_ranging()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- Configuration (`set_offset_mm`, `set_xtalk_kcps`, thresholds, calibrations)
+  fails with `DepzError::InvalidState` while ranging: the stream owns the
+  register bank.
+- `calibrate_offset(target_mm, None)` / `calibrate_xtalk(target_mm, None)` run
+  ST's loops and program the result; `start_temperature_update()` re-runs VHV
+  after a >8 °C change.
+- `xshut(XSHUT_RESET)` power-cycles the sensor; `init` again after.
+- A stream report that does not decode is counted in `stream_parse_errors()`.
+- `uld()` is the driver itself, which runs over any `Vl53l4Platform`.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## The codec surface
 
@@ -152,7 +186,6 @@ v4::sigma_threshold_raw(15)?;                // RANGE_CONFIG__SIGMA_THRESH (0x00
   [`Vl53l4Info`](api.md) counters (`slots_skipped`, `i2c_errors`) and gaps in
   `timestamp_us`; `stream_count` tells a frame the host never received from
   one the sensor never produced.
-- **The live driver is host code you write** — `uld_math` is the pure math
-  only; `sensor_init`, VHV calibration and ranging loops are a documented
-  extension point (see [What it is not](../guide.md#what-it-is-not)), driven
-  over `ReadReg`/`WriteReg`.
+- **One driver, any transport** — `Vl53l4cdDriver` runs over the
+  `Vl53l4Platform` trait; the device class maps it onto `ReadReg` / `WriteReg`,
+  a test or another bridge can script it.

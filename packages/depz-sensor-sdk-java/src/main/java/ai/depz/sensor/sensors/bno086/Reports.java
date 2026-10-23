@@ -1,5 +1,6 @@
 package ai.depz.sensor.sensors.bno086;
 
+import ai.depz.sensor.protocol.Wire;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,7 +10,8 @@ import java.util.Map;
  * SH-2 input-report catalog and parsers (contracts/05_SENSOR_BNO086.md §5).
  *
  * <p>Raw wire integers are authoritative (this decode layer surfaces them as
- * {@code *_raw} fields). Q-point scaling is derived downstream. Timestamps:
+ * {@code *_raw} fields); {@link #scaled} derives the physical values with the
+ * Q points of {@link #Q_POINTS}. Timestamps:
  * channel-3/4 cargos start with a Base Timestamp Reference (0xFB, i32 base
  * delta in 100 µs ticks, subtracted from the bridge capture time), 0xFA
  * rebases add; each report adds its own 14-bit delay (status bits 7:2 upper,
@@ -49,9 +51,13 @@ public final class Reports {
     public static final int ARVR_STABILIZED_RV = 0x28;
     public static final int ARVR_STABILIZED_GAME_RV = 0x29;
     public static final int GYRO_INTEGRATED_RV = 0x2a;
+    /** Interactive calibration, BNO086 only. */
+    public static final int MOTION_REQUEST = 0x2b;
 
     public static final int BASE_TIMESTAMP_REF = 0xfb;
     public static final int TIMESTAMP_REBASE = 0xfa;
+    /** + u8 sensor ID, no SH-2 header; the answer to Force Sensor Flush (0xF0). */
+    public static final int FLUSH_COMPLETED = 0xef;
 
     private static final Map<Integer, Integer> REPORT_LENGTHS = new LinkedHashMap<>();
 
@@ -92,16 +98,86 @@ public final class Reports {
         REPORT_LENGTHS.put(ARVR_STABILIZED_RV, 14);
         REPORT_LENGTHS.put(ARVR_STABILIZED_GAME_RV, 12);
         REPORT_LENGTHS.put(GYRO_INTEGRATED_RV, 14);
+        REPORT_LENGTHS.put(MOTION_REQUEST, 6);
     }
 
     /** One decoded report: a {@code type} tag plus the field map (raw-integer). */
     public record Report(String type, Map<String, Object> fields) {}
 
+    /** The Q points of the primary fields by sensor id (value = raw / 2^Q), SH-2 reference driver. */
+    public static final Map<Integer, Integer> Q_POINTS = Map.ofEntries(
+        Map.entry(ACCELEROMETER, 8), Map.entry(LINEAR_ACCELERATION, 8), Map.entry(GRAVITY, 8),
+        Map.entry(GYROSCOPE, 9), Map.entry(UNCAL_GYROSCOPE, 9),
+        Map.entry(MAGNETOMETER, 4), Map.entry(UNCAL_MAGNETOMETER, 4),
+        Map.entry(ROTATION_VECTOR, 14), Map.entry(GAME_ROTATION_VECTOR, 14), Map.entry(GEOMAG_ROTATION_VECTOR, 14),
+        Map.entry(ARVR_STABILIZED_RV, 14), Map.entry(ARVR_STABILIZED_GAME_RV, 14), Map.entry(GYRO_INTEGRATED_RV, 14),
+        Map.entry(PRESSURE, 20), Map.entry(AMBIENT_LIGHT, 8), Map.entry(HUMIDITY, 8), Map.entry(PROXIMITY, 4),
+        Map.entry(TEMPERATURE, 7),
+        Map.entry(RAW_ACCELEROMETER, 0), Map.entry(RAW_GYROSCOPE, 0), Map.entry(RAW_MAGNETOMETER, 0));
+
+    /** The rotation-vector accuracy estimate, radians. */
+    public static final int RV_ACCURACY_Q = 12;
+
+    /** The gyro-integrated rotation vector's angular velocity, rad/s. */
+    public static final int GYRO_RV_ANGVEL_Q = 10;
+
+    /** raw / 2^q (exact in a double). */
+    public static double scale(long raw, int q) {
+        return raw / (double) (1L << q);
+    }
+
+    private static long raw(Report r, String key) {
+        return ((Number) r.fields().get(key)).longValue();
+    }
+
+    /**
+     * The physical values of a report, under the reference SDK's property names: {@code x/y/z}
+     * (m/s², rad/s, µT), {@code i/j/k/real} (unit quaternion), {@code accuracy_rad} (null for the game
+     * variants), {@code bias} and {@code angular_velocity} (3 doubles), {@code value} (hPa, lux, %, cm, °C)
+     * and {@code double_tap} — only those the report's type has.
+     */
+    public static Map<String, Object> scaled(Report r) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        int sensor = (int) raw(r, "sensor_id");
+        switch (r.type()) {
+            case "Acceleration", "Gyroscope", "Magnetometer", "UncalibratedGyroscope", "UncalibratedMagnetometer" -> {
+                int q = Q_POINTS.get(sensor);
+                v.put("x", scale(raw(r, "x_raw"), q));
+                v.put("y", scale(raw(r, "y_raw"), q));
+                v.put("z", scale(raw(r, "z_raw"), q));
+                if (r.type().startsWith("Uncalibrated")) {
+                    v.put("bias", new double[] {
+                        scale(raw(r, "bias_x_raw"), q), scale(raw(r, "bias_y_raw"), q), scale(raw(r, "bias_z_raw"), q)});
+                }
+            }
+            case "RotationVector", "GyroIntegratedRV" -> {
+                v.put("i", scale(raw(r, "i_raw"), 14));
+                v.put("j", scale(raw(r, "j_raw"), 14));
+                v.put("k", scale(raw(r, "k_raw"), 14));
+                v.put("real", scale(raw(r, "real_raw"), 14));
+                if (r.type().equals("RotationVector")) {
+                    Object acc = r.fields().get("accuracy_raw");
+                    v.put("accuracy_rad", acc == null ? null : scale(((Number) acc).longValue(), RV_ACCURACY_Q));
+                } else {
+                    v.put("angular_velocity", new double[] {
+                        scale(raw(r, "vx_raw"), GYRO_RV_ANGVEL_Q), scale(raw(r, "vy_raw"), GYRO_RV_ANGVEL_Q),
+                        scale(raw(r, "vz_raw"), GYRO_RV_ANGVEL_Q)});
+                }
+            }
+            case "ScalarReport" -> v.put("value", scale(raw(r, "value_raw"), Q_POINTS.get(sensor)));
+            case "TapDetector" -> v.put("double_tap", (raw(r, "flags") & 0x40) != 0);
+            default -> { }
+        }
+        return v;
+    }
+
     /**
      * Parse a channel-3/4 cargo into typed reports. {@code captureTimestampUs}
-     * is the bridge RPT_DATA capture time (MCU uptime).
+     * is the bridge RPT_DATA capture time (MCU uptime, a u64: a negative one
+     * is an IllegalArgumentException).
      */
     public static List<Report> parseInputCargo(byte[] payload, long captureTimestampUs) {
+        Wire.checkUint("captureTimestampUs", captureTimestampUs, 63);
         List<Report> out = new ArrayList<>();
         long baseUs = captureTimestampUs;
         int pos = 0;
@@ -118,6 +194,17 @@ public final class Reports {
                 long delta = i32le(payload, pos + 1);
                 baseUs += delta * 100L;
                 pos += 5;
+                continue;
+            }
+            if (rid == FLUSH_COMPLETED && pos + 2 <= n) {
+                // 0xEF Flush Completed: every batched report of flushed_sensor
+                // has been sent. No SH-2 header: stamped with the current base.
+                Map<String, Object> f = new LinkedHashMap<>();
+                f.put("sensor_id", (long) rid);
+                f.put("timestamp_us", baseUs);
+                f.put("flushed_sensor", (long) (payload[pos + 1] & 0xFF));
+                out.add(new Report("FlushCompleted", f));
+                pos += 2;
                 continue;
             }
             Integer length = REPORT_LENGTHS.get(rid);
@@ -223,6 +310,13 @@ public final class Reports {
                 f.put("classification", (long) (rep[4] & 0xFF));
                 return new Report("StabilityClassifier", f);
             }
+            case MOTION_REQUEST -> {
+                // the motion intent the hub was last told, and what it asks of
+                // the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still)
+                f.put("intent", (long) (rep[4] & 0xFF));
+                f.put("request", (long) (rep[5] & 0xFF));
+                return new Report("MotionRequest", f);
+            }
             case SHAKE_DETECTOR -> {
                 f.put("flags", (long) u16le(rep, 4));
                 return new Report("ShakeDetector", f);
@@ -265,9 +359,11 @@ public final class Reports {
     /**
      * Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes:
      * 7×i16 bare, or prefixed with 0xFB + i32 base delta + u16 delay. Returns
-     * {@code null} on a too-short buffer.
+     * {@code null} on a too-short buffer; a negative {@code captureTimestampUs}
+     * is an IllegalArgumentException.
      */
     public static Report parseGyroRvCargo(byte[] payload, long captureTimestampUs) {
+        Wire.checkUint("captureTimestampUs", captureTimestampUs, 63);
         long ts = captureTimestampUs;
         byte[] body = payload;
         int bodyOff = 0;

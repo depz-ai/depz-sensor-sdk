@@ -13,6 +13,7 @@
  * the default platform.h of the C driver).
  */
 
+import { checkInt, checkUint } from "../../protocol/wire.js";
 import type { Vl53l8Assets, Vl53l8Variant } from "./assets/index.js";
 
 /** ULD platform: chunking/bridging is the caller's concern. */
@@ -44,6 +45,17 @@ export const I2C_VARIANTS: readonly Vl53l8Variant[] = ["l7cx", "l7ch"];
 export const SI_REVISION_CUT11 = 0x01; // VL53L5CX / VL53L7CX, first cut
 export const SI_REVISION_CUT12 = 0x02; // VL53L5CX / VL53L7CX / VL53L7CH
 export const SI_REVISION_L8 = 0x0c; // VL53L8CX / VL53L8CH
+
+/**
+ * Whether the silicon ids are the sensor's (vl53l8cx_is_alive() /
+ * vl53lmz_is_alive()): (0xF0, 0x0C) on L8 over SPI; revision 0x02, or 0x01
+ * with device id 0xF0, on L5/L7 over I2C.
+ */
+export function siliconIdMatches(deviceId: number, revisionId: number, i2c: boolean): boolean {
+  return i2c
+    ? revisionId === SI_REVISION_CUT12 || (deviceId === 0xf0 && revisionId === SI_REVISION_CUT11)
+    : deviceId === 0xf0 && revisionId === SI_REVISION_L8;
+}
 
 /** byte[1] = module_type, byte[6] = laser safety. */
 export const DCI_FW_FLAGS = 0xe0c4;
@@ -296,7 +308,7 @@ function hex8(n: number): string {
 /**
  * is_alive register sequence, standalone so the device facade can probe
  * without constructing a full driver (which needs the blob assets).
- * Returns [deviceId, revisionId]; alive when (0xF0, 0x0C).
+ * Returns [deviceId, revisionId]; siliconIdMatches() tells whether they are the sensor's.
  */
 export async function readDeviceRevisionId(p: Vl53l8Platform): Promise<[number, number]> {
   await p.wrMulti(0x7fff, Uint8Array.of(0x00));
@@ -326,15 +338,24 @@ export interface MotionResult {
   motion: number[];
 }
 
-/** One parsed raw results frame (plain arrays, mirroring the Python dict). */
+/**
+ * One parsed results frame (plain arrays, mirroring the Python dict), in the
+ * real units ST's GetRangingData gives (contract 04 §5).
+ */
 export interface Vl53l8Results {
+  /** Integer mm (raw / 4 floored); a negative distance is clamped to 0, as ST. */
   distanceMm: number[];
+  /** 5/9 = valid, 255 = no target. */
   targetStatus: number[];
   nbTargetDetected: number[];
+  /** kcps/SPAD (raw / 2048, fraction kept). */
   signalPerSpad: number[];
+  /** kcps/SPAD (raw / 2048, fraction kept). */
   ambientPerSpad: number[];
   nbSpadsEnabled: number[];
+  /** Measurement noise, mm (raw / 128). */
   rangeSigmaMm: number[];
+  /** Estimated target reflectance, % (raw / 2, fraction kept). */
   reflectance: number[];
   siliconTempDegc: number;
   cnhRaw: Uint8Array | null;
@@ -436,36 +457,50 @@ export function defaultMotionConfig(resolution: number): MotionConfig {
   return cfg;
 }
 
-/** Xtalk margin (kcps/spad) → raw DCI value (round(kcps * 2048)). */
+/**
+ * Xtalk margin (kcps/spad) → raw DCI value (round(kcps * 2048)). The margin is
+ * 0..10000 kcps; anything else is a RangeError, never wrapped (contract 07 §3).
+ */
 export function xtalkMarginToRaw(marginKcps: number): number {
-  return Math.round(marginKcps * 2048) >>> 0;
+  if (!(marginKcps >= 0 && marginKcps <= 10000)) {
+    throw new RangeError(`marginKcps: ${marginKcps} out of range 0..10000`);
+  }
+  return Math.round(marginKcps * 2048);
 }
 
 /**
- * Pack 64 detection thresholds into the DCI_DET_THRESH_START payload plus the
- * 8-byte valid-status block (pure — mirror of set_detection_thresholds). Each
- * threshold's low/high are scaled by its measurement selector.
+ * Pack up to 64 detection thresholds into the DCI_DET_THRESH_START payload plus
+ * the 8-byte valid-status block (pure — mirror of set_detection_thresholds).
+ * Each threshold's low/high are scaled by its measurement selector. More than
+ * 64 entries is a RangeError (never silently dropped).
  */
 export function packDetectionThresholds(thresholds: Partial<DetectionThreshold>[]): {
   start: Uint8Array;
   valid: Uint8Array;
 } {
+  if (thresholds.length > NB_THRESHOLDS) {
+    throw new RangeError(`thresholds: ${thresholds.length} entries, at most ${NB_THRESHOLDS}`);
+  }
   const valid = new Uint8Array(8).fill(0x05);
   const start = new Uint8Array(NB_THRESHOLDS * 12);
   const dv = new DataView(start.buffer);
   for (let k = 0; k < NB_THRESHOLDS; k++) {
     const t = thresholds[k] ?? {};
-    const meas = (t.measurement ?? 0) | 0;
+    // A fraction, or anything out of its field's range (before or after the
+    // scaling), is refused, never truncated or wrapped (contract 07 §3).
+    const meas = checkUint(`thresholds[${k}].measurement`, t.measurement ?? 0, 8);
     const scale = THRESH_SCALE[meas] ?? 1;
-    const low = ((t.lowThresh ?? 0) | 0) * scale;
-    const high = ((t.highThresh ?? 0) | 0) * scale;
+    const lowName = `thresholds[${k}].lowThresh`;
+    const highName = `thresholds[${k}].highThresh`;
+    const low = checkInt(lowName, checkInt(lowName, t.lowThresh ?? 0, 32) * scale, 32);
+    const high = checkInt(highName, checkInt(highName, t.highThresh ?? 0, 32) * scale, 32);
     const off = k * 12;
-    dv.setInt32(off, low | 0, true);
-    dv.setInt32(off + 4, high | 0, true);
-    dv.setUint8(off + 8, meas & 0xff);
-    dv.setUint8(off + 9, (t.type ?? 0) & 0xff);
-    dv.setUint8(off + 10, (t.zoneNum ?? 0) & 0xff);
-    dv.setUint8(off + 11, (t.operation ?? 0) & 0xff);
+    dv.setInt32(off, low, true);
+    dv.setInt32(off + 4, high, true);
+    dv.setUint8(off + 8, meas);
+    dv.setUint8(off + 9, checkUint(`thresholds[${k}].type`, t.type ?? 0, 8));
+    dv.setUint8(off + 10, checkUint(`thresholds[${k}].zoneNum`, t.zoneNum ?? 0, 8));
+    dv.setUint8(off + 11, checkUint(`thresholds[${k}].operation`, t.operation ?? 0, 8));
   }
   return { start, valid };
 }
@@ -768,9 +803,7 @@ export class VL53L8CX {
    */
   private async checkI2cSilicon(): Promise<void> {
     const [deviceId, revisionId] = await this.isAlive();
-    if (
-      !(revisionId === SI_REVISION_CUT12 || (deviceId === 0xf0 && revisionId === SI_REVISION_CUT11))
-    ) {
+    if (!siliconIdMatches(deviceId, revisionId, true)) {
       throw new Vl53l8cxError(
         STATUS_ERROR,
         `not a VL53L5/L7 sensor: device_id=0x${hex2(deviceId)} revision_id=0x${hex2(revisionId)}`,
@@ -788,8 +821,8 @@ export class VL53L8CX {
       if (progress) progress(text);
     };
 
-    const wr = (addr: number, value: number): Promise<void> => this.wrByte(addr, value);
-    const rd = (addr: number): Promise<number> => this.rdByte(addr);
+    const wr = async (addr: number, value: number): Promise<void> => this.wrByte(addr, value);
+    const rd = async (addr: number): Promise<number> => this.rdByte(addr);
     const i2c = this.i2c; // L5/L7 branch of vl53lmz_init(); L8 path unchanged
 
     this.moduleType = null;
@@ -1257,9 +1290,10 @@ export class VL53L8CX {
    * Parse one raw results frame (dataReadSize bytes read from reg 0x00).
    * Used both by poll-mode getRangingData() and by the host when the MCU
    * pushes frames over the INT-driven stream. Returns per-zone arrays
-   * distanceMm, targetStatus, nbTargetDetected, signalPerSpad (kcps/SPAD),
-   * ambientPerSpad (kcps/SPAD), nbSpadsEnabled, rangeSigmaMm, reflectance
-   * (%), plus the per-frame scalar siliconTempDegc.
+   * distanceMm (integer mm, >= 0), targetStatus, nbTargetDetected,
+   * signalPerSpad (float kcps/SPAD), ambientPerSpad (float kcps/SPAD),
+   * nbSpadsEnabled, rangeSigmaMm (float mm), reflectance (float %), plus the
+   * per-frame scalar siliconTempDegc.
    */
   parseFrame(raw: Uint8Array): Vl53l8Results {
     this.streamcount = raw[0]!;
@@ -1347,9 +1381,15 @@ export class VL53L8CX {
       results.reflectance = results.reflectance.slice(0, nt);
     }
 
-    // Convert to real format (fixed-point scaling, per ST GetRangingData).
-    results.distanceMm = results.distanceMm.map((d) => Math.floor(d / 4));
+    // Convert to real units, as ST GetRangingData: distance /4 with a
+    // negative distance clamped to 0; reflectance /2 (%); signal and ambient
+    // /2048 (kcps/SPAD); sigma /128 (mm). ST divides integers; the scaled
+    // values here keep their fraction (contract 04 §5).
+    results.distanceMm = results.distanceMm.map((d) => Math.max(0, Math.floor(d / 4)));
     results.rangeSigmaMm = results.rangeSigmaMm.map((s) => s / 128.0);
+    results.reflectance = results.reflectance.map((r) => r / 2.0);
+    results.signalPerSpad = results.signalPerSpad.map((s) => s / 2048.0);
+    results.ambientPerSpad = results.ambientPerSpad.map((a) => a / 2048.0);
 
     // No target detected -> status 255. Iterate the zones actually present
     // in this frame (16 for 4x4, 64 for 8x8), not a fixed 64.
@@ -1498,10 +1538,13 @@ export class VL53L8CX {
   }
 
   async setXtalkMargin(marginKcps: number): Promise<void> {
-    if (marginKcps > 10000) throw new Vl53l8cxError(STATUS_INVALID_PARAM, "set_xtalk_margin");
+    // 0..10000 kcps; below 0 (or NaN) is refused too, never wrapped (contract 07 §3)
+    if (!(marginKcps >= 0 && marginKcps <= 10000)) {
+      throw new Vl53l8cxError(STATUS_INVALID_PARAM, "set_xtalk_margin");
+    }
     const raw = xtalkMarginToRaw(marginKcps);
     const data = new Uint8Array(4);
-    new DataView(data.buffer).setUint32(0, raw >>> 0, true);
+    new DataView(data.buffer).setUint32(0, raw, true);
     await this.dciReplaceData(DCI_XTALK_CFG, 16, data, 0x00);
   }
 
@@ -1581,7 +1624,8 @@ export class VL53L8CX {
   }
 
   /**
-   * Program the 64 detection thresholds (missing entries default to zeros).
+   * Program the 64 detection thresholds (missing entries default to zeros;
+   * more than 64 is a RangeError).
    */
   async setDetectionThresholds(thresholds: Partial<DetectionThreshold>[]): Promise<void> {
     const { start, valid } = packDetectionThresholds(thresholds);
@@ -1635,65 +1679,6 @@ export class VL53L8CX {
   }
 
   // ---------------- xtalk calibration run (plugin) ----------------
-
-  /**
-   * Program the sensor output list/config/enables for `resolution` (a copy of
-   * the block startRanging() uses inline, kept separate so startRanging stays
-   * byte-identical for the replay gate); used by calibrateXtalk.
-   */
-  private async programOutputConfig(
-    resolution: number,
-    cnhDataSize: number | null = null,
-  ): Promise<number> {
-    let dataReadSize = 0;
-    const outputBhEnable = [0x00000fff, 0, 0, this.outputEnableW3];
-    const output = [
-      START_BH,
-      METADATA_BH,
-      COMMONDATA_BH,
-      AMBIENT_RATE_BH,
-      SPAD_COUNT_BH,
-      NB_TARGET_DETECTED_BH,
-      SIGNAL_RATE_BH,
-      RANGE_SIGMA_MM_BH,
-      DISTANCE_BH,
-      REFLECTANCE_BH,
-      TARGET_STATUS_BH,
-      MOTION_DETECT_BH,
-    ];
-    if (cnhDataSize !== null) {
-      const cnhBh =
-        (((CNH_DATA_IDX << 16) | ((Math.floor(cnhDataSize / 4) & 0xfff) << 4) | 4) >>> 0);
-      output.push(cnhBh);
-      outputBhEnable[0] = (outputBhEnable[0]! | (1 << (output.length - 1))) >>> 0;
-    }
-    for (let i = 0; i < output.length; i++) {
-      if (output[i] === 0 || !((outputBhEnable[Math.floor(i / 32)]! & (1 << i % 32)) >>> 0)) {
-        continue;
-      }
-      const [bhType, bhSizeIn, bhIdx] = bhFields(output[i]!);
-      let bhSize = bhSizeIn;
-      if (bhType >= 0x1 && bhType < 0x0d) {
-        if (bhIdx >= 0x54d0 && bhIdx < 0x54d0 + 960) {
-          bhSize = resolution;
-        } else if (bhIdx === CNH_DATA_IDX) {
-          // keep CNH block size
-        } else {
-          bhSize = resolution * NB_TARGET_PER_ZONE;
-        }
-        output[i] = bhSetSize(output[i]!, bhSize);
-        dataReadSize += bhType * bhSize;
-      } else {
-        dataReadSize += bhSize;
-      }
-      dataReadSize += 4;
-    }
-    dataReadSize += this.frameTail;
-    await this.dciWriteData(DCI_OUTPUT_LIST, packU32ArrayLE(output));
-    await this.dciWriteData(DCI_OUTPUT_CONFIG, packU32ArrayLE([dataReadSize, output.length + 1]));
-    await this.dciWriteData(DCI_OUTPUT_ENABLES, packU32ArrayLE(outputBhEnable));
-    return dataReadSize;
-  }
 
   /**
    * _vlxxx_program_output_config() of the ST xtalk plugin (every version):

@@ -23,6 +23,14 @@ uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps)
     return (uint32_t)r;
 }
 
+int depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw)
+{
+    if (!(margin_kcps >= 0.0 && margin_kcps <= 10000.0))
+        return -1; /* 0..10000 kcps: negative, NaN or too large is refused */
+    *raw = (uint32_t)round(margin_kcps * 2048.0);
+    return 0;
+}
+
 double depz_vl53l8_xtalk_margin_from_raw(uint32_t raw)
 {
     return (double)raw / 2048.0;
@@ -42,10 +50,22 @@ static int32_t thresh_scale(uint8_t measurement)
     }
 }
 
-void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
-                                 uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
-                                 uint8_t valid[8])
+/* Pack; with `strict`, -1 (nothing written) when a scaled low/high does not
+ * fit the i32 DCI field. Without, the scaled value wraps to 32 bits. */
+static int pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
+                           uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                           uint8_t valid[8], bool strict)
 {
+    if (strict) {
+        if (n > DEPZ_VL53L8_NB_THRESHOLDS)
+            return -1; /* never silently dropped */
+        for (size_t k = 0; th != NULL && k < n && k < DEPZ_VL53L8_NB_THRESHOLDS; k++) {
+            int64_t scale = thresh_scale(th[k].measurement);
+            int64_t lo = (int64_t)th[k].low_thresh * scale, hi = (int64_t)th[k].high_thresh * scale;
+            if (lo < INT32_MIN || lo > INT32_MAX || hi < INT32_MIN || hi > INT32_MAX)
+                return -1;
+        }
+    }
     memset(valid, 0x05, 8);
     memset(start, 0, DEPZ_VL53L8_THRESH_START_SIZE);
     for (int k = 0; k < DEPZ_VL53L8_NB_THRESHOLDS; k++) {
@@ -55,9 +75,9 @@ void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
         } else {
             memset(&t, 0, sizeof(t));
         }
-        int32_t scale = thresh_scale(t.measurement);
-        int32_t low = t.low_thresh * scale;
-        int32_t high = t.high_thresh * scale;
+        int64_t scale = thresh_scale(t.measurement);
+        int32_t low = (int32_t)(uint32_t)((int64_t)t.low_thresh * scale);
+        int32_t high = (int32_t)(uint32_t)((int64_t)t.high_thresh * scale);
         uint8_t *e = start + k * 12;
         put_i32(e, low);
         put_i32(e + 4, high);
@@ -66,6 +86,21 @@ void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
         e[10] = t.zone_num;
         e[11] = t.operation;
     }
+    return 0;
+}
+
+void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
+                                 uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                                 uint8_t valid[8])
+{
+    (void)pack_thresholds(th, n, start, valid, false);
+}
+
+int depz_vl53l8_pack_thresholds_checked(const depz_vl53l8_threshold *th, size_t n,
+                                        uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                                        uint8_t valid[8])
+{
+    return pack_thresholds(th, n, start, valid, true);
 }
 
 /*

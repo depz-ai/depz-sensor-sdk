@@ -16,11 +16,125 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L7CH (ToF + CNH)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PIN_LPN_OFF`](#pin_lpn_off), [`PIN_LPN_ON`](#pin_lpn_on), [`PIN_I2C_RST`](#pin_i2c_rst), [`PIN_SOFT_CYCLE`](#pin_soft_cycle), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`i2c_error_name`](#i2c_error_name), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`Vl53l7Model`](#vl53l7model), [`resolve_model`](#resolve_model)
+- **VL53L7CH (ToF + CNH)**: [`Vl53l7cxDevice`](#vl53l7cxdevice), [`Vl53l5cxDevice`](#vl53l5cxdevice), [`Vl53l7chDevice`](#vl53l7chdevice), [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PIN_LPN_OFF`](#pin_lpn_off), [`PIN_LPN_ON`](#pin_lpn_on), [`PIN_I2C_RST`](#pin_i2c_rst), [`PIN_SOFT_CYCLE`](#pin_soft_cycle), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`i2c_error_name`](#i2c_error_name), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`Vl53l7Model`](#vl53l7model), [`resolve_model`](#resolve_model)
 - **Shared with VL53L8 (re-exported / frame decode)**: [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`unpack_frame_chunk`](#unpack_frame_chunk), [`FrameReassembler`](#framereassembler), [`parse_frame`](#parse_frame), [`Variant`](#variant)
 - **CNH histogram decode (from `vl53l8`)**: [`CnhDecodeConfig`](#cnhdecodeconfig), [`CnhAggregate`](#cnhaggregate), [`CnhData`](#cnhdata), [`CnhError`](#cnherror), [`decode_cnh`](#decode_cnh), [`CNH_DATA_IDX`](#cnh_data_idx)
 
 ## VL53L7CH (ToF + CNH)
+
+### Vl53l7cxDevice
+
+```rust
+pub struct Vl53l7cxDevice(Vl53l8cxDevice);
+```
+
+VL53L7CX multizone ToF (8×8 zones, 90° field of view) on the I2C bridge board (contract 11): a
+[`Vl53l8cxDevice`] (every method, through `Deref`) with the L5/L7 firmware set (ULD 2.0.1),
+smaller register reads, ranging from 1 Hz, and the board commands
+[`Vl53l7cxDevice::get_bridge_info`], [`Vl53l7cxDevice::set_i2c_speed_khz`],
+[`Vl53l7cxDevice::pin_ctrl`]. L5CX / L7CX have no deep sleep and no threshold auto-stop.
+
+#### Vl53l7cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l7cxDevice
+```
+
+Continue the open connection `dev` as a VL53L7CX.
+
+#### Vl53l7cxDevice::module_type
+
+```rust
+pub fn module_type(&self) -> Option<u8>
+```
+
+The sensor's module type read at `init`: [`MODULE_TYPE_MZ`] (VL53L5CX) or
+[`MODULE_TYPE_MZEVO`] (VL53L7CX / CH); `None` before.
+
+#### Vl53l7cxDevice::xtalk_calibration_failed
+
+```rust
+pub fn xtalk_calibration_failed(&self) -> bool
+```
+
+The last `calibrate_xtalk` found nothing to calibrate ("coverglass too good").
+
+#### Vl53l7cxDevice::get_bridge_info
+
+```rust
+pub fn get_bridge_info(&self) -> Result<Vl53l7Info>
+```
+
+Bridge counters and pin levels (the sensor is not touched). Read it before and after a run:
+during one each call takes the bus from the stream and can cost a frame.
+
+#### Vl53l7cxDevice::set_i2c_speed_khz
+
+```rust
+pub fn set_i2c_speed_khz(&self, khz: u32) -> Result<u16>
+```
+
+Sensor bus SCL; the board takes the nearest of 100, 200, 400, 500 … 1000 kHz. Returns the
+value in effect. A busy status mid-transfer ([`DepzError::is_busy`]): stop ranging first.
+
+#### Vl53l7cxDevice::pin_ctrl
+
+```rust
+pub fn pin_ctrl(&self, action: u8) -> Result<()>
+```
+
+Drive the sensor's LPn / I2C_RST pins ([`crate::vl53l7::PIN_LPN_OFF`] …). LPN_OFF and
+SOFT_CYCLE drop the sensor's state: `init` again afterwards.
+
+### Vl53l5cxDevice
+
+```rust
+pub struct Vl53l5cxDevice(Vl53l7cxDevice);
+```
+
+VL53L5CX ToF (8×8 zones, 63° field of view): the board, firmware and API of
+[`Vl53l7cxDevice`]; the sensor reports module type MZ.
+
+#### Vl53l5cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l5cxDevice
+```
+
+Continue the open connection `dev` as a VL53L5CX.
+
+### Vl53l7chDevice
+
+```rust
+pub struct Vl53l7chDevice(Vl53l7cxDevice);
+```
+
+VL53L7CH: the VL53L7CX superset with CNH histograms. `init` downloads the CH firmware (VL53LMZ
+ULD 2.0.16, the VL53L8CH one); CNH frames up to ~7.6 KB stream in chunks.
+
+#### Vl53l7chDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l7chDevice
+```
+
+Continue the open connection `dev` as a VL53L7CH.
+
+#### Vl53l7chDevice::cnh_setup
+
+```rust
+pub fn cnh_setup(&self) -> Option<Vl53l8CnhSetup>
+```
+
+The CNH setup armed by [`Vl53l7chDevice::configure_cnh`], or `None`.
+
+#### Vl53l7chDevice::configure_cnh
+
+```rust
+pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
+```
+
+Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]).
 
 ### Vl53l7Cmd
 
@@ -129,6 +243,26 @@ pub fn i2c_error_name(code: u8) -> &'static str
 ```
 
 `last_i2c_error` code in [`Vl53l7Info`] → human-readable name.
+
+### pack_read_reg
+
+```rust
+pub fn pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError>
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian), with the
+L5/L7 limits (contract 11 §2): `len` 1..=[`READ_MAX_LEN`] and
+`addr + len <= 0x10000`.
+
+### pack_write_reg
+
+```rust
+pub fn pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
+```
+
+`VL53_WRITE_REG` payload: `addr u16` + the raw register bytes, with the
+L5/L7 limits (contract 11 §2): 1..=[`WRITE_MAX_LEN`] bytes and
+`addr + N <= 0x10000`.
 
 ### pack_pin_ctrl
 

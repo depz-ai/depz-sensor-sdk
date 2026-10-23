@@ -122,9 +122,11 @@ describe("DepzDevice core", () => {
 
   it("sync pin validation", async () => {
     await dev.setSyncPin({ pin: 1, mode: SyncPinMode.OutBoth, polarity: SyncPinPolarity.IdleLow });
+    // contract 02 §6: pins 1..5 — refused host-side, nothing is sent
     await expect(
       dev.setSyncPin({ pin: 9, mode: SyncPinMode.In, polarity: SyncPinPolarity.IdleLow }),
-    ).rejects.toThrow(StatusError);
+    ).rejects.toThrow(RangeError);
+    await expect(dev.getSyncPin(0)).rejects.toThrow(RangeError);
     const cfg = await dev.getSyncPin(2);
     expect(cfg.pin).toBe(2);
     expect(cfg.mode).toBe(SyncPinMode.Disable);

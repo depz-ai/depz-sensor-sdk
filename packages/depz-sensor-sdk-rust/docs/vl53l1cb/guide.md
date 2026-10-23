@@ -1,16 +1,15 @@
 # VL53L1CB — user guide
 
-Hands-on guide to the [`vl53lx`](api.md) decode layer for the VL53L1CB. For
+Hands-on guide to the [`vl53lx`](api.md) device class and decode layer for the VL53L1CB. For
 what the sensor is and its concepts, read the [introduction](introduction.md);
 for exact signatures see the [API reference](api.md).
 
-This crate does not drive the sensor: the ST driver (initialisation, modes,
-budgets, ROI, calibration, histogram target extraction) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
+The device class runs the ST drivers on the host (the VL53L1X ULD, or the histogram
+driver); below it, the bridge commands and the stateless decode of what the board streams.
 
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
@@ -20,6 +19,43 @@ commands and decode what the board streams.
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Behind a cover glass](#behind-a-cover-glass)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::open_on_link;
+
+let tof = open_on_link(link, None, None, None)?.into_vl53lx()?;   // a Vl53l1cbDevice underneath
+tof.init(None, None)?;                                   // VL53L1CB / uld
+tof.configure(50, 0, Some("short"), None, Some(stored_xtalk_kcps), None)?;
+let frames = tof.measurements(64);
+tof.start_ranging()?;
+let m = frames.take(Duration::from_secs(1))?;
+println!("{} mm, status {} ({}), {} targets", m.distance_mm, m.status, m.status_text, m.targets.len());
+tof.stop_ranging()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- `init(driver, product)` binds the (product, driver kind) pair — `None`, `None`:
+  the class's product, its first kind (`uld`). A pair the table lacks is refused with what the product has
+  (`driver_kinds(None)`); `notes()` and `identify_product()` say what was bound,
+  borrowed, and how far it reaches.
+- `configure(budget_ms, inter_ms, mode, offset_mm, xtalk_kcps, signal_kcps)`
+  re-initialises and applies a ranging configuration before every run (an
+  unsupported group is refused before the re-init); ask `supports(group)` first.
+  Behind a cover glass, re-apply the stored crosstalk with `xtalk_kcps`
+  (`calibrate_xtalk` measures it once). The histogram driver has modes and
+  timing only.
+- Measurements stream to `on_measurement(callback)` and `measurements(capacity)`
+  (`Vl53lxMeasurement`: distance, status, rates, `targets` and `bins` on the
+  histogram driver); `measure_once(None)` polls one; `plottable()` and
+  `plot_distances()` apply the family's 0 / 6 / 11 rule. A frame the driver
+  cannot decode is dropped and counted in `stream_parse_errors()`.
+- Configuration while ranging is refused (the stream owns the bus); `xshut(0)`
+  drops the driver — `init` again; `bridge_info()` is safe while streaming.
+
+The sections below are the layers under the device.
 
 ## Which board is it
 
@@ -151,7 +187,7 @@ if s.addr == HISTOGRAM_BLOCK_ADDR {
 ```
 
 Turning bins into up to four targets (preset, VCSEL period, the A/B frame
-pairs, phase history) is the full driver's job and is not in this crate. The
+pairs, phase history) is the histogram driver's job — the [live device](#live-device) runs it. The
 driver keeps state from frame to frame, so a stream fed to it must be decoded
 **exactly once, in order** — replaying or skipping frames changes its output.
 

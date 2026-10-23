@@ -6,6 +6,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import checked_pack
+
 
 class Vl53l8Cmd(IntEnum):
     READ_REG = 0x32
@@ -31,15 +33,19 @@ STREAM_TOTAL_MAX = 8192  # max frame_size accepted by START_STREAM
 
 
 def pack_read_reg(addr: int, length: int) -> bytes:
-    return struct.pack("<HH", addr, length)
+    return checked_pack("<HH", addr=addr, length=length)
 
 
 def pack_write_reg(addr: int, data: bytes) -> bytes:
-    return struct.pack("<H", addr) + data
+    head = checked_pack("<H", addr=addr)
+    # contract 04 §2: the payload is addr + at least one data byte
+    if not data:
+        raise ValueError("WRITE_REG data must be at least 1 byte")
+    return head + bytes(data)
 
 
 def pack_start_stream(frame_size: int) -> bytes:
-    return struct.pack("<H", frame_size)
+    return checked_pack("<H", frame_size=frame_size)
 
 
 @dataclass(frozen=True)

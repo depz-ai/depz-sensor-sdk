@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Depz.Sensor.Vl53l4;
 using Xunit;
 
@@ -34,6 +35,7 @@ public class Vl53l4EncodeTests
             string expected = c.GetProperty("payload").GetString()!;
             Assert.True(expected == Vectors.ToHex(actual),
                 $"{name}: expected {expected} got {Vectors.ToHex(actual)}");
+            Vectors.Seen(c);
         }
     }
 }
@@ -81,6 +83,7 @@ public class Vl53l4DecodeTests
                 default:
                     throw new InvalidOperationException($"{name}: unknown vl53l4 report {report:x2}");
             }
+            Vectors.Seen(c);
         }
     }
 }
@@ -105,6 +108,7 @@ public class Vl53l4ResultBlockTests
             Assert.True(expect.GetProperty("number_of_spad").GetInt32() == r.NumberOfSpad, $"{name}: number_of_spad");
             Assert.True(expect.GetProperty("sigma_mm").GetInt32() == r.SigmaMm, $"{name}: sigma_mm");
             Assert.True(expect.GetProperty("stream_count").GetInt32() == r.StreamCount, $"{name}: stream_count");
+            Vectors.Seen(c);
         }
     }
 
@@ -118,7 +122,7 @@ public class Vl53l4ResultBlockTests
 public class Vl53l4TimingTests
 {
     [Fact]
-    public void RangeTimingRegisters_ByteExact()
+    public void RangeTiming_EncodeDecodeByteExact()
     {
         var root = Vectors.Load("vl53l4.json");
         foreach (var c in root.GetProperty("timing").GetProperty("encode").EnumerateArray())
@@ -133,12 +137,6 @@ public class Vl53l4TimingTests
             Assert.True(c.GetProperty("range_config_b").GetInt32() == b, $"{name}: range_config_b got {b}");
             Assert.True(c.GetProperty("intermeasurement_raw").GetUInt32() == imRaw, $"{name}: intermeasurement_raw got {imRaw}");
         }
-    }
-
-    [Fact]
-    public void DecodeRangeTiming_ByteExact()
-    {
-        var root = Vectors.Load("vl53l4.json");
         foreach (var c in root.GetProperty("timing").GetProperty("decode").EnumerateArray())
         {
             string name = c.GetProperty("name").GetString()!;
@@ -150,6 +148,8 @@ public class Vl53l4TimingTests
             Assert.True(c.GetProperty("timing_budget_ms").GetInt32() == budgetMs, $"{name}: timing_budget_ms got {budgetMs}");
             Assert.True(c.GetProperty("inter_measurement_ms").GetInt32() == interMs, $"{name}: inter_measurement_ms got {interMs}");
         }
+        Assert.Equal(2, root.GetProperty("timing").EnumerateObject().Count());
+        Vectors.Seen("vl53l4/timing");
     }
 
     [Fact]
@@ -186,6 +186,7 @@ public class Vl53l4TuningTests
             };
             Assert.True(raw == encoded, $"{name}: raw expected {raw} got {encoded}");
             Assert.True(value == decoded, $"{name}: value expected {value} got {decoded}");
+            Vectors.Seen(c);
         }
     }
 
@@ -198,6 +199,7 @@ public class Vl53l4TuningTests
         {
             int raw = c.GetProperty("raw").GetInt32();
             Assert.Equal(c.GetProperty("kcps").GetInt32(), Vl53l4Uld.DecodeXtalk((ushort)raw));
+            Vectors.Seen(c);
         }
     }
 }
@@ -218,5 +220,58 @@ public class Vl53l4ConfigBlockTests
         Assert.Equal(Vl53l4Uld.ConfigFmpByte, cfg[0]);
         Assert.Equal(Vl53l4Uld.DefaultConfiguration[1..].ToArray(), cfg[1..]);
         Assert.Equal(Vl53l4Uld.ConfigEnd - Vl53l4Uld.ConfigAddr + 1, cfg.Length);
+        Vectors.Seen("vl53l4/config_block");
+    }
+}
+
+// recordings/vl53l4cd_session.depzrec decoded rx-side only (the C# SDK has no
+// device layer to re-issue the tx half): bridge info, the two single shots
+// (17-byte result-block reads) and the streamed frames against the sidecar.
+public class Vl53l4RecordingTests
+{
+    private static void AssertResult(string name, JsonElement want, ulong timestampUs, Vl53l4Results r)
+    {
+        var got = new Dictionary<string, long>
+        {
+            ["timestamp_us"] = (long)timestampUs, ["range_status"] = r.RangeStatus, ["distance_mm"] = r.DistanceMm,
+            ["sigma_mm"] = r.SigmaMm, ["signal_rate_kcps"] = r.SignalRateKcps, ["ambient_rate_kcps"] = r.AmbientRateKcps,
+            ["signal_per_spad_kcps"] = r.SignalPerSpadKcps, ["ambient_per_spad_kcps"] = r.AmbientPerSpadKcps,
+            ["number_of_spad"] = r.NumberOfSpad, ["stream_count"] = r.StreamCount,
+        };
+        Assert.Equal(want.EnumerateObject().Count(), got.Count);
+        foreach (var (key, value) in got)
+            Assert.True(want.GetProperty(key).GetInt64() == value, $"{name}: {key} expected {want.GetProperty(key)} got {value}");
+    }
+
+    [Fact]
+    public void Session_RxDecode_MatchesSidecar()
+    {
+        var exp = JsonDocument.Parse(File.ReadAllText(Vectors.RecordingPath("vl53l4cd_session.expected.json"))).RootElement;
+        var packets = Vectors.RxPackets("vl53l4cd_session.depzrec");
+
+        var infos = packets.Where(p => p.Cmd == (int)Vl53l4Rpt.Info).Select(p => Vl53l4Info.Unpack(p.Payload)).ToList();
+        Assert.Single(infos);
+        var wantInfo = exp.GetProperty("info");
+        Assert.Equal(wantInfo.GetProperty("model_id").GetInt32(), infos[0].ModelId);
+        Assert.Equal(wantInfo.GetProperty("fw_status").GetInt32(), infos[0].FwStatus);
+        Assert.Equal(wantInfo.GetProperty("i2c_khz").GetInt32(), infos[0].I2cKhz);
+
+        // The only 17-byte register reads are the single shots' result blocks.
+        var once = packets.Where(p => p.Cmd == (int)Vl53l4Rpt.RegData).Select(p => Vl53l4RegData.Unpack(p.Payload))
+            .Where(r => r.Data.Length == Vl53l4Uld.ResultBlockLen).ToList();
+        var wantOnce = exp.GetProperty("once").EnumerateArray().ToList();
+        Assert.Equal(wantOnce.Count, once.Count);
+        for (int i = 0; i < once.Count; i++)
+            AssertResult($"once[{i}]", wantOnce[i], once[i].TimestampUs, Vl53l4Uld.ParseResultBlock(once[i].Data));
+
+        var frames = packets.Where(p => p.Cmd == (int)Vl53l4Rpt.Stream).Select(p => Vl53l4StreamData.Unpack(p.Payload)).ToList();
+        var want = exp.GetProperty("frames").EnumerateArray().ToList();
+        Assert.True(frames.Count >= want.Count, $"{frames.Count} frames, expected >= {want.Count}");
+        for (int i = 0; i < want.Count; i++)
+        {
+            Assert.Equal(Vl53l4Uld.ResultBlockAddr, frames[i].Addr);
+            AssertResult($"frames[{i}]", want[i], frames[i].TimestampUs, Vl53l4Uld.ParseResultBlock(frames[i].Data));
+        }
+        Vectors.Seen("recordings/vl53l4cd_session.depzrec");
     }
 }

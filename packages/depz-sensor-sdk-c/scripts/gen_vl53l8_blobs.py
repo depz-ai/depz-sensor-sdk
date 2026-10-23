@@ -13,6 +13,7 @@ Run from packages/depz-sensor-sdk-c:  python3 scripts/gen_vl53l8_blobs.py
 """
 import importlib.util
 import sys
+import types
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
@@ -55,7 +56,16 @@ def render() -> str:
         '#include "vl53l8_blobs.h"',
         "",
     ]
-    spec = importlib.util.spec_from_file_location("uld", ULD)
+    # Load uld.py as depz_sensor_sdk.vl53l8.uld so its relative imports
+    # (..protocol._wire) resolve, without importing the SDK package itself
+    # (its __init__ needs pyserial; CI runs this with a bare python3).
+    sdk = ULD.parent.parent
+    for name, path in (("depz_sensor_sdk", sdk), ("depz_sensor_sdk.vl53l8", ULD.parent)):
+        if name not in sys.modules:
+            pkg = types.ModuleType(name)
+            pkg.__path__ = [str(path)]
+            sys.modules[name] = pkg
+    spec = importlib.util.spec_from_file_location("depz_sensor_sdk.vl53l8.uld", ULD)
     uld = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(uld)
     items = [(name, rel, (DATA / rel).read_bytes()) for name, rel in BLOBS]

@@ -1,16 +1,10 @@
 import random
 
-from depz_sensor_sdk.transport import (
-    CrcError,
-    CrcType,
-    Packet,
-    PacketParser,
-    Trash,
-    build_packet,
-)
+from depz_sensor_sdk.transport import CrcType, PacketParser, build_packet
+from vector_shapes import framing_collect as _collect
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for case in vectors("framing_encode.json")["cases"]:
         frame = build_packet(
             case["cmd"],
@@ -19,27 +13,7 @@ def test_encode_vectors(vectors):
             CrcType(case["crc_type"]),
         )
         assert frame.hex() == case["frame"], case["name"]
-
-
-def _collect(parser: PacketParser, chunks) -> dict:
-    events = []
-    trash = bytearray()
-    for chunk in chunks:
-        for ev in parser.feed(chunk):
-            if isinstance(ev, Packet):
-                events.append(
-                    {"type": "packet", "cmd": ev.cmd, "seq": ev.seq, "payload": ev.payload.hex()}
-                )
-            elif isinstance(ev, CrcError):
-                events.append({"type": "crc_error", "cmd": ev.cmd, "seq": ev.seq})
-            elif isinstance(ev, Trash):
-                trash.extend(ev.data)
-    return {
-        "events": events,
-        "trash": bytes(trash).hex(),
-        "residue": bytes(parser._buf).hex(),
-        "header_errors": parser.header_errors,
-    }
+        seen(case)
 
 
 def _random_chunks(stream: bytes, rng: random.Random):
@@ -52,7 +26,7 @@ def _random_chunks(stream: bytes, rng: random.Random):
     return out
 
 
-def test_decode_vectors_chunking_invariance(vectors):
+def test_decode_vectors_chunking_invariance(vectors, seen):
     """Contract 01 §5: identical results whole, byte-by-byte, random splits."""
     for case in vectors("framing_decode.json")["cases"]:
         stream = bytes.fromhex(case["stream"])
@@ -68,3 +42,4 @@ def test_decode_vectors_chunking_invariance(vectors):
         for round_ in range(3):
             split = _collect(PacketParser(), _random_chunks(stream, rng))
             assert split == expect, f"{case['name']}: random-split round {round_}"
+        seen(case)

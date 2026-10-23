@@ -19,9 +19,12 @@ adds Compact-Network-Histogram output on top of everything here; it has its own
 
 ## What it measures
 
-Per frame, each zone carries: `distanceMm`, `targetStatus` (5/9 = valid,
-255 = no target), `nbTargetDetected`, `signalPerSpad` and `ambientPerSpad`
-(kcps/SPAD), `nbSpadsEnabled`, `rangeSigmaMm`, `reflectance` (%). Plus a
+Per frame, each zone carries, in the real units ST's `GetRangingData` gives:
+`distanceMm` (integer mm, never negative — ST clamps a negative distance to 0),
+`targetStatus` (5/9 = valid, 255 = no target), `nbTargetDetected`,
+`signalPerSpad` and `ambientPerSpad` (kcps/SPAD, floats), `nbSpadsEnabled`,
+`rangeSigmaMm` (mm, float), `reflectance` (%, float). ST divides integers; the
+SDK keeps the fraction (e.g. reflectance 37.5 %, not 37). Plus a
 per-frame `siliconTempDegc` and an optional `motion` block. Arrays are sized to
 the active resolution (16 or 64), row-major.
 

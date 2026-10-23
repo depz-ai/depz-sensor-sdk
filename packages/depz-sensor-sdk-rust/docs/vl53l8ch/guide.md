@@ -7,8 +7,21 @@ signatures see the [API reference](api.md).
 **CH shares the entire VL53L8CX decode surface.** Chunk reassembly, frame
 decode, the results fields and scaling, the grid, the `Variant` selector, and
 every advanced DCI codec work exactly as in the
-[VL53L8CX user guide](../vl53l8cx/guide.md) — read that first. This page covers
-**only what CH adds**: the CH footer offset and the CNH decode.
+[VL53L8CX user guide](../vl53l8cx/guide.md) — read that first; so does the live
+device: `devices::Vl53l8chDevice` derefs to `Vl53l8cxDevice`. This page covers
+**only what CH adds**: arming CNH on the device, the CH footer offset and the
+CNH decode.
+
+```rust
+use depz_sensor_sdk::vl53l8::driver::Vl53l8CnhSetup;
+
+let mut cnh = Vl53l8CnhSetup::new();
+cnh.init_config(10, 20, 2)?;                  // start bin, CNH bins, bins summed per CNH bin
+cnh.create_agg_map(64, 0, 0, 2, 2, 4, 4)?;    // 16 aggregates of 2×2 zones on the 8×8 grid
+tof.configure_cnh(&cnh)?;                     // after init, before start_ranging
+// every frame now carries `cnh_raw`:
+// depz_sensor_sdk::vl53l8::decode_cnh(&cnh.decode_config(), frame.cnh_raw.as_ref().unwrap())
+```
 
 This crate does not drive the board: arming a CNH configuration is done with
 the Python or TypeScript SDK. Keep the configuration's aggregate count and bins

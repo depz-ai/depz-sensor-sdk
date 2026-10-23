@@ -252,6 +252,18 @@ public readonly record struct Bno055MagConfig(int Rate, int Mode, int Power)
     public static Bno055MagConfig Unpack(byte value) => new(value & 7, value >> 3 & 3, value >> 5 & 3);
 }
 
+/// <summary>ST_RESULT (0x36) + SYS_CLK_STATUS / SYS_STATUS / SYS_ERR (0x38..0x3A); INT_STA (0x37)
+/// sits in between and clears on read, so it is not read.</summary>
+public sealed record Bno055SystemStatus(int SelfTest, int ClkStatus, int Status, int Error)
+{
+    public string StatusText => Bno055Regs.SysStatusNames.TryGetValue(Status, out var s) ? s : $"unknown ({Status})";
+
+    /// <summary>Meaningful when <see cref="Status"/> is 1 (system error).</summary>
+    public string ErrorText => Bno055Regs.SysErrNames.TryGetValue(Error, out var s) ? s : $"unknown ({Error})";
+
+    public bool SelfTestPassed => (SelfTest & Bno055Regs.ExpectedSelfTest) == Bno055Regs.ExpectedSelfTest;
+}
+
 /// <summary>
 /// Raw register values found in one block read. A channel is null when the
 /// window addr..addr+len does not cover all of its bytes.
@@ -273,11 +285,61 @@ public sealed record Bno055RawBlock(
 /// "base" layer. Mirrors <c>depz_sensor_sdk/bno055/regs.py</c> 1:1. Nothing
 /// here touches the wire; <c>vectors/bno055.json</c> pins it. Scaling is
 /// raw / LSB with <see cref="Bno055Units"/> and the fixed LSB constants below.
-/// OUT OF SCOPE (as for every C# sensor): the live driver over the bridge
-/// (mode switching, boot / fusion-start polls, page discipline, self-test).
+/// The live driver over the bridge (mode switching, boot / fusion-start polls,
+/// page discipline, self-test) is <see cref="Devices.Bno055Device"/>.
 /// </summary>
 public static class Bno055Regs
 {
+    // ── timing (contract 13 §4) ─────────────────────────────────────────────
+    /// <summary>Settle time after an OPR_MODE write out of CONFIG (datasheet: 7 ms).</summary>
+    public static readonly TimeSpan ModeSwitchFromConfig = TimeSpan.FromMilliseconds(10);
+
+    /// <summary>Settle time after an OPR_MODE write into CONFIG (datasheet: 19 ms).</summary>
+    public static readonly TimeSpan ModeSwitchToConfig = TimeSpan.FromMilliseconds(25);
+
+    /// <summary>The built-in self-test runs ~400 ms (datasheet §3.9.2).</summary>
+    public static readonly TimeSpan SelfTestTime = TimeSpan.FromMilliseconds(450);
+
+    /// <summary>SYS_STATUS values of a sensor still booting (initializing, self-test).</summary>
+    public static readonly IReadOnlyList<int> SysStatusBooting = new[] { 2, 3, 4 };
+
+    public static readonly TimeSpan BootSettleTimeout = TimeSpan.FromSeconds(1);
+
+    /// <summary>SYS_STATUS 4 polls in a row taken as the leftover of a self-test run in CONFIG, not POST.</summary>
+    public const int StuckSelfTestPolls = 20;
+
+    /// <summary>After CONFIG → a fusion mode the fusion outputs read zero for ~70 ms.</summary>
+    public static readonly TimeSpan FusionStartTimeout = TimeSpan.FromSeconds(1);
+
+    /// <summary>Page-1 motion-interrupt setting registers (thresholds, durations, axis selects).</summary>
+    public static bool IsInterruptSettingReg(int register) => register >= P1AccAmThres && register <= P1GyrAmSet;
+
+    public static readonly IReadOnlyDictionary<int, string> SysStatusNames = new Dictionary<int, string>
+    {
+        [0] = "idle",
+        [1] = "system error",
+        [2] = "initializing peripherals",
+        [3] = "system initialization",
+        [4] = "executing self-test",
+        [5] = "fusion algorithm running",
+        [6] = "running without fusion",
+    };
+
+    public static readonly IReadOnlyDictionary<int, string> SysErrNames = new Dictionary<int, string>
+    {
+        [0] = "no error",
+        [1] = "peripheral initialization error",
+        [2] = "system initialization error",
+        [3] = "self-test failed",
+        [4] = "register map value out of range",
+        [5] = "register map address out of range",
+        [6] = "register map write error",
+        [7] = "low power mode not available for this operation mode",
+        [8] = "accelerometer power mode not available",
+        [9] = "fusion algorithm configuration error",
+        [10] = "sensor configuration error",
+    };
+
     // ── page 0 ──────────────────────────────────────────────────────────────
     public const byte ChipId = 0x00;
     public const byte PageId = 0x07;

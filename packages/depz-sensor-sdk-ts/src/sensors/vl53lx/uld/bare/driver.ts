@@ -94,7 +94,7 @@ export class VL53LX extends SensorDriver {
   }
 
   // ── identity ──
-  modelId(): Promise<number> {
+  async modelId(): Promise<number> {
     return this.p.rdWord(0x010f);
   }
 

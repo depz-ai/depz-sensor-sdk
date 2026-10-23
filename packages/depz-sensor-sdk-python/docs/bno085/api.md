@@ -10,7 +10,7 @@ the source, not this file.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
+- **BNO085 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`MotionRequest`](#motionrequest), [`MotionIntent`](#motionintent), [`FlushCompleted`](#flushcompleted), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
 
 ## BNO085 (IMU)
 
@@ -237,6 +237,13 @@ set_reorientation(self, x: float, y: float, z: float, w: float) -> None
 Set the runtime reorientation quaternion (Q14 on the wire; all
 zeros clears). No response per SH-2.
 
+The rotation is applied on the board's side (new = report * r) and is
+given in the hub's own axes: x and y swapped and z negated relative
+to the axes of the reports — a rotation about x here turns the
+reports about y (bench, 2026-10-22, SH-2 3.12.6). The System
+Orientation record (FRS 0x2D3E) uses the same axes and is read only
+when the hub starts.
+
 #### Bno086.set_calibration
 
 ```python
@@ -268,6 +275,39 @@ configure_periodic_dcd(self, enable: bool) -> None
 ```
 
 Enable/disable the hub's periodic DCD autosave (no response).
+
+#### Bno086.set_motion_intent
+
+```python
+set_motion_intent(self, intent: int) -> None
+```
+
+Tell the hub how the device is about to move (Interactive
+Calibration, command 0x0E, see MotionIntent), so it can refine the
+gyro zero-rate offset while the device is still. No response per
+SH-2; a BNO085 ignores it. The hub's answer, if it wants the device to
+stop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST).
+
+#### Bno086.enable_motion_request
+
+```python
+enable_motion_request(self, hz: float = 1, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+```
+
+Enable MotionRequest (0x2B) reports. The hub sends one when its
+request changes, not at `hz`; it reads the rate back late, so the
+granted rate is not checked.
+
+#### Bno086.flush
+
+```python
+flush(self, sensor: int, timeout: float = 1.0) -> None
+```
+
+Force Sensor Flush (0xF0): have the hub send `sensor`'s batched
+reports now instead of when its batch interval runs out. Returns once
+the hub's Flush Completed (0xEF) for `sensor` arrives — every report
+batched before the call has been emitted by then.
 
 #### Bno086.frs_read
 
@@ -421,6 +461,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Bno086.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Bno086.read_mcu_temperature
 
@@ -705,6 +754,150 @@ class Magnetometer(sensor_id: int, timestamp_us: int, seq: int, accuracy: int, d
 #### Magnetometer.y *(property)*
 
 #### Magnetometer.z *(property)*
+
+### MotionRequest
+
+```python
+class MotionRequest(sensor_id: int, timestamp_us: int, seq: int, accuracy: int, delay_us: int, intent: int, request: int) -> None
+```
+
+0x2B motion request (BNO085 interactive calibration): the motion
+intent the hub was last told, and what it asks of the device. Sent when
+the request changes, not periodically, whatever the granted rate.
+
+#### MotionRequest.intent_name *(property)*
+
+#### MotionRequest.request_name *(property)*
+
+#### MotionRequest.wants_stillness *(property)*
+
+True when the hub asks the device to stop (the deprecated
+optional request 2 does not count).
+
+### MotionIntent
+
+```python
+class MotionIntent(*values)
+```
+
+P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 —
+what the host knows about the device's motion. UNKNOWN is the hub's
+initial state.
+
+#### MotionIntent.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### MotionIntent.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### MotionIntent.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### MotionIntent.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### MotionIntent.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### MotionIntent.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### MotionIntent.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### FlushCompleted
+
+```python
+class FlushCompleted(sensor_id: int, timestamp_us: int, flushed_sensor: int) -> None
+```
+
+0xEF Flush Completed: every batched report of `flushed_sensor` as of
+the matching Force Sensor Flush has been sent. `sensor_id` is 0xEF.
 
 ### FeatureResponse
 

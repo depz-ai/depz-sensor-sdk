@@ -6,6 +6,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import check_uint, need_bytes
+
 
 class Sr04Cmd(IntEnum):
     GET_SAMPLE_PERIOD = 0x32
@@ -46,24 +48,27 @@ class Sr04Data:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "Sr04Data":
-        cmd, ts, echo = struct.unpack("<BQH", payload)
+        need_bytes("RPT_SR04_DATA", payload, 11)
+        cmd, ts, echo = struct.unpack_from("<BQH", payload)
         return cls(cmd, ts, echo)
 
 
 def pack_sample_period(period_us: int) -> bytes:
-    return struct.pack("<I", period_us)
+    return struct.pack("<I", check_uint("period_us", period_us, 32))
 
 
 def unpack_sample_period(payload: bytes) -> int:
-    return struct.unpack("<I", payload)[0]
+    need_bytes("RPT_SAMPLE_PERIOD", payload, 4)
+    return struct.unpack_from("<I", payload)[0]
 
 
 def pack_echo_decay(decay_us: int) -> bytes:
-    return struct.pack("<H", decay_us)
+    return struct.pack("<H", check_uint("decay_us", decay_us, 16))
 
 
 def unpack_echo_decay(payload: bytes) -> int:
-    return struct.unpack("<H", payload)[0]
+    need_bytes("RPT_ECHO_DECAY", payload, 2)
+    return struct.unpack_from("<H", payload)[0]
 
 
 def distance_mm_from_echo(echo_time_us: int, air_temp_c: float | None = None) -> float | None:

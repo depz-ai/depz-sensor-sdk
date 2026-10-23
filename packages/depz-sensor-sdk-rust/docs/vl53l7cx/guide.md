@@ -7,10 +7,13 @@ the grid, the advanced DCI codecs — is the VL53L8 one: see the
 [VL53L8CX guide](../vl53l8cx/guide.md). For concepts read the
 [introduction](introduction.md); for signatures the [API reference](api.md).
 
-This crate does not drive the board: initialising the sensor (firmware
-download, default configuration) and starting a ranging session is done with
-the Python or TypeScript SDK. What follows is everything you need to build the
-board's commands and decode what it sends.
+The live device is `devices::Vl53l7cxDevice`: it derefs to `Vl53l8cxDevice`,
+so init (the firmware download), configuration and ranging are the
+[VL53L8CX ones](../vl53l8cx/guide.md#live-device), with ranging from 1 Hz; it
+adds the board commands `get_bridge_info`, `set_i2c_speed_khz` and `pin_ctrl`
+(`PIN_LPN_OFF` and `PIN_SOFT_CYCLE` drop the sensor's state: `init` again).
+What follows is the layer under it: the board's commands and the decode of
+what it sends.
 
 ## Contents
 

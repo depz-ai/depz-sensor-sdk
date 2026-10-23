@@ -90,7 +90,8 @@ BNO_READ_REG payload: addr u8, len u8.
 bytes pack_write_reg(std::uint8_t addr, byte_span data);
 ```
 
-BNO_WRITE_REG payload: addr u8 then the raw register data (1..XFER_MAX).
+BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
+unless it is 1..XFER_MAX bytes.
 
 ### pack_start_stream
 
@@ -184,7 +185,7 @@ static std::optional<StreamData> unpack(byte_span payload);
 ```
 
 Decode a RPT_BNO_REG_STREAM payload (10+len bytes); nullopt when shorter
-than the 10-byte header.
+than the 10-byte header plus its `len` data bytes (trailing bytes ignored).
 
 ### REG_CHIP_ID
 

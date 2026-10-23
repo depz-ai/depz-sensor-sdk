@@ -9,7 +9,7 @@ from depz_sensor_sdk.protocol import (
 )
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for case in vectors("common_commands.json")["encode"]:
         if case["kind"] == "sync_time_request":
             assert pack_sync_time(case["pc_timestamp_us"]).hex() == case["payload"]
@@ -20,9 +20,10 @@ def test_encode_vectors(vectors):
             assert cfg.pack().hex() == case["payload"]
         else:
             raise AssertionError(f"unknown encode kind {case['kind']}")
+        seen(case)
 
 
-def test_decode_vectors(vectors):
+def test_decode_vectors(vectors, seen):
     for case in vectors("common_commands.json")["decode"]:
         payload = bytes.fromhex(case["payload"])
         expect = case["expect"]
@@ -44,10 +45,12 @@ def test_decode_vectors(vectors):
             )
         else:
             raise AssertionError(f"unknown report 0x{case['report']:02X}")
+        seen(case)
 
 
-def test_sync_time_math(vectors):
+def test_sync_time_math(vectors, seen):
     for case in vectors("common_commands.json")["sync_time_math"]:
         off, rtt = sync_time_offset_rtt(case["t1"], case["t2"], case["t3"], case["t4"])
         assert off == case["offset_us"], case["name"]
         assert rtt == case["rtt_us"], case["name"]
+        seen(case)

@@ -4,8 +4,9 @@ The **VL53L4CD** is ST's single-zone Time-of-Flight ranger (~1 mm resolution to
 ~1.3 m). On the DEPZ sensor line the MCU is a **thin I2C register bridge**: it
 owns only the I2C bus, the XSHUT and INT pins and one streaming FSM, while the
 full ST Ultra-Lite Driver (ULD 2.2.3) semantics run **on the host**. This crate
-provides both halves of the host side ([`vl53l4`](api.md)): the wire codecs
-(`vl53l4::codecs`) and the pure ULD decode/math (`vl53l4::uld_math`).
+runs it: the live device `devices::Vl53l4cdDevice` with the ULD port
+(`vl53l4::driver::Vl53l4cdDriver`), over the wire codecs (`vl53l4::codecs`) and
+the ULD register math (`vl53l4::uld_math`).
 
 ## What it does
 

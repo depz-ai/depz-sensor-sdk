@@ -1,7 +1,7 @@
 package ai.depz.sensor.sensors.vl53l4;
 
 /**
- * VL53L4CD ULD (ST STSW-IMG026 2.2.3) — the host-verifiable decode layer only.
+ * VL53L4CD ULD (ST STSW-IMG026 2.2.3) — the register math under the driver.
  *
  * <p>Port of the pure codec/math pieces of {@code VL53L4CD_api.c} that are
  * hardware-independent and covered by golden vectors: the 17-byte result-block
@@ -12,10 +12,8 @@ package ai.depz.sensor.sensors.vl53l4;
  * ({@code depz_sensor_sdk/vl53l4/uld.py}) 1:1 — integer widths and 32-bit
  * truncations included; do not "simplify" the math.
  *
- * <p>OUT OF SCOPE (extension point, intentionally not ported): the live ULD
- * init / register-bridge driver (sensor_init, VHV calibration, offset/xtalk
- * calibration loops). Those depend on a live I2C bridge and cannot be replayed
- * deterministically; see {@link #liveDriverStubbed()}.
+ * <p>The live driver over a register bridge (sensor_init, VHV calibration,
+ * offset / xtalk calibration loops) is {@link Vl53l4cdDriver}.
  */
 public final class Vl53l4Uld {
     private Vl53l4Uld() {}
@@ -56,6 +54,29 @@ public final class Vl53l4Uld {
 
     /** IDENTIFICATION__MODEL_ID word expected from a live VL53L4CD. */
     public static final int MODEL_ID = 0xEBAA;
+
+    /** The bus speed an unconfigured sensor is specified for (sensor_init writes its block at it). */
+    public static final int I2C_KHZ_BOOT = 400;
+
+    /** Recommended post-init bus speed (the result-block read is ~4× faster). */
+    public static final int I2C_KHZ_DEFAULT = 1000;
+
+    /** Range status (after the ST mapping) → its meaning; 0 is a valid measurement. */
+    public static final java.util.Map<Integer, String> RANGE_STATUS_NAMES = java.util.Map.ofEntries(
+        java.util.Map.entry(0, "valid"),
+        java.util.Map.entry(1, "sigma above threshold"),
+        java.util.Map.entry(2, "signal below threshold"),
+        java.util.Map.entry(3, "distance below detection threshold"),
+        java.util.Map.entry(4, "phase out of valid limit"),
+        java.util.Map.entry(5, "hardware fail"),
+        java.util.Map.entry(6, "no wrap-around check done"),
+        java.util.Map.entry(7, "wrapped target, phase mismatch"),
+        java.util.Map.entry(8, "processing fail"),
+        java.util.Map.entry(9, "crosstalk signal fail"),
+        java.util.Map.entry(10, "interrupt error"),
+        java.util.Map.entry(11, "merged target"),
+        java.util.Map.entry(12, "signal too low"),
+        java.util.Map.entry(255, "other error"));
 
     /** Detection-threshold window modes (SYSTEM__INTERRUPT). */
     public static final int WINDOW_BELOW = 0;
@@ -168,15 +189,23 @@ public final class Vl53l4Uld {
      * mode, i.e. when {@code interMeasurementMs > 0}). Budget 10..200 ms;
      * {@code interMeasurementMs} 0 (continuous) or greater than the budget
      * (autonomous low power) — anything else throws {@link Vl53l4Error}.
+     * Register words are refused out of range, never wrapped: {@code oscFrequency}
+     * 1..65535, {@code clockPll} 0..65535, {@code interMeasurementMs} a u32, and
+     * an INTERMEASUREMENT_MS dword that would overflow u32 throws too.
+     * The third element (the dword) is a u32 in Java's {@code int} convention
+     * ({@link Integer#toUnsignedLong}).
      */
     public static int[] rangeTimingRegisters(
-            int timingBudgetMs, int interMeasurementMs, int oscFrequency, int clockPll) {
+            int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll) {
         if (oscFrequency == 0) {
             throw new Vl53l4Error("osc_frequency reads 0");
         }
         if (timingBudgetMs < 10 || timingBudgetMs > 200) {
             throw new Vl53l4Error("timing_budget_ms must be 10..200");
         }
+        inRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        inRange("clockPll", clockPll, 0, 0xFFFF);
+        inRange("interMeasurementMs", interMeasurementMs, 0, 0xFFFFFFFFL);
 
         long timingBudgetUs = timingBudgetMs * 1000L;
         long macroPeriodUs = ((2304L * (0x40000000L / oscFrequency)) & 0xFFFFFFFFL) >> 6;
@@ -186,8 +215,12 @@ public final class Vl53l4Uld {
             intermeasurementRaw = 0;
             timingBudgetUs -= 2500;
         } else if (interMeasurementMs > timingBudgetMs) { // autonomous low power
-            double factor = 1.055 * interMeasurementMs * (clockPll & 0x3FF);
-            intermeasurementRaw = (long) factor; // truncate toward zero (non-negative)
+            double factor = Math.floor(1.055 * interMeasurementMs * (clockPll & 0x3FF));
+            if (factor > 0xFFFFFFFFL) {
+                throw new Vl53l4Error("interMeasurementMs " + interMeasurementMs
+                    + ": INTERMEASUREMENT_MS overflows u32");
+            }
+            intermeasurementRaw = (long) factor;
             timingBudgetUs = (timingBudgetUs - 4300) / 2;
         } else {
             throw new Vl53l4Error("inter_measurement_ms must be 0 or > timing_budget_ms");
@@ -215,13 +248,18 @@ public final class Vl53l4Uld {
      *
      * <p>Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
      * RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
-     * word.
+     * word. A value wider than its register (dword u32, words u16) throws
+     * {@link Vl53l4Error}.
      */
     public static int[] decodeRangeTiming(
             long intermeasurementRaw, int clockPll, int oscFrequency, int rangeConfigA) {
         if (oscFrequency == 0) {
             throw new Vl53l4Error("osc_frequency reads 0");
         }
+        inRange("intermeasurementRaw", intermeasurementRaw, 0, 0xFFFFFFFFL);
+        inRange("clockPll", clockPll, 0, 0xFFFF);
+        inRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        inRange("rangeConfigA", rangeConfigA, 0, 0xFFFF);
 
         long pll = ((long) (1.065 * (clockPll & 0x3FF))) & 0xFFFF;
         long interMeasurementMs = pll != 0 ? (intermeasurementRaw / pll) & 0xFFFF : 0;
@@ -245,32 +283,53 @@ public final class Vl53l4Uld {
 
     /** RANGE_OFFSET_MM word for SetOffset (INNER/OUTER are zeroed alongside). */
     public static int offsetRaw(int offsetMm) {
+        inRange("offsetMm", offsetMm, -1024, 1023); // 11-bit signed mm (decodeOffset's range)
         return (offsetMm * 4) & 0xFFFF;
     }
 
     /** GetOffset: RANGE_OFFSET_MM word → signed millimetres. */
     public static int decodeOffset(int rawWord) {
+        inRange("rawWord", rawWord, 0, 0xFFFF);
         int temp = ((rawWord << 3) & 0xFFFF) >> 5;
         return temp > 1024 ? temp - 2048 : temp;
     }
 
+    /**
+     * C's round(): an exact .5 goes away from zero. ST's ULD rounds xtalk this way; Java's
+     * {@code Math.round} sends a negative half up instead.
+     */
+    public static int roundHalfAway(double x) {
+        double t = x < 0 ? Math.ceil(x) : Math.floor(x);
+        if (x - t >= 0.5) {
+            return (int) t + 1;
+        }
+        if (x - t <= -0.5) {
+            return (int) t - 1;
+        }
+        return (int) t;
+    }
+
     /** XTALK_PLANE_OFFSET_KCPS word for SetXtalk. */
     public static int xtalkRaw(int xtalkKcps) {
+        inRange("xtalkKcps", xtalkKcps, 0, 0xFFFF >> 9);
         return (xtalkKcps << 9) & 0xFFFF;
     }
 
     /** GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps. */
     public static int decodeXtalk(int rawWord) {
+        inRange("rawWord", rawWord, 0, 0xFFFF);
         return (int) Math.round(rawWord / 512.0);
     }
 
     /** MIN_COUNT_RATE_RTN_LIMIT_MCPS word for SetSignalThreshold. */
     public static int signalThresholdRaw(int signalKcps) {
+        inRange("signalKcps", signalKcps, 0, 0xFFFF);
         return signalKcps >> 3;
     }
 
     /** GetSignalThreshold: word → kcps. */
     public static int decodeSignalThreshold(int rawWord) {
+        inRange("rawWord", rawWord, 0, 0xFFFF);
         return (rawWord << 3) & 0xFFFF;
     }
 
@@ -279,21 +338,22 @@ public final class Vl53l4Uld {
         if (sigmaMm > (0xFFFF >> 2)) {
             throw new Vl53l4Error("sigma_mm must be <= 16383");
         }
+        inRange("sigmaMm", sigmaMm, 0, 0xFFFF >> 2);
         return sigmaMm << 2;
     }
 
     /** GetSigmaThreshold: word → mm. */
     public static int decodeSigmaThreshold(int rawWord) {
+        inRange("rawWord", rawWord, 0, 0xFFFF);
         return rawWord >> 2;
     }
 
-    /**
-     * The live ULD init / register-bridge driver (sensor_init, VHV/offset/xtalk
-     * calibration) is intentionally not ported to Java — it is
-     * hardware-dependent and out of the decode scope.
-     */
-    public static boolean liveDriverStubbed() {
-        return true;
+
+    /** A register-derived argument outside {@code lo..hi} → {@link Vl53l4Error} (never wrapped). */
+    private static void inRange(String name, long v, long lo, long hi) {
+        if (v < lo || v > hi) {
+            throw new Vl53l4Error(name + " " + v + " out of range " + lo + ".." + hi);
+        }
     }
 
     // ── BE helpers ───────────────────────────────────────────────────────────

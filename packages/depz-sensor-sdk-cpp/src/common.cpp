@@ -2,6 +2,8 @@
 
 #include "depz/detail/byteio.hpp"
 
+#include <stdexcept>
+
 namespace depz {
 
 using detail::rd_i16;
@@ -36,6 +38,11 @@ SequenceErrorReport SequenceErrorReport::unpack(byte_span p) {
 }
 
 bytes SyncPinConfig::pack() const {
+    // contract 02 §6: logical pins 1..5, modes 0..4, polarity 0..1
+    if (pin < 1 || pin > 5) throw std::out_of_range("SyncPinConfig: pin is not a sync pin 1..5");
+    if (static_cast<std::uint8_t>(mode) > 4) throw std::out_of_range("SyncPinConfig: mode is not a SyncPinMode");
+    if (static_cast<std::uint8_t>(polarity) > 1)
+        throw std::out_of_range("SyncPinConfig: polarity is not a SyncPinPolarity");
     bytes out;
     out.push_back(std::byte{pin});
     out.push_back(std::byte{static_cast<std::uint8_t>(mode)});
@@ -78,9 +85,15 @@ std::string strip_device_string(byte_span raw) {
             break;
         }
     }
+    // ASCII (contract 02 §4.1): a byte >= 0x80 is U+FFFD (UTF-8 EF BF BD), an
+    // embedded 0x00 is kept as a character.
     std::string out;
     out.reserve(end);
-    for (std::size_t i = 0; i < end; ++i) out.push_back(static_cast<char>(u8(raw[i])));
+    for (std::size_t i = 0; i < end; ++i) {
+        const std::uint8_t c = u8(raw[i]);
+        if (c < 0x80) out.push_back(static_cast<char>(c));
+        else out.append("\xEF\xBF\xBD");
+    }
     return out;
 }
 

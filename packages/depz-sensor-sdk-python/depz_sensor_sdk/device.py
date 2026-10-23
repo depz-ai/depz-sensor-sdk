@@ -31,9 +31,11 @@ from .protocol.common import (
     TemperatureReport,
     TextReport,
     UNSOLICITED,
+    check_sync_pin,
     pack_sync_time,
     sync_time_offset_rtt,
 )
+from .protocol.identity import Identity, parse_software_name
 from .transport import CrcError, CrcType, Packet, PacketParser, Trash, build_packet
 from .transport.link import Link
 from .transport.serial_link import SerialLink
@@ -513,6 +515,11 @@ class DeviceBase:
     def get_serial_number(self) -> str:
         return self.request(Cmd.GET_SERIAL, matcher=self.expect_text(Cmd.GET_SERIAL))
 
+    def identify(self) -> Identity:
+        """Classify the running firmware (contract 02 §4): the software name
+        parsed into mode, sensor type and version."""
+        return parse_software_name(self.get_software_name())
+
     def read_mcu_temperature(self) -> float:
         """Last cached MCU temperature in °C (device refreshes ~2 Hz)."""
         rep: TemperatureReport = self.request(
@@ -563,7 +570,7 @@ class DeviceBase:
     def get_sync_pin(self, pin: int) -> SyncPinConfig:
         return self.request(
             Cmd.GET_SYNC_PIN_CONFIG,
-            bytes([pin]),
+            bytes([check_sync_pin(pin)]),
             matcher=self.expect_report(Rpt.SYNC_PIN_CONFIG, SyncPinConfig.unpack),
         )
 

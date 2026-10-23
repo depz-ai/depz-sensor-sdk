@@ -17,6 +17,8 @@
  * re-export this module with `export *` next to the other VL53 protocols.
  */
 
+import { checkUint } from "./wire.js";
+
 export enum Vl53lxCmd {
   ReadReg = 0x32,
   WriteReg = 0x33,
@@ -58,13 +60,13 @@ export function packVl53lxStartStream(
   }
   const out = new Uint8Array(6 + 3 * clear.length);
   const dv = new DataView(out.buffer);
-  dv.setUint16(0, addr, true);
-  dv.setUint16(2, length, true);
-  dv.setUint8(4, flags);
+  dv.setUint16(0, checkUint("addr", addr, 16), true);
+  dv.setUint16(2, checkUint("length", length, 16), true);
+  dv.setUint8(4, checkUint("flags", flags, 8));
   dv.setUint8(5, clear.length);
   clear.forEach(([stepAddr, value], i) => {
-    dv.setUint16(6 + 3 * i, stepAddr, true);
-    dv.setUint8(8 + 3 * i, value);
+    dv.setUint16(6 + 3 * i, checkUint("stepAddr", stepAddr, 16), true);
+    dv.setUint8(8 + 3 * i, checkUint("value", value, 8));
   });
   return out;
 }

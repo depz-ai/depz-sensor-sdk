@@ -14,7 +14,7 @@ from depz_sensor_sdk.vl53l8 import cnh
 _VECTOR = Path(__file__).resolve().parents[3] / "contracts/vectors/vl53l8_cnh.json"
 
 
-def test_cnh_decode_matches_golden_vector():
+def test_cnh_decode_matches_golden_vector(seen):
     v = json.loads(_VECTOR.read_text())
     c = v["config"]
     cfg = CnhConfig()
@@ -30,3 +30,16 @@ def test_cnh_decode_matches_golden_vector():
     for got, want in zip(decoded["aggregates"], exp["aggregates"]):
         assert got["hist_raw"] == want["hist_raw"]
         assert got["hist_scaler"] == want["hist_scaler"]
+    seen("vl53l8_cnh")
+
+
+def test_cnh_decode_of_a_streamed_frame():
+    """The last CNH block the VL53L8CH capture streamed (byte-exact against
+    the sidecar in scenarios/vl53l8ch_cnh_8x8_15hz) decodes with the setup
+    the scenario armed."""
+    sidecar = _VECTOR.parent / "recordings" / "vl53l8ch_cnh_8x8_15hz.expected.json"
+    raw = bytes.fromhex(json.loads(sidecar.read_text())["frames"][-1]["cnh_raw"])
+    cfg = CnhConfig()
+    cfg.init_config(start_bin=10, num_bins=20, sub_sample=2)
+    cfg.create_agg_map(64, 0, 0, 2, 2, 4, 4)
+    assert len(cnh.decode(cfg, raw)) > 0

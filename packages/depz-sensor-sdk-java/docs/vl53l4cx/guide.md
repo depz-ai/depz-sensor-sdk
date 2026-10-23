@@ -1,18 +1,15 @@
 # VL53L4CX — user guide
 
-Hands-on guide to the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
+Hands-on guide to the live device (`ai.depz.sensor.devices.Vl53lxDevice`,
+which runs ST's drivers on the host) and the layers under it: the 1D-family codecs ([`Vl53lx`](api.md#vl53lx)), product
 table ([`Vl53lxProducts`](api.md#vl53lxproducts)) and block decode
 ([`Vl53lxDecode`](api.md#vl53lxdecode)) for the VL53L4CX. For what the sensor
 is and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
-This SDK does not drive the sensor: the ST driver (initialisation, modes,
-budgets, histogram target extraction) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
@@ -21,6 +18,52 @@ commands and decode what the board streams.
 - [Which statuses to plot](#which-statuses-to-plot)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxTarget;
+import java.time.Duration;
+
+try (Vl53lxDevice tof = DepzDevices.openVl53lx()) { // a Vl53l4cxDevice for this board
+    System.out.println(tof.driverKinds());          // histogram
+    tof.init();                                   // the histogram driver; init("uld", "VL53L4CD") runs it light
+    tof.configure(50, 0, "medium");               // medium only on this part, 2..550 ms
+
+    try (Subscription<Vl53lxMeasurement> frames = tof.measurements()) {
+        tof.startRanging();
+        Vl53lxMeasurement m = frames.take(Duration.ofSeconds(1));
+        for (Vl53lxTarget t : m.targets()) {
+            System.out.println(t.distanceMm() + " mm (" + t.minRangeMm() + ".." + t.maxRangeMm() + "), " + t.statusText());
+        }
+        tof.stopRanging();
+    }
+}
+```
+
+- `histogram` is this product's only driver kind. To run the light VL53L4CD
+  ULD (`Vl53l4UldDriver`: offset / crosstalk calibration, detection
+  thresholds) borrow it: `init("uld", "VL53L4CD")` — `notes()` then says the
+  pair is borrowed and how far it reaches.
+- `histogram` — ST's BareDriver (`Vl53lxHistogramDriver`), its post-processing
+  on the host: up to four targets per frame in `targets()` (strongest first,
+  the top level repeats the first, `minRangeMm()`..`maxRangeMm()` is the
+  pulse's extent) and the raw 24 bins in `bins()` (a `bare.HistogramBinData`). It has no
+  calibrations and no detection thresholds.
+- The first frame of a histogram stream reports status 6 (no wrap check: there
+  is no frame before it), a target with nothing in the frame before reports 12;
+  draw `m.plotDistances()` (statuses 0, 6, 11).
+- Every streamed frame is decoded once, in order, on the reader thread: the
+  histogram driver keeps the A/B frame pair and the previous frame's targets.
+- `configure` re-initialises the sensor and applies the mode and budget; it
+  and every setting throw `IllegalStateException` while ranging. Ask
+  `tof.supports("offset")` (…) before an optional group: a missing one throws
+  `UnsupportedOperationException`.
+- `tof.driver()` is the driver itself; `measureOnce()` is one polled range.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## Which board is it
 
@@ -134,14 +177,14 @@ for (Event ev : parser.feed(rxBytes)) {
 ```
 
 Turning bins into up to four targets (preset, VCSEL period, the A/B frame
-pairs, phase history) is the full driver's job and is not in this SDK. The
-driver keeps state from frame to frame, so a stream fed to it must be decoded
+pairs, phase history) is the histogram driver's job (`Vl53lxHistogramDriver`,
+see [Live device](#live-device)). The driver keeps state from frame to frame, so a stream fed to it must be decoded
 **exactly once, in order** — replaying or skipping frames changes its output.
 
 ## Running as a VL53L4CD
 
-For offset/crosstalk calibration or thresholds, the full drivers can run the
-VL53L4CX on the VL53L4CD's light ULD (reach drops to ~1.4 m). The board then
+For offset/crosstalk calibration or thresholds, `init("uld", "VL53L4CD")` runs
+the VL53L4CX on the VL53L4CD's light ULD (reach drops to ~1.4 m). The board then
 streams the 17-byte die block, read with `DieVariant.L4`:
 
 ```java
@@ -185,8 +228,8 @@ The histogram block's `rangeStatus` byte is the raw device register, not the
 driver's target status — the rule does not apply to it.
 
 There is no `short` histogram preset on an L4 die (VL53L4CD / L4CX), and the
-budget ceiling there is 200 ms: the SDKs that run the driver (Python, TS, C,
-C++) refuse both, as ST's own L4CX driver does — the A frame of the short pair
+budget ceiling there is 200 ms: the driver refuses both
+(`configure` throws `IllegalArgumentException`), as ST's own L4CX driver does — the A frame of the short pair
 ranges on the wrong side of the phase wrap, one frame in two (flat wall,
 2026-09-28: −341 mm at 0.15 and 0.3 m, −156 mm at 0.6 m, status 7 / 4). A
 driver of your own should refuse it too; `medium` and `long` are clean.

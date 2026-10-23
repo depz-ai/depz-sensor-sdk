@@ -39,11 +39,20 @@ constexpr std::uint32_t TARGET_STATUS_IDX = 0xE084;
 
 constexpr int NB_TARGET_PER_ZONE = 1;
 
-// Python floor division (rounds toward negative infinity), matching `d // 4`.
-std::int32_t floordiv4(std::int32_t a) {
-    std::int32_t q = a / 4;
-    if ((a % 4 != 0) && ((a < 0) != (4 < 0))) --q;
-    return q;
+// ST GetRangingData distance: wire value / 4 floored, a negative result
+// clamped to 0 (contract 04 §5; Python `max(0, d // 4)`). A negative wire
+// value floors to a negative result, so all of them give 0.
+std::int32_t distance_mm_from_raw(std::int32_t a) {
+    return a <= 0 ? 0 : a / 4;
+}
+
+// Wire integers -> real units: value / divisor as a double (ST divides
+// integers; the fraction is kept).
+template <typename T>
+std::vector<double> scaled(const std::vector<T>& raw, double divisor) {
+    std::vector<double> out(raw.size());
+    for (std::size_t k = 0; k < raw.size(); ++k) out[k] = static_cast<double>(raw[k]) / divisor;
+    return out;
 }
 
 std::int16_t s16(std::uint16_t v) { return static_cast<std::int16_t>(v); }
@@ -167,8 +176,10 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off) {
         i += msize + 4;
     }
 
-    // Fixed-point scaling (ST GetRangingData): distance /4 (floor).
-    for (auto& d : distance) d = floordiv4(d);
+    // Real units, as ST GetRangingData (contract 04 §5): distance /4 floored
+    // with a negative distance clamped to 0; signal, ambient, sigma and
+    // reflectance are scaled where they are moved into the frame below.
+    for (auto& d : distance) d = distance_mm_from_raw(d);
 
     // No target detected -> status 255, over the zones actually present.
     std::size_t nzones = nb_target.size();
@@ -197,17 +208,20 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off) {
     f.distance_mm = std::move(distance);
     f.target_status = std::move(target_status);
     f.nb_target_detected = std::move(nb_target);
-    f.signal_per_spad = std::move(signal);
-    f.ambient_per_spad = std::move(ambient);
+    f.signal_per_spad = scaled(signal, 2048.0);    // kcps/SPAD
+    f.ambient_per_spad = scaled(ambient, 2048.0);  // kcps/SPAD
     f.nb_spads_enabled = std::move(spad);
-    f.range_sigma_mm_raw = std::move(sigma);
-    f.reflectance = std::move(reflect);
+    f.range_sigma_mm = scaled(sigma, 128.0);       // mm
+    f.reflectance = scaled(reflect, 2.0);          // %
     return f;
 }
 
 // ── advanced-feature DCI codecs ─────────────────────────────────────────────
 
 std::uint32_t xtalk_margin_raw(double margin_kcps) {
+    // 0..10000 kcps: below 0, NaN or above is refused, never wrapped (contract 07 §3)
+    if (!(margin_kcps >= 0.0 && margin_kcps <= 10000.0))
+        throw std::out_of_range("xtalk margin outside 0..10000 kcps");
     return static_cast<std::uint32_t>(std::llround(margin_kcps * 2048.0));
 }
 
@@ -231,14 +245,23 @@ void wr_i32(bytes& out, std::int32_t v) {
 }  // namespace
 
 bytes pack_detection_thresholds(const std::vector<DetectionThreshold>& thresholds) {
+    // never silently dropped, never wrapped (contract 07 §3)
+    if (thresholds.size() > static_cast<std::size_t>(NB_THRESHOLDS))
+        throw std::invalid_argument("at most 64 detection thresholds");
+    for (const DetectionThreshold& t : thresholds) {
+        const std::int64_t scale = thresh_scale(t.measurement);
+        const std::int64_t lo = t.low_thresh * scale, hi = t.high_thresh * scale;
+        if (lo < INT32_MIN || lo > INT32_MAX || hi < INT32_MIN || hi > INT32_MAX)
+            throw std::out_of_range("a scaled detection threshold overflows i32");
+    }
     bytes out;
     out.reserve(NB_THRESHOLDS * 12);
     for (int k = 0; k < NB_THRESHOLDS; ++k) {
         DetectionThreshold t{};
         if (k < static_cast<int>(thresholds.size())) t = thresholds[k];
-        std::int32_t scale = thresh_scale(t.measurement);
-        wr_i32(out, t.low_thresh * scale);
-        wr_i32(out, t.high_thresh * scale);
+        const std::int64_t scale = thresh_scale(t.measurement);
+        wr_i32(out, static_cast<std::int32_t>(t.low_thresh * scale));
+        wr_i32(out, static_cast<std::int32_t>(t.high_thresh * scale));
         out.push_back(std::byte{t.measurement});
         out.push_back(std::byte{t.type});
         out.push_back(std::byte{t.zone_num});
@@ -333,7 +356,7 @@ CnhFrame decode_cnh(int nb_of_aggregates, int feature_length, byte_span raw) {
     // directly, so a block shorter than this config implies would be read
     // past its end.
     if (nb_of_aggregates <= 0 || nb_of_aggregates > CNH_MAX_AGGREGATES ||
-        feature_length <= 0 || feature_length > CNH_MAX_FEATURE_LENGTH)
+        feature_length < 0 || feature_length > CNH_MAX_FEATURE_LENGTH)
         throw std::invalid_argument("decode_cnh: aggregates / feature length out of range");
     if (raw.size() < static_cast<std::size_t>(CNH_PER_HEADER_WORDS) * 4)
         throw std::length_error("decode_cnh: block shorter than the CNH header");
@@ -361,6 +384,8 @@ CnhFrame decode_cnh(int nb_of_aggregates, int feature_length, byte_span raw) {
 }
 
 MotionConfig motion_config_init(int resolution) {
+    if (resolution != RESOLUTION_4X4 && resolution != RESOLUTION_8X8)
+        throw std::invalid_argument("motion config: resolution is 16 (4x4) or 64 (8x8)");
     MotionConfig cfg;
     cfg.ref_bin_offset = 13633;
     cfg.detection_threshold = 2883584;

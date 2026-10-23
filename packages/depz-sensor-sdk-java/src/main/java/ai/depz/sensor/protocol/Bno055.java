@@ -63,11 +63,15 @@ public final class Bno055 {
 
     /** BNO_READ_REG payload: {@code addr u8, len u8}. */
     public static byte[] packReadReg(int addr, int len) {
-        return new byte[] {(byte) addr, (byte) len};
+        return new byte[] {(byte) Wire.checkUintI("addr", addr, 8), (byte) Wire.checkUintI("length", len, 8)};
     }
 
-    /** BNO_WRITE_REG payload: {@code addr u8, data[1..128]}. */
+    /** BNO_WRITE_REG payload: {@code addr u8, data[1..128]}, else IllegalArgumentException. */
     public static byte[] packWriteReg(int addr, byte[] data) {
+        Wire.checkUint("addr", addr, 8);
+        if (data.length < 1 || data.length > XFER_MAX) {
+            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes");
+        }
         byte[] out = new byte[1 + data.length];
         out[0] = (byte) addr;
         System.arraycopy(data, 0, out, 1, data.length);
@@ -79,6 +83,10 @@ public final class Bno055 {
      * period_ms u16 LE}. Replaces any running stream.
      */
     public static byte[] packStartStream(int trigger, int addr, int len, int periodMs) {
+        Wire.checkUint("trigger", trigger, 8);
+        Wire.checkUint("addr", addr, 8);
+        Wire.checkUint("length", len, 8);
+        Wire.checkUint("periodMs", periodMs, 16);
         return new byte[] {
             (byte) trigger, (byte) addr, (byte) len, (byte) periodMs, (byte) (periodMs >>> 8)};
     }
@@ -88,6 +96,7 @@ public final class Bno055 {
     /** RPT_BNO_REG_DATA: {@code cmd u8} (echoed READ_REG opcode), {@code timestamp_us u64}, data. */
     public record RegData(int cmd, long timestampUs, byte[] data) {
         public static RegData unpack(byte[] p) {
+            Wire.needBytes("RPT_BNO_REG_DATA", p, 9);
             return new RegData(p[0] & 0xFF, Common.u64le(p, 1),
                 java.util.Arrays.copyOfRange(p, 9, p.length));
         }
@@ -99,10 +108,13 @@ public final class Bno055 {
      * {@code timestampUs} is the trigger time (timer expiry or INT edge).
      */
     public record StreamData(long timestampUs, int addr, int len, byte[] data) {
+        /** Rejects a payload shorter than its header or than the {@code len} data bytes it announces. */
         public static StreamData unpack(byte[] p) {
+            Wire.needBytes("RPT_BNO_REG_STREAM", p, 10);
             long ts = Common.u64le(p, 0);
             int addr = p[8] & 0xFF;
             int len = p[9] & 0xFF;
+            Wire.needBytes("RPT_BNO_REG_STREAM data", p, 10 + len);
             return new StreamData(ts, addr, len, java.util.Arrays.copyOfRange(p, 10, 10 + len));
         }
     }

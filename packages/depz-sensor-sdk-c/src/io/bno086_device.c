@@ -137,11 +137,12 @@ static bool bno_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t l
     int got;
     if (cmd != DEPZ_BNO086_RPT_DATA || depz_bno086_unpack_data(p, len, &capture, &frame, &frame_len)) return false;
     depz_mutex_lock(&s->lock);
-    got = depz_shtp_feed(&s->shtp, frame, frame_len, &cargo);
+    got = depz_shtp_feed_ex(&s->shtp, frame, frame_len, capture, &cargo);
     if (got != 1) {
         depz_mutex_unlock(&s->lock);
         return true;
     }
+    capture = cargo.capture_us; /* the first fragment's: 0xFB base deltas refer to it */
     switch (cargo.channel) {
     case DEPZ_SHTP_CH_COMMAND: {
         size_t room = ADV_MAX - s->adv_len;

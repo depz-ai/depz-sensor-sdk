@@ -1,18 +1,14 @@
 # TMF8829 — user guide
 
-Hands-on guide to the TMF8829 wire codecs ([`Tmf8829`](api.md#tmf8829)) and
+Hands-on guide to the TMF8829 live device
+(`ai.depz.sensor.devices.Tmf8829Device`) and the layers under it: the wire codecs ([`Tmf8829`](api.md#tmf8829)) and
 the decode classes in `ai.depz.sensor.sensors.tmf8829`. For what the sensor is
 and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md).
 
-This SDK does not drive the sensor: there is no live device class. Init
-(soft reset + firmware download), configure and start/stop run in the Python
-or TypeScript SDK (or the C / C++ SDK). What follows is everything you need to
-build the commands and decode what the board sends; the register sequence
-itself is in contract 14 §4.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Commands](#commands)
 - [Sensor firmware](#sensor-firmware)
 - [Presets and the config page](#presets-and-the-config-page)
@@ -22,6 +18,51 @@ itself is in contract 14 §4.
 - [Capture time and the sensor clock](#capture-time-and-the-sensor-clock)
 - [Bridge info and events](#bridge-info-and-events)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.tmf8829.MeasurementBuilder.Measurement;
+import java.time.Duration;
+
+try (Tmf8829Device tof = DepzDevices.openTmf8829()) {
+    Tmf8829Device.InitResult id = tof.init();           // soft reset, 14.4 KB firmware download, ~0.15 s
+    System.out.println("application " + id.appVersion() + ", sensor serial " + id.sensorSerial());
+    Tmf8829AppliedConfig cfg = tof.configure("32x32", 100, null, 2, false, false, false, false, false, null);
+    System.out.println(cfg.grid()[0] + "x" + cfg.grid()[1] + ", fp_mode " + cfg.fields().get("fp_mode"));
+
+    try (Subscription<Measurement> frames = tof.measurements()) {
+        tof.start();
+        Measurement m = frames.take(Duration.ofSeconds(2));
+        int rows = m.shape()[0], cols = m.shape()[1];
+        System.out.println(rows + "x" + cols + ", " + m.peaks() + " peak(s), centre "
+                + m.distanceMm()[rows / 2 * cols + cols / 2] + " mm");
+        tof.stop();
+    }
+}
+```
+
+- `init()` brings the sensor from **any** state to its running application
+  (it starts with a soft reset), so it is also the recovery: after a
+  `Tmf8829InterruptEvent` with code 1 (a refused frame header) run it again.
+- `configure(preset, …)` loads a preset (`Tmf8829Config.PRESETS`: 8x8 …
+  48x32) and writes **every** field a preset does not reset — the result never
+  depends on an earlier config; the `fields` map sets any other page field by
+  name. A field that does not read back, or a page the sensor refuses (e.g.
+  `ERR_CONFIG_RESULT_SIZE`: too many peaks / strengths for the grid), throws
+  `Tmf8829Exception`. It throws `IllegalStateException` while streaming.
+- `start()` configures 8x8 when `configure` was not called since `init`;
+  `histograms` / `refFrame` add the histogram and ref-SPAD frames to each
+  measurement (`m.histograms()`, `m.refFrames()`).
+- Frame loss is counted, not raised: `framesDropped()` (bridge gaps),
+  `framesDiscarded()` (incomplete reassembly), `frameParseErrors()`;
+  `clockRatioQ16()` is the live clock model. `close()` stops a running stream.
+- `readRegisters` / `writeRegisters` / `sensorState()` / `getBridgeInfo()`
+  are the escape hatches.
+
+The sections below are the layers under the device; the register sequence
+itself is in contract 14 §4.
 
 ## Commands
 
@@ -286,9 +327,9 @@ while stopping. Any other means the sensor is lost: run init again.
 
 ## Gotchas
 
-- **No live driver here** — this SDK builds payloads and decodes; init,
-  configure and start/stop are done with the Python / TypeScript / C / C++ SDK
-  or by your own code following contract 14 §4.
+- **`init()` is the recovery** — the EN pin is wired high, there is no sleep;
+  from any state (a refused frame header, a hung sensor) `init()` starts over
+  with a soft reset.
 - **Write the whole result format on every configure** — a preset keeps the
   previous `nr_peaks`, strengths, histogram and ref-frame switches and period;
   `dump_histograms` even survives init.

@@ -10,9 +10,12 @@ that speak one shared framed protocol. The first four sensors of the line:
   production USB PID `0xED40`. Everything CX does, plus CNH.
 - **BNO086** — 9-axis IMU (host runs the SH-2 stack).
 
-Further boards, each with its decode and codec layer here (initialising and
-streaming the register-bridge boards is done with the Python or TypeScript
-SDK):
+Further boards, each with its decode and codec layer here and its live device
+class in `devices` (`Sr04Device`, `Vl53l4cdDevice`, `Vl53l8cxDevice` /
+`Vl53l8chDevice`, `Vl53l5cxDevice` / `Vl53l7cxDevice` / `Vl53l7chDevice`,
+`Bno055Device`, `Bno086Device`, `Tmf8829Device`, and the 1D family's
+`Vl53lxDevice` with `Vl53l0xDevice`, `Vl53l1cxDevice`, `Vl53l1cbDevice`,
+`Vl53l3cxDevice`, `Vl53l4cxDevice`):
 
 - **VL53L0X / VL53L1CX / VL53L1CB / VL53L3CX / VL53L4CX** — the 1D ToF family
   on one I2C register-bridge firmware.
@@ -34,7 +37,7 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.6.0):
+Published on crates.io as `depz-sensor-sdk` (0.7.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -48,7 +51,7 @@ It targets stable Rust (edition 2021) with no runtime dependencies.
 Full docs live under [`docs/`](docs/):
 
 - [Common guide](docs/guide.md) — what the crate is, framing & CRC, discovery,
-  the `.fwdepz` container, datasets, extension points, testing.
+  the `.fwdepz` container, live devices, datasets, testing.
 - Per sensor — **SR04** ([intro](docs/sr04/introduction.md) ·
   [guide](docs/sr04/guide.md) · [api](docs/sr04/api.md)), **VL53L8CX**
   ([intro](docs/vl53l8cx/introduction.md) · [guide](docs/vl53l8cx/guide.md) ·
@@ -119,7 +122,7 @@ The register-bridge boards:
 | Identity / class resolution | ✅ (`vl53lx`, `resolve_class`, product table) | ✅ (`vl53l7`, `resolve_model`) | ✅ (`bno055`) | ✅ (`tmf8829`) |
 | Command encoders / report decoders | ✅ (v2.00: address width, stream with clear list, info) | ✅ (pin, bus speed, info + the VL53L8 register codecs) | ✅ (read/write/reset/stream/info) | ✅ (read/write/stream/info, frame chunks, events, reassembler) |
 | Stateless decode | ✅ die block, VL53L0X raw fields, histogram bins | ✅ frames via `vl53l8::parse_frame(Variant::L7)`; CNH via `decode_cnh` (L7CH) | ✅ units, calibration, axis remap, page-1 configs, register windows | ✅ frames, results pixels, half-frame merge, clock model + capture time, measurements, config fields, firmware image |
-| Live driver (init, configuration, ranging) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript / C / C++ SDK) |
+| Live driver (init, configuration, ranging) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | — (Python / TypeScript SDK) | ✅ (`devices::Tmf8829Device`) |
 
 ## Layout
 
@@ -135,7 +138,7 @@ The register-bridge boards:
   embedded sensor firmware.
 - `bno086` — SHTP framing, SH-2 report parsers, control request builders.
 - `protocol`, `framing`, `crc`, `fwdepz`, `usb_ids` — shared transport/protocol.
-- `dataset` — `.depzdata` decoded multi-device dataset reader (contract 09).
+- `dataset` — `.depzdata` decoded multi-device datasets: reader, writer, session recorder, player (contract 09).
 
 ## Test
 

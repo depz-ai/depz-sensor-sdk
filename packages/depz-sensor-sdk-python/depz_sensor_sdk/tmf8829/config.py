@@ -54,9 +54,19 @@ CFG_FIELDS: dict[str, tuple[int, int, int]] = {
 }
 
 
+def _field_index(page: bytes | bytearray, name: str, reg: int, width: int) -> int:
+    """Index of `name`'s first byte in `page`; ValueError when the page is
+    too short to hold it."""
+    i = reg - REG_CFG
+    end = i + (2 if width == 16 else 1)
+    if len(page) < end:
+        raise ValueError(f"{name}: config page has {len(page)} bytes, field needs {end}")
+    return i
+
+
 def cfg_get(page: bytes | bytearray, name: str) -> int:
     reg, shift, width = CFG_FIELDS[name]
-    i = reg - REG_CFG
+    i = _field_index(page, name, reg, width)
     if width == 16:
         return page[i] | (page[i + 1] << 8)
     return (page[i] >> shift) & ((1 << width) - 1)
@@ -64,7 +74,7 @@ def cfg_get(page: bytes | bytearray, name: str) -> int:
 
 def cfg_set(page: bytearray, name: str, value: int) -> None:
     reg, shift, width = CFG_FIELDS[name]
-    i = reg - REG_CFG
+    i = _field_index(page, name, reg, width)
     if not 0 <= value < (1 << width):
         raise ValueError(f"{name}: {value} out of range for {width} bit")
     if width == 16:

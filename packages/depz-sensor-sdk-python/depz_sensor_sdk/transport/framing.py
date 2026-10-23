@@ -12,6 +12,7 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ..protocol._wire import check_uint
 from .crc import crc8_maxim, crc16_modbus, crc32_iso_hdlc
 
 MAGIC = b"\xa5\xc3"
@@ -48,10 +49,17 @@ def build_packet(
     non-empty payloads."""
     if len(payload) > MAX_PAYLOAD:
         raise ValueError(f"payload too long: {len(payload)} > {MAX_PAYLOAD}")
+    # contract 07 §3: out-of-range arguments are rejected, never masked
+    if not isinstance(cmd, int) or not 0 <= cmd <= 0xFF:
+        raise ValueError(f"cmd: {cmd} out of range for u8")
+    # `seq` is a free-running u32 counter, taken modulo 256 on the wire (vector
+    # seq_wraps_modulo_256); a negative or fractional one is invalid.
+    seq = check_uint("seq", seq, 32) & 0xFF
+    crc_type = CrcType(crc_type)  # ValueError for a value the contract does not list
     data_size = len(payload) | (int(crc_type) << 14)
     ds = struct.pack("<H", data_size)
-    hdr_crc = crc8_maxim(ds + bytes((cmd, seq & 0xFF)))
-    return MAGIC + ds + bytes((cmd, seq & 0xFF, hdr_crc)) + payload + payload_crc_bytes(
+    hdr_crc = crc8_maxim(ds + bytes((cmd, seq)))
+    return MAGIC + ds + bytes((cmd, seq, hdr_crc)) + payload + payload_crc_bytes(
         crc_type, payload
     )
 

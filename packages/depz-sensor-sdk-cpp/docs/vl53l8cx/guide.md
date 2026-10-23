@@ -244,19 +244,21 @@ the same struct the [decode layer](#decode-layer) produces), plus `motion`
 when the [motion indicator](#the-motion-indicator) is armed (`std::nullopt`
 otherwise). `Vl53l8Frame` carries every per-zone output as a
 `std::vector<…>` sized to the active resolution (16 or 64 zones), row-major,
-plus per-frame scalars. Raw wire integers throughout:
+plus per-frame scalars. Values are already in **real units**, the same as
+ST's `GetRangingData` gives — no scaling left to do. ST divides integers; the
+SDK keeps the fraction (`double` fields):
 
 | field | type | meaning |
 |---|---|---|
 | `timestamp_us` | `uint64` | MCU µs, the frame's capture time |
-| `distance_mm` | `int32` | per-zone distance in mm (ST /4 floor already applied) |
+| `distance_mm` | `int32` | per-zone distance in mm (wire value /4, floored; a negative distance comes out as 0, as ST) |
 | `target_status` | `uint8` | 5/9 = valid, 255 = no target |
 | `nb_target_detected` | `uint8` | targets found in the zone |
-| `signal_per_spad` | `uint32` | signal rate, kcps/SPAD (raw) |
-| `ambient_per_spad` | `uint32` | ambient rate, kcps/SPAD (raw) |
+| `signal_per_spad` | `double` | signal rate, kcps/SPAD (wire value /2048) |
+| `ambient_per_spad` | `double` | ambient rate, kcps/SPAD (wire value /2048) |
 | `nb_spads_enabled` | `uint32` | enabled SPADs (light-sensing cells) in the zone |
-| `range_sigma_mm_raw` | `uint16` | range std-dev, **raw** (real = raw / 128) |
-| `reflectance` | `uint8` | estimated reflectance, % |
+| `range_sigma_mm` | `double` | range std-dev, mm (wire value /128) |
+| `reflectance` | `double` | estimated reflectance, % (wire value /2) |
 | `resolution` | `int` | 16 or 64 (active zone count) |
 | `silicon_temp_degc` | `int` | per-frame sensor temperature, °C |
 | `cnh_raw` | `optional<bytes>` | the CNH block — VL53L8CH with CNH armed only |
@@ -277,7 +279,7 @@ void print_grid(const depz::Vl53l8LiveFrame& f) {
         else                            std::printf("%5d ", fr.distance_mm[i]);
         if (i % cols == cols - 1) std::printf("\n");
     }
-    std::printf("sigma zone 0: %.1f mm\n", fr.range_sigma_mm_raw[0] / 128.0);
+    std::printf("sigma zone 0: %.1f mm\n", fr.range_sigma_mm[0]);
 }
 ```
 
@@ -609,8 +611,8 @@ factor on pack.
   doubt.
 - **Streams drop the oldest** when full (default 8 frames) — watch
   `dropped_count()`, and `reassembler_discards()` for frames lost on the link.
-- **Fields are raw integers** — `range_sigma_mm_raw` is raw (÷128 for mm);
-  `signal_per_spad` / `ambient_per_spad` are raw kcps/SPAD. Convert at the edge.
+- **A distance of 0 can be a clamped negative reading** — like ST, the SDK
+  turns a negative distance into 0. Trust `target_status`, not the distance.
 - **Pass the right footer-id offset** (decode layer) — CX = 12, CH = 4. The
   wrong offset makes every frame fail the id check; `decode_frame` then
   returns `std::nullopt`.

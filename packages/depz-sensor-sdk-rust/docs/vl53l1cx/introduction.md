@@ -44,11 +44,10 @@ layer**:
   `DieVariant::L1`) and the histogram block's status bytes and 24 bins
   ([`decode_histogram_raw`](api.md#decode_histogram_raw)).
 
-What it does **not** do: initialise the sensor, apply modes, budgets, ROI or
-calibrations, or turn histogram bins into targets — that is the full driver.
-Initialising and streaming the board is done today with the Python or
-TypeScript SDK; this crate decodes what the board streams and builds the
-command payloads.
+Above it, the live device class (`devices::Vl53l1cxDevice`, see the
+[guide](guide.md#live-device)) runs ST's drivers on the host — the VL53L1X ULD
+and the histogram driver: init, modes, budgets, ROI, calibrations, and the
+histogram bins turned into targets.
 
 ## Key concepts
 

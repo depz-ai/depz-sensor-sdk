@@ -64,7 +64,7 @@ export function packTmf8829StartStream(intMask: number, flags = 0): Uint8Array {
   if (!Number.isInteger(intMask) || intMask < 1 || intMask > TMF8829_INT_MASK_ALL) {
     throw new RangeError("intMask must be a non-zero subset of 0x0F");
   }
-  if (flags & ~TMF8829_SF_REF_FRAME) throw new RangeError("flags: only SF_REF_FRAME (0x01) is defined");
+  if (!Number.isInteger(flags) || flags < 0 || flags > 0xff || flags & ~TMF8829_SF_REF_FRAME) throw new RangeError("flags: only SF_REF_FRAME (0x01) is defined");
   return Uint8Array.of(intMask, flags);
 }
 

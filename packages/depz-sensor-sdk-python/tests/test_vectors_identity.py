@@ -1,7 +1,7 @@
 from depz_sensor_sdk.protocol import parse_software_name, strip_device_string
 
 
-def test_identity_vectors(vectors):
+def test_identity_vectors(vectors, seen):
     for case in vectors("identity.json")["cases"]:
         raw = bytes.fromhex(case["raw"])
         ident = parse_software_name(strip_device_string(raw))
@@ -11,3 +11,4 @@ def test_identity_vectors(vectors):
         assert actual_sensor == expect["sensor_type"], case["name"]
         assert ident.software_name == expect["software_name"], case["name"]
         assert ident.version == expect["version"], case["name"]
+        seen(case)

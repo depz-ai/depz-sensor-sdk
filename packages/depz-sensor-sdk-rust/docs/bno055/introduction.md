@@ -47,10 +47,10 @@ The [`bno055`](api.md) module is the verifiable **codec and decode layer**:
 - [`decode_block`](api.md#decode_block): any streamed or read register window
   → the raw channel integers it covers.
 
-What it does **not** do: open a port or run the session logic — mode switches
-through CONFIG, waiting for the boot and for the fusion to start, page
-switching, scaled samples. That is done today with the Python or TypeScript
-SDK; this crate builds the command payloads and decodes what the board sends.
+On top of them, the live device `devices::Bno055Device` runs the session
+logic — mode switches through CONFIG, waiting for the boot and for the fusion to
+start, page switching — and hands out scaled `Bno055Sample`s, polled or
+streamed.
 
 ## Key concepts
 

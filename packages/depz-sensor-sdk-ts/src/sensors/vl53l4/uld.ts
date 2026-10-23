@@ -14,6 +14,8 @@
  * vectors can hold them to byte-exact parity with the other SDKs.
  */
 
+import { checkUint } from "../../protocol/wire.js";
+
 export const ULD_VERSION: readonly [number, number, number, number] = [2, 2, 3, 0];
 
 // ── Registers (VL53L4CD_api.h) ───────────────────────────────────────────────
@@ -123,6 +125,12 @@ export const RANGE_STATUS_NAMES: Readonly<Record<number, string>> = {
   12: "signal too low",
   255: "other error",
 };
+
+/** `v` when it is an integer in lo..hi, else Vl53l4cdError (contract 07 §3: never wrap). */
+function inRange(name: string, v: number, lo: number, hi: number): number {
+  if (!Number.isInteger(v) || v < lo || v > hi) throw new Vl53l4cdError(`${name} ${v} out of range ${lo}..${hi}`);
+  return v;
+}
 
 export class Vl53l4cdError extends Error {
   constructor(message?: string) {
@@ -240,6 +248,11 @@ export function rangeTimingRegisters(
   if (!(timingBudgetMs >= 10 && timingBudgetMs <= 200)) {
     throw new Vl53l4cdError("timingBudgetMs must be 10..200");
   }
+  // Register words (u16) and the u32 period: out of range is refused, never wrapped.
+  inRange("oscFrequency", oscFrequency, 1, 0xffff);
+  inRange("clockPll", clockPll, 0, 0xffff);
+  inRange("timingBudgetMs", timingBudgetMs, 10, 200);
+  inRange("interMeasurementMs", interMeasurementMs, 0, 0xffffffff);
 
   let timingBudgetUs = timingBudgetMs * 1000;
   const macroPeriodUs = u32(2304 * Math.floor(0x40000000 / oscFrequency)) >>> 6;
@@ -252,6 +265,9 @@ export function rangeTimingRegisters(
   } else if (interMeasurementMs > timingBudgetMs) {
     // autonomous low power (1.055 is a frozen double-precision PLL factor)
     intermeasurementRaw = Math.floor(1.055 * interMeasurementMs * (clockPll & 0x3ff));
+    if (intermeasurementRaw > 0xffffffff) {
+      throw new Vl53l4cdError(`interMeasurementMs ${interMeasurementMs}: INTERMEASUREMENT_MS overflows u32`);
+    }
     timingBudgetUs = Math.floor((timingBudgetUs - 4300) / 2);
   } else {
     throw new Vl53l4cdError("interMeasurementMs must be 0 or > timingBudgetMs");
@@ -262,6 +278,9 @@ export function rangeTimingRegisters(
   for (const mult of [16, 12]) {
     // RANGE_CONFIG_A, RANGE_CONFIG_B
     const tmp = u32(macroPeriodUs * mult) >>> 6;
+    // the reference divides by tmp: an oscFrequency whose macro period
+    // truncates to 0 is refused, not divided by (it used to loop forever)
+    if (tmp === 0) throw new Vl53l4cdError(`oscFrequency ${oscFrequency}: macro period truncates to 0`);
     let lsByte = Math.floor((timingBudgetUs + (tmp >>> 1)) / tmp) - 1;
     let msByte = 0;
     while (lsByte > 0xff) {
@@ -293,6 +312,11 @@ export function decodeRangeTiming(
   oscFrequency: number,
   rangeConfigA: number,
 ): RangeTiming {
+  // Raw register reads: a dword and three words (contract 07 §3).
+  checkUint("intermeasurementRaw", intermeasurementRaw, 32);
+  checkUint("clockPll", clockPll, 16);
+  checkUint("oscFrequency", oscFrequency, 16);
+  checkUint("rangeConfigA", rangeConfigA, 16);
   if (oscFrequency === 0) throw new Vl53l4cdError("oscFrequency reads 0");
 
   // 1.065 is a frozen double-precision PLL factor.
@@ -316,30 +340,34 @@ export function decodeRangeTiming(
 
 /** RANGE_OFFSET_MM word for setOffset (INNER/OUTER are zeroed alongside). */
 export function offsetRaw(offsetMm: number): number {
-  return (offsetMm * 4) & 0xffff;
+  // 11-bit signed mm (decodeOffset's range); the & 0xffff is the two's complement of a negative value
+  return (inRange("offsetMm", offsetMm, -1024, 1023) * 4) & 0xffff;
 }
 
 /** getOffset: RANGE_OFFSET_MM word → signed millimetres. */
 export function decodeOffset(rawWord: number): number {
+  inRange("rawWord", rawWord, 0, 0xffff);
   const temp = ((rawWord << 3) & 0xffff) >> 5;
   return temp > 1024 ? temp - 2048 : temp;
 }
 
 /** XTALK_PLANE_OFFSET_KCPS word for setXtalk. */
 export function xtalkRaw(xtalkKcps: number): number {
-  return (xtalkKcps << 9) & 0xffff;
+  return inRange("xtalkKcps", xtalkKcps, 0, 0xffff >> 9) << 9;
 }
 
 /** getXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps. */
 export function decodeXtalk(rawWord: number): number {
+  inRange("rawWord", rawWord, 0, 0xffff);
   return roundHalfAway(rawWord / 512.0);
 }
 
 export function signalThresholdRaw(signalKcps: number): number {
-  return signalKcps >> 3;
+  return inRange("signalKcps", signalKcps, 0, 0xffff) >> 3;
 }
 
 export function decodeSignalThreshold(rawWord: number): number {
+  inRange("rawWord", rawWord, 0, 0xffff);
   return (rawWord << 3) & 0xffff;
 }
 
@@ -347,10 +375,12 @@ export function sigmaThresholdRaw(sigmaMm: number): number {
   if (sigmaMm > 0xffff >> 2) {
     throw new Vl53l4cdError("sigmaMm must be <= 16383");
   }
+  inRange("sigmaMm", sigmaMm, 0, 0xffff >> 2);
   return sigmaMm << 2;
 }
 
 export function decodeSigmaThreshold(rawWord: number): number {
+  inRange("rawWord", rawWord, 0, 0xffff);
   return rawWord >> 2;
 }
 
@@ -402,7 +432,7 @@ export class VL53L4CD {
 
   // ── identity ───────────────────────────────────────────────────────────────
 
-  getSensorId(): Promise<number> {
+  async getSensorId(): Promise<number> {
     return this.rdWord(IDENTIFICATION__MODEL_ID);
   }
 

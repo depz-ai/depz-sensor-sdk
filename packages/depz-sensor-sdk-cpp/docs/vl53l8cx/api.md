@@ -125,22 +125,24 @@ struct Vl53l8Frame {
     std::uint64_t timestamp_us = 0;
     int resolution = 0;
     int silicon_temp_degc = 0;
-    std::vector<std::int32_t> distance_mm;
+    std::vector<std::int32_t> distance_mm;  // mm, >= 0
     std::vector<std::uint8_t> target_status;
     std::vector<std::uint8_t> nb_target_detected;
-    std::vector<std::uint32_t> signal_per_spad;
-    std::vector<std::uint32_t> ambient_per_spad;
+    std::vector<double> signal_per_spad;  // kcps/SPAD
+    std::vector<double> ambient_per_spad;  // kcps/SPAD
     std::vector<std::uint32_t> nb_spads_enabled;
-    std::vector<std::uint16_t> range_sigma_mm_raw;
-    std::vector<std::uint8_t> reflectance;
+    std::vector<double> range_sigma_mm;  // mm
+    std::vector<double> reflectance;  // %
     std::optional<bytes> cnh_raw;
 };
 ```
 
 One decoded ranging frame. Arrays are sized to the active resolution (16 or
-64 zones), row-major. Raw integers per the wire; `distance_mm` already has
-the ST /4 floor scaling applied, `range_sigma_mm_raw` is the raw u16 (real
-value = raw / 128).
+64 zones), row-major, in the real units ST's GetRangingData gives (contract
+04 §5): `distance_mm` = wire value / 4 floored, a negative result clamped to
+0; signal / ambient = wire / 2048 (kcps/SPAD); `range_sigma_mm` = wire / 128
+(mm); `reflectance` = wire / 2 (%). ST divides integers; the double fields
+keep the fraction.
 
 ### swap_buffer
 
@@ -169,6 +171,7 @@ std::uint32_t xtalk_margin_raw(double margin_kcps);
 ```
 
 Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
+xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
 
 ### xtalk_margin_kcps
 
@@ -220,6 +223,8 @@ bytes pack_detection_thresholds(const std::vector<DetectionThreshold>& threshold
 
 Pack the 64-entry DCI_DET_THRESH_START block (768 bytes). Missing entries
 default to zeros; low/high are multiplied by the measurement's scale factor.
+std::invalid_argument for more than 64 entries, std::out_of_range when a
+scaled low/high does not fit the i32 field (contract 07 §3).
 
 ### detection_thresholds_valid_status
 
@@ -271,6 +276,7 @@ MotionConfig motion_config_init(int resolution);
 
 Build the default motion-indicator configuration for `resolution`
 (RESOLUTION_4X4 or RESOLUTION_8X8), matching uld.motion_indicator_init.
+std::invalid_argument for any other resolution.
 
 ## VL53L8 live class (depz/device.hpp)
 
@@ -310,7 +316,8 @@ struct Vl53l8LiveFrame {
 };
 ```
 
-One streamed frame: the zone arrays in `frame` (distance_mm in mm; CH with
+One streamed frame: the zone arrays in `frame` (real units as ST
+GetRangingData — distance_mm in mm, see vl53l8::Vl53l8Frame; CH with
 CNH armed: frame.cnh_raw, decode with vl53l8::decode_cnh()), plus motion.
 
 #### Vl53l8LiveFrame.pull

@@ -6,7 +6,7 @@
 
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
   <packaging>jar</packaging>
 
   <name>depz-sensor-sdk</name>
@@ -40,7 +40,27 @@
     <maven.compiler.release>17</maven.compiler.release>
   </properties>
 
+  <dependencies>
+    <!-- serial ports on Windows, macOS and Linux (the build scripts pin the same version) -->
+    <dependency>
+      <groupId>com.fazecast</groupId>
+      <artifactId>jSerialComm</artifactId>
+      <version>2.11.4</version>
+    </dependency>
+  </dependencies>
+
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- The VL53L8 / L5 / L7 sensor firmware and ST configuration blobs: the Python SDK's
+           vl53l8/data, the one copy every SDK reads (build.sh copies it the same way). -->
+      <resource>
+        <directory>../depz-sensor-sdk-python/depz_sensor_sdk/vl53l8/data</directory>
+        <targetPath>ai/depz/sensor/sensors/vl53l8/data</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <!-- sources jar (required by Maven Central) -->
       <plugin>

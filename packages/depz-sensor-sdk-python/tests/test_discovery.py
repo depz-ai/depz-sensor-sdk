@@ -176,3 +176,56 @@ def test_dev_default_unit_is_candidate(fake_ports, spy_open):
         _port("/dev/ttyACM0", DEV_USB_VID, DEV_USB_PID, "SN000005"),
     ]
     assert discovery.open_device().port == "/dev/ttyACM0"
+
+
+# ── open_on_link: the §4.4 probe, then the class in place ─────────────────────
+
+
+def _logging_fake(software_name: str | None = None):
+    from fake_device import FakeSr04
+
+    fake = FakeSr04()
+    if software_name is not None:
+        fake.SOFTWARE_NAME = software_name
+    log: list[int] = []
+    handle = fake._handle
+
+    def spy(pkt):
+        log.append(pkt.cmd)
+        handle(pkt)
+
+    fake._handle = spy
+    return fake, log
+
+
+def test_open_on_link_probes_three_requests_then_attaches():
+    from depz_sensor_sdk.sr04 import Sr04
+
+    fake, log = _logging_fake()
+    dev = discovery.open_on_link(fake.link, DEPZ_USB_VID, PID_SR04, timeout=1.0)
+    try:
+        assert type(dev) is Sr04
+        assert log == [0x04, 0x03, 0x05]  # name, device name, serial — nothing else
+        assert dev.get_sample_period_us() == 50_000  # the same connection goes on
+    finally:
+        dev.close()
+
+
+def test_open_on_link_unknown_app_stays_base_device():
+    from depz_sensor_sdk.device import DeviceBase
+
+    fake, log = _logging_fake("APP_NEWSENSOR_v1.2")
+    dev = discovery.open_on_link(fake.link, timeout=1.0)
+    try:
+        assert type(dev) is DeviceBase
+        assert log == [0x04, 0x03, 0x05]
+    finally:
+        dev.close()
+
+
+def test_open_on_link_refuses_bootloader():
+    from depz_sensor_sdk.errors import DepzError
+
+    fake, _ = _logging_fake("BOOTDEPZ_v1.1")
+    with pytest.raises(DepzError, match="bootloader"):
+        discovery.open_on_link(fake.link, timeout=1.0)

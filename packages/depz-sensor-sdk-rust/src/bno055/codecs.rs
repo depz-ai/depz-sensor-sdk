@@ -57,7 +57,17 @@ pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2] {
     [addr, len]
 }
 
-/// `BNO_WRITE_REG` payload: `addr u8, data[1..128]`.
+/// `BNO_WRITE_REG` payload: `addr u8, data[1..128]`; a data length outside
+/// 1..=[`XFER_MAX`] is refused (contract 07 §3), never sent.
+pub fn try_pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError> {
+    if data.is_empty() || data.len() > XFER_MAX {
+        return Err(CodecError("BNO_WRITE_REG: data must be 1..128 bytes"));
+    }
+    Ok(pack_write_reg(addr, data))
+}
+
+/// `BNO_WRITE_REG` payload: `addr u8, data[1..128]`, unchecked — prefer
+/// [`try_pack_write_reg`].
 pub fn pack_write_reg(addr: u8, data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(1 + data.len());
     out.push(addr);

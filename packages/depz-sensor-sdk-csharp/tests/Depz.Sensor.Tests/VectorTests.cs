@@ -17,11 +17,11 @@ public class CrcTests
         {
             string name = c.GetProperty("name").GetString()!;
             byte[] input = Vectors.Hex(c.GetProperty("input").GetString()!);
-            Assert.Equal(c.GetProperty("crc8_maxim").GetInt32(), Crc.Crc8Maxim(input));
-            Assert.Equal((int)c.GetProperty("crc16_modbus").GetUInt32(), Crc.Crc16Modbus(input));
-            Assert.Equal(c.GetProperty("crc32_iso_hdlc").GetUInt32(), Crc.Crc32IsoHdlc(input));
-            Assert.Equal((int)c.GetProperty("crc16_ccitt_false").GetUInt32(), Crc.Crc16CcittFalse(input));
-            _ = name;
+            Assert.True(c.GetProperty("crc8_maxim").GetInt32() == Crc.Crc8Maxim(input), $"{name}: crc8_maxim");
+            Assert.True((int)c.GetProperty("crc16_modbus").GetUInt32() == Crc.Crc16Modbus(input), $"{name}: crc16_modbus");
+            Assert.True(c.GetProperty("crc32_iso_hdlc").GetUInt32() == Crc.Crc32IsoHdlc(input), $"{name}: crc32_iso_hdlc");
+            Assert.True((int)c.GetProperty("crc16_ccitt_false").GetUInt32() == Crc.Crc16CcittFalse(input), $"{name}: crc16_ccitt_false");
+            Vectors.Seen(c);
         }
     }
 }
@@ -42,6 +42,7 @@ public class FramingEncodeTests
             string expected = c.GetProperty("frame").GetString()!;
             string actual = Vectors.ToHex(Framing.BuildPacket(cmd, payload, seq, crcType));
             Assert.True(expected == actual, $"{name}: expected {expected} got {actual}");
+            Vectors.Seen(c);
         }
     }
 }
@@ -140,6 +141,7 @@ public class FramingDecodeTests
             Assert.True(expected == Collect(Bytewise(stream)), $"{name} (bytewise)");
             for (int round = 0; round < 5; round++)
                 Assert.True(expected == Collect(Random(stream, rng)), $"{name} (random round {round})");
+            Vectors.Seen(c);
         }
     }
 }
@@ -151,11 +153,16 @@ public class UsbIdsTests
     {
         var root = Vectors.Load("usb_ids.json");
         Assert.Equal(UsbIds.DepzUsbVid, root.GetProperty("vid").GetInt32());
+        Vectors.Seen("usb_ids/vid");
         Assert.Equal(UsbIds.DevUsbVid, root.GetProperty("dev_vid").GetInt32());
+        Vectors.Seen("usb_ids/dev_vid");
         Assert.Equal(UsbIds.DevUsbPid, root.GetProperty("dev_pid").GetInt32());
+        Vectors.Seen("usb_ids/dev_pid");
         var range = root.GetProperty("pid_range");
+        Assert.Equal(2, range.GetArrayLength());
         Assert.Equal(UsbIds.DepzPidRangeLo, range[0].GetInt32());
         Assert.Equal(UsbIds.DepzPidRangeHi, range[1].GetInt32());
+        Vectors.Seen("usb_ids/pid_range");
 
         foreach (var e in root.GetProperty("identity").EnumerateArray())
         {
@@ -166,6 +173,7 @@ public class UsbIdsTests
                 ? null : e.GetProperty("model").GetString();
             Assert.True(known == UsbIds.IsKnownDepzUsb(vid, pid), $"known mismatch for {vid:X}:{pid:X}");
             Assert.True(model == UsbIds.UsbModelHint(vid, pid), $"model mismatch for {vid:X}:{pid:X}");
+            Vectors.Seen(e);
         }
     }
 }
@@ -184,13 +192,14 @@ public class IdentityTests
             Identity id = IdentityParser.ParseSoftwareName(stripped);
             var expect = c.GetProperty("expect");
 
-            Assert.Equal(expect.GetProperty("mode").GetString(), id.Mode);
+            Assert.True(expect.GetProperty("mode").GetString() == id.Mode, $"{name}: mode {id.Mode}");
             string? sensor = expect.GetProperty("sensor_type").ValueKind == JsonValueKind.Null
                 ? null : expect.GetProperty("sensor_type").GetString();
-            Assert.Equal(sensor, id.SensorType is null ? null : id.SensorType.ToString()!.ToLowerInvariant());
-            Assert.Equal(expect.GetProperty("software_name").GetString(), id.SoftwareName);
-            Assert.Equal(expect.GetProperty("version").GetString(), id.Version);
-            _ = name;
+            string? gotSensor = id.SensorType is null ? null : id.SensorType.ToString()!.ToLowerInvariant();
+            Assert.True(sensor == gotSensor, $"{name}: sensor_type {gotSensor}");
+            Assert.True(expect.GetProperty("software_name").GetString() == id.SoftwareName, $"{name}: software_name {id.SoftwareName}");
+            Assert.True(expect.GetProperty("version").GetString() == id.Version, $"{name}: version {id.Version}");
+            Vectors.Seen(c);
         }
     }
 }
@@ -216,6 +225,7 @@ public class CommonCommandsTests
                 _ => throw new InvalidOperationException("unknown encode kind: " + kind),
             };
             Assert.True(expected == actual, $"{kind}: expected {expected} got {actual}");
+            Vectors.Seen(c);
         }
     }
 
@@ -253,6 +263,7 @@ public class CommonCommandsTests
                 default:
                     throw new InvalidOperationException("unhandled report: " + report);
             }
+            Vectors.Seen(c);
         }
     }
 
@@ -269,6 +280,7 @@ public class CommonCommandsTests
             var (offset, rtt) = Common.SyncTimeOffsetRtt(t1, t2, t3, t4);
             Assert.Equal(c.GetProperty("offset_us").GetInt64(), offset);
             Assert.Equal(c.GetProperty("rtt_us").GetInt64(), rtt);
+            Vectors.Seen(c);
         }
     }
 }
@@ -290,6 +302,7 @@ public class Sr04Tests
                 _ => throw new InvalidOperationException("unknown sr04 encode kind: " + kind),
             };
             Assert.True(expected == actual, $"{kind}: expected {expected} got {actual}");
+            Vectors.Seen(c);
         }
     }
 
@@ -319,7 +332,41 @@ public class Sr04Tests
                 default:
                     throw new InvalidOperationException("unhandled sr04 report: " + report);
             }
+            Vectors.Seen(c);
         }
+    }
+}
+
+// recordings/sr04_session.depzrec decoded rx-side only (the C# SDK has no
+// device layer to re-issue the tx half): every measurement against the sidecar.
+public class Sr04RecordingTests
+{
+    [Fact]
+    public void Session_RxDecode_MatchesSidecar()
+    {
+        var exp = JsonDocument.Parse(File.ReadAllText(Vectors.RecordingPath("sr04_session.expected.json"))).RootElement;
+        var packets = Vectors.RxPackets("sr04_session.depzrec");
+
+        var periods = packets.Where(p => p.Cmd == (int)Sr04Rpt.SamplePeriod).Select(p => Sr04.UnpackSamplePeriod(p.Payload)).ToList();
+        Assert.Equal(new[] { exp.GetProperty("sample_period_us").GetUInt32() }, periods);
+        var decays = packets.Where(p => p.Cmd == (int)Sr04Rpt.EchoDecay).Select(p => Sr04.UnpackEchoDecay(p.Payload)).ToList();
+        Assert.Equal(new[] { (ushort)exp.GetProperty("echo_decay_us").GetInt32() }, decays);
+
+        var data = packets.Where(p => p.Cmd == (int)Sr04Rpt.Data).Select(p => Sr04Data.Unpack(p.Payload)).ToList();
+        foreach (var (key, source) in new[] { ("once", Sr04Cmd.MeasureOnce), ("loop", Sr04Cmd.StartMeasurementLoop) })
+        {
+            var want = exp.GetProperty(key).EnumerateArray().ToList();
+            var got = data.Where(d => d.SourceCmd == (int)source).ToList();
+            // The loop may run on a sample or two past the last one consumed.
+            Assert.True(got.Count >= want.Count, $"{key}: {got.Count} samples, expected >= {want.Count}");
+            for (int i = 0; i < want.Count; i++)
+            {
+                Assert.Equal(key, want[i].GetProperty("source").GetString());
+                Assert.True(want[i].GetProperty("timestamp_us").GetUInt64() == got[i].TimestampUs, $"{key}[{i}]: timestamp_us");
+                Assert.True(want[i].GetProperty("echo_time_us").GetInt32() == got[i].EchoTimeUs, $"{key}[{i}]: echo_time_us");
+            }
+        }
+        Vectors.Seen("recordings/sr04_session.depzrec");
     }
 }
 
@@ -350,6 +397,7 @@ public class FwDepzTests
                 Assert.Equal(expect.GetProperty("tot_sec").GetInt32(), img.TotSec);
                 Assert.Equal(expect.GetProperty("payload_crc_ok").GetBoolean(), img.PayloadCrcOk);
             }
+            Vectors.Seen(c);
         }
     }
 }

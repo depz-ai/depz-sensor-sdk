@@ -173,7 +173,7 @@ export class Tmf8829 extends DepzDevice {
 
   constructor(transport: SerialTransport, opts?: Tmf8829Options) {
     super(transport, opts);
-    this.sleepImpl = opts?.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   // ── register access ────────────────────────────────────────────────────────
@@ -182,17 +182,17 @@ export class Tmf8829 extends DepzDevice {
    * Read `length` bytes from `addr` in ≤1024-byte requests; reads that reach the
    * FIFO port 0xFF stay there (the sensor does not auto-increment it).
    */
-  readRegisters(addr: number, length: number): Promise<Uint8Array> {
-    return this.locked(() => this.rd(addr, length));
+  async readRegisters(addr: number, length: number): Promise<Uint8Array> {
+    return this.locked(async () => this.rd(addr, length));
   }
 
   /** Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF). */
-  writeRegisters(addr: number, data: Uint8Array): Promise<void> {
-    return this.locked(() => this.wr(addr, data));
+  async writeRegisters(addr: number, data: Uint8Array): Promise<void> {
+    return this.locked(async () => this.wr(addr, data));
   }
 
   /** Raw host-interface registers, for diagnostics. */
-  sensorState(): Promise<Record<string, number>> {
+  async sensorState(): Promise<Record<string, number>> {
     return this.locked(async () => {
       const regs: Record<string, number> = {
         ID: REG_ID,
@@ -212,7 +212,7 @@ export class Tmf8829 extends DepzDevice {
   }
 
   /** Bridge counters (never touches the sensor, safe mid-stream). */
-  getBridgeInfo(): Promise<Tmf8829Info> {
+  async getBridgeInfo(): Promise<Tmf8829Info> {
     return this.request(Tmf8829Cmd.GetInfo, undefined, {
       matcher: DepzDevice.expectReport(Tmf8829Rpt.Info, unpackTmf8829Info),
     });
@@ -266,8 +266,8 @@ export class Tmf8829 extends DepzDevice {
   // ── config page ────────────────────────────────────────────────────────────
 
   /** LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor. */
-  configPage(): Promise<Uint8Array> {
-    return this.locked(() => this.loadConfig());
+  async configPage(): Promise<Uint8Array> {
+    return this.locked(async () => this.loadConfig());
   }
 
   /**
@@ -276,7 +276,7 @@ export class Tmf8829 extends DepzDevice {
    * earlier config. Rejects with `Tmf8829Error` when the sensor refuses the
    * page (e.g. ERR_CONFIG_RESULT_SIZE) or a written field does not read back.
    */
-  configure(preset: Tmf8829Preset = "8x8", opts: Tmf8829ConfigureOptions = {}): Promise<Tmf8829Config> {
+  async configure(preset: Tmf8829Preset = "8x8", opts: Tmf8829ConfigureOptions = {}): Promise<Tmf8829Config> {
     if (!(preset in TMF8829_PRESETS)) {
       return Promise.reject(new RangeError(`unknown preset ${preset}; one of ${Object.keys(TMF8829_PRESETS).join(", ")}`));
     }
@@ -364,7 +364,7 @@ export class Tmf8829 extends DepzDevice {
    * bad-header event a STOP raises mid histogram dump is expected and
    * swallowed.
    */
-  stop(): Promise<void> {
+  async stop(): Promise<void> {
     return this.locked(async () => {
       this.stopping = true;
       try {
@@ -459,7 +459,7 @@ export class Tmf8829 extends DepzDevice {
   // ── internal ───────────────────────────────────────────────────────────────
 
   /** Run `fn` after every previously queued sequence (non-reentrant). */
-  private locked<T>(fn: () => Promise<T>): Promise<T> {
+  private async locked<T>(fn: () => Promise<T>): Promise<T> {
     const run = this.chain.then(fn, fn);
     this.chain = run.catch(() => undefined);
     return run;
@@ -500,7 +500,7 @@ export class Tmf8829 extends DepzDevice {
     }
   }
 
-  private wr8(addr: number, value: number): Promise<void> {
+  private async wr8(addr: number, value: number): Promise<void> {
     return this.wr(addr, Uint8Array.of(value & 0xff));
   }
 

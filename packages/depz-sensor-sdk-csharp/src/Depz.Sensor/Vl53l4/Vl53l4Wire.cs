@@ -72,9 +72,12 @@ public static class Vl53l4Wire
         return buf;
     }
 
-    /// <summary>VL53_WRITE_REG payload: addr u16 LE, then the raw register data.</summary>
+    /// <summary>VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..<see cref="XferMax"/> bytes).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">data is empty or longer than <see cref="XferMax"/>.</exception>
     public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
     {
+        if (data.Length < 1 || data.Length > XferMax)
+            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes");
         var buf = new byte[2 + data.Length];
         BinaryPrimitives.WriteUInt16LittleEndian(buf, addr);
         data.CopyTo(buf.AsSpan(2));
@@ -163,6 +166,7 @@ public sealed record Vl53l4StreamData(ulong TimestampUs, ushort Addr, ushort Len
         ulong ts = BinaryPrimitives.ReadUInt64LittleEndian(payload);
         ushort addr = BinaryPrimitives.ReadUInt16LittleEndian(payload[8..]);
         ushort len = BinaryPrimitives.ReadUInt16LittleEndian(payload[10..]);
+        Protocol.Wire.NeedBytes("RPT_VL53_STREAM data", payload, 12 + len);
         return new Vl53l4StreamData(ts, addr, len, payload.Slice(12, len).ToArray());
     }
 }

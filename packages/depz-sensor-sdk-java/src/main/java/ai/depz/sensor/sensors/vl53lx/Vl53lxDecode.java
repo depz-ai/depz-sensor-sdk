@@ -19,8 +19,8 @@ import ai.depz.sensor.sensors.vl53l4.Vl53l4Uld;
  *       83-byte histogram block at 0x0088. Bins → targets is the full driver.</li>
  * </ul>
  *
- * <p>OUT OF SCOPE (as for every Java sensor): the live ULD / Bare-Driver host
- * drivers over the bridge.
+ * <p>The live ULD / ULP / Bare-Driver host drivers over the bridge are
+ * {@link Vl53lxDrivers} ({@code ai.depz.sensor.devices.Vl53lxDevice} runs them).
  */
 public final class Vl53lxDecode {
     private Vl53lxDecode() {}

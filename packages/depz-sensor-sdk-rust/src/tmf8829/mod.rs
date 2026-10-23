@@ -16,8 +16,8 @@
 //! - [`config`] — presets, preset `kilo_iterations`, config-page fields.
 //! - [`firmware`] — the embedded ams sensor-firmware image (MIT).
 //!
-//! The live driver (init sequence, configure, start/stop over a port) is a
-//! documented extension point, out of scope for this decode-layer crate.
+//! The live driver (init sequence, configure, start/stop over a link) is
+//! `devices::Tmf8829Device`.
 
 pub mod builder;
 pub mod clock;

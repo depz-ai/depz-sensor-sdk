@@ -32,8 +32,11 @@ simpler; for 8×8 depth at low cost, the [VL53L8CX](../vl53l8cx/introduction.md)
 
 ## What this SDK offers
 
-The `Depz.Sensor.Tmf8829` namespace is the verifiable **codec and decode
-layer** — there is **no live device class** in the C# SDK:
+The live device `Depz.Sensor.Devices.Tmf8829Device` runs the sensor from the
+host — `Init()` with the firmware download, `Configure()`, `Start()` /
+`Stop()`, measurements as a stream — see the [user guide](guide.md#live-device).
+Under it, the `Depz.Sensor.Tmf8829` namespace is the verifiable **codec and
+decode layer**:
 
 - the bridge wire codecs — `TMF_READ_REG`, `TMF_WRITE_REG`,
   `TMF_START_STREAM` / `TMF_STOP_STREAM`, `TMF_GET_INFO`
@@ -49,11 +52,6 @@ layer** — there is **no live device class** in the C# SDK:
   frames in stream order into measurements;
 - presets and config-page fields ([`Tmf8829Config`](api.md#tmf8829config));
 - the embedded sensor firmware image ([`Tmf8829Firmware`](api.md#tmf8829firmware)).
-
-What it does **not** do: open a port or run the sensor sequence — `init()`
-with the firmware download, `configure()`, `start()` / `stop()`. That is done
-today with the Python or TypeScript SDK (or the C / C++ SDKs); this SDK builds
-the command payloads and decodes what the board sends.
 
 ## Key concepts
 

@@ -35,6 +35,7 @@ read_registers(self, addr: int, length: int) -> bytes
 
 Read `length` bytes from `addr` in ≤1024-byte requests; reads that
 reach the FIFO port 0xFF stay there (the sensor does not auto-increment it).
+A reply shorter or longer than asked raises `DepzError`.
 
 #### Tmf8829.read_register
 
@@ -152,6 +153,15 @@ measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator
 Blocking iterator over measurements (bounded, drop-oldest).
 Subscribes immediately — call before or after `start()`.
 
+#### Tmf8829.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement
+```
+
+Wait for the next measurement. Raises `DepzTimeoutError` after
+`timeout`, `LinkClosedError` as soon as the device is closed.
+
 #### Tmf8829.frames_dropped *(property)*
 
 Frames the bridge dropped (frame_seq gaps) in this stream.
@@ -161,6 +171,11 @@ Frames the bridge dropped (frame_seq gaps) in this stream.
 Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
 
 #### Tmf8829.frame_parse_errors *(property)*
+
+#### Tmf8829.clock_ratio_q16 *(property)*
+
+Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal
+8 << 16 = 8 µs per SYSTICK), for diagnostics.
 
 #### Tmf8829.port *(property)*
 
@@ -240,6 +255,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Tmf8829.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Tmf8829.read_mcu_temperature
 

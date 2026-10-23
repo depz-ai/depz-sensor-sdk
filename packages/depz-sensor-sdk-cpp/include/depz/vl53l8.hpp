@@ -15,9 +15,9 @@
 // depz/device.hpp, which runs the C SDK's port of the reference Python
 // `vl53l8/uld.py` and decodes its frames with these structs.
 //
-// Semantics are byte-exact with the Python/TS reference implementations; raw
-// wire integers are authoritative (distance is the fixed-point value divided by
-// 4 with floor rounding, matching ST GetRangingData).
+// Semantics are byte-exact with the Python/TS reference implementations; frame
+// values come out in ST GetRangingData's real units (contract 04 §5, see
+// Vl53l8Frame).
 #pragma once
 
 #include <cstdint>
@@ -91,21 +91,23 @@ private:
 // ── frame decode ────────────────────────────────────────────────────────────
 
 // One decoded ranging frame. Arrays are sized to the active resolution (16 or
-// 64 zones), row-major. Raw integers per the wire; `distance_mm` already has
-// the ST /4 floor scaling applied, `range_sigma_mm_raw` is the raw u16 (real
-// value = raw / 128).
+// 64 zones), row-major, in the real units ST's GetRangingData gives (contract
+// 04 §5): `distance_mm` = wire value / 4 floored, a negative result clamped to
+// 0; signal / ambient = wire / 2048 (kcps/SPAD); `range_sigma_mm` = wire / 128
+// (mm); `reflectance` = wire / 2 (%). ST divides integers; the double fields
+// keep the fraction.
 struct Vl53l8Frame {
     std::uint64_t timestamp_us = 0;
     int resolution = 0;
     int silicon_temp_degc = 0;
-    std::vector<std::int32_t> distance_mm;
+    std::vector<std::int32_t> distance_mm;       // mm, >= 0
     std::vector<std::uint8_t> target_status;
     std::vector<std::uint8_t> nb_target_detected;
-    std::vector<std::uint32_t> signal_per_spad;
-    std::vector<std::uint32_t> ambient_per_spad;
+    std::vector<double> signal_per_spad;         // kcps/SPAD
+    std::vector<double> ambient_per_spad;        // kcps/SPAD
     std::vector<std::uint32_t> nb_spads_enabled;
-    std::vector<std::uint16_t> range_sigma_mm_raw;
-    std::vector<std::uint8_t> reflectance;
+    std::vector<double> range_sigma_mm;          // mm
+    std::vector<double> reflectance;             // %
     // Raw CNH data block (index CNH_DATA_IDX, byte-swapped like every results
     // block) when the frame carries one — VL53L8CH / VL53L7CH with CNH
     // configured; nullopt otherwise. Feed it to decode_cnh().
@@ -126,6 +128,7 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw,
 // ── advanced-feature DCI codecs (ST ULD, BSD-3) ─────────────────────────────
 
 // Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
+// xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
 std::uint32_t xtalk_margin_raw(double margin_kcps);
 double xtalk_margin_kcps(std::uint32_t raw);
 
@@ -154,6 +157,8 @@ inline constexpr int NB_THRESHOLDS = 64;
 
 // Pack the 64-entry DCI_DET_THRESH_START block (768 bytes). Missing entries
 // default to zeros; low/high are multiplied by the measurement's scale factor.
+// std::invalid_argument for more than 64 entries, std::out_of_range when a
+// scaled low/high does not fit the i32 field (contract 07 §3).
 bytes pack_detection_thresholds(const std::vector<DetectionThreshold>& thresholds);
 
 // The 8-byte DCI_DET_THRESH_VALID_STATUS write that accompanies the block.
@@ -186,6 +191,7 @@ struct MotionConfig {
 
 // Build the default motion-indicator configuration for `resolution`
 // (RESOLUTION_4X4 or RESOLUTION_8X8), matching uld.motion_indicator_init.
+// std::invalid_argument for any other resolution.
 MotionConfig motion_config_init(int resolution);
 
 // ── CNH (Compact Network Histogram) decode — VL53L8CH ───────────────────────

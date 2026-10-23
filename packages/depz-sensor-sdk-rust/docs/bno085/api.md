@@ -10,9 +10,828 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`pack_shtp_header`](#pack_shtp_header), [`unpack_shtp_header`](#unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`build_frame`](#build_frame), [`ShtpLayer`](#shtplayer)
+- **BNO085 (IMU)**: [`Bno086Cmd`](#bno086cmd), [`RPT_DATA`](#rpt_data), [`BUSY_BACKOFF_MS`](#busy_backoff_ms), [`Bno086Data`](#bno086data), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`EXECUTABLE_RESET_COMPLETE`](#executable_reset_complete), [`CMD_ERRORS`](#cmd_errors), [`CMD_COUNTER`](#cmd_counter), [`CMD_TARE`](#cmd_tare), [`CMD_INITIALIZE`](#cmd_initialize), [`CMD_SAVE_DCD`](#cmd_save_dcd), [`CMD_ME_CALIBRATE`](#cmd_me_calibrate), [`CMD_PERIODIC_DCD_CONFIG`](#cmd_periodic_dcd_config), [`CMD_GET_OSCILLATOR_TYPE`](#cmd_get_oscillator_type), [`CMD_CLEAR_DCD_AND_RESET`](#cmd_clear_dcd_and_reset), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`OSC_INTERNAL`](#osc_internal), [`OSC_EXT_CRYSTAL`](#osc_ext_crystal), [`OSC_EXT_CLOCK`](#osc_ext_clock), [`ERROR_SOURCE_NO_MORE_ERRORS`](#error_source_no_more_errors), [`TARE_X`](#tare_x), [`TARE_Y`](#tare_y), [`TARE_Z`](#tare_z), [`TARE_ALL`](#tare_all), [`TareBasis`](#tarebasis), [`MotionIntent`](#motionintent), [`FRS_STATIC_CALIBRATION_AGM`](#frs_static_calibration_agm), [`FRS_NOMINAL_CALIBRATION`](#frs_nominal_calibration), [`FRS_DYNAMIC_CALIBRATION`](#frs_dynamic_calibration), [`FRS_ME_POWER_MGMT`](#frs_me_power_mgmt), [`FRS_SYSTEM_ORIENTATION`](#frs_system_orientation), [`FRS_ACCEL_ORIENTATION`](#frs_accel_orientation), [`FRS_GYROSCOPE_ORIENTATION`](#frs_gyroscope_orientation), [`FRS_MAGNETOMETER_ORIENTATION`](#frs_magnetometer_orientation), [`FRS_ARVR_STABILIZATION_RV`](#frs_arvr_stabilization_rv), [`FRS_ARVR_STABILIZATION_GRV`](#frs_arvr_stabilization_grv), [`FRS_SERIAL_NUMBER`](#frs_serial_number), [`FRS_USER_RECORD`](#frs_user_record), [`FRS_SIG_MOTION_DETECT_CONFIG`](#frs_sig_motion_detect_config), [`FRS_SHAKE_DETECT_CONFIG`](#frs_shake_detect_config), [`FRS_STABILITY_DETECTOR_CONFIG`](#frs_stability_detector_config), [`FRS_ACTIVITY_TRACKER_CONFIG`](#frs_activity_tracker_config), [`METADATA_RECORDS`](#metadata_records), [`FRS_NO_ERROR`](#frs_no_error), [`FRS_UNRECOGNIZED_FRS_TYPE`](#frs_unrecognized_frs_type), [`FRS_BUSY`](#frs_busy), [`FRS_READ_COMPLETED`](#frs_read_completed), [`FRS_OFFSET_OUT_OF_RANGE`](#frs_offset_out_of_range), [`FRS_RECORD_EMPTY`](#frs_record_empty), [`FRS_BLOCK_COMPLETED`](#frs_block_completed), [`FRS_BLOCK_AND_READ_COMPLETED`](#frs_block_and_read_completed), [`FRS_DEVICE_ERROR`](#frs_device_error), [`FRS_WRITE_WORDS_RECEIVED`](#frs_write_words_received), [`FRS_WRITE_UNRECOGNIZED_FRS_TYPE`](#frs_write_unrecognized_frs_type), [`FRS_WRITE_BUSY`](#frs_write_busy), [`FRS_WRITE_COMPLETED`](#frs_write_completed), [`FRS_WRITE_MODE_READY`](#frs_write_mode_ready), [`FRS_WRITE_FAILED`](#frs_write_failed), [`FRS_WRITE_NOT_IN_WRITE_MODE`](#frs_write_not_in_write_mode), [`FRS_WRITE_INVALID_LENGTH`](#frs_write_invalid_length), [`FRS_WRITE_RECORD_VALID`](#frs_write_record_valid), [`FRS_WRITE_RECORD_INVALID`](#frs_write_record_invalid), [`Sh2HubError`](#sh2huberror), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`COUNTS_GET`](#counts_get), [`COUNTS_CLEAR`](#counts_clear), [`ME_CAL_GET`](#me_cal_get), [`split_control_cargo`](#split_control_cargo), [`counts_get_params`](#counts_get_params), [`counts_clear_params`](#counts_clear_params), [`errors_params`](#errors_params), [`tare_now_params`](#tare_now_params), [`persist_tare_params`](#persist_tare_params), [`set_reorientation_params`](#set_reorientation_params), [`me_calibration_params`](#me_calibration_params), [`interactive_calibration_params`](#interactive_calibration_params), [`force_flush`](#force_flush), [`periodic_dcd_params`](#periodic_dcd_params), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`try_parse_input_cargo`](#try_parse_input_cargo), [`try_parse_gyro_rv_cargo`](#try_parse_gyro_rv_cargo), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`ShtpError`](#shtperror), [`try_pack_shtp_header`](#try_pack_shtp_header), [`try_unpack_shtp_header`](#try_unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`try_build_frame`](#try_build_frame), [`ShtpLayer`](#shtplayer), [`RATE_LOW_FACTOR`](#rate_low_factor), [`RATE_HIGH_FACTOR`](#rate_high_factor), [`Bno086Device`](#bno086device)
 
 ## BNO085 (IMU)
+
+### Bno086Cmd
+
+```rust
+pub enum Bno086Cmd {
+    /// Hardware reset through nRST; RPT_STATUS OK.
+    SensorReset = 0x32,
+    /// 1 ms WAKE (PS0) pulse; RPT_STATUS OK.
+    SensorWakeUp = 0x33,
+    /// Payload = one raw SHTP frame; RPT_STATUS OK or ERR_BUSY (both TX slots full).
+    SendShtpPacket = 0x34,
+}
+```
+
+Bridge commands of the BNO085 board: the MCU only shuttles raw SHTP frames.
+
+### RPT_DATA
+
+```rust
+pub const RPT_DATA: u8 = 0x91;
+```
+
+RPT_DATA: cmd u8 (always 0x00, ERRATA E2), timestamp_us u64, raw SHTP frame.
+
+### BUSY_BACKOFF_MS
+
+```rust
+pub const BUSY_BACKOFF_MS: u64 = 200;
+```
+
+Two 64-byte SHTP transmit slots on the MCU (ERRATA E2); a third send gets ERR_BUSY, to back off
+at least this long, ms.
+
+### Bno086Data
+
+```rust
+pub struct Bno086Data {
+    pub cmd: u8,
+    pub timestamp_us: u64,
+    pub shtp: Vec<u8>,
+}
+```
+
+One RPT_DATA report: an SHTP frame captured from the sensor bus, with the MCU uptime.
+
+#### Bno086Data::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<Bno086Data, CodecError>
+```
+
+### FORCE_SENSOR_FLUSH
+
+```rust
+pub const FORCE_SENSOR_FLUSH: u8 = 0xF0;
+```
+
+Host → hub on the control channel; answered by Flush Completed (0xEF) on the input channel.
+
+### EXECUTABLE_RESET_COMPLETE
+
+```rust
+pub const EXECUTABLE_RESET_COMPLETE: u8 = 0x01;
+```
+
+Inbound on the executable channel: the hub finished a reset.
+
+### CMD_ERRORS
+
+```rust
+pub const CMD_ERRORS: u8 = 0x01;
+```
+
+### CMD_COUNTER
+
+```rust
+pub const CMD_COUNTER: u8 = 0x02;
+```
+
+### CMD_TARE
+
+```rust
+pub const CMD_TARE: u8 = 0x03;
+```
+
+### CMD_INITIALIZE
+
+```rust
+pub const CMD_INITIALIZE: u8 = 0x04;
+```
+
+### CMD_SAVE_DCD
+
+```rust
+pub const CMD_SAVE_DCD: u8 = 0x06;
+```
+
+### CMD_ME_CALIBRATE
+
+```rust
+pub const CMD_ME_CALIBRATE: u8 = 0x07;
+```
+
+### CMD_PERIODIC_DCD_CONFIG
+
+```rust
+pub const CMD_PERIODIC_DCD_CONFIG: u8 = 0x09;
+```
+
+### CMD_GET_OSCILLATOR_TYPE
+
+```rust
+pub const CMD_GET_OSCILLATOR_TYPE: u8 = 0x0A;
+```
+
+### CMD_CLEAR_DCD_AND_RESET
+
+```rust
+pub const CMD_CLEAR_DCD_AND_RESET: u8 = 0x0B;
+```
+
+### CMD_INTERACTIVE_CALIBRATION
+
+```rust
+pub const CMD_INTERACTIVE_CALIBRATION: u8 = 0x0E;
+```
+
+BNO085 only; no response.
+
+### OSC_INTERNAL
+
+```rust
+pub const OSC_INTERNAL: u8 = 0;
+```
+
+Get Oscillator Type R0: internal.
+
+### OSC_EXT_CRYSTAL
+
+```rust
+pub const OSC_EXT_CRYSTAL: u8 = 1;
+```
+
+Get Oscillator Type R0: external crystal.
+
+### OSC_EXT_CLOCK
+
+```rust
+pub const OSC_EXT_CLOCK: u8 = 2;
+```
+
+Get Oscillator Type R0: external clock.
+
+### ERROR_SOURCE_NO_MORE_ERRORS
+
+```rust
+pub const ERROR_SOURCE_NO_MORE_ERRORS: u8 = 255;
+```
+
+The end of the error queue (the `source` of an error record, SH-2 §6.4.1).
+
+### TARE_X
+
+```rust
+pub const TARE_X: u8 = 1;
+```
+
+Tare axes, a bitmap.
+
+### TARE_Y
+
+```rust
+pub const TARE_Y: u8 = 2;
+```
+
+### TARE_Z
+
+```rust
+pub const TARE_Z: u8 = 4;
+```
+
+### TARE_ALL
+
+```rust
+pub const TARE_ALL: u8 = 7;
+```
+
+### TareBasis
+
+```rust
+pub enum TareBasis {
+    RotationVector = 0,
+    GameRotationVector = 1,
+    GeomagneticRotationVector = 2,
+    GyroIntegratedRv = 3,
+    ArvrStabilizedRv = 4,
+    ArvrStabilizedGameRv = 5,
+}
+```
+
+The rotation vector a tare refers to (Tare Now P2).
+
+### MotionIntent
+
+```rust
+pub enum MotionIntent {
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+}
+```
+
+P0 of Interactive Calibration (0x0E, SH-2 §6.4.12.1): what the host knows about the device's
+motion. `Unknown` is the hub's initial state.
+
+### FRS_STATIC_CALIBRATION_AGM
+
+```rust
+pub const FRS_STATIC_CALIBRATION_AGM: u16 = 0x7979;
+```
+
+### FRS_NOMINAL_CALIBRATION
+
+```rust
+pub const FRS_NOMINAL_CALIBRATION: u16 = 0x4D4D;
+```
+
+### FRS_DYNAMIC_CALIBRATION
+
+```rust
+pub const FRS_DYNAMIC_CALIBRATION: u16 = 0x1F1F;
+```
+
+### FRS_ME_POWER_MGMT
+
+```rust
+pub const FRS_ME_POWER_MGMT: u16 = 0xD3E2;
+```
+
+### FRS_SYSTEM_ORIENTATION
+
+```rust
+pub const FRS_SYSTEM_ORIENTATION: u16 = 0x2D3E;
+```
+
+Mounting quaternion, 4 × Q30 words.
+
+### FRS_ACCEL_ORIENTATION
+
+```rust
+pub const FRS_ACCEL_ORIENTATION: u16 = 0x2D41;
+```
+
+### FRS_GYROSCOPE_ORIENTATION
+
+```rust
+pub const FRS_GYROSCOPE_ORIENTATION: u16 = 0x2D46;
+```
+
+### FRS_MAGNETOMETER_ORIENTATION
+
+```rust
+pub const FRS_MAGNETOMETER_ORIENTATION: u16 = 0x2D4C;
+```
+
+### FRS_ARVR_STABILIZATION_RV
+
+```rust
+pub const FRS_ARVR_STABILIZATION_RV: u16 = 0x3E2D;
+```
+
+### FRS_ARVR_STABILIZATION_GRV
+
+```rust
+pub const FRS_ARVR_STABILIZATION_GRV: u16 = 0x3E2E;
+```
+
+### FRS_SERIAL_NUMBER
+
+```rust
+pub const FRS_SERIAL_NUMBER: u16 = 0x4B4B;
+```
+
+One 32-bit word; empty unless programmed.
+
+### FRS_USER_RECORD
+
+```rust
+pub const FRS_USER_RECORD: u16 = 0x74B4;
+```
+
+Free for the user, up to 64 words.
+
+### FRS_SIG_MOTION_DETECT_CONFIG
+
+```rust
+pub const FRS_SIG_MOTION_DETECT_CONFIG: u16 = 0xC274;
+```
+
+### FRS_SHAKE_DETECT_CONFIG
+
+```rust
+pub const FRS_SHAKE_DETECT_CONFIG: u16 = 0x7D7D;
+```
+
+### FRS_STABILITY_DETECTOR_CONFIG
+
+```rust
+pub const FRS_STABILITY_DETECTOR_CONFIG: u16 = 0xED85;
+```
+
+### FRS_ACTIVITY_TRACKER_CONFIG
+
+```rust
+pub const FRS_ACTIVITY_TRACKER_CONFIG: u16 = 0xED88;
+```
+
+### METADATA_RECORDS
+
+```rust
+pub const METADATA_RECORDS: [(u8, u16); 24] = [
+    (0x14, 0xE301), (0x01, 0xE302), (0x04, 0xE303), (0x06, 0xE304), (0x15, 0xE305), (0x02, 0xE306),
+    (0x07, 0xE307), (0x16, 0xE308), (0x03, 0xE309), (0x0F, 0xE30A), (0x05, 0xE30B), (0x08, 0xE30C),
+    (0x09, 0xE30D), (0x10, 0xE313), (0x18, 0xE314), (0x11, 0xE315), (0x12, 0xE316), (0x13, 0xE317),
+    (0x19, 0xE318), (0x1E, 0xE31C), (0x28, 0xE322), (0x29, 0xE323), (0x2A, 0xE324), (0x2B, 0xE325),
+];
+```
+
+Sensor id → its metadata FRS record.
+
+### FRS_NO_ERROR
+
+```rust
+pub const FRS_NO_ERROR: u8 = 0;
+```
+
+### FRS_UNRECOGNIZED_FRS_TYPE
+
+```rust
+pub const FRS_UNRECOGNIZED_FRS_TYPE: u8 = 1;
+```
+
+### FRS_BUSY
+
+```rust
+pub const FRS_BUSY: u8 = 2;
+```
+
+### FRS_READ_COMPLETED
+
+```rust
+pub const FRS_READ_COMPLETED: u8 = 3;
+```
+
+### FRS_OFFSET_OUT_OF_RANGE
+
+```rust
+pub const FRS_OFFSET_OUT_OF_RANGE: u8 = 4;
+```
+
+### FRS_RECORD_EMPTY
+
+```rust
+pub const FRS_RECORD_EMPTY: u8 = 5;
+```
+
+### FRS_BLOCK_COMPLETED
+
+```rust
+pub const FRS_BLOCK_COMPLETED: u8 = 6;
+```
+
+### FRS_BLOCK_AND_READ_COMPLETED
+
+```rust
+pub const FRS_BLOCK_AND_READ_COMPLETED: u8 = 7;
+```
+
+### FRS_DEVICE_ERROR
+
+```rust
+pub const FRS_DEVICE_ERROR: u8 = 8;
+```
+
+### FRS_WRITE_WORDS_RECEIVED
+
+```rust
+pub const FRS_WRITE_WORDS_RECEIVED: u8 = 0;
+```
+
+### FRS_WRITE_UNRECOGNIZED_FRS_TYPE
+
+```rust
+pub const FRS_WRITE_UNRECOGNIZED_FRS_TYPE: u8 = 1;
+```
+
+### FRS_WRITE_BUSY
+
+```rust
+pub const FRS_WRITE_BUSY: u8 = 2;
+```
+
+### FRS_WRITE_COMPLETED
+
+```rust
+pub const FRS_WRITE_COMPLETED: u8 = 3;
+```
+
+### FRS_WRITE_MODE_READY
+
+```rust
+pub const FRS_WRITE_MODE_READY: u8 = 4;
+```
+
+### FRS_WRITE_FAILED
+
+```rust
+pub const FRS_WRITE_FAILED: u8 = 5;
+```
+
+### FRS_WRITE_NOT_IN_WRITE_MODE
+
+```rust
+pub const FRS_WRITE_NOT_IN_WRITE_MODE: u8 = 6;
+```
+
+### FRS_WRITE_INVALID_LENGTH
+
+```rust
+pub const FRS_WRITE_INVALID_LENGTH: u8 = 7;
+```
+
+### FRS_WRITE_RECORD_VALID
+
+```rust
+pub const FRS_WRITE_RECORD_VALID: u8 = 8;
+```
+
+### FRS_WRITE_RECORD_INVALID
+
+```rust
+pub const FRS_WRITE_RECORD_INVALID: u8 = 9;
+```
+
+### Sh2HubError
+
+```rust
+pub struct Sh2HubError(pub String);
+```
+
+A SH-2 level failure: a response that is not the one asked for, a non-zero command status, an
+FRS error.
+
+### FeatureResponse
+
+```rust
+pub struct FeatureResponse {
+    pub sensor_id: u8,
+    pub flags: u8,
+    pub sensitivity: u16,
+    pub interval_us: u32,
+    pub batch_us: u32,
+    pub cfg_word: u32,
+}
+```
+
+Get Feature Response (0xFC), 17 bytes: the rates in effect.
+
+#### FeatureResponse::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<FeatureResponse, Sh2HubError>
+```
+
+### ProductId
+
+```rust
+pub struct ProductId {
+    pub reset_cause: u8,
+    pub sw_version_major: u8,
+    pub sw_version_minor: u8,
+    pub sw_part_number: u32,
+    pub sw_build_number: u32,
+    pub sw_version_patch: u16,
+}
+```
+
+Product ID Response (0xF8), 16 bytes, one per software component (the SH-2 application first);
+the reset cause (SH-2 §6.4.5.2) is set on the first only.
+
+#### ProductId::version
+
+```rust
+pub fn version(&self) -> String
+```
+
+"major.minor.patch".
+
+#### ProductId::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<ProductId, Sh2HubError>
+```
+
+### CommandResponse
+
+```rust
+pub struct CommandResponse {
+    pub seq: u8,
+    pub command: u8,
+    pub command_seq: u8,
+    pub response_seq: u8,
+    pub r: [u8; 11],
+}
+```
+
+Command Response (0xF1), 16 bytes. `command_seq` echoes the request (correlate on it plus
+`command`); `response_seq` counts responses to one request; R0 is the status of most commands
+(0 = success).
+
+#### CommandResponse::status
+
+```rust
+pub fn status(&self) -> u8
+```
+
+#### CommandResponse::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<CommandResponse, Sh2HubError>
+```
+
+### FrsReadResponse
+
+```rust
+pub struct FrsReadResponse {
+    pub status: u8,
+    pub data_length: u8,
+    pub offset_words: u16,
+    pub data0: u32,
+    pub data1: u32,
+    pub frs_type: u16,
+}
+```
+
+FRS Read Response (0xF3), 16 bytes, up to two data words.
+
+#### FrsReadResponse::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<FrsReadResponse, Sh2HubError>
+```
+
+### FrsWriteResponse
+
+```rust
+pub struct FrsWriteResponse {
+    pub status: u8,
+    pub offset_words: u16,
+}
+```
+
+FRS Write Response (0xF5), 4 bytes.
+
+#### FrsWriteResponse::unpack
+
+```rust
+pub fn unpack(p: &[u8]) -> Result<FrsWriteResponse, Sh2HubError>
+```
+
+### ErrorRecord
+
+```rust
+pub struct ErrorRecord {
+    pub severity: u8,
+    pub seq: u8,
+    pub source: u8,
+    pub error: u8,
+    pub module: u8,
+    pub code: u8,
+}
+```
+
+One error-queue entry (command 0x01 response, R0..R5).
+
+#### ErrorRecord::from_response
+
+```rust
+pub fn from_response(r: &CommandResponse) -> ErrorRecord
+```
+
+### Counts
+
+```rust
+pub struct Counts {
+    pub sensor_id: u8,
+    pub offered: u32,
+    pub accepted: u32,
+    pub on: u32,
+    pub attempted: u32,
+}
+```
+
+Per-sensor event counts (command 0x02, two responses).
+
+### CalibrationConfig
+
+```rust
+pub struct CalibrationConfig {
+    pub accel: bool,
+    pub gyro: bool,
+    pub mag: bool,
+    pub planar: bool,
+}
+```
+
+ME calibration enables as the sensor reports them.
+
+### SensorMetadata
+
+```rust
+pub struct SensorMetadata {
+    pub me_version: u8,
+    pub mh_version: u8,
+    pub sh_version: u8,
+    pub range_raw: u32,
+    pub resolution_raw: u32,
+    pub revision: u16,
+    pub power_ma_q10: u16,
+    pub min_period_us: u32,
+    pub max_period_us: u32,
+    pub fifo_max: u16,
+    pub fifo_reserved: u16,
+    pub batch_buffer_bytes: u16,
+    pub q_point_1: u16,
+    pub q_point_2: u16,
+    pub q_point_3: u16,
+    pub raw_words: Vec<u32>,
+}
+```
+
+A sensor's metadata FRS record (revision-gated fields are 0 on older records); `raw_words` is
+authoritative.
+
+#### SensorMetadata::from_words
+
+```rust
+pub fn from_words(words: &[u32]) -> SensorMetadata
+```
+
+### COUNTS_GET
+
+```rust
+pub const COUNTS_GET: u8 = 0;
+```
+
+### COUNTS_CLEAR
+
+```rust
+pub const COUNTS_CLEAR: u8 = 1;
+```
+
+### ME_CAL_GET
+
+```rust
+pub const ME_CAL_GET: u8 = 0x01;
+```
+
+ME Calibration subcommand: report the current configuration.
+
+### split_control_cargo
+
+```rust
+pub fn split_control_cargo(payload: &[u8]) -> Vec<Vec<u8>>
+```
+
+Split a control cargo into its reports; an unknown id or a short tail ends the walk (the rest is
+one piece: its length is unknowable).
+
+### counts_get_params
+
+```rust
+pub fn counts_get_params(sensor_id: u8) -> [u8; 2]
+```
+
+### counts_clear_params
+
+```rust
+pub fn counts_clear_params(sensor_id: u8) -> [u8; 2]
+```
+
+### errors_params
+
+```rust
+pub fn errors_params(severity: u8) -> [u8; 1]
+```
+
+Errors of `severity` or greater (0 = all).
+
+### tare_now_params
+
+```rust
+pub fn tare_now_params(axes: u8, basis: TareBasis) -> [u8; 3]
+```
+
+`axes`: a `TARE_*` bitmap.
+
+### persist_tare_params
+
+```rust
+pub fn persist_tare_params() -> [u8; 1]
+```
+
+### set_reorientation_params
+
+```rust
+pub fn set_reorientation_params(x: f64, y: f64, z: f64, w: f64) -> Result<[u8; 9], Sh2HubError>
+```
+
+Tare subcommand 2: the reorientation quaternion as four Q14 int16 (all zero clears); a component
+out of the Q14 int16 range is refused.
+
+### me_calibration_params
+
+```rust
+pub fn me_calibration_params(accel: bool, gyro: bool, mag: bool, planar: bool, subcommand: u8) -> [u8; 5]
+```
+
+ME Calibration (0x07): subcommand 0 configures, 1 ([`ME_CAL_GET`]) reads back.
+
+### interactive_calibration_params
+
+```rust
+pub fn interactive_calibration_params(intent: u8) -> [u8; 1]
+```
+
+Interactive Calibration (0x0E, BNO085 only): P0 = motion intent; no response.
+
+### force_flush
+
+```rust
+pub fn force_flush(sensor_id: u8) -> [u8; 2]
+```
+
+Force Sensor Flush (0xF0, SH-2 §6.5.6); the hub answers with Flush Completed (0xEF).
+
+### periodic_dcd_params
+
+```rust
+pub fn periodic_dcd_params(enable: bool) -> [u8; 1]
+```
+
+Periodic DCD save (0x09): P0 0 = enable, 1 = disable; no response.
+
+### FrsReadSession
+
+```rust
+pub struct FrsReadSession {
+    pub frs_type: u16,
+    pub words: Vec<u32>,
+    pub done: bool,
+}
+```
+
+A multi-packet FRS read: send [`FrsReadSession::request`], [`FrsReadSession::feed`] every 0xF3 of
+the record until it returns true; `words` holds the record. Error statuses fail.
+
+#### FrsReadSession::new
+
+```rust
+pub fn new(frs_type: u16) -> FrsReadSession
+```
+
+#### FrsReadSession::request
+
+```rust
+pub fn request(&self) -> [u8; 8]
+```
+
+#### FrsReadSession::feed
+
+```rust
+pub fn feed(&mut self, r: &FrsReadResponse) -> Result<bool, Sh2HubError>
+```
+
+### FrsWriteSession
+
+```rust
+pub struct FrsWriteSession {
+    pub frs_type: u16,
+    pub words: Vec<u32>,
+    pub done: bool,
+    offset: usize,
+}
+```
+
+A multi-packet FRS write: send [`FrsWriteSession::request`]; for every 0xF5
+[`FrsWriteSession::feed`] returns the next Write Data payload, or `None`; `done` on
+WRITE_COMPLETED. Error statuses fail.
+
+#### FrsWriteSession::new
+
+```rust
+pub fn new(frs_type: u16, words: &[u32]) -> FrsWriteSession
+```
+
+#### FrsWriteSession::request
+
+```rust
+pub fn request(&self) -> [u8; 6]
+```
+
+#### FrsWriteSession::feed
+
+```rust
+pub fn feed(&mut self, r: &FrsWriteResponse) -> Result<Option<[u8; 12]>, Sh2HubError>
+```
 
 ### BASE_TIMESTAMP_REF
 
@@ -27,6 +846,15 @@ In-cargo control IDs on the input channels.
 ```rust
 pub const TIMESTAMP_REBASE: u8 = 0xfa;
 ```
+
+### FLUSH_COMPLETED
+
+```rust
+pub const FLUSH_COMPLETED: u8 = 0xef;
+```
+
+Flush Completed: + u8 sensor ID, no SH-2 header; the answer to Force Sensor
+Flush (0xF0).
 
 ### RV_ACCURACY_Q
 
@@ -161,6 +989,19 @@ pub enum Report {
         delay_us: i64,
         classification: u8,
     },
+    /// 0x2B motion request (BNO086 interactive calibration): the motion
+    /// intent the hub was last told, and what it asks of the device (SH-2
+    /// §6.5.45.2; 1, 3, 4 = stay still). Sent when the request changes, not
+    /// periodically, whatever the granted rate.
+    MotionRequest {
+        sensor_id: u8,
+        timestamp_us: i64,
+        seq: u8,
+        accuracy: u8,
+        delay_us: i64,
+        intent: u8,
+        request: u8,
+    },
     /// 0x19 shake detector; bits 0/1/2 = X/Y/Z.
     ShakeDetector {
         sensor_id: u8,
@@ -216,6 +1057,14 @@ pub enum Report {
         vy_raw: i32,
         vz_raw: i32,
     },
+    /// 0xEF Flush Completed: every batched report of `flushed_sensor` as of
+    /// the matching Force Sensor Flush has been sent. `sensor_id` is 0xEF; no
+    /// SH-2 header, so the timestamp is the cargo's current base.
+    FlushCompleted {
+        sensor_id: u8,
+        timestamp_us: i64,
+        flushed_sensor: u8,
+    },
     /// Unrecognized report ID: raw bytes from the ID to the end of the cargo.
     Unknown {
         sensor_id: u8,
@@ -226,6 +1075,22 @@ pub enum Report {
 ```
 
 A parsed report. Raw fields are authoritative; scale with the Q points.
+
+#### Report::sensor_id
+
+```rust
+pub fn sensor_id(&self) -> u8
+```
+
+The report id (0xEF for Flush Completed).
+
+#### Report::timestamp_us
+
+```rust
+pub fn timestamp_us(&self) -> i64
+```
+
+The report's measurement time on the MCU clock, µs.
 
 ### Vector3Kind
 
@@ -239,6 +1104,24 @@ pub enum Vector3Kind {
 
 Which of the plain 3-vector reports.
 
+### try_parse_input_cargo
+
+```rust
+pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Vec<Report>, CodecError>
+```
+
+[`parse_input_cargo`] that refuses a negative `capture_timestamp_us`: the
+capture time is the MCU uptime, a u64 (contract 07 §3).
+
+### try_parse_gyro_rv_cargo
+
+```rust
+pub fn try_parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Option<Report>, CodecError>
+```
+
+[`parse_gyro_rv_cargo`] that refuses a negative `capture_timestamp_us`
+(contract 07 §3).
+
 ### parse_input_cargo
 
 ```rust
@@ -246,7 +1129,8 @@ pub fn parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Vec<Repor
 ```
 
 Parse a channel-3/4 cargo into typed reports. `capture_timestamp_us` is the
-bridge RPT_DATA capture time (MCU uptime).
+bridge RPT_DATA capture time (MCU uptime); a negative one is not checked —
+prefer [`try_parse_input_cargo`].
 
 ### parse_gyro_rv_cargo
 
@@ -257,7 +1141,8 @@ pub fn parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Option<
 Parse a channel-5 cargo (gyro-integrated RV, dense format).
 
 Two shapes: 7×i16 bare, or prefixed with 0xFB + i32 base delta + u16 delay
-(both 100 µs ticks). Returns `None` if the cargo is too short.
+(both 100 µs ticks). Returns `None` if the cargo is too short. A negative
+`capture_timestamp_us` is not checked — prefer [`try_parse_gyro_rv_cargo`].
 
 ### REPORT_COMMAND_RESPONSE
 
@@ -501,7 +1386,7 @@ pub fn build_sleep() -> [u8; 1]
 ```
 
 SH-2 "Sleep" payload for the executable channel: `[0x03]`. Send it with
-`next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
+`try_next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
 bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
 
 Every report stops, except those enabled with flags wake-up | always-on,
@@ -537,21 +1422,42 @@ pub struct ShtpHeader {
 
 A decoded SHTP header.
 
-### pack_shtp_header
+### ShtpError
 
 ```rust
-pub fn pack_shtp_header(hdr: &ShtpHeader) -> [u8; 4]
+pub enum ShtpError {
+    /// `length` does not fit the 15-bit length field (max 0x7FFF).
+    LengthTooWide(usize),
+    /// Fewer than the 4 header bytes.
+    ShortHeader(usize),
+    /// Channel outside 0..[`NUM_CHANNELS`].
+    ChannelOutOfRange(u8),
+    /// A host→sensor frame larger than one MCU transmit slot ([`MAX_TX_FRAME`]).
+    TxCargoTooLong(usize),
+}
 ```
 
-Serialize an SHTP header to 4 bytes.
+SHTP codec error (contract 07 §3: an argument that does not fit its wire
+field, or input shorter than the fields it must hold, is rejected —
+never masked, wrapped or read past).
 
-### unpack_shtp_header
+### try_pack_shtp_header
 
 ```rust
-pub fn unpack_shtp_header(data: &[u8]) -> ShtpHeader
+pub fn try_pack_shtp_header(hdr: &ShtpHeader) -> Result<[u8; 4], ShtpError>
 ```
 
-Decode a 4-byte SHTP header (reads the first 4 bytes of `data`).
+Serialize an SHTP header to 4 bytes; `length` must fit 15 bits
+([`ShtpError::LengthTooWide`] otherwise — never masked).
+
+### try_unpack_shtp_header
+
+```rust
+pub fn try_unpack_shtp_header(data: &[u8]) -> Result<ShtpHeader, ShtpError>
+```
+
+Decode an SHTP header from the first 4 bytes of `data` (trailing bytes —
+the cargo — are ignored); [`ShtpError::ShortHeader`] when shorter.
 
 ### ShtpCargo
 
@@ -561,18 +1467,22 @@ pub struct ShtpCargo {
     /// seq of the first fragment.
     pub seq: u8,
     pub payload: Vec<u8>,
+    /// `RPT_DATA.timestamp_us` of the FIRST fragment (contract 05 §3) — the
+    /// capture the cargo's 0xFB base delta refers to; 0 when fed via [`ShtpLayer::feed`].
+    pub capture_us: u64,
 }
 ```
 
 One reassembled cargo: `payload` excludes all SHTP headers.
 
-### build_frame
+### try_build_frame
 
 ```rust
-pub fn build_frame(channel: u8, payload: &[u8], seq: u8) -> Vec<u8>
+pub fn try_build_frame(channel: u8, payload: &[u8], seq: u8) -> Result<Vec<u8>, ShtpError>
 ```
 
-Single-fragment frame: length = header + payload.
+Single-fragment frame: length = header + payload. A frame longer than the
+15-bit length field holds is [`ShtpError::LengthTooWide`].
 
 ### ShtpLayer
 
@@ -593,13 +1503,26 @@ Per-channel TX sequence counters + RX cargo reassembly.
 pub fn new() -> Self
 ```
 
-#### ShtpLayer::next_frame
+#### ShtpLayer::try_next_frame
 
 ```rust
-pub fn next_frame(&mut self, channel: u8, payload: &[u8]) -> Vec<u8>
+pub fn try_next_frame(&mut self, channel: u8, payload: &[u8]) -> Result<Vec<u8>, ShtpError>
 ```
 
-Build a single-fragment frame, consuming the channel's TX seq.
+Build a single-fragment frame, consuming the channel's TX seq (the seq
+wraps 255 → 0 by design). The frame must fit one MCU transmit slot
+([`ShtpError::TxCargoTooLong`]; host-side control payloads are ≤ 21
+bytes) and `channel` must be 0..[`NUM_CHANNELS`]
+([`ShtpError::ChannelOutOfRange`]). Nothing is consumed on an error.
+
+#### ShtpLayer::try_tx_seq
+
+```rust
+pub fn try_tx_seq(&self, channel: u8) -> Option<u8>
+```
+
+Current TX seq counter for a channel (next frame's seq); `None` for a
+channel outside 0..[`NUM_CHANNELS`].
 
 #### ShtpLayer::tx_seq
 
@@ -608,6 +1531,10 @@ pub fn tx_seq(&self, channel: u8) -> u8
 ```
 
 Current TX seq counter for a channel (next frame's seq).
+
+# Panics
+
+When `channel` ≥ [`NUM_CHANNELS`]; use [`ShtpLayer::try_tx_seq`].
 
 #### ShtpLayer::feed
 
@@ -622,6 +1549,18 @@ Rules (contract 05 §3): a non-continuation fragment starts a new cargo
 cargo in progress is dropped; the cargo completes when the accumulated
 bytes reach the first fragment's advertised total.
 
+Same as [`ShtpLayer::feed_at`] with capture 0 (cargo `capture_us` = 0).
+
+#### ShtpLayer::feed_at
+
+```rust
+pub fn feed_at(&mut self, frame: &[u8], capture_us: u64) -> Option<ShtpCargo>
+```
+
+[`ShtpLayer::feed`] with the frame's `RPT_DATA.timestamp_us`: the cargo
+carries the FIRST fragment's capture in `capture_us` — the base its 0xFB
+timestamps refer to (contract 05 §3), not the fragment that completed it.
+
 #### ShtpLayer::reset
 
 ```rust
@@ -629,3 +1568,340 @@ pub fn reset(&mut self)
 ```
 
 Forget all TX seq counters and partial cargos (sensor reset).
+
+### RATE_LOW_FACTOR
+
+```rust
+pub const RATE_LOW_FACTOR: f64 = 0.9;
+```
+
+Granted rates outside [0.9, 2.1] × the requested one are worth a warning, never an error
+(contract 05 §7).
+
+### RATE_HIGH_FACTOR
+
+```rust
+pub const RATE_HIGH_FACTOR: f64 = 2.1;
+```
+
+### Bno086Device
+
+```rust
+pub struct Bno086Device {
+    dev: DepzDevice,
+    hub: Arc<Hub>,
+    tx: Mutex<()>, // serialise SEND_SHTP_PACKET
+    cmd_seq: AtomicU8,
+    busy: Mutex<(u32, Duration)>,
+}
+```
+
+BNO085 / BNO086 9-axis IMU (contract 05). The board only shuttles raw SHTP frames
+(SEND_SHTP_PACKET / RPT_DATA); the SH-2 hub protocol runs here, ported from the reference SDK.
+Every send is acknowledged by the bridge at once and every inbound frame arrives as
+RPT_DATA(cmd 0x00), so replies are correlated at the SH-2 layer only. Never call a blocking device
+method (`enable`, `tare_now`, …) from an [`Bno086Device::on_report`] callback.
+
+#### Bno086Device::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Bno086Device
+```
+
+Continue the open connection `dev` as a BNO085 / BNO086.
+
+#### Bno086Device::set_busy_retry
+
+```rust
+pub fn set_busy_retry(&self, retries: u32, backoff: Duration) -> Result<()>
+```
+
+SEND_SHTP_PACKET attempts on ERR_BUSY before giving up, and the back-off between them (at least
+200 ms per the bridge spec).
+
+#### Bno086Device::advertisement
+
+```rust
+pub fn advertisement(&self) -> Vec<u8>
+```
+
+The raw SHTP channel-0 advertisement seen since open or reset.
+
+#### Bno086Device::hardware_reset
+
+```rust
+pub fn hardware_reset(&self, timeout: Option<Duration>) -> Result<()>
+```
+
+Hard-reset the sensor through nRST. The bridge's OK confirms it; the SH-2 executable
+reset-complete is waited for best-effort (firmware ≤ 0.95 never sent it, ERRATA E9). SHTP state
+and cached features restart from zero. `timeout` `None`: 2 s.
+
+#### Bno086Device::wake
+
+```rust
+pub fn wake(&self) -> Result<()>
+```
+
+Pulse WAKE (PS0) — the board's pin, not the SH-2 "On" that ends [`Bno086Device::sleep`] (that
+is [`Bno086Device::power_on`]).
+
+#### Bno086Device::sleep
+
+```rust
+pub fn sleep(&self) -> Result<()>
+```
+
+SH-2 "Sleep": every report stops except those enabled with wake-up | always-on; the
+configuration is kept. No response.
+
+#### Bno086Device::power_on
+
+```rust
+pub fn power_on(&self) -> Result<()>
+```
+
+SH-2 "On": ends [`Bno086Device::sleep`]; every enabled report comes back. No response.
+
+#### Bno086Device::product_id
+
+```rust
+pub fn product_id(&self, timeout: Option<Duration>) -> Result<ProductId>
+```
+
+The SH-2 application's Product ID — the first of [`Bno086Device::product_ids`].
+
+#### Bno086Device::product_ids
+
+```rust
+pub fn product_ids(&self, timeout: Option<Duration>, settle: Option<Duration>) -> Result<Vec<ProductId>>
+```
+
+Every component's Product ID Response, the SH-2 application first. Collects until no response
+came for `settle` (default 150 ms), so late ones cannot answer the next request.
+
+#### Bno086Device::interval_us
+
+```rust
+pub fn interval_us(hz: f64) -> Result<u32>
+```
+
+Hz → the Set Feature interval, rounded like the reference (half to even), at least 1 µs.
+
+#### Bno086Device::enable_interval
+
+```rust
+pub fn enable_interval(
+    &self,
+    sensor: u8,
+    interval_us: u32,
+    batch_us: u32,
+    sensitivity: u16,
+    flags: u8,
+    cfg_word: u32,
+    verify: bool,
+    timeout: Option<Duration>,
+) -> Result<Option<FeatureResponse>>
+```
+
+Enable `sensor` through Set Feature (0xFD) every `interval_us`. The hub rounds to its grid;
+with `verify` the granted rate is read back through Get Feature and a rate outside 0.9–2.1 × the
+request is reported on stderr as a warning (contract 05 §7). Returns that read-back (`None`
+without verify).
+
+#### Bno086Device::enable
+
+```rust
+pub fn enable(&self, sensor: u8, hz: f64) -> Result<FeatureResponse>
+```
+
+[`Bno086Device::enable_interval`] at `hz`, verified.
+
+#### Bno086Device::disable
+
+```rust
+pub fn disable(&self, sensor: u8) -> Result<()>
+```
+
+Disable `sensor` (Set Feature with interval 0).
+
+#### Bno086Device::get_feature
+
+```rust
+pub fn get_feature(&self, sensor: u8, timeout: Option<Duration>) -> Result<FeatureResponse>
+```
+
+Get Feature round trip: the rates in effect for `sensor`.
+
+#### Bno086Device::on_report
+
+```rust
+pub fn on_report(&self, callback: impl Fn(&Report) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every report on the reader thread. Drop the hook to stop.
+
+#### Bno086Device::reports
+
+```rust
+pub fn reports(&self, sensors: Option<&[u8]>, capacity: usize) -> Subscription<Report>
+```
+
+A pull queue of reports (of `sensors` only, when given), bounded, drop-oldest; subscribed when
+this returns.
+
+#### Bno086Device::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
+
+#### Bno086Device::tare_now
+
+```rust
+pub fn tare_now(&self, axes: u8, basis: TareBasis) -> Result<()>
+```
+
+Tare `axes` (a `hub::TARE_*` bitmap) against `basis` (no response).
+
+#### Bno086Device::persist_tare
+
+```rust
+pub fn persist_tare(&self) -> Result<()>
+```
+
+Persist the current tare into FRS (no response).
+
+#### Bno086Device::set_reorientation
+
+```rust
+pub fn set_reorientation(&self, x: f64, y: f64, z: f64, w: f64) -> Result<()>
+```
+
+The runtime reorientation quaternion (Q14 on the wire; all zeros clears; no response). It is
+applied on the hub's side, in the hub's own axes: x and y swapped and z negated relative to the
+reports.
+
+#### Bno086Device::set_calibration
+
+```rust
+pub fn set_calibration(&self, accel: bool, gyro: bool, mag: bool, planar: bool) -> Result<()>
+```
+
+Configure the motion-engine calibration; fails on a non-zero status.
+
+#### Bno086Device::get_calibration
+
+```rust
+pub fn get_calibration(&self) -> Result<CalibrationConfig>
+```
+
+Which motion-engine calibrations run.
+
+#### Bno086Device::save_dcd
+
+```rust
+pub fn save_dcd(&self) -> Result<()>
+```
+
+Save the dynamic calibration data to flash (DCD Save Now).
+
+#### Bno086Device::configure_periodic_dcd
+
+```rust
+pub fn configure_periodic_dcd(&self, enable: bool) -> Result<()>
+```
+
+The hub's periodic DCD autosave (no response).
+
+#### Bno086Device::set_motion_intent
+
+```rust
+pub fn set_motion_intent(&self, intent: MotionIntent) -> Result<()>
+```
+
+Interactive Calibration (0x0E, BNO085 only): how the device is about to move, so the hub can
+refine the gyro zero-rate offset while it is still. No response; a BNO085 ignores it.
+
+#### Bno086Device::enable_motion_request
+
+```rust
+pub fn enable_motion_request(&self, hz: f64) -> Result<()>
+```
+
+Enable MotionRequest (0x2B) reports; the hub sends one when its request changes, and reads the
+rate back late, so the granted rate is not checked.
+
+#### Bno086Device::flush
+
+```rust
+pub fn flush(&self, sensor: u8, timeout: Option<Duration>) -> Result<()>
+```
+
+Force Sensor Flush (0xF0): the hub sends `sensor`'s batched reports now; returns once its Flush
+Completed (0xEF) arrives.
+
+#### Bno086Device::frs_read
+
+```rust
+pub fn frs_read(&self, record_id: u16, timeout: Option<Duration>) -> Result<Vec<u32>>
+```
+
+Read a whole FRS record: its 32-bit words.
+
+#### Bno086Device::frs_write
+
+```rust
+pub fn frs_write(&self, record_id: u16, words: &[u32], timeout: Option<Duration>) -> Result<()>
+```
+
+Write a whole FRS record.
+
+#### Bno086Device::get_metadata
+
+```rust
+pub fn get_metadata(&self, sensor: u8, timeout: Option<Duration>) -> Result<SensorMetadata>
+```
+
+Read and parse `sensor`'s metadata FRS record.
+
+#### Bno086Device::get_oscillator_type
+
+```rust
+pub fn get_oscillator_type(&self) -> Result<u8>
+```
+
+Get Oscillator Type (0x0A): R0, one of `hub::OSC_*` (an unknown value comes back as is).
+
+#### Bno086Device::clear_dcd_and_reset
+
+```rust
+pub fn clear_dcd_and_reset(&self, timeout: Option<Duration>) -> Result<()>
+```
+
+Clear the in-RAM dynamic calibration and reset (0x0B). The hub resets instead of answering, so
+this waits for the executable reset-complete.
+
+#### Bno086Device::get_errors
+
+```rust
+pub fn get_errors(&self, severity: u8) -> Result<Vec<ErrorRecord>>
+```
+
+The error queue (0x01), `severity` or greater; records stream until one with source 255.
+
+#### Bno086Device::get_counts
+
+```rust
+pub fn get_counts(&self, sensor: u8) -> Result<Counts>
+```
+
+A sensor's event counts (0x02): two responses, response_seq 0 then 1.
+
+#### Bno086Device::clear_counts
+
+```rust
+pub fn clear_counts(&self, sensor: u8) -> Result<()>
+```
+
+Clear a sensor's event counts (0x02, subcommand 1).

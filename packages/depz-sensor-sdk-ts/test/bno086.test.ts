@@ -8,14 +8,18 @@ import {
   Bno086,
   BusyError,
   DepzError,
+  DepzTimeoutError,
   FeatureFlag,
   FrsRecordId,
+  MotionIntent,
   OscillatorType,
   SensorId,
+  ShtpChannel,
   Sh2Error,
   TareAxis,
   TareBasis,
   buildSetFeature,
+  fragmentCargo,
   splitControlCargo,
   type Acceleration,
   type GyroIntegratedRV,
@@ -275,6 +279,24 @@ describe("report streaming", () => {
     expect(got[0]!.x).toBeCloseTo(10.0); // 160 / 2^4 µT
   });
 
+  it("multi-fragment cargo is timestamped from its FIRST fragment", async () => {
+    // Contract 05 §3/§5: the 0xFB base delta refers to the capture of the
+    // transfer that started the cargo; later continuations must not shift it.
+    // 0xFB base delta 1.0 ms, then 12 accelerometer reports, delay 0..11 × 100 µs.
+    const it_ = dev.reports(undefined, 16);
+    const parts = [timebase(10)];
+    for (let i = 0; i < 12; i++) {
+      parts.push(report(0x01, i16s(0, 0, 2511), { seq: i, delay: i }));
+    }
+    const cargo = concat(...parts);
+    expect(fragmentCargo(ShtpChannel.InputNormal, cargo, 0, 64).length).toBe(3);
+    const captures = [7_000_000n, 7_002_000n, 7_004_000n];
+    fake.pushShtpCargo(ShtpChannel.InputNormal, cargo, 64, captures);
+    const got: bigint[] = [];
+    for (let i = 0; i < 12; i++) got.push((await take(it_)).timestampUs);
+    expect(got).toEqual(Array.from({ length: 12 }, (_, i) => captures[0]! - 1000n + 100n * BigInt(i)));
+  });
+
   it("report filtering and callbacks", async () => {
     const onlySteps = dev.reports(SensorId.StepCounter, 8);
     const seen: StepCounter[] = [];
@@ -372,6 +394,31 @@ describe("diagnostics", () => {
     // command request: [0xF2, seq, 0x03, subcmd, x(i16), y, z, w] — w = 1.0 → Q14.
     const w = new DataView(reorient!.buffer, reorient!.byteOffset).getInt16(10, true);
     expect(w).toBe(1 << 14);
+  });
+
+  it("setMotionIntent sends command 0x0E without expecting a response", async () => {
+    await dev.setMotionIntent(MotionIntent.StationaryWithVibration);
+    await waitFor(() => fake.motionIntents.length === 1);
+    expect(fake.motionIntents).toEqual([2]);
+    await expect(dev.setMotionIntent(256)).rejects.toThrow();
+  });
+
+  it("enableMotionRequest does not check the granted rate", async () => {
+    expect(await dev.enableMotionRequest()).toBeNull();
+    await waitFor(() => fake.features.get(SensorId.MotionRequest) === 1_000_000);
+  });
+
+  it("flush resolves on Flush Completed and emits it", async () => {
+    const seen: Report[] = [];
+    dev.onReport((r) => seen.push(r));
+    await dev.flush(SensorId.Accelerometer);
+    expect(fake.flushRequests).toEqual([SensorId.Accelerometer]);
+    expect(seen.some((r) => r.type === "FlushCompleted" && r.flushedSensor === SensorId.Accelerometer)).toBe(true);
+  });
+
+  it("flush times out when the hub stays silent", async () => {
+    fake.answerFlush = false;
+    await expect(dev.flush(SensorId.Accelerometer, 50)).rejects.toBeInstanceOf(DepzTimeoutError);
   });
 
   it("configurePeriodicDcd sends without expecting a response", async () => {

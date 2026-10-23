@@ -37,6 +37,7 @@ public class Vl53l7VectorTests
             string actual = Vectors.ToHex(payload);
             Assert.True(expected == actual, $"{name}: expected {expected} got {actual}");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -75,6 +76,7 @@ public class Vl53l7VectorTests
             Assert.True(e.GetProperty("i2c_khz").GetInt32() == info.I2cKhz, $"{name}: i2c_khz");
             Assert.True(e.GetProperty("frame_size").GetInt32() == info.FrameSize, $"{name}: frame_size");
             Assert.True(e.GetProperty("streaming").GetBoolean() == info.Streaming, $"{name}: streaming");
+            Vectors.Seen(c);
         }
     }
 
@@ -96,6 +98,7 @@ public class Vl53l7VectorTests
             Vl53l7Model got = Vl53l7Discovery.ResolveModel(usbModel, c.GetProperty("device_name").GetString());
             Assert.True(c.GetProperty("expect").GetString() == got.ToString().ToLowerInvariant(),
                 $"{name}: expected {c.GetProperty("expect").GetString()} got {got}");
+            Vectors.Seen(c);
         }
     }
 }
@@ -176,6 +179,7 @@ public class Vl53l7ReplayTests
                 Assert.False(want.TryGetProperty("cnh_raw", out JsonElement c) && c.ValueKind != JsonValueKind.Null);
             }
         }
+        Vectors.Seen($"recordings/{stem}.depzrec");
     }
 
     [Fact]

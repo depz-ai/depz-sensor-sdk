@@ -41,11 +41,10 @@ layer**:
   ([`decode_l0x_raw`](api.md#decode_l0x_raw)): distance, the raw device status
   byte, signal and ambient rates, effective SPAD count.
 
-What it does **not** do: initialise the sensor (reference SPADs, calibration,
-profiles), or compute the PAL range status, sigma and maximum distance — those
-need device data the driver caches at init. Initialising and streaming the
-board is done today with the Python or TypeScript SDK; this crate decodes what
-the board streams and builds the command payloads.
+Above it, the live device class (`devices::Vl53l0xDevice`, see the
+[guide](guide.md#live-device)) runs ST's VL53L0X API on the host: init
+(reference SPADs, calibration, profiles) and the PAL range status, sigma and
+maximum distance, which need the device data the driver caches at init.
 
 ## Key concepts
 

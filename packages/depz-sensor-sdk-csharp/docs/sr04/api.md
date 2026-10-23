@@ -10,9 +10,139 @@ in the source, not this file.
 
 ## Contents
 
-- **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
+- **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
 
 ## SR04
+
+### Sr04Measurement
+
+```csharp
+public sealed record Sr04Measurement(ulong TimestampUs, int EchoTimeUs, string Source)
+```
+
+One SR04 ranging result. `Source` is `"once"` (a host command or a SYNC_IN edge) or `"loop"`; `Valid` is false for the no-echo timeout.
+
+#### Sr04Measurement.Valid *(property)*
+
+```csharp
+public bool Valid
+```
+
+#### Sr04Measurement.DistanceMm *(property)*
+
+```csharp
+public double? DistanceMm
+```
+
+Distance at 343 m/s, or null when no echo came back.
+
+#### Sr04Measurement.DistanceMmAt
+
+```csharp
+public double? DistanceMmAt(double airTempC)
+```
+
+Distance with the speed of sound for `airTempC` °C.
+
+### Sr04Device
+
+```csharp
+public sealed class Sr04Device : DepzDevice
+```
+
+HC-SR04 ultrasonic ranger (contract 03). Measurements stream to `OnMeasurement` callbacks and `Measurements` queues: loop samples and the single shots an AUX SYNC_IN edge triggers.
+
+#### Sr04Device.Sr04Device *(constructor)*
+
+```csharp
+public Sr04Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Sr04Device.Sr04Device *(constructor)*
+
+```csharp
+#if NET public Sr04Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Sr04Device.GetSamplePeriodUs
+
+```csharp
+public long GetSamplePeriodUs()
+```
+
+The stored minimum interval between measurement starts, µs (default 50000) — not the effective rate, which the echo window throttles (contract 03 §3).
+
+#### Sr04Device.SetSamplePeriodUs
+
+```csharp
+public void SetSamplePeriodUs(long periodUs)
+```
+
+Set the minimum interval between measurement starts, µs (u32 wire field).
+
+#### Sr04Device.GetEchoDecayUs
+
+```csharp
+public int GetEchoDecayUs()
+```
+
+The post-echo settle pause, µs (4000–65000).
+
+#### Sr04Device.SetEchoDecayUs
+
+```csharp
+public int SetEchoDecayUs(int decayUs)
+```
+
+Set the settle pause. The device clamps it to 4000–65000 µs silently, so this reads it back and returns the value in effect. Must fit the u16 wire field.
+
+#### Sr04Device.MeasureOnce
+
+```csharp
+public Sr04Measurement MeasureOnce(TimeSpan? timeout = null)
+```
+
+One shot. The reply comes when the echo completes (or times out at ~65.5 ms), hence the 1 s default. `BusyException` while the loop runs.
+
+#### Sr04Device.Start
+
+```csharp
+public void Start()
+```
+
+Start the measurement loop (idempotent).
+
+#### Sr04Device.Stop
+
+```csharp
+public void Stop()
+```
+
+Stop the measurement loop (idempotent).
+
+#### Sr04Device.OnMeasurement
+
+```csharp
+public IDisposable OnMeasurement(Action<Sr04Measurement> callback)
+```
+
+Call `callback` for every measurement (reader thread). Dispose the result to stop.
+
+#### Sr04Device.Measurements
+
+```csharp
+public Subscription<Sr04Measurement> Measurements(int capacity = 256)
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Sr04Device.StreamDroppedCounts *(property)*
+
+```csharp
+public IReadOnlyList<long> StreamDroppedCounts
+```
+
+The drop counter of each open `Measurements` queue.
 
 ### Sr04Cmd
 

@@ -3,9 +3,11 @@
 `depz-sensor-sdk` (Rust) is the **contract-first, transport-agnostic
 foundation** for the DEPZ USB sensor line: byte-exact codecs, framing/parsing,
 CRCs, the USB-id table, per-sensor frame/report decoders, the `.fwdepz`
-firmware-container parser and the `.depzdata` dataset reader. Everything is
-pure computation over `&[u8]` — no threads, no I/O — verified against the
-shared golden vectors and byte-for-byte identical to the other reference SDKs.
+firmware-container parser, the `.depzdata` datasets (reader, recorder,
+player), and the live device classes of every board over a byte pipe you hand
+it. The codecs and decoders are pure computation over `&[u8]`, verified against
+the shared golden vectors and byte-for-byte identical to the other reference
+SDKs.
 
 **Working with one specific sensor?** Each has its own introduction, guide
 and API reference:
@@ -28,9 +30,9 @@ and API reference:
 - **[BNO085](bno085/introduction.md)** · **[BNO086](bno086/introduction.md)** —
   9-axis IMU: orientation and motion.
 
-The 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055 have the
-decode and codec layer in this crate; initialising and streaming them is done
-with the Python or TypeScript SDK (the TMF8829 also with the C and C++ SDKs).
+The VL53L5CX / L7CX / L7CH and the TMF8829 have the decode and codec layer
+in this crate; initialising and streaming them is done with the Python or
+TypeScript SDK (the TMF8829 also with the C and C++ SDKs).
 
 ## Quickstart
 

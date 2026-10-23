@@ -67,6 +67,12 @@ export class FakeBno086 {
   features = new Map<number, number>();
   lastSetFeature: Uint8Array | null = null;
   tareRequests: Uint8Array[] = [];
+  /** Interactive Calibration P0 values. */
+  motionIntents: number[] = [];
+  /** Force Sensor Flush sensor IDs. */
+  flushRequests: number[] = [];
+  /** When false, Force Sensor Flush gets no Flush Completed. */
+  answerFlush = true;
   /** Host SHTP frames on channel 1 (sleep / on — no response). */
   executableFrames: Uint8Array[] = [];
   frsWrites = new Map<number, number[]>();
@@ -126,12 +132,24 @@ export class FakeBno086 {
   productIdDelayMs = 30;
   productIdTailDelayMs = 20;
 
-  pushShtpCargo(channel: number, payload: Uint8Array, maxFrame = 4096): void {
+  /**
+   * `capturesUs` (one per frame) stamps the frames explicitly; by default each
+   * frame advances the MCU clock by 100 µs.
+   */
+  pushShtpCargo(
+    channel: number,
+    payload: Uint8Array,
+    maxFrame = 4096,
+    capturesUs?: bigint[],
+  ): void {
     const seq = this.shtpTxSeq[channel]!;
     const frames = fragmentCargo(channel, payload, seq, maxFrame);
+    if (capturesUs !== undefined && capturesUs.length !== frames.length) {
+      throw new Error(`${frames.length} frames but ${capturesUs.length} captures`);
+    }
     this.shtpTxSeq[channel] = (seq + frames.length) & 0xff;
-    for (const frame of frames) {
-      this.mcuTimeUs += 100n;
+    for (const [i, frame] of frames.entries()) {
+      this.mcuTimeUs = capturesUs !== undefined ? capturesUs[i]! : this.mcuTimeUs + 100n;
       const out = new Uint8Array(9 + frame.length);
       const v = new DataView(out.buffer);
       v.setUint8(0, 0x00);
@@ -275,6 +293,11 @@ export class FakeBno086 {
     } else if (rid === 0xf2) {
       // command request
       this.onCommand(payload);
+    } else if (rid === 0xf0) {
+      // force sensor flush — like the lab BNO086, the Flush Completed comes
+      // back on the input channel, header-less
+      this.flushRequests.push(payload[1]!);
+      if (this.answerFlush) this.pushInputCargo(Uint8Array.of(0xef, payload[1]!));
     } else if (rid === 0xf4) {
       // FRS read request
       this.frsRead(v.getUint16(4, true));
@@ -327,6 +350,11 @@ export class FakeBno086 {
       return;
     }
     if (command === 0x09) return; // periodic DCD config — no response
+    if (command === 0x0e) {
+      // interactive calibration — no response
+      this.motionIntents.push(params[0]!);
+      return;
+    }
     if (command === 0x06) {
       // DCD save
       this.commandResponse(seq, command, [0]);

@@ -9,9 +9,497 @@ source, not this file.
 
 ## Contents
 
-- **BNO055 (IMU)**: [`Bno055`](#bno055), [`Bno055.Bno055Cmd`](#bno055bno055cmd), [`Bno055.Bno055Rpt`](#bno055bno055rpt), [`Bno055.RegData`](#bno055regdata), [`Bno055.StreamData`](#bno055streamdata), [`Bno055.Bno055Info`](#bno055bno055info), [`Bno055Regs`](#bno055regs), [`Bno055Regs.OprMode`](#bno055regsoprmode), [`Bno055Regs.PwrMode`](#bno055regspwrmode), [`Bno055Regs.TempSource`](#bno055regstempsource), [`Bno055Regs.Units`](#bno055regsunits), [`Bno055Regs.CalibStatus`](#bno055regscalibstatus), [`Bno055Regs.CalibrationProfile`](#bno055regscalibrationprofile), [`Bno055Regs.AxisRemap`](#bno055regsaxisremap), [`Bno055Regs.AccelConfig`](#bno055regsaccelconfig), [`Bno055Regs.GyroConfig`](#bno055regsgyroconfig), [`Bno055Regs.MagConfig`](#bno055regsmagconfig), [`Bno055Regs.RawBlock`](#bno055regsrawblock)
+- **BNO055 (IMU)**: [`Bno055Device`](#bno055device), [`Bno055Sample`](#bno055sample), [`Bno055`](#bno055), [`Bno055.Bno055Cmd`](#bno055bno055cmd), [`Bno055.Bno055Rpt`](#bno055bno055rpt), [`Bno055.RegData`](#bno055regdata), [`Bno055.StreamData`](#bno055streamdata), [`Bno055.Bno055Info`](#bno055bno055info), [`Bno055Regs`](#bno055regs), [`Bno055Regs.SystemStatus`](#bno055regssystemstatus), [`Bno055Regs.OprMode`](#bno055regsoprmode), [`Bno055Regs.PwrMode`](#bno055regspwrmode), [`Bno055Regs.TempSource`](#bno055regstempsource), [`Bno055Regs.Units`](#bno055regsunits), [`Bno055Regs.CalibStatus`](#bno055regscalibstatus), [`Bno055Regs.CalibrationProfile`](#bno055regscalibrationprofile), [`Bno055Regs.AxisRemap`](#bno055regsaxisremap), [`Bno055Regs.AccelConfig`](#bno055regsaccelconfig), [`Bno055Regs.GyroConfig`](#bno055regsgyroconfig), [`Bno055Regs.MagConfig`](#bno055regsmagconfig), [`Bno055Regs.RawBlock`](#bno055regsrawblock)
 
 ## BNO055 (IMU)
+
+### Bno055Device
+
+```java
+public final class Bno055Device extends DepzDevice
+```
+
+BNO055 absolute-orientation IMU (contract 13). The board is a thin I2C register bridge: mode,
+units, axis remap and calibration are register access here; the sensor fuses on chip at 100 Hz.
+Typical use: `configure`, then `startStream` and read `samples`, or poll
+`readSample`. Page 1 (sensor configs, interrupts, unique id) is reached through PAGE_ID
+and refused while streaming.
+
+#### Bno055Device.bridgeInfo
+
+```java
+public Bno055.Bno055Info bridgeInfo()
+```
+
+RPT_BNO_INFO: chip ids, sensor firmware revision, bridge counters. Safe while streaming.
+
+#### Bno055Device.isAlive
+
+```java
+public boolean isAlive()
+```
+
+True when the bridge passed the chip-id handshake and the sensor answers with the BNO055 ids.
+
+#### Bno055Device.resetSensor
+
+```java
+public void resetSensor()
+```
+
+Hardware reset through nRESET (the bridge answers after the ~0.5 s boot handshake). Stops a
+stream; the sensor returns in CONFIG with power-on units and no calibration —
+`configure` again, or `restoreConfiguration()`.
+
+#### Bno055Device.readRegisters
+
+```java
+public byte[] readRegisters(int addr, int length, int page)
+```
+
+Read `length` bytes at `addr` on `page` (128-byte transfers). Page 1 is refused while streaming.
+
+#### Bno055Device.readRegisters
+
+```java
+public byte[] readRegisters(int addr, int length)
+```
+
+#### Bno055Device.writeRegisters
+
+```java
+public void writeRegisters(int addr, byte[] data, int page)
+```
+
+Write at `addr` on `page`. Most configuration registers only take writes in CONFIG
+mode (the sensor ignores the rest); the typed setters handle that.
+
+#### Bno055Device.writeRegisters
+
+```java
+public void writeRegisters(int addr, byte[] data)
+```
+
+#### Bno055Device.readRegister
+
+```java
+public int readRegister(int addr, int page)
+```
+
+#### Bno055Device.readRegister
+
+```java
+public int readRegister(int addr)
+```
+
+#### Bno055Device.writeRegister
+
+```java
+public void writeRegister(int addr, int value, int page)
+```
+
+#### Bno055Device.writeRegister
+
+```java
+public void writeRegister(int addr, int value)
+```
+
+#### Bno055Device.getOperationMode
+
+```java
+public OprMode getOperationMode()
+```
+
+#### Bno055Device.setOperationMode
+
+```java
+public void setOperationMode(OprMode mode)
+```
+
+Switch OPR_MODE and wait out the switching time; into a fusion mode also wait (up to 1 s) for
+the fusion outputs. The sensor only switches between CONFIG and another mode, so a switch
+between two operating modes goes through CONFIG.
+
+#### Bno055Device.getPowerMode
+
+```java
+public PwrMode getPowerMode()
+```
+
+#### Bno055Device.setPowerMode
+
+```java
+public void setPowerMode(PwrMode mode)
+```
+
+Normal / low power / suspend, written in CONFIG with the operating mode restored after. A
+suspended chip ignores OPR_MODE writes, so the mode is kept here and put back on wake-up (NDOF
+when the chip was already asleep at connect, contract 13 §4.6).
+
+#### Bno055Device.getUnits
+
+```java
+public Units getUnits()
+```
+
+#### Bno055Device.setUnits
+
+```java
+public void setUnits(Units units)
+```
+
+#### Bno055Device.getAxisRemap
+
+```java
+public AxisRemap getAxisRemap()
+```
+
+#### Bno055Device.setAxisRemap
+
+```java
+public void setAxisRemap(AxisRemap remap)
+```
+
+Remap the output axes for the board's mounting (`AxisRemap#placement` gives the datasheet
+placements P0..P7; P1 is the default).
+
+#### Bno055Device.getTemperatureSource
+
+```java
+public TempSource getTemperatureSource()
+```
+
+#### Bno055Device.setTemperatureSource
+
+```java
+public void setTemperatureSource(TempSource source)
+```
+
+#### Bno055Device.configure
+
+```java
+public void configure(OprMode mode, Units units, AxisRemap axisRemap, CalibrationProfile calibration)
+```
+
+The usual session setup: CONFIG → units → axis remap → calibration profile → `mode`; in a
+fusion mode it returns once the fusion outputs are live (~70 ms). Remembered for
+`restoreConfiguration()`. `units` null means the power-on units; `axisRemap`
+and `calibration` null leave the sensor's.
+
+#### Bno055Device.configure
+
+```java
+public void configure(OprMode mode, Units units)
+```
+
+#### Bno055Device.configure
+
+```java
+public void configure(OprMode mode)
+```
+
+#### Bno055Device.configure
+
+```java
+public void configure()
+```
+
+NDOF with the power-on units.
+
+#### Bno055Device.restoreConfiguration
+
+```java
+public void restoreConfiguration()
+```
+
+Re-apply the last `configure` — after `resetSensor()`, or when
+`bridgeInfo().sensorResets()` rose (bus recovery pulses nRESET). A running stream keeps
+running.
+
+#### Bno055Device.systemStatus
+
+```java
+public SystemStatus systemStatus()
+```
+
+ST_RESULT, SYS_CLK_STATUS, SYS_STATUS, SYS_ERR.
+
+#### Bno055Device.selfTest
+
+```java
+public SystemStatus selfTest()
+```
+
+The built-in self-test (datasheet §3.9.2), in CONFIG, ~400 ms; the operating mode is restored
+after. Not while streaming.
+
+#### Bno055Device.calibrationStatus
+
+```java
+public CalibStatus calibrationStatus()
+```
+
+CALIB_STAT: 0..3 per sensor; in NDOF the sensor calibrates in the background.
+
+#### Bno055Device.readCalibrationProfile
+
+```java
+public CalibrationProfile readCalibrationProfile()
+```
+
+Offsets and radii (0x55..0x6A), only readable in CONFIG: the driver switches there and back.
+
+#### Bno055Device.writeCalibrationProfile
+
+```java
+public void writeCalibrationProfile(CalibrationProfile profile)
+```
+
+Restore a stored profile (datasheet §3.11.5). A starting point, not a lock: the background
+calibration refines it once fusion resumes.
+
+#### Bno055Device.getSicMatrix
+
+```java
+public int[] getSicMatrix()
+```
+
+Soft-iron compensation matrix, 9 × i16 row-major, 1.0 = 16384.
+
+#### Bno055Device.setSicMatrix
+
+```java
+public void setSicMatrix(int[] matrix)
+```
+
+`matrix` null writes the identity.
+
+#### Bno055Device.getAccelConfig
+
+```java
+public AccelConfig getAccelConfig()
+```
+
+#### Bno055Device.setAccelConfig
+
+```java
+public void setAccelConfig(AccelConfig config)
+```
+
+Accelerometer range / bandwidth / power; fusion modes override it.
+
+#### Bno055Device.getGyroConfig
+
+```java
+public GyroConfig getGyroConfig()
+```
+
+#### Bno055Device.setGyroConfig
+
+```java
+public void setGyroConfig(GyroConfig config)
+```
+
+#### Bno055Device.getMagConfig
+
+```java
+public MagConfig getMagConfig()
+```
+
+#### Bno055Device.setMagConfig
+
+```java
+public void setMagConfig(MagConfig config)
+```
+
+#### Bno055Device.uniqueId
+
+```java
+public byte[] uniqueId()
+```
+
+The chip's 16-byte unique id (page 1, 0x50..0x5F).
+
+#### Bno055Device.getInterruptEnable
+
+```java
+public int getInterruptEnable()
+```
+
+#### Bno055Device.setInterruptEnable
+
+```java
+public void setInterruptEnable(int mask)
+```
+
+INT_EN: which interrupt engines run.
+
+#### Bno055Device.getInterruptMask
+
+```java
+public int getInterruptMask()
+```
+
+#### Bno055Device.setInterruptMask
+
+```java
+public void setInterruptMask(int mask)
+```
+
+INT_MSK: which enabled interrupts drive the INT pin.
+
+#### Bno055Device.setInterruptSetting
+
+```java
+public void setInterruptSetting(int register, int value)
+```
+
+One motion-interrupt setting register (page 1, 0x11..0x1F), as a raw byte. Not while streaming.
+
+#### Bno055Device.readInterruptStatus
+
+```java
+public int readInterruptStatus()
+```
+
+INT_STA — which interrupts fired. Clears on read.
+
+#### Bno055Device.clearInterrupt
+
+```java
+public void clearInterrupt()
+```
+
+SYS_TRIGGER RST_INT: reset the interrupt status bits and the INT pin.
+
+#### Bno055Device.readSample
+
+```java
+public Bno055Sample readSample(int[] block)
+```
+
+Poll one register block `{addr, length}` (null: the full 46 bytes 0x08..0x35) and decode
+it. Works alongside a stream.
+
+#### Bno055Device.readSample
+
+```java
+public Bno055Sample readSample()
+```
+
+#### Bno055Device.readQuaternion
+
+```java
+public double[] readQuaternion()
+```
+
+(w, x, y, z) — the cheapest orientation read (8 bytes).
+
+#### Bno055Device.startStream
+
+```java
+public void startStream(int periodMs, int[] block, int trigger)
+```
+
+Arm the bridge to read `block` (`{addr, length}`, null: the full block) every
+`periodMs` and push it. Fusion runs at 100 Hz, so 10 ms is the useful floor.
+`Bno055#TRIGGER_INT` reads on the INT edge, `periodMs` then a missed-edge watchdog
+(0 = none). Replaces a running stream.
+
+#### Bno055Device.startStream
+
+```java
+public void startStream(int periodMs, int[] block)
+```
+
+#### Bno055Device.startStream
+
+```java
+public void startStream(int periodMs)
+```
+
+#### Bno055Device.startStream
+
+```java
+public void startStream()
+```
+
+The full block every 10 ms.
+
+#### Bno055Device.stopStream
+
+```java
+public void stopStream()
+```
+
+#### Bno055Device.streaming
+
+```java
+public boolean streaming()
+```
+
+#### Bno055Device.onSample
+
+```java
+public AutoCloseable onSample(Consumer<Bno055Sample> callback)
+```
+
+Call `callback` for every streamed sample (reader thread).
+
+#### Bno055Device.samples
+
+```java
+public Subscription<Bno055Sample> samples(int capacity)
+```
+
+A pull queue of streamed samples (bounded, drop-oldest).
+
+#### Bno055Device.samples
+
+```java
+public Subscription<Bno055Sample> samples()
+```
+
+#### Bno055Device.getSample
+
+```java
+public Bno055Sample getSample(Duration timeout)
+```
+
+The next streamed sample (contract 07 §3).
+
+#### Bno055Device.streamParseErrors
+
+```java
+public long streamParseErrors()
+```
+
+Stream reports dropped because they did not decode (a short block).
+
+#### Bno055Device.streamDroppedCounts
+
+```java
+public List<Long> streamDroppedCounts()
+```
+
+### Bno055Sample
+
+```java
+public record Bno055Sample(long timestampUs, int addr, byte[] raw, Bno055Regs.Units units, double[] accel, double[] mag, double[] gyro, double[] euler, double[] quaternion, double[] linearAccel, double[] gravity, Double temperature, Bno055Regs.CalibStatus calibration)
+```
+
+One decoded BNO055 register block (streamed or polled). A channel is null when the block did not
+cover it; values are scaled by `units`, the units in effect when the stream started. Euler
+is (heading, roll, pitch), the quaternion (w, x, y, z); linear acceleration and gravity are always
+m/s². In non-fusion modes the fusion outputs read zero; in CONFIG everything does.
+
+#### Bno055Sample.decode
+
+```java
+public static Bno055Sample decode(long timestampUs, int addr, byte[] data, Bno055Regs.Units units)
+```
+
+Decode `data` read at `addr` with `units`.
 
 ### Bno055
 
@@ -117,7 +605,7 @@ BNO_READ_REG payload: `addr u8, len u8`.
 public static byte[] packWriteReg(int addr, byte[] data)
 ```
 
-BNO_WRITE_REG payload: `addr u8, data[1..128]`.
+BNO_WRITE_REG payload: `addr u8, data[1..128]`, else IllegalArgumentException.
 
 #### Bno055.packStartStream
 
@@ -190,6 +678,8 @@ echo the stream configuration so each report is self-describing;
 public static StreamData unpack(byte[] p)
 ```
 
+Rejects a payload shorter than its header or than the `len` data bytes it announces.
+
 ### Bno055.Bno055Info
 
 ```java
@@ -242,8 +732,82 @@ raw integers to physical units is `raw / LSB` with the LSB constants of
 `Units` and the fixed `MAG_LSB` / `QUAT_LSB` /
 `FUSION_ACCEL_LSB`.
 
-OUT OF SCOPE (as for every Java sensor): the live driver over the bridge
-(mode switching, boot / fusion-start polls, page discipline, self-test).
+The live driver over the bridge (mode switching, boot / fusion-start polls,
+page discipline, self-test) is `ai.depz.sensor.devices.Bno055Device`.
+
+#### Bno055Regs.MODE_SWITCH_FROM_CONFIG_MS *(field)*
+
+```java
+public static final int MODE_SWITCH_FROM_CONFIG_MS = 10
+```
+
+Settle time after an OPR_MODE write out of CONFIG (datasheet: 7 ms).
+
+#### Bno055Regs.MODE_SWITCH_TO_CONFIG_MS *(field)*
+
+```java
+public static final int MODE_SWITCH_TO_CONFIG_MS = 25
+```
+
+Settle time after an OPR_MODE write into CONFIG (datasheet: 19 ms).
+
+#### Bno055Regs.SELF_TEST_TIME_MS *(field)*
+
+```java
+public static final int SELF_TEST_TIME_MS = 450
+```
+
+The built-in self-test runs ~400 ms (datasheet §3.9.2).
+
+#### Bno055Regs.SYS_STATUS_BOOTING *(field)*
+
+```java
+public static final java.util.List<Integer> SYS_STATUS_BOOTING
+```
+
+SYS_STATUS values of a sensor still booting (initializing, self-test).
+
+#### Bno055Regs.BOOT_SETTLE_TIMEOUT_MS *(field)*
+
+```java
+public static final int BOOT_SETTLE_TIMEOUT_MS = 1000
+```
+
+#### Bno055Regs.STUCK_SELF_TEST_POLLS *(field)*
+
+```java
+public static final int STUCK_SELF_TEST_POLLS = 20
+```
+
+SYS_STATUS 4 polls in a row taken as the leftover of a self-test run in CONFIG, not POST.
+
+#### Bno055Regs.FUSION_START_TIMEOUT_MS *(field)*
+
+```java
+public static final int FUSION_START_TIMEOUT_MS = 1000
+```
+
+After CONFIG → a fusion mode the fusion outputs read zero for ~70 ms.
+
+#### Bno055Regs.SYS_STATUS_NAMES *(field)*
+
+```java
+public static final Map<Integer, String> SYS_STATUS_NAMES
+```
+
+#### Bno055Regs.SYS_ERR_NAMES *(field)*
+
+```java
+public static final Map<Integer, String> SYS_ERR_NAMES
+```
+
+#### Bno055Regs.isInterruptSettingReg
+
+```java
+public static boolean isInterruptSettingReg(int register)
+```
+
+Page-1 motion-interrupt setting registers (thresholds, durations, axis selects).
 
 #### Bno055Regs.REG_CHIP_ID *(field)*
 
@@ -774,7 +1338,38 @@ public static final String[] MAG_POWER_NAMES
 public static RawBlock decodeBlock(int addr, byte[] data)
 ```
 
-Unpack whatever channels the register window starting at `addr` holds.
+Unpack whatever channels the register window starting at `addr`
+holds. `addr` is a register address (0..255); anything else is
+rejected with `IllegalArgumentException`.
+
+### Bno055Regs.SystemStatus
+
+```java
+public record SystemStatus(int selfTest, int clkStatus, int status, int error)
+```
+
+ST_RESULT (0x36) + SYS_CLK_STATUS / SYS_STATUS / SYS_ERR (0x38..0x3A); INT_STA (0x37) sits
+in between and clears on read, so it is not read.
+
+#### Bno055Regs.SystemStatus.statusText
+
+```java
+public String statusText()
+```
+
+#### Bno055Regs.SystemStatus.errorText
+
+```java
+public String errorText()
+```
+
+Meaningful when `status()` is 1 (system error).
+
+#### Bno055Regs.SystemStatus.selfTestPassed
+
+```java
+public boolean selfTestPassed()
+```
 
 ### Bno055Regs.OprMode
 
@@ -864,6 +1459,8 @@ public int pack()
 public static Units unpack(int value)
 ```
 
+`value`: the UNIT_SEL register byte (outside 0..255 → IllegalArgumentException).
+
 #### Bno055Regs.Units.accelLsb
 
 ```java
@@ -909,6 +1506,8 @@ CALIB_STAT (0x35) `sys<7:6> gyr<5:4> acc<3:2> mag<1:0>`: 0 = not calibrated … 
 ```java
 public static CalibStatus unpack(int value)
 ```
+
+`value`: the CALIB_STAT register byte (outside 0..255 → IllegalArgumentException).
 
 #### Bno055Regs.CalibStatus.pack
 
@@ -982,6 +1581,8 @@ front with `IllegalArgumentException`.
 public static AxisRemap unpack(int config, int sign)
 ```
 
+The two register bytes (each outside 0..255 → IllegalArgumentException).
+
 #### Bno055Regs.AxisRemap.placement
 
 ```java
@@ -1019,6 +1620,8 @@ public int pack()
 ```java
 public static AccelConfig unpack(int value)
 ```
+
+`value`: the ACC_CONFIG register byte (outside 0..255 → IllegalArgumentException).
 
 ### Bno055Regs.GyroConfig
 
@@ -1077,6 +1680,8 @@ public int pack()
 ```java
 public static MagConfig unpack(int value)
 ```
+
+`value`: the MAG_CONFIG register byte (outside 0..255 → IllegalArgumentException).
 
 ### Bno055Regs.RawBlock
 

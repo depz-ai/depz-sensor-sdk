@@ -22,10 +22,26 @@ from .device import (
     sync_time_all,
 )
 from .bootloader import BootloaderDevice, find_bootloader_port, update_firmware
-from .dataset import DatasetReader, DatasetRecord, SessionRecorder
+from .dataset import (
+    DATASET_SCHEMA,
+    DatasetPlayer,
+    DatasetReader,
+    DatasetRecord,
+    PlayerState,
+    SessionRecorder,
+)
 from .protocol.bootloader import FwDepzImage
 from .device import StreamIterator
-from .discovery import DeviceInfo, list_depz_devices, open_device, probe_port
+from .discovery import (
+    SENSOR_CLASS_NAMES,
+    DeviceInfo,
+    attach_sensor_class,
+    list_depz_devices,
+    open_device,
+    open_on_link,
+    probe_port,
+    resolve_sensor_class,
+)
 from .vl53l4 import Vl53l4cd, Vl53l4Info, Vl53l4Measurement
 from .vl53l8 import CnhConfig, Vl53l8, Vl53l8ch, Vl53l8cx, Vl53l8Frame
 from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx, Vl53l7Frame, Vl53l7Info
@@ -84,6 +100,10 @@ __all__ = [
     "list_depz_devices",
     "probe_port",
     "open_device",
+    "open_on_link",
+    "resolve_sensor_class",
+    "attach_sensor_class",
+    "SENSOR_CLASS_NAMES",
     # usb identity table
     "DEPZ_USB_VID",
     "DEPZ_PID_MODEL",
@@ -149,6 +169,9 @@ __all__ = [
     "SessionRecorder",
     "DatasetReader",
     "DatasetRecord",
+    "DatasetPlayer",
+    "PlayerState",
+    "DATASET_SCHEMA",
     # bootloader / firmware update (contract 06)
     "BootloaderDevice",
     "FwDepzImage",

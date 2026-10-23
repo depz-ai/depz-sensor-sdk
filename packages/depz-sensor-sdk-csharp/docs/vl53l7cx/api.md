@@ -17,7 +17,7 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L7CX (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`Vl53l7PinAction`](#vl53l7pinaction), [`Vl53l7I2cError`](#vl53l7i2cerror), [`Vl53l7Wire`](#vl53l7wire), [`Vl53l7Info`](#vl53l7info), [`Vl53l7Model`](#vl53l7model), [`Vl53l7Discovery`](#vl53l7discovery), [`Vl53l7Frames`](#vl53l7frames)
+- **VL53L7CX (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`Vl53l7PinAction`](#vl53l7pinaction), [`Vl53l7I2cError`](#vl53l7i2cerror), [`Vl53l7Wire`](#vl53l7wire), [`Vl53l7Info`](#vl53l7info), [`Vl53l7Model`](#vl53l7model), [`Vl53l7Discovery`](#vl53l7discovery), [`Vl53l7Frames`](#vl53l7frames), [`Vl53l7cxDevice`](#vl53l7cxdevice), [`Vl53l5cxDevice`](#vl53l5cxdevice), [`Vl53l7chDevice`](#vl53l7chdevice)
 - **Shared with VL53L8 (frame decode)**: [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Frame`](#vl53l8frame)
 
 ## VL53L7CX (ToF)
@@ -303,6 +303,130 @@ public static Vl53l8FrameDecoder CreateDecoder()
 
 A decoder for L5/L7 frames (any of the three classes).
 
+### Vl53l7cxDevice
+
+```csharp
+public class Vl53l7cxDevice : Vl53l8cxDevice
+```
+
+VL53L7CX multizone ToF (8×8 zones, 90° field of view) on the I2C bridge board (contract 11). The board speaks the VL53L8 protocol plus three commands, and the sensor runs the same ST ULD family, so this is a `Vl53l8cxDevice` with the L5/L7 firmware set (ULD 2.0.1), smaller register reads, ranging from 1 Hz, and the board commands `GetBridgeInfo`, `SetI2cSpeedKhz`, `PinCtrl`. L5CX / L7CX have no deep sleep and no threshold auto-stop.
+
+#### Vl53l7cxDevice.Vl53l7cxDevice *(constructor)*
+
+```csharp
+public Vl53l7cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l7cxDevice.Vl53l7cxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l7cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Vl53l7cxDevice.ModuleType *(property)*
+
+```csharp
+public int? ModuleType
+```
+
+The sensor's module type read at `Init`: `ModuleTypeMz` (VL53L5CX) or `ModuleTypeMzevo` (VL53L7CX / CH); null before.
+
+#### Vl53l7cxDevice.XtalkCalibrationFailed *(property)*
+
+```csharp
+public bool XtalkCalibrationFailed
+```
+
+The last `CalibrateXtalk` found nothing to calibrate ("coverglass too good"): the sensor keeps its default xtalk data.
+
+#### Vl53l7cxDevice.Init
+
+```csharp
+public override void Init(Action<string>? progress = null, Action<int, int>? writeProgress = null)
+```
+
+Init, refusing non-L5/L7 silicon. A module type other than this class expects (a board labelled L7 carrying an L5, or the reverse) is traced as a warning: ranging still works, the firmware is shared.
+
+#### Vl53l7cxDevice.GetBridgeInfo
+
+```csharp
+public Vl53l7Info GetBridgeInfo()
+```
+
+Bridge counters and pin levels (the sensor is not touched). Read it before and after a run: during one each call takes the bus from the stream and can cost a frame.
+
+#### Vl53l7cxDevice.SetI2cSpeedKhz
+
+```csharp
+public int SetI2cSpeedKhz(int khz)
+```
+
+Sensor bus SCL; the board takes the nearest of 100, 200, 400, 500 … 1000 kHz. Returns the value in effect. `BusyException` mid-transfer: stop ranging first.
+
+#### Vl53l7cxDevice.PinCtrl
+
+```csharp
+public void PinCtrl(byte action)
+```
+
+Drive the sensor's LPn / I2C_RST pins (`Vl53l7PinAction`). LpnOff and SoftCycle drop the sensor's state: `Init` again afterwards.
+
+### Vl53l5cxDevice
+
+```csharp
+public class Vl53l5cxDevice : Vl53l7cxDevice
+```
+
+VL53L5CX ToF (8×8 zones, 63° field of view): the board, firmware and API of `Vl53l7cxDevice`; the sensor reports module type MZ.
+
+#### Vl53l5cxDevice.Vl53l5cxDevice *(constructor)*
+
+```csharp
+public Vl53l5cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l5cxDevice.Vl53l5cxDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l5cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+### Vl53l7chDevice
+
+```csharp
+public class Vl53l7chDevice : Vl53l7cxDevice
+```
+
+VL53L7CH: the VL53L7CX superset with CNH histograms. `Init` downloads the CH firmware (VL53LMZ ULD 2.0.16, the VL53L8CH one); CNH frames up to ~7.6 KB stream in chunks.
+
+#### Vl53l7chDevice.Vl53l7chDevice *(constructor)*
+
+```csharp
+public Vl53l7chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l7chDevice.Vl53l7chDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l7chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Vl53l7chDevice.CnhSetup *(property)*
+
+```csharp
+public Vl53l8CnhSetup? CnhSetup
+```
+
+The CNH setup armed by `ConfigureCnh`, or null.
+
+#### Vl53l7chDevice.ConfigureCnh
+
+```csharp
+public void ConfigureCnh(Vl53l8CnhSetup setup)
+```
+
+Arm CNH for the next start (as `ConfigureCnh`).
+
 ## Shared with VL53L8 (frame decode)
 
 ### FrameChunk
@@ -310,8 +434,6 @@ A decoder for L5/L7 frames (any of the three classes).
 ```csharp
 public sealed record FrameChunk(ulong TimestampUs, int FullSize, int Offset, byte[] Data)
 ```
-
-One RPT_VL53_FRAME chunk: device timestamp, the full frame size, this chunk's byte offset into the frame, and the chunk payload.
 
 #### FrameChunk.Unpack
 
@@ -359,7 +481,7 @@ public sealed class Vl53l8FrameDecoder
 
 VL53L8 results-frame decoder (contracts/04_SENSOR_VL53L8.md). Verbatim port of the verifiable parse path of the ST ULD's GetRangingData / parse_frame.
 
-Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is copied out raw (`CnhRaw`) and decoded by `DecodeHistogram`; the live register-bridge init/config that produces these frames is hardware-dependent and out of scope (`Vl53l8Uld`).
+Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is copied out raw (`CnhRaw`) and decoded by `DecodeHistogram`; the register-bridge init/config that produces these frames is `Vl53l8Driver`.
 
 #### Vl53l8FrameDecoder.CorruptedFrameException
 
@@ -432,10 +554,10 @@ Parse one raw results frame, trimming every per-zone array to `resolution` entri
 ### Vl53l8Frame
 
 ```csharp
-public sealed record Vl53l8Frame(ulong TimestampUs, int Resolution, int SiliconTempDegc, int[] DistanceMm, byte[] TargetStatus, byte[] NbTargetDetected, uint[] SignalPerSpad, uint[] AmbientPerSpad, uint[] NbSpadsEnabled, double[] RangeSigmaMm, byte[] Reflectance)
+public sealed record Vl53l8Frame(ulong TimestampUs, int Resolution, int SiliconTempDegc, int[] DistanceMm, byte[] TargetStatus, byte[] NbTargetDetected, double[] SignalPerSpad, double[] AmbientPerSpad, uint[] NbSpadsEnabled, double[] RangeSigmaMm, double[] Reflectance)
 ```
 
-One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Raw wire integers are preserved; `DistanceMm` and `RangeSigmaMm` carry the ST GetRangingData fixed-point scaling applied (÷4 and ÷128).
+One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Values are in the real units ST's GetRangingData gives (contract 04 §5); ST divides integers, here the scaled values keep their fraction.
 
 #### Vl53l8Frame.CnhRaw *(property)*
 
@@ -444,3 +566,11 @@ public byte[]? CnhRaw
 ```
 
 Raw CNH data block (output index 0xC048), byte-swapped like every other block — decode with `DecodeHistogram`. Null when the frame carries no CNH block (CX variants, or CNH not configured).
+
+#### Vl53l8Frame.Motion *(property)*
+
+```csharp
+public Vl53l8Motion? Motion
+```
+
+The motion-indicator output, when the motion indicator is configured; else null.

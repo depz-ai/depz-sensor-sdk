@@ -4,6 +4,9 @@ A contract-first decode/encode SDK for the DEPZ sensor family. Every codec is a
 byte-exact port of the reference Python SDK, pinned to the shared golden vectors
 under `contracts/vectors` (`dotnet test`).
 
+Builds for .NET 8 and .NET Standard 2.1 — the latter runs in **Unity** 2021.2+
+(see [Installation › Unity](docs/guide.md#unity)).
+
 ## Documentation
 
 Full docs live under [`docs/`](docs/):
@@ -79,12 +82,23 @@ decode path serves both:
 
 ## Coverage today
 
+**Live device layer** (contract 07) — connection and reader thread, requests,
+streams (callbacks and drop-oldest queues), events, time sync, `.depzrec`
+record/replay and port discovery — with the **SR04**, **VL53L4CD** (the ST
+ULD 2.2.3 on the host), the **VL53L 1D family** (VL53L0X / L1CX / L1CB / L3CX / L4CX:
+the PAL, the ULDs, the ULP and the histogram BareDriver on the host), **VL53L8CX / VL53L8CH** and **VL53L5CX / VL53L7CX / VL53L7CH** (the ST ULD with the
+sensor firmware download, CNH) **BNO055**, **BNO085 / BNO086** and **TMF8829** (the sensor sequence with the firmware download) classes — every sensor of the line; the shared device scenarios (contract 15)
+run against them.
+
 Verifiable, golden-vector-backed codecs are implemented for every sensor:
 
 - **SR04** — command encode + data/period/decay decode.
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX** — v2.00 codecs, the product table and
-  class resolution, die-block / VL53L0X raw / histogram-block decode.
-- **VL53L4CD** — register-bridge codecs, result decode, timing/tuning math and init block.
+  class resolution, die-block / VL53L0X raw / histogram-block decode; the live
+  drivers (VL53L0X PAL, VL53L1X / L4CD ULDs, L3CX ULP, the histogram
+  BareDriver with up to four targets per frame).
+- **VL53L4CD** — register-bridge codecs, result decode, timing/tuning math and init block;
+  the live ULD driver (init, ranging, calibration).
 - **VL53L5CX / VL53L7CX / VL53L7CH** — pin control / bus speed / info codecs,
   class resolution, and the L5/L7 frame decoder (footer at size − 4, per-zone
   trim), replayed against live-board captures.
@@ -95,33 +109,17 @@ Verifiable, golden-vector-backed codecs are implemented for every sensor:
   block into per-aggregate histograms.
 - **TMF8829** — wire codecs, chunk reassembly, frame / pixel decode and the
   half-frame merge, clock model and capture time, config-page fields, the
-  embedded ams sensor firmware (MIT).
+  embedded ams sensor firmware (MIT); the live sensor sequence.
 - **BNO055** — wire codecs, units / calibration status and profile / axis remap
   + placements / page-1 configs, register-window decode.
-- **BNO085 / BNO086** — SHTP framing/reassembly, SH-2 control encode, input-report and
-  gyro-integrated-RV decode.
-
-For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055,
-initialising and streaming the board is done with the Python or TypeScript SDK; this SDK
-decodes what they send and builds the command payloads.
+- **BNO085 / BNO086** — SHTP framing/reassembly, SH-2 control encode and response decode
+  (features, product id, commands, FRS sessions, metadata), input-report and
+  gyro-integrated-RV decode; the live SH-2 hub session.
 
 Plus the shared foundation: CRC KATs, DEPZ framing encode/decode, USB identity
 table + discovery ordering, common commands (time-sync, sync-pin), `.fwdepz`
-image parse, and `.depzdata` dataset read.
-
-### Not-yet-implemented extension points
-
-These are deliberately stubbed (clearly-named, throwing/`TODO` stubs) rather than
-faked, because they cannot be verified from golden vectors alone:
-
-- **Live VL53L8 ULD init/config** — `Vl53l8Uld`. The firmware-download +
-  register-bridge (DCI) init sequence only means anything against real silicon
-  over the CDC link, so it is out of scope for the decode SDK.
-- **Live drivers of the L5/L7 boards, the 1D family, the TMF8829 and the
-  BNO055** — firmware download and ULD configuration, the ST 1D drivers, the
-  TMF8829 sensor sequence, the BNO055 session logic.
-
-Everything else in the table above is fully implemented and covered.
+image parse, and `.depzdata` datasets: the multi-device recorder, the reader and
+the timeline player.
 
 ## License
 

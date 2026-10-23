@@ -48,6 +48,9 @@ int depz_build_packet(uint8_t cmd, const uint8_t *payload, size_t payload_len,
 {
     if (payload_len > DEPZ_MAX_PAYLOAD)
         return -1;
+    if (crc_type != DEPZ_CRC_NONE && crc_type != DEPZ_CRC8 &&
+        crc_type != DEPZ_CRC16 && crc_type != DEPZ_CRC32)
+        return -3; /* not a listed CRC type (contract 07 §3) */
 
     uint16_t data_size = (uint16_t)(payload_len | ((unsigned)crc_type << 14));
     uint8_t hdr[4] = {

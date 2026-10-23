@@ -39,6 +39,7 @@ from .cnh import CnhConfig
 #: releases a pending `get_frame()` promptly, large enough to stay off the CPU.
 _CLOSE_POLL_S = 0.05
 from .uld import (
+    I2C_VARIANTS,
     RANGING_MODE_AUTONOMOUS,
     RANGING_MODE_CONTINUOUS,
     RESOLUTION_4X4,
@@ -47,6 +48,7 @@ from .uld import (
     TARGET_ORDER_STRONGEST,
     VL53L8CX,
     Vl53l8cxError,
+    silicon_id_matches,
 )
 
 from .uld import (  # noqa: E402
@@ -83,14 +85,14 @@ class Vl53l8Frame:
 
     timestamp_us: int
     resolution: int  # 16 | 64
-    distance_mm: np.ndarray  # int32, shape (zones,)
+    distance_mm: np.ndarray  # int32 mm, shape (zones,); negative → 0, as ST
     target_status: np.ndarray  # uint8: 5/9 = valid, 255 = no target
     nb_target_detected: np.ndarray  # uint8
     signal_per_spad: np.ndarray  # float64 kcps/SPAD
     ambient_per_spad: np.ndarray  # float64 kcps/SPAD
     nb_spads_enabled: np.ndarray  # int32
-    range_sigma_mm: np.ndarray  # float64
-    reflectance: np.ndarray  # uint8 %
+    range_sigma_mm: np.ndarray  # float64 mm
+    reflectance: np.ndarray  # float64 %
     silicon_temp_degc: int
     cnh_raw: bytes | None = None  # CH variant: raw CNH block (decode via cnh)
     motion: dict | None = None  # motion-indicator output when configured
@@ -191,9 +193,13 @@ class Vl53l8cx(DeviceBase):
         return self.uld.variant
 
     def is_alive(self) -> bool:
+        """True when the sensor answers with its own silicon ids (a bus
+        error or a foreign id: False)."""
         probe = VL53L8CX(self._platform)
         try:
-            return bool(probe.is_alive())
+            device_id, revision_id = probe.is_alive()
+            return silicon_id_matches(device_id, revision_id,
+                                      self._VARIANT in I2C_VARIANTS)
         except (Vl53l8cxError, StatusError, DepzError):
             return False
 
@@ -494,7 +500,7 @@ class Vl53l8cx(DeviceBase):
             ambient_per_spad=np.asarray(parsed["ambient_per_spad"], dtype=np.float64),
             nb_spads_enabled=np.asarray(parsed["nb_spads_enabled"], dtype=np.int32),
             range_sigma_mm=np.asarray(parsed["range_sigma_mm"], dtype=np.float64),
-            reflectance=np.asarray(parsed["reflectance"], dtype=np.uint8),
+            reflectance=np.asarray(parsed["reflectance"], dtype=np.float64),
             silicon_temp_degc=parsed.get("silicon_temp_degc", 0),
             cnh_raw=parsed.get("cnh_raw"),
             motion=parsed.get("motion_indicator"),

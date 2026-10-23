@@ -37,11 +37,18 @@ public final class Framing {
     /**
      * Frame one packet. {@code crcType} bits are set in the header even for an
      * empty payload (matching device TX), but CRC bytes are only appended for
-     * non-empty payloads. {@code seq} is taken modulo 256.
+     * non-empty payloads. {@code seq} is a free-running u32 counter taken modulo
+     * 256 on the wire; {@code cmd} outside 0..255, {@code seq} outside 0..2^32-1 or
+     * a null {@code crcType} → IllegalArgumentException.
      */
-    public static byte[] buildPacket(int cmd, byte[] payload, int seq, CrcType crcType) {
+    public static byte[] buildPacket(int cmd, byte[] payload, long seq, CrcType crcType) {
         if (payload.length > MAX_PAYLOAD) {
             throw new IllegalArgumentException("payload too long: " + payload.length + " > " + MAX_PAYLOAD);
+        }
+        ai.depz.sensor.protocol.Wire.checkUint("cmd", cmd, 8);
+        ai.depz.sensor.protocol.Wire.checkUint("seq", seq, 32);
+        if (crcType == null) {
+            throw new IllegalArgumentException("crcType: null is not a CrcType");
         }
         int dataSize = payload.length | (crcType.value << 14);
         byte[] ds = {(byte) dataSize, (byte) (dataSize >>> 8)};
@@ -52,7 +59,7 @@ public final class Framing {
         out.write(MAGIC, 0, MAGIC.length);
         out.write(ds, 0, ds.length);
         out.write(cmd & 0xFF);
-        out.write(seq & 0xFF);
+        out.write((int) (seq & 0xFF));
         out.write(hdrCrc & 0xFF);
         out.write(payload, 0, payload.length);
         byte[] trailer = payloadCrcBytes(crcType, payload);

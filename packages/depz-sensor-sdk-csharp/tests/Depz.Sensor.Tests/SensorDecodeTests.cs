@@ -30,6 +30,7 @@ public class SerialOrderingTests
             var expected = c.GetProperty("order").EnumerateArray().Select(e => e.GetString()).ToList();
             var got = UsbIds.SerialOrdering(ports).Select(p => p.Port).ToList();
             Assert.True(expected.SequenceEqual(got), $"{name}: expected [{string.Join(",", expected)}] got [{string.Join(",", got)}]");
+            Vectors.Seen(c);
         }
     }
 }
@@ -41,18 +42,23 @@ public class SerialOrderingTests
 // this same path serves both (see Vl53l8Variant / Vl53l8FrameDecoder.ForVariant).
 // This fixture was captured on CX silicon (dev-default; probe "APP_VL53L8_v0.9",
 // ULD 2.1.0 → frame-id footer offset 12, the decoder default). CH would differ
-// only in that footer offset (4, VL53LMZ firmware); the CH-only CNH histogram
-// decode (Vl53l8Cnh) is covered by the vl53l8_cnh.json vector test.
+// only in that footer offset (4, VL53LMZ firmware); the two CH captures
+// (APP_VL53L8_v0.92) replay the same rx path with that offset, the CNH one
+// with cnh_raw byte-exact. The CNH histogram decode (Vl53l8Cnh) itself is
+// covered by the vl53l8_cnh.json vector test.
 
 public class Vl53l8ReplayTests
 {
     private static byte[] Hex(string s) => Vectors.Hex(s);
 
-    [Fact]
-    public void FullStackReplay_MatchesExpectedFrames()
+    [Theory]
+    [InlineData("vl53l8_8x8_15hz_3s", Vl53l8Variant.Cx, false)]
+    [InlineData("vl53l8ch_8x8_15hz_3s", Vl53l8Variant.Ch, false)]
+    [InlineData("vl53l8ch_cnh_8x8_15hz", Vl53l8Variant.Ch, true)]
+    public void FullStackReplay_MatchesExpectedFrames(string stem, Vl53l8Variant variant, bool withCnh)
     {
-        string recPath = Vectors.RecordingPath("vl53l8_8x8_15hz_3s.depzrec");
-        string expPath = Vectors.RecordingPath("vl53l8_8x8_15hz_3s.expected.json");
+        string recPath = Vectors.RecordingPath(stem + ".depzrec");
+        string expPath = Vectors.RecordingPath(stem + ".expected.json");
 
         string[] recLines = File.ReadAllLines(recPath);
         using var expDoc = JsonDocument.Parse(File.ReadAllText(expPath));
@@ -62,7 +68,7 @@ public class Vl53l8ReplayTests
         // Replay the rx byte stream through framing → reassembly → decode.
         var parser = new PacketParser();
         var reassembler = new FrameReassembler();
-        var decoder = new Vl53l8FrameDecoder();
+        var decoder = Vl53l8FrameDecoder.ForVariant(variant);
         var frames = new List<Vl53l8Frame>();
 
         for (int i = 1; i < recLines.Length; i++)
@@ -101,7 +107,12 @@ public class Vl53l8ReplayTests
             Assert.Equal(want.GetProperty("distance_mm").EnumerateArray().Select(e => e.GetInt32()).ToArray(), got.DistanceMm);
             Assert.Equal(want.GetProperty("target_status").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray(), got.TargetStatus);
             Assert.Equal(want.GetProperty("nb_target_detected").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray(), got.NbTargetDetected);
+            if (withCnh)
+                Assert.Equal(want.GetProperty("cnh_raw").GetString(), Vectors.ToHex(got.CnhRaw));
+            else
+                Assert.Null(got.CnhRaw);
         }
+        Vectors.Seen($"recordings/{stem}.depzrec");
     }
 }
 
@@ -120,6 +131,7 @@ public class Vl53l8AdvancedTests
             string expected = c.GetProperty("pack").GetString()!;
             string actual = Vectors.ToHex(MotionConfig.InitDefault(resolution).Pack());
             Assert.True(expected == actual, $"{name}: expected {expected} got {actual}");
+            Vectors.Seen(c);
         }
     }
 
@@ -145,6 +157,7 @@ public class Vl53l8AdvancedTests
             string actual = Vectors.ToHex(Vl53l8Advanced.PackDetectionThresholds(thresholds));
             Assert.True(expected == actual, $"{name}: start_block mismatch");
             Assert.Equal(c.GetProperty("valid_status").GetString(), Vectors.ToHex(Vl53l8Advanced.ThresholdValidStatus()));
+            Vectors.Seen(c);
         }
     }
 
@@ -157,6 +170,7 @@ public class Vl53l8AdvancedTests
             string name = c.GetProperty("name").GetString()!;
             double kcps = c.GetProperty("kcps").GetDouble();
             Assert.True(c.GetProperty("raw").GetUInt32() == Vl53l8Advanced.XtalkMarginRaw(kcps), $"{name}: raw mismatch");
+            Vectors.Seen(c);
         }
     }
 }
@@ -196,6 +210,7 @@ public class Vl53l8CnhTests
             Assert.Equal(wantRaw, got.Aggregates[a].HistRaw);
             Assert.Equal(wantScaler, got.Aggregates[a].HistScaler);
         }
+        Vectors.Seen("vl53l8_cnh");
     }
 }
 
@@ -219,6 +234,7 @@ public class Bno086ShtpTests
             Assert.True(expected == Vectors.ToHex(hdr.Pack()), $"{name}: pack mismatch");
             var round = ShtpHeader.Unpack(Vectors.Hex(expected));
             Assert.Equal(hdr, round);
+            Vectors.Seen(c);
         }
     }
 
@@ -233,6 +249,7 @@ public class Bno086ShtpTests
             byte[] payload = Vectors.Hex(c.GetProperty("payload").GetString()!);
             string expected = c.GetProperty("frame").GetString()!;
             Assert.True(expected == Vectors.ToHex(layer.NextFrame(channel, payload)), "tx_seq frame mismatch");
+            Vectors.Seen(c);
         }
     }
 
@@ -245,9 +262,12 @@ public class Bno086ShtpTests
             string name = c.GetProperty("name").GetString()!;
             var layer = new ShtpLayer();
             var cargos = new List<ShtpCargo>();
-            foreach (var f in c.GetProperty("frames").EnumerateArray())
+            var frames = c.GetProperty("frames").EnumerateArray().ToList();
+            var captures = c.GetProperty("captures_us").EnumerateArray().ToList();
+            Assert.True(frames.Count == captures.Count, $"{name}: {frames.Count} frames, {captures.Count} captures");
+            for (int k = 0; k < frames.Count; k++)
             {
-                ShtpCargo? cargo = layer.Feed(Vectors.Hex(f.GetString()!));
+                ShtpCargo? cargo = layer.Feed(Vectors.Hex(frames[k].GetString()!), captures[k].GetInt64());
                 if (cargo is not null)
                     cargos.Add(cargo);
             }
@@ -259,8 +279,10 @@ public class Bno086ShtpTests
                 Assert.Equal(wantCargos[i].GetProperty("channel").GetInt32(), cargos[i].Channel);
                 Assert.Equal(wantCargos[i].GetProperty("seq").GetInt32(), cargos[i].Seq);
                 Assert.Equal(wantCargos[i].GetProperty("payload").GetString(), Vectors.ToHex(cargos[i].Payload));
+                Assert.Equal(wantCargos[i].GetProperty("capture_us").GetInt64(), cargos[i].CaptureUs);
             }
             Assert.True(expect.GetProperty("discarded").GetInt32() == layer.Discarded, $"{name}: discarded {layer.Discarded}");
+            Vectors.Seen(c);
         }
     }
 
@@ -301,6 +323,29 @@ public class Bno086ShtpTests
             };
             string expected = c.GetProperty("payload").GetString()!;
             Assert.True(expected == Vectors.ToHex(actual), $"{name} ({kind}): expected {expected} got {Vectors.ToHex(actual)}");
+            Vectors.Seen(c);
+        }
+    }
+
+    [Fact]
+    public void InteractiveCalibrationAndFlush_ByteExact()
+    {
+        var root = Vectors.Load("bno086_shtp.json");
+        foreach (var c in root.GetProperty("interactive_and_flush").EnumerateArray())
+        {
+            string name = c.GetProperty("name").GetString()!;
+            byte[] actual = c.GetProperty("kind").GetString() switch
+            {
+                "command_request" => Sh2Control.Command(
+                    c.GetProperty("seq").GetInt32(),
+                    c.GetProperty("command").GetInt32(),
+                    Sh2Hub.InteractiveCalibrationParams(Vectors.Hex(c.GetProperty("params").GetString()!)[0])),
+                "force_flush" => Sh2Hub.ForceFlush(c.GetProperty("sensor_id").GetInt32()),
+                var k => throw new InvalidOperationException("unknown kind: " + k),
+            };
+            string expected = c.GetProperty("payload").GetString()!;
+            Assert.True(expected == Vectors.ToHex(actual), $"{name}: expected {expected} got {Vectors.ToHex(actual)}");
+            Vectors.Seen(c);
         }
     }
 
@@ -329,6 +374,7 @@ public class Bno086ShtpTests
                 c.GetProperty("bridge_seq").GetInt32(), (CrcType)c.GetProperty("crc_type").GetInt32());
             Assert.Equal(c.GetProperty("bridge_frame").GetString(), Vectors.ToHex(bridge));
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(2, n);
     }
@@ -339,6 +385,8 @@ public class Bno086ShtpTests
         var flags = Vectors.Load("bno086_shtp.json").GetProperty("feature_flags");
         Assert.Equal(FeatureFlags.Wakeup, flags.GetProperty("wakeup").GetInt32());
         Assert.Equal(FeatureFlags.AlwaysOn, flags.GetProperty("always_on").GetInt32());
+        Assert.Equal(2, flags.EnumerateObject().Count());
+        Vectors.Seen("bno086_shtp/feature_flags");
     }
 }
 
@@ -346,7 +394,7 @@ public class Bno086ShtpTests
 
 public class Bno086ReportsTests
 {
-    private static void AssertFields(string name, IReadOnlyDictionary<string, object?> got, JsonElement wantFields)
+    internal static void AssertFields(string name, IReadOnlyDictionary<string, object?> got, JsonElement wantFields)
     {
         foreach (JsonProperty prop in wantFields.EnumerateObject())
         {
@@ -376,7 +424,11 @@ public class Bno086ReportsTests
     public void InputCargos_DecodeByteExact()
     {
         var root = Vectors.Load("bno086_reports.json");
-        foreach (var c in root.GetProperty("input_cargos").EnumerateArray())
+        // interactive_and_flush: MotionRequest (0x2B) and the bare 0xEF Flush
+        // Completed, in the same input-cargo shape
+        var cargos = root.GetProperty("input_cargos").EnumerateArray()
+            .Concat(root.GetProperty("interactive_and_flush").EnumerateArray());
+        foreach (var c in cargos)
         {
             string name = c.GetProperty("name").GetString()!;
             byte[] cargo = Vectors.Hex(c.GetProperty("cargo").GetString()!);
@@ -389,7 +441,32 @@ public class Bno086ReportsTests
                 Assert.Equal(wantList[i].GetProperty("type").GetString(), reports[i].Kind);
                 AssertFields(name, reports[i].Fields(), wantList[i].GetProperty("fields"));
             }
+            // `record`: the contract 09 dataset value, scaled, key for key.
+            for (int i = 0; i < wantList.Count; i++)
+            {
+                if (!wantList[i].TryGetProperty("record", out var wantRecord))
+                    continue;
+                var got = (Dictionary<string, object?>)Json.JsonText.Parse(Json.JsonText.Serialize(DatasetRecords.Bno086(reports[i])))!;
+                var want = (Dictionary<string, object?>)Json.JsonText.Parse(wantRecord.GetRawText())!;
+                Assert.Equal(want.Keys.OrderBy(k => k, StringComparer.Ordinal), got.Keys.OrderBy(k => k, StringComparer.Ordinal));
+                Assert.Null(ScenarioTests.Mismatch(got, want, $"{name}#{i}.record"));
+            }
+            Vectors.Seen(c);
         }
+    }
+
+    [Fact]
+    public void QPoints()
+    {
+        var root = Vectors.Load("bno086_reports.json");
+        var want = root.GetProperty("q_points").EnumerateObject()
+            .ToDictionary(p => Convert.ToInt32(p.Name, 16), p => p.Value.GetInt32());
+        Assert.Equal(want.OrderBy(kv => kv.Key), Bno086Q.Points.OrderBy(kv => kv.Key));
+        Vectors.Seen("bno086_reports/q_points");
+        Assert.Equal(root.GetProperty("rv_accuracy_q").GetInt32(), Bno086Q.RvAccuracyQ);
+        Vectors.Seen("bno086_reports/rv_accuracy_q");
+        Assert.Equal(root.GetProperty("gyro_rv_angvel_q").GetInt32(), Bno086Q.GyroRvAngvelQ);
+        Vectors.Seen("bno086_reports/gyro_rv_angvel_q");
     }
 
     [Fact]
@@ -406,7 +483,53 @@ public class Bno086ReportsTests
             var expect = c.GetProperty("expect");
             Assert.Equal(expect.GetProperty("type").GetString(), rep!.Kind);
             AssertFields(name, rep.Fields(), expect.GetProperty("fields"));
+            Vectors.Seen(c); // `record` not checked, as in InputCargos_DecodeByteExact
         }
+    }
+}
+
+// recordings/bno086_session.depzrec decoded rx-side only (the C# SDK has no
+// device layer to re-issue the tx half): every RPT_DATA SHTP frame through the
+// SHTP layer, input-channel cargos through the SH-2 report parsers, against
+// the sidecar's 150 reports.
+public class Bno086RecordingTests
+{
+    private const int RptData = 0x91; // cmd u8, capture timestamp_us u64, raw SHTP frame
+
+    [Fact]
+    public void Session_RxDecode_MatchesSidecar()
+    {
+        var exp = JsonDocument.Parse(File.ReadAllText(Vectors.RecordingPath("bno086_session.expected.json"))).RootElement;
+        var layer = new ShtpLayer();
+        var reports = new List<BnoReport>();
+        foreach (var pkt in Vectors.RxPackets("bno086_session.depzrec"))
+        {
+            if (pkt.Cmd != RptData || pkt.Payload.Length < 9)
+                continue;
+            long capture = (long)System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(pkt.Payload.AsSpan(1));
+            ShtpCargo? cargo = layer.Feed(pkt.Payload[9..], capture);
+            if (cargo is null)
+                continue;
+            if (cargo.Channel is (int)ShtpChannel.InputNormal or (int)ShtpChannel.InputWake)
+                reports.AddRange(Sh2Reports.ParseInputCargo(cargo.Payload, cargo.CaptureUs));
+            else if (cargo.Channel == (int)ShtpChannel.GyroRv && Sh2Reports.ParseGyroRvCargo(cargo.Payload, cargo.CaptureUs) is { } rv)
+                reports.Add(rv);
+        }
+
+        var want = exp.GetProperty("reports").EnumerateArray().ToList();
+        Assert.True(reports.Count >= want.Count, $"decoded {reports.Count} reports, expected >= {want.Count}");
+        for (int i = 0; i < want.Count; i++)
+        {
+            Assert.Equal(want[i].GetProperty("type").GetString(), reports[i].Kind);
+            var fields = new Dictionary<string, JsonElement>();
+            foreach (var p in want[i].EnumerateObject())
+                if (p.Name != "type")
+                    fields[p.Name] = p.Value;
+            var wantFields = JsonSerializer.SerializeToElement(fields);
+            Assert.Equal(fields.Count, reports[i].Fields().Count);
+            Bno086ReportsTests.AssertFields($"report {i}", reports[i].Fields(), wantFields);
+        }
+        Vectors.Seen("recordings/bno086_session.depzrec");
     }
 }
 
@@ -440,10 +563,11 @@ public class DatasetReadTests
         // Decoded payloads (contract 09 sr04 kind): echo_us + source once|loop.
         foreach (var r in reader.Records)
         {
-            Assert.Equal(5831, r.Value.GetProperty("echo_us").GetInt32());
-            Assert.Contains(r.Value.GetProperty("source").GetString(), new[] { "once", "loop" });
+            Assert.Equal(5831L, r.Value["echo_us"]);
+            Assert.Contains((string)r.Value["source"]!, new[] { "once", "loop" });
         }
-        Assert.Equal(8, reader.Records.Count(r => r.Value.GetProperty("source").GetString() == "loop"));
-        Assert.Equal(2, reader.Records.Count(r => r.Value.GetProperty("source").GetString() == "once"));
+        Assert.Equal(8, reader.Records.Count(r => (string?)r.Value["source"] == "loop"));
+        Assert.Equal(2, reader.Records.Count(r => (string?)r.Value["source"] == "once"));
+        Vectors.Seen("recordings/dataset_dual_sr04.depzdata");
     }
 }

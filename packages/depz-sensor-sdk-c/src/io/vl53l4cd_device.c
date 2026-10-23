@@ -467,8 +467,11 @@ int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32
 
 int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm)
 {
+    uint16_t raw;
+    if (depz_vl53l4_offset_raw_checked(offset_mm, &raw))
+        return depz_fail(DEPZ_E_ARG, "vl53l4cd: offset %ld mm outside -1024..1023", (long)offset_mm);
     TRY(need_idle(dev));
-    TRY(wr_word(dev, RANGE_OFFSET_MM, depz_vl53l4_offset_raw(offset_mm)));
+    TRY(wr_word(dev, RANGE_OFFSET_MM, raw));
     TRY(wr_word(dev, INNER_OFFSET_MM, 0));
     return wr_word(dev, OUTER_OFFSET_MM, 0);
 }
@@ -484,10 +487,13 @@ int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm)
 
 int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps)
 {
+    uint16_t raw;
+    if (depz_vl53l4_xtalk_raw_checked(xtalk_kcps, &raw))
+        return depz_fail(DEPZ_E_ARG, "vl53l4cd: xtalk %u kcps outside 0..127", (unsigned)xtalk_kcps);
     TRY(need_idle(dev));
     TRY(wr_word(dev, XTALK_X_PLANE_GRADIENT_KCPS, 0));
     TRY(wr_word(dev, XTALK_Y_PLANE_GRADIENT_KCPS, 0));
-    return wr_word(dev, XTALK_PLANE_OFFSET_KCPS, depz_vl53l4_xtalk_raw(xtalk_kcps));
+    return wr_word(dev, XTALK_PLANE_OFFSET_KCPS, raw);
 }
 
 int depz_vl53l4cd_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps)
@@ -592,7 +598,12 @@ int depz_vl53l4cd_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t
     acc.sum = 0;
     TRY(collect(dev, nb, add_distance, &acc));
     off = (int32_t)target_mm - (int32_t)(acc.sum / nb);
-    TRY(wr_word(dev, RANGE_OFFSET_MM, depz_vl53l4_offset_raw(off)));
+    {
+        uint16_t raw;
+        if (depz_vl53l4_offset_raw_checked(off, &raw))
+            return depz_fail(DEPZ_E_ARG, "vl53l4cd: calibrated offset %ld mm outside -1024..1023", (long)off);
+        TRY(wr_word(dev, RANGE_OFFSET_MM, raw));
+    }
     if (offset_mm) *offset_mm = off;
     return DEPZ_OK;
 }

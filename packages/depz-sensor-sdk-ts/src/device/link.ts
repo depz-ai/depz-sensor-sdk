@@ -63,6 +63,11 @@ export class DepzLink {
    * is open. Ends (and fires `onClose`) when the transport's readable
    * iterator finishes or the transport reports a disconnect.
    */
+  /** True once `start()` ran (the read pump is, or was, running). */
+  get isStarted(): boolean {
+    return this.started;
+  }
+
   start(): void {
     if (this.started) throw new Error("DepzLink already started");
     this.started = true;

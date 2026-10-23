@@ -84,16 +84,24 @@ export const TMF8829_CFG_FIELDS: Readonly<Record<Tmf8829CfgField, readonly [numb
   distance_in_mm: [0x8f, 0, 1],
 };
 
+/** Index of `name`'s first byte in `page`; RangeError when the page is too short to hold it. */
+function fieldIndex(page: Uint8Array, name: Tmf8829CfgField, reg: number, width: number): number {
+  const i = reg - TMF8829_REG_CFG;
+  const end = i + (width === 16 ? 2 : 1);
+  if (page.length < end) throw new RangeError(`${name}: config page has ${page.length} bytes, field needs ${end}`);
+  return i;
+}
+
 export function tmf8829CfgGet(page: Uint8Array, name: Tmf8829CfgField): number {
   const [reg, shift, width] = TMF8829_CFG_FIELDS[name];
-  const i = reg - TMF8829_REG_CFG;
+  const i = fieldIndex(page, name, reg, width);
   if (width === 16) return page[i]! | (page[i + 1]! << 8);
   return (page[i]! >> shift) & ((1 << width) - 1);
 }
 
 export function tmf8829CfgSet(page: Uint8Array, name: Tmf8829CfgField, value: number): void {
   const [reg, shift, width] = TMF8829_CFG_FIELDS[name];
-  const i = reg - TMF8829_REG_CFG;
+  const i = fieldIndex(page, name, reg, width);
   if (!Number.isInteger(value) || value < 0 || value >= 2 ** width) {
     throw new RangeError(`${name}: ${value} out of range for ${width} bit`);
   }

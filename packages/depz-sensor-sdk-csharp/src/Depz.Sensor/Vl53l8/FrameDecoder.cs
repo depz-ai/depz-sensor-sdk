@@ -29,10 +29,21 @@ public enum Vl53l8Variant
 
 /// <summary>
 /// One decoded ranging frame. Per-zone arrays are sized to the active
-/// resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Raw wire
-/// integers are preserved; <see cref="DistanceMm"/> and <see cref="RangeSigmaMm"/>
-/// carry the ST GetRangingData fixed-point scaling applied (÷4 and ÷128).
+/// resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Values are
+/// in the real units ST's GetRangingData gives (contract 04 §5); ST divides
+/// integers, here the scaled values keep their fraction.
 /// </summary>
+/// <param name="TimestampUs">Host/device timestamp of the frame, µs.</param>
+/// <param name="Resolution">Zones in this frame: 16 (4×4) or 64 (8×8).</param>
+/// <param name="SiliconTempDegc">Sensor die temperature, °C.</param>
+/// <param name="DistanceMm">mm: raw ÷4 floored, a negative distance clamped to 0 (as ST).</param>
+/// <param name="TargetStatus">5 or 9 = valid measurement; 255 = no target detected.</param>
+/// <param name="NbTargetDetected">Targets found per zone.</param>
+/// <param name="SignalPerSpad">Signal rate, kcps/SPAD (raw ÷2048).</param>
+/// <param name="AmbientPerSpad">Ambient rate, kcps/SPAD (raw ÷2048), one per zone.</param>
+/// <param name="NbSpadsEnabled">Active SPAD count per zone.</param>
+/// <param name="RangeSigmaMm">Measurement noise, mm (raw ÷128).</param>
+/// <param name="Reflectance">Estimated target reflectance, % (raw ÷2).</param>
 public sealed record Vl53l8Frame(
     ulong TimestampUs,
     int Resolution,
@@ -40,11 +51,11 @@ public sealed record Vl53l8Frame(
     int[] DistanceMm,
     byte[] TargetStatus,
     byte[] NbTargetDetected,
-    uint[] SignalPerSpad,
-    uint[] AmbientPerSpad,
+    double[] SignalPerSpad,
+    double[] AmbientPerSpad,
     uint[] NbSpadsEnabled,
     double[] RangeSigmaMm,
-    byte[] Reflectance)
+    double[] Reflectance)
 {
     /// <summary>
     /// Raw CNH data block (output index 0xC048), byte-swapped like every other
@@ -52,6 +63,9 @@ public sealed record Vl53l8Frame(
     /// frame carries no CNH block (CX variants, or CNH not configured).
     /// </summary>
     public byte[]? CnhRaw { get; init; }
+
+    /// <summary>The motion-indicator output, when the motion indicator is configured; else null.</summary>
+    public Vl53l8Motion? Motion { get; init; }
 }
 
 /// <summary>
@@ -62,9 +76,8 @@ public sealed record Vl53l8Frame(
 /// results-frame layout; only the frame-id footer offset differs per variant
 /// (see <see cref="Vl53l8Variant"/> / <see cref="ForVariant"/>). The CH-only CNH
 /// histogram block is copied out raw (<see cref="Vl53l8Frame.CnhRaw"/>) and
-/// decoded by <see cref="Vl53l8Cnh.DecodeHistogram"/>; the live register-bridge
-/// init/config that produces these frames is hardware-dependent and out of scope
-/// (<see cref="Vl53l8Uld"/>).
+/// decoded by <see cref="Vl53l8Cnh.DecodeHistogram"/>; the register-bridge
+/// init/config that produces these frames is <see cref="Vl53l8Driver"/>.
 /// </summary>
 public sealed class Vl53l8FrameDecoder
 {
@@ -269,9 +282,12 @@ public sealed class Vl53l8FrameDecoder
             reflectance = Trim(reflectance, n);
         }
 
-        // Fixed-point scaling (ST GetRangingData): distance ÷4, sigma ÷128.
+        // Real units, as ST GetRangingData (contract 04 §5): distance ÷4 with a
+        // negative distance clamped to 0; reflectance ÷2 (%); signal and ambient
+        // ÷2048 (kcps/SPAD); sigma ÷128 (mm). ST divides integers; the scaled
+        // values here keep their fraction.
         for (int k = 0; k < distance.Length; k++)
-            distance[k] = FloorDiv(distance[k], 4);
+            distance[k] = Math.Max(0, FloorDiv(distance[k], 4));
         for (int k = 0; k < rangeSigmaMm.Length; k++)
             rangeSigmaMm[k] /= 128.0;
 
@@ -292,17 +308,21 @@ public sealed class Vl53l8FrameDecoder
             distance,
             targetStatus,
             nbTargetDetected,
-            signalPerSpad,
-            ambientPerSpad,
+            Scale(signalPerSpad, 2048.0),
+            Scale(ambientPerSpad, 2048.0),
             nbSpadsEnabled,
             rangeSigmaMm,
-            reflectance)
+            Scale(reflectance, 2.0))
         {
             CnhRaw = cnhRaw,
         };
     }
 
     private static T[] Trim<T>(T[] arr, int n) => arr.Length > n ? arr[..n] : arr;
+
+    private static double[] Scale(uint[] raw, double div) => Array.ConvertAll(raw, v => v / div);
+
+    private static double[] Scale(byte[] raw, double div) => Array.ConvertAll(raw, v => v / div);
 
     private static uint[] ReadU32(byte[] buf, int off, int count)
     {

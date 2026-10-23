@@ -20,12 +20,12 @@ import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld;
  *       every per-zone array is trimmed to the frame's resolution.</li>
  * </ul>
  *
- * <p>OUT OF SCOPE, as for VL53L8: the live ULD init/config driver over the I2C
- * bridge; see {@link #liveDriverStubbed()}. Power modes, xtalk calibration,
+ * <p>The live driver over the I2C bridge is {@code Vl53l8Driver} with the L5/L7
+ * firmware sets ({@code Vl53l7cxDevice}). Power modes, xtalk calibration,
  * detection thresholds and the motion indicator are the VL53L8 features with the
  * per-part deltas of contract 11 §4 (L5CX / L7CX: no threshold auto-stop, no
  * DEEP_SLEEP), checked against the ST sources and verified on hardware (L5CX and
- * L7CH, 2026-09-24); they run through that live driver (Python / TypeScript SDKs).
+ * L7CH, 2026-09-24); they run through that live driver.
  */
 public final class Vl53l7Uld {
     private Vl53l7Uld() {}
@@ -79,14 +79,6 @@ public final class Vl53l7Uld {
             return byName != null ? byName : Model.VL53L7CX;
         }
         return Model.VL53L7CX;
-    }
-
-    /**
-     * The live ULD init/config I2C-bridge driver is intentionally not ported to
-     * Java — hardware-dependent and out of the decode scope (as for VL53L8).
-     */
-    public static boolean liveDriverStubbed() {
-        return true;
     }
 
     /**

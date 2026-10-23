@@ -15,9 +15,45 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L8CH (ToF + CNH)**: [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Cnh`](#vl53l8cnh)
+- **VL53L8CH (ToF + CNH)**: [`Vl53l8chDevice`](#vl53l8chdevice), [`Vl53l8CnhConfig`](#vl53l8cnhconfig), [`Vl53l8CnhAggregate`](#vl53l8cnhaggregate), [`Vl53l8CnhResult`](#vl53l8cnhresult), [`Vl53l8Cnh`](#vl53l8cnh), [`Vl53l8CnhSetup`](#vl53l8cnhsetup)
 
 ## VL53L8CH (ToF + CNH)
+
+### Vl53l8chDevice
+
+```csharp
+public class Vl53l8chDevice : Vl53l8cxDevice
+```
+
+VL53L8CH: the VL53L8CX superset (every CX method) plus CNH, compact network histograms — each frame can carry a per-aggregate distance histogram. `Init` downloads the CH firmware (VL53LMZ ULD 2.0.16).
+
+#### Vl53l8chDevice.Vl53l8chDevice *(constructor)*
+
+```csharp
+public Vl53l8chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l8chDevice.Vl53l8chDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l8chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Vl53l8chDevice.CnhSetup *(property)*
+
+```csharp
+public Vl53l8CnhSetup? CnhSetup
+```
+
+The CNH setup armed by `ConfigureCnh`, or null; recorders keep it next to the raw blocks to decode them later.
+
+#### Vl53l8chDevice.ConfigureCnh
+
+```csharp
+public void ConfigureCnh(Vl53l8CnhSetup setup)
+```
+
+Arm CNH for the next `StartRanging`: every frame then carries `CnhRaw`, decoded with `DecodeHistogram` and `ToDecodeConfig`.
 
 ### Vl53l8CnhConfig
 
@@ -30,10 +66,26 @@ The `Vl53l8Cnh` input: the two aggregate/histogram dimensions of the on-device C
 ### Vl53l8CnhAggregate
 
 ```csharp
-public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler)
+public sealed record Vl53l8CnhAggregate(int[] HistRaw, sbyte[] HistScaler, int AmbientRaw, sbyte AmbientScaler)
 ```
 
-One decoded CNH aggregate histogram. The float value of bin `i` is `HistRaw[i] / 2^HistScaler[i]` (a per-bin block-floating-point mantissa + shift). Both arrays are `FeatureLength` long.
+One decoded CNH aggregate histogram. The float value of bin `i` is `HistRaw[i] / 2^HistScaler[i]` (a per-bin block-floating-point mantissa + shift); both arrays are `FeatureLength` long. The ambient level of the aggregate is `AmbientRaw / 2^AmbientScaler` (the value ST's Example_12 prints).
+
+#### Vl53l8CnhAggregate.Hist *(property)*
+
+```csharp
+public double[] Hist
+```
+
+The histogram as floating-point values.
+
+#### Vl53l8CnhAggregate.Ambient *(property)*
+
+```csharp
+public double Ambient
+```
+
+The ambient level as a floating-point value.
 
 ### Vl53l8CnhResult
 
@@ -42,6 +94,14 @@ public sealed record Vl53l8CnhResult(uint RefResidualWord, IReadOnlyList<Vl53l8C
 ```
 
 A decoded CNH data block: the reference-residual word plus one histogram per aggregate (in aggregate-id order).
+
+#### Vl53l8CnhResult.RefResidual *(property)*
+
+```csharp
+public double RefResidual
+```
+
+The ref residual (11 fractional bits).
 
 ### Vl53l8Cnh
 
@@ -74,3 +134,135 @@ Decode a captured CNH data block (`block`, byte-swapped exactly like the standar
 Layout (little-endian words) — a faithful port of `_cnh_get_mem_block_addresses` for the fixed cnh_cfg (ping-pong + variance disabled):
 
 `ref_residual_word = word[2]` (byte offset 8). Per-buffer base = `CNH_PER_HEADER_WORDS (5)` + the ping-pong buffer size (from the header buffer-info word); with ping-pong disabled the device reports one buffer and this resolves to the single buffer. Data starts after the 2-word buffer header, then: FEAT_INT `int32[nb_agg*feat]`, FEAT_FRAC `sbyte[nb_agg*feat]` (4-byte padded), AMBIENT_INT `int32[nb_agg]`, AMBIENT_FRAC `sbyte[nb_agg]`. Aggregate `a`'s slice starts at `a*feat`.
+
+### Vl53l8CnhSetup
+
+```csharp
+public sealed class Vl53l8CnhSetup
+```
+
+The CNH (compact network histogram) configuration of a VL53L8CH / VL53L7CH: a mirror of VL53LMZ_Motion_Configuration with the plugin helpers that fill it (vl53lmz_plugin_cnh.c, ULD 2.0.16), ported from the reference Python `CnhConfig`. Build it with `InitConfig` and `CreateAggMap`, check `RequiredMemory`, then arm it with the device's `ConfigureCnh`. The flags are fixed to ping-pong and variance off (Example_12_cnh_data.c), which `DecodeHistogram` assumes. Arguments outside their fields throw `ArgumentException`, never wrap.
+
+#### Vl53l8CnhSetup.MiCfgDevIdx *(constant)*
+
+```csharp
+public const int MiCfgDevIdx = 0xBFAC
+```
+
+#### Vl53l8CnhSetup.CnhMaxDataBytes *(constant)*
+
+```csharp
+public const int CnhMaxDataBytes = 1540 * 4
+```
+
+#### Vl53l8CnhSetup.PulseWidthBin *(constant)*
+
+```csharp
+public const int PulseWidthBin = 10
+```
+
+#### Vl53l8CnhSetup.BinWidthMm *(constant)*
+
+```csharp
+public const double BinWidthMm = 37.5348
+```
+
+#### Vl53l8CnhSetup.RefBinOffset *(property)*
+
+```csharp
+public int RefBinOffset
+```
+
+#### Vl53l8CnhSetup.SumSpan *(property)*
+
+```csharp
+public int SumSpan
+```
+
+#### Vl53l8CnhSetup.FeatureLength *(property)*
+
+```csharp
+public int FeatureLength
+```
+
+#### Vl53l8CnhSetup.NbOfAggregates *(property)*
+
+```csharp
+public int NbOfAggregates
+```
+
+#### Vl53l8CnhSetup.CnhCfg *(property)*
+
+```csharp
+public int CnhCfg
+```
+
+#### Vl53l8CnhSetup.CnhFlexShift *(property)*
+
+```csharp
+public int CnhFlexShift
+```
+
+#### Vl53l8CnhSetup.MapId *(property)*
+
+```csharp
+public sbyte[] MapId
+```
+
+Device zone → CNH aggregate, −1 for a zone in none (64 entries).
+
+#### Vl53l8CnhSetup.InitConfig
+
+```csharp
+public void InitConfig(int startBin, int numBins, int subSample)
+```
+
+vl53lmz_cnh_init_config. `startBin`: first device histogram bin; `numBins`: CNH bins; `subSample`: device bins summed per CNH bin.
+
+#### Vl53l8CnhSetup.CreateAggMap
+
+```csharp
+public void CreateAggMap(int resolution, int startX, int startY, int mergeX, int mergeY, int cols, int rows)
+```
+
+vl53lmz_cnh_create_agg_map: aggregates of `mergeX`×`mergeY` zones, `cols`×`rows` of them from (`startX`, `startY`). `resolution` (16 or 64) must be the sensor's.
+
+#### Vl53l8CnhSetup.RequiredMemory
+
+```csharp
+public int RequiredMemory()
+```
+
+vl53lmz_cnh_calc_required_memory: the on-device CNH buffer, bytes.
+
+#### Vl53l8CnhSetup.public
+
+```csharp
+public (int MinMm, int MaxMm) MinMaxDistanceMm()
+```
+
+(min, max) target distance, mm, the histogram captures whole.
+
+#### Vl53l8CnhSetup.BinCenterMm
+
+```csharp
+public double BinCenterMm(int binIdx)
+```
+
+Distance, mm, at the centre of CNH bin `binIdx`.
+
+#### Vl53l8CnhSetup.ToDecodeConfig
+
+```csharp
+public Vl53l8CnhConfig ToDecodeConfig()
+```
+
+What `DecodeHistogram` needs to decode this setup's blocks.
+
+#### Vl53l8CnhSetup.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+The 156-byte VL53LMZ_Motion_Configuration struct for the device (DCI 0xBFAC).

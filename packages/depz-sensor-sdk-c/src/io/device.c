@@ -555,13 +555,17 @@ int depz_device_get_payload_crc_type(depz_device *dev, depz_crc_type *out)
 int depz_device_set_payload_crc_type(depz_device *dev, depz_crc_type t)
 {
     uint8_t b = (uint8_t)t;
+    if (t != DEPZ_CRC_NONE && t != DEPZ_CRC8 && t != DEPZ_CRC16 && t != DEPZ_CRC32)
+        return depz_fail(DEPZ_E_ARG, "set_payload_crc_type: %d is not a depz_crc_type", (int)t);
     return depz_device_request(dev, DEPZ_CMD_SET_PAYLOAD_CRC_TYPE, &b, 1, NULL, NULL, true, -1);
 }
 
 int depz_device_get_sync_pin(depz_device *dev, uint8_t pin, depz_sync_pin_config *out)
 {
     raw_ctx r;
-    int rc = request_raw(dev, DEPZ_CMD_GET_SYNC_PIN_CONFIG, &pin, 1, DEPZ_RPT_SYNC_PIN_CONFIG, 3, &r);
+    int rc;
+    if (pin < 1 || pin > 5) return depz_fail(DEPZ_E_ARG, "get_sync_pin: pin %u is not a sync pin 1..5", pin);
+    rc = request_raw(dev, DEPZ_CMD_GET_SYNC_PIN_CONFIG, &pin, 1, DEPZ_RPT_SYNC_PIN_CONFIG, 3, &r);
     if (rc) return rc;
     if (out) depz_unpack_sync_pin_config(r.buf, r.len, out);
     return DEPZ_OK;
@@ -571,7 +575,9 @@ int depz_device_set_sync_pin(depz_device *dev, const depz_sync_pin_config *c)
 {
     uint8_t b[3];
     if (!c) return depz_fail(DEPZ_E_ARG, "set_sync_pin: NULL config");
-    depz_pack_sync_pin_config(c, b);
+    if (!depz_pack_sync_pin_config(c, b))
+        return depz_fail(DEPZ_E_ARG, "set_sync_pin: pin %u / mode %u / polarity %u out of range (1..5 / 0..4 / 0..1)",
+                         c->pin, c->mode, c->polarity);
     return depz_device_request(dev, DEPZ_CMD_SET_SYNC_PIN_CONFIG, b, 3, NULL, NULL, true, -1);
 }
 

@@ -229,17 +229,17 @@ export abstract class VL53L1Die extends SensorDriver {
   }
 
   // ── identity ──
-  modelId(): Promise<number> {
+  async modelId(): Promise<number> {
     return this.p.rdWord(IDENTIFICATION__MODEL_ID);
   }
 
   /** The bridge always addresses 0x29, so this makes the sensor unreachable. */
-  setI2cAddress(newAddress: number): Promise<void> {
+  async setI2cAddress(newAddress: number): Promise<void> {
     return this.p.wrByte(I2C_SLAVE__DEVICE_ADDRESS, newAddress >> 1);
   }
 
   // ── init ──
-  bootState(): Promise<number> {
+  async bootState(): Promise<number> {
     return this.p.rdByte(FIRMWARE__SYSTEM_STATUS);
   }
 
@@ -295,7 +295,7 @@ export abstract class VL53L1Die extends SensorDriver {
   }
 
   /** How a part gets to a booted die (the VL53L1X ULD resets first). */
-  protected initBoot(): Promise<void> {
+  protected async initBoot(): Promise<void> {
     return this.waitBoot();
   }
 
@@ -306,7 +306,7 @@ export abstract class VL53L1Die extends SensorDriver {
   protected async initExtra(): Promise<void> {}
 
   // ── ranging ──
-  clearInterrupt(): Promise<void> {
+  async clearInterrupt(): Promise<void> {
     return this.p.wrByte(SYSTEM__INTERRUPT_CLEAR, 0x01);
   }
 
@@ -316,7 +316,7 @@ export abstract class VL53L1Die extends SensorDriver {
     await this.p.wrByte(SYSTEM__MODE_START, mode);
   }
 
-  stopRanging(): Promise<void> {
+  async stopRanging(): Promise<void> {
     return this.p.wrByte(SYSTEM__MODE_START, this.STOP_MODE);
   }
 
@@ -429,7 +429,7 @@ export abstract class VL53L1Die extends SensorDriver {
     return [low, high, (await this.p.rdByte(SYSTEM__INTERRUPT_CONFIG_GPIO)) & 0x07];
   }
 
-  setSignalThreshold(signalKcps: number): Promise<void> {
+  async setSignalThreshold(signalKcps: number): Promise<void> {
     return this.p.wrWord(MIN_COUNT_RATE_RTN_LIMIT_MCPS, signalKcps >> 3);
   }
 
@@ -486,11 +486,11 @@ export abstract class VL53L1Die extends SensorDriver {
     return [(temp & 0x0f) + 1, ((temp & 0xf0) >> 4) + 1];
   }
 
-  setRoiCenter(centerSpad: number): Promise<void> {
+  async setRoiCenter(centerSpad: number): Promise<void> {
     return this.p.wrByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD, centerSpad);
   }
 
-  getRoiCenter(): Promise<number> {
+  async getRoiCenter(): Promise<number> {
     return this.p.rdByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD);
   }
 

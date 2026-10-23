@@ -36,20 +36,28 @@ export * from "./protocol/fwdepz.js";
 export * from "./protocol/usb-ids.js";
 export * from "./errors.js";
 export {
+  SENSOR_CLASS_NAMES,
+  attachSensorClass,
   isDeviceInfo,
   listDepzDevicesFrom,
   openDeviceByDeviceSerial,
   openDeviceFrom,
+  openOnTransport,
   orderDevicesBySerial,
   orderPortsBySerial,
   probePort,
+  resolveSensorClass,
+  sensorClass,
 } from "./discovery.js";
 export type {
   DeviceInfo,
   DepzPortInfo,
   ListOptions,
   OpenDeviceOptions,
+  OpenOnTransportOptions,
   OpenTarget,
+  SensorClassConstructor,
+  SensorClassName,
   TransportFactory,
 } from "./discovery.js";
 export { DepzLink } from "./device/link.js";
@@ -232,6 +240,7 @@ export {
 export type {
   DatasetDeviceMeta,
   DatasetHeader,
+  DatasetPlayerOptions,
   DatasetRecord,
   PlayerState,
 } from "./dataset.js";

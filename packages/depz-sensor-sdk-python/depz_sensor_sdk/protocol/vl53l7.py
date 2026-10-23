@@ -12,6 +12,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import check_uint, checked_pack
+
 
 class Vl53l7Cmd(IntEnum):
     PIN_CTRL = 0x34
@@ -51,12 +53,33 @@ INFO_SIZE = 20
 I2C_SPEED_STEPS_KHZ = (100, 200, 400, 500, 600, 700, 800, 900, 1000)
 
 
+_REG_SPACE = 0x10000  # a bridge transfer never runs past register 0xFFFF
+
+
+def pack_read_reg(addr: int, length: int) -> bytes:
+    """VL53_READ_REG payload `addr u16, len u16` with the L5/L7 limits
+    (contract 11 §2): `len` 1..1536 and `addr + len <= 0x10000`, else ValueError."""
+    payload = checked_pack("<HH", addr=addr, length=length)
+    if not 1 <= length <= READ_MAX_LEN or addr + length > _REG_SPACE:
+        raise ValueError(f"READ_REG length must be 1..{READ_MAX_LEN} and addr+length <= 0x10000")
+    return payload
+
+
+def pack_write_reg(addr: int, data: bytes) -> bytes:
+    """VL53_WRITE_REG payload `addr u16, data[N]` with the L5/L7 limits
+    (contract 11 §2): N 1..2048 and `addr + N <= 0x10000`, else ValueError."""
+    check_uint("addr", addr, 16)
+    if not 1 <= len(data) <= WRITE_MAX_LEN or addr + len(data) > _REG_SPACE:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX_LEN} bytes and addr+N <= 0x10000")
+    return struct.pack("<H", addr) + bytes(data)
+
+
 def pack_pin_ctrl(action: int) -> bytes:
-    return struct.pack("<B", action)
+    return checked_pack("<B", action=action)
 
 
 def pack_set_i2c_speed(khz: int) -> bytes:
-    return struct.pack("<H", khz)
+    return checked_pack("<H", khz=khz)
 
 
 @dataclass(frozen=True)

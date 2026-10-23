@@ -19,9 +19,9 @@ import java.util.regex.Pattern;
  * pair is a refusal, never a fallback. The model id is a cross-check only:
  * L1CX/L1CB share {@code 0xEACC}, L4CD/L4CX share {@code 0xEBAA}.
  *
- * <p>Java carries no live driver (as for every other sensor); each pair is
- * described by the bridge parameters its driver hands the firmware
- * ({@link Bridge}).
+ * <p>Each pair is described by the bridge parameters its driver hands the
+ * firmware ({@link Bridge}); the drivers themselves are {@link Vl53lxDrivers},
+ * the live device {@code ai.depz.sensor.devices.Vl53lxDevice}.
  */
 public final class Vl53lxProducts {
     private Vl53lxProducts() {}

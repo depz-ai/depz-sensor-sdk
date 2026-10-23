@@ -93,14 +93,22 @@ export class CnhConfig {
    * subSample: bins of the device histogram summed per CNH bin.
    */
   initConfig(startBin: number, numBins: number, subSample: number): void {
+    // refBinOffset = startBin·2048 is an i32 field (contract 07 §3: refused, never wrapped)
+    if (!Number.isInteger(startBin) || startBin < -1048576 || startBin > 1048575) {
+      throw new CnhConfigError(`startBin ${startBin} out of range -1048576..1048575`);
+    }
     this.refBinOffset = startBin * 2048;
     this.detectionThreshold = 0;
     this.extraNoiseSigma = 0;
     this.nullDenClipValue = 0;
     this.memUpdateMode = 0;
     this.memUpdateChoice = 0;
-    this.featureLength = numBins & 0xff;
-    this.sumSpan = subSample & 0xff;
+    // u8 fields: refused when out of range, never masked (contract 07 §3)
+    for (const [name, v] of [["numBins", numBins], ["subSample", subSample]] as const) {
+      if (!Number.isInteger(v) || v < 0 || v > 0xff) throw new CnhConfigError(`${name} ${v} out of range 0..255`);
+    }
+    this.featureLength = numBins;
+    this.sumSpan = subSample;
     this.nbOfTemporalAccumulations = 1;
     this.minNbForGlobalDetection = 0;
     this.globalIndicatorFormat1 = 0;
@@ -130,6 +138,13 @@ export class CnhConfig {
     cols: number,
     rows: number,
   ): void {
+    if (resolution !== 16 && resolution !== 64) throw new CnhConfigError(`resolution ${resolution}: 16 or 64`);
+    for (const [name, v, min] of [
+      ["startX", startX, 0], ["startY", startY, 0], ["mergeX", mergeX, 1],
+      ["mergeY", mergeY, 1], ["cols", cols, 1], ["rows", rows, 1],
+    ] as const) {
+      if (!Number.isInteger(v) || v < min) throw new CnhConfigError(`agg map ${name} ${v} must be an integer >= ${min}`);
+    }
     this.mapId = new Array<number>(MI_MAP_ID_LENGTH).fill(-1);
     const zoneRes = resolution === 16 ? 4 : 8;
     if (startX + cols * mergeX > zoneRes || startY + rows * mergeY > zoneRes) {

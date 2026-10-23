@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using Depz.Sensor.Protocol;
 using Depz.Sensor.Tmf8829;
@@ -18,10 +17,10 @@ public class Tmf8829VectorTests
 {
     private static readonly JsonElement Root = Vectors.Load("tmf8829.json");
 
-    private static string Sha256(ReadOnlySpan<byte> data) => Vectors.ToHex(SHA256.HashData(data));
+    private static string Sha256(ReadOnlySpan<byte> data) => VectorShapes.Sha256(data);
 
     /// <summary>Same key set, and each value equal to the JSON scalar / list / null.</summary>
-    private static void AssertFields(string name, JsonElement expect, IReadOnlyDictionary<string, object?> got)
+    internal static void AssertFields(string name, JsonElement expect, IReadOnlyDictionary<string, object?> got)
     {
         var expectedKeys = expect.EnumerateObject().Select(p => p.Name).OrderBy(k => k, StringComparer.Ordinal).ToArray();
         var gotKeys = got.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray();
@@ -57,20 +56,7 @@ public class Tmf8829VectorTests
         }
     }
 
-    private static long[]? Flat<T>(T[]? a) where T : struct =>
-        a?.Select(x => Convert.ToInt64(x)).ToArray();
-
-    private static Dictionary<string, object?> Arrays(Tmf8829PixelResults r) => new()
-    {
-        ["peaks"] = r.Peaks,
-        ["rows"] = r.Rows,
-        ["cols"] = r.Cols,
-        ["distance"] = Flat(r.Distance),
-        ["snr"] = Flat(r.Snr),
-        ["signal"] = Flat(r.Signal),
-        ["noise"] = Flat(r.Noise),
-        ["xtalk"] = Flat(r.Xtalk),
-    };
+    private static Dictionary<string, object?> Arrays(Tmf8829PixelResults r) => VectorShapes.Tmf8829Arrays(r);
 
     private static int Int(JsonElement c, string key) => c.GetProperty(key).GetInt32();
 
@@ -91,6 +77,7 @@ public class Tmf8829VectorTests
             string expected = c.GetProperty("payload").GetString()!;
             Assert.True(expected == Vectors.ToHex(payload), $"{name}: expected {expected} got {Vectors.ToHex(payload)}");
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(13, n);
         Assert.Equal(0x32, (int)Tmf8829Cmd.ReadReg);
@@ -119,6 +106,7 @@ public class Tmf8829VectorTests
             };
             Assert.ThrowsAny<ArgumentException>(act);
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(7, n);
     }
@@ -131,42 +119,10 @@ public class Tmf8829VectorTests
         {
             string name = c.GetProperty("name").GetString()!;
             byte[] payload = Vectors.Hex(c.GetProperty("payload").GetString()!);
-            Dictionary<string, object?> got;
-            switch ((Tmf8829Rpt)Int(c, "report"))
-            {
-                case Tmf8829Rpt.RegData:
-                    var r = Tmf8829RegData.Unpack(payload);
-                    got = new() { ["timestamp_us"] = r.TimestampUs, ["data"] = Vectors.ToHex(r.Data) };
-                    break;
-                case Tmf8829Rpt.Info:
-                    var i = Tmf8829Info.Unpack(payload);
-                    got = new()
-                    {
-                        ["int_edges"] = i.IntEdges, ["frames"] = i.Frames, ["frames_aborted"] = i.FramesAborted,
-                        ["frame_errors"] = i.FrameErrors, ["spi_timeouts"] = i.SpiTimeouts, ["int_level"] = i.IntLevel,
-                        ["streaming"] = i.Streaming, ["int_mask"] = i.IntMask, ["last_int_status"] = i.LastIntStatus,
-                        ["last_fifo_status"] = i.LastFifoStatus,
-                    };
-                    break;
-                case Tmf8829Rpt.Frame:
-                    var f = Tmf8829FrameChunk.Unpack(payload);
-                    got = new()
-                    {
-                        ["timestamp_us"] = f.TimestampUs, ["full_size"] = f.FullSize, ["offset"] = f.Offset,
-                        ["frame_seq"] = f.FrameSeq, ["edge_us"] = f.EdgeUs, ["data"] = Vectors.ToHex(f.Data),
-                    };
-                    break;
-                default:
-                    var e = Tmf8829Event.Unpack(payload);
-                    got = new()
-                    {
-                        ["timestamp_us"] = e.TimestampUs, ["int_status"] = e.IntStatus, ["code"] = e.Code,
-                        ["frame_id"] = e.FrameId, ["fifo_status"] = e.FifoStatus,
-                    };
-                    break;
-            }
+            var got = VectorShapes.Tmf8829Decode(Int(c, "report"), payload);
             AssertFields(name, c.GetProperty("expect"), got);
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(6, n);
         Assert.Throws<ArgumentException>(() => Tmf8829Info.Unpack(new byte[Tmf8829Wire.InfoSize - 1]));
@@ -190,11 +146,7 @@ public class Tmf8829VectorTests
                 if (f is null)
                     continue;
                 Assert.True(done < frames.Length, $"{name}: more frames than expected");
-                AssertFields($"{name}#{done}", frames[done], new Dictionary<string, object?>
-                {
-                    ["frame_seq"] = f.FrameSeq, ["timestamp_us"] = f.TimestampUs, ["edge_us"] = f.EdgeUs,
-                    ["size"] = f.Data.Length, ["sha256"] = Sha256(f.Data),
-                });
+                AssertFields($"{name}#{done}", frames[done], VectorShapes.Tmf8829Done(f));
                 done++;
             }
             Assert.True(done == frames.Length, $"{name}: {done} frames, expected {frames.Length}");
@@ -202,6 +154,7 @@ public class Tmf8829VectorTests
             Assert.True(expect.GetProperty("discarded").GetInt32() == r.Discarded, $"{name}: discarded");
             Assert.True(expect.GetProperty("seq_gaps").GetInt32() == r.SeqGaps, $"{name}: seq_gaps");
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(7, n);
     }
@@ -215,17 +168,7 @@ public class Tmf8829VectorTests
             string name = c.GetProperty("name").GetString()!;
             byte[] raw = Vectors.Hex(c.GetProperty("raw").GetString()!);
             var info = Tmf8829Frames.ParseFrame(raw);
-            AssertFields(name, c.GetProperty("header"), new Dictionary<string, object?>
-            {
-                ["fifo_status"] = info.FifoStatus, ["systick"] = info.Systick, ["id"] = info.Id,
-                ["kind"] = info.Kind, ["fp_mode"] = info.FpMode, ["layout"] = info.Layout,
-                ["payload"] = info.Payload, ["f_number"] = info.FNumber,
-                ["temperature"] = info.Temperature.Select(x => (long)x).ToArray(), ["bdv"] = info.Bdv,
-                ["ref_pos"] = info.RefPos.Select(x => (long)x).ToArray(),
-                ["t0_integration"] = info.T0Integration, ["t1_integration"] = info.T1Integration,
-                ["frame_status"] = info.FrameStatus, ["reserved"] = info.Reserved, ["eof"] = info.Eof,
-                ["size"] = info.Size,
-            });
+            AssertFields(name, c.GetProperty("header"), VectorShapes.Tmf8829Header(info));
             if (info.Kind != Tmf8829Frames.FidRefSpad)
                 Assert.True(Tmf8829Frames.FrameSize(raw) == raw.Length, $"{name}: full_size from the header");
             var problems = c.GetProperty("problems").EnumerateArray().Select(x => x.GetString()!).ToArray();
@@ -236,6 +179,7 @@ public class Tmf8829VectorTests
                 Assert.True(c.GetProperty("data_sha256").GetString() == Sha256(raw.AsSpan(21, raw.Length - 33)),
                     $"{name}: data sha256");
             n++;
+            Vectors.Seen(c);
         }
         Assert.Equal(18, n);
     }
@@ -259,23 +203,13 @@ public class Tmf8829VectorTests
                 if (m is null)
                     continue;
                 Assert.True(k < expect.Length, $"{name}: more measurements than expected");
-                var got = new Dictionary<string, object?>
-                {
-                    ["timestamp_us"] = m.TimestampUs, ["flags"] = m.Flags, ["fp_mode"] = m.FpMode,
-                    ["f_number"] = m.FNumber,
-                    ["frame_times_us"] = m.Times.Select(t => t.TimestampUs).ToArray(),
-                    ["t1_len_us"] = m.Times.Select(t => (long)t.T1LenUs).ToArray(),
-                    ["ratio_q16"] = b.Clock.RatioQ16,
-                    ["n_histograms"] = m.Histograms.Count, ["n_ref_frames"] = m.RefFrames.Count,
-                    ["n_problems"] = m.Problems.Count, ["distance_in_mm"] = m.Frames[^1].DistanceInMm,
-                };
-                foreach (var (key, value) in Arrays(m.Results))
-                    got[key] = value;
+                var got = VectorShapes.Tmf8829Meas(m, b);
                 AssertFields($"{name}#{k}", expect[k], got);
                 k++;
             }
             Assert.True(k == expect.Length, $"{name}: {k} measurements, expected {expect.Length}");
             n++;
+            Vectors.Seen(s);
         }
         Assert.Equal(9, n);
     }
@@ -284,6 +218,15 @@ public class Tmf8829VectorTests
     public void ConfigFields_GetSet()
     {
         var cfg = Root.GetProperty("config");
+        // The field table itself: name -> [register offset, shift, width].
+        var fields = cfg.GetProperty("fields").EnumerateObject().ToArray();
+        Assert.Equal(fields.Length, Tmf8829Config.CfgFields.Count);
+        foreach (var f in fields)
+        {
+            var (reg, shift, width) = Tmf8829Config.CfgFields[f.Name];
+            Assert.True(f.Value.EnumerateArray().Select(x => x.GetInt32()).SequenceEqual(new[] { reg, shift, width }),
+                $"fields.{f.Name}: got [{reg},{shift},{width}]");
+        }
         byte[] page = Vectors.Hex(cfg.GetProperty("page").GetString()!);
         Assert.Equal(Tmf8829Config.CfgSize, page.Length);
         foreach (var p in cfg.GetProperty("get").EnumerateObject())
@@ -307,6 +250,7 @@ public class Tmf8829VectorTests
         Assert.True(errors > 0);
         Assert.Equal(10, Tmf8829Config.Presets.Count);
         Assert.True(Tmf8829Config.Presets.Keys.OrderBy(x => x).SequenceEqual(Tmf8829Config.PresetKiloIterations.Keys.OrderBy(x => x)));
+        Vectors.Seen("tmf8829/config");
     }
 
     [Fact]
@@ -320,6 +264,7 @@ public class Tmf8829VectorTests
         Assert.Equal(fw.GetProperty("words").GetInt32(), img.Length / 4);
         Assert.Equal(fw.GetProperty("sha256").GetString(), Sha256(img));
         Assert.Contains("MIT License", Tmf8829Firmware.License());
+        Vectors.Seen("tmf8829/firmware");
     }
 
     [Fact]
@@ -366,7 +311,54 @@ public class Tmf8829FrameTimeVectorTests
                 Assert.True(got == want, $"{scenario} f_number {Get("f_number")}: got {got}, expected {want}");
                 checkedFrames++;
             }
+            Vectors.Seen(s);
         }
         Assert.Equal(970, checkedFrames);
+    }
+
+    /// <summary>The board's own capture, replayed raw: each <c>scenario</c> line starts a stream.</summary>
+    [Fact]
+    public void FrameTime_Recording_BitExact()
+    {
+        Tmf8829SensorClock? clock = null;
+        Tmf8829CaptureTimer? timer = null;
+        int checkedFrames = 0;
+        foreach (string line in File.ReadAllLines(Vectors.RecordingPath("tmf8829_frame_time.jsonl")))
+        {
+            if (line.Length == 0)
+                continue;
+            using var doc = JsonDocument.Parse(line);
+            var v = doc.RootElement;
+            if (v.TryGetProperty("scenario", out _))
+            {
+                clock = new Tmf8829SensorClock();
+                timer = new Tmf8829CaptureTimer(clock);
+                continue;
+            }
+            Assert.NotNull(clock);
+            long Get(string name) => v.GetProperty(name).GetInt64();
+            int fid = (int)Get("id");
+            long ts = Get("ts");
+            uint tick = (uint)Get("systick");
+            int kind = fid & 0xF0;
+            if (kind == 0x30)
+                continue;
+            int flags = clock!.Add(ts, tick);
+            if (kind == 0x20)
+            {
+                timer!.Histograms();
+                continue;
+            }
+            var t = timer!.Results(fid & 0x0F, tick, (uint)Get("t0"), (uint)Get("t1"), ts, Get("edge_us"), flags);
+            var e = v.GetProperty("exp");
+            Assert.Equal(4, e.EnumerateObject().Count());
+            var got = (t.TimestampUs, (long)t.T1LenUs, (long)t.Flags, (long)clock.RatioQ16);
+            var want = (e.GetProperty("timestamp_us").GetInt64(), e.GetProperty("t1_len_us").GetInt64(),
+                e.GetProperty("flags").GetInt64(), e.GetProperty("ratio_q16").GetInt64());
+            Assert.True(got == want, $"f_number {Get("f_number")}: got {got}, expected {want}");
+            checkedFrames++;
+        }
+        Assert.Equal(970, checkedFrames);
+        Vectors.Seen("recordings/tmf8829_frame_time.jsonl");
     }
 }

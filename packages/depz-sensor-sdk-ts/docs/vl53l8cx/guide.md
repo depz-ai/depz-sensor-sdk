@@ -79,6 +79,10 @@ const unsub = dev.onFrame((f) => queue.push(f));
 Each `Vl53l8Frame` exposes typed per-zone arrays (`distanceMm`, `targetStatus`,
 `signalPerSpad`, `ambientPerSpad`, `rangeSigmaMm`, `reflectance`,
 `nbTargetDetected`, `nbSpadsEnabled`), `siliconTempDegc`, and `motion`.
+Values come in real units, as ST's `GetRangingData`: `distanceMm` integer mm
+(a negative distance is clamped to 0), `signalPerSpad` / `ambientPerSpad`
+kcps/SPAD (`Float64Array`), `rangeSigmaMm` mm, `reflectance` % (`Float64Array`;
+the fraction ST drops is kept).
 
 ## Advanced features
 

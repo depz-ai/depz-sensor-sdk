@@ -89,7 +89,7 @@ export class Vl53l7cx extends Vl53l8cx {
    * and after a run, not during one: each call takes the bus from the stream
    * and can itself cost a frame.
    */
-  getBridgeInfo(): Promise<Vl53l7Info> {
+  async getBridgeInfo(): Promise<Vl53l7Info> {
     return this.request<Vl53l7Info>(Vl53l7Cmd.GetInfo, undefined, {
       matcher: DepzDevice.expectReport(Vl53l7Rpt.Vl53Info, unpackVl53l7Info),
     });

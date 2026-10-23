@@ -1,23 +1,54 @@
 # VL53L0X — user guide
 
-Hands-on guide to the 1D-family codecs, product table and block decode
-(`Depz.Sensor.Vl53lx`) for the VL53L0X. For what the sensor is and its
-concepts, read the [introduction](introduction.md); for exact signatures see
-the [API reference](api.md).
-
-This SDK does not drive the sensor: the ST driver (initialisation,
-reference SPADs, profiles, calibration, the PAL status) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
+Hands-on guide to the VL53L0X: the live device
+(`Depz.Sensor.Devices.Vl53l0xDevice`, which runs the PAL (`Vl53l0xUldDriver`) on the host) and the
+codecs, product table and block decode under it (`Depz.Sensor.Vl53lx`). For
+what the sensor is and its concepts, read the [introduction](introduction.md);
+for exact signatures see the [API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
 - [Decode the result block](#decode-the-result-block)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+
+using Vl53lxDevice tof = DepzDevices.OpenVl53lx();   // a Vl53l0xDevice for this board
+tof.Init();                                      // the PAL on the host: reference SPADs, VHV / phase calibration
+tof.Configure(budgetMs: 33, mode: "long-range"); // default / long-range / high-speed / high-accuracy, 20..200 ms
+
+using var frames = tof.Measurements();
+tof.StartRanging();
+Vl53lxMeasurement m = frames.Take(TimeSpan.FromSeconds(1));
+Console.WriteLine($"{m.DistanceMm} mm, {m.StatusText}, sigma {m.SigmaMm} mm, dmax {m.Extra["dmax_mm"]} mm");
+tof.StopRanging();
+```
+
+- One driver kind, `uld` (`Vl53l0xUldDriver`): ST's VL53L0X API 1.0.4 on the
+  host. The PAL range status (0 valid … 5 hardware fail, 255 no update), the
+  sigma estimate and Dmax come from the 12-byte block **and** the state the
+  driver cached at init — which is why a capture decodes fully only through it.
+- Calibration: `CalibrateOffset(targetDistMm)` (a target at 100..400 mm) and
+  `CalibrateXtalk(targetDistMm)`; keep the results and hand them back with
+  `Configure(offsetMm: …, xtalkKcps: …)`. `PerformRefSpadManagement()`
+  re-measures the reference SPADs on a live session.
+- No ROI and no detection thresholds on this die.
+- `Configure` re-initialises the sensor and applies the mode and budget; it
+  and every setting throw `InvalidOperationException` while ranging. Ask
+  `tof.Supports("offset")` (…) before an optional group: a missing one throws
+  `NotSupportedException`.
+- `tof.Driver` is the driver itself; `MeasureOnce()` is one polled range.
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## Which board is it
 
@@ -111,8 +142,8 @@ foreach (ParserEvent ev in parser.Feed(rxBytes))
 | `EffectiveSpadCount88` | effective SPAD count, 8.8 |
 
 The PAL range status, sigma and maximum distance the full drivers report need
-device data cached at init (reference SPADs, calibration), so they are not in
-this SDK. The family's plottable rule (statuses 0, 6, 11) applies to that
+device data cached at init (reference SPADs, calibration): the live device's
+driver (`Vl53l0xUldDriver`) reports them, the block alone cannot. The family's plottable rule (statuses 0, 6, 11) applies to that
 driver status, not to `DeviceRangeStatus`.
 
 ## Reset and bridge diagnostics

@@ -10,6 +10,7 @@ from depz_sensor_sdk.errors import DepzTimeoutError
 from depz_sensor_sdk.transport import Packet
 from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.protocol.vl53l8 import Vl53l8Rpt
+from depz_sensor_sdk.vl53l7 import Vl53l7cx
 from depz_sensor_sdk.vl53l8 import Vl53l8cx
 from depz_sensor_sdk.vl53l8.uld import Vl53l8cxError
 
@@ -48,5 +49,49 @@ def test_parse_error_counted_separately_from_reassembly():
         assert dev.frame_parse_errors == 1
         # a parse failure must NOT be miscounted as a reassembler gap discard
         assert dev.reassembler_discards == 0
+    finally:
+        dev.close()
+
+
+class _IdPlatform:
+    """Answers the is_alive register sequence with fixed silicon ids."""
+
+    def __init__(self, device_id, revision_id, fail=False):
+        self.regs = {0x00: device_id, 0x01: revision_id}
+        self.fail = fail
+
+    def wr_multi(self, addr, data):
+        pass
+
+    def rd_multi(self, addr, size):
+        if self.fail:
+            raise Vl53l8cxError(2, "bridge")
+        return bytes([self.regs[addr]])
+
+
+@pytest.mark.parametrize("cls, device_id, revision_id, alive", [
+    (Vl53l8cx, 0xF0, 0x0C, True),
+    (Vl53l8cx, 0xF0, 0x02, False),   # an L5/L7 answers, but it is not an L8
+    (Vl53l8cx, 0x00, 0x0C, False),
+    (Vl53l7cx, 0x00, 0x02, True),
+    (Vl53l7cx, 0xF0, 0x01, True),
+    (Vl53l7cx, 0x00, 0x01, False),
+    (Vl53l7cx, 0xF0, 0x0C, False),   # an L8 on an L7 board
+])
+def test_is_alive_checks_silicon_ids(cls, device_id, revision_id, alive):
+    a, _b = LoopbackLink.pair()
+    dev = cls(a, timeout=0.2)
+    try:
+        dev._platform = _IdPlatform(device_id, revision_id)
+        assert dev.is_alive() is alive
+    finally:
+        dev.close()
+
+
+def test_is_alive_false_on_bridge_error():
+    dev = _dev()
+    try:
+        dev._platform = _IdPlatform(0xF0, 0x0C, fail=True)
+        assert dev.is_alive() is False
     finally:
         dev.close()

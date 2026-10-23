@@ -9,9 +9,164 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
+- **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
 
 ## SR04
+
+### Sr04Measurement
+
+```rust
+pub struct Sr04Measurement {
+    pub timestamp_us: u64,
+    pub echo_time_us: u16,
+    pub source: &'static str,
+}
+```
+
+One SR04 ranging result. `source` is `"once"` (a host command or a SYNC_IN edge) or `"loop"`;
+[`Sr04Measurement::valid`] is false for the no-echo timeout.
+
+#### Sr04Measurement::valid
+
+```rust
+pub fn valid(&self) -> bool
+```
+
+#### Sr04Measurement::distance_mm
+
+```rust
+pub fn distance_mm(&self) -> Option<f64>
+```
+
+Distance at 343 m/s, or `None` when no echo came back.
+
+#### Sr04Measurement::distance_mm_at
+
+```rust
+pub fn distance_mm_at(&self, air_temp_c: f64) -> Option<f64>
+```
+
+Distance with the speed of sound for `air_temp_c` °C.
+
+### Sr04Device
+
+```rust
+pub struct Sr04Device {
+    dev: DepzDevice,
+    streams: Arc<Streams>,
+}
+```
+
+HC-SR04 ultrasonic ranger (contract 03). Measurements stream to [`Sr04Device::on_measurement`]
+callbacks and [`Sr04Device::measurements`] queues: loop samples and the single shots an AUX
+SYNC_IN edge triggers. Derefs to [`DepzDevice`] for the common commands.
+
+#### Sr04Device::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Sr04Device
+```
+
+Continue the open connection `dev` as an SR04 (or open one on a link with [`DepzDevice::new`]).
+
+#### Sr04Device::device
+
+```rust
+pub fn device(&self) -> &DepzDevice
+```
+
+The underlying connection.
+
+#### Sr04Device::get_sample_period_us
+
+```rust
+pub fn get_sample_period_us(&self) -> Result<u32>
+```
+
+The stored minimum interval between measurement starts, µs (default 50000) — not the
+effective rate, which the echo window throttles (contract 03 §3).
+
+#### Sr04Device::set_sample_period_us
+
+```rust
+pub fn set_sample_period_us(&self, period_us: u32) -> Result<()>
+```
+
+Set the minimum interval between measurement starts, µs (u32 wire field).
+
+#### Sr04Device::get_echo_decay_us
+
+```rust
+pub fn get_echo_decay_us(&self) -> Result<u16>
+```
+
+The post-echo settle pause, µs (4000–65000).
+
+#### Sr04Device::set_echo_decay_us
+
+```rust
+pub fn set_echo_decay_us(&self, decay_us: u16) -> Result<u16>
+```
+
+Set the settle pause. The device clamps it to 4000–65000 µs silently, so this reads it back and
+returns the value in effect.
+
+#### Sr04Device::measure_once
+
+```rust
+pub fn measure_once(&self, timeout: Option<Duration>) -> Result<Sr04Measurement>
+```
+
+One shot. The reply comes when the echo completes (or times out at ~65.5 ms), hence the 1 s
+default. Busy while the loop runs.
+
+#### Sr04Device::start
+
+```rust
+pub fn start(&self) -> Result<()>
+```
+
+Start the measurement loop (idempotent).
+
+#### Sr04Device::stop
+
+```rust
+pub fn stop(&self) -> Result<()>
+```
+
+Stop the measurement loop (idempotent).
+
+#### Sr04Device::on_measurement
+
+```rust
+pub fn on_measurement(&self, callback: impl Fn(&Sr04Measurement) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every measurement (reader thread). Drop the hook to stop.
+
+#### Sr04Device::measurements
+
+```rust
+pub fn measurements(&self, capacity: usize) -> Subscription<Sr04Measurement>
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Sr04Device::get_measurement
+
+```rust
+pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Sr04Measurement>
+```
+
+The next measurement (contract 07 §3); `timeout` `None`: 2 s.
+
+#### Sr04Device::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
+
+The drop counter of each open [`Sr04Device::measurements`] queue.
 
 ### Sr04Cmd
 

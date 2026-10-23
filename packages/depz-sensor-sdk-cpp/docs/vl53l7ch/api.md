@@ -150,6 +150,7 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 ```
 
 VL53_READ_REG payload: addr u16, len u16 (both little-endian; VL53L8 format).
+std::invalid_argument unless len is 1..READ_MAX_LEN and addr + len <= 0x10000.
 
 ### pack_write_reg
 
@@ -158,6 +159,8 @@ bytes pack_write_reg(std::uint16_t addr, byte_span data);
 ```
 
 VL53_WRITE_REG payload: addr u16 then the raw register data (VL53L8 format).
+std::invalid_argument unless data is 1..WRITE_MAX_LEN bytes and
+addr + size <= 0x10000.
 
 ### pack_pin_ctrl
 
@@ -394,7 +397,9 @@ filled by the plugin helpers.
 void init_config(int start_bin, int num_bins, int sub_sample);
 ```
 
-vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. ArgumentError when num_bins or sub_sample is outside 0..255 (u8
+fields, never masked — contract 07 §3).
 
 #### CnhSetup.create_agg_map
 
@@ -403,6 +408,8 @@ void create_agg_map(int resolution, int start_x, int start_y, int merge_x, int m
 ```
 
 vl53lmz_cnh_create_agg_map: zones (resolution 16 | 64) -> aggregates.
+ArgumentError for another resolution, a negative start, merge / cols /
+rows < 1, or a map past the zone grid.
 
 #### CnhSetup.required_memory
 

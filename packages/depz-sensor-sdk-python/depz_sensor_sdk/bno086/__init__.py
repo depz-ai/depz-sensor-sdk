@@ -21,11 +21,14 @@ from ..errors import BusyError, DepzTimeoutError
 from ..protocol.bno086 import BUSY_BACKOFF_S, Bno086Cmd, Bno086Data, Bno086Rpt
 from ..transport import Packet
 from .reports import (
+    FLUSH_COMPLETED,
     Acceleration,
+    FlushCompleted,
     GyroIntegratedRV,
     Gyroscope,
     InputReport,
     Magnetometer,
+    MotionRequest,
     Report,
     RotationVector,
     SensorId,
@@ -46,6 +49,7 @@ from .sh2 import (
     FrsWriteSession,
     ME_CAL_GET,
     METADATA_RECORDS,
+    MotionIntent,
     OscillatorType,
     ProductId,
     SensorMetadata,
@@ -54,6 +58,7 @@ from .sh2 import (
     TareAxis,
     TareBasis,
     build_command_request,
+    build_force_flush,
     build_get_feature_request,
     build_product_id_request,
     split_control_cargo,
@@ -61,6 +66,7 @@ from .sh2 import (
     counts_clear_params,
     counts_get_params,
     errors_params,
+    interactive_calibration_params,
     me_calibration_params,
     periodic_dcd_params,
     persist_tare_params,
@@ -79,6 +85,9 @@ __all__ = [
     "Magnetometer",
     "RotationVector",
     "GyroIntegratedRV",
+    "MotionRequest",
+    "MotionIntent",
+    "FlushCompleted",
     "FeatureResponse",
     "FeatureFlag",
     "ExecutableCommand",
@@ -150,6 +159,7 @@ class Bno086(DeviceBase):
         self._reset_event = threading.Event()
         self._advertisement = bytearray()
         self._features: dict[int, FeatureResponse] = {}
+        self._flush_waiters: dict[int, list[threading.Event]] = {}
 
     # ── RX path ──────────────────────────────────────────────────────────────
 
@@ -158,9 +168,10 @@ class Bno086(DeviceBase):
             return False
         data = Bno086Data.unpack(pkt.payload)
         with self._shtp_lock:
-            cargo = self._shtp.feed(data.shtp)
+            cargo = self._shtp.feed(data.shtp, data.timestamp_us)
         if cargo is not None:
-            self._dispatch_cargo(cargo, data.timestamp_us)
+            # The first fragment's capture: 0xFB base deltas refer to it.
+            self._dispatch_cargo(cargo, cargo.capture_us)
         return True
 
     def _dispatch_cargo(self, cargo: ShtpCargo, capture_us: int) -> None:
@@ -194,6 +205,11 @@ class Bno086(DeviceBase):
                 self._emit_report(rep)
 
     def _emit_report(self, rep: Report) -> None:
+        if isinstance(rep, FlushCompleted):
+            with self._control_lock:
+                waiters = list(self._flush_waiters.get(rep.flushed_sensor, ()))
+            for ev in waiters:
+                ev.set()
         for cb, filt in list(self._report_cbs):
             if filt is None or rep.sensor_id in filt:
                 cb(rep)
@@ -564,7 +580,14 @@ class Bno086(DeviceBase):
 
     def set_reorientation(self, x: float, y: float, z: float, w: float) -> None:
         """Set the runtime reorientation quaternion (Q14 on the wire; all
-        zeros clears). No response per SH-2."""
+        zeros clears). No response per SH-2.
+
+        The rotation is applied on the board's side (new = report * r) and is
+        given in the hub's own axes: x and y swapped and z negated relative
+        to the axes of the reports — a rotation about x here turns the
+        reports about y (bench, 2026-10-22, SH-2 3.12.6). The System
+        Orientation record (FRS 0x2D3E) uses the same axes and is read only
+        when the hub starts."""
         self._command(
             Sh2Command.TARE, set_reorientation_params(x, y, z, w), wait_response=False
         )
@@ -614,6 +637,45 @@ class Bno086(DeviceBase):
         self._command(
             Sh2Command.PERIODIC_DCD_CONFIG, periodic_dcd_params(enable), wait_response=False
         )
+
+    # ── interactive calibration (BNO086 only) ────────────────────────────────
+
+    def set_motion_intent(self, intent: int) -> None:
+        """Tell the hub how the device is about to move (Interactive
+        Calibration, command 0x0E, see MotionIntent), so it can refine the
+        gyro zero-rate offset while the device is still. No response per
+        SH-2; a BNO085 ignores it. The hub's answer, if it wants the device to
+        stop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST)."""
+        self._command(
+            Sh2Command.INTERACTIVE_CALIBRATION,
+            interactive_calibration_params(intent),
+            wait_response=False,
+        )
+
+    def enable_motion_request(self, hz: float = 1, **kw) -> FeatureResponse | None:
+        """Enable MotionRequest (0x2B) reports. The hub sends one when its
+        request changes, not at `hz`; it reads the rate back late, so the
+        granted rate is not checked."""
+        kw.setdefault("verify", False)
+        return self.enable(SensorId.MOTION_REQUEST, hz, **kw)
+
+    # ── batching ─────────────────────────────────────────────────────────────
+
+    def flush(self, sensor: int, timeout: float = 1.0) -> None:
+        """Force Sensor Flush (0xF0): have the hub send `sensor`'s batched
+        reports now instead of when its batch interval runs out. Returns once
+        the hub's Flush Completed (0xEF) for `sensor` arrives — every report
+        batched before the call has been emitted by then."""
+        done = threading.Event()
+        with self._control_lock:
+            self._flush_waiters.setdefault(int(sensor), []).append(done)
+        try:
+            self._send_shtp(ShtpChannel.CONTROL, build_force_flush(sensor))
+            if not done.wait(timeout):
+                raise DepzTimeoutError(FLUSH_COMPLETED, timeout)
+        finally:
+            with self._control_lock:
+                self._flush_waiters[int(sensor)].remove(done)
 
     # ── FRS ──────────────────────────────────────────────────────────────────
 

@@ -3,10 +3,10 @@
 The **BNO086** is a CEVA/Hillcrest 9-axis IMU with an on-chip sensor-fusion hub
 (SH-2). It fuses accelerometer, gyroscope and magnetometer into ready-to-use
 orientation, motion and activity outputs. On the DEPZ sensor line the MCU is an
-**SHTP pass-through bridge** — the full SH-2 host stack runs on the host. The C#
-SDK ports the pieces that decode cleanly against golden vectors: **SHTP framing
-and reassembly**, the **SH-2 control encoders**, and the **input-report
-decoders** (`Depz.Sensor.Bno086`).
+**SHTP pass-through bridge** — the full SH-2 host stack runs on the host:
+`Bno086Device`, over **SHTP framing and reassembly**, the **SH-2 control
+encoders and response decoders** and the **input-report decoders**
+(`Depz.Sensor.Bno086`).
 
 ## What it does
 
@@ -55,11 +55,12 @@ things are*, the BNO086 tells you *how the device itself is moving and facing*.
   `RPT_DATA`; `ShtpLayer` reassembles SHTP cargos (continuation-bit fragments),
   and `Sh2Reports` decodes the cargo into typed reports. You think in reports,
   not request/reply.
-- **Raw integers are authoritative; scaling is the caller's.** Each report keeps
-  its wire integers (`XRaw`, `IRaw`, …). Apply the fixed **Q point**
-  (`value = raw / 2^Q`) yourself: accel Q8 (m/s²), gyro Q9 (rad/s), mag Q4 (µT),
-  quaternions Q14, rotation-vector accuracy Q12 (**radians**), gyro-RV angular
-  velocity Q10 (rad/s).
+- **Raw integers are authoritative; the scaled values ride along.** Each report
+  keeps its wire integers (`XRaw`, `IRaw`, …) and scales them by the fixed
+  **Q point** (`value = raw / 2^Q`, `Bno086Q`) in `X`, `I`, `Value`, …: accel Q8
+  (m/s²), gyro Q9 (rad/s), mag Q4 (µT), quaternions Q14, rotation-vector
+  accuracy Q12 (**radians**, `AccuracyRad`), gyro-RV angular velocity Q10
+  (rad/s).
 - **Channels** — SHTP channel 2 is SH-2 control, 3/4 are input reports (non-wake
   / wake), 5 is the dense gyro-integrated RV (`ShtpChannel`). Channel 3/4 cargos
   carry a 0xFB base-timebase reference and a per-report delay (100 µs ticks); the

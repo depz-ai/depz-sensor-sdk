@@ -32,11 +32,9 @@ front of a wall, an edge). For a plain 8×8 depth image the
 
 ## What this SDK offers
 
-The Java SDK has the **codec and decode layer only**: there is **no live
-device class** — nothing here opens a port, downloads the firmware or runs
-the start/stop sequence. That is done today with the Python or TypeScript SDK
-(or the C / C++ SDK); this SDK builds the command payloads and decodes what
-the board sends:
+The live device `ai.depz.sensor.devices.Tmf8829Device` runs the sensor: the
+firmware download, the config page and the start / stop sequence of contract
+14 §4, with the measurements built from the streamed frames. Under it:
 
 - [`Tmf8829`](api.md#tmf8829) (`ai.depz.sensor.protocol`) — the bridge wire
   codecs: `TMF_READ_REG`, `TMF_WRITE_REG`, `TMF_START_STREAM`,

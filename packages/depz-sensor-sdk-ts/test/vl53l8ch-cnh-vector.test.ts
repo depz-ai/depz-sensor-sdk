@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CnhConfig, decode } from "../src/sensors/vl53l8/cnh.js";
+import { seen } from "./golden/vectors.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VECTOR = path.resolve(here, "../../../contracts/vectors/vl53l8_cnh.json");
@@ -35,5 +36,6 @@ describe("vl53l8ch CNH decode (golden vector)", () => {
       expect(got.histRaw).toEqual(exp.aggregates[i].hist_raw);
       expect(got.histScaler).toEqual(exp.aggregates[i].hist_scaler);
     });
+    seen("vl53l8_cnh");
   });
 });

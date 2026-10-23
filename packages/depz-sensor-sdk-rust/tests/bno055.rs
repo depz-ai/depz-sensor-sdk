@@ -4,7 +4,7 @@
 //! profile, axis remap + placements (and the refused non-permutations), the
 //! page-1 sensor configs, and register-window block decode.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::bno055::{
     decode_block, pack_get_info, pack_read_reg, pack_reset, pack_start_stream, pack_stop_stream,
@@ -17,33 +17,8 @@ use depz_sensor_sdk::usb_ids::DEPZ_USB_VID;
 use depz_sensor_sdk::usb_model_hint;
 use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR = packages/depz-sensor-sdk-rust
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn load(name: &str) -> Value {
-    let p = vectors_dir().join(name);
-    let txt =
-        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {}", p.display(), e));
-    serde_json::from_str(&txt).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len().is_multiple_of(2), "odd hex length: {:?}", s);
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{:02x}", x)).collect()
-}
+use common::shapes::{block_fields, info_fields};
+use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, reg_reads, seen};
 
 fn u(v: &Value) -> u64 {
     v.as_u64().unwrap_or_else(|| panic!("not an unsigned int: {}", v))
@@ -88,6 +63,7 @@ fn bno055_encode_vectors() {
             k => panic!("{}: unknown encode kind {:?}", name, k),
         };
         assert_eq!(hex_encode(&got), c["payload"].as_str().unwrap(), "{}", name);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 15);
@@ -106,34 +82,14 @@ fn bno055_decode_vectors() {
         match u(&c["report"]) {
             0x92 => {
                 let i = Bno055Info::unpack(&raw).unwrap();
-                let got = [
-                    ("i2c_addr", i.i2c_addr as u64),
-                    ("chip_id", i.chip_id as u64),
-                    ("acc_id", i.acc_id as u64),
-                    ("mag_id", i.mag_id as u64),
-                    ("gyr_id", i.gyr_id as u64),
-                    ("sw_rev", i.sw_rev as u64),
-                    ("bl_rev", i.bl_rev as u64),
-                    ("initialized", i.initialized as u64),
-                    ("int_level", i.int_level as u64),
-                    ("int_edges", i.int_edges as u64),
-                    ("read_min_us", i.read_min_us as u64),
-                    ("read_max_us", i.read_max_us as u64),
-                    ("read_avg_us", i.read_avg_us as u64),
-                    ("tx_dropped", i.tx_dropped as u64),
-                    ("i2c_errors", i.i2c_errors as u64),
-                    ("slots_skipped", i.slots_skipped as u64),
-                    ("bus_recoveries", i.bus_recoveries as u64),
-                    ("last_i2c_error", i.last_i2c_error as u64),
-                    ("sensor_resets", i.sensor_resets as u64),
-                    ("loop_max_us", i.loop_max_us as u64),
-                ];
+                let got = info_fields(&i);
                 assert_eq!(e.as_object().unwrap().len(), got.len(), "{}", name);
                 for (k, v) in got {
                     assert_eq!(v, u(&e[k]), "{}.{}", name, k);
                 }
                 assert!(i.ids_ok(), "{}", name);
                 assert_eq!(i.sw_rev_text(), "03.11", "{}", name);
+                seen(c);
                 info += 1;
             }
             0x91 => {
@@ -141,6 +97,7 @@ fn bno055_decode_vectors() {
                 assert_eq!(r.cmd as u64, u(&e["cmd"]), "{}", name);
                 assert_eq!(r.timestamp_us, u(&e["timestamp_us"]), "{}", name);
                 assert_eq!(hex_encode(&r.data), e["data"].as_str().unwrap(), "{}", name);
+                seen(c);
                 reg += 1;
             }
             0x93 => {
@@ -149,6 +106,7 @@ fn bno055_decode_vectors() {
                 assert_eq!(s.addr as u64, u(&e["addr"]), "{}", name);
                 assert_eq!(s.len as u64, u(&e["len"]), "{}", name);
                 assert_eq!(hex_encode(&s.data), e["data"].as_str().unwrap(), "{}", name);
+                seen(c);
                 stream += 1;
             }
             r => panic!("{}: unknown report {:#x}", name, r),
@@ -187,6 +145,7 @@ fn bno055_units_vectors() {
             assert_eq!(v, b(&e[k]), "unit_sel {:#x}.{}", value, k);
         }
         assert_eq!(s.pack() as u64, u(&c["repack"]), "unit_sel {:#x} repack", value);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 8);
@@ -217,6 +176,7 @@ fn bno055_calib_stat_vectors() {
         }
         assert_eq!(s.fully_calibrated(), b(&c["fully_calibrated"]), "{:#x}", value);
         assert_eq!(s.pack(), value, "{:#x} repack", value);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 5);
@@ -240,6 +200,7 @@ fn bno055_calibration_profile_vectors() {
         assert_eq!(p.accel_radius as i64, e["accel_radius"].as_i64().unwrap(), "{}", name);
         assert_eq!(p.mag_radius as i64, e["mag_radius"].as_i64().unwrap(), "{}", name);
         assert_eq!(hex_encode(&p.pack()), c["bytes"].as_str().unwrap(), "{} repack", name);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 3);
@@ -273,6 +234,7 @@ fn bno055_axis_remap_vectors() {
         assert_eq!(vec![config as u64, sign as u64], repack, "{} repack", name);
         assert_eq!(AxisRemap::placement(name), Some(a), "{} placement", name);
         assert_eq!(AxisRemap::placement(&name.to_ascii_lowercase()), Some(a), "{}", name);
+        seen(c);
     }
     assert_eq!(AxisRemap::placement("P1"), Some(AxisRemap::default()));
     assert_eq!(AxisRemap::placement("P8"), None);
@@ -291,6 +253,7 @@ fn bno055_axis_remap_invalid_vectors() {
             ..AxisRemap::default()
         };
         assert!(a.pack().is_err(), "{} must be refused", name);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 2);
@@ -351,6 +314,7 @@ fn bno055_sensor_config_vectors() {
     assert_eq!(AccelConfig::default().pack(), 0x0D);
     assert_eq!(GyroConfig::default().pack(), [0x38, 0x00]);
     assert_eq!(MagConfig::default().pack(), 0x0B);
+    seen("bno055/sensor_config");
 }
 
 // ---- blocks ----------------------------------------------------------------
@@ -363,21 +327,14 @@ fn bno055_block_vectors() {
         let name = c["name"].as_str().unwrap();
         let r = decode_block(u(&c["addr"]) as u8, &hex_decode(c["data"].as_str().unwrap()));
         let e = &c["expect"];
-        let got: [(&str, Option<Vec<i64>>); 7] = [
-            ("accel", r.accel.map(|v| i16s(&v))),
-            ("mag", r.mag.map(|v| i16s(&v))),
-            ("gyro", r.gyro.map(|v| i16s(&v))),
-            ("euler", r.euler.map(|v| i16s(&v))),
-            ("quaternion", r.quaternion.map(|v| i16s(&v))),
-            ("linear_accel", r.linear_accel.map(|v| i16s(&v))),
-            ("gravity", r.gravity.map(|v| i16s(&v))),
-        ];
+        let got = block_fields(&r);
         assert_eq!(e.as_object().unwrap().len(), got.len() + 2, "{}", name);
         for (k, v) in got {
             assert_eq!(v, ints(&e[k]), "{}.{}", name, k);
         }
         assert_eq!(r.temperature.map(|t| t as i64), e["temperature"].as_i64(), "{}.temperature", name);
         assert_eq!(r.calib_stat.map(|s| s as u64), e["calib_stat"].as_u64(), "{}.calib_stat", name);
+        seen(c);
         n += 1;
     }
     assert_eq!(n, 7);
@@ -416,4 +373,100 @@ fn bno055_identity() {
         Some(SensorType::Bno086)
     );
     assert_eq!(usb_model_hint(Some(DEPZ_USB_VID), Some(0xEE0A)), Some("bno055"));
+}
+
+// ---- recordings/bno055_*.depzrec -------------------------------------------
+
+/// Every rx report of a live capture through framing + the BNO055 decoders,
+/// vs the `.expected.json` sidecar (no device layer: not a strict tx replay).
+/// Register read-backs are paired with the READ_REG that asked for them.
+fn bno055_recording(stem: &str) {
+    use depz_sensor_sdk::bno055::regs::{REG_CALIB_PROFILE, REG_ST_RESULT, REG_SYS_CLK_STATUS};
+    use depz_sensor_sdk::protocol::common::Cmd;
+
+    let exp = load(&format!("recordings/{}.expected.json", stem));
+    let pkts = recording_packets(&format!("{}.depzrec", stem));
+    let sw = recorded_text(&pkts, Cmd::GetNameActiveSoftware).expect("software name");
+    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(SensorType::Bno055));
+    assert_eq!(sw, exp["software_name"].as_str().unwrap(), "{}", stem);
+    assert_eq!(recorded_text(&pkts, Cmd::GetDeviceName).as_deref(), exp["device_name"].as_str());
+
+    let mut info = None;
+    let mut frames = Vec::new();
+    for p in pkts.iter().filter(|p| p.rx) {
+        match p.cmd {
+            0x92 if info.is_none() => info = Some(Bno055Info::unpack(&p.payload).unwrap()),
+            0x93 => frames.push(StreamData::unpack(&p.payload).unwrap()),
+            _ => {}
+        }
+    }
+    let want_info = &exp["info"];
+    let got_info = info_fields(&info.expect("RPT_BNO_INFO"));
+    assert_eq!(want_info.as_object().unwrap().len(), got_info.len(), "{} info", stem);
+    for (k, v) in got_info {
+        assert_eq!(v, u(&want_info[k]), "{} info.{}", stem, k);
+    }
+
+    // Read-backs: the last read of each (addr, len) is what the getters saw.
+    let mut last = std::collections::HashMap::new();
+    for r in reg_reads(&pkts, false) {
+        let d = RegData::unpack(&r.reply).unwrap();
+        assert_eq!(d.data.len(), r.len as usize, "{} read {:#x}", stem, r.addr);
+        last.insert((r.addr as u8, r.len as usize), d.data);
+    }
+    let prof = CalibrationProfile::unpack(&last[&(REG_CALIB_PROFILE, CALIB_PROFILE_LEN)]).unwrap();
+    let wp = &exp["calibration_profile"];
+    assert_eq!(wp.as_object().unwrap().len(), 5, "{}", stem);
+    assert_eq!(Some(i16s(&prof.accel_offset)), ints(&wp["accel_offset"]), "{}", stem);
+    assert_eq!(Some(i16s(&prof.mag_offset)), ints(&wp["mag_offset"]), "{}", stem);
+    assert_eq!(Some(i16s(&prof.gyro_offset)), ints(&wp["gyro_offset"]), "{}", stem);
+    assert_eq!(prof.accel_radius as i64, wp["accel_radius"].as_i64().unwrap(), "{}", stem);
+    assert_eq!(prof.mag_radius as i64, wp["mag_radius"].as_i64().unwrap(), "{}", stem);
+    // ST_RESULT, then SYS_CLK_STATUS..SYS_ERR.
+    let st = &last[&(REG_ST_RESULT, 1)];
+    let sys = &last[&(REG_SYS_CLK_STATUS, 3)];
+    let ws = &exp["system_status"];
+    assert_eq!(ws.as_object().unwrap().len(), 4, "{}", stem);
+    assert_eq!(
+        [st[0], sys[0], sys[1], sys[2]].map(u64::from).to_vec(),
+        ["self_test", "clk_status", "status", "error"].map(|k| u(&ws[k])).to_vec(),
+        "{} system_status",
+        stem
+    );
+
+    let block: Vec<u64> = exp["block"].as_array().unwrap().iter().map(u).collect();
+    let want = exp["frames"].as_array().unwrap();
+    // The capture may stream past the sidecar; match the first N.
+    assert!(frames.len() >= want.len(), "{}: {} < {} frames", stem, frames.len(), want.len());
+    for (idx, (s, w)) in frames.iter().zip(want).enumerate() {
+        let ctx = format!("{} frame {}", stem, idx);
+        assert_eq!(s.timestamp_us, u(&w["timestamp_us"]), "{}", ctx);
+        assert_eq!(vec![s.addr as u64, s.len as u64], block, "{}", ctx);
+        assert_eq!(s.addr as u64, u(&w["addr"]), "{}", ctx);
+        assert_eq!(hex_encode(&s.data), w["raw"].as_str().unwrap(), "{}", ctx);
+        let r = decode_block(s.addr, &s.data);
+        let d = &w["decoded"];
+        assert_eq!(d.as_object().unwrap().len(), 9, "{}", ctx);
+        for (k, v) in block_fields(&r) {
+            assert_eq!(v, ints(&d[k]), "{}.{}", ctx, k);
+        }
+        assert_eq!(r.temperature.map(|t| t as i64), d["temperature"].as_i64(), "{}", ctx);
+        assert_eq!(r.calib_stat.map(|c| c as u64), d["calib_stat"].as_u64(), "{}", ctx);
+        // Streamed at the requested period on the MCU clock.
+        if idx > 0 {
+            let dt = s.timestamp_us as i64 - frames[idx - 1].timestamp_us as i64;
+            assert!((dt - 1000 * exp["period_ms"].as_i64().unwrap()).abs() < 500, "{} dt {}", ctx, dt);
+        }
+    }
+    seen(&format!("recordings/{}.depzrec", stem));
+}
+
+#[test]
+fn bno055_imu_quat_recording() {
+    bno055_recording("bno055_imu_quat_units_50hz");
+}
+
+#[test]
+fn bno055_ndof_full_recording() {
+    bno055_recording("bno055_ndof_full_100hz");
 }

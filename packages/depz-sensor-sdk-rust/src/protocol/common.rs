@@ -1,7 +1,8 @@
 //! Common command/report IDs and payload codecs (contracts/02_COMMON_COMMANDS.md).
 //!
 //! Codecs return raw integers exactly as on the wire; unit conversions happen in
-//! the device layer.
+//! the device layer. Decoders reject a payload shorter than its fields and
+//! ignore trailing bytes (a newer firmware may append fields; contract 07 §3).
 
 /// Host→device command opcodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,8 +99,8 @@ pub struct StatusReport {
 
 impl StatusReport {
     pub fn unpack(payload: &[u8]) -> Result<StatusReport, CodecError> {
-        if payload.len() != 2 {
-            return Err(CodecError("status report must be 2 bytes"));
+        if payload.len() < 2 {
+            return Err(CodecError("status report needs at least 2 bytes"));
         }
         Ok(StatusReport {
             cmd: payload[0],
@@ -137,8 +138,8 @@ pub struct SyncTimeReport {
 
 impl SyncTimeReport {
     pub fn unpack(payload: &[u8]) -> Result<SyncTimeReport, CodecError> {
-        if payload.len() != 24 {
-            return Err(CodecError("sync-time report must be 24 bytes"));
+        if payload.len() < 24 {
+            return Err(CodecError("sync-time report needs at least 24 bytes"));
         }
         Ok(SyncTimeReport {
             pc_timestamp_us: u64::from_le_bytes(payload[0..8].try_into().unwrap()),
@@ -157,8 +158,8 @@ pub struct TemperatureReport {
 
 impl TemperatureReport {
     pub fn unpack(payload: &[u8]) -> Result<TemperatureReport, CodecError> {
-        if payload.len() != 10 {
-            return Err(CodecError("temperature report must be 10 bytes"));
+        if payload.len() < 10 {
+            return Err(CodecError("temperature report needs at least 10 bytes"));
         }
         Ok(TemperatureReport {
             timestamp_us: u64::from_le_bytes(payload[0..8].try_into().unwrap()),
@@ -180,8 +181,8 @@ pub struct SequenceErrorReport {
 
 impl SequenceErrorReport {
     pub fn unpack(payload: &[u8]) -> Result<SequenceErrorReport, CodecError> {
-        if payload.len() != 2 {
-            return Err(CodecError("sequence-error report must be 2 bytes"));
+        if payload.len() < 2 {
+            return Err(CodecError("sequence-error report needs at least 2 bytes"));
         }
         Ok(SequenceErrorReport {
             expected_seq: payload[0],
@@ -198,14 +199,35 @@ pub struct SyncPinConfig {
     pub polarity: u8,
 }
 
+/// First / last logical AUX sync pin (contract 02 §6).
+pub const SYNC_PIN_MIN: u8 = 1;
+pub const SYNC_PIN_MAX: u8 = 5;
+
 impl SyncPinConfig {
+    /// `SET_SYNC_PIN_CONFIG` payload. Contract 02 §6: pin 1..5, mode a
+    /// [`SyncPinMode`] (0..4), polarity a [`SyncPinPolarity`] (0..1) — anything
+    /// else is refused.
+    pub fn try_pack(&self) -> Result<[u8; 3], CodecError> {
+        if !(SYNC_PIN_MIN..=SYNC_PIN_MAX).contains(&self.pin) {
+            return Err(CodecError("sync pin must be 1..5"));
+        }
+        if self.mode > SyncPinMode::OutBoth as u8 {
+            return Err(CodecError("sync-pin mode is not a SyncPinMode (0..4)"));
+        }
+        if self.polarity > SyncPinPolarity::IdleHigh as u8 {
+            return Err(CodecError("sync-pin polarity is not a SyncPinPolarity (0..1)"));
+        }
+        Ok([self.pin, self.mode, self.polarity])
+    }
+
+    /// [`SyncPinConfig::try_pack`] that panics on an invalid configuration.
     pub fn pack(&self) -> [u8; 3] {
-        [self.pin, self.mode, self.polarity]
+        self.try_pack().unwrap_or_else(|e| panic!("{}", e))
     }
 
     pub fn unpack(payload: &[u8]) -> Result<SyncPinConfig, CodecError> {
-        if payload.len() != 3 {
-            return Err(CodecError("sync-pin config must be 3 bytes"));
+        if payload.len() < 3 {
+            return Err(CodecError("sync-pin config needs at least 3 bytes"));
         }
         Ok(SyncPinConfig {
             pin: payload[0],
@@ -238,11 +260,19 @@ pub fn sync_time_offset_rtt(t1: i64, t2: i64, t3: i64, t4: i64) -> (i64, i64) {
     (offset as i64, rtt as i64)
 }
 
-/// Decode an ASCII device string, dropping trailing NUL/0xFF filler.
+/// Decode an ASCII device string, dropping trailing NUL/0xFF filler
+/// (contract 02 §4.1).
+///
+/// Device strings are ASCII: every byte ≥ 0x80 becomes one U+FFFD (never
+/// decoded as UTF-8 or Latin-1), and a `0x00` before the trailing filler is
+/// kept as a character, not a terminator.
 pub fn strip_device_string(raw: &[u8]) -> String {
     let end = raw
         .iter()
         .rposition(|&b| b != 0x00 && b != 0xFF)
         .map_or(0, |i| i + 1);
-    String::from_utf8_lossy(&raw[..end]).into_owned()
+    raw[..end]
+        .iter()
+        .map(|&b| if b < 0x80 { b as char } else { char::REPLACEMENT_CHARACTER })
+        .collect()
 }

@@ -43,18 +43,17 @@ def cmd_info(args: argparse.Namespace) -> int:
 
 
 def _open_for_streaming(port: str, record_path: str | None):
-    from .device import DeviceBase
-    from .discovery import open_device
+    from .discovery import _enumerate_ports, open_device, open_on_link
     from .transport.record_replay import RecordingLink
     from .transport.serial_link import SerialLink
 
     if record_path is None:
         return open_device(port)
     link = RecordingLink(SerialLink(port), record_path, header_extra={"port": port})
-    dev = DeviceBase(link, timeout=0.2)
-    from .discovery import _identify, _promote
-
-    return _promote(dev, _identify(dev))
+    pi = {p.port: p for p in _enumerate_ports()}.get(port)
+    vid, pid = (pi.vid, pi.pid) if pi is not None else (None, None)
+    # One connection, so the recording holds the probe too (contract 02 §4.4).
+    return open_on_link(link, vid, pid, timeout=0.2)
 
 
 def cmd_monitor(args: argparse.Namespace) -> int:

@@ -299,7 +299,7 @@ type FetchLike = (
   json(): Promise<unknown>;
 }>;
 
-const defaultFetch: FetchLike = (input, init) =>
+const defaultFetch: FetchLike = async (input, init) =>
   (globalThis.fetch as unknown as FetchLike)(input, init);
 
 /**

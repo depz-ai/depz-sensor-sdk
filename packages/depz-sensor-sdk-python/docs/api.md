@@ -10,7 +10,7 @@ Each sensor also has a focused reference with just its own symbols:
 
 ## Contents
 
-- **Discovery**: [`DeviceInfo`](#deviceinfo), [`list_depz_devices`](#list_depz_devices), [`probe_port`](#probe_port), [`open_device`](#open_device)
+- **Discovery**: [`DeviceInfo`](#deviceinfo), [`list_depz_devices`](#list_depz_devices), [`probe_port`](#probe_port), [`open_device`](#open_device), [`open_on_link`](#open_on_link), [`resolve_sensor_class`](#resolve_sensor_class), [`attach_sensor_class`](#attach_sensor_class)
 - **Device core**: [`DeviceBase`](#devicebase), [`TimeSync`](#timesync), [`LinkStats`](#linkstats), [`StreamQueue`](#streamqueue), [`host_now_us`](#host_now_us), [`sync_time_all`](#sync_time_all), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`StreamIterator`](#streamiterator)
 - **SR04**: [`Sr04`](#sr04), [`Sr04Measurement`](#sr04measurement)
 - **VL53L4CD (ToF)**: [`Vl53l4cd`](#vl53l4cd), [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdError`](#vl53l4cderror), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`RANGE_STATUS_NAMES`](#range_status_names), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
@@ -18,14 +18,14 @@ Each sensor also has a focused reference with just its own symbols:
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l5cx`](#vl53l5cx), [`Vl53l7cx`](#vl53l7cx), [`Vl53l7ch`](#vl53l7ch)
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`Vl53lx`](#vl53lx), [`Vl53l0x`](#vl53l0x), [`Vl53l1cx`](#vl53l1cx), [`Vl53l1cb`](#vl53l1cb), [`Vl53l3cx`](#vl53l3cx), [`Vl53l4cx`](#vl53l4cx), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Target`](#target), [`Vl53Error`](#vl53error), [`ProtocolError`](#protocolerror), [`PRODUCTS`](#products), [`DRIVER_KINDS`](#driver_kinds), [`PLOTTABLE_STATUSES`](#plottable_statuses), [`primary_target`](#primary_target), [`plot_distances`](#plot_distances)
 - **TMF8829 (dToF)**: [`Tmf8829`](#tmf8829), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Error`](#tmf8829error), [`Tmf8829InterruptEvent`](#tmf8829interruptevent), [`PixelResults`](#pixelresults), [`FrameInfo`](#frameinfo), [`FrameTime`](#frametime), [`HistogramFrame`](#histogramframe), [`MeasurementBuilder`](#measurementbuilder), [`SensorClock`](#sensorclock), [`CaptureTimer`](#capturetimer), [`PRESETS`](#presets), [`CFG_FIELDS`](#cfg_fields), [`FP_GRID`](#fp_grid), [`FT_NAMES`](#ft_names), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`distance_mm`](#distance_mm), [`flag_names`](#flag_names), [`merge_halves`](#merge_halves), [`parse_frame`](#parse_frame), [`parse_results`](#parse_results), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`firmware_image`](#firmware_image)
-- **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
+- **BNO086 (IMU)**: [`Bno086`](#bno086), [`SensorId`](#sensorid), [`RotationVector`](#rotationvector), [`GyroIntegratedRV`](#gyrointegratedrv), [`Report`](#report), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`MotionRequest`](#motionrequest), [`MotionIntent`](#motionintent), [`FlushCompleted`](#flushcompleted), [`FeatureResponse`](#featureresponse), [`FeatureFlag`](#featureflag), [`ExecutableCommand`](#executablecommand), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`TareAxis`](#tareaxis), [`TareBasis`](#tarebasis), [`Sh2Error`](#sh2error), [`CalibrationConfig`](#calibrationconfig), [`OscillatorType`](#oscillatortype), [`ErrorRecord`](#errorrecord), [`ErrorSource`](#errorsource), [`Counts`](#counts)
 - **BNO055 (IMU)**: [`Bno055`](#bno055), [`Bno055Sample`](#bno055sample), [`OprMode`](#oprmode), [`Units`](#units), [`AxisRemap`](#axisremap), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`SystemStatus`](#systemstatus), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`PLACEMENTS`](#placements), [`SIC_IDENTITY`](#sic_identity), [`I2C_ERROR_NAMES`](#i2c_error_names)
 - **Bootloader / firmware update**: [`BootloaderDevice`](#bootloaderdevice), [`update_firmware`](#update_firmware), [`find_bootloader_port`](#find_bootloader_port)
-- **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord)
+- **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord), [`DatasetPlayer`](#datasetplayer), [`PlayerState`](#playerstate)
 - **Transport**: [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`build_packet`](#build_packet), [`payload_crc_bytes`](#payload_crc_bytes), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`Link`](#link), [`LoopbackLink`](#loopbacklink)
 - **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`Tmf8829Info`](#tmf8829info)
 - **Errors**: [`DepzError`](#depzerror), [`DepzTimeoutError`](#depztimeouterror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`DeviceLostError`](#devicelosterror), [`LinkClosedError`](#linkclosederror), [`NoDepzDeviceError`](#nodepzdeviceerror)
-- **Top level**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`__version__`](#__version__)
+- **Top level**: [`SENSOR_CLASS_NAMES`](#sensor_class_names), [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`DATASET_SCHEMA`](#dataset_schema), [`__version__`](#__version__)
 - **Usb_Ids**: [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint)
 
 ## Discovery
@@ -58,7 +58,8 @@ OS knows the port). Results are ordered by USB iSerial.
 probe_port(port: str, *, timeout: float = 0.2) -> depz_sensor_sdk.discovery.DeviceInfo | None
 ```
 
-Open `port`, ask GET_NAME_ACTIVE_SOFTWARE (+ name/serial), close.
+Open `port`, run the contract 02 §4.4 probe (GET_NAME_ACTIVE_SOFTWARE,
+GET_DEVICE_NAME, GET_SERIAL), close.
 
 Returns None when nothing DEPZ-shaped answers. Note: probing opens the
 port — skip ports owned by other software via the `ports=` argument of
@@ -70,7 +71,7 @@ port — skip ports owned by other software via the `ports=` argument of
 open_device(target: str | int | depz_sensor_sdk.discovery.DeviceInfo | depz_sensor_sdk.transport.link.Link | None = None, *, serial: str | None = None, timeout: float = 0.2)
 ```
 
-Open the right sensor class for `target`.
+Open the right sensor class for `target` (contract 02 §4.3, §4.4).
 
 - ``None`` (default): the DEPZ candidate port with the alphabetically
   smallest USB serial (index 0); with ``serial=`` the candidate whose USB
@@ -79,11 +80,58 @@ Open the right sensor class for `target`.
   (0-based). Out of range → `NoDepzDeviceError`.
 - ``str`` (a port path): open exactly that port; if its USB (vid, pid) is
   not a known DEPZ id, warn but proceed.
-- ``DeviceInfo``: its ``.port``.
-- ``Link``/transport: opened directly (loopback/replay).
+- ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.
+- ``Link``/transport: `open_on_link` (probe and continue on that link).
 
-Bootloader-mode devices raise until the bootloader client lands
-(contract 06).
+On a port the probe runs on a connection of its own (`probe_port`), which
+is closed; the resolved class then opens the port afresh, so host packet
+sequence numbers restart at 0. Bootloader-mode devices raise (use the
+contract 06 client).
+
+### open_on_link
+
+```python
+open_on_link(link: depz_sensor_sdk.transport.link.Link, usb_vid: int | None = None, usb_pid: int | None = None, *, timeout: float = 0.2)
+```
+
+Open a device on an already-open `link` that cannot be reopened (a
+replay or recording link, an adopted transport) — contract 02 §4.4.
+
+Runs the same probe as `probe_port` on that link (GET_NAME_ACTIVE_SOFTWARE,
+GET_DEVICE_NAME, GET_SERIAL), resolves the class with
+`resolve_sensor_class` from the answers and the port's USB (vid, pid) —
+which the caller supplies, a link knows none — and continues as that class
+on the same connection (`attach_sensor_class`); host sequence numbers run
+on from the probe. The returned device owns `link`: on failure it is
+closed. No answer to GET_NAME_ACTIVE_SOFTWARE → `NoDepzDeviceError`;
+a bootloader → `DepzError`.
+
+### resolve_sensor_class
+
+```python
+resolve_sensor_class(software_name: str, device_name: str = '', usb_vid: int | None = None, usb_pid: int | None = None) -> str
+```
+
+The canonical class name for a device's probe answers and its port's
+USB (vid, pid) — contract 02 §4.4, pure. One of `SENSOR_CLASS_NAMES`.
+
+`software_name` is the GET_NAME_ACTIVE_SOFTWARE answer, `device_name` the
+GET_DEVICE_NAME answer ("" when there was none); the USB id is None when
+unknown (a replay, a bridge). Vectors: ``vectors/probe.json``.
+
+### attach_sensor_class
+
+```python
+attach_sensor_class(dev: depz_sensor_sdk.device.DeviceBase, class_name: str)
+```
+
+Continue the open base device `dev` as `class_name` on the same
+connection — no reopen, sequence numbers and reader run on (contract 02
+§4.4). `dev` must be a plain `DeviceBase` (no subclass yet); returns it,
+now an instance of that class. "bootloader" raises `DepzError`.
+
+State first, class swap second: the reader thread may dispatch a report
+between the two statements.
 
 ## Device core
 
@@ -183,6 +231,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### DeviceBase.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### DeviceBase.read_mcu_temperature
 
@@ -568,6 +625,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Sr04.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Sr04.read_mcu_temperature
 
@@ -1016,6 +1082,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l4cd.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l4cd.read_mcu_temperature
 
 ```python
@@ -1284,6 +1359,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 ```python
 is_alive(self) -> bool
 ```
+
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
 
 #### Vl53l8.init
 
@@ -1642,6 +1720,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l8.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l8.read_mcu_temperature
 
 ```python
@@ -1750,6 +1837,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 ```python
 is_alive(self) -> bool
 ```
+
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
 
 #### Vl53l8ch.init
 
@@ -2108,6 +2198,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l8ch.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l8ch.read_mcu_temperature
 
 ```python
@@ -2391,6 +2490,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 ```python
 is_alive(self) -> bool
 ```
+
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
 
 #### Vl53l5cx.get_resolution
 
@@ -2735,6 +2837,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l5cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l5cx.read_mcu_temperature
 
 ```python
@@ -2884,6 +2995,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 ```python
 is_alive(self) -> bool
 ```
+
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
 
 #### Vl53l7cx.get_resolution
 
@@ -3228,6 +3342,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l7cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l7cx.read_mcu_temperature
 
 ```python
@@ -3389,6 +3512,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 ```python
 is_alive(self) -> bool
 ```
+
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
 
 #### Vl53l7ch.get_resolution
 
@@ -3733,6 +3859,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Vl53l7ch.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Vl53l7ch.read_mcu_temperature
 
 ```python
@@ -3867,14 +4002,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53lx.identify
+#### Vl53lx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53lx.notes
 
@@ -3965,7 +4102,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53lx.snap_budget
@@ -4160,6 +4297,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53lx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53lx.close
 
 ```python
@@ -4244,6 +4385,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53lx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53lx.read_mcu_temperature
 
@@ -4369,14 +4519,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l0x.identify
+#### Vl53l0x.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l0x.notes
 
@@ -4467,7 +4619,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l0x.snap_budget
@@ -4662,6 +4814,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l0x.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l0x.close
 
 ```python
@@ -4746,6 +4902,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l0x.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l0x.read_mcu_temperature
 
@@ -4870,14 +5035,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l1cx.identify
+#### Vl53l1cx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l1cx.notes
 
@@ -4968,7 +5135,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l1cx.snap_budget
@@ -5163,6 +5330,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l1cx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l1cx.close
 
 ```python
@@ -5247,6 +5418,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l1cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l1cx.read_mcu_temperature
 
@@ -5371,14 +5551,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l1cb.identify
+#### Vl53l1cb.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l1cb.notes
 
@@ -5469,7 +5651,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l1cb.snap_budget
@@ -5664,6 +5846,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l1cb.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l1cb.close
 
 ```python
@@ -5748,6 +5934,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l1cb.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l1cb.read_mcu_temperature
 
@@ -5872,14 +6067,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l3cx.identify
+#### Vl53l3cx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l3cx.notes
 
@@ -5970,7 +6167,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l3cx.snap_budget
@@ -6165,6 +6362,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l3cx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l3cx.close
 
 ```python
@@ -6249,6 +6450,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l3cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l3cx.read_mcu_temperature
 
@@ -6373,14 +6583,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l4cx.identify
+#### Vl53l4cx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l4cx.notes
 
@@ -6471,7 +6683,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l4cx.snap_budget
@@ -6666,6 +6878,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l4cx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l4cx.close
 
 ```python
@@ -6750,6 +6966,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l4cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l4cx.read_mcu_temperature
 
@@ -7005,6 +7230,7 @@ read_registers(self, addr: int, length: int) -> bytes
 
 Read `length` bytes from `addr` in ≤1024-byte requests; reads that
 reach the FIFO port 0xFF stay there (the sensor does not auto-increment it).
+A reply shorter or longer than asked raises `DepzError`.
 
 #### Tmf8829.read_register
 
@@ -7122,6 +7348,15 @@ measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator
 Blocking iterator over measurements (bounded, drop-oldest).
 Subscribes immediately — call before or after `start()`.
 
+#### Tmf8829.get_measurement
+
+```python
+get_measurement(self, timeout: float = 2.0) -> depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement
+```
+
+Wait for the next measurement. Raises `DepzTimeoutError` after
+`timeout`, `LinkClosedError` as soon as the device is closed.
+
 #### Tmf8829.frames_dropped *(property)*
 
 Frames the bridge dropped (frame_seq gaps) in this stream.
@@ -7131,6 +7366,11 @@ Frames the bridge dropped (frame_seq gaps) in this stream.
 Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
 
 #### Tmf8829.frame_parse_errors *(property)*
+
+#### Tmf8829.clock_ratio_q16 *(property)*
+
+Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal
+8 << 16 = 8 µs per SYSTICK), for diagnostics.
 
 #### Tmf8829.port *(property)*
 
@@ -7210,6 +7450,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Tmf8829.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Tmf8829.read_mcu_temperature
 
@@ -7872,6 +8121,13 @@ set_reorientation(self, x: float, y: float, z: float, w: float) -> None
 Set the runtime reorientation quaternion (Q14 on the wire; all
 zeros clears). No response per SH-2.
 
+The rotation is applied on the board's side (new = report * r) and is
+given in the hub's own axes: x and y swapped and z negated relative
+to the axes of the reports — a rotation about x here turns the
+reports about y (bench, 2026-10-22, SH-2 3.12.6). The System
+Orientation record (FRS 0x2D3E) uses the same axes and is read only
+when the hub starts.
+
 #### Bno086.set_calibration
 
 ```python
@@ -7903,6 +8159,39 @@ configure_periodic_dcd(self, enable: bool) -> None
 ```
 
 Enable/disable the hub's periodic DCD autosave (no response).
+
+#### Bno086.set_motion_intent
+
+```python
+set_motion_intent(self, intent: int) -> None
+```
+
+Tell the hub how the device is about to move (Interactive
+Calibration, command 0x0E, see MotionIntent), so it can refine the
+gyro zero-rate offset while the device is still. No response per
+SH-2; a BNO085 ignores it. The hub's answer, if it wants the device to
+stop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST).
+
+#### Bno086.enable_motion_request
+
+```python
+enable_motion_request(self, hz: float = 1, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+```
+
+Enable MotionRequest (0x2B) reports. The hub sends one when its
+request changes, not at `hz`; it reads the rate back late, so the
+granted rate is not checked.
+
+#### Bno086.flush
+
+```python
+flush(self, sensor: int, timeout: float = 1.0) -> None
+```
+
+Force Sensor Flush (0xF0): have the hub send `sensor`'s batched
+reports now instead of when its batch interval runs out. Returns once
+the hub's Flush Completed (0xEF) for `sensor` arrives — every report
+batched before the call has been emitted by then.
 
 #### Bno086.frs_read
 
@@ -8056,6 +8345,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Bno086.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Bno086.read_mcu_temperature
 
@@ -8340,6 +8638,150 @@ class Magnetometer(sensor_id: int, timestamp_us: int, seq: int, accuracy: int, d
 #### Magnetometer.y *(property)*
 
 #### Magnetometer.z *(property)*
+
+### MotionRequest
+
+```python
+class MotionRequest(sensor_id: int, timestamp_us: int, seq: int, accuracy: int, delay_us: int, intent: int, request: int) -> None
+```
+
+0x2B motion request (BNO086 interactive calibration): the motion
+intent the hub was last told, and what it asks of the device. Sent when
+the request changes, not periodically, whatever the granted rate.
+
+#### MotionRequest.intent_name *(property)*
+
+#### MotionRequest.request_name *(property)*
+
+#### MotionRequest.wants_stillness *(property)*
+
+True when the hub asks the device to stop (the deprecated
+optional request 2 does not count).
+
+### MotionIntent
+
+```python
+class MotionIntent(*values)
+```
+
+P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 —
+what the host knows about the device's motion. UNKNOWN is the hub's
+initial state.
+
+#### MotionIntent.conjugate
+
+```python
+conjugate
+```
+
+Returns self, the complex conjugate of any int.
+
+#### MotionIntent.bit_length
+
+```python
+bit_length(self, /)
+```
+
+Number of bits necessary to represent self in binary.
+
+>>> bin(37)
+'0b100101'
+>>> (37).bit_length()
+6
+
+#### MotionIntent.bit_count
+
+```python
+bit_count(self, /)
+```
+
+Number of ones in the binary representation of the absolute value of self.
+
+Also known as the population count.
+
+>>> bin(13)
+'0b1101'
+>>> (13).bit_count()
+3
+
+#### MotionIntent.to_bytes
+
+```python
+to_bytes(self, /, length=1, byteorder='big', *, signed=False)
+```
+
+Return an array of bytes representing an integer.
+
+length
+  Length of bytes object to use.  An OverflowError is raised if the
+  integer is not representable with the given number of bytes.  Default
+  is length 1.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Determines whether two's complement is used to represent the integer.
+  If signed is False and a negative integer is given, an OverflowError
+  is raised.
+
+#### MotionIntent.from_bytes
+
+```python
+from_bytes(type, /, bytes, byteorder='big', *, signed=False)
+```
+
+Return the integer represented by the given array of bytes.
+
+bytes
+  Holds the array of bytes to convert.  The argument must either
+  support the buffer protocol or be an iterable object producing bytes.
+  Bytes and bytearray are examples of built-in objects that support the
+  buffer protocol.
+byteorder
+  The byte order used to represent the integer.  If byteorder is 'big',
+  the most significant byte is at the beginning of the byte array.  If
+  byteorder is 'little', the most significant byte is at the end of the
+  byte array.  To request the native byte order of the host system, use
+  `sys.byteorder' as the byte order value.  Default is to use 'big'.
+signed
+  Indicates whether two's complement is used to represent the integer.
+
+#### MotionIntent.as_integer_ratio
+
+```python
+as_integer_ratio(self, /)
+```
+
+Return a pair of integers, whose ratio is equal to the original int.
+
+The ratio is in lowest terms and has a positive denominator.
+
+>>> (10).as_integer_ratio()
+(10, 1)
+>>> (-10).as_integer_ratio()
+(-10, 1)
+>>> (0).as_integer_ratio()
+(0, 1)
+
+#### MotionIntent.is_integer
+
+```python
+is_integer(self, /)
+```
+
+Returns True. Exists for duck type compatibility with float.is_integer.
+
+### FlushCompleted
+
+```python
+class FlushCompleted(sensor_id: int, timestamp_us: int, flushed_sensor: int) -> None
+```
+
+0xEF Flush Completed: every batched report of `flushed_sensor` as of
+the matching Force Sensor Flush has been sent. `sensor_id` is 0xEF.
 
 ### FeatureResponse
 
@@ -9664,6 +10106,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Bno055.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Bno055.read_mcu_temperature
 
 ```python
@@ -10538,6 +10989,16 @@ Read a `.depzdata` file; iterate records merged by host time.
 
 #### DatasetReader.devices *(property)*
 
+#### DatasetReader.records *(property)*
+
+Every record, merged by host time (the order of iteration). Loaded
+on first access and cached — the whole file is held in memory.
+
+#### DatasetReader.duration_us *(property)*
+
+Host-time span from the first record to the last (0 when the
+dataset has fewer than two records).
+
 #### DatasetReader.play
 
 ```python
@@ -10545,13 +11006,700 @@ play(self, callback: Callable[[depz_sensor_sdk.dataset.DatasetRecord], NoneType]
 ```
 
 Deliver records paced by their timestamps (speed=2.0 → twice as
-fast; speed=0 → as fast as possible).
+fast; speed=0 → as fast as possible), blocking until the end or
+`stop`. For pause / seek / speed changes use `DatasetPlayer`.
 
 ### DatasetRecord
 
 ```python
 class DatasetRecord(device_id: str, t_host_us: int, kind: str, value: dict[str, typing.Any]) -> None
 ```
+
+### DatasetPlayer
+
+```python
+class DatasetPlayer(reader: 'DatasetReader | str | Path', *, speed: float = 1.0, clock: Callable[[], float] = <built-in function monotonic>, threaded: bool = True)
+```
+
+Timeline player over a dataset: paced delivery with play / pause /
+seek / speed — the engine behind a viewer's playback mode
+(contract 09 §Player; the TS SDK's `DatasetPlayer`).
+
+Usage::
+
+    player = DatasetPlayer(DatasetReader("run.depzdata"), speed=2.0)
+    player.on_record(lambda r: print(r.device_id, r.kind, r.t_host_us))
+    player.play()
+    player.wait()            # until done (or paused)
+
+Timing: playback runs on a media clock anchored to the host clock.
+Record ``i`` is due at ``anchor_wall + (t_i - anchor_t) / speed``; the
+anchor is (now, t of the last delivered record — or of the first record
+when none was) at play / resume / seek, so the first record goes out at
+once and every later one after its gap to the previous one. Pacing is
+against the clock, not cumulative: a slow consumer gets overdue records
+back to back and playback does not drift. ``speed=0`` delivers as fast as
+possible.
+
+Threads: by default records and the ``done`` state are delivered on a
+player thread (started on the first `play`); state changes made by a
+call (`play`, `pause`, `seek_us`) are reported on the calling thread
+before it returns. Callbacks run under the player's lock, so they see a
+consistent player, may call its methods, and once `pause` returns no
+record callback is running or will start. Like device stream callbacks
+(contract 07) they must not block — never wait in one for another thread
+that uses this player.
+
+``threaded=False`` starts no thread: the owner calls `tick` from its own
+loop (a GUI timer, or a test with a fake ``clock``).
+
+#### DatasetPlayer.state *(property)*
+
+#### DatasetPlayer.duration_us *(property)*
+
+Span of the timeline: last record's `t` minus the first's.
+
+#### DatasetPlayer.position_us *(property)*
+
+Current position, µs from the first record: the `t` of the last
+delivered record (after a seek: of the record just before the
+target). 0 before anything was delivered.
+
+#### DatasetPlayer.speed *(property)*
+
+#### DatasetPlayer.on_record
+
+```python
+on_record(self, cb: Callable[[depz_sensor_sdk.dataset.DatasetRecord], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to delivered records. Returns an unsubscribe function
+(idempotent).
+
+#### DatasetPlayer.on_state
+
+```python
+on_state(self, cb: Callable[[depz_sensor_sdk.dataset.PlayerState], NoneType]) -> Callable[[], NoneType]
+```
+
+Subscribe to state changes (called with the new state on every
+transition). Returns an unsubscribe function (idempotent).
+
+#### DatasetPlayer.play
+
+```python
+play(self) -> None
+```
+
+Start, or resume after `pause`. No-op while playing. From `done`
+(or after a seek past the end) playback restarts from the first
+record. An empty dataset goes straight to `done`.
+
+#### DatasetPlayer.pause
+
+```python
+pause(self) -> None
+```
+
+Stop delivering; `play` resumes from the next record, which then
+waits its full gap again. No-op unless playing.
+
+#### DatasetPlayer.seek_us
+
+```python
+seek_us(self, offset_us: float) -> None
+```
+
+Move to `offset_us` µs from the first record: the next record
+delivered is the first one with ``t >= t_first + offset_us`` (a
+negative offset means the start). Records between the old and the
+new position are skipped, not delivered. The state does not change,
+except that a seek past the end while playing ends playback
+(`done`); while playing, delivery continues from the new position.
+
+#### DatasetPlayer.tick
+
+```python
+tick(self) -> float | None
+```
+
+Deliver every record that is due now (on the calling thread).
+Returns the seconds until the next one is due, or None when not
+playing. For ``threaded=False``; harmless with a player thread.
+
+#### DatasetPlayer.wait
+
+```python
+wait(self, timeout: float | None = None) -> bool
+```
+
+Block until the player is not playing (done, or paused by someone
+else). True if so, False on timeout. Needs the player thread.
+
+#### DatasetPlayer.close
+
+```python
+close(self) -> None
+```
+
+Stop playback and the player thread. Idempotent.
+
+### PlayerState
+
+```python
+class PlayerState(*values)
+```
+
+`DatasetPlayer` state (contract 09 §Player). A `str` enum, so
+`player.state == "playing"` works too.
+
+#### PlayerState.encode
+
+```python
+encode(self, /, encoding='utf-8', errors='strict')
+```
+
+Encode the string using the codec registered for encoding.
+
+encoding
+  The encoding in which to encode the string.
+errors
+  The error handling scheme to use for encoding errors.
+  The default is 'strict' meaning that encoding errors raise a
+  UnicodeEncodeError.  Other possible values are 'ignore', 'replace' and
+  'xmlcharrefreplace' as well as any other name registered with
+  codecs.register_error that can handle UnicodeEncodeErrors.
+
+#### PlayerState.replace
+
+```python
+replace(self, old, new, count=-1, /)
+```
+
+Return a copy with all occurrences of substring old replaced by new.
+
+  count
+    Maximum number of occurrences to replace.
+    -1 (the default value) means replace all occurrences.
+
+If the optional argument count is given, only the first count occurrences are
+replaced.
+
+#### PlayerState.split
+
+```python
+split(self, /, sep=None, maxsplit=-1)
+```
+
+Return a list of the substrings in the string, using sep as the separator string.
+
+  sep
+    The separator used to split the string.
+
+    When set to None (the default value), will split on any whitespace
+    character (including \n \r \t \f and spaces) and will discard
+    empty strings from the result.
+  maxsplit
+    Maximum number of splits.
+    -1 (the default value) means no limit.
+
+Splitting starts at the front of the string and works to the end.
+
+Note, str.split() is mainly useful for data that has been intentionally
+delimited.  With natural text that includes punctuation, consider using
+the regular expression module.
+
+#### PlayerState.rsplit
+
+```python
+rsplit(self, /, sep=None, maxsplit=-1)
+```
+
+Return a list of the substrings in the string, using sep as the separator string.
+
+  sep
+    The separator used to split the string.
+
+    When set to None (the default value), will split on any whitespace
+    character (including \n \r \t \f and spaces) and will discard
+    empty strings from the result.
+  maxsplit
+    Maximum number of splits.
+    -1 (the default value) means no limit.
+
+Splitting starts at the end of the string and works to the front.
+
+#### PlayerState.join
+
+```python
+join(self, iterable, /)
+```
+
+Concatenate any number of strings.
+
+The string whose method is called is inserted in between each given string.
+The result is returned as a new string.
+
+Example: '.'.join(['ab', 'pq', 'rs']) -> 'ab.pq.rs'
+
+#### PlayerState.capitalize
+
+```python
+capitalize(self, /)
+```
+
+Return a capitalized version of the string.
+
+More specifically, make the first character have upper case and the rest lower
+case.
+
+#### PlayerState.casefold
+
+```python
+casefold(self, /)
+```
+
+Return a version of the string suitable for caseless comparisons.
+
+#### PlayerState.title
+
+```python
+title(self, /)
+```
+
+Return a version of the string where each word is titlecased.
+
+More specifically, words start with uppercased characters and all remaining
+cased characters have lower case.
+
+#### PlayerState.center
+
+```python
+center(self, width, fillchar=' ', /)
+```
+
+Return a centered string of length width.
+
+Padding is done using the specified fill character (default is a space).
+
+#### PlayerState.count
+
+```python
+count
+```
+
+Return the number of non-overlapping occurrences of substring sub in
+string S[start:end].  Optional arguments start and end are
+interpreted as in slice notation.
+
+#### PlayerState.expandtabs
+
+```python
+expandtabs(self, /, tabsize=8)
+```
+
+Return a copy where all tab characters are expanded using spaces.
+
+If tabsize is not given, a tab size of 8 characters is assumed.
+
+#### PlayerState.find
+
+```python
+find
+```
+
+Return the lowest index in S where substring sub is found,
+such that sub is contained within S[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Return -1 on failure.
+
+#### PlayerState.partition
+
+```python
+partition(self, sep, /)
+```
+
+Partition the string into three parts using the given separator.
+
+This will search for the separator in the string.  If the separator is found,
+returns a 3-tuple containing the part before the separator, the separator
+itself, and the part after it.
+
+If the separator is not found, returns a 3-tuple containing the original string
+and two empty strings.
+
+#### PlayerState.index
+
+```python
+index
+```
+
+Return the lowest index in S where substring sub is found,
+such that sub is contained within S[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Raises ValueError when the substring is not found.
+
+#### PlayerState.ljust
+
+```python
+ljust(self, width, fillchar=' ', /)
+```
+
+Return a left-justified string of length width.
+
+Padding is done using the specified fill character (default is a space).
+
+#### PlayerState.lower
+
+```python
+lower(self, /)
+```
+
+Return a copy of the string converted to lowercase.
+
+#### PlayerState.lstrip
+
+```python
+lstrip(self, chars=None, /)
+```
+
+Return a copy of the string with leading whitespace removed.
+
+If chars is given and not None, remove characters in chars instead.
+
+#### PlayerState.rfind
+
+```python
+rfind
+```
+
+Return the highest index in S where substring sub is found,
+such that sub is contained within S[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Return -1 on failure.
+
+#### PlayerState.rindex
+
+```python
+rindex
+```
+
+Return the highest index in S where substring sub is found,
+such that sub is contained within S[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Raises ValueError when the substring is not found.
+
+#### PlayerState.rjust
+
+```python
+rjust(self, width, fillchar=' ', /)
+```
+
+Return a right-justified string of length width.
+
+Padding is done using the specified fill character (default is a space).
+
+#### PlayerState.rstrip
+
+```python
+rstrip(self, chars=None, /)
+```
+
+Return a copy of the string with trailing whitespace removed.
+
+If chars is given and not None, remove characters in chars instead.
+
+#### PlayerState.rpartition
+
+```python
+rpartition(self, sep, /)
+```
+
+Partition the string into three parts using the given separator.
+
+This will search for the separator in the string, starting at the end. If
+the separator is found, returns a 3-tuple containing the part before the
+separator, the separator itself, and the part after it.
+
+If the separator is not found, returns a 3-tuple containing two empty strings
+and the original string.
+
+#### PlayerState.splitlines
+
+```python
+splitlines(self, /, keepends=False)
+```
+
+Return a list of the lines in the string, breaking at line boundaries.
+
+Line breaks are not included in the resulting list unless keepends is given and
+true.
+
+#### PlayerState.strip
+
+```python
+strip(self, chars=None, /)
+```
+
+Return a copy of the string with leading and trailing whitespace removed.
+
+If chars is given and not None, remove characters in chars instead.
+
+#### PlayerState.swapcase
+
+```python
+swapcase(self, /)
+```
+
+Convert uppercase characters to lowercase and lowercase characters to uppercase.
+
+#### PlayerState.translate
+
+```python
+translate(self, table, /)
+```
+
+Replace each character in the string using the given translation table.
+
+  table
+    Translation table, which must be a mapping of Unicode ordinals to
+    Unicode ordinals, strings, or None.
+
+The table must implement lookup/indexing via __getitem__, for instance a
+dictionary or list.  If this operation raises LookupError, the character is
+left untouched.  Characters mapped to None are deleted.
+
+#### PlayerState.upper
+
+```python
+upper(self, /)
+```
+
+Return a copy of the string converted to uppercase.
+
+#### PlayerState.startswith
+
+```python
+startswith
+```
+
+Return True if S starts with the specified prefix, False otherwise.
+With optional start, test S beginning at that position.
+With optional end, stop comparing S at that position.
+prefix can also be a tuple of strings to try.
+
+#### PlayerState.endswith
+
+```python
+endswith
+```
+
+Return True if S ends with the specified suffix, False otherwise.
+With optional start, test S beginning at that position.
+With optional end, stop comparing S at that position.
+suffix can also be a tuple of strings to try.
+
+#### PlayerState.removeprefix
+
+```python
+removeprefix(self, prefix, /)
+```
+
+Return a str with the given prefix string removed if present.
+
+If the string starts with the prefix string, return string[len(prefix):].
+Otherwise, return a copy of the original string.
+
+#### PlayerState.removesuffix
+
+```python
+removesuffix(self, suffix, /)
+```
+
+Return a str with the given suffix string removed if present.
+
+If the string ends with the suffix string and that suffix is not empty,
+return string[:-len(suffix)]. Otherwise, return a copy of the original
+string.
+
+#### PlayerState.isascii
+
+```python
+isascii(self, /)
+```
+
+Return True if all characters in the string are ASCII, False otherwise.
+
+ASCII characters have code points in the range U+0000-U+007F.
+Empty string is ASCII too.
+
+#### PlayerState.islower
+
+```python
+islower(self, /)
+```
+
+Return True if the string is a lowercase string, False otherwise.
+
+A string is lowercase if all cased characters in the string are lowercase and
+there is at least one cased character in the string.
+
+#### PlayerState.isupper
+
+```python
+isupper(self, /)
+```
+
+Return True if the string is an uppercase string, False otherwise.
+
+A string is uppercase if all cased characters in the string are uppercase and
+there is at least one cased character in the string.
+
+#### PlayerState.istitle
+
+```python
+istitle(self, /)
+```
+
+Return True if the string is a title-cased string, False otherwise.
+
+In a title-cased string, upper- and title-case characters may only
+follow uncased characters and lowercase characters only cased ones.
+
+#### PlayerState.isspace
+
+```python
+isspace(self, /)
+```
+
+Return True if the string is a whitespace string, False otherwise.
+
+A string is whitespace if all characters in the string are whitespace and there
+is at least one character in the string.
+
+#### PlayerState.isdecimal
+
+```python
+isdecimal(self, /)
+```
+
+Return True if the string is a decimal string, False otherwise.
+
+A string is a decimal string if all characters in the string are decimal and
+there is at least one character in the string.
+
+#### PlayerState.isdigit
+
+```python
+isdigit(self, /)
+```
+
+Return True if the string is a digit string, False otherwise.
+
+A string is a digit string if all characters in the string are digits and there
+is at least one character in the string.
+
+#### PlayerState.isnumeric
+
+```python
+isnumeric(self, /)
+```
+
+Return True if the string is a numeric string, False otherwise.
+
+A string is numeric if all characters in the string are numeric and there is at
+least one character in the string.
+
+#### PlayerState.isalpha
+
+```python
+isalpha(self, /)
+```
+
+Return True if the string is an alphabetic string, False otherwise.
+
+A string is alphabetic if all characters in the string are alphabetic and there
+is at least one character in the string.
+
+#### PlayerState.isalnum
+
+```python
+isalnum(self, /)
+```
+
+Return True if the string is an alpha-numeric string, False otherwise.
+
+A string is alpha-numeric if all characters in the string are alpha-numeric and
+there is at least one character in the string.
+
+#### PlayerState.isidentifier
+
+```python
+isidentifier(self, /)
+```
+
+Return True if the string is a valid Python identifier, False otherwise.
+
+Call keyword.iskeyword(s) to test whether string s is a reserved identifier,
+such as "def" or "class".
+
+#### PlayerState.isprintable
+
+```python
+isprintable(self, /)
+```
+
+Return True if all characters in the string are printable, False otherwise.
+
+A character is printable if repr() may use it in its output.
+
+#### PlayerState.zfill
+
+```python
+zfill(self, width, /)
+```
+
+Pad a numeric string with zeros on the left, to fill a field of the given width.
+
+The string is never truncated.
+
+#### PlayerState.format
+
+```python
+format
+```
+
+Return a formatted version of S, using substitutions from args and kwargs.
+The substitutions are identified by braces ('{' and '}').
+
+#### PlayerState.format_map
+
+```python
+format_map
+```
+
+Return a formatted version of S, using substitutions from mapping.
+The substitutions are identified by braces ('{' and '}').
+
+#### PlayerState.maketrans
+
+```python
+maketrans
+```
+
+Return a translation table usable for str.translate().
+
+If there is only one argument, it must be a dictionary mapping Unicode
+ordinals (integers) or characters to Unicode ordinals, strings or None.
+Character keys will be then converted to ordinals.
+If there are two arguments, they must be strings of equal length, and
+in the resulting dictionary, each character in x will be mapped to the
+character at the same position in y. If there is a third argument, it
+must be a string, whose characters will be mapped to None in the result.
 
 ## Transport
 
@@ -12682,6 +13830,17 @@ add a note to the exception
 
 ## Top level
 
+### SENSOR_CLASS_NAMES
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.
+
 ### DEPZ_USB_VID
 
 `int` constant.
@@ -12712,6 +13871,20 @@ dict(iterable) -> new dictionary initialized as if via:
         d[k] = v
 dict(**kwargs) -> new dictionary initialized with the name=value pairs
     in the keyword argument list.  For example:  dict(one=1, two=2)
+
+### DATASET_SCHEMA
+
+`str` constant.
+
+str(bytes_or_buffer[, encoding[, errors]]) -> str
+
+Create a new string object from the given object. If encoding or
+errors is specified, then the object must expose a data buffer
+that will be decoded using the given encoding and error handler.
+Otherwise, returns the result of object.__str__() (if defined)
+or repr(object).
+encoding defaults to sys.getdefaultencoding().
+errors defaults to 'strict'.
 
 ### __version__
 

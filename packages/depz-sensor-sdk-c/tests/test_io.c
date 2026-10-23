@@ -7,6 +7,7 @@
 #include "fake_bno086.h"
 #include "fake_tmf8829.h"
 #include "json.h"
+#include "scenarios.h"
 
 #include "../src/io/platform.h"
 
@@ -96,8 +97,16 @@ static void sync_pin_validation(rig *r)
     depz_sync_pin_config c = {1, DEPZ_SYNC_PIN_IN, 0}, got;
     CHECK_RC(depz_device_set_sync_pin(r->dev, &c), DEPZ_OK);
     c.pin = 9;
-    CHECK_RC(depz_device_set_sync_pin(r->dev, &c), DEPZ_E_STATUS);
-    CHECK(depz_last_status() == DEPZ_STATUS_ERR_INVALID_PARAM);
+    /* contract 07 §3: refused on the host, nothing sent */
+    CHECK_RC(depz_device_set_sync_pin(r->dev, &c), DEPZ_E_ARG);
+    CHECK_RC(depz_device_get_sync_pin(r->dev, 0, &got), DEPZ_E_ARG);
+    {
+        /* the device's own validation still answers ERR_INVALID_PARAM */
+        const uint8_t raw[3] = {9, DEPZ_SYNC_PIN_IN, 0};
+        CHECK_RC(depz_device_request(r->dev, DEPZ_CMD_SET_SYNC_PIN_CONFIG, raw, 3, NULL, NULL, true, -1),
+                 DEPZ_E_STATUS);
+        CHECK(depz_last_status() == DEPZ_STATUS_ERR_INVALID_PARAM);
+    }
     CHECK_RC(depz_device_get_sync_pin(r->dev, 2, &got), DEPZ_OK);
     CHECK(got.pin == 2);
 }
@@ -448,7 +457,9 @@ static void record_then_replay(void)
     remove(path);
 }
 
-/* ── a real SR04 capture (contracts/vectors/recordings) ────────────────── */
+/* ── golden data (contracts/vectors) ─────────────────────────────────────
+ * The real-hardware captures (vectors/recordings) are replayed by the
+ * contract 15 scenarios (scenarios.c), run as test_io scenario:<id>. */
 
 #ifndef DEPZ_VECTORS_DIR
 #define DEPZ_VECTORS_DIR "."
@@ -468,68 +479,6 @@ static char *slurp(const char *path)
     if (buf) buf[n] = '\0';
     fclose(f);
     return buf;
-}
-
-static bool same_measurement(const depz_sr04_measurement *m, const json_value *want)
-{
-    const char *src = json_as_str(json_obj_get(want, "source"));
-    return m->timestamp_us == (uint64_t)json_as_int(json_obj_get(want, "timestamp_us")) &&
-           m->echo_time_us == (uint16_t)json_as_int(json_obj_get(want, "echo_time_us")) &&
-           m->from_loop == (src && strcmp(src, "loop") == 0);
-}
-
-/* The lab SR04's session, recorded by the Python SDK: strict replay makes the
- * C SDK re-issue every request byte for byte and decode the same values. */
-static void sr04_session_replay(void)
-{
-    char *text = slurp(DEPZ_VECTORS_DIR "/recordings/sr04_session.expected.json");
-    json_value *exp;
-    const json_value *once, *loop;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_sr04_measurement m;
-    char name[128];
-    uint32_t period;
-    uint16_t decay;
-    size_t i;
-
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    once = json_obj_get(exp, "once");
-    loop = json_obj_get(exp, "loop");
-    CHECK_RC(depz_link_open_replay(DEPZ_VECTORS_DIR "/recordings/sr04_session.depzrec", true, false,
-                                   &link), DEPZ_OK);
-    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-    depz_device_set_timeout_ms(dev, 2000);
-    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    CHECK(depz_is_sr04(dev));
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_device_get_device_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "device_name"))) == 0);
-    CHECK_RC(depz_sr04_set_sample_period_us(dev, 20000), DEPZ_OK);
-    CHECK_RC(depz_sr04_get_sample_period_us(dev, &period), DEPZ_OK);
-    CHECK(period == (uint32_t)json_as_int(json_obj_get(exp, "sample_period_us")));
-    CHECK_RC(depz_sr04_get_echo_decay_us(dev, &decay), DEPZ_OK);
-    CHECK(decay == (uint16_t)json_as_int(json_obj_get(exp, "echo_decay_us")));
-    for (i = 0; i < json_arr_size(once); i++) {
-        CHECK_RC(depz_sr04_measure_once(dev, 2000, &m), DEPZ_OK);
-        CHECK(same_measurement(&m, json_arr_get(once, i)));
-    }
-    s = depz_sr04_stream(dev, json_arr_size(loop) + 64);
-    CHECK(s);
-    CHECK_RC(depz_sr04_start(dev), DEPZ_OK);
-    for (i = 0; i < json_arr_size(loop); i++) {
-        CHECK_RC(depz_stream_next(s, &m, 2000), DEPZ_OK);
-        CHECK(same_measurement(&m, json_arr_get(loop, i)));
-    }
-    CHECK_RC(depz_sr04_stop(dev), DEPZ_OK);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
 }
 
 /* ── VL53L4CD (the ULD over the fake register bridge) ──────────────────── */
@@ -707,186 +656,7 @@ L4_RIG(l4_measure_once_polls_and_stops)
     CHECK(v == 0x80); /* stopped after the read */
 }
 
-static bool same_l4(const depz_vl53l4cd_measurement *m, const json_value *w)
-{
-#define F(name) (json_as_int(json_obj_get(w, #name)))
-    return m->timestamp_us == (uint64_t)F(timestamp_us) && m->r.range_status == F(range_status) &&
-           m->r.distance_mm == F(distance_mm) && m->r.sigma_mm == F(sigma_mm) &&
-           m->r.signal_rate_kcps == F(signal_rate_kcps) && m->r.ambient_rate_kcps == F(ambient_rate_kcps) &&
-           m->r.signal_per_spad_kcps == F(signal_per_spad_kcps) &&
-           m->r.ambient_per_spad_kcps == F(ambient_per_spad_kcps) &&
-           m->r.number_of_spad == F(number_of_spad) && m->r.stream_count == F(stream_count);
-#undef F
-}
-
-/* The lab VL53L4CD's session (Python SDK capture): init polls, timing, reads,
- * single shots and the stream, all byte-identical under strict replay. */
-static void l4_session_replay(void)
-{
-    char *text = slurp(DEPZ_VECTORS_DIR "/recordings/vl53l4cd_session.expected.json");
-    json_value *exp;
-    const json_value *once, *frames, *info, *timing;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_vl53l4cd_measurement m;
-    depz_vl53l4_info bi;
-    char name[128];
-    uint32_t b, im;
-    int32_t off;
-    uint16_t x;
-    size_t i;
-
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    once = json_obj_get(exp, "once");
-    frames = json_obj_get(exp, "frames");
-    info = json_obj_get(exp, "info");
-    timing = json_obj_get(exp, "timing");
-    CHECK_RC(depz_link_open_replay(DEPZ_VECTORS_DIR "/recordings/vl53l4cd_session.depzrec", true,
-                                   false, &link), DEPZ_OK);
-    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-    depz_device_set_timeout_ms(dev, 2000);
-    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    CHECK(depz_is_vl53l4cd(dev));
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_device_get_device_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "device_name"))) == 0);
-    CHECK_RC(depz_vl53l4cd_bridge_info(dev, &bi), DEPZ_OK);
-    CHECK(bi.model_id == json_as_int(json_obj_get(info, "model_id")));
-    CHECK(bi.fw_status == json_as_int(json_obj_get(info, "fw_status")));
-    CHECK(bi.i2c_khz == json_as_int(json_obj_get(info, "i2c_khz")));
-    CHECK_RC(depz_vl53l4cd_init(dev, 0), DEPZ_OK);
-    CHECK_RC(depz_vl53l4cd_set_range_timing(dev, 33, 0), DEPZ_OK);
-    CHECK_RC(depz_vl53l4cd_get_range_timing(dev, &b, &im), DEPZ_OK);
-    CHECK(b == json_as_int(json_arr_get(timing, 0)) && im == json_as_int(json_arr_get(timing, 1)));
-    CHECK_RC(depz_vl53l4cd_get_offset_mm(dev, &off), DEPZ_OK);
-    CHECK(off == json_as_int(json_obj_get(exp, "offset_mm")));
-    CHECK_RC(depz_vl53l4cd_get_xtalk_kcps(dev, &x), DEPZ_OK);
-    CHECK(x == json_as_int(json_obj_get(exp, "xtalk_kcps")));
-    for (i = 0; i < json_arr_size(once); i++) {
-        CHECK_RC(depz_vl53l4cd_measure_once(dev, -1, &m), DEPZ_OK);
-        CHECK(same_l4(&m, json_arr_get(once, i)));
-    }
-    s = depz_vl53l4cd_stream(dev, json_arr_size(frames) + 64);
-    CHECK(s);
-    CHECK_RC(depz_vl53l4cd_start_ranging(dev), DEPZ_OK);
-    for (i = 0; i < json_arr_size(frames); i++) {
-        CHECK_RC(depz_stream_next(s, &m, 2000), DEPZ_OK);
-        CHECK(same_l4(&m, json_arr_get(frames, i)));
-    }
-    CHECK_RC(depz_vl53l4cd_stop_ranging(dev), DEPZ_OK);
-    CHECK(depz_vl53l4cd_stream_parse_errors(dev) == 0);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
-}
-
-/* ── VL53L8 (real captures: init with the firmware download, 8x8 @ 15 Hz) ── */
-
-static bool same_ints(const json_value *arr, const int32_t *v, int n)
-{
-    int k;
-    if ((int)json_arr_size(arr) != n) return false;
-    for (k = 0; k < n; k++)
-        if (json_as_int(json_arr_get(arr, (size_t)k)) != v[k]) return false;
-    return true;
-}
-
-static bool same_u8s(const json_value *arr, const uint8_t *v, int n)
-{
-    int k;
-    if ((int)json_arr_size(arr) != n) return false;
-    for (k = 0; k < n; k++)
-        if (json_as_int(json_arr_get(arr, (size_t)k)) != v[k]) return false;
-    return true;
-}
-
-static bool same_hex(const char *hex, const uint8_t *v, size_t n)
-{
-    size_t k;
-    if (!hex || strlen(hex) != 2 * n) return false;
-    for (k = 0; k < n; k++) {
-        unsigned b;
-        if (sscanf(hex + 2 * k, "%2x", &b) != 1 || b != v[k]) return false;
-    }
-    return true;
-}
-
-/* The Python SDK's capture replayed strict: the whole ULD init (the ~84 KB
- * firmware download included), 8x8, 15 Hz, [CNH], the stream. */
-static void l8_replay_res(const char *stem, depz_vl53l8_model model, bool with_cnh, bool promote,
-                          int resolution)
-{
-    char path[512];
-    char *text;
-    json_value *exp;
-    const json_value *frames;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_vl53l8_live_frame *f = (depz_vl53l8_live_frame *)malloc(sizeof *f);
-    char name[128];
-    size_t i;
-
-    CHECK(f);
-    snprintf(path, sizeof path, "%s/recordings/%s.expected.json", DEPZ_VECTORS_DIR, stem);
-    text = slurp(path);
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    frames = json_obj_get(exp, "frames");
-    snprintf(path, sizeof path, "%s/recordings/%s.depzrec", DEPZ_VECTORS_DIR, stem);
-    CHECK_RC(depz_link_open_replay(path, true, false, &link), DEPZ_OK);
-    if (promote) {
-        /* Over a bare link there is no USB PID: promote picks the CX base. */
-        CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-        depz_device_set_timeout_ms(dev, 2000);
-        CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    } else {
-        CHECK_RC(depz_vl53l8_open_link(link, model, &dev), DEPZ_OK);
-        depz_device_set_timeout_ms(dev, 2000);
-    }
-    CHECK(depz_is_vl53l8(dev) && depz_vl53l8_get_model(dev) == model);
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_vl53l8_init(dev, NULL, NULL), DEPZ_OK);
-    if (json_obj_get(exp, "module_type"))
-        CHECK(depz_vl53l8_module_type(dev) == json_as_int(json_obj_get(exp, "module_type")));
-    CHECK_RC(depz_vl53l8_set_resolution(dev, resolution), DEPZ_OK);
-    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(dev, 15), DEPZ_OK);
-    if (with_cnh) {
-        depz_vl53l8_cnh_setup cnh;
-        depz_vl53l8_cnh_init_config(&cnh, 10, 20, 2);
-        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&cnh, 64, 0, 0, 2, 2, 4, 4), DEPZ_OK);
-        CHECK_RC(depz_vl53l8_configure_cnh(dev, &cnh), DEPZ_OK);
-    }
-    s = depz_vl53l8_frames(dev, json_arr_size(frames) + 8);
-    CHECK(s);
-    CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_OK);
-    for (i = 0; i < json_arr_size(frames); i++) {
-        const json_value *w = json_arr_get(frames, i);
-        CHECK_RC(depz_stream_next(s, f, 5000), DEPZ_OK);
-        CHECK(f->f.timestamp_us == (uint64_t)json_as_int(json_obj_get(w, "timestamp_us")));
-        CHECK(f->f.resolution == json_as_int(json_obj_get(w, "resolution")));
-        CHECK(f->f.silicon_temp_degc == json_as_int(json_obj_get(w, "silicon_temp_degc")));
-        CHECK(same_ints(json_obj_get(w, "distance_mm"), f->f.distance_mm, f->f.resolution));
-        CHECK(same_u8s(json_obj_get(w, "target_status"), f->f.target_status, f->f.resolution));
-        CHECK(same_u8s(json_obj_get(w, "nb_target_detected"), f->f.nb_target_detected, f->f.resolution));
-        if (with_cnh) CHECK(same_hex(json_as_str(json_obj_get(w, "cnh_raw")), f->cnh, f->cnh_len));
-        else CHECK(f->cnh_len == 0);
-    }
-    CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);
-    CHECK(depz_vl53l8_frame_parse_errors(dev) == 0);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
-    free(f);
-}
+/* ── VL53L8 / L5 / L7 ────────────────────────────────────────────────── */
 
 /* Guards and the CNH setup math (no device answers: none is needed). */
 static void l8_guards_and_cnh_math(void)
@@ -912,235 +682,24 @@ static void l8_guards_and_cnh_math(void)
     CHECK_RC(depz_vl53l8_cnh_required_memory(&cnh, &bytes), DEPZ_OK);
     CHECK(bytes == 1708 && cnh.nb_of_aggregates == 16 && cnh.map_id[0] == 0 && cnh.map_id[63] == 15);
     CHECK_RC(depz_vl53l8_cnh_create_agg_map(&cnh, 64, 0, 0, 2, 2, 5, 4), DEPZ_E_ARG);
+    /* Regression (difftest crash): a negative start wrote map_id[] before its
+     * start; an unlisted resolution, merge / cols / rows < 1 and an int
+     * overflow of start + cols * merge are refused the same way. */
+    {
+        depz_vl53l8_cnh_setup bad = cnh;
+        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&bad, 64, -24, 0, 2, 2, 4, 4), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&bad, 64, 0, -1, 1, 1, 4, 4), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&bad, 32, 0, 0, 1, 1, 4, 4), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&bad, 16, 0, 0, 1, 1, 0, 4), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_create_agg_map(&bad, 64, 1, 0, 0x40000000, 1, 4, 1), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_init_config_checked(&bad, 10, 256, 2), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_init_config_checked(&bad, 10, 20, -1), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53l8_cnh_init_config_checked(&bad, 10, 0, 2), DEPZ_OK); /* 0 bins: empty histograms */
+    }
     depz_vl53l8_cnh_pack(&cnh, packed);
     CHECK(packed[0] == 0x00 && packed[1] == 0x50 && packed[18] == 2 && packed[19] == 20 && packed[25] == 0x3F);
     depz_device_close(dev);
     depz_link_free(b);
-}
-
-static void l8_replay(const char *stem, depz_vl53l8_model model, bool with_cnh, bool promote)
-{
-    l8_replay_res(stem, model, with_cnh, promote, 64);
-}
-
-static void l8cx_replay(void) { l8_replay("vl53l8_8x8_15hz_3s", DEPZ_VL53L8_MODEL_L8CX, false, true); }
-/* L5/L7: promote reads the device name to pick the class (contract 11 §1). */
-static void l5cx_replay(void) { l8_replay("vl53l5cx_8x8_15hz_3s", DEPZ_VL53L8_MODEL_L5CX, false, true); }
-static void l5cx_4x4_replay(void) { l8_replay_res("vl53l5cx_4x4_15hz", DEPZ_VL53L8_MODEL_L5CX, false, true, 16); }
-static void l7ch_replay(void) { l8_replay("vl53l7ch_8x8_15hz_3s", DEPZ_VL53L8_MODEL_L7CH, false, true); }
-static void l7ch_cnh_replay(void) { l8_replay("vl53l7ch_cnh_8x8_15hz", DEPZ_VL53L8_MODEL_L7CH, true, true); }
-static void l8ch_replay(void) { l8_replay("vl53l8ch_8x8_15hz_3s", DEPZ_VL53L8_MODEL_L8CH, false, false); }
-static void l8ch_cnh_replay(void) { l8_replay("vl53l8ch_cnh_8x8_15hz", DEPZ_VL53L8_MODEL_L8CH, true, false); }
-
-/* ── BNO055 (real captures: reset, configure, profile, status, stream) ──── */
-
-static void bno_replay(const char *stem)
-{
-    char path[512], name[128];
-    char *text;
-    json_value *exp;
-    const json_value *info, *prof, *sys, *frames, *block;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_bno055_info bi;
-    depz_bno055_units u;
-    depz_bno055_calib_profile cp;
-    depz_bno055_status_regs sr;
-    depz_bno055_sample m;
-    size_t i;
-    int k;
-
-    snprintf(path, sizeof path, "%s/recordings/%s.expected.json", DEPZ_VECTORS_DIR, stem);
-    text = slurp(path);
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    info = json_obj_get(exp, "info");
-    prof = json_obj_get(exp, "calibration_profile");
-    sys = json_obj_get(exp, "system_status");
-    frames = json_obj_get(exp, "frames");
-    block = json_obj_get(exp, "block");
-    depz_bno055_unpack_units((uint8_t)json_as_int(json_obj_get(exp, "unit_sel")), &u);
-    snprintf(path, sizeof path, "%s/recordings/%s.depzrec", DEPZ_VECTORS_DIR, stem);
-    CHECK_RC(depz_link_open_replay(path, true, false, &link), DEPZ_OK);
-    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-    depz_device_set_timeout_ms(dev, 2000);
-    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    CHECK(depz_is_bno055(dev));
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_device_get_device_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "device_name"))) == 0);
-    CHECK_RC(depz_bno055_bridge_info(dev, &bi), DEPZ_OK);
-    CHECK(bi.chip_id == json_as_int(json_obj_get(info, "chip_id")) && bi.sw_rev == json_as_int(json_obj_get(info, "sw_rev")));
-    CHECK(bi.read_avg_us == json_as_int(json_obj_get(info, "read_avg_us")) && bi.initialized == 1);
-    CHECK_RC(depz_bno055_reset_sensor(dev), DEPZ_OK);
-    CHECK_RC(depz_bno055_configure(dev, (uint8_t)json_as_int(json_obj_get(exp, "mode")), &u, NULL, NULL), DEPZ_OK);
-    CHECK_RC(depz_bno055_read_calibration_profile(dev, &cp), DEPZ_OK);
-    for (k = 0; k < 3; k++) {
-        CHECK(cp.accel_offset[k] == json_as_int(json_arr_get(json_obj_get(prof, "accel_offset"), (size_t)k)));
-        CHECK(cp.gyro_offset[k] == json_as_int(json_arr_get(json_obj_get(prof, "gyro_offset"), (size_t)k)));
-    }
-    CHECK(cp.accel_radius == json_as_int(json_obj_get(prof, "accel_radius")));
-    CHECK(cp.mag_radius == json_as_int(json_obj_get(prof, "mag_radius")));
-    CHECK_RC(depz_bno055_system_status(dev, &sr), DEPZ_OK);
-    CHECK(sr.self_test == json_as_int(json_obj_get(sys, "self_test")) && sr.status == json_as_int(json_obj_get(sys, "status")));
-    s = depz_bno055_samples(dev, json_arr_size(frames) + 8);
-    CHECK(s);
-    CHECK_RC(depz_bno055_start_stream(dev, (uint16_t)json_as_int(json_obj_get(exp, "period_ms")),
-                                      (uint8_t)json_as_int(json_arr_get(block, 0)),
-                                      (uint8_t)json_as_int(json_arr_get(block, 1)), DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
-    for (i = 0; i < json_arr_size(frames); i++) {
-        const json_value *w = json_arr_get(frames, i);
-        CHECK_RC(depz_stream_next(s, &m, 2000), DEPZ_OK);
-        CHECK(m.timestamp_us == (uint64_t)json_as_int(json_obj_get(w, "timestamp_us")));
-        CHECK(m.addr == json_as_int(json_obj_get(w, "addr")));
-        CHECK(same_hex(json_as_str(json_obj_get(w, "raw")), m.raw, m.len));
-        CHECK(m.present & DEPZ_BNO055_HAS_QUATERNION);
-        CHECK(m.quaternion[0] != 0 || m.quaternion[1] != 0 || m.quaternion[2] != 0 || m.quaternion[3] != 0);
-        CHECK(memcmp(&m.units, &u, sizeof u) == 0);
-    }
-    CHECK_RC(depz_bno055_stop_stream(dev), DEPZ_OK);
-    CHECK(depz_bno055_stream_parse_errors(dev) == 0);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
-}
-
-static void bno_imu_replay(void) { bno_replay("bno055_imu_quat_units_50hz"); }
-static void bno_ndof_replay(void) { bno_replay("bno055_ndof_full_100hz"); }
-
-/* ── BNO085 / BNO086 over a real capture ─────────────────────────────── */
-
-/* A report field by its Python dataclass name; false for an unknown name. */
-static bool bno086_field(const depz_bno_report *r, const char *k, int64_t *v)
-{
-    static const struct { const char *name; size_t off; int kind; } f[] = {
-#define F32(n) {#n, offsetof(depz_bno_report, n), 0}
-        F32(x_raw), F32(y_raw), F32(z_raw), F32(bias_x_raw), F32(bias_y_raw), F32(bias_z_raw),
-        F32(i_raw), F32(j_raw), F32(k_raw), F32(real_raw), F32(vx_raw), F32(vy_raw), F32(vz_raw),
-        F32(delay_us), F32(accuracy_raw),
-#undef F32
-    };
-    size_t i;
-    if (!strcmp(k, "sensor_id")) { *v = r->sensor_id; return true; }
-    if (!strcmp(k, "timestamp_us")) { *v = r->timestamp_us; return true; }
-    if (!strcmp(k, "seq")) { *v = r->seq; return true; }
-    if (!strcmp(k, "accuracy")) { *v = r->accuracy; return true; }
-    for (i = 0; i < sizeof f / sizeof f[0]; i++) {
-        if (!strcmp(k, f[i].name)) {
-            *v = *(const int32_t *)((const char *)r + f[i].off);
-            return true;
-        }
-    }
-    return false;
-}
-
-static void bno086_session_replay(void)
-{
-    char path[1024], name[128];
-    char *text;
-    json_value *exp;
-    const json_value *pid, *en, *feats, *reps, *cal, *counts, *meta;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_bno_product_id p;
-    depz_bno_feature g;
-    depz_bno086_calibration c;
-    depz_bno086_counts n;
-    depz_bno086_error_record errs[8];
-    depz_bno_metadata md, want;
-    uint32_t words[16];
-    uint8_t osc;
-    size_t i, k, nerr;
-
-    snprintf(path, sizeof path, "%s/recordings/bno086_session.expected.json", DEPZ_VECTORS_DIR);
-    text = slurp(path);
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    pid = json_obj_get(exp, "product_id");
-    en = json_obj_get(exp, "enable");
-    feats = json_obj_get(exp, "features");
-    reps = json_obj_get(exp, "reports");
-    cal = json_obj_get(exp, "calibration");
-    counts = json_obj_get(exp, "counts_rv");
-    meta = json_obj_get(exp, "metadata_rv_words");
-    snprintf(path, sizeof path, "%s/recordings/bno086_session.depzrec", DEPZ_VECTORS_DIR);
-    CHECK_RC(depz_link_open_replay(path, true, false, &link), DEPZ_OK);
-    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-    depz_device_set_timeout_ms(dev, 2000);
-    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    CHECK(depz_is_bno086(dev));
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_device_get_device_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "device_name"))) == 0);
-    CHECK_RC(depz_bno086_hardware_reset(dev, -1), DEPZ_OK);
-    CHECK_RC(depz_bno086_product_id(dev, &p), DEPZ_OK);
-    CHECK(p.sw_part_number == (uint32_t)json_as_int(json_obj_get(pid, "sw_part_number")));
-    CHECK(p.sw_build_number == (uint32_t)json_as_int(json_obj_get(pid, "sw_build_number")));
-    CHECK(p.sw_version_major == json_as_int(json_obj_get(pid, "sw_version_major")));
-    CHECK(p.sw_version_patch == json_as_int(json_obj_get(pid, "sw_version_patch")));
-    CHECK(p.reset_cause == json_as_int(json_obj_get(pid, "reset_cause")));
-    s = depz_bno086_reports(dev, json_arr_size(reps) + 512);
-    CHECK(s);
-    for (i = 0; i < json_arr_size(en); i++) {
-        const json_value *e = json_arr_get(en, i), *f = json_arr_get(feats, i);
-        uint8_t sid = (uint8_t)json_as_int(json_arr_get(e, 0));
-        CHECK_RC(depz_bno086_enable(dev, sid, (double)json_as_int(json_arr_get(e, 1)), &g), DEPZ_OK);
-        CHECK(g.sensor_id == json_as_int(json_obj_get(f, "sensor_id")));
-        CHECK(g.interval_us == (uint32_t)json_as_int(json_obj_get(f, "interval_us")));
-        CHECK(g.batch_us == (uint32_t)json_as_int(json_obj_get(f, "batch_us")));
-        CHECK(depz_bno086_rate_ok((uint32_t)(1000000 / json_as_int(json_arr_get(e, 1))), &g));
-    }
-    for (i = 0; i < json_arr_size(reps); i++) {
-        const json_value *w = json_arr_get(reps, i);
-        depz_bno_report r;
-        CHECK_RC(depz_stream_next(s, &r, 2000), DEPZ_OK);
-        CHECK(strcmp(depz_bno_report_type_str(r.type), json_as_str(json_obj_get(w, "type"))) == 0);
-        for (k = 0; k < w->count; k++) {
-            int64_t v;
-            if (!strcmp(w->keys[k], "type")) continue;
-            if (!strcmp(w->keys[k], "accuracy_raw") && json_is_null(w->items[k])) {
-                CHECK(!r.has_accuracy_raw);
-                continue;
-            }
-            CHECK(bno086_field(&r, w->keys[k], &v));
-            if (v != json_as_int(w->items[k])) {
-                fprintf(stderr, "  report %zu field %s: %lld != %lld\n", i, w->keys[k], (long long)v,
-                        (long long)json_as_int(w->items[k]));
-                CHECK(0);
-            }
-        }
-    }
-    for (i = 0; i < json_arr_size(en); i++)
-        CHECK_RC(depz_bno086_disable(dev, (uint8_t)json_as_int(json_arr_get(json_arr_get(en, i), 0))), DEPZ_OK);
-    CHECK_RC(depz_bno086_get_calibration(dev, &c), DEPZ_OK);
-    CHECK(c.accel == json_as_bool(json_obj_get(cal, "accel")) && c.gyro == json_as_bool(json_obj_get(cal, "gyro")));
-    CHECK(c.mag == json_as_bool(json_obj_get(cal, "mag")) && c.planar == json_as_bool(json_obj_get(cal, "planar")));
-    CHECK_RC(depz_bno086_get_oscillator_type(dev, &osc), DEPZ_OK);
-    CHECK(osc == json_as_int(json_obj_get(exp, "oscillator")));
-    CHECK_RC(depz_bno086_get_metadata(dev, DEPZ_BNO_SENSOR_ROTATION_VECTOR, &md), DEPZ_OK);
-    for (i = 0; i < json_arr_size(meta) && i < 16; i++) words[i] = (uint32_t)json_as_int(json_arr_get(meta, i));
-    depz_bno_metadata_from_words(words, json_arr_size(meta), &want);
-    CHECK(memcmp(&md, &want, sizeof md) == 0);
-    CHECK(md.revision == 4 && md.q_point_1 == 14 && md.q_point_2 == 12 && md.min_period_us == 1000);
-    CHECK_RC(depz_bno086_get_counts(dev, DEPZ_BNO_SENSOR_ROTATION_VECTOR, &n), DEPZ_OK);
-    CHECK(n.offered == (uint32_t)json_as_int(json_obj_get(counts, "offered")));
-    CHECK(n.accepted == (uint32_t)json_as_int(json_obj_get(counts, "accepted")));
-    CHECK(n.on == (uint32_t)json_as_int(json_obj_get(counts, "on")));
-    CHECK(n.attempted == (uint32_t)json_as_int(json_obj_get(counts, "attempted")));
-    CHECK_RC(depz_bno086_get_errors(dev, 0, errs, 8, &nerr), DEPZ_OK);
-    CHECK(nerr == json_arr_size(json_obj_get(exp, "errors")));
-    CHECK(depz_bno086_shtp_discarded(dev) == 0);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
 }
 
 /* ── BNO085 / BNO086 against the fake hub ────────────────────────────── */
@@ -1298,6 +857,60 @@ static void bno086_reports(void)
     fake_bno086_stop(f);
 }
 
+/* A multi-fragment input cargo is timestamped from its FIRST fragment: the
+ * 0xFB base delta refers to the capture of the transfer that started it
+ * (contract 05 §3, §5), not the one that completed it. */
+static void bno086_cargo_capture(void)
+{
+    /* 0xFB base delta 10 ticks, then 12 accelerometer reports, delay 0..11. */
+    uint8_t cargo[5 + 12 * 10], frame[64];
+    static const uint64_t captures[3] = {7000000, 7002000, 7004000};
+    size_t len = 0, off = 0;
+    int k = 0, i;
+    fake_bno086 *f;
+    depz_device *dev = bno086_fake_open(&f);
+    depz_stream *s = depz_bno086_reports(dev, 16);
+    depz_bno_report r;
+    CHECK(dev);
+    CHECK(s);
+    cargo[len++] = 0xFB;
+    cargo[len++] = 10; cargo[len++] = 0; cargo[len++] = 0; cargo[len++] = 0;
+    for (i = 0; i < 12; i++) {
+        static const uint8_t xyz[6] = {0, 0, 0, 0, 0xCF, 0x09}; /* 0, 0, 2511 */
+        cargo[len++] = DEPZ_BNO_SENSOR_ACCELEROMETER;
+        cargo[len++] = (uint8_t)i;
+        cargo[len++] = 0;
+        cargo[len++] = (uint8_t)i;
+        memcpy(cargo + len, xyz, sizeof xyz);
+        len += sizeof xyz;
+    }
+    /* Three ≤64-byte frames: the first advertises the total, continuations
+     * the remaining length with bit 15 set; seq increments per frame. */
+    while (off < len) {
+        size_t chunk = len - off < 60 ? len - off : 60;
+        uint16_t hl = (uint16_t)(4 + len - off) | (off ? 0x8000u : 0);
+        frame[0] = (uint8_t)hl;
+        frame[1] = (uint8_t)(hl >> 8);
+        frame[2] = DEPZ_SHTP_CH_INPUT_NORMAL;
+        frame[3] = (uint8_t)k;
+        memcpy(frame + 4, cargo + off, chunk);
+        CHECK(k < 3);
+        if (k < 3) fake_bno086_send_frame(f, captures[k], frame, 4 + chunk);
+        off += chunk;
+        k++;
+    }
+    CHECK(k == 3);
+    for (i = 0; i < 12; i++) {
+        CHECK_RC(depz_stream_next(s, &r, 2000), DEPZ_OK);
+        CHECK(r.type == DEPZ_BNO_ACCELERATION && r.seq == i);
+        CHECK(r.timestamp_us == 6999000 + 100 * (int64_t)i);
+    }
+    CHECK(depz_bno086_shtp_discarded(dev) == 0);
+    depz_stream_close(s);
+    depz_device_close(dev);
+    fake_bno086_stop(f);
+}
+
 static void bno086_commands(void)
 {
     fake_bno086 *f;
@@ -1405,7 +1018,7 @@ static void bno086_codecs(void)
     CHECK(depz_bno_report_scalar(&r) == -2.0);
 }
 
-/* ── the VL53L 1D family over real captures ──────────────────────────── */
+/* ── the VL53L 1D family ─────────────────────────────────────────────── */
 
 static depz_vl53lx_driver vlx_kind(const char *s)
 {
@@ -1414,119 +1027,40 @@ static depz_vl53lx_driver vlx_kind(const char *s)
     return DEPZ_VL53LX_DRIVER_HISTOGRAM;
 }
 
-static void vlx_replay(const char *stem)
+/* configure_ex's signal threshold on a driver without that group is refused
+ * before the re-init, with no traffic (a scenario cannot name configure_ex).
+ * Each capture replays strictly up to init; the scenarios assert the rest. */
+static void vlx_unsupported_group_refused(void)
 {
-    char path[1024], name[64];
-    char *text;
-    json_value *exp;
-    const json_value *frames, *timing, *parg, *mode;
-    depz_link *link;
-    depz_device *dev;
-    depz_stream *s;
-    depz_vl53lx_measurement m;
-    int budget, inter;
-    size_t i, k;
-
-    snprintf(path, sizeof path, "%s/recordings/%s.expected.json", DEPZ_VECTORS_DIR, stem);
-    text = slurp(path);
-    CHECK(text);
-    exp = json_parse(text);
-    free(text);
-    CHECK(exp);
-    frames = json_obj_get(exp, "frames");
-    timing = json_obj_get(exp, "timing");
-    parg = json_obj_get(exp, "product_arg");
-    mode = json_obj_get(exp, "mode");
-    snprintf(path, sizeof path, "%s/recordings/%s.depzrec", DEPZ_VECTORS_DIR, stem);
-    CHECK_RC(depz_link_open_replay(path, true, false, &link), DEPZ_OK);
-    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
-    depz_device_set_timeout_ms(dev, 2000);
-    CHECK_RC(depz_device_promote(dev), DEPZ_OK);
-    CHECK(depz_is_vl53lx(dev));
-    CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
-    CHECK(strcmp(name, json_as_str(json_obj_get(exp, "software_name"))) == 0);
-    CHECK_RC(depz_vl53lx_init(dev, vlx_kind(json_as_str(json_obj_get(exp, "driver"))),
-                              json_is_null(parg) ? DEPZ_VL53LX_PRODUCT_NONE
-                                                 : depz_vl53lx_product_from_str(json_as_str(parg))), DEPZ_OK);
-    CHECK(strcmp(depz_vl53lx_product_get(depz_vl53lx_product_bound(dev))->name,
-                 json_as_str(json_obj_get(exp, "product"))) == 0);
-    if (json_obj_get(exp, "refused")) {
-        /* A configuration the driver no longer accepts (short on an L4 die):
-         * init still replays, configure refuses the mode. */
-        const json_value *after = json_obj_get(json_obj_get(exp, "refused"), "after_init");
-        const json_value *want_modes = json_obj_get(after, "modes"), *want_budget = json_obj_get(after, "budget_ms");
-        const char *names[8];
-        int lo, hi;
-        size_t n = depz_vl53lx_modes(dev, names, 8);
-        CHECK(n == json_arr_size(want_modes));
-        for (k = 0; k < n; k++) CHECK(strcmp(names[k], json_as_str(json_arr_get(want_modes, k))) == 0);
-        CHECK_RC(depz_vl53lx_budget_range(dev, &lo, &hi), DEPZ_OK);
-        CHECK(lo == json_as_int(json_arr_get(want_budget, 0)) && hi == json_as_int(json_arr_get(want_budget, 1)));
-        CHECK(depz_vl53lx_driver_reach_mm(dev) == (uint32_t)json_as_int(json_obj_get(after, "driver_reach_mm")));
-        CHECK_RC(depz_vl53lx_configure(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0, json_as_str(mode),
-                                       NULL, NULL), DEPZ_E_ARG);
+    static const struct { const char *stem, *driver, *product; int budget; } caps[] = {
+        {"vl53l4cx_uld_as_l4cd_50ms", "uld", "VL53L4CD", 50}, {"vl53l1cx_uld_long_33ms", "uld", NULL, 33},
+        {"vl53l1cb_uld_short_50ms", "uld", NULL, 50},          {"vl53l3cx_ulp_33ms", "ulp", NULL, 33},
+        {"vl53l0x_uld_long-range_33ms", "uld", NULL, 33},       {"vl53l1cx_histogram_long_33ms", "histogram", NULL, 33},
+    };
+    const int kcps = 512;
+    size_t i, refused = 0;
+    for (i = 0; i < sizeof caps / sizeof caps[0]; i++) {
+        char path[1024], name[64];
+        depz_link *link;
+        depz_device *dev;
+        snprintf(path, sizeof path, "%s/recordings/%s.depzrec", DEPZ_VECTORS_DIR, caps[i].stem);
+        CHECK_RC(depz_link_open_replay(path, true, false, &link), DEPZ_OK);
+        CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
+        depz_device_set_timeout_ms(dev, 2000);
+        CHECK_RC(depz_device_promote(dev), DEPZ_OK);
+        CHECK_RC(depz_device_get_software_name(dev, name, sizeof name), DEPZ_OK);
+        CHECK_RC(depz_vl53lx_init(dev, vlx_kind(caps[i].driver),
+                                  caps[i].product ? depz_vl53lx_product_from_str(caps[i].product)
+                                                  : DEPZ_VL53LX_PRODUCT_NONE), DEPZ_OK);
+        if (!depz_vl53lx_supports(dev, DEPZ_VL53LX_CAP_SIGNAL_THRESH)) {
+            CHECK_RC(depz_vl53lx_configure_ex(dev, caps[i].budget, 0, NULL, NULL, NULL, &kcps), DEPZ_E_ARG);
+            CHECK(strstr(depz_last_error(), "does not support") != NULL);
+            refused++;
+        }
         depz_device_close(dev);
-        json_free(exp);
-        return;
     }
-    if (!depz_vl53lx_supports(dev, DEPZ_VL53LX_CAP_SIGNAL_THRESH)) {
-        /* A group the driver lacks is refused before the re-init: no traffic,
-         * so the capture's own configure below still replays strictly. */
-        const int kcps = 512;
-        CHECK_RC(depz_vl53lx_configure_ex(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0,
-                                          json_is_null(mode) ? NULL : json_as_str(mode), NULL, NULL, &kcps),
-                 DEPZ_E_ARG);
-    }
-    CHECK_RC(depz_vl53lx_configure(dev, (int)json_as_int(json_obj_get(exp, "budget_ms")), 0,
-                                   json_is_null(mode) ? NULL : json_as_str(mode), NULL, NULL), DEPZ_OK);
-    CHECK_RC(depz_vl53lx_get_range_timing(dev, &budget, &inter), DEPZ_OK);
-    CHECK(budget == json_as_int(json_arr_get(timing, 0)) && inter == json_as_int(json_arr_get(timing, 1)));
-    s = depz_vl53lx_measurements(dev, json_arr_size(frames) + 8);
-    CHECK(s);
-    CHECK_RC(depz_vl53lx_start_ranging(dev), DEPZ_OK);
-    for (i = 0; i < json_arr_size(frames); i++) {
-        const json_value *w = json_arr_get(frames, i), *t = json_obj_get(w, "targets"), *b = json_obj_get(w, "bins");
-        CHECK_RC(depz_stream_next(s, &m, 3000), DEPZ_OK);
-        if (m.timestamp_us != (uint64_t)json_as_int(json_obj_get(w, "timestamp_us")) ||
-            m.distance_mm != json_as_int(json_obj_get(w, "distance_mm")) ||
-            m.status != json_as_int(json_obj_get(w, "status")) || m.n_targets != json_arr_size(t)) {
-            fprintf(stderr, "  frame %zu: %d mm st %d n %zu, want %lld mm st %lld n %zu\n", i, (int)m.distance_mm,
-                    m.status, m.n_targets, (long long)json_as_int(json_obj_get(w, "distance_mm")),
-                    (long long)json_as_int(json_obj_get(w, "status")), json_arr_size(t));
-            CHECK(0);
-        }
-        for (k = 0; k < m.n_targets; k++) {
-            const json_value *tk = json_arr_get(t, k);
-            CHECK(m.targets[k].distance_mm == json_as_int(json_arr_get(tk, 0)));
-            CHECK(m.targets[k].status == json_as_int(json_arr_get(tk, 1)));
-        }
-        if (b) {
-            const json_value *bd = json_obj_get(b, "bin_data");
-            CHECK(m.has_bins && m.bins.number_of_bins == json_arr_size(bd));
-            for (k = 0; k < json_arr_size(bd); k++) CHECK(m.bins.bin_data[k] == json_as_int(json_arr_get(bd, k)));
-            CHECK(m.bins.vcsel_period == json_as_int(json_obj_get(b, "vcsel_period")));
-            CHECK(m.bins.stream_count == json_as_int(json_obj_get(b, "stream_count")));
-        } else {
-            CHECK(!m.has_bins);
-        }
-    }
-    CHECK_RC(depz_vl53lx_stop_ranging(dev), DEPZ_OK);
-    CHECK(depz_vl53lx_stream_parse_errors(dev) == 0);
-    depz_stream_close(s);
-    depz_device_close(dev);
-    json_free(exp);
+    CHECK(refused > 0);
 }
-
-static void vlx_l4cd_uld_replay(void) { vlx_replay("vl53l4cx_uld_as_l4cd_50ms"); }
-static void vlx_l1cx_uld_replay(void) { vlx_replay("vl53l1cx_uld_long_33ms"); }
-static void vlx_l1cb_uld_replay(void) { vlx_replay("vl53l1cb_uld_short_50ms"); }
-static void vlx_l3cx_ulp_replay(void) { vlx_replay("vl53l3cx_ulp_33ms"); }
-static void vlx_l0x_uld_replay(void) { vlx_replay("vl53l0x_uld_long-range_33ms"); }
-static void vlx_l4cx_hist_medium_replay(void) { vlx_replay("vl53l4cx_histogram_medium_50ms"); }
-static void vlx_l4cx_hist_short_replay(void) { vlx_replay("vl53l4cx_histogram_short_33ms"); }
-static void vlx_l1cx_hist_replay(void) { vlx_replay("vl53l1cx_histogram_long_33ms"); }
-static void vlx_l1cb_hist_replay(void) { vlx_replay("vl53l1cb_histogram_medium_33ms"); }
-static void vlx_l3cx_hist_replay(void) { vlx_replay("vl53l3cx_histogram_medium_33ms"); }
 
 /* ── TMF8829 against the fake bridge (contracts/vectors/tmf8829.json) ────── */
 
@@ -1844,7 +1378,6 @@ static const test_case k_tests[] = {
     {"events_and_disconnect", NULL, events_and_disconnect},
     {"same_opcode_in_flight_is_busy", NULL, same_opcode_in_flight_is_busy},
     {"record_then_replay", NULL, record_then_replay},
-    {"sr04_session_replay", NULL, sr04_session_replay},
     {"l4_init_boot_speed_then_retimes", NULL, l4_init_boot_speed_then_retimes},
     {"l4_init_at_400_never_retimes", NULL, l4_init_at_400_never_retimes},
     {"l4_init_config_block_and_vhv", NULL, l4_init_config_block_and_vhv},
@@ -1854,40 +1387,26 @@ static const test_case k_tests[] = {
     {"l4_config_refused_while_ranging", NULL, l4_config_refused_while_ranging},
     {"l4_stream_decodes_and_counts_short_blocks", NULL, l4_stream_decodes_and_counts_short_blocks},
     {"l4_measure_once_polls_and_stops", NULL, l4_measure_once_polls_and_stops},
-    {"l4_session_replay", NULL, l4_session_replay},
     {"l8_guards_and_cnh_math", NULL, l8_guards_and_cnh_math},
-    {"l8cx_replay", NULL, l8cx_replay},
-    {"l8ch_replay", NULL, l8ch_replay},
-    {"l8ch_cnh_replay", NULL, l8ch_cnh_replay},
-    {"l5cx_replay", NULL, l5cx_replay},
-    {"l5cx_4x4_replay", NULL, l5cx_4x4_replay},
-    {"l7ch_replay", NULL, l7ch_replay},
-    {"l7ch_cnh_replay", NULL, l7ch_cnh_replay},
-    {"bno_imu_replay", NULL, bno_imu_replay},
-    {"bno_ndof_replay", NULL, bno_ndof_replay},
-    {"bno086_session_replay", NULL, bno086_session_replay},
     {"bno086_features", NULL, bno086_features},
     {"bno086_busy_retry", NULL, bno086_busy_retry},
     {"bno086_reports", NULL, bno086_reports},
+    {"bno086_cargo_capture", NULL, bno086_cargo_capture},
     {"bno086_commands", NULL, bno086_commands},
     {"bno086_frs", NULL, bno086_frs},
     {"bno086_codecs", NULL, bno086_codecs},
     {"tmf8829_fake_session", NULL, tmf8829_fake_session},
-    {"vlx_l4cd_uld_replay", NULL, vlx_l4cd_uld_replay},
-    {"vlx_l1cx_uld_replay", NULL, vlx_l1cx_uld_replay},
-    {"vlx_l1cb_uld_replay", NULL, vlx_l1cb_uld_replay},
-    {"vlx_l3cx_ulp_replay", NULL, vlx_l3cx_ulp_replay},
-    {"vlx_l0x_uld_replay", NULL, vlx_l0x_uld_replay},
-    {"vlx_l4cx_hist_medium_replay", NULL, vlx_l4cx_hist_medium_replay},
-    {"vlx_l4cx_hist_short_replay", NULL, vlx_l4cx_hist_short_replay},
-    {"vlx_l1cx_hist_replay", NULL, vlx_l1cx_hist_replay},
-    {"vlx_l1cb_hist_replay", NULL, vlx_l1cb_hist_replay},
-    {"vlx_l3cx_hist_replay", NULL, vlx_l3cx_hist_replay},
+    {"vlx_unsupported_group_refused", NULL, vlx_unsupported_group_refused},
 };
 
 int main(int argc, char **argv)
 {
     size_t i, ran = 0;
+    if (argc > 1 && strncmp(argv[1], "scenario:", 9) == 0) {
+        int rc = scenario_run(argv[1] + 9);
+        printf("%s %s\n", rc ? "FAIL" : "ok  ", argv[1]);
+        return rc ? 1 : 0;
+    }
     for (i = 0; i < sizeof k_tests / sizeof k_tests[0]; i++) {
         const test_case *t = &k_tests[i];
         int before = g_failed;
@@ -1902,6 +1421,11 @@ int main(int argc, char **argv)
             t->plain_fn();
         }
         printf("%s %s\n", g_failed == before ? "ok  " : "FAIL", t->name);
+    }
+    for (i = 0; argc <= 1 && scenario_ids[i]; i++, ran++) {
+        int rc = scenario_run(scenario_ids[i]);
+        if (rc) g_failed++;
+        printf("%s scenario:%s\n", rc ? "FAIL" : "ok  ", scenario_ids[i]);
     }
     if (!ran) { fprintf(stderr, "no test named %s\n", argc > 1 ? argv[1] : "?"); return 2; }
     return g_failed ? 1 : 0;

@@ -32,6 +32,7 @@ struct depz_link {
 };
 
 bool depz_replay_exhausted_impl(void *self);
+void depz_replay_pending_impl(void *self, size_t *tx_left, size_t *rx_left);
 
 /* Platform serial port (serial_posix.c / serial_win32.c). */
 int depz_serial_link_open(const char *port, depz_link **out);

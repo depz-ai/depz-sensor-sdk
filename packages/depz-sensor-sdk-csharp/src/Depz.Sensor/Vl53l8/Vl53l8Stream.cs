@@ -22,6 +22,41 @@ public enum Vl53l8Rpt
 /// <summary>Wire limits (contract 04).</summary>
 public static class Vl53l8Wire
 {
+    /// <summary>Register bytes one READ_REG / WRITE_REG moves at most (the bridge's limit).</summary>
+    public const int ChunkSize = 2048;
+
+    /// <summary>VL53_READ_REG payload: addr u16 LE, length u16 LE.</summary>
+    public static byte[] PackReadReg(int addr, int length)
+    {
+        Protocol.Wire.CheckUint("addr", addr, 16);
+        Protocol.Wire.CheckUint("length", length, 16);
+        var b = new byte[4];
+        BinaryPrimitives.WriteUInt16LittleEndian(b, (ushort)addr);
+        BinaryPrimitives.WriteUInt16LittleEndian(b.AsSpan(2), (ushort)length);
+        return b;
+    }
+
+    /// <summary>VL53_WRITE_REG payload: addr u16 LE, then at least one data byte (contract 04 §2).</summary>
+    public static byte[] PackWriteReg(int addr, ReadOnlySpan<byte> data)
+    {
+        Protocol.Wire.CheckUint("addr", addr, 16);
+        if (data.Length == 0)
+            throw new ArgumentException("WRITE_REG data must be at least 1 byte", nameof(data));
+        var b = new byte[2 + data.Length];
+        BinaryPrimitives.WriteUInt16LittleEndian(b, (ushort)addr);
+        data.CopyTo(b.AsSpan(2));
+        return b;
+    }
+
+    /// <summary>VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE.</summary>
+    public static byte[] PackStartStream(int frameSize)
+    {
+        Protocol.Wire.CheckUint("frameSize", frameSize, 16);
+        var b = new byte[2];
+        BinaryPrimitives.WriteUInt16LittleEndian(b, (ushort)frameSize);
+        return b;
+    }
+
     /// <summary>Bytes of frame data per RPT_VL53_FRAME chunk.</summary>
     public const int StreamChunkMax = 1528;
 
@@ -33,6 +68,16 @@ public static class Vl53l8Wire
 /// One RPT_VL53_FRAME chunk: device timestamp, the full frame size, this
 /// chunk's byte offset into the frame, and the chunk payload.
 /// </summary>
+/// <summary>RPT_VL53_REG_DATA: the echoed READ_REG opcode, the MCU timestamp and the register bytes.</summary>
+public sealed record Vl53l8RegData(int Cmd, ulong TimestampUs, byte[] Data)
+{
+    public static Vl53l8RegData Unpack(ReadOnlySpan<byte> payload)
+    {
+        Protocol.Wire.NeedBytes("RPT_VL53_REG_DATA", payload, 9);
+        return new(payload[0], BinaryPrimitives.ReadUInt64LittleEndian(payload[1..]), payload[9..].ToArray());
+    }
+}
+
 public sealed record FrameChunk(ulong TimestampUs, int FullSize, int Offset, byte[] Data)
 {
     /// <summary>Parse a RPT_VL53_FRAME payload: ts u64 LE, full u16 LE, off u16 LE, then data.</summary>

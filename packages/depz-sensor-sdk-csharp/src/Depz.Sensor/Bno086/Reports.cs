@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using Depz.Sensor.Protocol;
 
 namespace Depz.Sensor.Bno086;
 
@@ -41,6 +42,29 @@ public enum SensorId
     ArvrStabilizedRv = 0x28,
     ArvrStabilizedGameRv = 0x29,
     GyroIntegratedRv = 0x2A,
+    /// <summary>Interactive calibration, BNO086 only.</summary>
+    MotionRequest = 0x2B,
+}
+
+/// <summary>The Q points of the report values (value = raw / 2^Q), SH-2 reference driver.</summary>
+public static class Bno086Q
+{
+    /// <summary>Q of the primary fields, by sensor id.</summary>
+    public static readonly IReadOnlyDictionary<int, int> Points = new Dictionary<int, int>
+    {
+        [0x01] = 8, [0x04] = 8, [0x06] = 8, [0x02] = 9, [0x07] = 9, [0x03] = 4, [0x0F] = 4,
+        [0x05] = 14, [0x08] = 14, [0x09] = 14, [0x28] = 14, [0x29] = 14, [0x2A] = 14,
+        [0x0A] = 20, [0x0B] = 8, [0x0C] = 8, [0x0D] = 4, [0x0E] = 7, [0x14] = 0, [0x15] = 0, [0x16] = 0,
+    };
+
+    /// <summary>The rotation-vector accuracy estimate, radians.</summary>
+    public const int RvAccuracyQ = 12;
+
+    /// <summary>The gyro-integrated rotation vector's angular velocity, rad/s.</summary>
+    public const int GyroRvAngvelQ = 10;
+
+    /// <summary>raw / 2^<paramref name="q"/> (exact in a double).</summary>
+    public static double Scale(long raw, int q) => raw / (double)(1L << q);
 }
 
 /// <summary>Base for a decoded report. Raw wire integers are authoritative.</summary>
@@ -78,6 +102,11 @@ public sealed record Acceleration(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "Acceleration";
+
+    /// <summary>m/s², Q8 (also linear acceleration and gravity). Scaled values (raw / 2^8).</summary>
+    public double X => Bno086Q.Scale(XRaw, 8);
+    public double Y => Bno086Q.Scale(YRaw, 8);
+    public double Z => Bno086Q.Scale(ZRaw, 8);
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -93,6 +122,11 @@ public sealed record Gyroscope(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "Gyroscope";
+
+    /// <summary>rad/s, Q9. Scaled values (raw / 2^9).</summary>
+    public double X => Bno086Q.Scale(XRaw, 9);
+    public double Y => Bno086Q.Scale(YRaw, 9);
+    public double Z => Bno086Q.Scale(ZRaw, 9);
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -108,6 +142,11 @@ public sealed record Magnetometer(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "Magnetometer";
+
+    /// <summary>µT, Q4. Scaled values (raw / 2^4).</summary>
+    public double X => Bno086Q.Scale(XRaw, 4);
+    public double Y => Bno086Q.Scale(YRaw, 4);
+    public double Z => Bno086Q.Scale(ZRaw, 4);
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -123,6 +162,14 @@ public sealed record UncalibratedGyroscope(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "UncalibratedGyroscope";
+
+    /// <summary>Scaled values (raw / 2^9).</summary>
+    public double X => Bno086Q.Scale(XRaw, 9);
+    public double Y => Bno086Q.Scale(YRaw, 9);
+    public double Z => Bno086Q.Scale(ZRaw, 9);
+
+    /// <summary>The bias estimate, rad/s.</summary>
+    public double[] Bias => new[] { Bno086Q.Scale(BiasXRaw, 9), Bno086Q.Scale(BiasYRaw, 9), Bno086Q.Scale(BiasZRaw, 9) };
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -139,6 +186,14 @@ public sealed record UncalibratedMagnetometer(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "UncalibratedMagnetometer";
+
+    /// <summary>Scaled values (raw / 2^4).</summary>
+    public double X => Bno086Q.Scale(XRaw, 4);
+    public double Y => Bno086Q.Scale(YRaw, 4);
+    public double Z => Bno086Q.Scale(ZRaw, 4);
+
+    /// <summary>The hard-iron bias, µT.</summary>
+    public double[] Bias => new[] { Bno086Q.Scale(BiasXRaw, 4), Bno086Q.Scale(BiasYRaw, 4), Bno086Q.Scale(BiasZRaw, 4) };
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -155,6 +210,15 @@ public sealed record RotationVector(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "RotationVector";
+
+    /// <summary>The unit quaternion, Q14.</summary>
+    public double I => Bno086Q.Scale(IRaw, 14);
+    public double J => Bno086Q.Scale(JRaw, 14);
+    public double K => Bno086Q.Scale(KRaw, 14);
+    public double Real => Bno086Q.Scale(RealRaw, 14);
+
+    /// <summary>Estimated heading accuracy, radians (null for the game variants).</summary>
+    public double? AccuracyRad => AccuracyRaw is int a ? Bno086Q.Scale(a, Bno086Q.RvAccuracyQ) : null;
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -171,6 +235,9 @@ public sealed record ScalarReport(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "ScalarReport";
+
+    /// <summary>The value, Q from <see cref="Bno086Q.Points"/> by sensor (hPa, lux, %, cm, °C).</summary>
+    public double Value => Bno086Q.Scale(ValueRaw, Bno086Q.Points[SensorIdValue]);
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -185,6 +252,9 @@ public sealed record TapDetector(
     : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
 {
     public override string Kind => "TapDetector";
+
+    /// <summary>Bit 6: a double tap.</summary>
+    public bool DoubleTap => (Flags & 0x40) != 0;
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -246,6 +316,26 @@ public sealed record StabilityClassifier(
         var d = new Dictionary<string, object?>();
         AddInputHead(d);
         d["classification"] = (long)Classification;
+        return d;
+    }
+}
+
+/// <summary>
+/// 0x2B motion request (BNO086 interactive calibration): the motion intent the
+/// hub was last told, and what it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 =
+/// stay still). Sent when the request changes, not periodically.
+/// </summary>
+public sealed record MotionRequest(
+    int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Intent, int Request)
+    : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+{
+    public override string Kind => "MotionRequest";
+    public override IReadOnlyDictionary<string, object?> Fields()
+    {
+        var d = new Dictionary<string, object?>();
+        AddInputHead(d);
+        d["intent"] = (long)Intent;
+        d["request"] = (long)Request;
         return d;
     }
 }
@@ -319,6 +409,18 @@ public sealed record GyroIntegratedRV(
     : BnoReport(SensorIdValue, TimestampUs)
 {
     public override string Kind => "GyroIntegratedRV";
+
+    /// <summary>The unit quaternion, Q14.</summary>
+    public double I => Bno086Q.Scale(IRaw, 14);
+    public double J => Bno086Q.Scale(JRaw, 14);
+    public double K => Bno086Q.Scale(KRaw, 14);
+    public double Real => Bno086Q.Scale(RealRaw, 14);
+
+    /// <summary>Angular velocity, rad/s (Q10).</summary>
+    public double[] AngularVelocity => new[]
+    {
+        Bno086Q.Scale(VxRaw, Bno086Q.GyroRvAngvelQ), Bno086Q.Scale(VyRaw, Bno086Q.GyroRvAngvelQ), Bno086Q.Scale(VzRaw, Bno086Q.GyroRvAngvelQ),
+    };
     public override IReadOnlyDictionary<string, object?> Fields()
     {
         var d = new Dictionary<string, object?>();
@@ -326,6 +428,24 @@ public sealed record GyroIntegratedRV(
         d["i_raw"] = (long)IRaw; d["j_raw"] = (long)JRaw; d["k_raw"] = (long)KRaw;
         d["real_raw"] = (long)RealRaw;
         d["vx_raw"] = (long)VxRaw; d["vy_raw"] = (long)VyRaw; d["vz_raw"] = (long)VzRaw;
+        return d;
+    }
+}
+
+/// <summary>
+/// 0xEF Flush Completed: every batched report of <c>FlushedSensor</c> as of the
+/// matching Force Sensor Flush has been sent. <c>SensorIdValue</c> is 0xEF; no
+/// SH-2 header, so the timestamp is the cargo's current base.
+/// </summary>
+public sealed record FlushCompleted(int SensorIdValue, long TimestampUs, int FlushedSensor)
+    : BnoReport(SensorIdValue, TimestampUs)
+{
+    public override string Kind => "FlushCompleted";
+    public override IReadOnlyDictionary<string, object?> Fields()
+    {
+        var d = new Dictionary<string, object?>();
+        AddHead(d);
+        d["flushed_sensor"] = (long)FlushedSensor;
         return d;
     }
 }
@@ -338,7 +458,7 @@ public sealed record UnknownReport(int SensorIdValue, long TimestampUs, byte[] D
     {
         var d = new Dictionary<string, object?>();
         AddHead(d);
-        d["data"] = Convert.ToHexString(Data).ToLowerInvariant();
+        d["data"] = BitConverter.ToString(Data).Replace("-", "").ToLowerInvariant();
         return d;
     }
 }
@@ -346,12 +466,15 @@ public sealed record UnknownReport(int SensorIdValue, long TimestampUs, byte[] D
 /// <summary>
 /// SH-2 input-report parsers (contracts/05_SENSOR_BNO086.md §5). Byte-exact
 /// with the reference Python <c>reports.py</c>. Raw wire integers preserved;
-/// scaling (Q points) is the caller's concern.
+/// the report records scale them (<see cref="Bno086Q"/>).
 /// </summary>
 public static class Sh2Reports
 {
     private const byte BaseTimestampRef = 0xFB; // + i32 base delta (100 µs ticks)
     private const byte TimestampRebase = 0xFA;  // + i32 rebase delta (100 µs ticks)
+
+    /// <summary>Flush Completed: + u8 sensor ID, no SH-2 header; the answer to Force Sensor Flush (0xF0).</summary>
+    public const int FlushCompletedId = 0xEF;
 
     public const int GyroIntegratedRvId = 0x2A;
 
@@ -364,6 +487,7 @@ public static class Sh2Reports
         [0x13] = 6, [0x14] = 16, [0x15] = 16, [0x16] = 16, [0x18] = 8, [0x19] = 6,
         [0x1A] = 6, [0x1B] = 8, [0x1C] = 6, [0x1E] = 16, [0x1F] = 6, [0x20] = 6,
         [0x21] = 6, [0x22] = 6, [0x23] = 6, [0x28] = 14, [0x29] = 12, [0x2A] = 14,
+        [0x2B] = 6,
     };
 
     private static int I16(ReadOnlySpan<byte> p, int off) => BinaryPrimitives.ReadInt16LittleEndian(p[off..]);
@@ -373,10 +497,13 @@ public static class Sh2Reports
 
     /// <summary>
     /// Parse a channel-3/4 cargo into typed reports. <paramref name="captureTimestampUs"/>
-    /// is the bridge RPT_DATA capture time; 0xFB base and 0xFA rebase adjust it.
+    /// is the bridge RPT_DATA capture time (MCU uptime, never negative); 0xFB base
+    /// and 0xFA rebase adjust it.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="captureTimestampUs"/> is negative.</exception>
     public static List<BnoReport> ParseInputCargo(byte[] payload, long captureTimestampUs)
     {
+        Wire.CheckUint(nameof(captureTimestampUs), captureTimestampUs, 63);
         var outList = new List<BnoReport>();
         long baseUs = captureTimestampUs;
         int pos = 0;
@@ -396,6 +523,13 @@ public static class Sh2Reports
                 int delta = I32(payload, pos + 1);
                 baseUs += (long)delta * 100;
                 pos += 5;
+                continue;
+            }
+            if (rid == FlushCompletedId && pos + 2 <= n)
+            {
+                // no SH-2 header: stamped with the current base
+                outList.Add(new FlushCompleted(rid, baseUs, payload[pos + 1]));
+                pos += 2;
                 continue;
             }
             if (!ReportLengths.TryGetValue(rid, out int length) || pos + length > n)
@@ -454,6 +588,8 @@ public static class Sh2Reports
                 return new SignificantMotion(rid, ts, seq, accuracy, delayUs, U16(rep, 4));
             case 0x13:
                 return new StabilityClassifier(rid, ts, seq, accuracy, delayUs, rep[4]);
+            case 0x2B:
+                return new MotionRequest(rid, ts, seq, accuracy, delayUs, rep[4], rep[5]);
             case 0x19:
                 return new ShakeDetector(rid, ts, seq, accuracy, delayUs, U16(rep, 4));
             case 0x1E:
@@ -483,8 +619,10 @@ public static class Sh2Reports
     /// 7×i16, or prefixed with 0xFB + i32 base delta + u16 delay. Returns null
     /// when the cargo is too short.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="captureTimestampUs"/> is negative.</exception>
     public static GyroIntegratedRV? ParseGyroRvCargo(byte[] payload, long captureTimestampUs)
     {
+        Wire.CheckUint(nameof(captureTimestampUs), captureTimestampUs, 63);
         long ts = captureTimestampUs;
         ReadOnlySpan<byte> p = payload;
         if (p.Length >= 1 && p[0] == BaseTimestampRef)

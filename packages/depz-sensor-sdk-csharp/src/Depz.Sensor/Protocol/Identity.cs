@@ -68,16 +68,16 @@ public static class IdentityParser
 {
     private static readonly Regex VersionRe = new(@"_v(\d+(?:\.\d+)*)$", RegexOptions.Compiled);
 
+    // Checked in this order, the first match wins when a name holds several
+    // tokens (contract 02 §4.1). "VL53L0_4" does not contain "VL53L4".
     private static readonly (string Token, SensorType Sensor)[] ProductTokens =
     {
-        // The 1D-family tokens go first: none of the other tokens is a substring
-        // of them today, but "APP_VL53L0_4" must never fall through to VL53L4.
+        ("SR04", Protocol.SensorType.Sr04),
+        ("VL53L4", Protocol.SensorType.Vl53l4),
+        ("VL53L8", Protocol.SensorType.Vl53l8),
+        ("VL53L7", Protocol.SensorType.Vl53l7),
         ("VL53L0_4", Protocol.SensorType.Vl53lx),
         ("VL53LX", Protocol.SensorType.Vl53lx),
-        ("SR04", Protocol.SensorType.Sr04),
-        ("VL53L8", Protocol.SensorType.Vl53l8),
-        ("VL53L4", Protocol.SensorType.Vl53l4),
-        ("VL53L7", Protocol.SensorType.Vl53l7),
         ("BNO086", Protocol.SensorType.Bno086),
         ("BNO055", Protocol.SensorType.Bno055),
         ("TMF8829", Protocol.SensorType.Tmf8829),

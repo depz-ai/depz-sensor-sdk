@@ -660,8 +660,10 @@ static int uld_get_xtalk_margin(depz_device *dev, double *m)
 static int uld_set_xtalk_margin(depz_device *dev, double m)
 {
     uint8_t v[4];
-    if (m > 10000) return uld_fail(127, "set_xtalk_margin");
-    wr_u32le(v, depz_vl53l8_xtalk_margin_to_raw(m));
+    uint32_t raw;
+    /* 0..10000 kcps: below 0 (or NaN) is refused too, never wrapped */
+    if (depz_vl53l8_xtalk_margin_to_raw_checked(m, &raw)) return uld_fail(127, "set_xtalk_margin");
+    wr_u32le(v, raw);
     return dci_replace(dev, DCI_XTALK_CFG, 16, v, 4, 0);
 }
 
@@ -1435,8 +1437,9 @@ int depz_vl53l8_get_detection_thresholds(depz_device *dev, depz_vl53l8_threshold
 int depz_vl53l8_set_detection_thresholds(depz_device *dev, const depz_vl53l8_threshold *th, size_t n)
 {
     uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE], valid[8];
+    if (depz_vl53l8_pack_thresholds_checked(th, n, start, valid))
+        return depz_fail(DEPZ_E_ARG, "vl53l8: a scaled detection threshold overflows i32");
     TRY(need_idle(dev));
-    depz_vl53l8_pack_thresholds(th, n, start, valid);
     TRY(dci_write(dev, DCI_DET_THRESH_VALID_STATUS, valid, 8));
     return dci_write(dev, DCI_DET_THRESH_START, start, sizeof start);
 }
@@ -1662,7 +1665,7 @@ void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int nu
     int k;
     memset(s, 0, sizeof *s);
     for (k = 0; k < 64; k++) s->map_id[k] = -1;
-    s->ref_bin_offset = start_bin * 2048;
+    s->ref_bin_offset = (int32_t)(uint32_t)((int64_t)start_bin * 2048);
     s->feature_length = (uint8_t)(num_bins & 0xFF);
     s->sum_span = (uint8_t)(sub_sample & 0xFF);
     s->nb_of_temporal_accumulations = 1;
@@ -1672,12 +1675,31 @@ void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int nu
     s->cnh_flex_shift = 1;
 }
 
+int depz_vl53l8_cnh_init_config_checked(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins,
+                                        int sub_sample)
+{
+    /* u8 fields: refused when out of range, never masked (contract 07 §3) */
+    if (num_bins < 0 || num_bins > 0xFF || sub_sample < 0 || sub_sample > 0xFF)
+        return depz_fail(DEPZ_E_ARG, "cnh: num_bins %d / sub_sample %d outside 0..255", num_bins, sub_sample);
+    /* ref_bin_offset = start_bin * 2048 is an i32 */
+    if (start_bin < -1048576 || start_bin > 1048575)
+        return depz_fail(DEPZ_E_ARG, "cnh: start_bin %d outside -1048576..1048575", start_bin);
+    depz_vl53l8_cnh_init_config(s, start_bin, num_bins, sub_sample);
+    return DEPZ_OK;
+}
+
 int depz_vl53l8_cnh_create_agg_map(depz_vl53l8_cnh_setup *s, int resolution, int start_x, int start_y,
                                    int merge_x, int merge_y, int cols, int rows)
 {
     int zone_res = resolution == 16 ? 4 : 8, row, col, k;
     for (k = 0; k < 64; k++) s->map_id[k] = -1;
-    if (merge_x < 1 || merge_y < 1 || start_x + cols * merge_x > zone_res || start_y + rows * merge_y > zone_res)
+    if (resolution != 16 && resolution != 64)
+        return depz_fail(DEPZ_E_ARG, "cnh: resolution %d is not 16 or 64", resolution);
+    if (start_x < 0 || start_y < 0 || merge_x < 1 || merge_y < 1 || cols < 1 || rows < 1)
+        return depz_fail(DEPZ_E_ARG, "cnh: agg map start must be >= 0, merge / cols / rows >= 1");
+    /* 64-bit: every zone index written below is then inside the grid */
+    if ((int64_t)start_x + (int64_t)cols * merge_x > zone_res ||
+        (int64_t)start_y + (int64_t)rows * merge_y > zone_res)
         return depz_fail(DEPZ_E_ARG, "cnh: agg map exceeds zone grid");
     s->nb_of_aggregates = (uint8_t)(cols * rows);
     for (row = start_y; row < start_y + rows * merge_y; row++) {

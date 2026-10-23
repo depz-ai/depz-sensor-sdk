@@ -1,19 +1,49 @@
 # SR04 — user guide
 
-Hands-on guide to the `Sr04` codecs. For what the sensor is and its concepts,
-read the [introduction](introduction.md); for exact signatures see the
-[API reference](api.md). This is a decode layer — the snippets build request
-bytes and decode reply/report payloads; you supply the transport that carries
-them.
+Hands-on guide to the SR04: the live device (`ai.depz.sensor.devices.Sr04Device`)
+and the `Sr04` codecs under it. For what the sensor is and its concepts, read
+the [introduction](introduction.md); for exact signatures see the
+[API reference](api.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The codec surface](#the-codec-surface)
 - [Decode a measurement](#decode-a-measurement)
 - [Single shot vs the loop](#single-shot-vs-the-loop)
 - [Configuration](#configuration)
 - [Temperature-compensated distance](#temperature-compensated-distance)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import java.time.Duration;
+
+try (Sr04Device dev = DepzDevices.openSr04()) {
+    dev.setSamplePeriodUs(100_000);                 // a start every 100 ms at most
+    int decay = dev.setEchoDecayUs(5_000);          // returns the value the device keeps (4000..65000)
+    Sr04Measurement once = dev.measureOnce();       // ~65 ms worst case: the echo window
+    System.out.println(once.valid() ? once.distanceMm() + " mm" : "no echo");
+
+    try (Subscription<Sr04Measurement> loop = dev.measurements()) {
+        dev.start();
+        Sr04Measurement m = loop.take(Duration.ofSeconds(1));
+        System.out.println(m.source() + " " + m.distanceMmAt(24.0));   // speed of sound at 24 °C
+        dev.stop();
+    }
+}
+```
+
+- `measureOnce()` throws `BusyException` while the loop runs.
+- A SYNC_IN edge (`setSyncPin`) also triggers single shots; they arrive on the
+  stream with `source() == "once"`.
+- `onMeasurement(callback)` runs on the reader thread; close the returned
+  handle to stop.
+
+The sections below are the codecs under the device, for replaying captures or
+writing your own transport.
 
 ## The codec surface
 

@@ -53,7 +53,7 @@ _BUFFER_INFO_NO_VARIANCE    = 0x01
 MI_STATE_PING = 0
 
 
-class CnhConfigError(Exception):
+class CnhConfigError(ValueError):
     pass
 
 
@@ -87,14 +87,21 @@ class CnhConfig:
     def init_config(self, start_bin, num_bins, sub_sample):
         """start_bin: first device-histogram bin; num_bins: CNH bins;
         sub_sample: bins of the device histogram summed per CNH bin."""
+        # ref_bin_offset = start_bin*2048 is an i32 field (contract 07 §3: refused, never wrapped)
+        if not isinstance(start_bin, int) or not -1048576 <= start_bin <= 1048575:
+            raise CnhConfigError(f'start_bin {start_bin} out of range -1048576..1048575')
         self.ref_bin_offset = start_bin * 2048
         self.detection_threshold = 0
         self.extra_noise_sigma = 0
         self.null_den_clip_value = 0
         self.mem_update_mode = 0
         self.mem_update_choice = 0
-        self.feature_length = num_bins & 0xFF
-        self.sum_span = sub_sample & 0xFF
+        # u8 fields: refused when out of range, never masked (contract 07 §3)
+        for name, v in (('num_bins', num_bins), ('sub_sample', sub_sample)):
+            if not isinstance(v, int) or not 0 <= v <= 0xFF:
+                raise CnhConfigError(f'{name} {v} out of range 0..255')
+        self.feature_length = num_bins
+        self.sum_span = sub_sample
         self.nb_of_temporal_accumulations = 1
         self.min_nb_for_global_detection = 0
         self.global_indicator_format_1 = 0
@@ -113,6 +120,13 @@ class CnhConfig:
                        merge_x, merge_y, cols, rows):
         """Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)
         — must match the value passed to set_resolution()."""
+        if resolution not in (16, 64):
+            raise CnhConfigError(f'resolution {resolution}: 16 or 64')
+        for name, v, lo in (('start_x', start_x, 0), ('start_y', start_y, 0),
+                            ('merge_x', merge_x, 1), ('merge_y', merge_y, 1),
+                            ('cols', cols, 1), ('rows', rows, 1)):
+            if not isinstance(v, int) or v < lo:
+                raise CnhConfigError(f'agg map {name} {v} must be an integer >= {lo}')
         self.map_id = [-1] * MI_MAP_ID_LENGTH
         zone_res = 4 if resolution == 16 else 8
         if (start_x + cols * merge_x) > zone_res \

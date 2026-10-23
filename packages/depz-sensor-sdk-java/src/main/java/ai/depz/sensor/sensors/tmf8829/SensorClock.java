@@ -96,9 +96,12 @@ public final class SensorClock {
 
     /**
      * Add a pair → {@link #FT_CLOCK_RESET} if it does not fit the model (which
-     * then restarts from it), else 0.
+     * then restarts from it), else 0. {@code us} is a u64 in Java's
+     * two's-complement convention; {@code tick} a u32 SYSTICK (outside
+     * 0..2^32-1 → IllegalArgumentException, contract 07 §3).
      */
     public int add(long us, long tick) {
+        ai.depz.sensor.protocol.Wire.checkUint("tick", tick, 32);
         int flags = 0;
         if (valid && !stepOk(us - lastUs, (tick - lastTick) & U32)) {
             valid = false;

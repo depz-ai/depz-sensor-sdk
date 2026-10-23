@@ -1,6 +1,7 @@
 #include "depz/vl53l7.hpp"
 
 #include <regex>
+#include <stdexcept>
 
 #include "depz/detail/byteio.hpp"
 
@@ -15,6 +16,9 @@ using detail::wr_le;
 // ── command encoders ────────────────────────────────────────────────────────
 
 bytes pack_read_reg(std::uint16_t addr, std::uint16_t len) {
+    // contract 11 §2: len 1..1536, addr + len <= 0x10000 (refused, never sent)
+    if (len < 1 || len > READ_MAX_LEN || static_cast<std::uint32_t>(addr) + len > 0x10000u)
+        throw std::invalid_argument("VL53_READ_REG: len must be 1..1536 and addr+len <= 0x10000");
     bytes out;
     wr_le(out, addr, 2);
     wr_le(out, len, 2);
@@ -22,6 +26,9 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len) {
 }
 
 bytes pack_write_reg(std::uint16_t addr, byte_span data) {
+    // contract 11 §2: N 1..2048, addr + N <= 0x10000 (refused, never sent)
+    if (data.empty() || data.size() > WRITE_MAX_LEN || addr + data.size() > 0x10000u)
+        throw std::invalid_argument("VL53_WRITE_REG: data must be 1..2048 bytes and addr+N <= 0x10000");
     bytes out;
     out.reserve(2 + data.size());
     wr_le(out, addr, 2);
@@ -140,7 +147,7 @@ std::optional<vl53l8::Vl53l8Frame> decode_frame(byte_span raw, std::optional<int
         trim(f->signal_per_spad);
         trim(f->ambient_per_spad);
         trim(f->nb_spads_enabled);
-        trim(f->range_sigma_mm_raw);
+        trim(f->range_sigma_mm);
         trim(f->reflectance);
         f->resolution = static_cast<int>(f->nb_target_detected.size());
     }

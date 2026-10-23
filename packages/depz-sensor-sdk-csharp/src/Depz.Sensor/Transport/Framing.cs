@@ -43,12 +43,19 @@ public static class Framing
     /// Frame one packet. The <paramref name="crcType"/> bits are set in the
     /// header even for an empty payload (matching device TX), but CRC bytes are
     /// only appended for non-empty payloads (E6). <paramref name="seq"/> is
-    /// taken modulo 256.
+    /// a free-running u32 counter, taken modulo 256 on the wire.
     /// </summary>
-    public static byte[] BuildPacket(int cmd, ReadOnlySpan<byte> payload = default, int seq = 0, CrcType crcType = CrcType.None)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="cmd"/> outside 0..255,
+    /// <paramref name="seq"/> outside 0..2^32−1, or
+    /// <paramref name="crcType"/> not a listed <see cref="CrcType"/>.</exception>
+    public static byte[] BuildPacket(int cmd, ReadOnlySpan<byte> payload = default, long seq = 0, CrcType crcType = CrcType.None)
     {
         if (payload.Length > MaxPayload)
             throw new ArgumentException($"payload too long: {payload.Length} > {MaxPayload}", nameof(payload));
+        Protocol.Wire.CheckUint("cmd", cmd, 8);
+        Protocol.Wire.CheckUint("seq", seq, 32);
+        if (!Enum.IsDefined(typeof(CrcType), crcType))
+            throw new ArgumentOutOfRangeException(nameof(crcType), crcType, $"crcType: {(int)crcType} is not a CrcType");
 
         int dataSize = payload.Length | ((int)crcType << 14);
         byte dsLo = (byte)(dataSize & 0xFF);

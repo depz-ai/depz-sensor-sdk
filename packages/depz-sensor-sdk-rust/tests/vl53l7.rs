@@ -3,46 +3,15 @@
 //! the 1536-byte ceiling, WRITE_REG, PIN_CTRL, SET_I2C_SPEED), RPT_VL53_INFO
 //! decode, and the class-resolution table.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::protocol::identity::{self, SensorType};
 use depz_sensor_sdk::vl53l7::{
     pack_pin_ctrl, pack_read_reg, pack_set_i2c_speed, pack_write_reg, resolve_model, Vl53l7Info,
     Vl53l7Rpt, INFO_SIZE, READ_MAX_LEN,
 };
-use serde_json::Value;
 
-fn vectors_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR = packages/depz-sensor-sdk-rust
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn load(name: &str) -> Value {
-    let p = vectors_dir().join(name);
-    let txt =
-        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("read {}: {}", p.display(), e));
-    serde_json::from_str(&txt).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len().is_multiple_of(2), "odd hex length: {:?}", s);
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{:02x}", x));
-    }
-    s
-}
+use common::{hex_decode, hex_encode, load, seen};
 
 // ---- vl53l7.json: "encode" -------------------------------------------------
 
@@ -56,12 +25,13 @@ fn vl53l7_encode_vectors() {
             "read_reg" => {
                 let len = c["len"].as_u64().unwrap();
                 assert!(len as usize <= READ_MAX_LEN, "{} exceeds READ_MAX_LEN", c["name"]);
-                hex_encode(&pack_read_reg(c["addr"].as_u64().unwrap() as u16, len as u16))
+                hex_encode(&pack_read_reg(c["addr"].as_u64().unwrap() as u16, len as u16).unwrap())
             }
             "write_reg" => hex_encode(&pack_write_reg(
                 c["addr"].as_u64().unwrap() as u16,
                 &hex_decode(c["data"].as_str().unwrap()),
-            )),
+            )
+            .unwrap()),
             "pin_ctrl" => hex_encode(&pack_pin_ctrl(c["action"].as_u64().unwrap() as u8)),
             "set_i2c_speed" => {
                 hex_encode(&pack_set_i2c_speed(c["khz"].as_u64().unwrap() as u16))
@@ -69,6 +39,7 @@ fn vl53l7_encode_vectors() {
             other => panic!("unknown encode kind {:?} in {}", other, c["name"]),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -97,6 +68,7 @@ fn vl53l7_decode_vectors() {
         assert_eq!(info.i2c_khz as u64, u("i2c_khz"), "{} i2c_khz", name);
         assert_eq!(info.frame_size as u64, u("frame_size"), "{} frame_size", name);
         assert_eq!(info.streaming, e["streaming"].as_bool().unwrap(), "{} streaming", name);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -118,6 +90,7 @@ fn vl53l7_model_vectors() {
     for c in doc["model"].as_array().unwrap() {
         let got = resolve_model(c["usb_model"].as_str(), c["device_name"].as_str().unwrap());
         assert_eq!(got.as_str(), c["expect"].as_str().unwrap(), "model {}", c["name"]);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);

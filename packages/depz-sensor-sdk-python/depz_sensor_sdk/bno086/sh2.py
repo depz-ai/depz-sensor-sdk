@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 
 from ..errors import DepzError
+from ..protocol._wire import check_uint, checked_pack
 
 
 class Sh2Error(DepzError):
@@ -33,6 +34,7 @@ class ControlReport(IntEnum):
     GET_FEATURE_RESPONSE = 0xFC
     SET_FEATURE_COMMAND = 0xFD
     GET_FEATURE_REQUEST = 0xFE
+    FORCE_SENSOR_FLUSH = 0xF0  # host → hub; answered by Flush Completed (0xEF)
 
 
 # Fixed lengths of the sensor→host control reports (contract 05 §6). One
@@ -75,6 +77,7 @@ class Sh2Command(IntEnum):
     PERIODIC_DCD_CONFIG = 0x09
     GET_OSCILLATOR_TYPE = 0x0A
     CLEAR_DCD_AND_RESET = 0x0B
+    INTERACTIVE_CALIBRATION = 0x0E  # BNO086 only; no response
 
 
 class OscillatorType(IntEnum):
@@ -189,21 +192,21 @@ def build_set_feature(
     `interval_us` = 0 disables the sensor. `sensitivity` units are
     sensor-dependent (change sensitivity, u16); `flags` bit meanings per
     SH-2 §6.5.4; `cfg_word` is the sensor-specific configuration u32."""
-    return struct.pack(
+    return checked_pack(
         "<BBBHIII",
-        ControlReport.SET_FEATURE_COMMAND,
-        sensor_id,
-        flags & 0xFF,
-        sensitivity & 0xFFFF,
-        interval_us & 0xFFFFFFFF,
-        batch_us & 0xFFFFFFFF,
-        cfg_word & 0xFFFFFFFF,
+        report=ControlReport.SET_FEATURE_COMMAND,
+        sensor_id=sensor_id,
+        flags=flags,
+        sensitivity=sensitivity,
+        interval_us=interval_us,
+        batch_us=batch_us,
+        cfg_word=cfg_word,
     )
 
 
 def build_get_feature_request(sensor_id: int) -> bytes:
     """Get Feature Request (0xFE), 2 bytes."""
-    return bytes((ControlReport.GET_FEATURE_REQUEST, sensor_id))
+    return checked_pack("<BB", report=ControlReport.GET_FEATURE_REQUEST, sensor_id=sensor_id)
 
 
 @dataclass(frozen=True)
@@ -269,9 +272,9 @@ def build_command_request(seq: int, command: int, params: bytes = b"") -> bytes:
     """Command Request (0xF2), 12 bytes: id, seq, command, P0..P8."""
     if len(params) > 9:
         raise ValueError("command request carries at most 9 parameter bytes")
-    return bytes((ControlReport.COMMAND_REQUEST, seq & 0xFF, command)) + params.ljust(
-        9, b"\x00"
-    )
+    return checked_pack(
+        "<BBB", report=ControlReport.COMMAND_REQUEST, seq=seq, command=command
+    ) + params.ljust(9, b"\x00")
 
 
 @dataclass(frozen=True)
@@ -332,6 +335,33 @@ def me_calibration_params(
 ME_CAL_GET = 0x01  # subcommand: report current ME calibration config
 
 
+class MotionIntent(IntEnum):
+    """P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 —
+    what the host knows about the device's motion. UNKNOWN is the hub's
+    initial state."""
+
+    UNKNOWN = 0
+    STATIONARY_NO_VIBRATION = 1
+    STATIONARY_WITH_VIBRATION = 2
+    IN_MOTION = 3
+    IN_MOTION_ACCELERATING = 4
+
+
+def interactive_calibration_params(intent: int) -> bytes:
+    """Interactive Calibration (command 0x0E, BNO086 only): P0 = motion
+    intent, P1..P8 reserved. No command response is generated."""
+    check_uint("intent", intent, 8)
+    return bytes((intent,))
+
+
+def build_force_flush(sensor_id: int) -> bytes:
+    """Force Sensor Flush (0xF0, SH-2 §6.5.6): flush `sensor_id`'s batched
+    data now. The hub answers with Flush Completed (0xEF) — on the input
+    channel, as the lab BNO086 does (SH-2 3.12.6, 2026-10-22)."""
+    check_uint("sensor_id", sensor_id, 8)
+    return bytes((ControlReport.FORCE_SENSOR_FLUSH, sensor_id))
+
+
 def periodic_dcd_params(enable: bool) -> bytes:
     """Periodic DCD save config (command 0x09). P0: 0 = enable, 1 = disable.
     No command response is generated."""
@@ -354,6 +384,8 @@ class FrsRecordId(IntEnum):
     MAGNETOMETER_ORIENTATION = 0x2D4C
     ARVR_STABILIZATION_RV = 0x3E2D
     ARVR_STABILIZATION_GRV = 0x3E2E
+    SERIAL_NUMBER = 0x4B4B  # one 32-bit word; empty unless programmed
+    USER_RECORD = 0x74B4  # free for the user, up to 64 words
     # Feature configuration records (SH-2 §5.1; write to tune detectors).
     SIG_MOTION_DETECT_CONFIG = 0xC274
     SHAKE_DETECT_CONFIG = 0x7D7D
@@ -386,6 +418,7 @@ METADATA_RECORDS: dict[int, int] = {
     0x28: 0xE322,  # ARVR-stabilized RV
     0x29: 0xE323,  # ARVR-stabilized game RV
     0x2A: 0xE324,  # gyro-integrated RV
+    0x2B: 0xE325,  # motion request (BNO086 only)
 }
 
 
@@ -418,8 +451,13 @@ class FrsWriteStatus(IntEnum):
 
 def build_frs_read_request(frs_type: int, offset_words: int = 0, block_words: int = 0) -> bytes:
     """FRS Read Request (0xF4), 8 bytes. block_words = 0 reads the record."""
-    return struct.pack(
-        "<BBHHH", ControlReport.FRS_READ_REQUEST, 0, offset_words, frs_type, block_words
+    return checked_pack(
+        "<BBHHH",
+        report=ControlReport.FRS_READ_REQUEST,
+        reserved=0,
+        offset_words=offset_words,
+        frs_type=frs_type,
+        block_words=block_words,
     )
 
 
@@ -444,7 +482,13 @@ class FrsReadResponse:
 
 def build_frs_write_request(frs_type: int, length_words: int) -> bytes:
     """FRS Write Request (0xF7), 6 bytes. length_words = 0 erases the record."""
-    return struct.pack("<BBHH", ControlReport.FRS_WRITE_REQUEST, 0, length_words, frs_type)
+    return checked_pack(
+        "<BBHH",
+        report=ControlReport.FRS_WRITE_REQUEST,
+        reserved=0,
+        length_words=length_words,
+        frs_type=frs_type,
+    )
 
 
 def build_frs_write_data(offset_words: int, words: tuple[int, ...] | list[int]) -> bytes:
@@ -453,7 +497,9 @@ def build_frs_write_data(offset_words: int, words: tuple[int, ...] | list[int]) 
         raise ValueError("FRS write data carries 1 or 2 words")
     w0 = words[0]
     w1 = words[1] if len(words) > 1 else 0
-    return struct.pack("<BBHII", ControlReport.FRS_WRITE_DATA, 0, offset_words, w0, w1)
+    return checked_pack(
+        "<BBHII", report=ControlReport.FRS_WRITE_DATA, reserved=0, offset_words=offset_words, w0=w0, w1=w1
+    )
 
 
 @dataclass(frozen=True)

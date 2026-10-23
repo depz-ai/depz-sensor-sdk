@@ -70,14 +70,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53l4cx.identify
+#### Vl53l4cx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53l4cx.notes
 
@@ -168,7 +170,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53l4cx.snap_budget
@@ -363,6 +365,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53l4cx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53l4cx.close
 
 ```python
@@ -447,6 +453,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l4cx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l4cx.read_mcu_temperature
 
@@ -580,14 +595,16 @@ name; `driver` defaults to the product's first kind in DRIVER_KINDS
 order (``uld``, else ``ulp``, else ``histogram``). A pair the table has
 no row for raises NotImplementedError naming what the product has.
 
-#### Vl53lx.identify
+#### Vl53lx.identify_product
 
 ```python
-identify(self) -> dict
+identify_product(self) -> dict
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
 is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+(Until 0.7.0 this was `identify()`, which now is the base class's
+parsed firmware name, as on every device.)
 
 #### Vl53lx.notes
 
@@ -678,7 +695,7 @@ budget_choices(self) -> tuple[int, ...]
 ```
 
 The only budgets accepted right now (ascending), or () when any
-integer in ``identify()['budget_ms']`` will do. Can move with the mode
+integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
 (VL53L1: 15 ms exists in short mode only).
 
 #### Vl53lx.snap_budget
@@ -873,6 +890,10 @@ after `timeout`, LinkClosedError as soon as the device is closed.
 
 Stream reports dropped because the driver failed to decode them.
 
+#### Vl53lx.stream_dropped_counts *(property)*
+
+Drop-oldest counters of all live measurement queues (diagnostics).
+
 #### Vl53lx.close
 
 ```python
@@ -957,6 +978,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53lx.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53lx.read_mcu_temperature
 

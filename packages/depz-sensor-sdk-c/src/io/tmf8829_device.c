@@ -81,7 +81,8 @@ static void on_chunk(depz_device *dev, const uint8_t *p, size_t len)
         raw.data = s->frame_buf;
         got = depz_tmf8829_builder_add(s->builder, raw.data, raw.len, (int64_t)raw.timestamp_us,
                                        (int64_t)raw.edge_us, s->meas);
-        if (got) s->measurements++;
+        if (got == 1) s->measurements++;
+        else got = 0;
     }
     depz_mutex_unlock(&s->lock);
     if (!done) return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseSoftwareName, stripDeviceString } from "../../src/index.js";
-import { fromHex, loadVectors } from "./vectors.js";
+import { fromHex, loadVectors, seen } from "./vectors.js";
 
 const data = loadVectors("identity.json");
 
@@ -12,6 +12,7 @@ describe("identity vectors", () => {
       expect(ident.sensorType).toBe(c.expect.sensor_type);
       expect(ident.softwareName).toBe(c.expect.software_name);
       expect(ident.version).toBe(c.expect.version);
+      seen(c);
     });
   }
 });

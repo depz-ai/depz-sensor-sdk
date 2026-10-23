@@ -39,8 +39,13 @@ public sealed record ShtpHeader(int Length, int Channel, int Seq, bool Continuat
     public const int LengthMask = 0x7FFF;
     public const int ContinuationBit = 0x8000;
 
+    /// <exception cref="ArgumentOutOfRangeException"><c>Length</c> outside u15, <c>Channel</c> or
+    /// <c>Seq</c> outside u8 — never masked.</exception>
     public byte[] Pack()
     {
+        Protocol.Wire.CheckUint("length", Length, 15);
+        Protocol.Wire.CheckUint("channel", Channel, 8);
+        Protocol.Wire.CheckUint("seq", Seq, 8);
         int word = (Length & LengthMask) | (Continuation ? ContinuationBit : 0);
         var buf = new byte[Size];
         BinaryPrimitives.WriteUInt16LittleEndian(buf, (ushort)word);
@@ -51,13 +56,19 @@ public sealed record ShtpHeader(int Length, int Channel, int Seq, bool Continuat
 
     public static ShtpHeader Unpack(ReadOnlySpan<byte> data)
     {
+        Protocol.Wire.NeedBytes("SHTP header", data, Size);
         int word = BinaryPrimitives.ReadUInt16LittleEndian(data);
         return new ShtpHeader(word & LengthMask, data[2], data[3], (word & ContinuationBit) != 0);
     }
 }
 
-/// <summary>One reassembled cargo: <c>Payload</c> excludes all SHTP headers.</summary>
-public sealed record ShtpCargo(int Channel, int Seq, byte[] Payload);
+/// <summary>
+/// One reassembled cargo: <c>Payload</c> excludes all SHTP headers; <c>Seq</c> and
+/// <c>CaptureUs</c> are the FIRST fragment's — <c>CaptureUs</c> is its
+/// <c>RPT_DATA.timestamp_us</c>, the capture the cargo's 0xFB base delta refers to
+/// (contract 05 §3).
+/// </summary>
+public sealed record ShtpCargo(int Channel, int Seq, byte[] Payload, long CaptureUs = 0);
 
 /// <summary>
 /// SHTP codec: per-channel TX sequence counters and RX cargo reassembly
@@ -74,6 +85,7 @@ public sealed class ShtpLayer
         public List<byte> Buf = new();
         public int Expected;
         public int Seq;
+        public long CaptureUs;
     }
 
     private readonly int[] _txSeq = new int[NumChannels];
@@ -136,6 +148,9 @@ public sealed class ShtpLayer
     {
         if (ShtpHeader.Size + payload.Length > MaxTxFrame)
             throw new ArgumentException($"TX cargo {payload.Length}B exceeds the {MaxTxFrame}B MCU slot");
+        if (channel < 0 || channel >= NumChannels)
+            throw new ArgumentOutOfRangeException(nameof(channel), channel,
+                $"SHTP channel {channel} out of range 0..{NumChannels - 1}");
         int seq = _txSeq[channel];
         _txSeq[channel] = (seq + 1) & 0xFF;
         return BuildFrame(channel, payload, seq);
@@ -145,9 +160,17 @@ public sealed class ShtpLayer
 
     // ── RX ───────────────────────────────────────────────────────────────────
 
-    /// <summary>Consume one inbound frame; return the cargo when complete, else null.</summary>
-    public ShtpCargo? Feed(byte[] frame)
+    /// <summary>
+    /// Consume one inbound frame; return the cargo when complete, else null.
+    /// <paramref name="captureUs"/> is the frame's <c>RPT_DATA.timestamp_us</c>; the
+    /// cargo carries the FIRST fragment's — the base its 0xFB timestamps refer to
+    /// (contract 05 §3), not the fragment that completed it. It is the MCU uptime
+    /// (a u64 µs): a negative one throws <see cref="ArgumentOutOfRangeException"/>.
+    /// </summary>
+    public ShtpCargo? Feed(byte[] frame, long captureUs = 0)
     {
+        if (captureUs < 0)
+            throw new ArgumentOutOfRangeException(nameof(captureUs), captureUs, "captureUs is a u64 (MCU uptime µs)");
         if (frame.Length < ShtpHeader.Size)
             return null;
         ShtpHeader hdr = ShtpHeader.Unpack(frame);
@@ -162,6 +185,7 @@ public sealed class ShtpLayer
             rx.Buf = new List<byte>(chunk.ToArray());
             rx.Expected = hdr.Length - ShtpHeader.Size;
             rx.Seq = hdr.Seq;
+            rx.CaptureUs = captureUs;
         }
         else
         {
@@ -182,7 +206,7 @@ public sealed class ShtpLayer
             rx.Expected = 0;
             return null;
         }
-        var cargo = new ShtpCargo(hdr.Channel, rx.Seq, rx.Buf.ToArray());
+        var cargo = new ShtpCargo(hdr.Channel, rx.Seq, rx.Buf.ToArray(), rx.CaptureUs);
         rx.Buf = new List<byte>();
         rx.Expected = 0;
         return cargo;
@@ -191,7 +215,7 @@ public sealed class ShtpLayer
     /// <summary>Forget all TX seq counters and partial cargos (sensor reset).</summary>
     public void Reset()
     {
-        Array.Clear(_txSeq);
+        Array.Clear(_txSeq, 0, _txSeq.Length);
         for (int i = 0; i < NumChannels; i++)
             _rx[i] = new ChannelRx();
     }

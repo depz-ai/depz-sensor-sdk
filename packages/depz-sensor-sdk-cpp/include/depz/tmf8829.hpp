@@ -330,7 +330,8 @@ public:
     SensorClock() { reset(); }
     void reset();
     // Add a pair -> FT_CLOCK_RESET when it does not fit the model (which then
-    // restarts from it), else 0.
+    // restarts from it), else 0. std::out_of_range for a negative `us` (a u64
+    // MCU time, contract 07 §3).
     std::uint8_t add(std::int64_t us, std::uint32_t tick);
     // SYSTICK `tick` -> MCU µs through the pair (pair_us, pair_tick).
     std::int64_t to_us(std::int64_t pair_us, std::uint32_t pair_tick, std::uint32_t tick) const;
@@ -371,7 +372,8 @@ public:
     void reset();
     // A histogram frame was seen in the stream.
     void histograms() { hist_seen_ = true; }
-    // `flags` = what clock.add() returned for this frame.
+    // `flags` = what clock.add() returned for this frame. std::out_of_range for
+    // fp_mode > 255 or a negative pair_us / edge_us.
     FrameTime results(const SensorClock& clock, unsigned fp_mode, std::uint32_t systick,
                       std::uint32_t t0_tick, std::uint32_t t1_tick, std::int64_t pair_us,
                       std::int64_t edge_us, std::uint8_t flags);
@@ -438,7 +440,8 @@ public:
     MeasurementBuilder() { reset(); }
     void reset();
     // One frame with the MCU time of its header read and its INT edge (0 =
-    // none) -> the measurement it completes, or nullopt.
+    // none) -> the measurement it completes, or nullopt. std::out_of_range for
+    // a negative timestamp_us / edge_us (u64 MCU times, contract 07 §3).
     std::optional<Measurement> add(byte_span raw, std::int64_t timestamp_us, std::int64_t edge_us = 0);
 
     SensorClock clock;
@@ -542,14 +545,16 @@ inline constexpr std::array<CfgField, 14> CFG_FIELDS = {{
 
 // The field called `name`, or nullopt.
 std::optional<CfgField> find_cfg_field(const std::string& name);
-// Read a field of a 190-byte config page. std::out_of_range for an unknown
-// name, std::invalid_argument for a page shorter than CFG_SIZE.
+// Read a field of a config page (CFG_SIZE bytes, or a partial read from its
+// start that holds the field). std::out_of_range for an unknown name,
+// std::invalid_argument for a page too short to hold the field.
 std::uint32_t cfg_get(byte_span page, const std::string& name);
 // Set a field in place. std::out_of_range for an unknown name,
-// std::invalid_argument for a value outside 0 .. 2^width - 1 (page untouched)
-// or a page shorter than CFG_SIZE.
+// std::invalid_argument for a value outside 0 .. 2^width - 1 or a page too
+// short to hold the field (page untouched either way).
 void cfg_set(bytes& page, const std::string& name, std::int64_t value);
-// Every named field of a config page, in CFG_FIELDS order.
+// Every named field of a config page, in CFG_FIELDS order (std::invalid_argument
+// when the page is too short for one of them).
 std::vector<std::pair<std::string, std::uint32_t>> config_fields(byte_span page);
 
 // ── sensor firmware ─────────────────────────────────────────────────────────

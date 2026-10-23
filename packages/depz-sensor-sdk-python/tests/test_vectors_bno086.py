@@ -1,7 +1,5 @@
 """Golden-vector consumers: bno086_shtp.json + bno086_reports.json."""
 
-import dataclasses
-
 from depz_sensor_sdk.bno086 import sh2
 from depz_sensor_sdk.bno086.reports import (
     GYRO_RV_ANGVEL_Q,
@@ -13,39 +11,42 @@ from depz_sensor_sdk.bno086.reports import (
 from depz_sensor_sdk.bno086.shtp import ExecutableCommand, ShtpChannel, ShtpHeader, ShtpLayer
 from depz_sensor_sdk.protocol.bno086 import Bno086Cmd
 from depz_sensor_sdk.transport import build_packet
-from depz_sensor_sdk.dataset import bno086_record_value
+from vector_shapes import bno086_cargo, bno086_serialize as _serialize
 
 # ── bno086_shtp.json ──────────────────────────────────────────────────────────
 
 
-def test_shtp_header_pack_unpack(vectors):
+def test_shtp_header_pack_unpack(vectors, seen):
     for case in vectors("bno086_shtp.json")["header"]:
         hdr = ShtpHeader(case["length"], case["channel"], case["seq"], case["continuation"])
         assert hdr.pack().hex() == case["bytes"], case["name"]
         back = ShtpHeader.unpack(bytes.fromhex(case["bytes"]))
         assert back == hdr, case["name"]
+        seen(case)
 
 
-def test_shtp_per_channel_tx_seq(vectors):
+def test_shtp_per_channel_tx_seq(vectors, seen):
     layer = ShtpLayer()
     for case in vectors("bno086_shtp.json")["tx_seq"]:
         frame = layer.next_frame(case["channel"], bytes.fromhex(case["payload"]))
         assert frame.hex() == case["frame"]
+        seen(case)
 
 
-def test_shtp_reassembly(vectors):
+def test_shtp_reassembly(vectors, seen):
     for case in vectors("bno086_shtp.json")["reassembly"]:
         rx = ShtpLayer()
         cargos = []
-        for f in case["frames"]:
-            c = rx.feed(bytes.fromhex(f))
+        for f, t in zip(case["frames"], case["captures_us"]):
+            c = rx.feed(bytes.fromhex(f), t)
             if c is not None:
-                cargos.append({"channel": c.channel, "seq": c.seq, "payload": c.payload.hex()})
+                cargos.append(bno086_cargo(c))
         assert cargos == case["expect"]["cargos"], case["name"]
         assert rx.discarded == case["expect"]["discarded"], case["name"]
+        seen(case)
 
 
-def test_sh2_control_encodes(vectors):
+def test_sh2_control_encodes(vectors, seen):
     for case in vectors("bno086_shtp.json")["control_encode"]:
         kind = case["kind"]
         if kind == "set_feature":
@@ -76,9 +77,25 @@ def test_sh2_control_encodes(vectors):
         else:
             raise AssertionError(kind)
         assert got.hex() == case["payload"], case["name"]
+        seen(case)
 
 
-def test_executable_sleep_power_on_frames(vectors):
+def test_interactive_calibration_and_flush_encodes(vectors, seen):
+    for case in vectors("bno086_shtp.json")["interactive_and_flush"]:
+        if case["kind"] == "command_request":
+            assert bytes.fromhex(case["params"]) == sh2.interactive_calibration_params(
+                bytes.fromhex(case["params"])[0])
+            got = sh2.build_command_request(
+                case["seq"], case["command"], bytes.fromhex(case["params"])
+            )
+        else:
+            assert case["kind"] == "force_flush"
+            got = sh2.build_force_flush(case["sensor_id"])
+        assert got.hex() == case["payload"], case["name"]
+        seen(case)
+
+
+def test_executable_sleep_power_on_frames(vectors, seen):
     commands = {"sleep": ExecutableCommand.SLEEP, "power_on": ExecutableCommand.ON}
     layer = ShtpLayer()  # fresh: sleep then power_on → channel-1 seq 0, 1
     for case in vectors("bno086_shtp.json")["executable"]:
@@ -92,43 +109,45 @@ def test_executable_sleep_power_on_frames(vectors):
         assert case["bridge_cmd"] == Bno086Cmd.SEND_SHTP_PACKET
         bridge = build_packet(case["bridge_cmd"], frame, case["bridge_seq"], case["crc_type"])
         assert bridge.hex() == case["bridge_frame"], case["name"]
+        seen(case)
 
 
-def test_feature_flag_bits(vectors):
+def test_feature_flag_bits(vectors, seen):
     flags = vectors("bno086_shtp.json")["feature_flags"]
     assert flags == {"wakeup": sh2.FeatureFlag.WAKEUP, "always_on": sh2.FeatureFlag.ALWAYS_ON}
+    seen("bno086_shtp/feature_flags")
 
 
 # ── bno086_reports.json ───────────────────────────────────────────────────────
 
 
-def _serialize(rep) -> dict:
-    fields = {}
-    for k, v in dataclasses.asdict(rep).items():
-        if isinstance(v, bytes):
-            v = v.hex()
-        elif isinstance(v, tuple):
-            v = list(v)
-        fields[k] = int(v) if isinstance(v, bool) else v
-    # `record`: the contract 09 dataset record value the recorder writes
-    return {"type": type(rep).__name__, "fields": fields, "record": bno086_record_value(rep)}
-
-
-def test_q_point_table_matches(vectors):
+def test_q_point_table_matches(vectors, seen):
     data = vectors("bno086_reports.json")
     assert {f"0x{int(k):02X}": v for k, v in Q_POINTS.items()} == data["q_points"]
+    seen("bno086_reports/q_points")
     assert data["rv_accuracy_q"] == RV_ACCURACY_Q
+    seen("bno086_reports/rv_accuracy_q")
     assert data["gyro_rv_angvel_q"] == GYRO_RV_ANGVEL_Q
+    seen("bno086_reports/gyro_rv_angvel_q")
 
 
-def test_input_cargo_decode_vectors(vectors):
+def test_input_cargo_decode_vectors(vectors, seen):
     for case in vectors("bno086_reports.json")["input_cargos"]:
         reps = parse_input_cargo(bytes.fromhex(case["cargo"]), case["capture_timestamp_us"])
         assert [_serialize(r) for r in reps] == case["expect"], case["name"]
+        seen(case)
 
 
-def test_gyro_rv_decode_vectors(vectors):
+def test_interactive_and_flush_decode_vectors(vectors, seen):
+    for case in vectors("bno086_reports.json")["interactive_and_flush"]:
+        reps = parse_input_cargo(bytes.fromhex(case["cargo"]), case["capture_timestamp_us"])
+        assert [_serialize(r) for r in reps] == case["expect"], case["name"]
+        seen(case)
+
+
+def test_gyro_rv_decode_vectors(vectors, seen):
     for case in vectors("bno086_reports.json")["gyro_rv"]:
         rep = parse_gyro_rv_cargo(bytes.fromhex(case["cargo"]), case["capture_timestamp_us"])
         assert rep is not None, case["name"]
         assert _serialize(rep) == case["expect"], case["name"]
+        seen(case)

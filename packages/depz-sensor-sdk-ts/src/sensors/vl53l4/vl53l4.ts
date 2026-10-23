@@ -108,7 +108,7 @@ export class Vl53l4cd extends DepzDevice {
 
   /** ULD `platform` object mapped onto the firmware register bridge. */
   private readonly platform: Vl53l4Platform = {
-    rdMulti: (addr: number, size: number): Promise<Uint8Array> =>
+    rdMulti: async (addr: number, size: number): Promise<Uint8Array> =>
       chunkedRead(addr, size, {
         chunkSize: XFER_MAX,
         readChunk: async (a, n) => {
@@ -122,10 +122,10 @@ export class Vl53l4cd extends DepzDevice {
           this.lastRegTimestampUs = ts;
         },
       }),
-    wrMulti: (addr: number, data: Uint8Array): Promise<void> =>
+    wrMulti: async (addr: number, data: Uint8Array): Promise<void> =>
       chunkedWrite(addr, data, {
         chunkSize: XFER_MAX,
-        writeChunk: (a, chunk) =>
+        writeChunk: async (a, chunk) =>
           this.request(Vl53l4Cmd.WriteReg, packWriteReg(a, chunk), {
             okCompletes: true,
             timeoutMs: 2000,
@@ -134,12 +134,12 @@ export class Vl53l4cd extends DepzDevice {
     setI2cSpeed: async (khz: number): Promise<void> => {
       await this.request(Vl53l4Cmd.SetI2cSpeed, packSetI2cSpeed(khz), { okCompletes: true });
     },
-    sleepMs: (ms: number): Promise<void> => this.sleepImpl(ms),
+    sleepMs: async (ms: number): Promise<void> => this.sleepImpl(ms),
   };
 
   constructor(transport: SerialTransport, opts?: Vl53l4Options) {
     super(transport, opts);
-    this.sleepImpl = opts?.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
     this.uldDriver = new VL53L4CD(this.platform);
   }
 
@@ -208,7 +208,7 @@ export class Vl53l4cd extends DepzDevice {
    * are free-running (wrap silently) — watch increments. Safe to call while
    * streaming.
    */
-  bridgeInfo(): Promise<Vl53l4Info> {
+  async bridgeInfo(): Promise<Vl53l4Info> {
     return this.request(Vl53l4Cmd.GetInfo, undefined, {
       matcher: DepzDevice.expectReport(Vl53l4Rpt.Info, unpackInfo),
     });
@@ -230,7 +230,7 @@ export class Vl53l4cd extends DepzDevice {
    * → { timingBudgetMs, interMeasurementMs }. interMeasurement 0 means
    * continuous mode.
    */
-  getRangeTiming(): Promise<RangeTiming> {
+  async getRangeTiming(): Promise<RangeTiming> {
     return this.uldDriver.getRangeTiming();
   }
 
@@ -245,7 +245,7 @@ export class Vl53l4cd extends DepzDevice {
   }
 
   /** Configured ranging offset in mm (signed). */
-  getOffsetMm(): Promise<number> {
+  async getOffsetMm(): Promise<number> {
     return this.uldDriver.getOffset();
   }
 
@@ -256,7 +256,7 @@ export class Vl53l4cd extends DepzDevice {
   }
 
   /** Configured crosstalk compensation in kcps (0 = disabled). */
-  getXtalkKcps(): Promise<number> {
+  async getXtalkKcps(): Promise<number> {
     return this.uldDriver.getXtalk();
   }
 
@@ -270,7 +270,7 @@ export class Vl53l4cd extends DepzDevice {
    * → { distanceLowMm, distanceHighMm, window }. Window is one of
    * WINDOW_BELOW / WINDOW_ABOVE / WINDOW_OUT / WINDOW_IN.
    */
-  getDetectionThresholds(): Promise<{
+  async getDetectionThresholds(): Promise<{
     distanceLowMm: number;
     distanceHighMm: number;
     window: number;
@@ -291,7 +291,7 @@ export class Vl53l4cd extends DepzDevice {
     await this.uldDriver.setDetectionThresholds(distanceLowMm, distanceHighMm, window);
   }
 
-  getSignalThresholdKcps(): Promise<number> {
+  async getSignalThresholdKcps(): Promise<number> {
     return this.uldDriver.getSignalThreshold();
   }
 
@@ -304,7 +304,7 @@ export class Vl53l4cd extends DepzDevice {
     await this.uldDriver.setSignalThreshold(signalKcps);
   }
 
-  getSigmaThresholdMm(): Promise<number> {
+  async getSigmaThresholdMm(): Promise<number> {
     return this.uldDriver.getSigmaThreshold();
   }
 
@@ -474,9 +474,11 @@ export class Vl53l4cd extends DepzDevice {
     if (pkt.cmd !== Vl53l4Rpt.Stream || pkt.payload.length < 12) {
       return false;
     }
-    const sample = unpackStream(pkt.payload);
+    let sample: ReturnType<typeof unpackStream>;
     let result: Vl53l4Results;
     try {
+      // A report shorter than its own length field, too, is a dropped frame.
+      sample = unpackStream(pkt.payload);
       result = parseResultBlock(sample.data);
     } catch {
       // Somebody re-armed the stream on a different block — count, don't

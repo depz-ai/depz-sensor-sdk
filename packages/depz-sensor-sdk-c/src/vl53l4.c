@@ -175,6 +175,8 @@ int depz_vl53l4_range_timing_registers(uint32_t budget_ms, uint32_t inter_ms,
         timing_budget_us -= 2500u;
     } else if (inter_ms > budget_ms) { /* autonomous low power */
         double factor = 1.055 * (double)inter_ms * (double)(clock_pll & 0x3FFu);
+        if (factor >= 4294967296.0)
+            return -1; /* INTERMEASUREMENT_MS overflows u32: refused, never wrapped */
         inter_raw = (uint32_t)factor; /* truncation toward zero, as the C ULD */
         timing_budget_us = (timing_budget_us - 4300u) / 2u;
     } else {
@@ -241,6 +243,14 @@ uint16_t depz_vl53l4_offset_raw(int32_t mm)
     return (uint16_t)((uint32_t)mm * 4u);
 }
 
+int depz_vl53l4_offset_raw_checked(int32_t mm, uint16_t *raw)
+{
+    if (mm < -1024 || mm > 1023)
+        return -1;
+    *raw = depz_vl53l4_offset_raw(mm);
+    return 0;
+}
+
 int32_t depz_vl53l4_decode_offset(uint16_t raw)
 {
     uint16_t temp = (uint16_t)((uint16_t)(raw << 3) >> 5);
@@ -250,6 +260,14 @@ int32_t depz_vl53l4_decode_offset(uint16_t raw)
 uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps)
 {
     return (uint16_t)(kcps << 9);
+}
+
+int depz_vl53l4_xtalk_raw_checked(uint16_t kcps, uint16_t *raw)
+{
+    if (kcps > (0xFFFFu >> 9))
+        return -1;
+    *raw = depz_vl53l4_xtalk_raw(kcps);
+    return 0;
 }
 
 uint16_t depz_vl53l4_decode_xtalk(uint16_t raw)

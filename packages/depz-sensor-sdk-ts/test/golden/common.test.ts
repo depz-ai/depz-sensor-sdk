@@ -8,7 +8,7 @@ import {
   unpackTemperature,
   unpackText,
 } from "../../src/index.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const data = loadVectors("common_commands.json");
 
@@ -26,6 +26,7 @@ describe("common command encode vectors", () => {
       } else {
         throw new Error(`unknown encode kind ${c.kind}`);
       }
+      seen(c);
     });
   }
 });
@@ -50,6 +51,7 @@ describe("common report decode vectors", () => {
       } else {
         throw new Error(`unknown report ${c.report}`);
       }
+      seen(c);
     });
   }
 });
@@ -65,6 +67,7 @@ describe("sync time math vectors", () => {
       );
       expect(offsetUs).toBe(BigInt(c.offset_us));
       expect(rttUs).toBe(BigInt(c.rtt_us));
+      seen(c);
     });
   }
 });

@@ -35,7 +35,7 @@ Python or TypeScript SDK.
 
 ## Install
 
-Published on NuGet as `Depz.Sensor` (0.6.0):
+Published on NuGet as `Depz.Sensor` (0.7.0):
 
 ```bash
 dotnet add package Depz.Sensor
@@ -53,12 +53,12 @@ using Depz.Sensor.Protocol;    // Cmd/Rpt/Status, common reports, SR04, identity
 using Depz.Sensor.Vl53l4;      // single-zone ToF register bridge + ULD math
 using Depz.Sensor.Vl53l8;      // ToF frame decode + DCI codecs
 using Depz.Sensor.Vl53l7;      // VL53L5CX / L7CX / L7CH board codecs + frame decoder
-using Depz.Sensor.Vl53lx;      // VL53L0X / L1CX / L1CB / L3CX / L4CX codecs + block decode
+using Depz.Sensor.Vl53lx;      // VL53L0X / L1CX / L1CB / L3CX / L4CX codecs, block decode, drivers
 using Depz.Sensor.Bno086;      // SHTP + SH-2
 using Depz.Sensor.Bno055;      // BNO055 register-bridge + register codecs
 using Depz.Sensor.Tmf8829;     // TMF8829 SPI-bridge codecs, frame decode, clock model
 using Depz.Sensor.Usb;         // USB identity table + discovery ordering
-using Depz.Sensor.Dataset;     // .depzdata reader
+using Depz.Sensor.Dataset;     // .depzdata record, read, replay
 ```
 
 ## Where to next

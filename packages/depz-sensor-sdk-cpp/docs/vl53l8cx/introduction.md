@@ -111,9 +111,11 @@ raw return histograms.
   `ArgumentError` ("stop ranging first"). Stop, reconfigure, restart.
 - **`Vl53l8Frame`** — one decoded frame. Every per-zone field is a
   `std::vector<…>` sized to the active resolution (16 or 64), row-major.
-  Values are raw wire integers: `distance_mm` is in mm (the ST /4 floor
-  scaling already applied); `range_sigma_mm_raw` is the raw u16 (real value =
-  raw / 128). `target_status` 5/9 = valid, 255 = no target.
+  Values are in the real units ST's `GetRangingData` gives: `distance_mm` in
+  mm (a negative distance comes out as 0), `signal_per_spad` /
+  `ambient_per_spad` in kcps/SPAD, `range_sigma_mm` in mm, `reflectance` in %
+  — the `double` fields keep the fraction ST's integer division drops.
+  `target_status` 5/9 = valid, 255 = no target.
 
 The live class has been checked on a real board (a VL53L8CH, board
 `TMNQ8E3PRR`, which runs the same ranging path): model `L8CH` detected from

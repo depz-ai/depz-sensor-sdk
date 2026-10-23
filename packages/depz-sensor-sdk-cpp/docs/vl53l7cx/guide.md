@@ -355,7 +355,7 @@ void on_frame_chunk(const depz::Packet& pkt) {
 `decode_frame(raw, resolution)` takes the resolution `start_ranging` used
 (`RESOLUTION_4X4` / `RESOLUTION_8X8`) when you know it; omitted, it is read
 from the zone-sized ambient block (`infer_resolution()`). The frame fields,
-their raw fixed-point scaling and the status values are exactly the VL53L8
+their real units (as ST's `GetRangingData`) and the status values are exactly the VL53L8
 ones — see the
 [VL53L8CX guide](../vl53l8cx/guide.md#the-frame-fields-and-the-zone-grid).
 `reasm.completed` / `reasm.discarded` count whole frames and frames lost to a

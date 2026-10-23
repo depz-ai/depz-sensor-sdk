@@ -9,6 +9,7 @@ from depz_sensor_sdk import (
     StatusError,
 )
 from depz_sensor_sdk.protocol.common import SyncPinConfig, SyncPinMode, SyncPinPolarity
+from depz_sensor_sdk.protocol.identity import Identity, SensorType
 
 from fake_device import FakeSr04
 
@@ -27,6 +28,11 @@ def test_identity_roundtrip(rig):
     assert dev.get_software_name() == FakeSr04.SOFTWARE_NAME
     assert dev.get_device_name() == FakeSr04.DEVICE_NAME
     assert dev.get_serial_number() == FakeSr04.SERIAL
+
+
+def test_identify_parses_the_software_name(rig):
+    _, dev = rig
+    assert dev.identify() == Identity("app", SensorType.SR04, FakeSr04.SOFTWARE_NAME, "0.95")
 
 
 def test_temperature(rig):
@@ -53,8 +59,11 @@ def test_unknown_cmd_raises_status_error(rig):
 def test_sync_pin_validation(rig):
     _, dev = rig
     dev.set_sync_pin(SyncPinConfig(1, SyncPinMode.OUT_BOTH, SyncPinPolarity.IDLE_LOW))
-    with pytest.raises(StatusError):
+    # contract 02 §6: pins 1..5 — refused host-side, nothing is sent
+    with pytest.raises(ValueError):
         dev.set_sync_pin(SyncPinConfig(9, SyncPinMode.IN, SyncPinPolarity.IDLE_LOW))
+    with pytest.raises(ValueError):
+        dev.get_sync_pin(0)
     cfg = dev.get_sync_pin(2)
     assert cfg.pin == 2 and cfg.mode == SyncPinMode.DISABLE
 

@@ -5,9 +5,10 @@ class resolution, board commands, the 1536-byte ceilings and the frame decode
 with `Variant::L7` all apply unchanged. This page covers the CNH block. For
 signatures see the [API reference](api.md).
 
-This crate does not drive the board: arming a CNH configuration and starting
-the stream is done with the Python or TypeScript SDK. Keep the configuration's
-aggregate count and bins per aggregate — the decode needs them.
+The live device is `devices::Vl53l7chDevice` (the `Vl53l7cxDevice` API plus
+`configure_cnh`, as on the [VL53L8CH](../vl53l8ch/guide.md)). Keep the armed
+configuration (`cnh_setup()`): the decode needs its aggregate count and bins
+per aggregate.
 
 ## Contents
 

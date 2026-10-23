@@ -71,7 +71,8 @@ typedef enum {
  * *out_len. crc_type bits are set in the header even for an empty payload
  * (matching device TX), but a CRC trailer is appended only for a non-empty
  * payload (ERRATA E6). `seq` is taken modulo 256.
- * Returns 0 on success, -1 on payload-too-long, -2 on insufficient capacity.
+ * Returns 0 on success, -1 on payload-too-long, -2 on insufficient capacity,
+ * -3 when crc_type is not one of the listed depz_crc_type values.
  */
 int depz_build_packet(uint8_t cmd, const uint8_t *payload, size_t payload_len,
                       unsigned int seq, depz_crc_type crc_type,
@@ -141,6 +142,10 @@ int depz_parser_feed(depz_parser *p, const uint8_t *data, size_t len,
 bool depz_is_known_depz_usb(int vid, int pid);
 /* Best-guess model name for a (vid, pid), or NULL. Informational only. */
 const char *depz_usb_model_hint(int vid, int pid);
+/* Both at once, checked: -1 when vid or pid is not a u16 (0..0xFFFF) — an
+ * invalid id, not an unknown one (contract 07 §3); else 0 with *known /
+ * *model (either may be NULL) as the two functions above give them. */
+int depz_usb_identity(int vid, int pid, bool *known, const char **model);
 
 /* ======================================================================== */
 /* Firmware-name identity (contract 02 §4.1)                                 */
@@ -176,13 +181,60 @@ typedef struct {
 
 const char *depz_sensor_type_str(depz_sensor_type t); /* NULL for NONE */
 
-/* Strip trailing 0x00/0xFF filler and copy as an ASCII C-string into `out`.
- * Returns the resulting string length. */
+/* Strip trailing 0x00/0xFF filler and decode the rest as ASCII into `out`
+ * (contract 02 §4.1): every byte >= 0x80 becomes U+FFFD (written as UTF-8,
+ * EF BF BD), and an embedded 0x00 before the filler is KEPT as a character.
+ * `out` is NUL-filled to `out_cap`; a character that does not fit whole is
+ * dropped with the rest. Returns the string length written (embedded NULs
+ * included) — or, when out_cap == 0, the length the whole string needs. */
 size_t depz_strip_device_string(const uint8_t *data, size_t len,
                                 char *out, size_t out_cap);
 
-/* Classify a GET_NAME_ACTIVE_SOFTWARE string (already stripped). */
+/* Length of a stripped device string held in a NUL-filled buffer of `cap`
+ * bytes (depz_text_report.text, depz_identity.software_name): up to its last
+ * non-NUL byte, so embedded NULs count. */
+size_t depz_device_string_len(const char *buf, size_t cap);
+
+/* Classify a GET_NAME_ACTIVE_SOFTWARE string (already stripped). Product
+ * tokens are checked in the contract's order (SR04, VL53L4, VL53L8, VL53L7,
+ * VL53L0_4, VL53LX, BNO086, BNO055, TMF8829): the first one found wins.
+ * `software_name` / `version` are NUL-filled copies, truncated to fit. */
 void depz_parse_software_name(const char *name, depz_identity *out);
+/* The same over name[0..len): a name holding embedded NULs (as
+ * depz_strip_device_string keeps them) is classified whole. */
+void depz_parse_software_name_n(const char *name, size_t len, depz_identity *out);
+
+/*
+ * Class resolution (contract 02 §4.4, pure): the canonical class name for a
+ * device's probe answers — `software_name` (GET_NAME_ACTIVE_SOFTWARE) and
+ * `device_name` (GET_DEVICE_NAME; NULL or "" when there was none) — and its
+ * port's USB id (-1 = unknown: a replay, a bridge). One of the
+ * DEPZ_SENSOR_CLASS_COUNT names of depz_sensor_class_name():
+ *   - BOOTDEPZ_*  -> "bootloader" (no sensor class: contract 06 client);
+ *   - APP_VL53L8  -> "vl53l8ch" if the USB model is VL53L8CH, else "vl53l8cx";
+ *   - APP_VL53L7  -> depz_vl53l7_resolve_model() (USB model, then the name);
+ *   - APP_VL53L0_4 -> depz_vl53lx_resolve_class() (USB model, then the name,
+ *     else the generic "vl53lx"; VL53L4CD is generic on this firmware);
+ *   - any other known token -> its class; unknown APP_* or a name that is
+ *     neither APP_ nor BOOTDEPZ -> "device" (the base device).
+ * Returns a static string. Vectors: contracts/vectors/probe.json.
+ */
+const char *depz_resolve_sensor_class(const char *software_name, const char *device_name,
+                                      int usb_vid, int usb_pid);
+/* The same with explicit lengths (strings may hold embedded NULs);
+ * `device_name` may be NULL (its length is then ignored). The USB ids are
+ * pointers: NULL = unknown; a given id must be a u16, else the result is
+ * NULL (an invalid id, contract 07 §3). */
+const char *depz_resolve_sensor_class_n(const char *software_name, size_t software_name_len,
+                                        const char *device_name, size_t device_name_len,
+                                        const int *usb_vid, const int *usb_pid);
+/* The canonical class names (SENSOR_CLASS_NAMES), in contract order:
+ * "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx",
+ * "vl53l7ch", "vl53l0x", "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx",
+ * "vl53lx", "bno086", "bno055", "tmf8829", "device", "bootloader".
+ * depz_sensor_class_name(i) is NULL for i >= DEPZ_SENSOR_CLASS_COUNT. */
+#define DEPZ_SENSOR_CLASS_COUNT 18
+const char *depz_sensor_class_name(size_t i);
 
 /* ======================================================================== */
 /* Common command / report codecs (contract 02)                              */
@@ -249,11 +301,23 @@ typedef struct { uint8_t pin; uint8_t mode; uint8_t polarity; } depz_sync_pin_co
 /* Encoders (return payload length written). */
 size_t depz_pack_sync_time(uint64_t pc_timestamp_us, uint8_t *out); /* 8 B */
 size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out); /* 1 B */
-size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out); /* 3 B */
+/* 3 B, or 0 (nothing written) unless pin is 1..5, mode a depz_sync_pin_mode
+ * (0..4) and polarity 0 (idle low) or 1 (idle high) — contract 02 §6. */
+size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out);
 
-/* Decoders (return 0 on success, -1 on wrong payload length). */
+/* Decoders (contract 07 §3): return 0 on success, -1 when the payload is
+ * shorter than the report's fields; trailing bytes are ignored. RPT_TEXT's
+ * text is depz_strip_device_string()'s (NUL-filled; embedded NULs kept —
+ * depz_device_string_len() gives its length). */
 int depz_unpack_status(const uint8_t *p, size_t len, depz_status_report *out);
 int depz_unpack_text(const uint8_t *p, size_t len, depz_text_report *out);
+/* RPT_TEXT into a caller buffer of any size (depz_text_report.text holds 255
+ * bytes): *cmd, the stripped text in text[text_cap] (as
+ * depz_strip_device_string; text_cap = 3 * (len - 1) + 1 always holds it
+ * whole) and its length in *text_len (may be NULL). 0, or -1 for an empty
+ * payload. */
+int depz_unpack_text_ex(const uint8_t *p, size_t len, uint8_t *cmd,
+                        char *text, size_t text_cap, size_t *text_len);
 int depz_unpack_sync_time(const uint8_t *p, size_t len, depz_sync_time_report *out);
 int depz_unpack_temperature(const uint8_t *p, size_t len, depz_temperature_report *out);
 int depz_unpack_sequence_error(const uint8_t *p, size_t len, depz_sequence_error_report *out);
@@ -453,22 +517,24 @@ int depz_vl53l8_reasm_feed(depz_vl53l8_reassembler *r, const depz_vl53l8_chunk *
 
 /*
  * One decoded ranging frame. Arrays are valid for [0, resolution); zone index
- * runs row-major. Values are RAW fixed-point integers exactly as on the wire
- * (no float scaling — the host applies range_sigma/128, signal/kcps, etc.).
- * distance_mm is the ST-scaled value (raw/4, floored) to match GetRangingData.
+ * runs row-major. Values are in the real units ST's GetRangingData gives
+ * (contract 04 §5): distance_mm = raw/4 floored, a negative result clamped to
+ * 0; signal/ambient = raw/2048 kcps/SPAD; range_sigma_mm = raw/128 mm;
+ * reflectance = raw/2 %. ST divides integers; the floating-point fields here
+ * keep the fraction.
  */
 typedef struct {
     uint64_t timestamp_us;
     int      resolution;                 /* 16 | 64 (zone count present)      */
     int8_t   silicon_temp_degc;
-    int32_t  distance_mm[DEPZ_VL53L8_MAX_ZONES];
+    int32_t  distance_mm[DEPZ_VL53L8_MAX_ZONES];       /* mm, >= 0            */
     uint8_t  target_status[DEPZ_VL53L8_MAX_ZONES];
     uint8_t  nb_target_detected[DEPZ_VL53L8_MAX_ZONES];
-    uint32_t signal_per_spad[DEPZ_VL53L8_MAX_ZONES];   /* kcps/SPAD raw       */
-    uint32_t ambient_per_spad[DEPZ_VL53L8_MAX_ZONES];  /* kcps/SPAD raw       */
+    double   signal_per_spad[DEPZ_VL53L8_MAX_ZONES];   /* kcps/SPAD           */
+    double   ambient_per_spad[DEPZ_VL53L8_MAX_ZONES];  /* kcps/SPAD           */
     uint32_t nb_spads_enabled[DEPZ_VL53L8_MAX_ZONES];
-    uint16_t range_sigma_mm_raw[DEPZ_VL53L8_MAX_ZONES];/* mm = raw/128        */
-    uint8_t  reflectance[DEPZ_VL53L8_MAX_ZONES];       /* %                   */
+    double   range_sigma_mm[DEPZ_VL53L8_MAX_ZONES];    /* mm                  */
+    double   reflectance[DEPZ_VL53L8_MAX_ZONES];       /* %                   */
 } depz_vl53l8_frame;
 
 /*
@@ -518,7 +584,7 @@ int depz_vl53l8ch_decode_frame(const uint8_t *raw, size_t raw_len,
  * cnh_send_config values). */
 typedef struct {
     int nb_of_aggregates; /* 1..DEPZ_VL53L8_CNH_MAX_AGGREGATES */
-    int feature_length;   /* 1..DEPZ_VL53L8_CNH_MAX_FEATURE    */
+    int feature_length;   /* 0..DEPZ_VL53L8_CNH_MAX_FEATURE (0: empty histograms) */
 } depz_vl53l8ch_cnh_config;
 
 /* Decoded CNH block: per-aggregate raw histogram and per-bin scaler. The
@@ -566,8 +632,11 @@ int depz_vl53l8ch_decode_cnh(const depz_vl53l8ch_cnh_config *cfg,
 #define DEPZ_VL53L8_THRESH_START_SIZE     (DEPZ_VL53L8_NB_THRESHOLDS * 12) /* 768 */
 #define DEPZ_VL53L8_MOTION_CFG_SIZE       156
 
-/* Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048). */
+/* Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048) (a negative
+ * margin clamps to 0). The checked form refuses (-1, *raw untouched) a margin
+ * outside 0..10000 kcps (or NaN), else 0. */
 uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps);
+int      depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw);
 /* Inverse: raw DCI -> kcps/SPAD (raw / 2048.0). */
 double   depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
 
@@ -589,6 +658,13 @@ typedef struct {
 void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
                                  uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
                                  uint8_t valid[8]);
+/* The same, refusing (-1, nothing written) more than 64 entries or an entry
+ * whose scaled low/high does not fit the i32 DCI field (contract 07 §3); 0
+ * on success. The
+ * unchecked form above wraps such a value to 32 bits. */
+int depz_vl53l8_pack_thresholds_checked(const depz_vl53l8_threshold *th, size_t n,
+                                        uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                                        uint8_t valid[8]);
 
 /*
  * Build the default 156-byte VL53L8CX_Motion_Configuration bytes that
@@ -680,6 +756,9 @@ int depz_vl53l7_unpack_info(const uint8_t *payload, size_t len,
  */
 depz_vl53l7_model depz_vl53l7_resolve_model(const char *usb_model,
                                             const char *device_name);
+/* The same with explicit lengths (strings may hold embedded NULs; NULL = none). */
+depz_vl53l7_model depz_vl53l7_resolve_model_n(const char *usb_model, size_t usb_model_len,
+                                              const char *device_name, size_t device_name_len);
 const char *depz_vl53l7_model_str(depz_vl53l7_model m); /* "vl53l7cx", ... */
 
 /*
@@ -833,7 +912,8 @@ int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len,
  * RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
  * inter_ms > 0). inter_ms == 0 selects continuous mode; a value greater than
  * the budget selects autonomous low power. Returns 0 on success, -1 when
- * osc_frequency == 0, budget_ms outside 10..200, or 0 < inter_ms <= budget_ms.
+ * osc_frequency == 0, budget_ms outside 10..200, 0 < inter_ms <= budget_ms,
+ * or an INTERMEASUREMENT_MS value that would overflow u32.
  */
 int depz_vl53l4_range_timing_registers(uint32_t budget_ms, uint32_t inter_ms,
                                        uint16_t osc_frequency, uint16_t clock_pll,
@@ -856,6 +936,12 @@ int depz_vl53l4_decode_range_timing(uint32_t intermeasurement_raw,
 uint16_t depz_vl53l4_offset_raw(int32_t mm);       /* RANGE_OFFSET_MM: mm*4 */
 int32_t  depz_vl53l4_decode_offset(uint16_t raw);  /* -> signed millimetres */
 uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps);     /* XTALK_PLANE_OFFSET: kcps*512 */
+/* Range-checked forms (contract 07 §3 — prefer these; the unchecked ones
+ * above wrap): offset -1024..1023 mm (the 11-bit word decode_offset reads
+ * back), xtalk 0..127 kcps (fits the word after << 9). 0, or -1 with *raw
+ * untouched. */
+int      depz_vl53l4_offset_raw_checked(int32_t mm, uint16_t *raw);
+int      depz_vl53l4_xtalk_raw_checked(uint16_t kcps, uint16_t *raw);
 uint16_t depz_vl53l4_decode_xtalk(uint16_t raw);   /* lround(raw/512.0) */
 uint16_t depz_vl53l4_signal_threshold_raw(uint16_t kcps);    /* kcps/8 */
 uint16_t depz_vl53l4_decode_signal_threshold(uint16_t raw);  /* raw*8 */
@@ -980,10 +1066,13 @@ depz_vl53lx_product depz_vl53lx_product_from_str(const char *name);
  * `VL53L<digit>[A-Z0-9]*` in the upper-cased name, NONE when there is no
  * match or the match is not a family product. `name` may be NULL. */
 depz_vl53lx_product depz_vl53lx_product_from_board_name(const char *name);
+depz_vl53lx_product depz_vl53lx_product_from_board_name_n(const char *name, size_t len);
 /* The PID model (`usb_model` as from depz_usb_model_hint(), may be NULL) if
  * it names a family product, else depz_vl53lx_product_from_board_name(). */
 depz_vl53lx_product depz_vl53lx_resolve_product(const char *usb_model,
                                                 const char *device_name);
+depz_vl53lx_product depz_vl53lx_resolve_product_n(const char *usb_model, size_t usb_model_len,
+                                                  const char *device_name, size_t device_name_len);
 
 /* Which class an APP_VL53L0_4 board opens as (contract 12 §1). VL53L4CD has
  * no class of its own here (its vl53l4cd class belongs to APP_VL53L4): it,
@@ -999,6 +1088,9 @@ typedef enum {
 
 depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model,
                                             const char *device_name);
+/* _n variants: explicit lengths, strings may hold embedded NULs (NULL = none). */
+depz_vl53lx_class depz_vl53lx_resolve_class_n(const char *usb_model, size_t usb_model_len,
+                                              const char *device_name, size_t device_name_len);
 const char *depz_vl53lx_class_str(depz_vl53lx_class c); /* "vl53lx", "vl53l0x", ... */
 
 /* ---- stateless block decoders (contract 12 §4) -------------------------- */
@@ -1294,6 +1386,9 @@ uint8_t depz_bno055_pack_accel_config(const depz_bno055_accel_config *c);
  * bandwidth<5:3>; byte 1 power<2:0>. Power-on 0x38/0x00. */
 typedef struct { uint8_t range, bandwidth, power; } depz_bno055_gyro_config;
 void   depz_bno055_unpack_gyro_config(const uint8_t bytes[2], depz_bno055_gyro_config *out);
+/* The same from a buffer of `len` bytes: -1 when shorter than 2 (contract 07
+ * §3), else 0; trailing bytes are ignored. */
+int    depz_bno055_unpack_gyro_config_n(const uint8_t *bytes, size_t len, depz_bno055_gyro_config *out);
 size_t depz_bno055_pack_gyro_config(const depz_bno055_gyro_config *c,
                                     uint8_t out[2]); /* 2 B */
 
@@ -1618,6 +1713,9 @@ void    depz_tmf8829_clock_reset(depz_tmf8829_clock *c);
 /* Add a pair -> DEPZ_TMF8829_FT_CLOCK_RESET when it does not fit the model
  * (which then restarts from it), else 0. */
 uint8_t depz_tmf8829_clock_add(depz_tmf8829_clock *c, int64_t us, uint32_t tick);
+/* The same, refusing (-1, clock untouched) a negative MCU time — it is a u64
+ * (contract 07 §3); else 0 with the flags in *flags. */
+int     depz_tmf8829_clock_add_checked(depz_tmf8829_clock *c, int64_t us, uint32_t tick, uint8_t *flags);
 /* SYSTICK `tick` -> MCU µs through the pair (pair_us, pair_tick). */
 int64_t depz_tmf8829_clock_to_us(const depz_tmf8829_clock *c, int64_t pair_us,
                                  uint32_t pair_tick, uint32_t tick);
@@ -1652,6 +1750,12 @@ void depz_tmf8829_timer_results(depz_tmf8829_timer *t, const depz_tmf8829_clock 
                                 unsigned fp_mode, uint32_t systick, uint32_t t0_tick,
                                 uint32_t t1_tick, int64_t pair_us, int64_t edge_us,
                                 uint8_t flags, depz_tmf8829_frame_time *out);
+/* The same, refusing (-1, nothing changed) fp_mode > 255 or a negative
+ * pair_us / edge_us (contract 07 §3); else 0. */
+int  depz_tmf8829_timer_results_checked(depz_tmf8829_timer *t, const depz_tmf8829_clock *c,
+                                        unsigned fp_mode, uint32_t systick, uint32_t t0_tick,
+                                        uint32_t t1_tick, int64_t pair_us, int64_t edge_us,
+                                        uint8_t flags, depz_tmf8829_frame_time *out);
 /* Sub-integrations per results frame: fp_mode 0..2 -> 2, 3..4 -> 4, 5 -> 6,
  * any other -> 2. */
 unsigned depz_tmf8829_subints(unsigned fp_mode);
@@ -1712,7 +1816,9 @@ typedef struct {
 
 void depz_tmf8829_builder_reset(depz_tmf8829_builder *b);
 /* One frame with the MCU time of its header read and its INT edge (0 =
- * none). Returns 1 and fills *out when it completes a measurement, else 0. */
+ * none). Returns 1 and fills *out when it completes a measurement, else 0;
+ * -1 (nothing changed) when timestamp_us or edge_us is negative — they are
+ * u64 MCU times (contract 07 §3). */
 int  depz_tmf8829_builder_add(depz_tmf8829_builder *b, const uint8_t *raw, size_t len,
                               int64_t timestamp_us, int64_t edge_us,
                               depz_tmf8829_measurement *out);
@@ -1773,6 +1879,10 @@ int depz_tmf8829_cfg_get(const uint8_t page[190], const char *name, uint32_t *va
 /* Set a field. 0; -1 unknown name; -2 value outside 0 .. 2^width - 1 (page
  * untouched). */
 int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value);
+/* The same over a page of `page_len` bytes (a partial page read is fine as
+ * long as it holds the field): -3 when it is too short for the field. */
+int depz_tmf8829_cfg_get_n(const uint8_t *page, size_t page_len, const char *name, uint32_t *value);
+int depz_tmf8829_cfg_set_n(uint8_t *page, size_t page_len, const char *name, int64_t value);
 
 /* ---- sensor firmware ---------------------------------------------------------- */
 
@@ -1831,6 +1941,11 @@ typedef struct {
     bool     continuation;
 } depz_shtp_header;
 
+/* Pack a header. `length` is a 15-bit field: depz_shtp_pack_header_checked
+ * returns -1 and writes nothing when it is > 0x7FFF (contract 07 §3), else 0.
+ * depz_shtp_pack_header (kept for compatibility) cannot report that and
+ * masks the length to 15 bits — prefer the checked form. */
+int depz_shtp_pack_header_checked(const depz_shtp_header *hdr, uint8_t out[4]);
 void depz_shtp_pack_header(const depz_shtp_header *hdr, uint8_t out[4]);
 void depz_shtp_unpack_header(const uint8_t in[4], depz_shtp_header *out);
 
@@ -1842,6 +1957,7 @@ typedef struct {
     size_t   cap;
     uint8_t  seq;
     bool     active;
+    uint64_t capture_us;  /* capture of the fragment that started the cargo */
 } depz_shtp_rx_channel;
 
 typedef struct {
@@ -1866,13 +1982,21 @@ typedef struct {
     uint8_t  seq;         /* first fragment's seq */
     const uint8_t *payload;
     size_t   payload_len;
+    uint64_t capture_us;  /* first fragment's capture (contract 05 §3); 0 via depz_shtp_feed */
 } depz_shtp_cargo;
 
 /* Feed one inbound frame. Returns 1 when a cargo completes (fills *out, whose
  * payload points into the channel buffer, valid until the next feed on that
- * channel), 0 otherwise. Returns -1 on allocation failure. */
+ * channel), 0 otherwise. Returns -1 on allocation failure. Same as
+ * depz_shtp_feed_ex with capture_us = 0. */
 int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
                    depz_shtp_cargo *out);
+
+/* depz_shtp_feed with the frame's RPT_DATA capture time. The completed cargo
+ * carries the FIRST fragment's capture in out->capture_us — the base its 0xFB
+ * timestamps refer to (contract 05 §3, §5). */
+int depz_shtp_feed_ex(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
+                      uint64_t capture_us, depz_shtp_cargo *out);
 
 /* --- SH-2 control message encoders (return payload length written) -------- */
 
@@ -1885,7 +2009,8 @@ size_t depz_bno_pack_set_feature(uint8_t sensor_id, uint8_t flags,
 size_t depz_bno_pack_get_feature_request(uint8_t sensor_id, uint8_t out[2]);
 /* PRODUCT_ID_REQUEST 0xF9, 2 B. */
 size_t depz_bno_pack_product_id_request(uint8_t out[2]);
-/* COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B). */
+/* COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B). Returns 12, or
+ * 0 (nothing written) when nparams > 9. */
 size_t depz_bno_pack_command_request(uint8_t seq, uint8_t command,
                                      const uint8_t *params, size_t nparams,
                                      uint8_t out[12]);
@@ -1895,7 +2020,9 @@ size_t depz_bno_pack_frs_read_request(uint16_t frs_type, uint16_t offset_words,
 /* FRS_WRITE_REQUEST 0xF7, 6 B. */
 size_t depz_bno_pack_frs_write_request(uint16_t frs_type, uint16_t length_words,
                                        uint8_t out[6]);
-/* FRS_WRITE_DATA 0xF6, 4 + 4*nwords B. Returns 0 on capacity error. */
+/* FRS_WRITE_DATA 0xF6, always 12 B (contract 05 §6): `nwords` is 1 or 2, and
+ * a single word is followed by a zero word1. Returns 12, or 0 when nwords is
+ * not 1 or 2 or out_cap < 12. */
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words,
                                     size_t nwords, uint8_t *out, size_t out_cap);
 
@@ -1934,6 +2061,7 @@ size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words
 #define DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV       0x28u
 #define DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV  0x29u
 #define DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV       0x2Au
+#define DEPZ_BNO_SENSOR_MOTION_REQUEST           0x2Bu /* interactive calibration, BNO086 only */
 
 /* Control-channel report ids. */
 #define DEPZ_SH2_COMMAND_RESPONSE     0xF1
@@ -2099,6 +2227,8 @@ uint16_t depz_bno_metadata_record(uint8_t sensor_id);
 
 #define DEPZ_BNO_BASE_TIMESTAMP_REF 0xFB
 #define DEPZ_BNO_TIMESTAMP_REBASE   0xFA
+/* + u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0) */
+#define DEPZ_BNO_FLUSH_COMPLETED    0xEF
 
 typedef enum {
     DEPZ_BNO_ACCELERATION = 0,
@@ -2118,7 +2248,9 @@ typedef enum {
     DEPZ_BNO_RAW_SENSOR,
     DEPZ_BNO_GENERIC_EVENT,
     DEPZ_BNO_GYRO_INTEGRATED_RV,
-    DEPZ_BNO_UNKNOWN_REPORT
+    DEPZ_BNO_UNKNOWN_REPORT,
+    DEPZ_BNO_MOTION_REQUEST,   /* 0x2B: intent, request */
+    DEPZ_BNO_FLUSH_COMPLETED_REPORT /* 0xEF: flushed_sensor; no seq/accuracy/delay */
 } depz_bno_report_type;
 
 /* Report catalog name (matches the vector "type" strings). */
@@ -2130,7 +2262,8 @@ typedef struct {
     depz_bno_report_type type;
     uint8_t  sensor_id;
     int64_t  timestamp_us;    /* capture - base_delta*100 + delay*100 */
-    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT) */
+    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT /
+     * FLUSH_COMPLETED_REPORT) */
     uint8_t  seq;
     uint8_t  accuracy;
     int32_t  delay_us;
@@ -2154,6 +2287,12 @@ typedef struct {
     bool     end_of_sequence;
     int32_t  most_likely_state;
     uint8_t  confidences[10];
+    /* motion request (0x2B): the motion intent the hub was last told and what
+     * it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still) */
+    int32_t  intent;
+    int32_t  request;
+    /* flush completed (0xEF): the sensor whose batched reports are all sent */
+    int32_t  flushed_sensor;
     /* raw sensor */
     uint32_t sensor_timestamp_us;
     int32_t  temperature_raw;
@@ -2167,8 +2306,9 @@ typedef struct {
 /*
  * Parse a channel-3/4 input cargo into typed reports. `capture_timestamp_us`
  * is the bridge RPT_DATA capture time. Writes up to `cap` reports into `out`,
- * returns the count. Handles 0xFB base and 0xFA rebase; an unknown report id
- * stops the parse (last entry is UNKNOWN_REPORT).
+ * returns the count. Handles 0xFB base and 0xFA rebase, and a bare 0xEF
+ * Flush Completed (2 bytes, timestamp = the current base); an unknown report
+ * id stops the parse (last entry is UNKNOWN_REPORT).
  */
 size_t depz_bno_parse_input_cargo(const uint8_t *payload, size_t len,
                                   uint64_t capture_timestamp_us,

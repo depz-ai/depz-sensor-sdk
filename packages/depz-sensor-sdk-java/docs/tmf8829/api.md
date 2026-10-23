@@ -15,9 +15,290 @@ source, not this file.
 
 ## Contents
 
-- **TMF8829 (dToF)**: [`Tmf8829`](#tmf8829), [`Tmf8829.Tmf8829Cmd`](#tmf8829tmf8829cmd), [`Tmf8829.Tmf8829Rpt`](#tmf8829tmf8829rpt), [`Tmf8829.EventCode`](#tmf8829eventcode), [`Tmf8829.RegData`](#tmf8829regdata), [`Tmf8829.Tmf8829Info`](#tmf8829tmf8829info), [`Tmf8829.FrameChunk`](#tmf8829framechunk), [`Tmf8829.Tmf8829Event`](#tmf8829tmf8829event), [`Tmf8829.RawFrame`](#tmf8829rawframe), [`Tmf8829.FrameReassembler`](#tmf8829framereassembler), [`CaptureTimer`](#capturetimer), [`CaptureTimer.FrameTime`](#capturetimerframetime), [`Frames`](#frames), [`Frames.FrameError`](#framesframeerror), [`Frames.FrameInfo`](#framesframeinfo), [`Frames.PixelResults`](#framespixelresults), [`Frames.HistogramFrame`](#frameshistogramframe), [`MeasurementBuilder`](#measurementbuilder), [`MeasurementBuilder.Measurement`](#measurementbuildermeasurement), [`SensorClock`](#sensorclock), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Config.CfgField`](#tmf8829configcfgfield), [`Tmf8829Firmware`](#tmf8829firmware)
+- **TMF8829 (dToF)**: [`Tmf8829AppliedConfig`](#tmf8829appliedconfig), [`Tmf8829Device`](#tmf8829device), [`Tmf8829Device.InitResult`](#tmf8829deviceinitresult), [`Tmf8829Exception`](#tmf8829exception), [`Tmf8829InterruptEvent`](#tmf8829interruptevent), [`Tmf8829`](#tmf8829), [`Tmf8829.Tmf8829Cmd`](#tmf8829tmf8829cmd), [`Tmf8829.Tmf8829Rpt`](#tmf8829tmf8829rpt), [`Tmf8829.EventCode`](#tmf8829eventcode), [`Tmf8829.RegData`](#tmf8829regdata), [`Tmf8829.Tmf8829Info`](#tmf8829tmf8829info), [`Tmf8829.FrameChunk`](#tmf8829framechunk), [`Tmf8829.Tmf8829Event`](#tmf8829tmf8829event), [`Tmf8829.RawFrame`](#tmf8829rawframe), [`Tmf8829.FrameReassembler`](#tmf8829framereassembler), [`CaptureTimer`](#capturetimer), [`CaptureTimer.FrameTime`](#capturetimerframetime), [`Frames`](#frames), [`Frames.FrameError`](#framesframeerror), [`Frames.FrameInfo`](#framesframeinfo), [`Frames.PixelResults`](#framespixelresults), [`Frames.HistogramFrame`](#frameshistogramframe), [`MeasurementBuilder`](#measurementbuilder), [`MeasurementBuilder.Measurement`](#measurementbuildermeasurement), [`SensorClock`](#sensorclock), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Config.CfgField`](#tmf8829configcfgfield), [`Tmf8829Firmware`](#tmf8829firmware)
 
 ## TMF8829 (dToF)
+
+### Tmf8829AppliedConfig
+
+```java
+public record Tmf8829AppliedConfig(String preset, byte[] page, boolean histograms, boolean refFrame, Map<String, Integer> fields)
+```
+
+The config `Tmf8829Device#configure` wrote, as read back from the sensor: the preset name, the
+190-byte page 0x22..0xDF, whether histogram frames are dumped and a ref-SPAD frame comes with each
+measurement, and every named field of the page.
+
+#### Tmf8829AppliedConfig.grid
+
+```java
+public int[] grid()
+```
+
+{rows, cols} of a measurement.
+
+### Tmf8829Device
+
+```java
+public final class Tmf8829Device extends DepzDevice
+```
+
+TMF8829 multizone dToF (8×8 … 48×32 zones, up to 4 peaks per zone, histograms) over the SPI register
+bridge (contract 14). The board is a thin bridge: this class runs the sensor. `init` downloads
+the 14.4 KB sensor firmware (~0.15 s), `configure` writes the config page, `start`
+streams measurements to `onMeasurement` / `measurements`, `stop` ends it. The
+sensor's EN pin is wired high: there is no sleep, and recovery from any state is `init` (it
+starts with a soft reset).
+
+#### Tmf8829Device.appVersion
+
+```java
+public String appVersion()
+```
+
+The RAM application version `init` started ("2.200.0"), or null.
+
+#### Tmf8829Device.sensorSerial
+
+```java
+public Long sensorSerial()
+```
+
+The sensor's serial number, read by `init`, or null.
+
+#### Tmf8829Device.config
+
+```java
+public Tmf8829AppliedConfig config()
+```
+
+The last `configure` result (null after `init`).
+
+#### Tmf8829Device.streaming
+
+```java
+public boolean streaming()
+```
+
+#### Tmf8829Device.readRegisters
+
+```java
+public byte[] readRegisters(int addr, int length)
+```
+
+Read `length` bytes from `addr` in ≤1024-byte requests; reads that reach the FIFO port
+0xFF stay there (the sensor does not auto-increment it).
+
+#### Tmf8829Device.readRegister
+
+```java
+public int readRegister(int addr)
+```
+
+#### Tmf8829Device.writeRegisters
+
+```java
+public void writeRegisters(int addr, byte[] data, BiConsumer<Integer, Integer> progress)
+```
+
+Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF);
+`progress` (may be null) gets (done, total) after each.
+
+#### Tmf8829Device.writeRegisters
+
+```java
+public void writeRegisters(int addr, byte[] data)
+```
+
+#### Tmf8829Device.writeRegister
+
+```java
+public void writeRegister(int addr, int value)
+```
+
+Write one register; the low byte of `value`.
+
+#### Tmf8829Device.sensorState
+
+```java
+public Map<String, Integer> sensorState()
+```
+
+Raw host-interface registers, for diagnostics.
+
+#### Tmf8829Device.getBridgeInfo
+
+```java
+public Tmf8829.Tmf8829Info getBridgeInfo()
+```
+
+Bridge counters (never touches the sensor, safe mid-stream).
+
+#### Tmf8829Device.init
+
+```java
+public InitResult init(BiConsumer<Integer, Integer> progress)
+```
+
+Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware
+download, start. Stops a running stream first. `progress` (done, total; may be null) tracks
+the image download.
+
+#### Tmf8829Device.init
+
+```java
+public InitResult init()
+```
+
+#### Tmf8829Device.configPage
+
+```java
+public byte[] configPage()
+```
+
+LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
+
+#### Tmf8829Device.configure
+
+```java
+public Tmf8829AppliedConfig configure(String preset, int periodMs, Integer kiloIterations, int nrPeaks, boolean signalStrength, boolean noiseStrength, boolean xtalk, boolean histograms, boolean refFrame, Map<String, Integer> fields)
+```
+
+Load `preset` and write the config page. Every field a preset does not reset is written
+(contract 14 §4), so the result never depends on an earlier config; `fields` (may be null)
+sets any other page field by name. `kiloIterations` null: the preset's. Not while streaming.
+
+is too big for the grid) or a written field does not read back
+
+#### Tmf8829Device.configure
+
+```java
+public Tmf8829AppliedConfig configure(String preset, int periodMs)
+```
+
+#### Tmf8829Device.configure
+
+```java
+public Tmf8829AppliedConfig configure(String preset)
+```
+
+#### Tmf8829Device.configure
+
+```java
+public Tmf8829AppliedConfig configure()
+```
+
+The 8x8 preset at the default period.
+
+#### Tmf8829Device.start
+
+```java
+public void start()
+```
+
+MEASURE with the bridge stream armed. Configures the default 8x8 preset first when
+`configure` was not called since `init`.
+
+#### Tmf8829Device.stop
+
+```java
+public void stop()
+```
+
+Sensor STOP, then the bridge stream (the frames already queued drain). The bad-header event a STOP
+raises mid histogram dump is expected and swallowed.
+
+#### Tmf8829Device.onMeasurement
+
+```java
+public AutoCloseable onMeasurement(Consumer<MeasurementBuilder.Measurement> callback)
+```
+
+Call `callback` for every measurement (reader thread; don't block).
+
+#### Tmf8829Device.measurements
+
+```java
+public Subscription<MeasurementBuilder.Measurement> measurements(int capacity)
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Tmf8829Device.measurements
+
+```java
+public Subscription<MeasurementBuilder.Measurement> measurements()
+```
+
+#### Tmf8829Device.getMeasurement
+
+```java
+public MeasurementBuilder.Measurement getMeasurement(Duration timeout)
+```
+
+The next measurement (contract 07 §3).
+
+#### Tmf8829Device.streamDroppedCounts
+
+```java
+public List<Long> streamDroppedCounts()
+```
+
+#### Tmf8829Device.framesDropped
+
+```java
+public int framesDropped()
+```
+
+Frames the bridge dropped (frame_seq gaps) in this stream.
+
+#### Tmf8829Device.framesDiscarded
+
+```java
+public int framesDiscarded()
+```
+
+Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
+
+#### Tmf8829Device.frameParseErrors
+
+```java
+public int frameParseErrors()
+```
+
+#### Tmf8829Device.clockRatioQ16
+
+```java
+public long clockRatioQ16()
+```
+
+Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal 8 << 16 = 8 µs per SYSTICK),
+for diagnostics.
+
+### Tmf8829Device.InitResult
+
+```java
+public record InitResult(String appVersion, long sensorSerial)
+```
+
+What `init` reports: the RAM application version and the sensor's serial number.
+
+### Tmf8829Exception
+
+```java
+public final class Tmf8829Exception extends DepzException
+```
+
+The TMF8829 refused or did not answer (bootloader / application status).
+
+### Tmf8829InterruptEvent
+
+```java
+public record Tmf8829InterruptEvent(Tmf8829.Tmf8829Event event) implements DeviceEvent
+```
+
+RPT_TMF_EVENT that is not an expected stop artefact: a MOTION / PROXIMITY interrupt (code 0) or a
+refused frame header (code 1 — the sensor is lost, run `Tmf8829Device#init` again).
 
 ### Tmf8829
 
@@ -911,7 +1192,9 @@ public int add(long us, long tick)
 ```
 
 Add a pair → `FT_CLOCK_RESET` if it does not fit the model (which
-then restarts from it), else 0.
+then restarts from it), else 0. `us` is a u64 in Java's
+two's-complement convention; `tick` a u32 SYSTICK (outside
+0..2^32-1 → IllegalArgumentException, contract 07 §3).
 
 #### SensorClock.toUs
 

@@ -129,4 +129,66 @@ public static class Vl53lxProducts
     /// True only says "not something else entirely".
     /// </summary>
     public static bool ModelIdOk(string product, int value) => Find(product)?.ModelId == value;
+
+    /// <summary>The driver kinds in the order a UI lists them (uld/registry.py DRIVER_KINDS).</summary>
+    public static readonly IReadOnlyList<string> DriverKindNames = new[] { "uld", "ulp", "histogram" };
+
+    private const string HistCaveat =
+        "the histogram driver has no calibrations and no detection thresholds - the light drivers are the ones with those";
+
+    // Which (product, kind) pairs exist and what to tell the user about each; a missing pair is absent on purpose.
+    private static readonly Dictionary<string, Dictionary<string, (Func<Vl53lxPlatform, string, Vl53lxDriver> Create, string? Caveat)>> Drivers = new()
+    {
+        ["VL53L0X"] = new()
+        {
+            ["uld"] = ((p, n) => new Vl53l0xUldDriver(p, n), "no detection thresholds; there is no ROI on this die at all"),
+        },
+        ["VL53L1CX"] = new()
+        {
+            ["uld"] = ((p, n) => new Vl53l1UldDriver(p, n), null),
+            ["histogram"] = ((p, n) => new Vl53lxHistogramDriver(p, n), HistCaveat),
+        },
+        ["VL53L1CB"] = new()
+        {
+            ["uld"] = ((p, n) => new Vl53l1UldDriver(p, n), null),
+            ["histogram"] = ((p, n) => new Vl53lxHistogramDriver(p, n), HistCaveat),
+        },
+        ["VL53L3CX"] = new()
+        {
+            ["ulp"] = ((p, n) => new Vl53l3UlpDriver(p, n), "single-target ranging only - the histogram driver gives several targets instead"),
+            ["histogram"] = ((p, n) => new Vl53lxHistogramDriver(p, n), HistCaveat),
+        },
+        ["VL53L4CD"] = new()
+        {
+            ["uld"] = ((p, n) => new Vl53l4UldDriver(p, n), null),
+            ["histogram"] = ((p, n) => new Vl53lxHistogramDriver(p, n), HistCaveat),
+        },
+        ["VL53L4CX"] = new()
+        {
+            ["histogram"] = ((p, n) => new Vl53lxHistogramDriver(p, n), HistCaveat),
+        },
+    };
+
+    /// <summary>The driver kinds <paramref name="product"/> has, in <see cref="DriverKindNames"/> order.</summary>
+    /// <exception cref="NotSupportedException">No such product.</exception>
+    public static IReadOnlyList<string> DriverKinds(string product)
+    {
+        var have = Row(product);
+        return DriverKindNames.Where(have.ContainsKey).ToList();
+    }
+
+    /// <summary>The driver for one (product, kind) pair, and its caveat or null.</summary>
+    /// <exception cref="NotSupportedException">A pair the table has no row for.</exception>
+    public static (Vl53lxDriver Driver, string? Caveat) CreateDriver(string product, string kind, Vl53lxPlatform platform)
+    {
+        var row = Row(product);
+        if (!row.TryGetValue(kind, out var entry))
+            throw new NotSupportedException($"{product} has no '{kind}' driver - it has {string.Join(", ", DriverKinds(product))}");
+        return (entry.Create(platform, product), entry.Caveat);
+    }
+
+    private static Dictionary<string, (Func<Vl53lxPlatform, string, Vl53lxDriver> Create, string? Caveat)> Row(string product) =>
+        Drivers.TryGetValue(product, out var row)
+            ? row
+            : throw new NotSupportedException($"no such product: {product} - served: {string.Join(", ", All.Select(p => p.Name))}");
 }

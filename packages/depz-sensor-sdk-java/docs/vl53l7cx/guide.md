@@ -1,6 +1,7 @@
 # VL53L7CX — user guide
 
-Hands-on guide to the L5/L7 codecs ([`Vl53l7`](api.md#vl53l7)) and decode
+Hands-on guide to the VL53L7CX live device
+(`ai.depz.sensor.devices.Vl53l7cxDevice`) and the layers under it: the L5/L7 codecs ([`Vl53l7`](api.md#vl53l7)) and decode
 ([`Vl53l7Uld`](api.md#vl53l7uld)). It applies unchanged to the
 [VL53L5CX](../vl53l5cx/guide.md) and, plus CNH, to the
 [VL53L7CH](../vl53l7ch/guide.md). The results frame itself — fields, scaling,
@@ -8,13 +9,9 @@ the advanced-DCI codecs — is the VL53L8 one: see the
 [VL53L8CX guide](../vl53l8cx/guide.md). For concepts read the
 [introduction](introduction.md); for signatures the [API reference](api.md).
 
-This SDK does not drive the board: initialising the sensor (firmware
-download, default configuration) and starting a ranging session is done with
-the Python or TypeScript SDK. What follows is everything you need to build the
-board's commands and decode what it sends.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [Board commands](#board-commands)
 - [The bridge info report](#the-bridge-info-report)
@@ -22,6 +19,37 @@ board's commands and decode what it sends.
 - [Reassemble and decode a frame](#reassemble-and-decode-a-frame)
 - [What differs from the VL53L8 decode](#what-differs-from-the-vl53l8-decode)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.vl53l8.Vl53l8Frame;
+import java.time.Duration;
+
+try (Vl53l7cxDevice tof = DepzDevices.openVl53l7()) { // a Vl53l7cxDevice, Vl53l5cxDevice or Vl53l7chDevice
+    tof.init();                                   // L5/L7 firmware over I2C, ~1.4 s at the board's 1 MHz
+    System.out.println(tof.moduleType());         // 1 = MZEVO (VL53L7), 0 = MZ (VL53L5)
+    tof.setResolution(64);
+    tof.setRangingFrequencyHz(1);                 // the L5/L7 stream down to 1 Hz
+
+    try (Subscription<Vl53l8Frame> frames = tof.frames()) {
+        tof.startRanging();
+        Vl53l8Frame f = frames.take(Duration.ofSeconds(2));
+        tof.stopRanging();
+    }
+    System.out.println(tof.getBridgeInfo());      // counters and pin levels: before / after a run
+}
+```
+
+The device is a `Vl53l8cxDevice` underneath: every configuration method of
+the [VL53L8CX guide](../vl53l8cx/guide.md#live-device) works the same, except
+that L5CX / L7CX have no deep sleep and no threshold auto-stop. The board adds
+`setI2cSpeedKhz` and `pinCtrl` (after `LPN_OFF` or `SOFT_CYCLE`, `init()` again).
+A board whose sensor reports another module type than its class expects is
+traced as a warning: it still ranges, the firmware is shared.
+
+The sections below are the layers under the device.
 
 ## Which board is it
 

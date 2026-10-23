@@ -101,6 +101,75 @@ impl Value {
             _ => None,
         }
     }
+
+    /// A number value from an integer.
+    pub fn int(v: i64) -> Value {
+        Value::Number(v.to_string())
+    }
+
+    /// A number value from a float (shortest text that reads back the same; a whole number keeps
+    /// its `.0`, as Python writes floats). Not finite → `null`, which JSON has no number for.
+    pub fn float(v: f64) -> Value {
+        if !v.is_finite() {
+            return Value::Null;
+        }
+        let s = format!("{v:?}");
+        Value::Number(s)
+    }
+
+    /// Compact JSON text (`", "` / `": "`-free, as `json.dumps(separators=(",", ":"))`).
+    pub fn to_json(&self) -> String {
+        let mut out = String::new();
+        self.write_json(&mut out);
+        out
+    }
+
+    fn write_json(&self, out: &mut String) {
+        match self {
+            Value::Null => out.push_str("null"),
+            Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+            Value::Number(n) => out.push_str(n),
+            Value::String(s) => write_json_string(s, out),
+            Value::Array(a) => {
+                out.push('[');
+                for (i, v) in a.iter().enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    v.write_json(out);
+                }
+                out.push(']');
+            }
+            Value::Object(e) => {
+                out.push('{');
+                for (i, (k, v)) in e.iter().enumerate() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    write_json_string(k, out);
+                    out.push(':');
+                    v.write_json(out);
+                }
+                out.push('}');
+            }
+        }
+    }
+}
+
+fn write_json_string(s: &str, out: &mut String) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
 }
 
 struct Parser<'a> {

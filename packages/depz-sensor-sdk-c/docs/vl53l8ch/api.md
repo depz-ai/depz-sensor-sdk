@@ -71,7 +71,7 @@ CNH feature_length is packed as a uint8 on the device (num_bins & 0xFF).
 ```c
 typedef struct {
     int nb_of_aggregates; /* 1..DEPZ_VL53L8_CNH_MAX_AGGREGATES */
-    int feature_length;   /* 1..DEPZ_VL53L8_CNH_MAX_FEATURE    */
+    int feature_length;   /* 0..DEPZ_VL53L8_CNH_MAX_FEATURE (0: empty histograms) */
 } depz_vl53l8ch_cnh_config;
 ```
 
@@ -156,7 +156,10 @@ the plugin helpers that fill it (vl53lmz_plugin_cnh.c).
 void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins, int sub_sample);
 ```
 
-vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. num_bins / sub_sample are u8 fields: this form masks them to 8 bits;
+the _checked form (preferred, contract 07 §3) answers DEPZ_E_ARG outside
+0..255 and leaves `s` untouched.
 
 ### depz_vl53l8_cnh_create_agg_map
 
@@ -165,6 +168,8 @@ int depz_vl53l8_cnh_create_agg_map(depz_vl53l8_cnh_setup *s, int resolution, int
 ```
 
 vl53lmz_cnh_create_agg_map: map zones (resolution 16 | 64) to aggregates.
+DEPZ_E_ARG for another resolution, start_x / start_y < 0, merge_x /
+merge_y / cols / rows < 1, or a map past the zone grid.
 
 ### depz_vl53l8_cnh_required_memory
 

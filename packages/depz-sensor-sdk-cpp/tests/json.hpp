@@ -22,6 +22,11 @@ struct Value {
     bool b = false;
     std::int64_t i = 0;
     double d = 0.0;
+    // Int range: 0 = fits int64 (in `i`); 1 = above INT64_MAX but fits uint64
+    // (exact value in `u`); 2 = outside both. `i` saturates when range != 0.
+    // Lets a caller read u64 inputs exactly (the difftest adapter).
+    int range = 0;
+    std::uint64_t u = 0;
     std::string s;
     Array arr;
     Object obj;
@@ -240,7 +245,20 @@ private:
             v.d = std::stod(num);
         } else {
             v.type = Type::Int;
-            v.i = std::stoll(num);
+            try {
+                v.i = std::stoll(num);
+                v.u = static_cast<std::uint64_t>(v.i);
+            } catch (const std::out_of_range&) {
+                v.range = 2;
+                v.i = num[0] == '-' ? INT64_MIN : INT64_MAX;
+                if (num[0] != '-') {
+                    try {
+                        v.u = std::stoull(num);
+                        v.range = 1;
+                    } catch (const std::out_of_range&) {
+                    }
+                }
+            }
         }
         return v;
     }

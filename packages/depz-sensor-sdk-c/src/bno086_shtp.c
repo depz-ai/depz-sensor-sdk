@@ -24,6 +24,14 @@ void depz_shtp_pack_header(const depz_shtp_header *hdr, uint8_t out[4])
     out[3] = hdr->seq;
 }
 
+int depz_shtp_pack_header_checked(const depz_shtp_header *hdr, uint8_t out[4])
+{
+    if (hdr->length > DEPZ_SHTP_LENGTH_MASK)
+        return -1;
+    depz_shtp_pack_header(hdr, out);
+    return 0;
+}
+
 void depz_shtp_unpack_header(const uint8_t in[4], depz_shtp_header *out)
 {
     uint16_t word = rd_u16(in);
@@ -89,6 +97,12 @@ size_t depz_shtp_next_frame(depz_shtp_layer *l, uint8_t channel,
 int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
                    depz_shtp_cargo *out)
 {
+    return depz_shtp_feed_ex(l, frame, frame_len, 0, out);
+}
+
+int depz_shtp_feed_ex(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
+                      uint64_t capture_us, depz_shtp_cargo *out)
+{
     if (frame_len < DEPZ_SHTP_HEADER_SIZE)
         return 0;
     depz_shtp_header hdr;
@@ -109,6 +123,7 @@ int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
         rx->received = chunk_len;
         rx->expected = (size_t)hdr.length - DEPZ_SHTP_HEADER_SIZE;
         rx->seq = hdr.seq;
+        rx->capture_us = capture_us;
         rx->active = true;
     } else {
         if (rx->expected == 0) {
@@ -135,6 +150,7 @@ int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len,
     out->seq = rx->seq;
     out->payload = rx->buf;
     out->payload_len = rx->received;
+    out->capture_us = rx->capture_us;
     rx->received = 0;
     rx->expected = 0;
     rx->active = false;
@@ -175,12 +191,12 @@ size_t depz_bno_pack_command_request(uint8_t seq, uint8_t command,
                                      const uint8_t *params, size_t nparams,
                                      uint8_t out[12])
 {
+    if (nparams > 9)
+        return 0; /* never truncate (contract 07 §3) */
     memset(out, 0, 12);
     out[0] = 0xF2;
     out[1] = seq;
     out[2] = command;
-    if (nparams > 9)
-        nparams = 9;
     if (nparams && params)
         memcpy(out + 3, params, nparams);
     return 12;
@@ -210,13 +226,14 @@ size_t depz_bno_pack_frs_write_request(uint16_t frs_type, uint16_t length_words,
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words,
                                     size_t nwords, uint8_t *out, size_t out_cap)
 {
-    size_t total = 4 + 4 * nwords;
-    if (out_cap < total)
+    /* Always 12 B (contract 05 §6): one or two words, word1 zero when only
+     * one is written. */
+    if (nwords < 1 || nwords > 2 || !words || out_cap < 12)
         return 0;
     out[0] = 0xF6;
     out[1] = 0x00;
     put_u16(out + 2, offset_words);
-    for (size_t i = 0; i < nwords; i++)
-        put_u32(out + 4 + 4 * i, words[i]);
-    return total;
+    put_u32(out + 4, words[0]);
+    put_u32(out + 8, nwords == 2 ? words[1] : 0u);
+    return 12;
 }

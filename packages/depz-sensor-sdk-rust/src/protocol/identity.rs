@@ -66,6 +66,7 @@ pub struct Identity {
     pub version: String,
 }
 
+/// Checked in this order, the first match wins (contract 02 §4.1).
 const PRODUCT_TOKENS: &[(&str, SensorType)] = &[
     ("SR04", SensorType::Sr04),
     ("VL53L4", SensorType::Vl53l4),
@@ -75,8 +76,8 @@ const PRODUCT_TOKENS: &[(&str, SensorType)] = &[
     // calls it APP_VL53LX_v* (contract 12).
     ("VL53L0_4", SensorType::Vl53lx),
     ("VL53LX", SensorType::Vl53lx),
-    ("BNO055", SensorType::Bno055),
     ("BNO086", SensorType::Bno086),
+    ("BNO055", SensorType::Bno055),
     ("TMF8829", SensorType::Tmf8829),
 ];
 

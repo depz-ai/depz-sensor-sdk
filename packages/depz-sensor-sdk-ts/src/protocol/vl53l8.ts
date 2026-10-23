@@ -3,6 +3,8 @@
  * Mirrors the Python reference `depz_sensor_sdk.protocol.vl53l8`.
  */
 
+import { checkUint } from "./wire.js";
+
 export enum Vl53l8Cmd {
   ReadReg = 0x32,
   WriteReg = 0x33,
@@ -30,12 +32,15 @@ export const STREAM_TOTAL_MAX = 8192;
 export function packReadReg(addr: number, length: number): Uint8Array {
   const out = new Uint8Array(4);
   const dv = new DataView(out.buffer);
-  dv.setUint16(0, addr, true);
-  dv.setUint16(2, length, true);
+  dv.setUint16(0, checkUint("addr", addr, 16), true);
+  dv.setUint16(2, checkUint("length", length, 16), true);
   return out;
 }
 
 export function packWriteReg(addr: number, data: Uint8Array): Uint8Array {
+  checkUint("addr", addr, 16);
+  // contract 04 §2: the payload is addr + at least one data byte
+  if (data.length < 1) throw new RangeError("WRITE_REG data must be at least 1 byte");
   const out = new Uint8Array(2 + data.length);
   new DataView(out.buffer).setUint16(0, addr, true);
   out.set(data, 2);
@@ -44,7 +49,7 @@ export function packWriteReg(addr: number, data: Uint8Array): Uint8Array {
 
 export function packStartStream(frameSize: number): Uint8Array {
   const out = new Uint8Array(2);
-  new DataView(out.buffer).setUint16(0, frameSize, true);
+  new DataView(out.buffer).setUint16(0, checkUint("frameSize", frameSize, 16), true);
   return out;
 }
 

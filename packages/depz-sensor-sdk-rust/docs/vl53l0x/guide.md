@@ -1,22 +1,57 @@
 # VL53L0X — user guide
 
-Hands-on guide to the [`vl53lx`](api.md) decode layer for the VL53L0X. For
+Hands-on guide to the [`vl53lx`](api.md) device class and decode layer for the VL53L0X. For
 what the sensor is and its concepts, read the [introduction](introduction.md);
 for exact signatures see the [API reference](api.md).
 
-This crate does not drive the sensor: the ST driver (initialisation,
-reference SPADs, profiles, calibration, the PAL status) runs in the Python or
-TypeScript SDK. What follows is everything you need to build the bridge
-commands and decode what the board streams.
+The device class runs the ST driver (VL53L0X API 1.0.4) on the host; below it, the bridge
+commands and the stateless decode of what the board streams.
 
 ## Contents
 
+- [Live device](#live-device)
 - [Which board is it](#which-board-is-it)
 - [The product table](#the-product-table)
 - [Stream commands](#stream-commands)
 - [Decode the result block](#decode-the-result-block)
 - [Reset and bridge diagnostics](#reset-and-bridge-diagnostics)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::open_on_link;
+
+let tof = open_on_link(link, None, None, None)?.into_vl53lx()?;   // a Vl53l0xDevice underneath
+tof.init(None, None)?;                                   // VL53L0X / uld
+tof.configure(33, 0, Some("long-range"), None, None, None)?;
+let frames = tof.measurements(64);
+tof.start_ranging()?;
+let m = frames.take(Duration::from_secs(1))?;
+println!("{} mm, status {} ({}), {} targets", m.distance_mm, m.status, m.status_text, m.targets.len());
+tof.stop_ranging()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- `init(driver, product)` binds the (product, driver kind) pair — `None`, `None`:
+  the class's product, its first kind (`uld`, the only one). A pair the table lacks is refused with what the product has
+  (`driver_kinds(None)`); `notes()` and `identify_product()` say what was bound,
+  borrowed, and how far it reaches.
+- `configure(budget_ms, inter_ms, mode, offset_mm, xtalk_kcps, signal_kcps)`
+  re-initialises and applies a ranging configuration before every run (an
+  unsupported group is refused before the re-init); ask `supports(group)` first.
+  The L0X has the ranging profiles as modes, offset / crosstalk
+  calibration and `perform_ref_spad_management()`; no ROI, no thresholds.
+- Measurements stream to `on_measurement(callback)` and `measurements(capacity)`
+  (`Vl53lxMeasurement`: distance, status, rates, `targets` and `bins` on the
+  histogram driver); `measure_once(None)` polls one; `plottable()` and
+  `plot_distances()` apply the family's 0 / 6 / 11 rule. A frame the driver
+  cannot decode is dropped and counted in `stream_parse_errors()`.
+- Configuration while ranging is refused (the stream owns the bus); `xshut(0)`
+  drops the driver — `init` again; `bridge_info()` is safe while streaming.
+
+The sections below are the layers under the device.
 
 ## Which board is it
 
@@ -115,9 +150,9 @@ for ev in parser.feed(&rx_bytes) {
 | `signal_rate_mcps_1616` / `ambient_rate_mcps_1616` | rates, FixPoint16.16 Mcps (the wire's 9.7 shifted left by 9) |
 | `effective_spad_count_88` | effective SPAD count, 8.8 |
 
-The PAL range status, sigma and maximum distance the full drivers report need
-device data cached at init (reference SPADs, calibration), so they are not in
-this crate. The family's plottable rule (statuses 0, 6, 11) applies to that
+The PAL range status, sigma and maximum distance the driver reports need
+device data cached at init (reference SPADs, calibration): the
+[live device](#live-device) gives them. The family's plottable rule (statuses 0, 6, 11) applies to that
 driver status, not to `device_range_status`.
 
 ## Reset and bridge diagnostics

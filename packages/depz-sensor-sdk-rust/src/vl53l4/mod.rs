@@ -18,17 +18,19 @@
 //! point, out of scope for this decode-layer crate.
 
 pub mod codecs;
+pub mod driver;
 pub mod uld_math;
 
 pub use codecs::{
     i2c_error_name, pack_read_reg, pack_set_i2c_speed, pack_start_stream, pack_write_reg,
-    pack_xshut, RegData, StreamData, Vl53l4Cmd, Vl53l4Info, Vl53l4Rpt, I2C_KHZ_STEPS,
+    pack_xshut, try_pack_write_reg, RegData, StreamData, Vl53l4Cmd, Vl53l4Info, Vl53l4Rpt, I2C_KHZ_STEPS,
     SF_INT_ACT_HIGH, XFER_MAX, XSHUT_OFF, XSHUT_ON, XSHUT_RESET,
 };
 pub use uld_math::{
     config_block, decode_offset, decode_range_timing, decode_sigma_threshold,
-    decode_signal_threshold, decode_xtalk, offset_raw, parse_result_block, range_status_name,
-    range_timing_registers, sigma_threshold_raw, signal_threshold_raw, xtalk_raw, Vl53l4Error,
+    decode_signal_threshold, decode_xtalk, parse_result_block, range_status_name,
+    range_timing_registers, sigma_threshold_raw, signal_threshold_raw, try_offset_raw, try_xtalk_raw,
+    Vl53l4Error,
     Vl53l4Results, CONFIG_ADDR, CONFIG_FMP_BYTE, DEFAULT_CONFIGURATION, I2C_KHZ_BOOT,
     I2C_KHZ_DEFAULT, MODEL_ID_VL53L4CD, RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN, STATUS_RTN,
 };

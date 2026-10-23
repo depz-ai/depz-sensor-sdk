@@ -6,6 +6,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import checked_pack, need_bytes
+
 
 class Vl53l4Cmd(IntEnum):
     READ_REG = 0x32
@@ -42,23 +44,29 @@ I2C_KHZ_STEPS = (100, 200, 400, 500, 600, 700, 800, 900, 1000)
 
 
 def pack_read_reg(addr: int, length: int) -> bytes:
-    return struct.pack("<HH", addr, length)
+    return checked_pack("<HH", addr=addr, length=length)
+
+
+WRITE_MAX_LEN = 253  # VL53_WRITE_REG data length limit (contracts 10/12 §2: 1..253 bytes)
 
 
 def pack_write_reg(addr: int, data: bytes) -> bytes:
-    return struct.pack("<H", addr) + data
+    head = checked_pack("<H", addr=addr)
+    if not 1 <= len(data) <= WRITE_MAX_LEN:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX_LEN} bytes")
+    return head + bytes(data)
 
 
 def pack_xshut(action: int) -> bytes:
-    return struct.pack("<B", action)
+    return checked_pack("<B", action=action)
 
 
 def pack_start_stream(addr: int, length: int, flags: int = 0) -> bytes:
-    return struct.pack("<HHB", addr, length, flags)
+    return checked_pack("<HHB", addr=addr, length=length, flags=flags)
 
 
 def pack_set_i2c_speed(khz: int) -> bytes:
-    return struct.pack("<H", khz)
+    return checked_pack("<H", khz=khz)
 
 
 @dataclass(frozen=True)
@@ -113,4 +121,6 @@ class StreamData:
     @classmethod
     def unpack(cls, payload: bytes) -> "StreamData":
         ts, addr, length = struct.unpack_from("<QHH", payload)
+        # contract 07 §3: checked against its own length field; trailing bytes ignored
+        need_bytes("RPT_VL53_STREAM data", payload, 12 + length)
         return cls(ts, addr, length, payload[12 : 12 + length])

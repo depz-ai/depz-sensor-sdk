@@ -3,6 +3,7 @@
  * Mirrors the Python reference `depz_sensor_sdk.tmf8829.builder`.
  */
 
+import { checkU64Number } from "../../protocol/wire.js";
 import { Tmf8829CaptureTimer, Tmf8829SensorClock, type Tmf8829FrameTime } from "./clock.js";
 import {
   TMF8829_FID_HISTOGRAMS,
@@ -95,6 +96,9 @@ export class Tmf8829MeasurementBuilder {
    * none) → the measurement it completes, or null. `raw` is copied.
    */
   add(rawIn: Uint8Array, timestampUs: number, edgeUs = 0): Tmf8829Measurement | null {
+    // contract 07 §3: MCU µs times are u64 — checked before the frame is parsed
+    checkU64Number("timestampUs", timestampUs);
+    checkU64Number("edgeUs", edgeUs);
     const raw = rawIn.slice();
     let f: Tmf8829FrameInfo;
     try {

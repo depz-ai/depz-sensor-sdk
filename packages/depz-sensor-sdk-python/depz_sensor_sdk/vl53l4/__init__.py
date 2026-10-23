@@ -420,10 +420,11 @@ class Vl53l4cd(DeviceBase):
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd != Vl53l4Rpt.STREAM or len(pkt.payload) < 12:
             return False
-        sample = StreamData.unpack(pkt.payload)
         try:
+            # a report shorter than its own length field is refused (ValueError)
+            sample = StreamData.unpack(pkt.payload)
             result = parse_result_block(sample.data)
-        except Vl53l4cdError:
+        except (ValueError, Vl53l4cdError):
             # Somebody re-armed the stream on a different block — count, don't
             # crash the reader thread.
             self._stream_parse_errors += 1

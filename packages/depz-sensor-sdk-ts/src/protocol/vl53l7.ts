@@ -8,6 +8,8 @@
  * holds only what the I2C board adds, plus its tighter transfer limits.
  */
 
+import { checkUint } from "./wire.js";
+
 export enum Vl53l7Cmd {
   PinCtrl = 0x34,
   GetInfo = 0x37,
@@ -53,13 +55,48 @@ export const VL53L7_I2C_SPEED_STEPS_KHZ: readonly number[] = [
   100, 200, 400, 500, 600, 700, 800, 900, 1000,
 ];
 
+/** Register space the bridge addresses: a transfer never runs past 0xFFFF. */
+const VL53L7_REG_SPACE = 0x10000;
+
+/**
+ * VL53_READ_REG payload `addr u16, len u16` with the L5/L7 limits (contract
+ * 11 §2): `len` 1..1536 and `addr + len ≤ 0x10000`, else RangeError.
+ */
+export function packVl53l7ReadReg(addr: number, length: number): Uint8Array {
+  checkUint("addr", addr, 16);
+  checkUint("length", length, 16);
+  if (length < 1 || length > VL53L7_READ_MAX_LEN || addr + length > VL53L7_REG_SPACE) {
+    throw new RangeError(`READ_REG length must be 1..${VL53L7_READ_MAX_LEN} and addr+length <= 0x10000`);
+  }
+  const out = new Uint8Array(4);
+  const dv = new DataView(out.buffer);
+  dv.setUint16(0, addr, true);
+  dv.setUint16(2, length, true);
+  return out;
+}
+
+/**
+ * VL53_WRITE_REG payload `addr u16, data[N]` with the L5/L7 limits (contract
+ * 11 §2): N 1..2048 and `addr + N ≤ 0x10000`, else RangeError.
+ */
+export function packVl53l7WriteReg(addr: number, data: Uint8Array): Uint8Array {
+  checkUint("addr", addr, 16);
+  if (data.length < 1 || data.length > VL53L7_WRITE_MAX_LEN || addr + data.length > VL53L7_REG_SPACE) {
+    throw new RangeError(`WRITE_REG data must be 1..${VL53L7_WRITE_MAX_LEN} bytes and addr+N <= 0x10000`);
+  }
+  const out = new Uint8Array(2 + data.length);
+  new DataView(out.buffer).setUint16(0, addr, true);
+  out.set(data, 2);
+  return out;
+}
+
 export function packPinCtrl(action: number): Uint8Array {
-  return Uint8Array.of(action & 0xff);
+  return Uint8Array.of(checkUint("action", action, 8));
 }
 
 export function packVl53l7SetI2cSpeed(khz: number): Uint8Array {
   const out = new Uint8Array(2);
-  new DataView(out.buffer).setUint16(0, khz, true);
+  new DataView(out.buffer).setUint16(0, checkUint("khz", khz, 16), true);
   return out;
 }
 

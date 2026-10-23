@@ -252,7 +252,7 @@ export class Vl53lx extends DepzDevice {
       try {
         await chunkedWrite(addr, data, {
           chunkSize: XFER_MAX,
-          writeChunk: (a, chunk) =>
+          writeChunk: async (a, chunk) =>
             this.request(Vl53lxCmd.WriteReg, packWriteReg(a, chunk), {
               okCompletes: true,
               timeoutMs: 2000,
@@ -329,8 +329,8 @@ export class Vl53lx extends DepzDevice {
 
   constructor(transport: SerialTransport, opts?: Vl53lxOptions) {
     super(transport, opts);
-    this.sleepImpl = opts?.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-    this.platform = new BridgePlatform(this.bridge, (ms) => this.sleepImpl(ms));
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
+    this.platform = new BridgePlatform(this.bridge, async (ms) => this.sleepImpl(ms));
   }
 
   private get classProduct(): string | null {
@@ -493,7 +493,7 @@ export class Vl53lx extends DepzDevice {
   }
 
   /** RPT_VL53_INFO — the bridge's own counters; safe while streaming. */
-  bridgeInfo(): Promise<Vl53lxInfo> {
+  async bridgeInfo(): Promise<Vl53lxInfo> {
     return this.request(Vl53lxCmd.GetInfo, undefined, {
       matcher: DepzDevice.expectReport(Vl53lxRpt.Info, unpackVl53lxInfo),
     });
@@ -511,6 +511,7 @@ export class Vl53lx extends DepzDevice {
   async configure(opts: Vl53lxConfigureOptions = {}): Promise<void> {
     this.requireNotRanging();
     const drv = this.driver;
+    if (opts.mode != null) this.need("mode");
     const offset = opts.offsetMm != null ? this.need("offset") : null;
     const xtalk = opts.xtalkKcps != null ? this.need("xtalk") : null;
     const signal = opts.signalKcps != null ? this.need("signal_thresh") : null;
@@ -523,7 +524,7 @@ export class Vl53lx extends DepzDevice {
   }
 
   /** → [timingBudgetMs, interMeasurementMs]; 0 for the period = continuous. */
-  getRangeTiming(): Promise<[number, number]> {
+  async getRangeTiming(): Promise<[number, number]> {
     return this.driver.getRangeTiming();
   }
 
@@ -552,7 +553,7 @@ export class Vl53lx extends DepzDevice {
   // Capability-gated passthroughs. Each throws DepzError on a product/driver
   // that does not serve the group (see supports()).
 
-  getOffsetMm(): Promise<number> {
+  async getOffsetMm(): Promise<number> {
     return this.need("offset").getOffset();
   }
 
@@ -561,7 +562,7 @@ export class Vl53lx extends DepzDevice {
     await this.need("offset").setOffset(offsetMm);
   }
 
-  getXtalkKcps(): Promise<number> {
+  async getXtalkKcps(): Promise<number> {
     return this.need("xtalk").getXtalk();
   }
 
@@ -586,7 +587,7 @@ export class Vl53lx extends DepzDevice {
   }
 
   /** → [distanceLowMm, distanceHighMm, window]. */
-  getDetectionThresholds(): Promise<[number, number, number]> {
+  async getDetectionThresholds(): Promise<[number, number, number]> {
     return this.need("thresholds").getDetectionThresholds();
   }
 
@@ -600,7 +601,7 @@ export class Vl53lx extends DepzDevice {
     await this.need("thresholds").setDetectionThresholds(distanceLowMm, distanceHighMm, window);
   }
 
-  getSignalThresholdKcps(): Promise<number> {
+  async getSignalThresholdKcps(): Promise<number> {
     return this.need("signal_thresh").getSignalThreshold();
   }
 
@@ -609,7 +610,7 @@ export class Vl53lx extends DepzDevice {
     await this.need("signal_thresh").setSignalThreshold(signalKcps);
   }
 
-  getSigmaThresholdMm(): Promise<number> {
+  async getSigmaThresholdMm(): Promise<number> {
     return this.need("sigma_thresh").getSigmaThreshold();
   }
 
@@ -619,7 +620,7 @@ export class Vl53lx extends DepzDevice {
   }
 
   /** → [x, y] SPAD window size. */
-  getRoi(): Promise<[number, number]> {
+  async getRoi(): Promise<[number, number]> {
     return this.need("roi").getRoi();
   }
 
@@ -628,7 +629,7 @@ export class Vl53lx extends DepzDevice {
     await this.need("roi").setRoi(x, y);
   }
 
-  getRoiCenter(): Promise<number> {
+  async getRoiCenter(): Promise<number> {
     return this.need("roi").getRoiCenter();
   }
 
@@ -791,10 +792,12 @@ export class Vl53lx extends DepzDevice {
     if (pkt.cmd !== Vl53lxRpt.Stream || pkt.payload.length < 12) return false;
     const drv = this.driverInst;
     if (drv === null) return true;
-    const sample = unpackStream(pkt.payload);
     // Decoded exactly once per sample: the histogram driver steps its own
     // frame-pair state on every frame it sees.
     try {
+      // Inside the try: a report shorter than its own length field is a
+      // dropped frame, not an exception in the read pump.
+      const sample = unpackStream(pkt.payload);
       if (!drv.HISTOGRAM) {
         this.emit(toVl53lxMeasurement(sample.timestampUs, drv.decode(sample.data)));
         return true;

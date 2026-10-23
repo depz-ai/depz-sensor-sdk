@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,7 @@ struct ShtpHeader {
     std::uint8_t seq = 0;
     bool continuation = false;
 
+    // std::invalid_argument when length > 0x7FFF (never masked, contract 07 §3).
     bytes pack() const;
     static ShtpHeader unpack(byte_span data);
 };
@@ -58,6 +60,7 @@ struct ShtpCargo {
     int channel = 0;
     int seq = 0;  // seq of the first fragment
     bytes payload;
+    std::uint64_t capture_us = 0;  // capture time of the first fragment (contract 05 §3)
 };
 
 // Single-fragment frame: length = header + payload.
@@ -73,11 +76,19 @@ std::vector<bytes> shtp_fragment_cargo(int channel, byte_span payload, std::uint
 class ShtpLayer {
 public:
     // Build a single-fragment frame, consuming the channel's TX seq.
+    // std::out_of_range for a channel outside 0..5, std::invalid_argument for
+    // a payload past the 64-byte MCU slot.
     bytes next_frame(int channel, byte_span payload);
-    int tx_seq(int channel) const { return tx_seq_[channel]; }
+    // std::out_of_range for a channel outside 0..5.
+    int tx_seq(int channel) const {
+        if (channel < 0 || channel >= NUM_CHANNELS) throw std::out_of_range("SHTP channel out of range 0..5");
+        return tx_seq_[channel];
+    }
 
     // Consume one inbound frame; return the cargo when complete, else nullopt.
-    std::optional<ShtpCargo> feed(byte_span frame);
+    // `capture_us` is the frame's RPT_DATA capture time; the cargo carries the
+    // FIRST fragment's — the base its 0xFB timestamps refer to (§3, §5).
+    std::optional<ShtpCargo> feed(byte_span frame, std::uint64_t capture_us = 0);
 
     // Forget all TX seq counters and partial cargos (sensor reset).
     void reset();
@@ -89,6 +100,7 @@ private:
         bytes buf;
         std::size_t expected = 0;  // total cargo payload bytes (headers excluded)
         int seq = 0;
+        std::uint64_t capture_us = 0;
     };
     int tx_seq_[NUM_CHANNELS] = {0};
     ChannelRx rx_[NUM_CHANNELS];
@@ -119,6 +131,8 @@ bytes sh2_build_frs_write_data(std::uint16_t offset_words, const std::vector<std
 // In-cargo control IDs on the input channels.
 inline constexpr std::uint8_t BASE_TIMESTAMP_REF = 0xFB;
 inline constexpr std::uint8_t TIMESTAMP_REBASE = 0xFA;
+// + u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0).
+inline constexpr std::uint8_t FLUSH_COMPLETED = 0xEF;
 
 inline constexpr int RV_ACCURACY_Q = 12;
 inline constexpr int GYRO_RV_ANGVEL_Q = 10;
@@ -142,6 +156,8 @@ enum class ReportType {
     RawSensor,
     GyroIntegratedRV,
     UnknownReport,
+    MotionRequest,   // 0x2B, BNO086 interactive calibration: intent, request
+    FlushCompleted,  // 0xEF: flushed_sensor; no seq / accuracy / delay
 };
 
 // Flat tagged report. Only the fields relevant to `type` are populated; the
@@ -177,6 +193,14 @@ struct Report {
     int most_likely_state = 0;
     std::vector<int> confidences;
 
+    // motion request (0x2B): the motion intent the hub was last told and what
+    // it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still)
+    int intent = 0;
+    int request = 0;
+
+    // flush completed (0xEF): the sensor whose batched reports are all sent
+    int flushed_sensor = 0;
+
     // raw sensor
     std::int64_t sensor_timestamp_us = 0;
     std::int64_t temperature_raw = 0;
@@ -190,11 +214,14 @@ struct Report {
 
 // Parse a channel-3/4 cargo into typed reports. Handles 0xFB base timestamp
 // references and 0xFA rebases; every report's timestamp is base + delay where
-// base = capture − base_delta·100 µs.
+// base = capture − base_delta·100 µs. A bare 0xEF Flush Completed (2 bytes, no
+// SH-2 header) is stamped with the current base. A negative capture_timestamp_us (the MCU
+// uptime) is std::invalid_argument.
 std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_timestamp_us);
 
 // Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes: 7×i16
-// bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks).
+// bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks). A
+// negative capture_timestamp_us is std::invalid_argument.
 std::optional<Report> parse_gyro_rv_cargo(byte_span payload, std::int64_t capture_timestamp_us);
 
 }  // namespace bno086

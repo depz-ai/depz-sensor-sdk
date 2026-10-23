@@ -59,6 +59,7 @@ public static class UsbIds
     {
         if (vid is null || pid is null)
             return false;
+        CheckIds(vid.Value, pid.Value);
         if (vid == DevUsbVid && pid == DevUsbPid)
             return true;
         if (vid != DepzUsbVid)
@@ -73,6 +74,7 @@ public static class UsbIds
     {
         if (vid is null || pid is null)
             return null;
+        CheckIds(vid.Value, pid.Value);
         if (vid == DevUsbVid && pid == DevUsbPid)
             return "dev";
         if (vid == DepzUsbVid)
@@ -94,4 +96,11 @@ public static class UsbIds
             .ThenBy(p => p.Serial ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(p => p.Port, StringComparer.Ordinal)
             .ToList();
+
+    /// <summary>A USB id is a u16 (contract 07 §3): anything else is invalid, not "unknown".</summary>
+    private static void CheckIds(int vid, int pid)
+    {
+        Protocol.Wire.CheckUint("vid", vid, 16);
+        Protocol.Wire.CheckUint("pid", pid, 16);
+    }
 }

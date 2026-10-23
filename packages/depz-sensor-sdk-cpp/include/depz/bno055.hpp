@@ -58,7 +58,8 @@ inline constexpr std::uint8_t TRIGGER_INT = 1;
 // BNO_READ_REG payload: addr u8, len u8.
 bytes pack_read_reg(std::uint8_t addr, std::uint8_t len);
 
-// BNO_WRITE_REG payload: addr u8 then the raw register data (1..XFER_MAX).
+// BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
+// unless it is 1..XFER_MAX bytes.
 bytes pack_write_reg(std::uint8_t addr, byte_span data);
 
 // BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE.
@@ -119,7 +120,7 @@ struct StreamData {
     bytes data;  // payload[10..10+len]
 
     // Decode a RPT_BNO_REG_STREAM payload (10+len bytes); nullopt when shorter
-    // than the 10-byte header.
+    // than the 10-byte header plus its `len` data bytes (trailing bytes ignored).
     static std::optional<StreamData> unpack(byte_span payload);
 };
 

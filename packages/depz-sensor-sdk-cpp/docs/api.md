@@ -17,19 +17,19 @@ runs its commands and delivers its data — see the last section.
 
 - **Transport (framing & CRC)**: [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`MAGIC0`](#magic0), [`MAGIC1`](#magic1), [`CrcType`](#crctype), [`payload_crc_bytes`](#payload_crc_bytes), [`build_packet`](#build_packet), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false)
 - **Common protocol**: [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`UNSOLICITED`](#unsolicited), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`SyncPinConfig`](#syncpinconfig), [`pack_sync_time`](#pack_sync_time), [`pack_set_payload_crc_type`](#pack_set_payload_crc_type), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string)
-- **Identity**: [`SensorType`](#sensortype), [`to_string`](#to_string), [`DeviceMode`](#devicemode), [`Identity`](#identity), [`parse_software_name`](#parse_software_name)
+- **Identity**: [`SensorType`](#sensortype), [`to_string`](#to_string), [`DeviceMode`](#devicemode), [`Identity`](#identity), [`parse_software_name`](#parse_software_name), [`sensor_class_names`](#sensor_class_names), [`resolve_sensor_class`](#resolve_sensor_class)
 - **USB identity**: [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`PID_VL53L8`](#pid_vl53l8), [`PID_VL53L4CD`](#pid_vl53l4cd), [`PID_TMF8829`](#pid_tmf8829), [`PID_BNO086`](#pid_bno086), [`DEV_USB_VID`](#dev_usb_vid), [`DEV_USB_PID`](#dev_usb_pid), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortInfo`](#portinfo), [`order_by_serial`](#order_by_serial)
 - **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
 - **VL53L4CD (ToF)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`MODEL_ID`](#model_id), [`CONFIG_ADDR`](#config_addr), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Result`](#vl53l4result), [`parse_result_block`](#parse_result_block), [`RangeTimingRegs`](#rangetimingregs), [`range_timing_registers`](#range_timing_registers), [`RangeTiming`](#rangetiming), [`decode_range_timing`](#decode_range_timing), [`offset_raw`](#offset_raw), [`decode_offset`](#decode_offset), [`xtalk_raw`](#xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold), [`default_configuration`](#default_configuration), [`config_block`](#config_block)
 - **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`CNH_DATA_IDX`](#cnh_data_idx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_MAX_AGGREGATES`](#cnh_max_aggregates), [`CNH_MAX_FEATURE_LENGTH`](#cnh_max_feature_length), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`FOOTER_ID_OFF`](#footer_id_off), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`Model`](#model), [`to_string`](#to_string), [`resolve_model`](#resolve_model), [`infer_resolution`](#infer_resolution), [`decode_frame`](#decode_frame)
 - **VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`RegData`](#regdata), [`StreamData`](#streamdata), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`ClearStep`](#clearstep), [`pack_read_reg`](#pack_read_reg), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_addr_width`](#pack_set_addr_width), [`Vl53lxInfo`](#vl53lxinfo), [`DriverKind`](#driverkind), [`to_string`](#to_string), [`Product`](#product), [`products`](#products), [`find_product`](#find_product), [`product_from_board_name`](#product_from_board_name), [`SensorClass`](#sensorclass), [`resolve_class`](#resolve_class), [`DieVariant`](#dievariant), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw)
-- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
 - **TMF8829 (dToF)**: [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_HV_CP_OVERLOAD`](#frame_hv_cp_overload), [`FRAME_VCDRV_OVERLOAD`](#frame_vcdrv_overload), [`FRAME_VCDRV_BURST_EXCEEDED`](#frame_vcdrv_burst_exceeded), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`MAX_PEAKS`](#max_peaks), [`FrameError`](#frameerror), [`fp_grid`](#fp_grid), [`frame_rows`](#frame_rows), [`fp_name`](#fp_name), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`parse_results`](#parse_results), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`flag_names`](#flag_names), [`subints`](#subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Measurement`](#measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`REG_APP_ID`](#reg_app_id), [`REG_CMD_STAT`](#reg_cmd_stat), [`REG_SERIAL`](#reg_serial), [`REG_CID_RID`](#reg_cid_rid), [`REG_CFG`](#reg_cfg), [`REG_INT_STATUS`](#reg_int_status), [`REG_INT_ENAB`](#reg_int_enab), [`REG_ID`](#reg_id), [`REG_REVID`](#reg_revid), [`REG_RESET`](#reg_reset), [`REG_ENABLE`](#reg_enable), [`REG_FIFOSTATUS`](#reg_fifostatus), [`REG_FIFO`](#reg_fifo), [`DEVICE_ID`](#device_id), [`CFG_SIZE`](#cfg_size), [`CMD_MEASURE`](#cmd_measure), [`CMD_WRITE_PAGE`](#cmd_write_page), [`CMD_LOAD_CONFIG_PAGE`](#cmd_load_config_page), [`CMD_STOP`](#cmd_stop), [`STAT_OK`](#stat_ok), [`STAT_ACCEPTED`](#stat_accepted), [`status_name`](#status_name), [`Preset`](#preset), [`PRESETS`](#presets), [`find_preset`](#find_preset), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`find_cfg_field`](#find_cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`firmware_image`](#firmware_image)
 - **Bootloader / firmware**: [`FWDEPZ_HEADER_SIZE`](#fwdepz_header_size), [`FWDEPZ_MAGIC`](#fwdepz_magic), [`BlCmd`](#blcmd), [`BlRpt`](#blrpt), [`BlStatus`](#blstatus), [`FlashInfo`](#flashinfo), [`pack_write_page`](#pack_write_page), [`pack_read_page`](#pack_read_page), [`FwDepzErrorKind`](#fwdepzerrorkind), [`FwDepzError`](#fwdepzerror), [`FwDepzImage`](#fwdepzimage)
 - **Datasets**: [`SCHEMA_PREFIX`](#schema_prefix), [`TimeSync`](#timesync), [`DeviceMeta`](#devicemeta), [`Record`](#record), [`Reader`](#reader)
-- **Live hardware (links, device, discovery)**: [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FEATURE_WAKEUP`](#feature_wakeup), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Config`](#tmf8829config), [`Tmf8829SensorId`](#tmf8829sensorid), [`Tmf8829StreamStats`](#tmf8829streamstats), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Progress`](#tmf8829progress), [`Tmf8829`](#tmf8829), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx), [`open_tmf8829`](#open_tmf8829)
+- **Live hardware (links, device, discovery)**: [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FEATURE_WAKEUP`](#feature_wakeup), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Config`](#tmf8829config), [`Tmf8829SensorId`](#tmf8829sensorid), [`Tmf8829StreamStats`](#tmf8829streamstats), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Progress`](#tmf8829progress), [`Tmf8829`](#tmf8829), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`attach_sensor_class`](#attach_sensor_class), [`open_on_link`](#open_on_link), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx), [`open_tmf8829`](#open_tmf8829)
 
 ## Transport (framing & CRC)
 
@@ -79,12 +79,14 @@ CRC trailer for a payload; empty payloads never carry CRC bytes (ERRATA E6).
 ### build_packet
 
 ```cpp
-bytes build_packet(std::uint8_t cmd, byte_span payload = {}, std::uint8_t seq = 0, CrcType crc_type = CrcType::None);
+bytes build_packet(std::uint8_t cmd, byte_span payload = {}, std::uint32_t seq = 0, CrcType crc_type = CrcType::None);
 ```
 
 Frame one packet. `crc_type` bits are set in the header even for an empty
 payload (matching device TX), but CRC bytes are appended only for non-empty
-payloads. Throws std::length_error if payload exceeds MAX_PAYLOAD.
+payloads. `seq` is a free-running counter taken modulo 256 on the wire.
+Throws std::length_error if payload exceeds MAX_PAYLOAD, std::invalid_argument
+if crc_type is not one of the four listed CrcType values (contract 07 §3).
 
 ### Packet
 
@@ -371,6 +373,9 @@ struct SyncPinConfig {
 bytes pack() const;
 ```
 
+std::out_of_range unless pin is 1..5, mode a listed SyncPinMode and
+polarity a listed SyncPinPolarity (contract 02 §6).
+
 #### SyncPinConfig.unpack
 
 ```cpp
@@ -405,7 +410,9 @@ zero: offset = ((T2-T1)+(T3-T4)) / 2, rtt = (T4-T1)-(T3-T2).
 std::string strip_device_string(byte_span raw);
 ```
 
-Decode an ASCII device string, dropping trailing NUL/0xFF filler.
+Decode an ASCII device string, dropping trailing NUL/0xFF filler (contract
+02 §4.1): every byte >= 0x80 becomes U+FFFD (UTF-8 "\xEF\xBF\xBD"); an
+embedded 0x00 before the filler is kept as a character.
 
 ## Identity
 
@@ -466,6 +473,38 @@ Identity parse_software_name(const std::string& name);
 
 Classify a GET_NAME_ACTIVE_SOFTWARE string. The string must already be
 stripped of trailing NUL/0xFF (strip_device_string).
+
+### sensor_class_names
+
+```cpp
+const std::vector<std::string>& sensor_class_names();
+```
+
+Every name resolve_sensor_class() returns, in contract order: the sensor
+classes of contract 07 §1, "vl53lx" (the generic 1D-family class),
+"tmf8829", "device" (the base Device: an unknown application, or a name
+that is neither APP_ nor BOOTDEPZ) and "bootloader" (no sensor class: use
+the contract 06 client). BNO085 boards run APP_BNO086 and resolve to
+"bno086".
+
+### resolve_sensor_class
+
+```cpp
+std::string resolve_sensor_class(const std::string& software_name, const std::string& device_name, std::optional<std::uint16_t> usb_vid, std::optional<std::uint16_t> usb_pid);
+```
+
+The canonical class name for a device's probe answers and its port's USB
+id — contract 02 §4.4, pure. `software_name` is the GET_NAME_ACTIVE_SOFTWARE
+answer, `device_name` the GET_DEVICE_NAME answer ("" when there was none);
+the USB id is nullopt when unknown (a replay, a bridge).
+  - BOOTDEPZ_*   -> "bootloader";
+  - APP_VL53L8   -> "vl53l8ch" if the USB model is VL53L8CH, else "vl53l8cx";
+  - APP_VL53L7   -> vl53l7::resolve_model() (USB model, then the name);
+  - APP_VL53L0_4 -> vl53lx::resolve_class() (USB model, then the name, else
+    the generic "vl53lx"; VL53L4CD is generic on this firmware);
+  - any other known token -> its class; unknown APP_* (or neither APP_ nor
+    BOOTDEPZ) -> "device".
+Vectors: contracts/vectors/probe.json.
 
 ## USB identity
 
@@ -815,7 +854,8 @@ VL53_READ_REG payload: addr u16, len u16 (both little-endian).
 bytes pack_write_reg(std::uint16_t addr, byte_span data);
 ```
 
-VL53_WRITE_REG payload: addr u16 then the raw register data (1..XFER_MAX).
+VL53_WRITE_REG payload: addr u16 then the raw register data; std::invalid_argument
+unless it is 1..XFER_MAX bytes.
 
 ### pack_xshut
 
@@ -967,7 +1007,8 @@ SetRangeTiming register math. `osc_frequency` is the word read from 0x0006;
 `clock_pll` the word from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
 mode). budget 10..200 ms; inter_ms == 0 selects continuous mode, a value
 greater than the budget selects autonomous low power. Returns nullopt when
-osc_frequency is 0, the budget is out of range, or 0 < inter_ms <= budget.
+osc_frequency is 0, the budget is out of range, 0 < inter_ms <= budget, or
+the INTERMEASUREMENT_MS value would overflow u32 (never wrapped).
 Bit-exact with the ULD (32-bit truncations, 1.055 PLL factor).
 
 ### RangeTiming
@@ -999,7 +1040,7 @@ std::uint16_t offset_raw(int offset_mm);
 ```
 
 RANGE_OFFSET_MM (0x001E) word for SetOffset (offset x4; INNER/OUTER zeroed
-alongside).
+alongside). std::out_of_range outside -1024..1023 mm (contract 07 §3).
 
 ### decode_offset
 
@@ -1016,6 +1057,7 @@ std::uint16_t xtalk_raw(int xtalk_kcps);
 ```
 
 XTALK_PLANE_OFFSET_KCPS (0x0016) word for SetXtalk (kcps x512).
+std::out_of_range outside 0..127 kcps (the word would overflow).
 
 ### decode_xtalk
 
@@ -1032,6 +1074,7 @@ std::uint16_t signal_threshold_raw(int signal_kcps);
 ```
 
 MIN_COUNT_RATE_RTN_LIMIT_MCPS (0x0066) word for SetSignalThreshold (kcps /8).
+std::out_of_range outside 0..65535 kcps.
 
 ### decode_signal_threshold
 
@@ -1048,7 +1091,7 @@ std::optional<std::uint16_t> sigma_threshold_raw(int sigma_mm);
 ```
 
 RANGE_CONFIG__SIGMA_THRESH (0x0064) word for SetSigmaThreshold (mm x4);
-nullopt when sigma_mm > 16383 (the word would overflow).
+nullopt when sigma_mm is negative or > 16383 (the word would overflow).
 
 ### decode_sigma_threshold
 
@@ -1191,22 +1234,24 @@ struct Vl53l8Frame {
     std::uint64_t timestamp_us = 0;
     int resolution = 0;
     int silicon_temp_degc = 0;
-    std::vector<std::int32_t> distance_mm;
+    std::vector<std::int32_t> distance_mm;  // mm, >= 0
     std::vector<std::uint8_t> target_status;
     std::vector<std::uint8_t> nb_target_detected;
-    std::vector<std::uint32_t> signal_per_spad;
-    std::vector<std::uint32_t> ambient_per_spad;
+    std::vector<double> signal_per_spad;  // kcps/SPAD
+    std::vector<double> ambient_per_spad;  // kcps/SPAD
     std::vector<std::uint32_t> nb_spads_enabled;
-    std::vector<std::uint16_t> range_sigma_mm_raw;
-    std::vector<std::uint8_t> reflectance;
+    std::vector<double> range_sigma_mm;  // mm
+    std::vector<double> reflectance;  // %
     std::optional<bytes> cnh_raw;
 };
 ```
 
 One decoded ranging frame. Arrays are sized to the active resolution (16 or
-64 zones), row-major. Raw integers per the wire; `distance_mm` already has
-the ST /4 floor scaling applied, `range_sigma_mm_raw` is the raw u16 (real
-value = raw / 128).
+64 zones), row-major, in the real units ST's GetRangingData gives (contract
+04 §5): `distance_mm` = wire value / 4 floored, a negative result clamped to
+0; signal / ambient = wire / 2048 (kcps/SPAD); `range_sigma_mm` = wire / 128
+(mm); `reflectance` = wire / 2 (%). ST divides integers; the double fields
+keep the fraction.
 
 ### swap_buffer
 
@@ -1235,6 +1280,7 @@ std::uint32_t xtalk_margin_raw(double margin_kcps);
 ```
 
 Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
+xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
 
 ### xtalk_margin_kcps
 
@@ -1286,6 +1332,8 @@ bytes pack_detection_thresholds(const std::vector<DetectionThreshold>& threshold
 
 Pack the 64-entry DCI_DET_THRESH_START block (768 bytes). Missing entries
 default to zeros; low/high are multiplied by the measurement's scale factor.
+std::invalid_argument for more than 64 entries, std::out_of_range when a
+scaled low/high does not fit the i32 field (contract 07 §3).
 
 ### detection_thresholds_valid_status
 
@@ -1337,6 +1385,7 @@ MotionConfig motion_config_init(int resolution);
 
 Build the default motion-indicator configuration for `resolution`
 (RESOLUTION_4X4 or RESOLUTION_8X8), matching uld.motion_indicator_init.
+std::invalid_argument for any other resolution.
 
 ### CNH_MAX_AGGREGATES
 
@@ -1560,6 +1609,7 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 ```
 
 VL53_READ_REG payload: addr u16, len u16 (both little-endian; VL53L8 format).
+std::invalid_argument unless len is 1..READ_MAX_LEN and addr + len <= 0x10000.
 
 ### pack_write_reg
 
@@ -1568,6 +1618,8 @@ bytes pack_write_reg(std::uint16_t addr, byte_span data);
 ```
 
 VL53_WRITE_REG payload: addr u16 then the raw register data (VL53L8 format).
+std::invalid_argument unless data is 1..WRITE_MAX_LEN bytes and
+addr + size <= 0x10000.
 
 ### pack_pin_ctrl
 
@@ -2159,6 +2211,8 @@ struct ShtpHeader {
 bytes pack() const;
 ```
 
+std::invalid_argument when length > 0x7FFF (never masked, contract 07 §3).
+
 #### ShtpHeader.unpack
 
 ```cpp
@@ -2172,6 +2226,7 @@ struct ShtpCargo {
     int channel = 0;
     int seq = 0;  // seq of the first fragment
     bytes payload;
+    std::uint64_t capture_us = 0;  // capture time of the first fragment (contract 05 §3)
 };
 ```
 
@@ -2212,6 +2267,8 @@ bytes next_frame(int channel, byte_span payload);
 ```
 
 Build a single-fragment frame, consuming the channel's TX seq.
+std::out_of_range for a channel outside 0..5, std::invalid_argument for
+a payload past the 64-byte MCU slot.
 
 #### ShtpLayer.tx_seq
 
@@ -2219,13 +2276,17 @@ Build a single-fragment frame, consuming the channel's TX seq.
 int tx_seq(int channel) const;
 ```
 
+std::out_of_range for a channel outside 0..5.
+
 #### ShtpLayer.feed
 
 ```cpp
-std::optional<ShtpCargo> feed(byte_span frame);
+std::optional<ShtpCargo> feed(byte_span frame, std::uint64_t capture_us = 0);
 ```
 
 Consume one inbound frame; return the cargo when complete, else nullopt.
+`capture_us` is the frame's RPT_DATA capture time; the cargo carries the
+FIRST fragment's — the base its 0xFB timestamps refer to (§3, §5).
 
 #### ShtpLayer.reset
 
@@ -2305,6 +2366,14 @@ In-cargo control IDs on the input channels.
 inline constexpr std::uint8_t TIMESTAMP_REBASE = 0xFA;
 ```
 
+### FLUSH_COMPLETED
+
+```cpp
+inline constexpr std::uint8_t FLUSH_COMPLETED = 0xEF;
+```
+
++ u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0).
+
 ### RV_ACCURACY_Q
 
 ```cpp
@@ -2339,6 +2408,8 @@ enum class ReportType {
     RawSensor,
     GyroIntegratedRV,
     UnknownReport,
+    MotionRequest,   // 0x2B, BNO086 interactive calibration: intent, request
+    FlushCompleted,  // 0xEF: flushed_sensor; no seq / accuracy / delay
 };
 ```
 
@@ -2367,6 +2438,9 @@ struct Report {
     bool end_of_sequence = false;
     int most_likely_state = 0;
     std::vector<int> confidences;
+    int intent = 0;
+    int request = 0;
+    int flushed_sensor = 0;
     std::int64_t sensor_timestamp_us = 0;
     std::int64_t temperature_raw = 0;
     std::int64_t vx_raw = 0, vy_raw = 0, vz_raw = 0;
@@ -2385,7 +2459,9 @@ std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_ti
 
 Parse a channel-3/4 cargo into typed reports. Handles 0xFB base timestamp
 references and 0xFA rebases; every report's timestamp is base + delay where
-base = capture − base_delta·100 µs.
+base = capture − base_delta·100 µs. A bare 0xEF Flush Completed (2 bytes, no
+SH-2 header) is stamped with the current base. A negative capture_timestamp_us (the MCU
+uptime) is std::invalid_argument.
 
 ### parse_gyro_rv_cargo
 
@@ -2394,7 +2470,8 @@ std::optional<Report> parse_gyro_rv_cargo(byte_span payload, std::int64_t captur
 ```
 
 Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes: 7×i16
-bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks).
+bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks). A
+negative capture_timestamp_us is std::invalid_argument.
 
 ## BNO055 (IMU)
 
@@ -2469,7 +2546,8 @@ BNO_READ_REG payload: addr u8, len u8.
 bytes pack_write_reg(std::uint8_t addr, byte_span data);
 ```
 
-BNO_WRITE_REG payload: addr u8 then the raw register data (1..XFER_MAX).
+BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
+unless it is 1..XFER_MAX bytes.
 
 ### pack_start_stream
 
@@ -2563,7 +2641,7 @@ static std::optional<StreamData> unpack(byte_span payload);
 ```
 
 Decode a RPT_BNO_REG_STREAM payload (10+len bytes); nullopt when shorter
-than the 10-byte header.
+than the 10-byte header plus its `len` data bytes (trailing bytes ignored).
 
 ### REG_CHIP_ID
 
@@ -3960,7 +4038,8 @@ std::uint8_t add(std::int64_t us, std::uint32_t tick);
 ```
 
 Add a pair -> FT_CLOCK_RESET when it does not fit the model (which then
-restarts from it), else 0.
+restarts from it), else 0. std::out_of_range for a negative `us` (a u64
+MCU time, contract 07 §3).
 
 #### SensorClock.to_us
 
@@ -4045,7 +4124,8 @@ A histogram frame was seen in the stream.
 FrameTime results(const SensorClock& clock, unsigned fp_mode, std::uint32_t systick, std::uint32_t t0_tick, std::uint32_t t1_tick, std::int64_t pair_us, std::int64_t edge_us, std::uint8_t flags);
 ```
 
-`flags` = what clock.add() returned for this frame.
+`flags` = what clock.add() returned for this frame. std::out_of_range for
+fp_mode > 255 or a negative pair_us / edge_us.
 
 #### CaptureTimer.results_frame
 
@@ -4159,7 +4239,8 @@ std::optional<Measurement> add(byte_span raw, std::int64_t timestamp_us, std::in
 ```
 
 One frame with the MCU time of its header read and its INT edge (0 =
-none) -> the measurement it completes, or nullopt.
+none) -> the measurement it completes, or nullopt. std::out_of_range for
+a negative timestamp_us / edge_us (u64 MCU times, contract 07 §3).
 
 ### REG_APP_ID
 
@@ -4381,8 +4462,9 @@ The field called `name`, or nullopt.
 std::uint32_t cfg_get(byte_span page, const std::string& name);
 ```
 
-Read a field of a 190-byte config page. std::out_of_range for an unknown
-name, std::invalid_argument for a page shorter than CFG_SIZE.
+Read a field of a config page (CFG_SIZE bytes, or a partial read from its
+start that holds the field). std::out_of_range for an unknown name,
+std::invalid_argument for a page too short to hold the field.
 
 ### cfg_set
 
@@ -4391,8 +4473,8 @@ void cfg_set(bytes& page, const std::string& name, std::int64_t value);
 ```
 
 Set a field in place. std::out_of_range for an unknown name,
-std::invalid_argument for a value outside 0 .. 2^width - 1 (page untouched)
-or a page shorter than CFG_SIZE.
+std::invalid_argument for a value outside 0 .. 2^width - 1 or a page too
+short to hold the field (page untouched either way).
 
 ### config_fields
 
@@ -4400,7 +4482,8 @@ or a page shorter than CFG_SIZE.
 std::vector<std::pair<std::string, std::uint32_t>> config_fields(byte_span page);
 ```
 
-Every named field of a config page, in CFG_FIELDS order.
+Every named field of a config page, in CFG_FIELDS order (std::invalid_argument
+when the page is too short for one of them).
 
 ### FIRMWARE_LOAD_ADDR
 
@@ -5140,8 +5223,11 @@ std::int64_t to_host_time_us(std::uint64_t device_us) const;
 static std::unique_ptr<Device> promote(std::unique_ptr<Device> dev);
 ```
 
-Identify (GET_NAME_ACTIVE_SOFTWARE) and return the matching class,
-consuming this plain device — what open_device() does after its probe.
+The in-place probe captures older than contract 02 §4.4 hold (contract
+15 `probe: "legacy"`): GET_NAME_ACTIVE_SOFTWARE — plus GET_DEVICE_NAME
+for the L5/L7 and 1D families only — then the class
+resolve_sensor_class() picks (no USB id), consuming this plain device.
+New code opens with open_device() or open_on_link() (the §4.4 probe).
 
 #### Device.request_ok
 
@@ -5629,7 +5715,8 @@ struct Vl53l8LiveFrame {
 };
 ```
 
-One streamed frame: the zone arrays in `frame` (distance_mm in mm; CH with
+One streamed frame: the zone arrays in `frame` (real units as ST
+GetRangingData — distance_mm in mm, see vl53l8::Vl53l8Frame; CH with
 CNH armed: frame.cnh_raw, decode with vl53l8::decode_cnh()), plus motion.
 
 #### Vl53l8LiveFrame.pull
@@ -5664,7 +5751,9 @@ filled by the plugin helpers.
 void init_config(int start_bin, int num_bins, int sub_sample);
 ```
 
-vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. ArgumentError when num_bins or sub_sample is outside 0..255 (u8
+fields, never masked — contract 07 §3).
 
 #### CnhSetup.create_agg_map
 
@@ -5673,6 +5762,8 @@ void create_agg_map(int resolution, int start_x, int start_y, int merge_x, int m
 ```
 
 vl53lmz_cnh_create_agg_map: zones (resolution 16 | 64) -> aggregates.
+ArgumentError for another resolution, a negative start, merge / cols /
+rows < 1, or a map past the zone grid.
 
 #### CnhSetup.required_memory
 
@@ -6552,6 +6643,16 @@ std::optional<std::string> detected_product();
 The product the board's device name carries ("VL53L4CX"), nullopt on
 an unstamped board (then name it at init).
 
+#### Vl53lx.sensor_class
+
+```cpp
+std::string sensor_class() const;
+```
+
+The class the board opened as, fixed at open from the USB PID / device
+name ("vl53l0x" ... "vl53l4cx"; "vl53lx" = generic, product at init).
+No traffic.
+
 #### Vl53lx.driver_kinds
 
 ```cpp
@@ -6876,6 +6977,7 @@ enum class SensorId : std::uint8_t {
     PersonalActivityClassifier = 0x1E, SleepDetector = 0x1F, TiltDetector = 0x20, PocketDetector = 0x21,
     CircleDetector = 0x22, HeartRateMonitor = 0x23, ArvrStabilizedRv = 0x28,
     ArvrStabilizedGameRv = 0x29, GyroIntegratedRv = 0x2A,
+    MotionRequest = 0x2B,  // interactive calibration, BNO086 only
 };
 ```
 
@@ -6992,6 +7094,7 @@ struct SensorMetadata {
     std::uint32_t min_period_us = 0, max_period_us = 0;
     std::uint16_t fifo_max = 0, fifo_reserved = 0, batch_buffer_bytes = 0;
     std::uint16_t q_point_1 = 0, q_point_2 = 0, q_point_3 = 0;
+    std::vector<std::uint32_t> raw_words;  // the FRS record as read; authoritative
 };
 ```
 
@@ -7638,6 +7741,37 @@ std::unique_ptr<Device> open_device(const OpenOptions& opt = {});
 
 Find, probe and open with the right class: dynamic_cast<Sr04*> (or
 <Vl53l4cd*>, <Vl53l8*>, <Bno055*>, <Bno086*>, <Vl53lx*>, <Tmf8829*>) tells.
+Contract 02 §4.4: the probe runs on a connection of its own, which is
+closed; the class (resolve_sensor_class() of the answers and the port's
+USB id) then opens the port afresh.
+
+### attach_sensor_class
+
+```cpp
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name);
+```
+
+Continue the open plain Device `dev` as `class_name` (one of
+sensor_class_names(), as from resolve_sensor_class()) on the same
+connection — contract 02 §4.4: no reopen, the reader and the host sequence
+numbers run on. `dev` must be a plain Device (no class yet) with no request
+in flight (ArgumentError otherwise); it is consumed — use the result.
+"device" returns `dev` itself; "bootloader" throws BootloaderModeError.
+
+### open_on_link
+
+```cpp
+std::unique_ptr<Device> open_on_link(Link link, std::optional<std::uint16_t> usb_vid = std::nullopt, std::optional<std::uint16_t> usb_pid = std::nullopt, std::chrono::milliseconds timeout = std::chrono::milliseconds(0));
+```
+
+Open a device on a connection that cannot be reopened — a replay or
+recording link, an adopted transport (contract 02 §4.4). Runs the probe
+probe_port() runs (GET_NAME_ACTIVE_SOFTWARE, GET_DEVICE_NAME, GET_SERIAL)
+on `link`, resolves the class with resolve_sensor_class() from the answers
+and the given USB id (nullopt = unknown), and continues as that class on
+the same link (attach_sensor_class). `timeout` 0 = default 200 ms. No
+answer to GET_NAME_ACTIVE_SOFTWARE -> NoDeviceError; a bootloader ->
+BootloaderModeError.
 
 ### open_sr04
 

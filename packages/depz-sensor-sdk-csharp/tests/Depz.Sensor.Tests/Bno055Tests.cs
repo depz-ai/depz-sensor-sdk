@@ -69,6 +69,7 @@ public class Bno055VectorTests
             string actual = Vectors.ToHex(payload);
             Assert.True(expected == actual, $"{name}: expected {expected} got {actual}");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Equal(0x32, (int)Bno055Cmd.ReadReg);
@@ -147,6 +148,7 @@ public class Bno055VectorTests
                 default:
                     throw new InvalidOperationException($"{name}: unknown report {report}");
             }
+            Vectors.Seen(c);
         }
         Assert.Equal(3, seen.Count);
         Assert.Throws<ArgumentException>(() => Bno055Info.Unpack(new byte[Bno055Wire.InfoSize - 1]));
@@ -169,6 +171,7 @@ public class Bno055VectorTests
             Assert.True(e.GetProperty("android").GetBoolean() == u.Android, $"0x{sel:x2} android");
             Assert.True(c.GetProperty("repack").GetInt32() == u.Pack(), $"0x{sel:x2} repack");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -204,6 +207,7 @@ public class Bno055VectorTests
             Assert.True(c.GetProperty("fully_calibrated").GetBoolean() == s.FullyCalibrated, $"0x{value:x2}");
             Assert.Equal(value, s.Pack());
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -226,6 +230,7 @@ public class Bno055VectorTests
             Assert.Equal(e.GetProperty("mag_radius").GetInt32(), p.MagRadius);
             Assert.True(bytes == Vectors.ToHex(p.Pack()), $"{name}: repack");
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Throws<ArgumentException>(() => Bno055CalibrationProfile.Unpack(new byte[Bno055Regs.CalibProfileLen - 1]));
@@ -252,6 +257,7 @@ public class Bno055VectorTests
             Assert.True(Ints(c.GetProperty("repack")).SequenceEqual(new int[] { config, sign }), $"{name}: repack");
             Assert.Equal(a, Bno055AxisRemap.Placement(name));
             Assert.Equal(a, Bno055AxisRemap.Placement(name.ToLowerInvariant()));
+            Vectors.Seen(c);
         }
         Assert.Equal(names, Bno055AxisRemap.Placements.Select(p => p.Name));
         Assert.Equal(new Bno055AxisRemap(), Bno055AxisRemap.Placement("P1"));
@@ -270,6 +276,7 @@ public class Bno055VectorTests
                 (Bno055Axis)c.GetProperty("z").GetInt32());
             Assert.Throws<ArgumentException>(() => a.Pack());
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
     }
@@ -312,6 +319,8 @@ public class Bno055VectorTests
         Assert.Equal(Bno055AccelConfig.Default, Bno055AccelConfig.Unpack(0x0D));
         Assert.Equal(Bno055MagConfig.Default, Bno055MagConfig.Unpack(0x0B));
         Assert.Equal(Bno055GyroConfig.Default, Bno055GyroConfig.Unpack(new byte[] { 0x38, 0x00 }));
+        Assert.Equal(3, sc.EnumerateObject().Count());
+        Vectors.Seen("bno055/sensor_config");
     }
 
     [Fact]
@@ -338,6 +347,7 @@ public class Bno055VectorTests
             AssertChannel($"{name}.calib_stat", e.GetProperty("calib_stat"),
                 b.CalibStat is { } cs ? new int[] { cs } : null);
             n++;
+            Vectors.Seen(c);
         }
         Assert.True(n > 0);
         Assert.Equal((0x08, 46), (Bno055Regs.FullBlockAddr, Bno055Regs.FullBlockLen));
@@ -349,5 +359,96 @@ public class Bno055VectorTests
     {
         Assert.Equal(SensorType.Bno055, IdentityParser.ParseSoftwareName("APP_BNO055_v0.12").SensorType);
         Assert.Equal(SensorType.Bno086, IdentityParser.ParseSoftwareName("APP_BNO086_v0.95").SensorType);
+    }
+}
+
+// recordings/bno055_*.depzrec decoded rx-side only (the C# SDK has no device
+// layer to re-issue the tx half): bridge info, the calibration profile read
+// and every streamed block (raw bytes + window decode) against the sidecar.
+public class Bno055RecordingTests
+{
+    [Theory]
+    [InlineData("bno055_imu_quat_units_50hz")]
+    [InlineData("bno055_ndof_full_100hz")]
+    public void Session_RxDecode_MatchesSidecar(string stem)
+    {
+        var exp = JsonDocument.Parse(File.ReadAllText(Vectors.RecordingPath(stem + ".expected.json"))).RootElement;
+        var packets = Vectors.RxPackets(stem + ".depzrec");
+
+        var infos = packets.Where(p => p.Cmd == (int)Bno055Rpt.Info).Select(p => Bno055Info.Unpack(p.Payload)).ToList();
+        Assert.Single(infos);
+        var i = infos[0];
+        var wantInfo = exp.GetProperty("info");
+        var gotInfo = new Dictionary<string, long>
+        {
+            ["i2c_addr"] = i.I2cAddr, ["chip_id"] = i.ChipId, ["acc_id"] = i.AccId, ["mag_id"] = i.MagId,
+            ["gyr_id"] = i.GyrId, ["sw_rev"] = i.SwRev, ["bl_rev"] = i.BlRev, ["initialized"] = i.Initialized,
+            ["int_level"] = i.IntLevel, ["int_edges"] = i.IntEdges, ["read_min_us"] = i.ReadMinUs,
+            ["read_max_us"] = i.ReadMaxUs, ["read_avg_us"] = i.ReadAvgUs, ["tx_dropped"] = i.TxDropped,
+            ["i2c_errors"] = i.I2cErrors, ["slots_skipped"] = i.SlotsSkipped, ["bus_recoveries"] = i.BusRecoveries,
+            ["last_i2c_error"] = i.LastI2cError, ["sensor_resets"] = i.SensorResets, ["loop_max_us"] = i.LoopMaxUs,
+        };
+        Assert.Equal(wantInfo.EnumerateObject().Count(), gotInfo.Count);
+        foreach (var (key, value) in gotInfo)
+            Assert.True(wantInfo.GetProperty(key).GetInt64() == value, $"{stem}: info.{key} got {value}");
+
+        // The only 22-byte register read of the session is the calibration profile.
+        var profiles = packets.Where(p => p.Cmd == (int)Bno055Rpt.RegData)
+            .Select(p => Bno055RegData.Unpack(p.Payload)).Where(r => r.Data.Length == Bno055Regs.CalibProfileLen).ToList();
+        Assert.Single(profiles);
+        var cp = Bno055CalibrationProfile.Unpack(profiles[0].Data);
+        var wantCp = exp.GetProperty("calibration_profile");
+        Assert.Equal(5, wantCp.EnumerateObject().Count());
+        AssertChannel($"{stem}: accel_offset", wantCp.GetProperty("accel_offset"), Arr(cp.AccelOffset));
+        AssertChannel($"{stem}: mag_offset", wantCp.GetProperty("mag_offset"), Arr(cp.MagOffset));
+        AssertChannel($"{stem}: gyro_offset", wantCp.GetProperty("gyro_offset"), Arr(cp.GyroOffset));
+        Assert.Equal(wantCp.GetProperty("accel_radius").GetInt32(), cp.AccelRadius);
+        Assert.Equal(wantCp.GetProperty("mag_radius").GetInt32(), cp.MagRadius);
+
+        var block = Ints(exp.GetProperty("block"));
+        var frames = packets.Where(p => p.Cmd == (int)Bno055Rpt.Stream).Select(p => Bno055StreamData.Unpack(p.Payload)).ToList();
+        var want = exp.GetProperty("frames").EnumerateArray().ToList();
+        Assert.True(frames.Count >= want.Count, $"{stem}: {frames.Count} blocks, expected >= {want.Count}");
+        for (int k = 0; k < want.Count; k++)
+        {
+            var got = frames[k];
+            var w = want[k];
+            Assert.True(w.GetProperty("timestamp_us").GetUInt64() == got.TimestampUs, $"{stem}[{k}]: timestamp_us");
+            Assert.Equal(w.GetProperty("addr").GetInt32(), got.Addr);
+            Assert.Equal(block, new int[] { got.Addr, got.Length });
+            Assert.True(w.GetProperty("raw").GetString() == Vectors.ToHex(got.Data), $"{stem}[{k}]: raw");
+            var b = Bno055Regs.DecodeBlock(got.Addr, got.Data);
+            var d = w.GetProperty("decoded");
+            Assert.Equal(9, d.EnumerateObject().Count());
+            AssertChannel($"{stem}[{k}].accel", d.GetProperty("accel"), Arr(b.Accel));
+            AssertChannel($"{stem}[{k}].mag", d.GetProperty("mag"), Arr(b.Mag));
+            AssertChannel($"{stem}[{k}].gyro", d.GetProperty("gyro"), Arr(b.Gyro));
+            AssertChannel($"{stem}[{k}].euler", d.GetProperty("euler"),
+                b.Euler is { } eu ? new int[] { eu.Heading, eu.Roll, eu.Pitch } : null);
+            AssertChannel($"{stem}[{k}].quaternion", d.GetProperty("quaternion"),
+                b.Quaternion is { } q ? new int[] { q.W, q.X, q.Y, q.Z } : null);
+            AssertChannel($"{stem}[{k}].linear_accel", d.GetProperty("linear_accel"), Arr(b.LinearAccel));
+            AssertChannel($"{stem}[{k}].gravity", d.GetProperty("gravity"), Arr(b.Gravity));
+            AssertChannel($"{stem}[{k}].temperature", d.GetProperty("temperature"),
+                b.Temperature is { } t ? new int[] { t } : null);
+            AssertChannel($"{stem}[{k}].calib_stat", d.GetProperty("calib_stat"),
+                b.CalibStat is { } cs ? new int[] { cs } : null);
+        }
+        Vectors.Seen($"recordings/{stem}.depzrec");
+    }
+
+    /// <summary>A JSON integer list, or a scalar integer as a one-element list.</summary>
+    private static int[] Ints(JsonElement e) => e.ValueKind == JsonValueKind.Number
+        ? new[] { e.GetInt32() }
+        : e.EnumerateArray().Select(x => x.GetInt32()).ToArray();
+
+    private static int[]? Arr(Bno055Vec3? v) => v is { } x ? new int[] { x.X, x.Y, x.Z } : null;
+
+    private static void AssertChannel(string name, JsonElement expect, int[]? got)
+    {
+        if (expect.ValueKind == JsonValueKind.Null)
+            Assert.True(got is null, $"{name}: expected null");
+        else
+            Assert.True(got is not null && Ints(expect).SequenceEqual(got), $"{name}: expected {expect}");
     }
 }

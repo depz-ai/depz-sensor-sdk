@@ -9,9 +9,389 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L8CX (ToF)**: [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`xtalk_margin_to_raw`](#xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`default_motion_config`](#default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`pack_detection_thresholds`](#pack_detection_thresholds), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
+- **VL53L8CX (ToF)**: [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`BridgeUld`](#bridgeuld), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8chDevice`](#vl53l8chdevice), [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`AdvancedError`](#advancederror), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`try_xtalk_margin_to_raw`](#try_xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`try_default_motion_config`](#try_default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`try_pack_detection_thresholds`](#try_pack_detection_thresholds), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8UldError`](#vl53l8ulderror), [`UldResult`](#uldresult), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Platform`](#vl53l8platform), [`get_xtalk_cmd`](#get_xtalk_cmd), [`calibrate_xtalk_cx`](#calibrate_xtalk_cx), [`calibrate_xtalk_lmz`](#calibrate_xtalk_lmz), [`calibrate_xtalk_l7cx`](#calibrate_xtalk_l7cx), [`xtalk_cal_output`](#xtalk_cal_output), [`xtalk_cal_output_enable`](#xtalk_cal_output_enable), [`RANGING_MODE_CONTINUOUS`](#ranging_mode_continuous), [`RANGING_MODE_AUTONOMOUS`](#ranging_mode_autonomous), [`TARGET_ORDER_CLOSEST`](#target_order_closest), [`TARGET_ORDER_STRONGEST`](#target_order_strongest), [`MODULE_TYPE_MZ`](#module_type_mz), [`MODULE_TYPE_MZEVO`](#module_type_mzevo), [`MODULE_TYPE_MZPLUS`](#module_type_mzplus), [`NVM_DATA_SIZE`](#nvm_data_size), [`OFFSET_BUFFER_SIZE`](#offset_buffer_size), [`XTALK_BUFFER_SIZE`](#xtalk_buffer_size), [`Vl53l8Driver`](#vl53l8driver), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
 
 ## VL53L8CX (ToF)
+
+### MIN_RANGING_FREQUENCY_HZ
+
+```rust
+pub const MIN_RANGING_FREQUENCY_HZ: i32 = 2;
+```
+
+Below this the VL53L8 never enters its ranging loop and streams nothing (contract 04).
+
+### BridgeUld
+
+```rust
+pub type BridgeUld = Vl53l8Driver<Arc<dyn Vl53l8Platform>>;
+```
+
+The ULD driver a VL53L8 / L5 / L7 device runs ([`Vl53l8cxDevice::with_uld`]).
+
+### Vl53l8cxDevice
+
+```rust
+pub struct Vl53l8cxDevice {
+    dev: DepzDevice,
+    shared: Arc<Shared>,
+    platform: Arc<BridgePlatform>,
+    profile: &'static Profile,
+    ranging: AtomicBool,
+    armed_cnh: Arc<Mutex<Option<Vl53l8CnhSetup>>>,
+}
+```
+
+VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here
+([`Vl53l8cxDevice::with_uld`]). [`Vl53l8cxDevice::init`] downloads the ~84 KB sensor firmware
+(about a second), then configure and [`Vl53l8cxDevice::start_ranging`]: the board pushes one
+frame per INT edge in chunks, reassembled and parsed into [`Vl53l8cxDevice::frames`].
+Configuration needs `init` and fails with [`DepzError::InvalidState`] while ranging — the stream
+owns the register bank. The VL53L8CH superset is [`Vl53l8chDevice`]; the L5/L7 classes deref to
+this one too.
+
+#### Vl53l8cxDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l8cxDevice
+```
+
+Continue the open connection `dev` as a VL53L8CX.
+
+#### Vl53l8cxDevice::with_uld
+
+```rust
+pub fn with_uld<R>(&self, f: impl FnOnce(&mut BridgeUld) -> UldResult<R>) -> Result<R>
+```
+
+Run `f` on the ULD driver (escape hatch for DCI access). [`DepzError::InvalidState`] before
+[`Vl53l8cxDevice::init`].
+
+#### Vl53l8cxDevice::firmware
+
+```rust
+pub fn firmware(&self) -> Vl53l8Firmware
+```
+
+The sensor firmware [`Vl53l8cxDevice::init`] downloads (cx / ch / l7cx / l7ch).
+
+#### Vl53l8cxDevice::initialized
+
+```rust
+pub fn initialized(&self) -> bool
+```
+
+True after a successful [`Vl53l8cxDevice::init`], until the sensor loses its state.
+
+#### Vl53l8cxDevice::ranging
+
+```rust
+pub fn ranging(&self) -> bool
+```
+
+#### Vl53l8cxDevice::is_alive
+
+```rust
+pub fn is_alive(&self) -> bool
+```
+
+True when the sensor answers with its own silicon ids (a bus error or a foreign id: false).
+
+#### Vl53l8cxDevice::init
+
+```rust
+pub fn init(&self) -> Result<()>
+```
+
+Download the sensor firmware and the default configuration.
+
+#### Vl53l8cxDevice::init_with_progress
+
+```rust
+pub fn init_with_progress(&self, progress: &mut dyn FnMut(&str), write_progress: Option<WriteProgress>) -> Result<()>
+```
+
+[`Vl53l8cxDevice::init`] reporting its phases to `progress` and the big firmware writes to
+`write_progress` (done, total bytes). On L5/L7, a module type other than the class expects
+(a board labelled L7 carrying an L5, or the reverse) is a warning on stderr: ranging still
+works, the firmware is shared.
+
+#### Vl53l8cxDevice::get_resolution
+
+```rust
+pub fn get_resolution(&self) -> Result<usize>
+```
+
+Zones in use: 16 (4×4) or 64 (8×8).
+
+#### Vl53l8cxDevice::set_resolution
+
+```rust
+pub fn set_resolution(&self, zones: usize) -> Result<()>
+```
+
+16 (4×4) or 64 (8×8) zones.
+
+#### Vl53l8cxDevice::get_ranging_frequency_hz
+
+```rust
+pub fn get_ranging_frequency_hz(&self) -> Result<u8>
+```
+
+#### Vl53l8cxDevice::set_ranging_frequency_hz
+
+```rust
+pub fn set_ranging_frequency_hz(&self, hz: i32) -> Result<()>
+```
+
+At least 2 Hz (1 Hz on L5/L7); at most 60 Hz at 4×4 and 15 Hz at 8×8.
+
+#### Vl53l8cxDevice::get_ranging_mode
+
+```rust
+pub fn get_ranging_mode(&self) -> Result<u8>
+```
+
+[`crate::vl53l8::driver::RANGING_MODE_CONTINUOUS`] or
+[`crate::vl53l8::driver::RANGING_MODE_AUTONOMOUS`].
+
+#### Vl53l8cxDevice::set_ranging_mode
+
+```rust
+pub fn set_ranging_mode(&self, mode: u8) -> Result<()>
+```
+
+#### Vl53l8cxDevice::get_integration_time_ms
+
+```rust
+pub fn get_integration_time_ms(&self) -> Result<u32>
+```
+
+#### Vl53l8cxDevice::set_integration_time_ms
+
+```rust
+pub fn set_integration_time_ms(&self, ms: i32) -> Result<()>
+```
+
+2–1000 ms; autonomous mode only.
+
+#### Vl53l8cxDevice::get_sharpener_percent
+
+```rust
+pub fn get_sharpener_percent(&self) -> Result<u8>
+```
+
+#### Vl53l8cxDevice::set_sharpener_percent
+
+```rust
+pub fn set_sharpener_percent(&self, pct: i32) -> Result<()>
+```
+
+Edge sharpener, 0–99 % (0 = off).
+
+#### Vl53l8cxDevice::get_target_order
+
+```rust
+pub fn get_target_order(&self) -> Result<u8>
+```
+
+[`crate::vl53l8::driver::TARGET_ORDER_CLOSEST`] or
+[`crate::vl53l8::driver::TARGET_ORDER_STRONGEST`].
+
+#### Vl53l8cxDevice::set_target_order
+
+```rust
+pub fn set_target_order(&self, order: u8) -> Result<()>
+```
+
+#### Vl53l8cxDevice::get_power_mode
+
+```rust
+pub fn get_power_mode(&self) -> Result<u8>
+```
+
+[`crate::vl53l8::advanced::POWER_MODE_SLEEP`], `POWER_MODE_WAKEUP` or `POWER_MODE_DEEP_SLEEP`.
+
+#### Vl53l8cxDevice::set_power_mode
+
+```rust
+pub fn set_power_mode(&self, mode: u8) -> Result<()>
+```
+
+Waking from deep sleep downloads the firmware again.
+
+#### Vl53l8cxDevice::get_xtalk_margin
+
+```rust
+pub fn get_xtalk_margin(&self) -> Result<f64>
+```
+
+#### Vl53l8cxDevice::set_xtalk_margin
+
+```rust
+pub fn set_xtalk_margin(&self, margin_kcps: f64) -> Result<()>
+```
+
+#### Vl53l8cxDevice::calibrate_xtalk
+
+```rust
+pub fn calibrate_xtalk(&self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> Result<()>
+```
+
+On-device crosstalk calibration against a flat target; read the result with
+[`Vl53l8cxDevice::get_caldata_xtalk`].
+
+#### Vl53l8cxDevice::get_caldata_xtalk
+
+```rust
+pub fn get_caldata_xtalk(&self) -> Result<Vec<u8>>
+```
+
+The 776-byte xtalk calibration buffer (save / restore).
+
+#### Vl53l8cxDevice::set_caldata_xtalk
+
+```rust
+pub fn set_caldata_xtalk(&self, blob: &[u8]) -> Result<()>
+```
+
+#### Vl53l8cxDevice::get_detection_thresholds_enable
+
+```rust
+pub fn get_detection_thresholds_enable(&self) -> Result<u8>
+```
+
+#### Vl53l8cxDevice::set_detection_thresholds_enable
+
+```rust
+pub fn set_detection_thresholds_enable(&self, enabled: bool) -> Result<()>
+```
+
+#### Vl53l8cxDevice::get_detection_thresholds
+
+```rust
+pub fn get_detection_thresholds(&self) -> Result<Vec<DetectionThreshold>>
+```
+
+#### Vl53l8cxDevice::set_detection_thresholds
+
+```rust
+pub fn set_detection_thresholds(&self, thresholds: &[DetectionThreshold]) -> Result<()>
+```
+
+The 64 detection thresholds (interrupt on threshold).
+
+#### Vl53l8cxDevice::set_detection_thresholds_auto_stop
+
+```rust
+pub fn set_detection_thresholds_auto_stop(&self, auto_stop: bool) -> Result<()>
+```
+
+#### Vl53l8cxDevice::configure_motion_indicator
+
+```rust
+pub fn configure_motion_indicator(&self, distance_mm: Option<(i32, i32)>) -> Result<MotionConfig>
+```
+
+Enable the motion indicator over [min, max] mm (`None`: 400–1500); every frame then carries
+[`Vl53l8Frame::motion`]. Returns the configuration for further tuning.
+
+#### Vl53l8cxDevice::start_ranging
+
+```rust
+pub fn start_ranging(&self) -> Result<()>
+```
+
+Program the output list, start the sensor and the board's stream.
+
+#### Vl53l8cxDevice::stop_ranging
+
+```rust
+pub fn stop_ranging(&self) -> Result<()>
+```
+
+#### Vl53l8cxDevice::on_frame
+
+```rust
+pub fn on_frame(&self, callback: impl Fn(&Vl53l8Frame) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every parsed frame (reader thread).
+
+#### Vl53l8cxDevice::frames
+
+```rust
+pub fn frames(&self, capacity: usize) -> Subscription<Vl53l8Frame>
+```
+
+A pull queue of parsed frames (bounded, drop-oldest).
+
+#### Vl53l8cxDevice::get_frame
+
+```rust
+pub fn get_frame(&self, timeout: Option<Duration>) -> Result<Vl53l8Frame>
+```
+
+The next frame (contract 07 §3); `timeout` `None`: 2 s.
+
+#### Vl53l8cxDevice::frame_parse_errors
+
+```rust
+pub fn frame_parse_errors(&self) -> u64
+```
+
+Frames dropped because they did not parse (corrupt frame, bad size) — not reassembly gaps.
+
+#### Vl53l8cxDevice::reassembler_discards
+
+```rust
+pub fn reassembler_discards(&self) -> u64
+```
+
+Chunked frames the reassembler discarded (gaps, offset errors).
+
+#### Vl53l8cxDevice::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
+
+### Vl53l8chDevice
+
+```rust
+pub struct Vl53l8chDevice(Vl53l8cxDevice);
+```
+
+VL53L8CH: the VL53L8CX superset (every CX method, through `Deref`) plus CNH, compact network
+histograms — each frame can carry a per-aggregate distance histogram. `init` downloads the CH
+firmware (VL53LMZ ULD 2.0.16).
+
+#### Vl53l8chDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l8chDevice
+```
+
+Continue the open connection `dev` as a VL53L8CH.
+
+#### Vl53l8chDevice::cnh_setup
+
+```rust
+pub fn cnh_setup(&self) -> Option<Vl53l8CnhSetup>
+```
+
+The CNH setup armed by [`Vl53l8chDevice::configure_cnh`], or `None`; recorders keep it next
+to the raw blocks to decode them later.
+
+#### Vl53l8chDevice::configure_cnh
+
+```rust
+pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
+```
+
+Arm CNH for the next [`Vl53l8cxDevice::start_ranging`]: every frame then carries
+[`Vl53l8Frame::cnh_raw`], decoded with [`crate::vl53l8::decode_cnh`] and
+[`Vl53l8CnhSetup::decode_config`].
 
 ### DIST_MM
 
@@ -89,13 +469,42 @@ pub const POWER_MODE_WAKEUP: u8 = 1;
 pub const POWER_MODE_DEEP_SLEEP: u8 = 2;
 ```
 
-### xtalk_margin_to_raw
+### AdvancedError
 
 ```rust
-pub fn xtalk_margin_to_raw(margin_kcps: f64) -> u32
+pub enum AdvancedError {
+    /// Motion indicator resolution other than 16 (4×4) or 64 (8×8).
+    InvalidResolution(usize),
+    /// Xtalk margin outside 0..=10000 kcps (or not a number).
+    XtalkMarginOutOfRange,
+    /// Threshold `index`: low/high × its measurement scale does not fit i32.
+    ThresholdOverflow(usize),
+    /// More than [`NB_THRESHOLDS`] thresholds.
+    TooManyThresholds(usize),
+}
 ```
 
-Xtalk margin (kcps/SPAD) → raw DCI value: `round(kcps * 2048)`.
+Advanced-codec argument error (contract 07 §3: an argument the driver
+would refuse, or one that does not fit its DCI field, is rejected before
+anything is written — the ULD's `VL53L8CX_STATUS_INVALID_PARAM`).
+
+### XTALK_MARGIN_MAX_KCPS
+
+```rust
+pub const XTALK_MARGIN_MAX_KCPS: f64 = 10000.0;
+```
+
+Largest xtalk margin `set_xtalk_margin` accepts, kcps/SPAD.
+
+### try_xtalk_margin_to_raw
+
+```rust
+pub fn try_xtalk_margin_to_raw(margin_kcps: f64) -> Result<u32, AdvancedError>
+```
+
+Xtalk margin (kcps/SPAD) → raw DCI value `round(kcps * 2048)`, as
+`set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`], else
+[`AdvancedError::XtalkMarginOutOfRange`].
 
 ### MotionConfig
 
@@ -134,22 +543,25 @@ pub fn pack(&self) -> Vec<u8>
 
 Serialize to the 156-byte DCI payload.
 
-#### MotionConfig::set_resolution
+#### MotionConfig::try_set_resolution
 
 ```rust
-pub fn set_resolution(&mut self, resolution: usize)
+pub fn try_set_resolution(&mut self, resolution: usize) -> Result<(), AdvancedError>
 ```
 
-Set `map_id` for the resolution (pure; mirrors `_set_resolution`).
+Set `map_id` for the resolution (pure; mirrors `_set_resolution`):
+16 or 64 zones, else [`AdvancedError::InvalidResolution`] with
+`map_id` untouched.
 
-### default_motion_config
+### try_default_motion_config
 
 ```rust
-pub fn default_motion_config(resolution: usize) -> MotionConfig
+pub fn try_default_motion_config(resolution: usize) -> Result<MotionConfig, AdvancedError>
 ```
 
 The default motion-indicator configuration `motion_indicator_init` programs
-for a resolution (the exact bytes written to the sensor).
+for a resolution (the exact bytes written to the sensor); a resolution
+other than 16 or 64 is [`AdvancedError::InvalidResolution`].
 
 ### DetectionThreshold
 
@@ -179,15 +591,19 @@ pub struct DetectionThresholdBlocks {
 
 The two DCI blocks written by `set_detection_thresholds`.
 
-### pack_detection_thresholds
+### try_pack_detection_thresholds
 
 ```rust
-pub fn pack_detection_thresholds(thresholds: &[DetectionThreshold]) -> DetectionThresholdBlocks
+pub fn try_pack_detection_thresholds(
+    thresholds: &[DetectionThreshold],
+) -> Result<DetectionThresholdBlocks, AdvancedError>
 ```
 
 Pack up to 64 detection thresholds into their DCI blocks. Entries beyond
 the supplied list are zero-filled. Each entry's low/high are multiplied by
-its measurement's fixed-point scale.
+its measurement's fixed-point scale; a product that does not fit the i32
+field is [`AdvancedError::ThresholdOverflow`] (never wrapped), more than
+64 entries [`AdvancedError::TooManyThresholds`].
 
 ### Vl53l8Cmd
 
@@ -245,6 +661,15 @@ pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8>
 ```
 
 `VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes.
+
+### try_pack_write_reg
+
+```rust
+pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
+```
+
+[`pack_write_reg`] that refuses empty data (contract 04 §2: at least one
+data byte).
 
 ### pack_start_stream
 
@@ -338,20 +763,20 @@ Frame-decode failure.
 
 ```rust
 pub struct Vl53l8Results {
-    /// mm, already scaled `floor(raw/4)` per ST `GetRangingData`.
+    /// mm: `floor(raw/4)`, a negative distance clamped to 0, as ST `GetRangingData`.
     pub distance_mm: Vec<i32>,
     /// 5/9 = valid; 255 = no target detected in the zone.
     pub target_status: Vec<u8>,
     pub nb_target_detected: Vec<u8>,
-    /// kcps/SPAD, raw fixed-point (÷2048 for real units).
-    pub signal_per_spad: Vec<u32>,
-    /// kcps/SPAD, raw fixed-point.
-    pub ambient_per_spad: Vec<u32>,
+    /// Signal rate, kcps/SPAD (`raw / 2048`).
+    pub signal_per_spad: Vec<f64>,
+    /// Ambient rate, kcps/SPAD (`raw / 2048`).
+    pub ambient_per_spad: Vec<f64>,
     pub nb_spads_enabled: Vec<u32>,
-    /// mm, raw fixed-point (÷128 for real units).
-    pub range_sigma_mm_raw: Vec<u16>,
-    /// reflectance %.
-    pub reflectance: Vec<u8>,
+    /// Measurement noise, mm (`raw / 128`).
+    pub range_sigma_mm: Vec<f64>,
+    /// Estimated target reflectance, % (`raw / 2`).
+    pub reflectance: Vec<f64>,
     pub silicon_temp_degc: i8,
     /// Raw compact-network-histogram block bytes, present only on **VL53L8CH**
     /// frames that carry a CNH output block. Pass this to
@@ -391,6 +816,925 @@ Decode one raw results frame (`raw` = `full_size` bytes read from reg 0x00).
 
 The frame's own length is authoritative (`data_read_size = raw.len()`); the
 FW streams exactly the size advertised in each `RPT_VL53_FRAME` chunk.
+
+### Vl53l8CnhSetup
+
+```rust
+pub struct Vl53l8CnhSetup {
+    ref_bin_offset: i32,
+    sum_span: i32,
+    feature_length: i32,
+    nb_of_aggregates: i32,
+    cnh_cfg: u8,
+    cnh_flex_shift: u8,
+    map_id: [i8; 64],
+}
+```
+
+The CNH (compact network histogram) configuration of a VL53L8CH / VL53L7CH.
+
+A mirror of `VL53LMZ_Motion_Configuration` with the plugin helpers that fill it
+(`vl53lmz_plugin_cnh.c`, ULD 2.0.16), ported from the reference Python `CnhConfig`. Build it
+with [`Vl53l8CnhSetup::init_config`] and [`Vl53l8CnhSetup::create_agg_map`], check
+[`Vl53l8CnhSetup::required_memory`], then arm it on the device (the CNH block size goes to
+[`super::Vl53l8Driver::start_ranging`], the struct to DCI [`Vl53l8CnhSetup::MI_CFG_DEV_IDX`]).
+The flags are fixed to ping-pong and variance off (`Example_12_cnh_data.c`), which
+[`crate::vl53l8::decode_cnh`] assumes. Arguments outside their fields are
+[`DepzError::InvalidArgument`], never wrapped.
+
+#### Vl53l8CnhSetup::new
+
+```rust
+pub fn new() -> Self
+```
+
+An empty configuration: no bins, no aggregates, every zone in none.
+
+#### Vl53l8CnhSetup::ref_bin_offset
+
+```rust
+pub fn ref_bin_offset(&self) -> i32
+```
+
+The first device bin, ×2048 (`ref_bin_offset`).
+
+#### Vl53l8CnhSetup::sum_span
+
+```rust
+pub fn sum_span(&self) -> i32
+```
+
+Device bins summed per CNH bin.
+
+#### Vl53l8CnhSetup::feature_length
+
+```rust
+pub fn feature_length(&self) -> i32
+```
+
+CNH bins per aggregate.
+
+#### Vl53l8CnhSetup::nb_of_aggregates
+
+```rust
+pub fn nb_of_aggregates(&self) -> i32
+```
+
+Aggregates in the map.
+
+#### Vl53l8CnhSetup::cnh_cfg
+
+```rust
+pub fn cnh_cfg(&self) -> u8
+```
+
+The CNH flags byte.
+
+#### Vl53l8CnhSetup::cnh_flex_shift
+
+```rust
+pub fn cnh_flex_shift(&self) -> u8
+```
+
+The CNH flex shift.
+
+#### Vl53l8CnhSetup::map_id
+
+```rust
+pub fn map_id(&self) -> [i8; 64]
+```
+
+Device zone → CNH aggregate, −1 for a zone in none (64 entries).
+
+#### Vl53l8CnhSetup::decode_config
+
+```rust
+pub fn decode_config(&self) -> CnhDecodeConfig
+```
+
+The counts [`crate::vl53l8::decode_cnh`] needs to unpack this configuration's blocks.
+
+#### Vl53l8CnhSetup::init_config
+
+```rust
+pub fn init_config(&mut self, start_bin: i32, num_bins: i32, sub_sample: i32) -> Result<()>
+```
+
+`vl53lmz_cnh_init_config`. `start_bin`: first device histogram bin; `num_bins`: CNH bins;
+`sub_sample`: device bins summed per CNH bin.
+
+#### Vl53l8CnhSetup::create_agg_map
+
+```rust
+pub fn create_agg_map(
+    &mut self,
+    resolution: usize,
+    start_x: i32,
+    start_y: i32,
+    merge_x: i32,
+    merge_y: i32,
+    cols: i32,
+    rows: i32,
+) -> Result<()>
+```
+
+`vl53lmz_cnh_create_agg_map`: aggregates of `merge_x`×`merge_y` zones, `cols`×`rows` of
+them from (`start_x`, `start_y`). `resolution` (16 or 64) must be the sensor's.
+
+#### Vl53l8CnhSetup::required_memory
+
+```rust
+pub fn required_memory(&self) -> Result<u32>
+```
+
+`vl53lmz_cnh_calc_required_memory`: the on-device CNH buffer, bytes. No aggregate map yet,
+or more than [`Vl53l8CnhSetup::CNH_MAX_DATA_BYTES`], is [`DepzError::InvalidArgument`].
+
+#### Vl53l8CnhSetup::min_max_distance_mm
+
+```rust
+pub fn min_max_distance_mm(&self) -> (i32, i32)
+```
+
+(min, max) target distance, mm, the histogram captures whole.
+
+#### Vl53l8CnhSetup::bin_center_mm
+
+```rust
+pub fn bin_center_mm(&self, bin_idx: i32) -> f64
+```
+
+Distance, mm, at the centre of CNH bin `bin_idx`.
+
+#### Vl53l8CnhSetup::pack
+
+```rust
+pub fn pack(&self) -> Vec<u8>
+```
+
+The 156-byte `VL53LMZ_Motion_Configuration` struct for the device (DCI 0xBFAC).
+
+### Vl53l8UldError
+
+```rust
+pub enum Vl53l8UldError {
+    /// A ULD status ([`status`] codes, or the GO2 error byte the sensor reports) and where it
+    /// happened.
+    Status {
+        /// The status code.
+        code: u8,
+        /// The step that failed (`"sensor boot"`, `"dci read 0x5450"` …); may be empty.
+        context: String,
+    },
+    /// An argument the SDK refuses before sending anything that the ULD itself would not catch (a
+    /// field it would wrap): a Java `IllegalArgumentException`.
+    InvalidArgument(String),
+    /// The platform (the register bridge) failed.
+    Platform(DepzError),
+}
+```
+
+What a [`super::Vl53l8Driver`] call can fail with.
+
+`?` turns it into [`DepzError`]: a ULD status becomes [`DepzError::Sensor`] with the status
+name and code in the text (`"VL53L8CX TIMEOUT (code 1) sensor boot"`, as the other SDKs word
+it), a refused argument [`DepzError::InvalidArgument`], and a platform failure the
+[`DepzError`] the platform returned. Match on this type before converting when the status
+code matters ([`Vl53l8UldError::status_code`]).
+
+#### Vl53l8UldError::status
+
+```rust
+pub fn status(code: u8, context: impl Into<String>) -> Self
+```
+
+A ULD status error.
+
+#### Vl53l8UldError::status_code
+
+```rust
+pub fn status_code(&self) -> Option<u8>
+```
+
+The ULD status code, for a [`Vl53l8UldError::Status`].
+
+### UldResult
+
+```rust
+pub type UldResult<T> = std::result::Result<T, Vl53l8UldError>;
+```
+
+`Result` with [`Vl53l8UldError`].
+
+### Vl53l8Firmware
+
+```rust
+pub enum Vl53l8Firmware {
+    /// VL53L8CX, ST ULD 2.1.0.
+    #[default]
+    Cx,
+    /// VL53L8CH, VL53LMZ ULD 2.0.16 (CNH).
+    Ch,
+    /// VL53L5CX / VL53L7CX over I2C, ULD 2.0.1.
+    L7cx,
+    /// VL53L7CH over I2C, VL53LMZ ULD 2.0.16 with the VL53L7 configuration.
+    L7ch,
+}
+```
+
+The sensor firmware a [`super::Vl53l8Driver`] downloads.
+
+#### Vl53l8Firmware::set_name
+
+```rust
+pub fn set_name(self) -> &'static str
+```
+
+The blob set name under `vl53l8/data` (`cx`, `ch`, `l7cx`, `l7ch`).
+
+### Vl53l8Motion
+
+```rust
+pub struct Vl53l8Motion {
+    /// Global indicator 1.
+    pub global_indicator_1: u32,
+    /// Global indicator 2.
+    pub global_indicator_2: u32,
+    /// Motion-indicator status.
+    pub status: u8,
+    /// Aggregates with motion detected.
+    pub nb_of_detected_aggregates: u8,
+    /// Aggregates configured.
+    pub nb_of_aggregates: u8,
+    /// Per-aggregate motion value (32 entries).
+    pub motion: Vec<u32>,
+}
+```
+
+The motion-indicator block of a frame (`VL53L8CX_ResultsData MotionIndicator`).
+
+### Vl53l8Frame
+
+```rust
+pub struct Vl53l8Frame {
+    /// Host timestamp the caller gave the frame, µs.
+    pub timestamp_us: u64,
+    /// Zones in this frame (16 or 64).
+    pub resolution: usize,
+    /// Silicon temperature, °C.
+    pub silicon_temp_degc: i8,
+    /// Distance per zone and target, mm (≥ 0).
+    pub distance_mm: Vec<i32>,
+    /// Target status per zone and target: 5 / 9 valid, 255 no target detected.
+    pub target_status: Vec<u8>,
+    /// Targets detected per zone.
+    pub nb_target_detected: Vec<u8>,
+    /// Signal rate per zone and target, kcps/SPAD.
+    pub signal_per_spad: Vec<f64>,
+    /// Ambient rate per zone, kcps/SPAD.
+    pub ambient_per_spad: Vec<f64>,
+    /// SPADs enabled per zone (raw, ÷256).
+    pub nb_spads_enabled: Vec<u32>,
+    /// Range sigma per zone and target, mm.
+    pub range_sigma_mm: Vec<f64>,
+    /// Reflectance estimate per zone and target, %.
+    pub reflectance: Vec<f64>,
+    /// The raw CNH block (word-swapped like every block), or `None`; decode with
+    /// [`crate::vl53l8::decode_cnh`].
+    pub cnh_raw: Option<Vec<u8>>,
+    /// The motion-indicator output, or `None` when the indicator is not configured.
+    pub motion: Option<Vl53l8Motion>,
+}
+```
+
+One decoded ranging frame.
+
+Per-zone vectors are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs
+row-major. Values are in ST GetRangingData's real units (contract 04 §5): a negative distance
+is clamped to 0, the rates and the reflectance keep their fraction. `cnh_raw` is the raw CNH data block (VL53L8CH / VL53L7CH with CNH armed),
+else `None`; `motion` the motion-indicator output when it is configured, else `None`.
+
+#### Vl53l8Frame::with_resolution
+
+```rust
+pub fn with_resolution(mut self, zones: usize) -> Self
+```
+
+This frame with `resolution` replaced (the device's own count of zones in use).
+
+### Vl53l8Platform
+
+```rust
+pub trait Vl53l8Platform: Send + Sync {
+    /// Read `size` bytes from `addr` on. Fewer bytes than asked is a failure the driver reports.
+    fn read_multi(&self, addr: u16, size: usize) -> Result<Vec<u8>>;
+
+    /// Write `data` from `addr` on.
+    fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()>;
+
+    /// Wait `ms` milliseconds (the default sleeps the thread).
+    fn sleep_ms(&self, ms: u32) {
+        std::thread::sleep(Duration::from_millis(ms as u64));
+    }
+}
+```
+
+What the ULD needs from the board: register access through the bridge (16-bit addresses,
+auto-increment) and a delay. The device class maps it onto the firmware bridge; a test can
+script it. `Send + Sync`, so a driver over it can live in a device's `Mutex` and be called from
+any thread.
+
+### get_xtalk_cmd
+
+```rust
+pub fn get_xtalk_cmd() -> &'static [u8]
+```
+
+vl53l8cx_plugin_xtalk.h: the command that reads the xtalk buffer back; 72 bytes.
+
+### calibrate_xtalk_cx
+
+```rust
+pub fn calibrate_xtalk_cx() -> &'static [u8]
+```
+
+VL53L8CX_CALIBRATE_XTALK (ULD 2.1.0); 1000 bytes.
+
+### calibrate_xtalk_lmz
+
+```rust
+pub fn calibrate_xtalk_lmz() -> &'static [u8]
+```
+
+VL53LMZ_CALIBRATE_XTALK (ULD 2.0.16: L8CH, L7CH); 984 bytes.
+
+### calibrate_xtalk_l7cx
+
+```rust
+pub fn calibrate_xtalk_l7cx() -> &'static [u8]
+```
+
+VL53L7CX_CALIBRATE_XTALK (ULD 2.0.1: L5CX, L7CX); 984 bytes.
+
+### xtalk_cal_output
+
+```rust
+pub fn xtalk_cal_output() -> &'static [u32]
+```
+
+The 17-block output list of the xtalk calibration run (u32 block headers); 17 words.
+
+### xtalk_cal_output_enable
+
+```rust
+pub fn xtalk_cal_output_enable() -> &'static [u32]
+```
+
+The output enables of [`xtalk_cal_output`] (one bit per block); 4 words.
+
+### RANGING_MODE_CONTINUOUS
+
+```rust
+pub const RANGING_MODE_CONTINUOUS: u8 = 1;
+```
+
+`set_ranging_mode`: continuous ranging (the integration time has no effect).
+
+### RANGING_MODE_AUTONOMOUS
+
+```rust
+pub const RANGING_MODE_AUTONOMOUS: u8 = 3;
+```
+
+`set_ranging_mode`: autonomous ranging (frames at the ranging frequency, set integration time).
+
+### TARGET_ORDER_CLOSEST
+
+```rust
+pub const TARGET_ORDER_CLOSEST: u8 = 1;
+```
+
+`set_target_order`: closest target first.
+
+### TARGET_ORDER_STRONGEST
+
+```rust
+pub const TARGET_ORDER_STRONGEST: u8 = 2;
+```
+
+`set_target_order`: strongest target first.
+
+### MODULE_TYPE_MZ
+
+```rust
+pub const MODULE_TYPE_MZ: u8 = 0;
+```
+
+[`Vl53l8Driver::module_type`]: VL53L5CX.
+
+### MODULE_TYPE_MZEVO
+
+```rust
+pub const MODULE_TYPE_MZEVO: u8 = 1;
+```
+
+[`Vl53l8Driver::module_type`]: VL53L7CX / VL53L7CH.
+
+### MODULE_TYPE_MZPLUS
+
+```rust
+pub const MODULE_TYPE_MZPLUS: u8 = 2;
+```
+
+[`Vl53l8Driver::module_type`]: VL53L8.
+
+### NVM_DATA_SIZE
+
+```rust
+pub const NVM_DATA_SIZE: usize = 492;
+```
+
+Bytes of NVM data the ULD reads at init.
+
+### OFFSET_BUFFER_SIZE
+
+```rust
+pub const OFFSET_BUFFER_SIZE: usize = 488;
+```
+
+Bytes of the offset buffer the ULD uploads.
+
+### XTALK_BUFFER_SIZE
+
+```rust
+pub const XTALK_BUFFER_SIZE: usize = 776;
+```
+
+Bytes of the xtalk calibration buffer (save / restore with the caldata calls).
+
+### Vl53l8Driver
+
+```rust
+pub struct Vl53l8Driver<P: Vl53l8Platform> {
+    p: P,
+    firmware: Vl53l8Firmware,
+    i2c: bool,
+    fw_checksum: Option<u32>,
+    output_enable_w3: u32,
+    frame_tail: u32,
+    variant: Variant,
+    offset_data: Vec<u8>,
+    xtalk_data: Vec<u8>,
+    stream_count: i32,
+    motion_present: bool,
+    module_type: Option<u8>,
+    data_read_size: usize,
+    frame_size_mismatch: Option<(usize, usize)>,
+    resolution: Option<usize>,
+    xtalk_calibration_failed: bool,
+}
+```
+
+The ST VL53L8CX ULD 2.1.0 / VL53LMZ ULD 2.0.16 / VL53L5CX-L7CX ULD 2.0.1 on the host.
+
+Ported from the reference Python driver: init (sensor firmware download), resolution,
+frequency, mode, integration time, sharpener, target order, ranging, frame parsing, power
+modes, xtalk margin and calibration, detection thresholds, motion indicator. Register sequences
+are a 1:1 port — every request matches the Python one, so captures replay in both. `Send`
+(the platform is `Send + Sync`): a device class holds it in a `Mutex`.
+
+#### Vl53l8Driver::new
+
+```rust
+pub fn new(platform: P, firmware: Vl53l8Firmware) -> Self
+```
+
+A driver over `platform` for `firmware` ([`Vl53l8Firmware::Cx`] is the default). Nothing
+is sent until the first call.
+
+#### Vl53l8Driver::platform
+
+```rust
+pub fn platform(&self) -> &P
+```
+
+The platform the driver runs on.
+
+#### Vl53l8Driver::firmware
+
+```rust
+pub fn firmware(&self) -> Vl53l8Firmware
+```
+
+The sensor firmware this driver downloads.
+
+#### Vl53l8Driver::is_i2c
+
+```rust
+pub fn is_i2c(&self) -> bool
+```
+
+The L5/L7 boards: the sensor sits on I2C (other boot sequence, per-target blocks keep 64
+entries in 4×4).
+
+#### Vl53l8Driver::module_type
+
+```rust
+pub fn module_type(&self) -> Option<u8>
+```
+
+L5/L7: [`MODULE_TYPE_MZ`] (VL53L5CX) or [`MODULE_TYPE_MZEVO`] (VL53L7CX/CH), read during
+[`Vl53l8Driver::init`]; else `None`.
+
+#### Vl53l8Driver::data_read_size
+
+```rust
+pub fn data_read_size(&self) -> usize
+```
+
+The frame size the firmware streams (bytes), set by [`Vl53l8Driver::start_ranging`].
+
+#### Vl53l8Driver::frame_size_mismatch
+
+```rust
+pub fn frame_size_mismatch(&self) -> Option<(usize, usize)>
+```
+
+(firmware, host) frame sizes when the firmware reported another size than the ULD formula;
+else `None`.
+
+#### Vl53l8Driver::resolution
+
+```rust
+pub fn resolution(&self) -> Option<usize>
+```
+
+Zones the last [`Vl53l8Driver::start_ranging`] used, or `None`.
+
+#### Vl53l8Driver::xtalk_calibration_failed
+
+```rust
+pub fn xtalk_calibration_failed(&self) -> bool
+```
+
+The last [`Vl53l8Driver::calibrate_xtalk`] ran into "coverglass too good": the default
+xtalk buffer is kept.
+
+#### Vl53l8Driver::xtalk_data
+
+```rust
+pub fn xtalk_data(&self) -> &[u8]
+```
+
+The 776-byte xtalk buffer the driver uploads (default, calibrated or restored); empty
+before [`Vl53l8Driver::init`].
+
+#### Vl53l8Driver::silicon_id_matches
+
+```rust
+pub fn silicon_id_matches(device_id: u8, revision_id: u8, i2c: bool) -> bool
+```
+
+Whether the silicon ids are the sensor's: (0xF0, 0x0C) on L8 over SPI; revision 0x02, or
+0x01 with device id 0xF0, on L5/L7 over I2C.
+
+#### Vl53l8Driver::dci_read_data
+
+```rust
+pub fn dci_read_data(&self, index: u16, data_size: usize) -> UldResult<Vec<u8>>
+```
+
+`vl53l8cx_dci_read_data`: `data_size` bytes of DCI `index` (byte order fixed: the swap is
+undone).
+
+#### Vl53l8Driver::dci_write_data
+
+```rust
+pub fn dci_write_data(&self, index: u16, data: &[u8]) -> UldResult<()>
+```
+
+`vl53l8cx_dci_write_data`: write `data` to DCI `index`.
+
+#### Vl53l8Driver::dci_replace_data
+
+```rust
+pub fn dci_replace_data(&self, index: u16, data_size: usize, new_data: &[u8], new_data_pos: usize) -> UldResult<()>
+```
+
+`vl53l8cx_dci_replace_data`: read `data_size` bytes of DCI `index`, put `new_data` at
+`new_data_pos`, write it back.
+
+#### Vl53l8Driver::is_alive
+
+```rust
+pub fn is_alive(&self) -> UldResult<(u8, u8)>
+```
+
+(device id, revision id) of the silicon; [`Vl53l8Driver::silicon_id_matches`] tells whether
+they are the sensor's.
+
+#### Vl53l8Driver::init
+
+```rust
+pub fn init(&mut self) -> UldResult<()>
+```
+
+`vl53l8cx_init`: boot the sensor MCU, download the 84 KB sensor firmware, upload the NVM
+offsets, the default xtalk and the default configuration.
+
+#### Vl53l8Driver::init_with_progress
+
+```rust
+pub fn init_with_progress(&mut self, progress: &mut dyn FnMut(&str)) -> UldResult<()>
+```
+
+[`Vl53l8Driver::init`] that tells `progress` the phase texts (`"SW reboot..."`,
+`"Downloading sensor FW (84 KB)... bank 1/3"` … `"Sensor init done"`).
+
+#### Vl53l8Driver::get_resolution
+
+```rust
+pub fn get_resolution(&self) -> UldResult<usize>
+```
+
+Zones in use (16 or 64; 0 before a resolution is set).
+
+#### Vl53l8Driver::set_resolution
+
+```rust
+pub fn set_resolution(&mut self, res: usize) -> UldResult<()>
+```
+
+16 (4×4) or 64 (8×8) zones; uploads the offsets and xtalk for it.
+
+#### Vl53l8Driver::get_ranging_frequency_hz
+
+```rust
+pub fn get_ranging_frequency_hz(&self) -> UldResult<u8>
+```
+
+Ranging frequency, Hz.
+
+#### Vl53l8Driver::set_ranging_frequency_hz
+
+```rust
+pub fn set_ranging_frequency_hz(&mut self, hz: i32) -> UldResult<()>
+```
+
+Ranging frequency, Hz: a u8 field, so 0..255 (outside is
+[`Vl53l8UldError::InvalidArgument`]); the sensor's own limits apply on top.
+
+#### Vl53l8Driver::set_ranging_mode
+
+```rust
+pub fn set_ranging_mode(&mut self, mode: u8) -> UldResult<()>
+```
+
+[`RANGING_MODE_CONTINUOUS`] or [`RANGING_MODE_AUTONOMOUS`].
+
+#### Vl53l8Driver::get_ranging_mode
+
+```rust
+pub fn get_ranging_mode(&self) -> UldResult<u8>
+```
+
+[`RANGING_MODE_CONTINUOUS`] or [`RANGING_MODE_AUTONOMOUS`].
+
+#### Vl53l8Driver::get_integration_time_ms
+
+```rust
+pub fn get_integration_time_ms(&self) -> UldResult<u32>
+```
+
+Integration time, ms.
+
+#### Vl53l8Driver::set_integration_time_ms
+
+```rust
+pub fn set_integration_time_ms(&mut self, time_ms: i32) -> UldResult<()>
+```
+
+2..1000 ms; no effect in continuous mode.
+
+#### Vl53l8Driver::get_sharpener_percent
+
+```rust
+pub fn get_sharpener_percent(&self) -> UldResult<u8>
+```
+
+0..99 %, rounded to nearest on the way back (ST truncates and loses a count for 95 of the
+100 legal values; the stored byte is the same).
+
+#### Vl53l8Driver::set_sharpener_percent
+
+```rust
+pub fn set_sharpener_percent(&mut self, pct: i32) -> UldResult<()>
+```
+
+0..99 %: 100 and up is the ULD's INVALID_PARAM, a negative value
+[`Vl53l8UldError::InvalidArgument`].
+
+#### Vl53l8Driver::get_target_order
+
+```rust
+pub fn get_target_order(&self) -> UldResult<u8>
+```
+
+[`TARGET_ORDER_CLOSEST`] or [`TARGET_ORDER_STRONGEST`].
+
+#### Vl53l8Driver::set_target_order
+
+```rust
+pub fn set_target_order(&mut self, order: u8) -> UldResult<()>
+```
+
+[`TARGET_ORDER_CLOSEST`] or [`TARGET_ORDER_STRONGEST`].
+
+#### Vl53l8Driver::start_ranging
+
+```rust
+pub fn start_ranging(&mut self, cnh_data_size: Option<u32>) -> UldResult<()>
+```
+
+Program the output list and start. `cnh_data_size` (bytes, from
+[`super::Vl53l8CnhSetup::required_memory`]; `None` for none) appends the CNH block to every
+frame. The frame size the firmware reports wins over the ULD formula
+([`Vl53l8Driver::frame_size_mismatch`]).
+
+#### Vl53l8Driver::stop_ranging
+
+```rust
+pub fn stop_ranging(&mut self) -> UldResult<()>
+```
+
+`vl53l8cx_stop_ranging`: provoke an MCU stop (unless the detection thresholds auto-stopped
+it), wait up to ~5 s, then undo the stop and the xshut bypass. A stuck MCU is not an error.
+
+#### Vl53l8Driver::check_data_ready
+
+```rust
+pub fn check_data_ready(&mut self) -> UldResult<bool>
+```
+
+Poll mode: a new frame is ready. A GO2 error is a [`Vl53l8UldError::Status`] carrying the
+sensor's error byte as the code.
+
+#### Vl53l8Driver::get_ranging_data
+
+```rust
+pub fn get_ranging_data(&mut self, timestamp_us: u64) -> UldResult<Vl53l8Frame>
+```
+
+Poll mode: read one frame from register 0x00 and parse it.
+
+#### Vl53l8Driver::parse_frame
+
+```rust
+pub fn parse_frame(&mut self, timestamp_us: u64, raw: &[u8]) -> UldResult<Vl53l8Frame>
+```
+
+Parse one raw frame ([`Vl53l8Driver::data_read_size`] bytes) — polled, or pushed by the
+board's stream. L5/L7 frames are trimmed to the zones in use.
+
+A header / footer id mismatch (or a frame too short to hold them) is
+[`status::CORRUPTED_FRAME`].
+
+#### Vl53l8Driver::get_power_mode
+
+```rust
+pub fn get_power_mode(&self) -> UldResult<u8>
+```
+
+[`POWER_MODE_WAKEUP`], [`POWER_MODE_SLEEP`] or [`POWER_MODE_DEEP_SLEEP`]
+(`crate::vl53l8::advanced` constants); an unknown state is [`status::ERROR`].
+
+#### Vl53l8Driver::set_power_mode
+
+```rust
+pub fn set_power_mode(&mut self, power_mode: u8) -> UldResult<()>
+```
+
+Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs
+[`Vl53l8Driver::init`]: the sensor firmware is lost.
+
+#### Vl53l8Driver::get_xtalk_margin
+
+```rust
+pub fn get_xtalk_margin(&self) -> UldResult<f64>
+```
+
+Xtalk margin, kcps/SPAD.
+
+#### Vl53l8Driver::set_xtalk_margin
+
+```rust
+pub fn set_xtalk_margin(&mut self, margin_kcps: f64) -> UldResult<()>
+```
+
+Xtalk margin, kcps/SPAD: 0..10000 (NaN and anything else is [`status::INVALID_PARAM`],
+nothing written).
+
+#### Vl53l8Driver::get_caldata_xtalk
+
+```rust
+pub fn get_caldata_xtalk(&mut self) -> UldResult<Vec<u8>>
+```
+
+The live 776-byte xtalk calibration buffer (save / restore); the resolution is restored
+afterwards.
+
+#### Vl53l8Driver::set_caldata_xtalk
+
+```rust
+pub fn set_caldata_xtalk(&mut self, blob: &[u8]) -> UldResult<()>
+```
+
+Restore a saved 776-byte xtalk buffer; it is uploaded again by the next resolution change
+and at once here. Another length is [`status::INVALID_PARAM`].
+
+#### Vl53l8Driver::get_detection_thresholds_enable
+
+```rust
+pub fn get_detection_thresholds_enable(&self) -> UldResult<u8>
+```
+
+Whether the detection thresholds are enabled (the raw enable byte: 1 on, 0 off).
+
+#### Vl53l8Driver::set_detection_thresholds_enable
+
+```rust
+pub fn set_detection_thresholds_enable(&mut self, enabled: bool) -> UldResult<()>
+```
+
+Enable or disable the detection thresholds.
+
+#### Vl53l8Driver::get_detection_thresholds
+
+```rust
+pub fn get_detection_thresholds(&self) -> UldResult<Vec<DetectionThreshold>>
+```
+
+The 64 thresholds, low / high rescaled to the units of their measurement (floor division).
+
+#### Vl53l8Driver::set_detection_thresholds
+
+```rust
+pub fn set_detection_thresholds(&mut self, thresholds: &[DetectionThreshold]) -> UldResult<()>
+```
+
+Program the 64 thresholds (missing entries are zeros). More than 64, or a low / high whose
+scaled value does not fit i32, is [`Vl53l8UldError::InvalidArgument`], nothing written.
+
+#### Vl53l8Driver::set_detection_thresholds_auto_stop
+
+```rust
+pub fn set_detection_thresholds_auto_stop(&mut self, auto_stop: bool) -> UldResult<()>
+```
+
+Stop ranging when a threshold fires (not in the L5CX/L7CX ULD: [`status::INVALID_PARAM`]).
+
+#### Vl53l8Driver::motion_indicator_init
+
+```rust
+pub fn motion_indicator_init(&mut self, res: usize) -> UldResult<MotionConfig>
+```
+
+A default motion-indicator configuration for `res`, written to the sensor; frames carry
+motion output from here on.
+
+#### Vl53l8Driver::motion_indicator_set_resolution
+
+```rust
+pub fn motion_indicator_set_resolution(&mut self, cfg: &mut MotionConfig, res: usize) -> UldResult<()>
+```
+
+Set `cfg`'s zone map for `res` (16 or 64, else [`status::INVALID_PARAM`]) and write it.
+
+#### Vl53l8Driver::motion_indicator_set_distance_motion
+
+```rust
+pub fn motion_indicator_set_distance_motion(
+    &mut self,
+    cfg: &mut MotionConfig,
+    distance_min_mm: i32,
+    distance_max_mm: i32,
+) -> UldResult<()>
+```
+
+Set `cfg`'s distance window (400..4000 mm, at most 1500 mm wide, else
+[`status::INVALID_PARAM`]) and write it.
+
+#### Vl53l8Driver::calibrate_xtalk
+
+```rust
+pub fn calibrate_xtalk(&mut self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> UldResult<()>
+```
+
+`vl53l8cx_calibrate_xtalk`: on-device crosstalk calibration against a flat target at
+`distance_mm` (600..3000) of `reflectance_percent` (1..99), averaging `nb_samples` (1..16);
+outside is [`status::INVALID_PARAM`], nothing sent. Takes seconds; the configuration is
+saved and restored around it. Without cover glass the firmware answers "coverglass too
+good": [`Vl53l8Driver::xtalk_calibration_failed`], and the default buffer stays.
 
 ### STREAM_CHUNK_MAX
 

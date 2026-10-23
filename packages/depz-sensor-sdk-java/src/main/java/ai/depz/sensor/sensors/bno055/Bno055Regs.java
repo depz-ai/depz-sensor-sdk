@@ -16,11 +16,72 @@ import java.util.Map;
  * {@link Units} and the fixed {@link #MAG_LSB} / {@link #QUAT_LSB} /
  * {@link #FUSION_ACCEL_LSB}.
  *
- * <p>OUT OF SCOPE (as for every Java sensor): the live driver over the bridge
- * (mode switching, boot / fusion-start polls, page discipline, self-test).
+ * <p>The live driver over the bridge (mode switching, boot / fusion-start polls,
+ * page discipline, self-test) is {@link ai.depz.sensor.devices.Bno055Device}.
  */
 public final class Bno055Regs {
     private Bno055Regs() {}
+
+    // ── timing (contract 13 §4) ──────────────────────────────────────────────
+    /** Settle time after an OPR_MODE write out of CONFIG (datasheet: 7 ms). */
+    public static final int MODE_SWITCH_FROM_CONFIG_MS = 10;
+    /** Settle time after an OPR_MODE write into CONFIG (datasheet: 19 ms). */
+    public static final int MODE_SWITCH_TO_CONFIG_MS = 25;
+    /** The built-in self-test runs ~400 ms (datasheet §3.9.2). */
+    public static final int SELF_TEST_TIME_MS = 450;
+    /** SYS_STATUS values of a sensor still booting (initializing, self-test). */
+    public static final java.util.List<Integer> SYS_STATUS_BOOTING = java.util.List.of(2, 3, 4);
+    public static final int BOOT_SETTLE_TIMEOUT_MS = 1000;
+    /** SYS_STATUS 4 polls in a row taken as the leftover of a self-test run in CONFIG, not POST. */
+    public static final int STUCK_SELF_TEST_POLLS = 20;
+    /** After CONFIG → a fusion mode the fusion outputs read zero for ~70 ms. */
+    public static final int FUSION_START_TIMEOUT_MS = 1000;
+
+    public static final Map<Integer, String> SYS_STATUS_NAMES = Map.of(
+        0, "idle",
+        1, "system error",
+        2, "initializing peripherals",
+        3, "system initialization",
+        4, "executing self-test",
+        5, "fusion algorithm running",
+        6, "running without fusion");
+
+    public static final Map<Integer, String> SYS_ERR_NAMES = Map.ofEntries(
+        Map.entry(0, "no error"),
+        Map.entry(1, "peripheral initialization error"),
+        Map.entry(2, "system initialization error"),
+        Map.entry(3, "self-test failed"),
+        Map.entry(4, "register map value out of range"),
+        Map.entry(5, "register map address out of range"),
+        Map.entry(6, "register map write error"),
+        Map.entry(7, "low power mode not available for this operation mode"),
+        Map.entry(8, "accelerometer power mode not available"),
+        Map.entry(9, "fusion algorithm configuration error"),
+        Map.entry(10, "sensor configuration error"));
+
+    /** Page-1 motion-interrupt setting registers (thresholds, durations, axis selects). */
+    public static boolean isInterruptSettingReg(int register) {
+        return register >= REG1_ACC_AM_THRES && register <= REG1_GYR_AM_SET;
+    }
+
+    /**
+     * ST_RESULT (0x36) + SYS_CLK_STATUS / SYS_STATUS / SYS_ERR (0x38..0x3A); INT_STA (0x37) sits
+     * in between and clears on read, so it is not read.
+     */
+    public record SystemStatus(int selfTest, int clkStatus, int status, int error) {
+        public String statusText() {
+            return SYS_STATUS_NAMES.getOrDefault(status, "unknown (" + status + ")");
+        }
+
+        /** Meaningful when {@link #status()} is 1 (system error). */
+        public String errorText() {
+            return SYS_ERR_NAMES.getOrDefault(error, "unknown (" + error + ")");
+        }
+
+        public boolean selfTestPassed() {
+            return (selfTest & EXPECTED_SELF_TEST) == EXPECTED_SELF_TEST;
+        }
+    }
 
     // ── page 0 ───────────────────────────────────────────────────────────────
     public static final int REG_CHIP_ID = 0x00;
@@ -156,7 +217,9 @@ public final class Bno055Regs {
                 | (android ? UNIT_ORI_ANDROID : 0);
         }
 
+        /** {@code value}: the UNIT_SEL register byte (outside 0..255 → IllegalArgumentException). */
         public static Units unpack(int value) {
+            ai.depz.sensor.protocol.Wire.checkUint("UNIT_SEL", value, 8);
             return new Units(
                 (value & UNIT_ACC_MG) != 0,
                 (value & UNIT_GYR_RPS) != 0,
@@ -200,7 +263,9 @@ public final class Bno055Regs {
 
     /** CALIB_STAT (0x35) {@code sys<7:6> gyr<5:4> acc<3:2> mag<1:0>}: 0 = not calibrated … 3 = fully. */
     public record CalibStatus(int system, int gyro, int accel, int mag) {
+        /** {@code value}: the CALIB_STAT register byte (outside 0..255 → IllegalArgumentException). */
         public static CalibStatus unpack(int value) {
+            ai.depz.sensor.protocol.Wire.checkUint("CALIB_STAT", value, 8);
             return new CalibStatus(value >> 6 & 3, value >> 4 & 3, value >> 2 & 3, value & 3);
         }
 
@@ -296,7 +361,10 @@ public final class Bno055Regs {
             return new int[] {config, sign};
         }
 
+        /** The two register bytes (each outside 0..255 → IllegalArgumentException). */
         public static AxisRemap unpack(int config, int sign) {
+            ai.depz.sensor.protocol.Wire.checkUint("AXIS_MAP_CONFIG", config, 8);
+            ai.depz.sensor.protocol.Wire.checkUint("AXIS_MAP_SIGN", sign, 8);
             return new AxisRemap(
                 config & 3, config >> 2 & 3, config >> 4 & 3,
                 (sign & 4) != 0, (sign & 2) != 0, (sign & 1) != 0);
@@ -357,7 +425,9 @@ public final class Bno055Regs {
             return (power & 7) << 5 | (bandwidth & 7) << 2 | (range & 3);
         }
 
+        /** {@code value}: the ACC_CONFIG register byte (outside 0..255 → IllegalArgumentException). */
         public static AccelConfig unpack(int value) {
+            ai.depz.sensor.protocol.Wire.checkUint("ACC_CONFIG", value, 8);
             return new AccelConfig(value & 3, value >> 2 & 7, value >> 5 & 7);
         }
     }
@@ -376,6 +446,9 @@ public final class Bno055Regs {
         }
 
         public static GyroConfig unpack(byte[] data) {
+            if (data.length < 2) {
+                throw new IllegalArgumentException("GYR_CONFIG is 2 bytes, got " + data.length);
+            }
             int b0 = data[0] & 0xFF;
             return new GyroConfig(b0 & 7, b0 >> 3 & 7, data[1] & 7);
         }
@@ -394,7 +467,9 @@ public final class Bno055Regs {
             return (power & 3) << 5 | (mode & 3) << 3 | (rate & 7);
         }
 
+        /** {@code value}: the MAG_CONFIG register byte (outside 0..255 → IllegalArgumentException). */
         public static MagConfig unpack(int value) {
+            ai.depz.sensor.protocol.Wire.checkUint("MAG_CONFIG", value, 8);
             return new MagConfig(value & 7, value >> 3 & 3, value >> 5 & 3);
         }
     }
@@ -410,8 +485,13 @@ public final class Bno055Regs {
                            int[] linearAccel, int[] gravity, Integer temperature,
                            Integer calibStat) {}
 
-    /** Unpack whatever channels the register window starting at {@code addr} holds. */
+    /**
+     * Unpack whatever channels the register window starting at {@code addr}
+     * holds. {@code addr} is a register address (0..255); anything else is
+     * rejected with {@link IllegalArgumentException}.
+     */
     public static RawBlock decodeBlock(int addr, byte[] data) {
+        ai.depz.sensor.protocol.Wire.checkUint("addr", addr, 8);
         int end = addr + data.length;
         Integer temp = null;
         if (addr <= REG_TEMP && REG_TEMP < end) {

@@ -429,6 +429,17 @@ double depz_tmf8829_clock_ratio(const depz_tmf8829_clock *c)
 
 /* ── capture time ──────────────────────────────────────────────────────── */
 
+int depz_tmf8829_timer_results_checked(depz_tmf8829_timer *t, const depz_tmf8829_clock *c,
+                                       unsigned fp_mode, uint32_t systick, uint32_t t0_tick,
+                                       uint32_t t1_tick, int64_t pair_us, int64_t edge_us,
+                                       uint8_t flags, depz_tmf8829_frame_time *out)
+{
+    if (fp_mode > 0xFFu || pair_us < 0 || edge_us < 0)
+        return -1; /* fp_mode is a byte, MCU µs times are u64 (contract 07 §3) */
+    depz_tmf8829_timer_results(t, c, fp_mode, systick, t0_tick, t1_tick, pair_us, edge_us, flags, out);
+    return 0;
+}
+
 unsigned depz_tmf8829_subints(unsigned fp_mode)
 {
     static const uint8_t N[6] = {2, 2, 2, 4, 4, 6};
@@ -436,6 +447,14 @@ unsigned depz_tmf8829_subints(unsigned fp_mode)
 }
 
 void depz_tmf8829_timer_reset(depz_tmf8829_timer *t) { memset(t, 0, sizeof *t); }
+
+int depz_tmf8829_clock_add_checked(depz_tmf8829_clock *c, int64_t us, uint32_t tick, uint8_t *flags)
+{
+    if (us < 0)
+        return -1; /* an MCU µs time is a u64 (contract 07 §3) */
+    *flags = depz_tmf8829_clock_add(c, us, tick);
+    return 0;
+}
 
 void depz_tmf8829_timer_histograms(depz_tmf8829_timer *t) { t->hist_seen = true; }
 
@@ -512,6 +531,9 @@ int depz_tmf8829_builder_add(depz_tmf8829_builder *b, const uint8_t *raw, size_t
     uint8_t flags;
     size_t i, n;
     double ratio;
+
+    if (timestamp_us < 0 || edge_us < 0)
+        return -1; /* MCU µs times are u64 (contract 07 §3): checked before the frame */
 
     if (depz_tmf8829_parse_frame(raw, len, &f)) {
         b->parse_errors++;
@@ -685,24 +707,35 @@ const depz_tmf8829_cfg_field *depz_tmf8829_find_cfg_field(const char *name)
     return NULL;
 }
 
-int depz_tmf8829_cfg_get(const uint8_t page[190], const char *name, uint32_t *value)
+/* The field's first byte in a page of `page_len` bytes, or -3 when the page
+ * is too short to hold the field (-1 for an unknown name). */
+static int cfg_index(const char *name, size_t page_len, const depz_tmf8829_cfg_field **out)
 {
     const depz_tmf8829_cfg_field *f = depz_tmf8829_find_cfg_field(name);
     size_t i;
     if (!f) return -1;
     i = (size_t)(f->reg - DEPZ_TMF8829_REG_CFG);
+    if (page_len < i + (f->width == 16 ? 2u : 1u)) return -3;
+    *out = f;
+    return (int)i;
+}
+
+int depz_tmf8829_cfg_get_n(const uint8_t *page, size_t page_len, const char *name, uint32_t *value)
+{
+    const depz_tmf8829_cfg_field *f = NULL;
+    int i = cfg_index(name, page_len, &f);
+    if (i < 0) return i;
     if (f->width == 16) *value = (uint32_t)page[i] | (uint32_t)page[i + 1] << 8;
     else *value = (uint32_t)(page[i] >> f->shift) & ((1u << f->width) - 1u);
     return 0;
 }
 
-int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value)
+int depz_tmf8829_cfg_set_n(uint8_t *page, size_t page_len, const char *name, int64_t value)
 {
-    const depz_tmf8829_cfg_field *f = depz_tmf8829_find_cfg_field(name);
-    size_t i;
-    if (!f) return -1;
+    const depz_tmf8829_cfg_field *f = NULL;
+    int i = cfg_index(name, page_len, &f);
+    if (i < 0) return i;
     if (value < 0 || value >= ((int64_t)1 << f->width)) return -2;
-    i = (size_t)(f->reg - DEPZ_TMF8829_REG_CFG);
     if (f->width == 16) {
         page[i] = (uint8_t)value;
         page[i + 1] = (uint8_t)(value >> 8);
@@ -711,6 +744,16 @@ int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value)
         page[i] = (uint8_t)((page[i] & ~mask) | ((unsigned)value << f->shift));
     }
     return 0;
+}
+
+int depz_tmf8829_cfg_get(const uint8_t page[190], const char *name, uint32_t *value)
+{
+    return depz_tmf8829_cfg_get_n(page, 190, name, value);
+}
+
+int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value)
+{
+    return depz_tmf8829_cfg_set_n(page, 190, name, value);
 }
 
 const char *depz_tmf8829_status_name(uint8_t st)

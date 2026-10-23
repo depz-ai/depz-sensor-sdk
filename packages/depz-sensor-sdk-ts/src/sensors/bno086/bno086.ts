@@ -20,7 +20,7 @@ import {
   unpackBno086Data,
 } from "../../protocol/bno086.js";
 import type { SerialTransport } from "../../transport/types.js";
-import { SensorId, parseGyroRvCargo, parseInputCargo, type Report } from "./reports.js";
+import { FLUSH_COMPLETED, SensorId, parseGyroRvCargo, parseInputCargo, type Report } from "./reports.js";
 import {
   ControlReport,
   ErrorSource,
@@ -34,6 +34,7 @@ import {
   TareAxis,
   TareBasis,
   buildCommandRequest,
+  buildForceFlush,
   buildGetFeatureRequest,
   buildProductIdRequest,
   buildSetFeature,
@@ -42,6 +43,7 @@ import {
   countsGetParams,
   errorRecordFromResponse,
   errorsParams,
+  interactiveCalibrationParams,
   meCalibrationParams,
   periodicDcdParams,
   persistTareParams,
@@ -107,7 +109,7 @@ export interface EnableOptions {
   timeoutMs?: number;
 }
 
-function sleep(ms: number): Promise<void> {
+async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -141,6 +143,7 @@ export class Bno086 extends DepzDevice {
   private shtp = new ShtpLayer();
   private txChain: Promise<void> = Promise.resolve();
   private reportCbs: Array<{ cb: (r: Report) => void; filter: Set<number> | null }> = [];
+  private readonly flushWaiters = new Map<number, Set<() => void>>();
   private reportQueues: Array<{ queue: StreamQueue<Report>; filter: Set<number> | null }> = [];
   private controlWaiters = new Map<number, ControlWaiter[]>();
   // Parallel registry of the `fail` handle for each in-flight control exchange,
@@ -174,8 +177,9 @@ export class Bno086 extends DepzDevice {
   protected override handleReport(pkt: PacketEvent): boolean {
     if (pkt.cmd !== Bno086Rpt.Data || pkt.payload.length < 9) return false;
     const data = unpackBno086Data(pkt.payload);
-    const cargo = this.shtp.feed(data.shtp);
-    if (cargo !== null) this.dispatchCargo(cargo, data.timestampUs);
+    const cargo = this.shtp.feed(data.shtp, data.timestampUs);
+    // The first fragment's capture: 0xFB base deltas refer to it.
+    if (cargo !== null) this.dispatchCargo(cargo, cargo.captureUs);
     return true;
   }
 
@@ -216,6 +220,9 @@ export class Bno086 extends DepzDevice {
   }
 
   private emitReport(rep: Report): void {
+    if (rep.type === "FlushCompleted") {
+      for (const done of [...(this.flushWaiters.get(rep.flushedSensor) ?? [])]) done();
+    }
     for (const { cb, filter } of [...this.reportCbs]) {
       if (filter === null || filter.has(rep.sensorId)) cb(rep);
     }
@@ -233,7 +240,7 @@ export class Bno086 extends DepzDevice {
    * retransmits, up to `busyRetries` attempts (contract 05 §2). Sends are
    * serialized (single opcode, single wire).
    */
-  private sendShtp(channel: number, payload: Uint8Array): Promise<void> {
+  private async sendShtp(channel: number, payload: Uint8Array): Promise<void> {
     const frame = this.shtp.nextFrame(channel, payload);
     const run = async (): Promise<void> => {
       for (let attempt = 0; ; attempt++) {
@@ -256,7 +263,7 @@ export class Bno086 extends DepzDevice {
    * `handler` decide when the exchange finishes. Correlation is purely
    * SH-2-level (report ID + handler predicate).
    */
-  private controlExchange<T>(
+  private async controlExchange<T>(
     rid: number,
     timeoutMs: number,
     handler: (raw: Uint8Array, finish: (value: T) => void, fail: (err: Error) => void) => void,
@@ -298,7 +305,7 @@ export class Bno086 extends DepzDevice {
   }
 
   /** Send a control-channel payload and wait for one matching response. */
-  private controlRequest<T>(
+  private async controlRequest<T>(
     payload: Uint8Array,
     expectRid: number,
     parse: (raw: Uint8Array) => T,
@@ -318,7 +325,7 @@ export class Bno086 extends DepzDevice {
         }
         if (pred === undefined || pred(obj)) finish(obj);
       },
-      () => this.sendShtp(ShtpChannel.Control, payload),
+      async () => this.sendShtp(ShtpChannel.Control, payload),
     );
   }
 
@@ -359,7 +366,7 @@ export class Bno086 extends DepzDevice {
    * multi-message commands (Errors, Counts) where the hub streams several
    * 0xF1 responses with an incrementing responseSeq.
    */
-  private commandCollect(
+  private async commandCollect(
     command: number,
     params: Uint8Array,
     collect: (resp: CommandResponse, acc: CommandResponse[]) => boolean,
@@ -382,7 +389,7 @@ export class Bno086 extends DepzDevice {
         if (resp.command !== command || resp.commandSeq !== seq) return;
         if (collect(resp, results)) finish(results);
       },
-      () => this.sendShtp(ShtpChannel.Control, payload),
+      async () => this.sendShtp(ShtpChannel.Control, payload),
     );
   }
 
@@ -483,7 +490,7 @@ export class Bno086 extends DepzDevice {
    * a second cargo; taking only the first once returned the bootloader's
    * version on a back-to-back call).
    */
-  productIds(timeoutMs: number = CONTROL_TIMEOUT_MS, settleMs = 150): Promise<ProductId[]> {
+  async productIds(timeoutMs: number = CONTROL_TIMEOUT_MS, settleMs = 150): Promise<ProductId[]> {
     const out: ProductId[] = [];
     let settle: ReturnType<typeof setTimeout> | undefined;
     return this.controlExchange<ProductId[]>(
@@ -499,7 +506,7 @@ export class Bno086 extends DepzDevice {
         clearTimeout(settle);
         settle = setTimeout(() => finish(out), settleMs);
       },
-      () => this.sendShtp(ShtpChannel.Control, buildProductIdRequest()),
+      async () => this.sendShtp(ShtpChannel.Control, buildProductIdRequest()),
     ).finally(() => clearTimeout(settle));
   }
 
@@ -577,7 +584,7 @@ export class Bno086 extends DepzDevice {
   }
 
   /** Get Feature Request/Response round trip for `sensor`. */
-  getFeature(sensor: number, timeoutMs: number = CONTROL_TIMEOUT_MS): Promise<FeatureResponse> {
+  async getFeature(sensor: number, timeoutMs: number = CONTROL_TIMEOUT_MS): Promise<FeatureResponse> {
     return this.controlRequest(
       buildGetFeatureRequest(sensor),
       ControlReport.GetFeatureResponse,
@@ -588,35 +595,35 @@ export class Bno086 extends DepzDevice {
   }
 
   // sugar for the everyday sensors
-  enableRotationVector(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableRotationVector(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.RotationVector, hz, opts);
   }
 
-  enableGameRotationVector(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableGameRotationVector(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.GameRotationVector, hz, opts);
   }
 
-  enableAccelerometer(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableAccelerometer(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.Accelerometer, hz, opts);
   }
 
-  enableGyroscope(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableGyroscope(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.Gyroscope, hz, opts);
   }
 
-  enableMagnetometer(hz = 50, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableMagnetometer(hz = 50, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.Magnetometer, hz, opts);
   }
 
-  enableLinearAcceleration(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableLinearAcceleration(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.LinearAcceleration, hz, opts);
   }
 
-  enableGravity(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableGravity(hz = 100, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.Gravity, hz, opts);
   }
 
-  enableGyroIntegratedRv(hz = 400, opts?: EnableOptions): Promise<FeatureResponse | null> {
+  async enableGyroIntegratedRv(hz = 400, opts?: EnableOptions): Promise<FeatureResponse | null> {
     return this.enable(SensorId.GyroIntegratedRv, hz, opts);
   }
 
@@ -664,6 +671,12 @@ export class Bno086 extends DepzDevice {
   /**
    * Set the runtime reorientation quaternion (Q14 on the wire; all zeros
    * clears). No response per SH-2.
+   *
+   * The rotation is applied on the board's side (new = report * r) and is
+   * given in the hub's own axes: x and y swapped and z negated relative to
+   * the axes of the reports — a rotation about x here turns the reports
+   * about y (bench, 2026-10-22, SH-2 3.12.6). The System Orientation record
+   * (FRS 0x2D3E) uses the same axes and is read only when the hub starts.
    */
   async setReorientation(x: number, y: number, z: number, w: number): Promise<void> {
     await this.command(Sh2Command.Tare, setReorientationParams(x, y, z, w), false);
@@ -713,10 +726,63 @@ export class Bno086 extends DepzDevice {
     await this.command(Sh2Command.PeriodicDcdConfig, periodicDcdParams(enable), false);
   }
 
+  // ── interactive calibration (BNO086 only) ──────────────────────────────────
+
+  /**
+   * Tell the hub how the device is about to move (Interactive Calibration,
+   * command 0x0E, see MotionIntent), so it can refine the gyro zero-rate
+   * offset while the device is still. No response per SH-2; a BNO085 ignores
+   * it. The hub's answer, if it wants the device to stop, arrives as a
+   * MotionRequest report (enable SensorId.MotionRequest).
+   */
+  async setMotionIntent(intent: number): Promise<void> {
+    await this.command(Sh2Command.InteractiveCalibration, interactiveCalibrationParams(intent), false);
+  }
+
+  /**
+   * Enable MotionRequest (0x2B) reports. The hub sends one when its request
+   * changes, not at `hz`; it reads the rate back late, so the granted rate is
+   * not checked.
+   */
+  async enableMotionRequest(hz = 1, opts: EnableOptions = {}): Promise<FeatureResponse | null> {
+    return this.enable(SensorId.MotionRequest, hz, { verify: false, ...opts });
+  }
+
+  // ── batching ───────────────────────────────────────────────────────────────
+
+  /**
+   * Force Sensor Flush (0xF0): have the hub send `sensor`'s batched reports
+   * now instead of when its batch interval runs out. Resolves once the hub's
+   * Flush Completed (0xEF) for `sensor` arrives — every report batched before
+   * the call has been emitted by then.
+   */
+  async flush(sensor: number, timeoutMs: number = CONTROL_TIMEOUT_MS): Promise<void> {
+    const payload = buildForceFlush(sensor);
+    let waiters = this.flushWaiters.get(sensor);
+    if (waiters === undefined) {
+      waiters = new Set();
+      this.flushWaiters.set(sensor, waiters);
+    }
+    let done!: () => void;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const completed = new Promise<void>((resolve, reject) => {
+      done = resolve;
+      timer = setTimeout(() => reject(new DepzTimeoutError(FLUSH_COMPLETED, timeoutMs)), timeoutMs);
+    });
+    waiters.add(done);
+    try {
+      await this.sendShtp(ShtpChannel.Control, payload);
+      await completed;
+    } finally {
+      clearTimeout(timer);
+      waiters.delete(done);
+    }
+  }
+
   // ── FRS ────────────────────────────────────────────────────────────────────
 
   /** Read a whole FRS record; resolves with its 32-bit words. */
-  frsRead(recordId: number, timeoutMs: number = FRS_TIMEOUT_MS): Promise<number[]> {
+  async frsRead(recordId: number, timeoutMs: number = FRS_TIMEOUT_MS): Promise<number[]> {
     const session = new FrsReadSession(recordId);
     return this.controlExchange<number[]>(
       ControlReport.FrsReadResponse,
@@ -728,12 +794,12 @@ export class Bno086 extends DepzDevice {
           fail(err instanceof Error ? err : new DepzError(String(err)));
         }
       },
-      () => this.sendShtp(ShtpChannel.Control, session.request()),
+      async () => this.sendShtp(ShtpChannel.Control, session.request()),
     );
   }
 
   /** Write a whole FRS record (word list); rejects with Sh2Error on failure. */
-  frsWrite(recordId: number, words: Iterable<number>, timeoutMs: number = FRS_TIMEOUT_MS): Promise<void> {
+  async frsWrite(recordId: number, words: Iterable<number>, timeoutMs: number = FRS_TIMEOUT_MS): Promise<void> {
     const session = new FrsWriteSession(recordId, [...words]);
     return this.controlExchange<void>(
       ControlReport.FrsWriteResponse,
@@ -750,7 +816,7 @@ export class Bno086 extends DepzDevice {
           fail(err instanceof Error ? err : new DepzError(String(err)));
         }
       },
-      () => this.sendShtp(ShtpChannel.Control, session.request()),
+      async () => this.sendShtp(ShtpChannel.Control, session.request()),
     );
   }
 

@@ -31,8 +31,10 @@ bytes payload_crc_bytes(CrcType crc_type, byte_span payload);
 
 // Frame one packet. `crc_type` bits are set in the header even for an empty
 // payload (matching device TX), but CRC bytes are appended only for non-empty
-// payloads. Throws std::length_error if payload exceeds MAX_PAYLOAD.
-bytes build_packet(std::uint8_t cmd, byte_span payload = {}, std::uint8_t seq = 0,
+// payloads. `seq` is a free-running counter taken modulo 256 on the wire.
+// Throws std::length_error if payload exceeds MAX_PAYLOAD, std::invalid_argument
+// if crc_type is not one of the four listed CrcType values (contract 07 §3).
+bytes build_packet(std::uint8_t cmd, byte_span payload = {}, std::uint32_t seq = 0,
                    CrcType crc_type = CrcType::None);
 
 struct Packet {

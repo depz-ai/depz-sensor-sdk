@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 typedef struct {
     const char *p;
@@ -38,7 +39,7 @@ static void append_item(json_value *arr, json_value *item, char *key)
 }
 
 /* Parse a JSON string literal (leading '"' already consumed check done here). */
-static char *parse_string_raw(parser *ps)
+static char *parse_string_raw(parser *ps, size_t *out_len)
 {
     if (*ps->p != '"') { ps->error = true; return NULL; }
     ps->p++;
@@ -91,15 +92,18 @@ static char *parse_string_raw(parser *ps)
     ps->p++;
     if (len + 1 > cap) { out = (char *)realloc(out, len + 1); }
     out[len] = '\0';
+    if (out_len) *out_len = len;
     return out;
 }
 
 static json_value *parse_string(parser *ps)
 {
-    char *s = parse_string_raw(ps);
+    size_t n = 0;
+    char *s = parse_string_raw(ps, &n);
     if (ps->error) { free(s); return NULL; }
     json_value *v = new_val(JSON_STRING);
     v->s = s;
+    v->slen = n;
     return v;
 }
 
@@ -126,7 +130,17 @@ static json_value *parse_number(parser *ps)
         return v;
     }
     json_value *v = new_val(JSON_INT);
+    errno = 0;
     v->i = strtoll(buf, NULL, 10);
+    v->u = (uint64_t)v->i;
+    if (errno == ERANGE) {
+        v->range = 2;
+        if (buf[0] != '-') {
+            errno = 0;
+            unsigned long long u = strtoull(buf, NULL, 10);
+            if (errno != ERANGE) { v->range = 1; v->u = (uint64_t)u; }
+        }
+    }
     return v;
 }
 
@@ -157,7 +171,7 @@ static json_value *parse_object(parser *ps)
     if (*ps->p == '}') { ps->p++; return v; }
     for (;;) {
         skip_ws(ps);
-        char *key = parse_string_raw(ps);
+        char *key = parse_string_raw(ps, NULL);
         if (ps->error) { free(key); json_free(v); return NULL; }
         skip_ws(ps);
         if (*ps->p != ':') { ps->error = true; free(key); json_free(v); return NULL; }

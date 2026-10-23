@@ -43,7 +43,7 @@ code.
 ## Contents
 
 - [What it is](#what-it-is)
-- [Scope: a decode layer](#scope-a-decode-layer)
+- [Live devices](#live-devices)
 - [Build](#build)
 - [Getting started](#getting-started)
 - [Mental model](#mental-model)
@@ -89,35 +89,67 @@ The sensors fall into a few firmware philosophies:
   SH-2 stack. This SDK ports the SHTP framing/reassembly, the SH-2 control
   encoders and the input-report decoders (`ai.depz.sensor.sensors.bno086`).
 
-## Scope: a decode layer
+## Live devices
 
-This SDK is **decode-layer only** — pure codecs covered by golden vectors. It
-does **not** open serial ports, run reader threads or drive live hardware; that
-live layer (register-bridge bring-up, ULD firmware download, the 1D family's
-ST drivers, the BNO055 session logic) lives in the Python and TypeScript SDKs.
-The live drivers are intentionally left as documented **extension points**:
+On top of the codecs sits the **device layer** (contract 07,
+`ai.depz.sensor.devices`): a connection with its reader thread, requests and
+replies, streams, events, time sync, `.depzrec` record / replay and port
+discovery. Serial ports go through [jSerialComm](https://fazecast.github.io/jSerialComm/)
+(Windows, macOS, Linux) — the one dependency, pulled in by Maven / Gradle, or
+fetched and checksum-checked by `./build.sh`. The sensor classes are ported one
+class per sensor family — the **SR04**, the **VL53L4CD**, the **VL53L8 / L5 / L7**
+boards, the **VL53L 1D family**, the **TMF8829**, the **BNO055** and the
+**BNO085 / BNO086**; a board this SDK has no class for opens as a plain
+`DepzDevice` (the common commands).
 
-- **Live ULD init / register-bridge driver** — `Vl53l4Uld.liveDriverStubbed()`
-  (VL53L4CD), `Vl53l7Uld.liveDriverStubbed()` (VL53L5CX / L7CX / L7CH),
-  `Vl53l8Uld.liveDriverStubbed()` (VL53L8CX / CH).
-- **The 1D family's drivers and the BNO055 session logic** — the codecs, the
-  product table and the block / register-window decode are here; initialising
-  and streaming those boards is done with the Python or TypeScript SDK.
+```java
+import ai.depz.sensor.devices.*;
+import java.time.Duration;
 
-Everything else — CRCs, framing, the incremental parser, USB ids, identity,
-common/SR04 codecs, the register-bridge codecs of the 1D family, VL53L4CD,
-L5/L7, TMF8829 and BNO055, the shared VL53L8 frame decode, the CNH histogram decode
-(`Vl53l8Uld.decodeCnh`) and advanced-DCI codecs, and the full BNO086 SHTP/SH-2
-layer — is complete and vector-tested.
+try (Sr04Device dev = DepzDevices.openSr04()) {           // smallest USB serial; or openSr04("SN…", null)
+    System.out.println(dev.getSoftwareName());             // APP_usonic_SR04_v0.97
+    Sr04Measurement once = dev.measureOnce();
+
+    try (Subscription<Sr04Measurement> loop = dev.measurements()) {   // subscribe before start(): nothing is missed
+        dev.start();
+        for (int i = 0; i < 20; i++) {
+            System.out.println(loop.take(Duration.ofSeconds(1)).distanceMm());
+        }
+        dev.stop();
+    }
+}
+```
+
+- **Requests** block the calling thread until the reply, at most
+  `dev.timeout()` (200 ms by default). A board error throws `StatusException`
+  (`BusyException` for ERR_BUSY), no reply `DepzTimeoutException`, a lost
+  connection `DeviceLostException` — all unchecked, all `DepzException`; an
+  argument outside its wire field throws `IllegalArgumentException` before
+  anything is sent.
+- **Streams** come two ways: `on…(callback)` runs on the reader thread (keep it
+  short, never block; close the returned handle to stop), and `measurements()`
+  (`events()`, …) returns a `Subscription<T>` — a bounded queue that drops the
+  oldest item when full and counts it in `droppedCount()`. `take(timeout)`
+  waits, `tryTake()` and `drain()` never block.
+- **Events** (`onEvent`, `events()`): unsolicited status (hardware fault),
+  sequence gaps, CRC errors, text, temperature, disconnect — the nested records
+  of `DeviceEvent`.
+- **Time**: `syncTime()` measures device clock − host clock;
+  `toHostTimeUs(deviceUs)` then puts device timestamps on the host clock
+  (`DepzDevice.hostNowUs()`).
+- **Record / replay**: wrap any link in `RecordingLink` to write a `.depzrec`
+  capture (contract 08); `ReplayLink` plays one back, and
+  `DepzDevices.openOnLink(link)` opens whatever the capture holds. The SDK's
+  tests run the shared device scenarios (contract 15) this way.
 
 ## Build
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.6.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.7.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.6.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.7.0")
 ```
 
 Maven:
@@ -126,7 +158,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
 </dependency>
 ```
 
@@ -137,12 +169,12 @@ To build from source instead, the repo uses no build system — plain `javac`
 (Java 17+; verified on JDK 21):
 
 ```sh
-./build.sh          # compile main + test harness into ./out
-./test.sh           # build, then run every golden vector
+./build.sh          # fetch jSerialComm into ./lib (once), compile main + test harness into ./out
+./test.sh           # build, then run every golden vector and the device tests
 ```
 
 The package is a flat source tree under `src/main/java/ai/depz/sensor/`; add
-`out/` (or the sources) to your classpath and import `ai.depz.sensor.*`.
+`out/` and `lib/jSerialComm-*.jar` to your classpath and import `ai.depz.sensor.*`.
 
 ## Getting started
 
@@ -293,33 +325,94 @@ boolean ok = img.payloadCrcOk();                            // crc32IsoHdlc(payl
 
 ## Datasets
 
-`Dataset.parse` reads a `.depzdata` JSONL recording (contract 09) — a header
-line plus record lines — and stably merges the records onto one host timeline by
-`t` (µs). JSON parsing is delegated to a caller-supplied line parser so the
-module has no dependency on any JSON library:
+A `.depzdata` file (contract 09) holds **decoded** results of one or more
+devices on one host timeline: JSON Lines, plain or gzip (`.depzdata.gz`).
+
+**Record.** `SessionRecorder` hooks the result stream of every device class and
+writes one record per measurement, frame or report, stamped with the device
+time mapped onto the host clock (`t = device µs − offset`; `add` runs
+`syncTime` for that offset). It never configures a device — start and stop
+streaming yourself:
 
 ```java
-Dataset ds = Dataset.parse(content, line -> myJson.parse(line));
-for (Dataset.Record rec : ds.records()) {
-    System.out.println(rec.deviceId() + " " + rec.kind() + " @ " + rec.tHostUs());
+import ai.depz.sensor.dataset.*;
+import ai.depz.sensor.devices.*;
+import java.nio.file.Path;
+
+try (Sr04Device sr04 = DepzDevices.openSr04(); Vl53l8cxDevice tof = DepzDevices.openVl53l8()) {
+    tof.init();
+    try (SessionRecorder rec = new SessionRecorder(Path.of("run.depzdata"), "desk test", false, 1.0)) {
+        rec.add(sr04);                  // d0
+        rec.add(tof);                   // d1
+        rec.start();
+        sr04.start();
+        tof.startRanging();
+        Thread.sleep(10_000);
+        sr04.stop();
+        tof.stopRanging();
+    }                                   // close: unhook, close the file
 }
 ```
 
-Records from every device — including two of the same model — land on one
-timeline, merged strictly by host time.
+Every class has its kind — `sr04`, `vl53l4`, `vl53l8` (+ `vl53l8_cnh` for an
+armed CH), `vl53lx`, `bno055`, `bno086`, `tmf8829` — plus about one
+`temperature` record per second and device (`temperatureHz`; the MCU, and the
+VL53L8 die). `DatasetRecords` builds each record value (BNO086 values scaled
+with the Q points of `Reports.Q_POINTS`), for a writer of your own over
+`DatasetWriter`.
+
+**Read.** `Dataset.read(path)` (plain or gzip) — or `Dataset.parse(content,
+jsonLine)` with a line parser of your own — merges the records of every
+device, two of the same model included, stably by host time:
+
+```java
+Dataset ds = Dataset.read(Path.of("run.depzdata"));
+for (Dataset.Record rec : ds.records()) {   // merged by ascending host time
+    System.out.println(rec.deviceId() + " " + rec.kind() + " @ " + rec.tHostUs());
+}
+System.out.println(ds.devices());           // per-device header metadata
+System.out.println(ds.durationUs() / 1e6 + " s");
+long echoUs = (Long) ds.records().get(0).value().get("echo_us");   // an "sr04" record
+```
+
+Values are plain objects — `Long`, `Double`, `String`, `Boolean`, `null`,
+lists and nested maps — as `ai.depz.sensor.json.JsonText.parse` returns them.
+
+**Replay.** `ds.play(callback, speed)` delivers the records paced by their
+timestamps (2 = twice as fast, 0 = at once) and blocks. For a viewer timeline,
+`DatasetPlayer` adds play / pause / seek / speed (contract 09 §Player):
+
+```java
+try (DatasetPlayer player = new DatasetPlayer(ds, 2.0)) {
+    player.onRecord(r -> System.out.println(r.kind() + " " + r.tHostUs()));   // player thread; don't block
+    player.onState(st -> System.out.println(st));
+    player.play();
+    player.seekUs(5_000_000);   // the next record is the first at >= 5 s from the start
+    player.await();             // until done (or paused)
+}
+```
+
+With `threaded` false (`new DatasetPlayer(ds, speed, null, false)`) no thread
+starts: call `tick()` from your own loop; it returns the seconds until the next
+record is due.
+
+The raw-byte capture layer (`.depzrec`, contract 08) is a different thing: one
+device's link, byte for byte, which `ReplayLink` plays back through the full
+device stack.
 
 ## Testing with golden vectors
 
 The `RunVectors` harness (no JUnit) replays every case in `contracts/vectors/`
-through these codecs and prints `TOTAL: N/N vector cases passed`. That is how
-the whole SDK is verified without hardware — every codec here is pinned to the
-same vectors as the Python and TypeScript ports.
+through these codecs and prints `TOTAL: N/N vector cases passed`; `RunDeviceTests`
+then runs the device layer over a fake board and every contract 15 scenario of
+a ported class against its real-hardware capture (replayed strict: each byte
+the SDK writes must equal the recorded one). That is how the whole SDK is
+verified without hardware — every codec here is pinned to the same vectors as
+the Python and TypeScript ports.
 
 ## Extension points
 
-The live drivers are out of the decode scope and stubbed truthfully (see
-[Scope](#scope-a-decode-layer)): the **live ULD init / register-bridge driver**
-of the ToF boards (single, documented `liveDriverStubbed()` methods that
-return `true` today), the 1D family's ST drivers and the BNO055 session logic.
-The surrounding decode surface they would plug into is already complete and
-vector-tested.
+Every sensor of the line has its live class. A board whose sensor class this
+SDK does not know (a newer firmware) opens as a plain `DepzDevice`: the common
+commands work, and the decode surface — complete and vector-tested — is there
+to build a driver on, the way the classes here are built.

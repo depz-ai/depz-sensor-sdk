@@ -30,9 +30,9 @@ returns `Model.VL53L5CX` for this board) and frame decode through
 `Vl53l7Uld.parseFrame`. Nothing in the decode is specific to the L5:
 its frames have the L7 layout.
 
-Initialising the sensor (firmware download, configuration) and running a
-ranging session is done today with the Python or TypeScript SDK; this SDK
-decodes the frames and builds the command payloads.
+The live device is `ai.depz.sensor.devices.Vl53l5cxDevice`: the
+[VL53L7CX device](../vl53l7cx/introduction.md) (the same L5/L7 firmware, ULD
+2.0.1, downloaded over I2C at `init()`), expecting module type MZ (0).
 
 ## See also
 

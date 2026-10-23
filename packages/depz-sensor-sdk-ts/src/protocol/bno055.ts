@@ -3,6 +3,8 @@
  * Mirrors the Python reference `depz_sensor_sdk.protocol.bno055`.
  */
 
+import { checkUint, needBytes } from "./wire.js";
+
 export enum Bno055Cmd {
   ReadReg = 0x32,
   WriteReg = 0x33,
@@ -30,12 +32,19 @@ export const BNO055_TRIGGER_INT = 1;
 export const BNO055_RESET_TIMEOUT_MS = 3000;
 
 export function packBno055ReadReg(addr: number, length: number): Uint8Array {
-  return Uint8Array.of(addr & 0xff, length & 0xff);
+  return Uint8Array.of(checkUint("addr", addr, 8), checkUint("length", length, 8));
 }
 
+/** BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes). */
+export const BNO055_WRITE_MAX = 128;
+
 export function packBno055WriteReg(addr: number, data: Uint8Array): Uint8Array {
+  checkUint("addr", addr, 8);
+  if (data.length < 1 || data.length > BNO055_WRITE_MAX) {
+    throw new RangeError(`WRITE_REG data must be 1..${BNO055_WRITE_MAX} bytes`);
+  }
   const out = new Uint8Array(1 + data.length);
-  out[0] = addr & 0xff;
+  out[0] = addr;
   out.set(data, 1);
   return out;
 }
@@ -48,10 +57,10 @@ export function packBno055StartStream(
 ): Uint8Array {
   const out = new Uint8Array(5);
   const dv = new DataView(out.buffer);
-  dv.setUint8(0, trigger);
-  dv.setUint8(1, addr);
-  dv.setUint8(2, length);
-  dv.setUint16(3, periodMs, true);
+  dv.setUint8(0, checkUint("trigger", trigger, 8));
+  dv.setUint8(1, checkUint("addr", addr, 8));
+  dv.setUint8(2, checkUint("length", length, 8));
+  dv.setUint16(3, checkUint("periodMs", periodMs, 16), true);
   return out;
 }
 
@@ -172,8 +181,11 @@ export interface Bno055StreamData {
 }
 
 export function unpackBno055Stream(payload: Uint8Array): Bno055StreamData {
+  needBytes("RPT_BNO_REG_STREAM", payload, 10);
   const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   const length = dv.getUint8(9);
+  // contract 07 §3: checked against its own length field; trailing bytes ignored
+  needBytes("RPT_BNO_REG_STREAM data", payload, 10 + length);
   return {
     timestampUs: dv.getBigUint64(0, true),
     addr: dv.getUint8(8),

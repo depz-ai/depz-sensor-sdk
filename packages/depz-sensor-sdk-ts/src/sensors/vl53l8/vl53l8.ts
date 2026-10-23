@@ -28,11 +28,13 @@ import type { SerialTransport } from "../../transport/types.js";
 import { loadAssets, type Vl53l8Variant } from "./assets/index.js";
 import { MI_CFG_DEV_IDX, type CnhConfig } from "./cnh.js";
 import {
+  I2C_VARIANTS,
   RESOLUTION_4X4,
   RESOLUTION_8X8,
   VL53L8CX,
   Vl53l8cxError,
   readDeviceRevisionId,
+  siliconIdMatches,
   type DetectionThreshold,
   type MotionConfig,
   type MotionResult,
@@ -51,18 +53,20 @@ export interface Vl53l8Frame {
   timestampUs: bigint;
   /** 16 | 64 */
   resolution: number;
+  /** Integer mm, as ST: a negative distance is clamped to 0. */
   distanceMm: Int32Array;
   /** 5/9 = valid, 255 = no target. */
   targetStatus: Uint8Array;
   nbTargetDetected: Uint8Array;
-  /** kcps/SPAD. */
+  /** kcps/SPAD (raw / 2048, fraction kept). */
   signalPerSpad: Float64Array;
-  /** kcps/SPAD. */
+  /** kcps/SPAD (raw / 2048, fraction kept). */
   ambientPerSpad: Float64Array;
   nbSpadsEnabled: Int32Array;
+  /** Measurement noise, mm (raw / 128). */
   rangeSigmaMm: Float64Array;
-  /** %. */
-  reflectance: Uint8Array;
+  /** Estimated target reflectance, % (raw / 2, fraction kept). */
+  reflectance: Float64Array;
   siliconTempDegc: number;
   /** CH variant: raw CNH block (decode via cnh). */
   cnhRaw: Uint8Array | null;
@@ -119,6 +123,7 @@ export class Vl53l8cx extends DepzDevice {
   private frameQueues: StreamQueue<Vl53l8Frame>[] = [];
   protected rangingFlag = false;
   protected cnhConfig: CnhConfig | null = null;
+  private frameParseErrorCount = 0;
 
   /** The CNH config armed by `configureCnh()` (CH), or null. Recorders read
    *  this to persist the decode parameters next to raw CNH blocks. */
@@ -138,7 +143,7 @@ export class Vl53l8cx extends DepzDevice {
 
   /** ULD `platform` object mapped onto the firmware register bridge. */
   private readonly platform: Vl53l8Platform = {
-    rdMulti: (addr: number, size: number): Promise<Uint8Array> =>
+    rdMulti: async (addr: number, size: number): Promise<Uint8Array> =>
       chunkedRead(addr, size, {
         chunkSize: this.readChunk,
         readChunk: async (a, n) => {
@@ -152,7 +157,7 @@ export class Vl53l8cx extends DepzDevice {
     wrMulti: async (addr: number, data: Uint8Array): Promise<void> => {
       await chunkedWrite(addr, data, {
         chunkSize: this.writeChunk,
-        writeChunk: (a, chunk) =>
+        writeChunk: async (a, chunk) =>
           this.request(Vl53l8Cmd.WriteReg, packWriteReg(a, chunk), {
             okCompletes: true,
             timeoutMs: 2000,
@@ -171,12 +176,12 @@ export class Vl53l8cx extends DepzDevice {
         this.fwWriteBase += data.length;
       }
     },
-    sleepMs: (ms: number): Promise<void> => this.sleepImpl(ms),
+    sleepMs: async (ms: number): Promise<void> => this.sleepImpl(ms),
   };
 
   constructor(transport: SerialTransport, opts?: Vl53l8Options) {
     super(transport, opts);
-    this.sleepImpl = opts?.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
@@ -192,10 +197,11 @@ export class Vl53l8cx extends DepzDevice {
     return this.uld.variant;
   }
 
+  /** True when the sensor answers with its own silicon ids (a bus error or a foreign id: false). */
   async isAlive(): Promise<boolean> {
     try {
-      await readDeviceRevisionId(this.platform);
-      return true;
+      const [deviceId, revisionId] = await readDeviceRevisionId(this.platform);
+      return siliconIdMatches(deviceId, revisionId, I2C_VARIANTS.includes(this.variantId));
     } catch (err) {
       if (err instanceof Vl53l8cxError || err instanceof DepzError) return false;
       throw err;
@@ -249,7 +255,7 @@ export class Vl53l8cx extends DepzDevice {
     this.resolution = zones;
   }
 
-  getRangingFrequencyHz(): Promise<number> {
+  async getRangingFrequencyHz(): Promise<number> {
     return this.uld.getRangingFrequencyHz();
   }
 
@@ -264,7 +270,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setRangingFrequencyHz(hz);
   }
 
-  getRangingMode(): Promise<number> {
+  async getRangingMode(): Promise<number> {
     return this.uld.getRangingMode();
   }
 
@@ -273,7 +279,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setRangingMode(mode);
   }
 
-  getIntegrationTimeMs(): Promise<number> {
+  async getIntegrationTimeMs(): Promise<number> {
     return this.uld.getIntegrationTimeMs();
   }
 
@@ -282,7 +288,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setIntegrationTimeMs(ms);
   }
 
-  getSharpenerPercent(): Promise<number> {
+  async getSharpenerPercent(): Promise<number> {
     return this.uld.getSharpenerPercent();
   }
 
@@ -291,7 +297,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setSharpenerPercent(pct);
   }
 
-  getTargetOrder(): Promise<number> {
+  async getTargetOrder(): Promise<number> {
     return this.uld.getTargetOrder();
   }
 
@@ -303,7 +309,7 @@ export class Vl53l8cx extends DepzDevice {
   // ── advanced features (UM3109; init() first, not while ranging) ─────────────
 
   /** POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants). */
-  getPowerMode(): Promise<number> {
+  async getPowerMode(): Promise<number> {
     return this.uld.getPowerMode();
   }
 
@@ -316,7 +322,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setPowerMode(mode);
   }
 
-  getXtalkMargin(): Promise<number> {
+  async getXtalkMargin(): Promise<number> {
     return this.uld.getXtalkMargin();
   }
 
@@ -352,7 +358,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setCaldataXtalk(blob);
   }
 
-  getDetectionThresholdsEnable(): Promise<number> {
+  async getDetectionThresholdsEnable(): Promise<number> {
     return this.uld.getDetectionThresholdsEnable();
   }
 
@@ -361,7 +367,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setDetectionThresholdsEnable(enabled);
   }
 
-  getDetectionThresholds(): Promise<DetectionThreshold[]> {
+  async getDetectionThresholds(): Promise<DetectionThreshold[]> {
     return this.uld.getDetectionThresholds();
   }
 
@@ -424,6 +430,14 @@ export class Vl53l8cx extends DepzDevice {
 
   get ranging(): boolean {
     return this.rangingFlag;
+  }
+
+  /**
+   * Frames dropped because the ULD could not parse them (corrupt frame, bad
+   * size). Distinct from reassembly gaps. Mirrors Python `frame_parse_errors`.
+   */
+  get frameParseErrors(): number {
+    return this.frameParseErrorCount;
   }
 
   /** Subscribe to parsed frames (read-pump context; don't block). */
@@ -496,7 +510,7 @@ export class Vl53l8cx extends DepzDevice {
     try {
       parsed = this.uldDriver.parseFrame(done.frame);
     } catch {
-      this.reassembler.discarded += 1;
+      this.frameParseErrorCount += 1;
       return true;
     }
     const frame = this.toFrame(done.timestampUs, parsed);
@@ -516,7 +530,7 @@ export class Vl53l8cx extends DepzDevice {
       ambientPerSpad: Float64Array.from(parsed.ambientPerSpad),
       nbSpadsEnabled: Int32Array.from(parsed.nbSpadsEnabled),
       rangeSigmaMm: Float64Array.from(parsed.rangeSigmaMm),
-      reflectance: Uint8Array.from(parsed.reflectance),
+      reflectance: Float64Array.from(parsed.reflectance),
       siliconTempDegc: parsed.siliconTempDegc,
       cnhRaw: parsed.cnhRaw,
       motion: parsed.motion,

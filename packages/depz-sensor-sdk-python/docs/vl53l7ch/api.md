@@ -110,6 +110,9 @@ The underlying ULD driver (escape hatch for advanced DCI access).
 is_alive(self) -> bool
 ```
 
+True when the sensor answers with its own silicon ids (a bus
+error or a foreign id: False).
+
 #### Vl53l7ch.get_resolution
 
 ```python
@@ -452,6 +455,15 @@ get_software_name(self) -> str
 ```python
 get_serial_number(self) -> str
 ```
+
+#### Vl53l7ch.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
 
 #### Vl53l7ch.read_mcu_temperature
 

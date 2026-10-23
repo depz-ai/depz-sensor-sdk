@@ -164,7 +164,9 @@ filled by the plugin helpers.
 void init_config(int start_bin, int num_bins, int sub_sample);
 ```
 
-vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. ArgumentError when num_bins or sub_sample is outside 0..255 (u8
+fields, never masked — contract 07 §3).
 
 #### CnhSetup.create_agg_map
 
@@ -173,6 +175,8 @@ void create_agg_map(int resolution, int start_x, int start_y, int merge_x, int m
 ```
 
 vl53lmz_cnh_create_agg_map: zones (resolution 16 | 64) -> aggregates.
+ArgumentError for another resolution, a negative start, merge / cols /
+rows < 1, or a map past the zone grid.
 
 #### CnhSetup.required_memory
 

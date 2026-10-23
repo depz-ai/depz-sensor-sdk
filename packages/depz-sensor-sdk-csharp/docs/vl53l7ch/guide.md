@@ -5,9 +5,11 @@ class resolution, board commands, the 1536-byte ceilings and the frame decode
 with `Vl53l7Frames.CreateDecoder()` all apply unchanged. This page covers the
 CNH block. For signatures see the [API reference](api.md).
 
-This SDK does not drive the board: arming a CNH configuration and starting
-the stream is done with the Python or TypeScript SDK. Keep the configuration's
-aggregate count and bins per aggregate — the decode needs them.
+The live device is `Vl53l7chDevice`: the [VL53L7CX device](../vl53l7cx/guide.md#live-device)
+plus `ConfigureCnh(Vl53l8CnhSetup)`, exactly as on the
+[VL53L8CH](../vl53l8ch/guide.md#arm-cnh-on-the-live-device); every frame then
+carries `CnhRaw`. Decoding a block needs the setup's aggregate count and bins
+per aggregate (`setup.ToDecodeConfig()`).
 
 ## Contents
 

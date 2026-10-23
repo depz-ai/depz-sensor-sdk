@@ -29,9 +29,9 @@ the board's wire codecs and transfer ceilings, class resolution
 and frame decode through [`Vl53l7Frames.CreateDecoder`](api.md#vl53l7frames). Nothing in the decode is specific to the L5:
 its frames have the L7 layout.
 
-Initialising the sensor (firmware download, configuration) and running a
-ranging session is done today with the Python or TypeScript SDK; this SDK
-decodes the frames and builds the command payloads.
+The live device, `Vl53l5cxDevice`, downloads the L5/L7 sensor firmware,
+configures the sensor and streams frames: see the
+[VL53L7CX guide](../vl53l7cx/guide.md#live-device).
 
 ## See also
 

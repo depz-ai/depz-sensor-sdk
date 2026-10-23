@@ -47,6 +47,8 @@ class FakeBno086:
         self.features: dict[int, int] = {}  # sensor -> granted interval_us
         self.last_set_feature: bytes | None = None
         self.tare_requests: list[bytes] = []
+        self.motion_intents: list[int] = []  # Interactive Calibration P0
+        self.flush_requests: list[int] = []  # Force Sensor Flush sensor IDs
         self.executable_frames: list[bytes] = []  # host SHTP frames on channel 1
         self.frs_writes: dict[int, list[int]] = {}
         self._frs_wr_type: int | None = None
@@ -183,6 +185,10 @@ class FakeBno086:
             self._send_feature_response(payload[1])
         elif rid == 0xF2:  # command request
             self._on_command(payload)
+        elif rid == 0xF0:  # force sensor flush — like the lab BNO086, the
+            # Flush Completed comes back on the input channel, header-less
+            self.flush_requests.append(payload[1])
+            self.push_input_cargo(bytes((0xEF, payload[1])))
         elif rid == 0xF4:  # FRS read request
             _, _, offset, ftype, block = struct.unpack_from("<BBHHH", payload)
             self._frs_read(ftype)
@@ -220,6 +226,9 @@ class FakeBno086:
             self.tare_requests.append(bytes(payload))
             return
         if command == 0x09:  # periodic DCD config — no response
+            return
+        if command == 0x0E:  # interactive calibration — no response
+            self.motion_intents.append(params[0])
             return
         if command == 0x06:  # DCD save
             self._command_response(seq, command, [0])

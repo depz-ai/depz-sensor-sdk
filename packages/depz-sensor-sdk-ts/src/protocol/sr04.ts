@@ -1,5 +1,7 @@
 /** SR04 wire codecs (contracts/03_SENSOR_SR04.md). */
 
+import { checkUint, needBytes } from "./wire.js";
+
 export enum Sr04Cmd {
   GetSamplePeriod = 0x32,
   SetSamplePeriod = 0x33,
@@ -32,6 +34,7 @@ export interface Sr04Data {
 }
 
 export function unpackSr04Data(p: Uint8Array): Sr04Data {
+  needBytes("RPT_SR04_DATA", p, 11);
   const v = new DataView(p.buffer, p.byteOffset, p.byteLength);
   return {
     sourceCmd: v.getUint8(0),
@@ -42,21 +45,23 @@ export function unpackSr04Data(p: Uint8Array): Sr04Data {
 
 export function packSamplePeriod(periodUs: number): Uint8Array {
   const out = new Uint8Array(4);
-  new DataView(out.buffer).setUint32(0, periodUs, true);
+  new DataView(out.buffer).setUint32(0, checkUint("periodUs", periodUs, 32), true);
   return out;
 }
 
 export function unpackSamplePeriod(p: Uint8Array): number {
+  needBytes("RPT_SAMPLE_PERIOD", p, 4);
   return new DataView(p.buffer, p.byteOffset, p.byteLength).getUint32(0, true);
 }
 
 export function packEchoDecay(decayUs: number): Uint8Array {
   const out = new Uint8Array(2);
-  new DataView(out.buffer).setUint16(0, decayUs, true);
+  new DataView(out.buffer).setUint16(0, checkUint("decayUs", decayUs, 16), true);
   return out;
 }
 
 export function unpackEchoDecay(p: Uint8Array): number {
+  needBytes("RPT_ECHO_DECAY", p, 2);
   return new DataView(p.buffer, p.byteOffset, p.byteLength).getUint16(0, true);
 }
 

@@ -39,10 +39,14 @@ bytes payload_crc_bytes(CrcType crc_type, byte_span payload) {
     return out;
 }
 
-bytes build_packet(std::uint8_t cmd, byte_span payload, std::uint8_t seq, CrcType crc_type) {
+bytes build_packet(std::uint8_t cmd, byte_span payload, std::uint32_t seq32, CrcType crc_type) {
     if (payload.size() > MAX_PAYLOAD) {
         throw std::length_error("payload too long");
     }
+    if (crc_type != CrcType::None && crc_type != CrcType::Crc8 && crc_type != CrcType::Crc16 &&
+        crc_type != CrcType::Crc32)
+        throw std::invalid_argument("crc_type is not a listed CrcType");
+    const auto seq = static_cast<std::uint8_t>(seq32 & 0xFF);
     const std::uint16_t data_size = static_cast<std::uint16_t>(
         payload.size() | (static_cast<std::uint16_t>(crc_type) << 14));
     const std::byte ds0 = b(static_cast<std::uint8_t>(data_size & 0xFF));

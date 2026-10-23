@@ -151,6 +151,16 @@ pub enum Vl53l4Error {
     InterMeasurementInvalid,
     /// `sigma_mm` exceeds the 16383 mm register ceiling.
     SigmaTooLarge,
+    /// Autonomous mode: `1.055 × inter_measurement_ms × clock_pll` does not
+    /// fit the u32 `INTERMEASUREMENT_MS` register.
+    InterMeasurementOverflow,
+    /// `osc_frequency` so small that the macro period truncates to 0 (the
+    /// ULD would divide by it).
+    MacroPeriodZero,
+    /// `offset_mm` outside the register's 11-bit signed range -1024..=1023.
+    OffsetOutOfRange,
+    /// `xtalk_kcps` outside the register's 7-bit range 0..=127.
+    XtalkOutOfRange,
 }
 
 impl std::fmt::Display for Vl53l4Error {
@@ -165,6 +175,14 @@ impl std::fmt::Display for Vl53l4Error {
                 write!(f, "VL53L4 inter_measurement_ms must be 0 or > timing_budget_ms")
             }
             Vl53l4Error::SigmaTooLarge => write!(f, "VL53L4 sigma_mm must be <= 16383"),
+            Vl53l4Error::InterMeasurementOverflow => {
+                write!(f, "VL53L4 inter_measurement_ms: INTERMEASUREMENT_MS overflows u32")
+            }
+            Vl53l4Error::MacroPeriodZero => {
+                write!(f, "VL53L4 osc_frequency: macro period truncates to 0")
+            }
+            Vl53l4Error::OffsetOutOfRange => write!(f, "VL53L4 offset_mm out of range -1024..1023"),
+            Vl53l4Error::XtalkOutOfRange => write!(f, "VL53L4 xtalk_kcps out of range 0..127"),
         }
     }
 }
@@ -235,6 +253,11 @@ pub fn parse_result_block(raw: &[u8]) -> Result<Vl53l4Results, Vl53l4Error> {
 /// from `RESULT__OSC_CALIBRATE_VAL` (used only in autonomous mode, i.e. when
 /// `inter_measurement_ms > 0`). `inter_measurement_ms == 0` selects continuous
 /// mode; a value greater than the budget selects autonomous low power.
+///
+/// Rejected (contract 07 §3, never wrapped): an `osc_frequency` of 0 or so
+/// small that the macro period truncates to 0
+/// ([`Vl53l4Error::MacroPeriodZero`]), and an autonomous period whose
+/// register value overflows u32 ([`Vl53l4Error::InterMeasurementOverflow`]).
 pub fn range_timing_registers(
     timing_budget_ms: u32,
     inter_measurement_ms: u32,
@@ -258,7 +281,10 @@ pub fn range_timing_registers(
         timing_budget_us -= 2500;
     } else if inter_measurement_ms > timing_budget_ms {
         // Autonomous low-power mode (f64 product truncated toward zero).
-        let factor = 1.055 * inter_measurement_ms as f64 * (clock_pll & 0x3FF) as f64;
+        let factor = (1.055 * inter_measurement_ms as f64 * (clock_pll & 0x3FF) as f64).floor();
+        if factor > u32::MAX as f64 {
+            return Err(Vl53l4Error::InterMeasurementOverflow);
+        }
         intermeasurement_raw = factor as u32;
         timing_budget_us = (timing_budget_us - 4300) / 2;
     } else {
@@ -270,6 +296,9 @@ pub fn range_timing_registers(
     for (word, mult) in words.iter_mut().zip([16u32, 12]) {
         // RANGE_CONFIG_A (x16), RANGE_CONFIG_B (x12).
         let tmp = macro_period_us.wrapping_mul(mult) >> 6;
+        if tmp == 0 {
+            return Err(Vl53l4Error::MacroPeriodZero);
+        }
         let mut ls_byte = (timing_budget_us as u64 + (tmp as u64 >> 1)) / tmp as u64 - 1;
         let mut ms_byte = 0u64;
         while ls_byte & 0xFFFF_FF00 != 0 {
@@ -323,9 +352,13 @@ pub fn decode_range_timing(
 // ── Threshold / offset / xtalk raw codecs (register word ↔ user units) ───────
 
 /// `RANGE_OFFSET_MM` word for `SetOffset` (`INNER`/`OUTER` are zeroed
-/// alongside).
-pub fn offset_raw(offset_mm: i32) -> u16 {
-    (offset_mm.wrapping_mul(4) & 0xFFFF) as u16
+/// alongside); `offset_mm` must fit the register's 11-bit signed range
+/// -1024..=1023 ([`Vl53l4Error::OffsetOutOfRange`] otherwise).
+pub fn try_offset_raw(offset_mm: i32) -> Result<u16, Vl53l4Error> {
+    if !(-1024..=1023).contains(&offset_mm) {
+        return Err(Vl53l4Error::OffsetOutOfRange);
+    }
+    Ok((offset_mm * 4) as u16)
 }
 
 /// `GetOffset`: `RANGE_OFFSET_MM` word → signed millimetres.
@@ -338,9 +371,14 @@ pub fn decode_offset(raw_word: u16) -> i32 {
     }
 }
 
-/// `XTALK_PLANE_OFFSET_KCPS` word for `SetXtalk`.
-pub fn xtalk_raw(xtalk_kcps: u16) -> u16 {
-    (((xtalk_kcps as u32) << 9) & 0xFFFF) as u16
+/// `XTALK_PLANE_OFFSET_KCPS` word for `SetXtalk`; `xtalk_kcps` must be
+/// 0..=127 — the value the 16-bit word holds at 9 fractional bits
+/// ([`Vl53l4Error::XtalkOutOfRange`] otherwise).
+pub fn try_xtalk_raw(xtalk_kcps: u16) -> Result<u16, Vl53l4Error> {
+    if xtalk_kcps > 0xFFFF >> 9 {
+        return Err(Vl53l4Error::XtalkOutOfRange);
+    }
+    Ok(xtalk_kcps << 9)
 }
 
 /// `GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (an exact .5 goes away

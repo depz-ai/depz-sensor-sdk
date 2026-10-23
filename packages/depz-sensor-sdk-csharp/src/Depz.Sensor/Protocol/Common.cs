@@ -75,23 +75,34 @@ public static class Reports
 /// <summary>Status report: echoed request opcode (0x00 = unsolicited) + status code.</summary>
 public sealed record StatusReport(int Cmd, int Status)
 {
-    public static StatusReport Unpack(ReadOnlySpan<byte> payload) => new(payload[0], payload[1]);
+    public static StatusReport Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_STATUS", payload, 2);
+        return new(payload[0], payload[1]);
+    }
 }
 
 /// <summary>Text report: echoed opcode + ASCII string (trailing 0x00/0xFF stripped).</summary>
 public sealed record TextReport(int Cmd, string Text)
 {
-    public static TextReport Unpack(ReadOnlySpan<byte> payload) =>
-        new(payload[0], Common.StripDeviceString(payload[1..]));
+    public static TextReport Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_TEXT", payload, 1);
+        return new(payload[0], Common.StripDeviceString(payload[1..]));
+    }
 }
 
 /// <summary>Sync-time report: T1 (echoed), T2 (mcu rx), T3 (mcu tx), all µs.</summary>
 public sealed record SyncTimeReport(ulong PcTimestampUs, ulong McuRxUs, ulong McuTxUs)
 {
-    public static SyncTimeReport Unpack(ReadOnlySpan<byte> payload) => new(
-        BinaryPrimitives.ReadUInt64LittleEndian(payload),
-        BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]),
-        BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]));
+    public static SyncTimeReport Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_SYNC_TIME", payload, 24);
+        return new(
+            BinaryPrimitives.ReadUInt64LittleEndian(payload),
+            BinaryPrimitives.ReadUInt64LittleEndian(payload[8..]),
+            BinaryPrimitives.ReadUInt64LittleEndian(payload[16..]));
+    }
 }
 
 /// <summary>Temperature report: timestamp µs + raw int16 in units of 0.1 °C.</summary>
@@ -99,24 +110,52 @@ public sealed record TemperatureReport(ulong TimestampUs, short RawDecidegrees)
 {
     public double Celsius => RawDecidegrees / 10.0;
 
-    public static TemperatureReport Unpack(ReadOnlySpan<byte> payload) => new(
-        BinaryPrimitives.ReadUInt64LittleEndian(payload),
-        BinaryPrimitives.ReadInt16LittleEndian(payload[8..]));
+    public static TemperatureReport Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_TEMPERATURE", payload, 10);
+        return new(
+            BinaryPrimitives.ReadUInt64LittleEndian(payload),
+            BinaryPrimitives.ReadInt16LittleEndian(payload[8..]));
+    }
 }
 
 /// <summary>Sequence-error report: expected vs received seq bytes.</summary>
 public sealed record SequenceErrorReport(int ExpectedSeq, int ReceivedSeq)
 {
-    public static SequenceErrorReport Unpack(ReadOnlySpan<byte> payload) => new(payload[0], payload[1]);
+    public static SequenceErrorReport Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_SEQUENCE_ERROR", payload, 2);
+        return new(payload[0], payload[1]);
+    }
 }
 
 /// <summary>Sync-pin configuration (pin 1..5, mode, polarity).</summary>
 public sealed record SyncPinConfig(int Pin, SyncPinMode Mode, SyncPinPolarity Polarity)
 {
-    public byte[] Pack() => new[] { (byte)Pin, (byte)Mode, (byte)Polarity };
+    /// <summary>First / last logical AUX sync pin (contract 02 §6).</summary>
+    public const int PinMin = 1, PinMax = 5;
 
-    public static SyncPinConfig Unpack(ReadOnlySpan<byte> payload) =>
-        new(payload[0], (SyncPinMode)payload[1], (SyncPinPolarity)payload[2]);
+    /// <summary>
+    /// SET_SYNC_PIN_CONFIG payload. Contract 02 §6: pin 1..5, mode a
+    /// <see cref="SyncPinMode"/> (0..4), polarity a <see cref="SyncPinPolarity"/> (0..1).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">a field outside those — nothing is written.</exception>
+    public byte[] Pack()
+    {
+        if (Pin < PinMin || Pin > PinMax)
+            throw new ArgumentOutOfRangeException(nameof(Pin), Pin, $"sync pin must be {PinMin}..{PinMax}");
+        if (!Enum.IsDefined(typeof(SyncPinMode), Mode))
+            throw new ArgumentOutOfRangeException(nameof(Mode), Mode, "not a SyncPinMode (0..4)");
+        if (!Enum.IsDefined(typeof(SyncPinPolarity), Polarity))
+            throw new ArgumentOutOfRangeException(nameof(Polarity), Polarity, "not a SyncPinPolarity (0..1)");
+        return new[] { (byte)Pin, (byte)Mode, (byte)Polarity };
+    }
+
+    public static SyncPinConfig Unpack(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_SYNC_PIN_CONFIG", payload, 3);
+        return new(payload[0], (SyncPinMode)payload[1], (SyncPinPolarity)payload[2]);
+    }
 }
 
 /// <summary>Common command/report payload codecs (contract 02).</summary>
@@ -143,12 +182,19 @@ public static class Common
         return (offset, rtt);
     }
 
-    /// <summary>Decode an ASCII device string, dropping trailing NUL/0xFF filler.</summary>
+    /// <summary>
+    /// Decode an ASCII device string, dropping trailing NUL/0xFF filler. Every
+    /// byte ≥ 0x80 becomes U+FFFD (contract 02 §4.1: never '?', never UTF-8 or
+    /// Latin-1); an embedded 0x00 before the filler is kept as a character.
+    /// </summary>
     public static string StripDeviceString(ReadOnlySpan<byte> raw)
     {
         int end = raw.Length;
         while (end > 0 && (raw[end - 1] == 0x00 || raw[end - 1] == 0xFF))
             end--;
-        return Encoding.ASCII.GetString(raw[..end]);
+        var sb = new StringBuilder(end);
+        foreach (byte b in raw[..end])
+            sb.Append(b < 0x80 ? (char)b : '\uFFFD');
+        return sb.ToString();
     }
 }

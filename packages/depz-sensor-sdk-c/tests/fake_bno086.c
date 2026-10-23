@@ -546,3 +546,15 @@ void fake_bno086_send_input(fake_bno086 *f, uint8_t channel, uint64_t capture_us
     shtp_out(f, channel, capture_us, cargo, len);
     depz_mutex_unlock(&f->lock);
 }
+
+void fake_bno086_send_frame(fake_bno086 *f, uint64_t capture_us, const uint8_t *frame, size_t len)
+{
+    uint8_t p[9 + 4 + 512];
+    if (len > 4 + 512) return;
+    p[0] = 0x00;
+    put_u64le(p + 1, capture_us);
+    memcpy(p + 9, frame, len);
+    depz_mutex_lock(&f->lock);
+    send_locked(f, 0x91, p, 9 + len);
+    depz_mutex_unlock(&f->lock);
+}

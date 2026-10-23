@@ -2,48 +2,18 @@
 //! `contracts/vectors/*.json` (path relative to this crate) and asserted
 //! byte-exact against the DEPZ contract.
 
-use std::path::PathBuf;
+mod common;
 
 use depz_sensor_sdk::crc::{crc16_ccitt_false, crc16_modbus, crc32_iso_hdlc, crc8_maxim};
 use depz_sensor_sdk::framing::{build_packet, CrcType, Event, PacketParser};
 use depz_sensor_sdk::fwdepz;
-use depz_sensor_sdk::protocol::{common, identity, sr04};
+use depz_sensor_sdk::protocol::{common as proto, identity, sr04};
 use depz_sensor_sdk::usb_ids::{self, PortEntry};
 use serde_json::Value;
 
+use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, seen};
+
 // ---- helpers ---------------------------------------------------------------
-
-fn vectors_dir() -> PathBuf {
-    // CARGO_MANIFEST_DIR = packages/depz-sensor-sdk-rust
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
-        .join("vectors")
-}
-
-fn load(name: &str) -> Value {
-    let p = vectors_dir().join(name);
-    let txt = std::fs::read_to_string(&p)
-        .unwrap_or_else(|e| panic!("read {}: {}", p.display(), e));
-    serde_json::from_str(&txt).unwrap_or_else(|e| panic!("parse {}: {}", p.display(), e))
-}
-
-fn hex_decode(s: &str) -> Vec<u8> {
-    assert!(s.len() % 2 == 0, "odd hex length: {:?}", s);
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("bad hex"))
-        .collect()
-}
-
-fn hex_encode(b: &[u8]) -> String {
-    let mut s = String::with_capacity(b.len() * 2);
-    for x in b {
-        s.push_str(&format!("{:02x}", x));
-    }
-    s
-}
 
 fn crc_type_from(v: u64) -> CrcType {
     CrcType::from_bits(v as u16)
@@ -81,6 +51,7 @@ fn crc_vectors() {
             "crc16_ccitt_false {}",
             c["name"]
         );
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -105,6 +76,7 @@ fn framing_encode_vectors() {
             "frame {}",
             c["name"]
         );
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -219,6 +191,7 @@ fn framing_decode_vectors_chunking_invariant() {
             let rnd = run_parser(&stream, &chunks);
             assert_eq!(rnd, expected, "{} (random seed {})", name, seed);
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -237,6 +210,9 @@ fn usb_ids_vectors() {
     let range = doc["pid_range"].as_array().unwrap();
     assert_eq!(range[0].as_u64().unwrap() as u16, usb_ids::DEPZ_PID_RANGE.0);
     assert_eq!(range[1].as_u64().unwrap() as u16, usb_ids::DEPZ_PID_RANGE.1);
+    for id in ["usb_ids/vid", "usb_ids/dev_vid", "usb_ids/dev_pid", "usb_ids/pid_range"] {
+        seen(id);
+    }
 
     let mut n = 0;
     for e in doc["identity"].as_array().unwrap() {
@@ -252,6 +228,7 @@ fn usb_ids_vectors() {
         let model = usb_ids::usb_model_hint(vid, pid);
         let want = e["model"].as_str();
         assert_eq!(model, want, "model vid={:?} pid={:?}", vid, pid);
+        seen(e);
         n += 1;
     }
 
@@ -277,6 +254,7 @@ fn usb_ids_vectors() {
             .map(|v| v.as_str().unwrap().to_string())
             .collect();
         assert_eq!(got, want, "ordering {}", c["name"]);
+        seen(c);
         m += 1;
     }
     assert!(n > 0 && m > 0);
@@ -294,13 +272,13 @@ fn common_commands_vectors() {
         let want = c["payload"].as_str().unwrap();
         let got = match c["kind"].as_str().unwrap() {
             "sync_time_request" => {
-                hex_encode(&common::pack_sync_time(c["pc_timestamp_us"].as_u64().unwrap()))
+                hex_encode(&proto::pack_sync_time(c["pc_timestamp_us"].as_u64().unwrap()))
             }
-            "set_payload_crc_type" => hex_encode(&common::pack_set_payload_crc_type(
+            "set_payload_crc_type" => hex_encode(&proto::pack_set_payload_crc_type(
                 c["crc_type"].as_u64().unwrap() as u8,
             )),
             "sync_pin_config" => {
-                let cfg = common::SyncPinConfig {
+                let cfg = proto::SyncPinConfig {
                     pin: c["pin"].as_u64().unwrap() as u8,
                     mode: c["mode"].as_u64().unwrap() as u8,
                     polarity: c["polarity"].as_u64().unwrap() as u8,
@@ -310,6 +288,7 @@ fn common_commands_vectors() {
             other => panic!("unknown encode kind {}", other),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
+        seen(c);
         enc += 1;
     }
 
@@ -320,17 +299,17 @@ fn common_commands_vectors() {
         let expect = &c["expect"];
         match report {
             0x80 => {
-                let r = common::StatusReport::unpack(&payload).unwrap();
+                let r = proto::StatusReport::unpack(&payload).unwrap();
                 assert_eq!(r.cmd as u64, expect["cmd"].as_u64().unwrap());
                 assert_eq!(r.status as u64, expect["status"].as_u64().unwrap());
             }
             0x81 => {
-                let r = common::TextReport::unpack(&payload).unwrap();
+                let r = proto::TextReport::unpack(&payload).unwrap();
                 assert_eq!(r.cmd as u64, expect["cmd"].as_u64().unwrap());
                 assert_eq!(r.text, expect["text"].as_str().unwrap());
             }
             0x83 => {
-                let r = common::TemperatureReport::unpack(&payload).unwrap();
+                let r = proto::TemperatureReport::unpack(&payload).unwrap();
                 assert_eq!(r.timestamp_us, expect["timestamp_us"].as_u64().unwrap());
                 assert_eq!(
                     r.raw_decidegrees as i64,
@@ -338,18 +317,19 @@ fn common_commands_vectors() {
                 );
             }
             0x84 => {
-                let r = common::SequenceErrorReport::unpack(&payload).unwrap();
+                let r = proto::SequenceErrorReport::unpack(&payload).unwrap();
                 assert_eq!(r.expected_seq as u64, expect["expected_seq"].as_u64().unwrap());
                 assert_eq!(r.received_seq as u64, expect["received_seq"].as_u64().unwrap());
             }
             other => panic!("unhandled report 0x{:02x} in {}", other, c["name"]),
         }
+        seen(c);
         dec += 1;
     }
 
     let mut math = 0;
     for c in doc["sync_time_math"].as_array().unwrap() {
-        let (offset, rtt) = common::sync_time_offset_rtt(
+        let (offset, rtt) = proto::sync_time_offset_rtt(
             c["t1"].as_i64().unwrap(),
             c["t2"].as_i64().unwrap(),
             c["t3"].as_i64().unwrap(),
@@ -357,6 +337,7 @@ fn common_commands_vectors() {
         );
         assert_eq!(offset, c["offset_us"].as_i64().unwrap(), "offset {}", c["name"]);
         assert_eq!(rtt, c["rtt_us"].as_i64().unwrap(), "rtt {}", c["name"]);
+        seen(c);
         math += 1;
     }
 
@@ -376,7 +357,7 @@ fn identity_vectors() {
     for c in doc["cases"].as_array().unwrap() {
         // `raw` is wire bytes; strip trailing NUL/FF before parsing.
         let raw = hex_decode(c["raw"].as_str().unwrap());
-        let name = common::strip_device_string(&raw);
+        let name = proto::strip_device_string(&raw);
         let id = identity::parse_software_name(&name);
         let expect = &c["expect"];
 
@@ -397,6 +378,7 @@ fn identity_vectors() {
             c["name"]
         );
         assert_eq!(id.version, expect["version"].as_str().unwrap(), "version {}", c["name"]);
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
@@ -422,6 +404,7 @@ fn sr04_vectors() {
             other => panic!("unknown sr04 encode kind {}", other),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
+        seen(c);
         enc += 1;
     }
 
@@ -447,6 +430,7 @@ fn sr04_vectors() {
             }
             other => panic!("unhandled sr04 report 0x{:02x} in {}", other, c["name"]),
         }
+        seen(c);
         dec += 1;
     }
     assert!(enc > 0 && dec > 0);
@@ -480,8 +464,67 @@ fn fwdepz_vectors() {
             assert_eq!(h.tot_sec as u64, expect["tot_sec"].as_u64().unwrap());
             assert_eq!(h.payload_crc_ok, expect["payload_crc_ok"].as_bool().unwrap());
         }
+        seen(c);
         n += 1;
     }
     assert!(n > 0);
     eprintln!("fwdepz.json: {} cases", n);
+}
+
+// ---- recordings/sr04_session.depzrec ---------------------------------------
+
+/// Every rx report of the live capture through framing + the SR04 decoders,
+/// vs the `.expected.json` sidecar (no device layer: not a strict tx replay).
+#[test]
+fn sr04_session_recording() {
+    let exp = load("recordings/sr04_session.expected.json");
+    let pkts = recording_packets("sr04_session.depzrec");
+    let sw = recorded_text(&pkts, proto::Cmd::GetNameActiveSoftware).expect("software name");
+    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(identity::SensorType::Sr04));
+    assert_eq!(sw, exp["software_name"].as_str().unwrap());
+    assert_eq!(
+        recorded_text(&pkts, proto::Cmd::GetDeviceName).as_deref(),
+        exp["device_name"].as_str()
+    );
+
+    let (mut period, mut decay) = (None, None);
+    let (mut once, mut looped) = (Vec::new(), Vec::new());
+    for p in pkts.iter().filter(|p| p.rx) {
+        match p.cmd {
+            0x92 => period = Some(sr04::unpack_sample_period(&p.payload).unwrap()),
+            0x93 => decay = Some(sr04::unpack_echo_decay(&p.payload).unwrap()),
+            0x91 => {
+                let d = sr04::Sr04Data::unpack(&p.payload).unwrap();
+                let row = (d.timestamp_us, d.echo_time_us as u64);
+                match d.source_cmd {
+                    0x36 => once.push((row, "once")),
+                    0x37 => looped.push((row, "loop")),
+                    other => panic!("unknown SR04 source cmd {:#x}", other),
+                }
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(period.map(u64::from), exp["sample_period_us"].as_u64());
+    assert_eq!(decay.map(u64::from), exp["echo_decay_us"].as_u64());
+    let rows = |k: &str| -> Vec<((u64, u64), String)> {
+        exp[k]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| {
+                let row = (w["timestamp_us"].as_u64().unwrap(), w["echo_time_us"].as_u64().unwrap());
+                (row, w["source"].as_str().unwrap().to_string())
+            })
+            .collect()
+    };
+    let own = |v: &[((u64, u64), &str)]| -> Vec<((u64, u64), String)> {
+        v.iter().map(|(r, s)| (*r, s.to_string())).collect()
+    };
+    assert_eq!(own(&once), rows("once"));
+    // The loop may stream past the sidecar before the stop lands; match the first N.
+    let want_loop = rows("loop");
+    assert!(looped.len() >= want_loop.len(), "loop: {} < {}", looped.len(), want_loop.len());
+    assert_eq!(own(&looped[..want_loop.len()]), want_loop);
+    seen("recordings/sr04_session.depzrec");
 }

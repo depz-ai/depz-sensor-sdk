@@ -25,7 +25,7 @@ size_t depz_sr04_pack_echo_decay(uint16_t decay_us, uint8_t *out)
 int depz_sr04_unpack_data(const uint8_t *p, size_t len, depz_sr04_data *out)
 {
     /* cmd u8, timestamp_us u64, echo_time_us u16 — 11 B */
-    if (len != 11)
+    if (len < 11)
         return -1;
     out->source_cmd = p[0];
     uint64_t ts = 0;
@@ -38,7 +38,7 @@ int depz_sr04_unpack_data(const uint8_t *p, size_t len, depz_sr04_data *out)
 
 int depz_sr04_unpack_sample_period(const uint8_t *p, size_t len, uint32_t *out)
 {
-    if (len != 4)
+    if (len < 4)
         return -1;
     *out = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
            ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
@@ -47,7 +47,7 @@ int depz_sr04_unpack_sample_period(const uint8_t *p, size_t len, uint32_t *out)
 
 int depz_sr04_unpack_echo_decay(const uint8_t *p, size_t len, uint16_t *out)
 {
-    if (len != 2)
+    if (len < 2)
         return -1;
     *out = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
     return 0;

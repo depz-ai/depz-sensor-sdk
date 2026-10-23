@@ -407,6 +407,7 @@ void SensorClock::reset()
 
 std::uint8_t SensorClock::add(std::int64_t us, std::uint32_t tick)
 {
+    if (us < 0) throw std::out_of_range("SensorClock: an MCU µs time is a u64");
     std::uint8_t flags = 0;
     if (valid_) {
         const std::int64_t d_us = us - last_us_;
@@ -468,6 +469,9 @@ FrameTime CaptureTimer::results(const SensorClock& clock, unsigned fp_mode, std:
                                 std::uint32_t t0_tick, std::uint32_t t1_tick, std::int64_t pair_us,
                                 std::int64_t edge_us, std::uint8_t flags)
 {
+    // fp_mode is a byte, MCU µs times are u64 (contract 07 §3)
+    if (fp_mode > 0xFFu) throw std::out_of_range("CaptureTimer: fp_mode is a byte");
+    if (pair_us < 0 || edge_us < 0) throw std::out_of_range("CaptureTimer: an MCU µs time is a u64");
     if (clock.nominal()) flags |= FT_NOMINAL;
     const std::int64_t t0 = clock.to_us(pair_us, systick, t0_tick);
     const std::int64_t t1 = clock.to_us(pair_us, systick, t1_tick);
@@ -541,6 +545,8 @@ void MeasurementBuilder::reset()
 
 std::optional<Measurement> MeasurementBuilder::add(byte_span raw, std::int64_t timestamp_us, std::int64_t edge_us)
 {
+    // MCU µs times are u64 (contract 07 §3): checked before the frame is parsed
+    if (timestamp_us < 0 || edge_us < 0) throw std::out_of_range("MeasurementBuilder: an MCU µs time is a u64");
     FrameInfo f;
     try {
         f = parse_frame(raw);
@@ -683,9 +689,19 @@ CfgField field_or_throw(const std::string& name)
     return *f;
 }
 
-std::uint32_t field_get(byte_span page, const CfgField& f)
+// Index of the field's first byte; std::invalid_argument when the page (a
+// whole page or a partial read from its start) is too short to hold it.
+std::size_t field_index(std::size_t page_size, const CfgField& f)
 {
     const std::size_t i = static_cast<std::size_t>(f.reg - REG_CFG);
+    if (page_size < i + (f.width == 16 ? 2u : 1u))
+        throw std::invalid_argument(std::string(f.name) + ": config page too short for the field");
+    return i;
+}
+
+std::uint32_t field_get(byte_span page, const CfgField& f)
+{
+    const std::size_t i = field_index(page.size(), f);
     if (f.width == 16) return rd_u16(page, i);
     return (static_cast<std::uint32_t>(u8(page[i])) >> f.shift) & ((1u << f.width) - 1u);
 }
@@ -695,18 +711,16 @@ std::uint32_t field_get(byte_span page, const CfgField& f)
 std::uint32_t cfg_get(byte_span page, const std::string& name)
 {
     const CfgField f = field_or_throw(name);
-    if (page.size() < CFG_SIZE) throw std::invalid_argument("config page must be 190 bytes");
     return field_get(page, f);
 }
 
 void cfg_set(bytes& page, const std::string& name, std::int64_t value)
 {
     const CfgField f = field_or_throw(name);
-    if (page.size() < CFG_SIZE) throw std::invalid_argument("config page must be 190 bytes");
+    const std::size_t i = field_index(page.size(), f);
     if (value < 0 || value >= (std::int64_t{1} << f.width))
         throw std::invalid_argument(name + ": " + std::to_string(value) + " out of range for " +
                                     std::to_string(f.width) + " bit");
-    const std::size_t i = static_cast<std::size_t>(f.reg - REG_CFG);
     if (f.width == 16) {
         page[i] = std::byte{static_cast<std::uint8_t>(value & 0xFF)};
         page[i + 1] = std::byte{static_cast<std::uint8_t>(value >> 8)};
@@ -719,7 +733,6 @@ void cfg_set(bytes& page, const std::string& name, std::int64_t value)
 
 std::vector<std::pair<std::string, std::uint32_t>> config_fields(byte_span page)
 {
-    if (page.size() < CFG_SIZE) throw std::invalid_argument("config page must be 190 bytes");
     std::vector<std::pair<std::string, std::uint32_t>> out;
     out.reserve(CFG_FIELDS.size());
     for (const auto& f : CFG_FIELDS) out.emplace_back(f.name, field_get(page, f));

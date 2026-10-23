@@ -5,7 +5,12 @@
  * vectors directory is passed via -DDEPZ_VECTORS_DIR at compile time.
  */
 #include "depz_sensor_sdk.h"
+#if DEPZ_VECTORS_HAS_IO
+#include "depz_sensor_io.h" /* the CNH setup helpers (vl53l8_advanced input_rules) */
+#endif
 #include "json.h"
+#include "vector_seen.h"
+#include "sha256.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +32,21 @@ static int g_checks = 0;
         fprintf(stderr, "\n");                           \
     }                                                   \
 } while (0)
+
+/* Coverage gate (vector_seen.h): report an ID only when no CHECK failed since
+ * `fails_before` was taken — a failing case is never reported. */
+static void seen_id(const char *id, int fails_before)
+{
+    if (g_fail == fails_before) vector_seen(id);
+}
+
+/* A case object: its "id" (every case of a case-list group carries one). */
+static void seen_case(const json_value *c, int fails_before)
+{
+    const char *id = json_as_str(json_obj_get(c, "id"));
+    CHECK(id != NULL, "vector case without an \"id\"");
+    seen_id(id, fails_before);
+}
 
 /* --- hex helpers ---------------------------------------------------------- */
 
@@ -96,6 +116,7 @@ static void test_crc(void)
     const json_value *cases = json_obj_get(root, "cases");
     for (size_t i = 0; i < json_arr_size(cases); i++) {
         const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *data; size_t n = hex_decode(json_as_str(json_obj_get(c, "input")), &data);
 
@@ -108,6 +129,7 @@ static void test_crc(void)
         CHECK(depz_crc16_ccitt_false(data, n) == (uint16_t)json_as_int(json_obj_get(c, "crc16_ccitt_false")),
               "crc16_ccitt_false %s", name);
         free(data);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -143,6 +165,7 @@ static void test_usb_ids(void)
     const json_value *ident = json_obj_get(root, "identity");
     for (size_t i = 0; i < json_arr_size(ident); i++) {
         const json_value *c = json_arr_get(ident, i);
+        const int f0 = g_fail;
         int vid = (int)json_as_int(json_obj_get(c, "vid"));
         int pid = (int)json_as_int(json_obj_get(c, "pid"));
         bool known = json_as_bool(json_obj_get(c, "known"));
@@ -158,11 +181,13 @@ static void test_usb_ids(void)
         else
             CHECK(hint && strcmp(hint, model) == 0,
                   "model hint(%04x,%04x) expected %s got %s", vid, pid, model, hint ? hint : "NULL");
+        seen_case(c, f0);
     }
 
     const json_value *ord = json_obj_get(root, "serial_ordering");
     for (size_t i = 0; i < json_arr_size(ord); i++) {
         const json_value *c = json_arr_get(ord, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *ports = json_obj_get(c, "ports");
         size_t np = json_arr_size(ports);
@@ -181,6 +206,26 @@ static void test_usb_ids(void)
                   "serial_ordering %s idx %zu expected %s got %s", name, j, want, ents[j].port);
         }
         free(ents);
+        seen_case(c, f0);
+    }
+
+    /* the id constants themselves */
+    {
+        const json_value *pr = json_obj_get(root, "pid_range");
+        int f0 = g_fail;
+        CHECK(json_as_int(json_obj_get(root, "vid")) == DEPZ_USB_VID, "usb_ids vid");
+        seen_id("usb_ids/vid", f0);
+        f0 = g_fail;
+        CHECK(json_as_int(json_obj_get(root, "dev_vid")) == DEPZ_DEV_USB_VID, "usb_ids dev_vid");
+        seen_id("usb_ids/dev_vid", f0);
+        f0 = g_fail;
+        CHECK(json_as_int(json_obj_get(root, "dev_pid")) == DEPZ_DEV_USB_PID, "usb_ids dev_pid");
+        seen_id("usb_ids/dev_pid", f0);
+        f0 = g_fail;
+        CHECK(json_arr_size(pr) == 2 && json_as_int(json_arr_get(pr, 0)) == DEPZ_PID_RANGE_LO &&
+                  json_as_int(json_arr_get(pr, 1)) == DEPZ_PID_RANGE_HI,
+              "usb_ids pid_range");
+        seen_id("usb_ids/pid_range", f0);
     }
     json_free(root);
 }
@@ -195,6 +240,7 @@ static void test_identity(void)
     const json_value *cases = json_obj_get(root, "cases");
     for (size_t i = 0; i < json_arr_size(cases); i++) {
         const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
 
@@ -219,6 +265,7 @@ static void test_identity(void)
         CHECK(strcmp(id.version, json_as_str(json_obj_get(e, "version"))) == 0,
               "identity version %s: got '%s'", name, id.version);
         free(raw);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -229,6 +276,10 @@ static void test_identity(void)
 static void check_payload(const char *label, const uint8_t *got, size_t got_n, const char *want_hex)
 {
     char buf[4096];
+    if (!want_hex || got_n * 2 >= sizeof buf) {
+        CHECK(0, "%s: %zu bytes, no expected payload to compare", label, got_n);
+        return;
+    }
     hex_encode(got, got_n, buf);
     CHECK(strcmp(buf, want_hex) == 0, "%s: got %s want %s", label, buf, want_hex);
 }
@@ -241,6 +292,7 @@ static void test_common_commands(void)
     const json_value *enc = json_obj_get(root, "encode");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
         uint8_t out[64]; size_t n = 0;
@@ -256,11 +308,13 @@ static void test_common_commands(void)
             n = depz_pack_sync_pin_config(&cfg, out);
         } else { CHECK(0, "unknown common encode kind %s", kind); continue; }
         check_payload(json_as_str(json_obj_get(c, "name")), out, n, want);
+        seen_case(c, f0);
     }
 
     const json_value *dec = json_obj_get(root, "decode");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int rpt = (int)json_as_int(json_obj_get(c, "report"));
         uint8_t *p; size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
@@ -293,11 +347,13 @@ static void test_common_commands(void)
             CHECK(0, "unknown common decode report 0x%02x (%s)", rpt, name);
         }
         free(p);
+        seen_case(c, f0);
     }
 
     const json_value *st = json_obj_get(root, "sync_time_math");
     for (size_t i = 0; i < json_arr_size(st); i++) {
         const json_value *c = json_arr_get(st, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int64_t off, rtt;
         depz_sync_time_offset_rtt(
@@ -305,6 +361,7 @@ static void test_common_commands(void)
             json_as_int(json_obj_get(c, "t3")), json_as_int(json_obj_get(c, "t4")), &off, &rtt);
         CHECK(off == json_as_int(json_obj_get(c, "offset_us")), "sync offset %s: got %lld", name, (long long)off);
         CHECK(rtt == json_as_int(json_obj_get(c, "rtt_us")), "sync rtt %s: got %lld", name, (long long)rtt);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -320,6 +377,7 @@ static void test_sr04(void)
     const json_value *enc = json_obj_get(root, "encode");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
         uint8_t out[8]; size_t n = 0;
@@ -329,11 +387,13 @@ static void test_sr04(void)
             n = depz_sr04_pack_echo_decay((uint16_t)json_as_int(json_obj_get(c, "decay_us")), out);
         else { CHECK(0, "unknown sr04 encode kind %s", kind); continue; }
         check_payload(json_as_str(json_obj_get(c, "name")), out, n, want);
+        seen_case(c, f0);
     }
 
     const json_value *dec = json_obj_get(root, "decode");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int rpt = (int)json_as_int(json_obj_get(c, "report"));
         uint8_t *p; size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
@@ -359,6 +419,7 @@ static void test_sr04(void)
             CHECK(0, "unknown sr04 decode report 0x%02x (%s)", rpt, name);
         }
         free(p);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -373,6 +434,7 @@ static void test_framing_encode(void)
     const json_value *cases = json_obj_get(root, "cases");
     for (size_t i = 0; i < json_arr_size(cases); i++) {
         const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t cmd = (uint8_t)json_as_int(json_obj_get(c, "cmd"));
         unsigned int seq = (unsigned int)json_as_int(json_obj_get(c, "seq"));
@@ -388,6 +450,7 @@ static void test_framing_encode(void)
         hex_encode(out, on, hex);
         CHECK(strcmp(hex, want) == 0, "framing_encode %s:\n    got  %s\n    want %s", name, hex, want);
         free(hex); free(out); free(payload);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -482,6 +545,7 @@ static void test_framing_decode(void)
     const json_value *cases = json_obj_get(root, "cases");
     for (size_t i = 0; i < json_arr_size(cases); i++) {
         const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *stream; size_t n = hex_decode(json_as_str(json_obj_get(c, "stream")), &stream);
         const json_value *e = json_obj_get(c, "expect");
@@ -541,6 +605,7 @@ static void test_framing_decode(void)
         free(residue);
         dr_free(&expect_r);
         free(stream);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -555,6 +620,7 @@ static void test_fwdepz(void)
     const json_value *cases = json_obj_get(root, "cases");
     for (size_t i = 0; i < json_arr_size(cases); i++) {
         const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *blob; size_t n = hex_decode(json_as_str(json_obj_get(c, "file")), &blob);
 
@@ -582,6 +648,7 @@ static void test_fwdepz(void)
             }
         }
         free(blob);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -597,6 +664,7 @@ static void test_vl53l8_advanced(void)
     const json_value *motion = json_obj_get(root, "motion");
     for (size_t i = 0; i < json_arr_size(motion); i++) {
         const json_value *c = json_arr_get(motion, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int res = (int)json_as_int(json_obj_get(c, "resolution"));
         uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE];
@@ -604,11 +672,13 @@ static void test_vl53l8_advanced(void)
         char hex[DEPZ_VL53L8_MOTION_CFG_SIZE * 2 + 1];
         hex_encode(out, sizeof(out), hex);
         check_payload(name, out, sizeof(out), json_as_str(json_obj_get(c, "pack")));
+        seen_case(c, f0);
     }
 
     const json_value *thr = json_obj_get(root, "thresholds");
     for (size_t i = 0; i < json_arr_size(thr); i++) {
         const json_value *c = json_arr_get(thr, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *list = json_obj_get(c, "thresholds");
         size_t n = json_arr_size(list);
@@ -627,16 +697,19 @@ static void test_vl53l8_advanced(void)
         depz_vl53l8_pack_thresholds(th, n, start, valid);
         check_payload(name, start, sizeof(start), json_as_str(json_obj_get(c, "start_block")));
         check_payload(name, valid, sizeof(valid), json_as_str(json_obj_get(c, "valid_status")));
+        seen_case(c, f0);
     }
 
     const json_value *xm = json_obj_get(root, "xtalk_margin");
     for (size_t i = 0; i < json_arr_size(xm); i++) {
         const json_value *c = json_arr_get(xm, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         double kcps = (double)json_as_int(json_obj_get(c, "kcps"));
         uint32_t raw = depz_vl53l8_xtalk_margin_to_raw(kcps);
         CHECK((int64_t)raw == json_as_int(json_obj_get(c, "raw")),
               "xtalk margin %s: got %u", name, raw);
+        seen_case(c, f0);
     }
     json_free(root);
 }
@@ -655,6 +728,7 @@ static void test_vl53l4(void)
     const json_value *enc = json_obj_get(root, "encode");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
@@ -681,12 +755,14 @@ static void test_vl53l4(void)
                 (uint16_t)json_as_int(json_obj_get(c, "khz")), out);
         } else { CHECK(0, "unknown vl53l4 encode kind %s", kind); continue; }
         check_payload(name, out, n, want);
+        seen_case(c, f0);
     }
 
     /* decode: RPT_VL53_REG_DATA / _INFO / _STREAM */
     const json_value *dec = json_obj_get(root, "decode");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int rpt = (int)json_as_int(json_obj_get(c, "report"));
         uint8_t *p; size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
@@ -733,12 +809,14 @@ static void test_vl53l4(void)
             CHECK(0, "unknown vl53l4 decode report 0x%02x (%s)", rpt, name);
         }
         free(p);
+        seen_case(c, f0);
     }
 
     /* result_block: 17-byte 0x0089 block -> VL53L4CD_ResultsData_t */
     const json_value *rb = json_obj_get(root, "result_block");
     for (size_t i = 0; i < json_arr_size(rb); i++) {
         const json_value *c = json_arr_get(rb, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
         const json_value *e = json_obj_get(c, "expect");
@@ -764,11 +842,15 @@ static void test_vl53l4(void)
         CHECK((int64_t)r.stream_count == json_as_int(json_obj_get(e, "stream_count")),
               "vl53l4 %s stream_count: got %d", name, r.stream_count);
         free(raw);
+        seen_case(c, f0);
     }
 
     /* timing.encode / timing.decode: SetRangeTiming / GetRangeTiming math */
     const json_value *timing = json_obj_get(root, "timing");
     const json_value *tenc = json_obj_get(timing, "encode");
+    const int timing_f0 = g_fail;
+    CHECK(json_arr_size(tenc) > 0 && json_arr_size(json_obj_get(timing, "decode")) > 0,
+          "vl53l4 timing encode/decode cases present");
     for (size_t i = 0; i < json_arr_size(tenc); i++) {
         const json_value *c = json_arr_get(tenc, i);
         const char *name = json_as_str(json_obj_get(c, "name"));
@@ -804,11 +886,13 @@ static void test_vl53l4(void)
         CHECK((int64_t)inter == json_as_int(json_obj_get(c, "inter_measurement_ms")),
               "vl53l4 timing %s inter_measurement_ms: got %u", name, inter);
     }
+    seen_id("vl53l4/timing", timing_f0);
 
     /* tuning: word codecs, both directions */
     const json_value *tun = json_obj_get(root, "tuning");
     for (size_t i = 0; i < json_arr_size(tun); i++) {
         const json_value *c = json_arr_get(tun, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         int64_t value = json_as_int(json_obj_get(c, "value"));
@@ -841,6 +925,7 @@ static void test_vl53l4(void)
         } else {
             CHECK(0, "unknown vl53l4 tuning kind %s", kind);
         }
+        seen_case(c, f0);
     }
 
     /* xtalk_decode: C round(), an exact .5 goes away from zero (256 -> 1) */
@@ -848,13 +933,16 @@ static void test_vl53l4(void)
     CHECK(json_arr_size(xd) > 0, "vl53l4 xtalk_decode missing");
     for (size_t i = 0; i < json_arr_size(xd); i++) {
         const json_value *c = json_arr_get(xd, i);
+        const int f0 = g_fail;
         uint16_t raw = (uint16_t)json_as_int(json_obj_get(c, "raw"));
         CHECK((int64_t)depz_vl53l4_decode_xtalk(raw) == json_as_int(json_obj_get(c, "kcps")),
               "vl53l4 xtalk_decode %u: got %u", raw, depz_vl53l4_decode_xtalk(raw));
+        seen_case(c, f0);
     }
 
     /* config_block: the 91-byte init block with byte 0 forced to 0x12 */
     const json_value *cb = json_obj_get(root, "config_block");
+    const int cb_f0 = g_fail;
     CHECK((int64_t)DEPZ_VL53L4_CONFIG_ADDR == json_as_int(json_obj_get(cb, "addr")),
           "vl53l4 config_block addr");
     {
@@ -864,6 +952,7 @@ static void test_vl53l4(void)
         check_payload("config_block", out, n, json_as_str(json_obj_get(cb, "data")));
         CHECK(out[0] == DEPZ_VL53L4_CONFIG_FMP_BYTE, "vl53l4 config_block fmp byte");
     }
+    seen_id("vl53l4/config_block", cb_f0);
 
     json_free(root);
 }
@@ -880,6 +969,7 @@ static void test_bno086_shtp(void)
     const json_value *hdr = json_obj_get(root, "header");
     for (size_t i = 0; i < json_arr_size(hdr); i++) {
         const json_value *c = json_arr_get(hdr, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         depz_shtp_header h = {
             (uint16_t)json_as_int(json_obj_get(c, "length")),
@@ -897,6 +987,7 @@ static void test_bno086_shtp(void)
         CHECK(u.length == h.length && u.channel == h.channel && u.seq == h.seq &&
               u.continuation == h.continuation, "shtp header unpack %s", name);
         free(raw);
+        seen_case(c, f0);
     }
 
     /* tx_seq: shared layer, per-channel counters */
@@ -906,6 +997,7 @@ static void test_bno086_shtp(void)
         const json_value *tx = json_obj_get(root, "tx_seq");
         for (size_t i = 0; i < json_arr_size(tx); i++) {
             const json_value *c = json_arr_get(tx, i);
+            const int f0 = g_fail;
             uint8_t ch = (uint8_t)json_as_int(json_obj_get(c, "channel"));
             uint8_t *pl; size_t pn = hex_decode(json_as_str(json_obj_get(c, "payload")), &pl);
             uint8_t out[DEPZ_SHTP_MAX_TX_FRAME];
@@ -913,6 +1005,7 @@ static void test_bno086_shtp(void)
             char label[32]; snprintf(label, sizeof(label), "tx_seq[%zu]", i);
             check_payload(label, out, on, json_as_str(json_obj_get(c, "frame")));
             free(pl);
+            seen_case(c, f0);
         }
         depz_shtp_free(&layer);
     }
@@ -921,17 +1014,20 @@ static void test_bno086_shtp(void)
     const json_value *reasm = json_obj_get(root, "reassembly");
     for (size_t i = 0; i < json_arr_size(reasm); i++) {
         const json_value *c = json_arr_get(reasm, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         depz_shtp_layer layer;
         depz_shtp_init(&layer);
         const json_value *frames = json_obj_get(c, "frames");
+        const json_value *captures = json_obj_get(c, "captures_us");
         const json_value *expect = json_obj_get(c, "expect");
         const json_value *cargos = json_obj_get(expect, "cargos");
         size_t got_cargo = 0;
+        CHECK(json_arr_size(captures) == json_arr_size(frames), "shtp %s: captures_us per frame", name);
         for (size_t j = 0; j < json_arr_size(frames); j++) {
             uint8_t *fr; size_t fn = hex_decode(json_as_str(json_arr_get(frames, j)), &fr);
             depz_shtp_cargo cargo;
-            int rc = depz_shtp_feed(&layer, fr, fn, &cargo);
+            int rc = depz_shtp_feed_ex(&layer, fr, fn, (uint64_t)json_as_int(json_arr_get(captures, j)), &cargo);
             if (rc == 1) {
                 const json_value *ec = json_arr_get(cargos, got_cargo);
                 CHECK(ec != NULL, "shtp %s: unexpected extra cargo", name);
@@ -939,6 +1035,9 @@ static void test_bno086_shtp(void)
                     CHECK(cargo.channel == json_as_int(json_obj_get(ec, "channel")) &&
                           cargo.seq == json_as_int(json_obj_get(ec, "seq")),
                           "shtp %s cargo %zu header", name, got_cargo);
+                    CHECK((int64_t)cargo.capture_us == json_as_int(json_obj_get(ec, "capture_us")),
+                          "shtp %s cargo %zu capture_us: got %llu", name, got_cargo,
+                          (unsigned long long)cargo.capture_us);
                     char buf[8192];
                     hex_encode(cargo.payload, cargo.payload_len, buf);
                     CHECK(strcmp(buf, json_as_str(json_obj_get(ec, "payload"))) == 0,
@@ -953,12 +1052,14 @@ static void test_bno086_shtp(void)
         CHECK((int64_t)layer.discarded == json_as_int(json_obj_get(expect, "discarded")),
               "shtp %s discarded: got %llu", name, (unsigned long long)layer.discarded);
         depz_shtp_free(&layer);
+        seen_case(c, f0);
     }
 
     /* control_encode */
     const json_value *ctl = json_obj_get(root, "control_encode");
     for (size_t i = 0; i < json_arr_size(ctl); i++) {
         const json_value *c = json_arr_get(ctl, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         uint8_t out[64]; size_t on = 0;
@@ -999,6 +1100,7 @@ static void test_bno086_shtp(void)
                 (uint16_t)json_as_int(json_obj_get(c, "offset_words")), w, wn, out, sizeof(out));
         } else { CHECK(0, "unknown control_encode kind %s", kind); continue; }
         check_payload(name, out, on, json_as_str(json_obj_get(c, "payload")));
+        seen_case(c, f0);
     }
 
     /* executable: sleep / power_on (contract 05 §6a) — fresh layer, seq 0, 1 */
@@ -1009,6 +1111,7 @@ static void test_bno086_shtp(void)
         CHECK(json_arr_size(ex) == 2, "executable: want 2 cases");
         for (size_t i = 0; i < json_arr_size(ex); i++) {
             const json_value *c = json_arr_get(ex, i);
+            const int f0 = g_fail;
             const char *name = json_as_str(json_obj_get(c, "name"));
             uint8_t command;
             if (strcmp(name, "sleep") == 0) command = DEPZ_SHTP_EXEC_SLEEP;
@@ -1031,6 +1134,7 @@ static void test_bno086_shtp(void)
                                        bridge, sizeof(bridge), &bn);
             CHECK(rc == 0, "executable %s build_packet rc=%d", name, rc);
             check_payload(name, bridge, bn, json_as_str(json_obj_get(c, "bridge_frame")));
+            seen_case(c, f0);
         }
         depz_shtp_free(&layer);
     }
@@ -1038,9 +1142,12 @@ static void test_bno086_shtp(void)
     /* Set Feature flag bits */
     {
         const json_value *ff = json_obj_get(root, "feature_flags");
+        const int f0 = g_fail;
+        CHECK(ff && ff->count == 2, "feature_flags: want wakeup + always_on");
         CHECK(json_as_int(json_obj_get(ff, "wakeup")) == DEPZ_BNO_FEATURE_WAKEUP, "feature flag wakeup");
         CHECK(json_as_int(json_obj_get(ff, "always_on")) == DEPZ_BNO_FEATURE_ALWAYS_ON,
               "feature flag always_on");
+        seen_id("bno086_shtp/feature_flags", f0);
     }
     json_free(root);
 }
@@ -1075,6 +1182,7 @@ static void check_report_fields(const char *name, const depz_bno_report *r,
     FI("page_number", page_number); FI("most_likely_state", most_likely_state);
     FI("sensor_timestamp_us", sensor_timestamp_us); FI("temperature_raw", temperature_raw);
     FI("vx_raw", vx_raw); FI("vy_raw", vy_raw); FI("vz_raw", vz_raw);
+    FI("intent", intent); FI("request", request); FI("flushed_sensor", flushed_sensor);
 #undef FI
     const json_value *acc = json_obj_get(f, "accuracy_raw");
     if (acc) {
@@ -1101,37 +1209,104 @@ static void check_report_fields(const char *name, const depz_bno_report *r,
     }
 }
 
+static double json_num(const json_value *v)
+{
+    return v && v->kind == JSON_DOUBLE ? v->d : (double)json_as_int(v);
+}
+
+static void check_doubles(const char *name, const char *key, const json_value *want,
+                          const double *got, size_t n)
+{
+    CHECK(json_arr_size(want) == n, "%s record %s: %zu values", name, key, json_arr_size(want));
+    for (size_t k = 0; k < n && k < json_arr_size(want); k++)
+        CHECK(got[k] == json_num(json_arr_get(want, k)), "%s record %s[%zu]: got %.17g want %.17g",
+              name, key, k, got[k], json_num(json_arr_get(want, k)));
+}
+
+/* `record`: the contract 09 dataset value, i.e. the report in SI units
+ * (raw / 2^Q, exact in binary). Its integer keys repeat `fields` (checked by
+ * check_report_fields); here the scaled ones go through the SDK's scalers. */
+static void check_report_record(const char *name, const depz_bno_report *r, const json_value *rec)
+{
+    double v[4], acc = 0;
+    CHECK(rec != NULL, "%s: no record", name);
+    if (!rec) return;
+    CHECK(strcmp(depz_bno_report_type_str(r->type), json_as_str(json_obj_get(rec, "type"))) == 0,
+          "%s record type", name);
+    if (json_obj_get(rec, "x")) {
+        static const char *const XYZ[3] = {"x", "y", "z"};
+        depz_bno_report_xyz(r, v);
+        for (int k = 0; k < 3; k++)
+            CHECK(v[k] == json_num(json_obj_get(rec, XYZ[k])), "%s record %s: got %.17g", name, XYZ[k], v[k]);
+    }
+    if (json_obj_get(rec, "bias")) {
+        depz_bno_report_bias(r, v);
+        check_doubles(name, "bias", json_obj_get(rec, "bias"), v, 3);
+    }
+    if (json_obj_get(rec, "i")) {
+        static const char *const Q[4] = {"i", "j", "k", "real"};
+        depz_bno_report_quaternion(r, v);
+        for (int k = 0; k < 4; k++)
+            CHECK(v[k] == json_num(json_obj_get(rec, Q[k])), "%s record %s: got %.17g", name, Q[k], v[k]);
+        if (r->type != DEPZ_BNO_GYRO_INTEGRATED_RV) {
+            /* the game variants carry no heading accuracy: the key is absent */
+            const json_value *want = json_obj_get(rec, "accuracy_rad");
+            bool has = depz_bno_report_accuracy_rad(r, &acc);
+            CHECK(has == (want != NULL), "%s record accuracy_rad presence", name);
+            if (has && want)
+                CHECK(acc == json_num(want), "%s record accuracy_rad: got %.17g", name, acc);
+        }
+    }
+    if (json_obj_get(rec, "value"))
+        CHECK(depz_bno_report_scalar(r) == json_num(json_obj_get(rec, "value")),
+              "%s record value: got %.17g", name, depz_bno_report_scalar(r));
+    if (json_obj_get(rec, "angular_velocity")) {
+        depz_bno_report_angular_velocity(r, v);
+        check_doubles(name, "angular_velocity", json_obj_get(rec, "angular_velocity"), v, 3);
+    }
+}
+
 static void test_bno086_reports(void)
 {
     json_value *root = load_vectors("bno086_reports");
     if (!root) { g_fail++; return; }
 
-    const json_value *cargos = json_obj_get(root, "input_cargos");
-    for (size_t i = 0; i < json_arr_size(cargos); i++) {
-        const json_value *c = json_arr_get(cargos, i);
-        const char *name = json_as_str(json_obj_get(c, "name"));
-        uint64_t cap_ts = (uint64_t)json_as_int(json_obj_get(c, "capture_timestamp_us"));
-        uint8_t *cargo; size_t cn = hex_decode(json_as_str(json_obj_get(c, "cargo")), &cargo);
-        depz_bno_report reps[16];
-        size_t got = depz_bno_parse_input_cargo(cargo, cn, cap_ts, reps, 16);
-        const json_value *expect = json_obj_get(c, "expect");
-        CHECK(got == json_arr_size(expect), "%s report count: got %zu want %zu",
-              name, got, json_arr_size(expect));
-        for (size_t j = 0; j < got && j < json_arr_size(expect); j++) {
-            const json_value *e = json_arr_get(expect, j);
-            const char *wtype = json_as_str(json_obj_get(e, "type"));
-            CHECK(strcmp(depz_bno_report_type_str(reps[j].type), wtype) == 0,
-                  "%s report %zu type: got %s want %s", name, j,
-                  depz_bno_report_type_str(reps[j].type), wtype);
-            bool with_header = strcmp(wtype, "UnknownReport") != 0;
-            check_report_fields(name, &reps[j], json_obj_get(e, "fields"), with_header);
+    /* interactive_and_flush: MotionRequest (0x2B) and the bare 0xEF Flush
+     * Completed, in the same input-cargo shape */
+    static const char *const CARGO_GROUPS[] = {"input_cargos", "interactive_and_flush"};
+    for (size_t g = 0; g < 2; g++) {
+        const json_value *cargos = json_obj_get(root, CARGO_GROUPS[g]);
+        CHECK(cargos != NULL, "bno086_reports %s present", CARGO_GROUPS[g]);
+        for (size_t i = 0; i < json_arr_size(cargos); i++) {
+            const json_value *c = json_arr_get(cargos, i);
+            const int f0 = g_fail;
+            const char *name = json_as_str(json_obj_get(c, "name"));
+            uint64_t cap_ts = (uint64_t)json_as_int(json_obj_get(c, "capture_timestamp_us"));
+            uint8_t *cargo; size_t cn = hex_decode(json_as_str(json_obj_get(c, "cargo")), &cargo);
+            depz_bno_report reps[16];
+            size_t got = depz_bno_parse_input_cargo(cargo, cn, cap_ts, reps, 16);
+            const json_value *expect = json_obj_get(c, "expect");
+            CHECK(got == json_arr_size(expect), "%s report count: got %zu want %zu",
+                  name, got, json_arr_size(expect));
+            for (size_t j = 0; j < got && j < json_arr_size(expect); j++) {
+                const json_value *e = json_arr_get(expect, j);
+                const char *wtype = json_as_str(json_obj_get(e, "type"));
+                CHECK(strcmp(depz_bno_report_type_str(reps[j].type), wtype) == 0,
+                      "%s report %zu type: got %s want %s", name, j,
+                      depz_bno_report_type_str(reps[j].type), wtype);
+                bool with_header = strcmp(wtype, "UnknownReport") != 0;
+                check_report_fields(name, &reps[j], json_obj_get(e, "fields"), with_header);
+                check_report_record(name, &reps[j], json_obj_get(e, "record"));
+            }
+            free(cargo);
+            seen_case(c, f0);
         }
-        free(cargo);
     }
 
     const json_value *grv = json_obj_get(root, "gyro_rv");
     for (size_t i = 0; i < json_arr_size(grv); i++) {
         const json_value *c = json_arr_get(grv, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint64_t cap_ts = (uint64_t)json_as_int(json_obj_get(c, "capture_timestamp_us"));
         uint8_t *cargo; size_t cn = hex_decode(json_as_str(json_obj_get(c, "cargo")), &cargo);
@@ -1141,7 +1316,38 @@ static void test_bno086_reports(void)
         CHECK(strcmp(depz_bno_report_type_str(r.type), json_as_str(json_obj_get(e, "type"))) == 0,
               "gyro_rv %s type", name);
         check_report_fields(name, &r, json_obj_get(e, "fields"), false);
+        check_report_record(name, &r, json_obj_get(e, "record"));
         free(cargo);
+        seen_case(c, f0);
+    }
+
+    /* Q points: the per-sensor table and the two fixed ones */
+    {
+        const json_value *qp = json_obj_get(root, "q_points");
+        int f0 = g_fail;
+        CHECK(qp && qp->count > 0, "bno086 q_points present");
+        for (size_t i = 0; qp && i < qp->count; i++) {
+            unsigned sid = (unsigned)strtoul(qp->keys[i], NULL, 16);
+            CHECK(depz_bno_q_point((uint8_t)sid) == json_as_int(qp->items[i]),
+                  "bno086 q_point(%s): got %d want %lld", qp->keys[i], depz_bno_q_point((uint8_t)sid),
+                  (long long)json_as_int(qp->items[i]));
+        }
+        /* and nothing beyond the table: every other id is an event report */
+        for (unsigned sid = 0; sid < 256; sid++) {
+            char key[8];
+            snprintf(key, sizeof key, "0x%02X", sid);
+            if (!json_obj_get(qp, key))
+                CHECK(depz_bno_q_point((uint8_t)sid) == -1, "bno086 q_point(%s) not in the table", key);
+        }
+        seen_id("bno086_reports/q_points", f0);
+        f0 = g_fail;
+        CHECK(json_as_int(json_obj_get(root, "rv_accuracy_q")) == DEPZ_BNO_RV_ACCURACY_Q,
+              "bno086 rv_accuracy_q");
+        seen_id("bno086_reports/rv_accuracy_q", f0);
+        f0 = g_fail;
+        CHECK(json_as_int(json_obj_get(root, "gyro_rv_angvel_q")) == DEPZ_BNO_GYRO_RV_ANGVEL_Q,
+              "bno086 gyro_rv_angvel_q");
+        seen_id("bno086_reports/gyro_rv_angvel_q", f0);
     }
     json_free(root);
 }
@@ -1153,6 +1359,27 @@ static void test_bno086_reports(void)
 /* (CNH histogram output is not in this capture — see the CNH extension       */
 /*  point in vl53l8_decode.c.)                                                */
 /* ======================================================================== */
+
+/* Real units (contract 04 §5), as ST GetRangingData: distance >= 0;
+ * reflectance raw/2 (%), signal/ambient raw/2048 (kcps/SPAD), sigma raw/128
+ * (mm) — each multiplied back is a whole wire integer in the field's range. */
+static int is_whole(double v, double max) { return v >= 0 && v <= max && v == (double)(int64_t)v; }
+
+static void check_real_units(const depz_vl53l8_frame *f, const char *what, size_t i)
+{
+    for (int z = 0; z < f->resolution; z++) {
+        CHECK(f->distance_mm[z] >= 0, "%s frame %zu dist[%d] negative: %d",
+              what, i, z, f->distance_mm[z]);
+        CHECK(is_whole(f->reflectance[z] * 2.0, 255.0),
+              "%s frame %zu reflectance[%d] not raw/2: %g", what, i, z, f->reflectance[z]);
+        CHECK(is_whole(f->signal_per_spad[z] * 2048.0, 4294967295.0),
+              "%s frame %zu signal[%d] not raw/2048: %g", what, i, z, f->signal_per_spad[z]);
+        CHECK(is_whole(f->ambient_per_spad[z] * 2048.0, 4294967295.0),
+              "%s frame %zu ambient[%d] not raw/2048: %g", what, i, z, f->ambient_per_spad[z]);
+        CHECK(is_whole(f->range_sigma_mm[z] * 128.0, 65535.0),
+              "%s frame %zu sigma[%d] not raw/128: %g", what, i, z, f->range_sigma_mm[z]);
+    }
+}
 
 typedef struct {
     depz_vl53l8_reassembler reasm;
@@ -1182,12 +1409,85 @@ static void replay_cb(const depz_event *ev, void *user)
     ctx->frames[ctx->n++] = f;
 }
 
+/* A hand-built 4x4 frame with known wire values: the scaling to real units
+ * (contract 04 §5), as the Python test_get_ranging_data_*_and_scales. Blocks
+ * are laid out in the swapped domain, then byte-reversed per 32-bit word like
+ * the sensor sends them. */
+static size_t synth_block(uint8_t *b, size_t i, uint32_t type, uint32_t size, uint32_t idx,
+                          const uint8_t *body)
+{
+    uint32_t bh = type | (size << 4) | (idx << 16);
+    size_t msize = (type > 0x1 && type < 0xd) ? (size_t)type * size : size;
+    b[i] = (uint8_t)bh; b[i + 1] = (uint8_t)(bh >> 8);
+    b[i + 2] = (uint8_t)(bh >> 16); b[i + 3] = (uint8_t)(bh >> 24);
+    memcpy(b + i + 4, body, msize);
+    return i + 4 + msize;
+}
+
+static void test_vl53l8_real_units(void)
+{
+    enum { N = 16 };
+    static const int16_t dist_raw[N] = { 400 * 4 + 3, -5, -1, 0, 3, 4, 7, 8 };
+    static const uint32_t rate_raw[N] = { 1, 2048, 3072, 0, 4096 };
+    static const uint16_t sigma_raw[N] = { 256, 1, 129 };
+    static const uint8_t refl_raw[N] = { 3, 200, 255, 0 };
+    uint8_t d16[2 * N], s16[2 * N], r32[4 * N], st[N], nbt[N];
+    for (int k = 0; k < N; k++) {
+        d16[2 * k] = (uint8_t)dist_raw[k]; d16[2 * k + 1] = (uint8_t)((uint16_t)dist_raw[k] >> 8);
+        s16[2 * k] = (uint8_t)sigma_raw[k]; s16[2 * k + 1] = (uint8_t)(sigma_raw[k] >> 8);
+        for (int b = 0; b < 4; b++) r32[4 * k + b] = (uint8_t)(rate_raw[k] >> (8 * b));
+        st[k] = 5;
+        nbt[k] = 1;
+    }
+    uint8_t buf[512];
+    memset(buf, 0, sizeof buf);
+    buf[8] = 0x12; buf[9] = 0x34;
+    size_t i = 16;
+    i = synth_block(buf, i, 4, N, 0x54d0u, r32);           /* ambient   */
+    i = synth_block(buf, i, 1, N, 0xdb84u, nbt);           /* nb target */
+    i = synth_block(buf, i, 4, N, 0xdbc4u, r32);           /* signal    */
+    i = synth_block(buf, i, 2, N, 0xdec4u, s16);           /* sigma     */
+    i = synth_block(buf, i, 2, N, 0xdf44u, d16);           /* distance  */
+    i = synth_block(buf, i, 1, N, 0xe044u, refl_raw);      /* reflect.  */
+    i = synth_block(buf, i, 1, N, 0xe084u, st);            /* status    */
+    /* a header whose block runs past the end stops the walk before the footer */
+    buf[i] = 0xf0; buf[i + 1] = 0xff;
+    size_t len = 400;
+    buf[len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET] = 0x12;
+    buf[len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET + 1] = 0x34;
+    for (size_t w = 0; w < len; w += 4) {
+        uint8_t t0 = buf[w], t1 = buf[w + 1];
+        buf[w] = buf[w + 3]; buf[w + 1] = buf[w + 2]; buf[w + 2] = t1; buf[w + 3] = t0;
+    }
+
+    depz_vl53l8_frame f;
+    CHECK(depz_vl53l8_decode_frame(buf, len, 7, &f) == 0, "synthetic frame did not decode");
+    CHECK(f.resolution == N, "synthetic resolution %d", f.resolution);
+    static const int32_t dist_mm[8] = { 400, 0, 0, 0, 0, 1, 1, 2 };   /* /4 floored, < 0 -> 0 */
+    for (int k = 0; k < 8; k++)
+        CHECK(f.distance_mm[k] == dist_mm[k], "synthetic dist[%d]: got %d want %d",
+              k, f.distance_mm[k], dist_mm[k]);
+    static const double rate[5] = { 1.0 / 2048, 1.0, 1.5, 0.0, 2.0 }; /* kcps/SPAD */
+    for (int k = 0; k < 5; k++) {
+        CHECK(f.signal_per_spad[k] == rate[k], "synthetic signal[%d]: got %g", k, f.signal_per_spad[k]);
+        CHECK(f.ambient_per_spad[k] == rate[k], "synthetic ambient[%d]: got %g", k, f.ambient_per_spad[k]);
+    }
+    static const double sigma[3] = { 2.0, 1.0 / 128, 129.0 / 128 };  /* mm */
+    for (int k = 0; k < 3; k++)
+        CHECK(f.range_sigma_mm[k] == sigma[k], "synthetic sigma[%d]: got %g", k, f.range_sigma_mm[k]);
+    static const double refl[4] = { 1.5, 100.0, 127.5, 0.0 };        /* % */
+    for (int k = 0; k < 4; k++)
+        CHECK(f.reflectance[k] == refl[k], "synthetic reflectance[%d]: got %g", k, f.reflectance[k]);
+}
+
 static void test_vl53l8_replay(void)
 {
+    test_vl53l8_real_units();
     char path[512];
     snprintf(path, sizeof(path), "%s/recordings/vl53l8_8x8_15hz_3s.depzrec", DEPZ_VECTORS_DIR);
     char *rec = read_file(path);
     if (!rec) { g_fail++; return; }
+    const int f0 = g_fail;
 
     replay_ctx ctx;
     memset(&ctx, 0, sizeof(ctx));
@@ -1258,9 +1558,11 @@ static void test_vl53l8_replay(void)
             CHECK(f->nb_target_detected[z] == json_as_int(json_arr_get(nbt, z)),
                   "replay frame %zu nbt[%d]: got %d", i, z, f->nb_target_detected[z]);
         }
+        check_real_units(f, "vl53l8", i);
     }
     json_free(eroot);
     free(ctx.frames);
+    seen_id("recordings/vl53l8_8x8_15hz_3s.depzrec", f0);
 }
 
 /* ======================================================================== */
@@ -1272,6 +1574,7 @@ static void test_dataset(void)
     snprintf(path, sizeof(path), "%s/recordings/dataset_dual_sr04.depzdata", DEPZ_VECTORS_DIR);
     char *text = read_file(path);
     if (!text) { g_fail++; return; }
+    const int f0 = g_fail;
 
     depz_dataset *ds = depz_dataset_parse(text, strlen(text));
     CHECK(ds != NULL, "dataset parse");
@@ -1322,8 +1625,73 @@ static void test_dataset(void)
               "first record: %s @ %lld", r.device_id, (long long)r.t_host_us);
     }
 
+    /* record for record against the file itself: the header's devices, then
+     * every line (already host-time sorted) as one record, values included */
+    {
+        size_t line_no = 0, rec = 0;
+        char *p = text;
+        while (*p) {
+            char *nl = strchr(p, '\n');
+            if (nl) *nl = '\0';
+            if (*p == '{') {
+                json_value *v = json_parse(p);
+                CHECK(v != NULL, "dataset line %zu parses", line_no);
+                if (v && line_no == 0) {
+                    const json_value *devs = json_obj_get(v, "devices");
+                    CHECK(devs && devs->count == depz_dataset_device_count(ds), "dataset header devices");
+                    for (size_t i = 0; devs && i < devs->count; i++) {
+                        const json_value *w = devs->items[i];
+                        const json_value *sync = json_obj_get(w, "time_sync");
+                        depz_dataset_device dev;
+                        bool found = false;
+                        for (size_t k = 0; k < depz_dataset_device_count(ds); k++) {
+                            depz_dataset_get_device(ds, k, &dev);
+                            if (strcmp(dev.id, devs->keys[i]) == 0) { found = true; break; }
+                        }
+                        CHECK(found, "dataset device %s", devs->keys[i]);
+                        if (!found) continue;
+                        CHECK(strcmp(dev.serial, json_as_str(json_obj_get(w, "serial"))) == 0 &&
+                                  strcmp(dev.sensor_type, json_as_str(json_obj_get(w, "sensor_type"))) == 0 &&
+                                  strcmp(dev.software_name, json_as_str(json_obj_get(w, "software_name"))) == 0 &&
+                                  dev.offset_us == json_as_int(json_obj_get(sync, "offset_us")) &&
+                                  dev.rtt_us == json_as_int(json_obj_get(sync, "rtt_us")),
+                              "dataset device %s metadata", devs->keys[i]);
+                    }
+                } else if (v) {
+                    depz_dataset_record r;
+                    const json_value *val = json_obj_get(v, "v");
+                    int64_t echo = -1;
+                    char src[16] = "";
+                    CHECK(rec < depz_dataset_record_count(ds), "dataset line %zu: no record", line_no);
+                    if (rec < depz_dataset_record_count(ds)) {
+                        depz_dataset_get_record(ds, rec, &r);
+                        CHECK(strcmp(r.device_id, json_as_str(json_obj_get(v, "d"))) == 0 &&
+                                  r.t_host_us == json_as_int(json_obj_get(v, "t")) &&
+                                  strcmp(r.kind, json_as_str(json_obj_get(v, "k"))) == 0,
+                              "dataset record %zu: %s @ %lld %s", rec, r.device_id,
+                              (long long)r.t_host_us, r.kind);
+                        CHECK(val && val->count == 2 &&
+                                  depz_dataset_value_int(&r, "echo_us", &echo) == 0 &&
+                                  echo == json_as_int(json_obj_get(val, "echo_us")) &&
+                                  depz_dataset_value_str(&r, "source", src, sizeof(src)) == 0 &&
+                                  strcmp(src, json_as_str(json_obj_get(val, "source"))) == 0,
+                              "dataset record %zu value", rec);
+                    }
+                    rec++;
+                }
+                json_free(v);
+                line_no++;
+            }
+            if (!nl) break;
+            p = nl + 1;
+        }
+        CHECK(rec == depz_dataset_record_count(ds), "dataset: %zu lines, %zu records", rec,
+              depz_dataset_record_count(ds));
+    }
+
     depz_dataset_free(ds);
     free(text);
+    seen_id("recordings/dataset_dual_sr04.depzdata", f0);
 }
 
 /* ======================================================================== */
@@ -1334,6 +1702,7 @@ static void test_vl53l8_cnh(void)
 {
     json_value *root = load_vectors("vl53l8_cnh");
     if (!root) { g_fail++; return; }
+    const int f0 = g_fail;
 
     const json_value *cfg_j = json_obj_get(root, "config");
     depz_vl53l8ch_cnh_config cfg = {
@@ -1388,6 +1757,7 @@ static void test_vl53l8_cnh(void)
         if (ok) agg_pass++;
     }
     CHECK(agg_pass == want_nb, "cnh all aggregates pass: %d/%d", agg_pass, want_nb);
+    seen_id("vl53l8_cnh", f0);
 
     free(out);
     free(raw);
@@ -1407,6 +1777,7 @@ static void test_vl53l7(void)
     CHECK(json_arr_size(enc) > 0, "vl53l7 encode cases present");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
@@ -1428,6 +1799,7 @@ static void test_vl53l7(void)
                 (uint16_t)json_as_int(json_obj_get(c, "khz")), out);
         } else { CHECK(0, "unknown vl53l7 encode kind %s", kind); continue; }
         check_payload(name, out, n, want);
+        seen_case(c, f0);
     }
 
     /* transfer ceilings: the L8 2048 B read must be refused on L5/L7 */
@@ -1451,6 +1823,7 @@ static void test_vl53l7(void)
     CHECK(json_arr_size(dec) > 0, "vl53l7 decode cases present");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         CHECK(json_as_int(json_obj_get(c, "report")) == DEPZ_VL53L7_RPT_INFO,
               "vl53l7 decode %s report id", name);
@@ -1479,6 +1852,7 @@ static void test_vl53l7(void)
         CHECK(depz_vl53l7_unpack_info(p, DEPZ_VL53L7_INFO_SIZE - 1, &info) == -1,
               "vl53l7 info %s rejects 19 B", name);
         free(p);
+        seen_case(c, f0);
     }
 
     /* model: PID model -> VL53L([57])(CX|CH) in the device name -> vl53l7cx */
@@ -1486,6 +1860,7 @@ static void test_vl53l7(void)
     CHECK(json_arr_size(model) > 0, "vl53l7 model cases present");
     for (size_t i = 0; i < json_arr_size(model); i++) {
         const json_value *c = json_arr_get(model, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *um = json_obj_get(c, "usb_model");
         const char *usb_model = json_is_null(um) ? NULL : json_as_str(um);
@@ -1493,6 +1868,7 @@ static void test_vl53l7(void)
         const char *got = depz_vl53l7_model_str(depz_vl53l7_resolve_model(usb_model, dev));
         const char *want = json_as_str(json_obj_get(c, "expect"));
         CHECK(strcmp(got, want) == 0, "vl53l7 model %s: got %s want %s", name, got, want);
+        seen_case(c, f0);
     }
     /* regex semantics beyond the table: the first match wins even when it
      * names a part with no class (VL53L5CH -> default), a foreign PID model
@@ -1626,6 +2002,7 @@ static void replay_vl53l7_recording(const char *stem)
     snprintf(path, sizeof(path), "%s/recordings/%s.depzrec", DEPZ_VECTORS_DIR, stem);
     char *rec = read_file(path);
     if (!rec) { g_fail++; return; }
+    const int f0 = g_fail;
 
     l7_replay_ctx *ctx = (l7_replay_ctx *)calloc(1, sizeof(*ctx));
     ctx->l8ch = strncmp(stem, "vl53l8ch", 8) == 0;
@@ -1741,6 +2118,7 @@ static void replay_vl53l7_recording(const char *stem)
             CHECK(f->nb_target_detected[z] == json_as_int(json_arr_get(nbt, z)),
                   "%s frame %zu nbt[%d]: got %d", stem, i, z, f->nb_target_detected[z]);
         }
+        check_real_units(f, stem, i);
         const json_value *ecnh = json_obj_get(e, "cnh_raw");
         if (ecnh && !json_is_null(ecnh)) {
             const char *want = json_as_str(ecnh);
@@ -1757,6 +2135,11 @@ static void replay_vl53l7_recording(const char *stem)
         }
     }
     json_free(eroot);
+    {
+        char id[256];
+        snprintf(id, sizeof(id), "recordings/%s.depzrec", stem);
+        seen_id(id, f0);
+    }
 out:
     for (size_t i = 0; i < ctx->n; i++) free(ctx->frames[i].cnh);
     free(ctx->frames);
@@ -1792,6 +2175,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(enc) > 0, "vl53lx encode cases present");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
@@ -1832,6 +2216,7 @@ static void test_vl53lx(void)
             CHECK(n == 6 + 3 * ns, "vl53lx %s length 6+3n: got %zu", name, n);
         } else { CHECK(0, "unknown vl53lx encode kind %s", kind); continue; }
         check_payload(name, out, n, want);
+        seen_case(c, f0);
     }
     /* refusals: five clear steps, address width 0 / 3 */
     {
@@ -1852,6 +2237,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(dec) > 0, "vl53lx decode cases present");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         CHECK(json_as_int(json_obj_get(c, "report")) == DEPZ_VL53LX_RPT_INFO,
               "vl53lx decode %s report id", name);
@@ -1881,6 +2267,7 @@ static void test_vl53lx(void)
         CHECK(depz_vl53lx_unpack_info(p, DEPZ_VL53LX_INFO_SIZE - 1, &info) == -1,
               "vl53lx info %s rejects 22 B", name);
         free(p);
+        seen_case(c, f0);
     }
 
     /* products: the table, in order, with the default driver's bridge params */
@@ -1890,6 +2277,7 @@ static void test_vl53lx(void)
           (int)DEPZ_VL53LX_PRODUCT_COUNT);
     for (size_t i = 0; i < json_arr_size(prods); i++) {
         const json_value *r = json_arr_get(prods, i);
+        const int f0 = g_fail;
         const char *pname = json_as_str(json_obj_get(r, "product"));
         const depz_vl53lx_product_info *row = depz_vl53lx_product_get((depz_vl53lx_product)i);
         CHECK(row && strcmp(row->name, pname) == 0, "vl53lx products[%zu]: got %s want %s",
@@ -1935,6 +2323,7 @@ static void test_vl53lx(void)
                   "vl53lx %s clear_steps[%zu]: got 0x%04x<-%u", pname, k,
                   row->clear[k].addr, row->clear[k].value);
         }
+        seen_case(r, f0);
     }
     CHECK(depz_vl53lx_product_get(DEPZ_VL53LX_PRODUCT_NONE) == NULL &&
               depz_vl53lx_product_get(DEPZ_VL53LX_PRODUCT_COUNT) == NULL,
@@ -1945,6 +2334,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(model) > 0, "vl53lx model cases present");
     for (size_t i = 0; i < json_arr_size(model); i++) {
         const json_value *c = json_arr_get(model, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *um = json_obj_get(c, "usb_model");
         const char *usb_model = json_is_null(um) ? NULL : json_as_str(um);
@@ -1967,6 +2357,7 @@ static void test_vl53lx(void)
             CHECK(got_p && strcmp(got_p->name, json_as_str(ep)) == 0,
                   "vl53lx model %s product: got %s want %s", name,
                   got_p ? got_p->name : "null", json_as_str(ep));
+        seen_case(c, f0);
     }
     /* regex semantics beyond the table: leftmost `VL53L\d` match decides,
      * greedy [A-Z0-9]* tail, a PID model outside the family falls through. */
@@ -1988,6 +2379,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(die) > 0, "vl53lx die_block cases present");
     for (size_t i = 0; i < json_arr_size(die); i++) {
         const json_value *c = json_arr_get(die, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *var = json_as_str(json_obj_get(c, "variant"));
         depz_vl53lx_die_variant v;
@@ -2019,6 +2411,7 @@ static void test_vl53lx(void)
         CHECK(depz_vl53lx_decode_die_block(raw, DEPZ_VL53LX_DIE_BLOCK_LEN - 1, v, &r) == -1,
               "vl53lx die_block %s rejects 16 B", name);
         free(raw);
+        seen_case(c, f0);
     }
 
     /* l0x_raw: raw fields of the VL53L0X 12-byte 0x14 block */
@@ -2026,6 +2419,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(l0x) > 0, "vl53lx l0x_raw cases present");
     for (size_t i = 0; i < json_arr_size(l0x); i++) {
         const json_value *c = json_arr_get(l0x, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
         const json_value *e = json_obj_get(c, "expect");
@@ -2048,6 +2442,7 @@ static void test_vl53lx(void)
         CHECK(depz_vl53lx_decode_l0x_raw(raw, DEPZ_VL53LX_L0X_BLOCK_LEN - 1, &r) == -1,
               "vl53lx l0x_raw %s rejects 11 B", name);
         free(raw);
+        seen_case(c, f0);
     }
 
     /* histogram_raw: status bytes + 24 bins (bin-23 MSB/LSB patch) */
@@ -2055,6 +2450,7 @@ static void test_vl53lx(void)
     CHECK(json_arr_size(hist) > 0, "vl53lx histogram_raw cases present");
     for (size_t i = 0; i < json_arr_size(hist); i++) {
         const json_value *c = json_arr_get(hist, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "raw")), &raw);
         const json_value *e = json_obj_get(c, "expect");
@@ -2090,6 +2486,7 @@ static void test_vl53lx(void)
         CHECK(depz_vl53lx_decode_histogram_raw(raw, DEPZ_VL53LX_HISTOGRAM_BLOCK_LEN - 1, &r) == -1,
               "vl53lx histogram_raw %s rejects 82 B", name);
         free(raw);
+        seen_case(c, f0);
     }
 
     json_free(root);
@@ -2129,6 +2526,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(enc) > 0, "bno055 encode cases present");
     for (size_t i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         const char *want = json_as_str(json_obj_get(c, "payload"));
@@ -2154,6 +2552,7 @@ static void test_bno055(void)
             n = 0; /* empty payload */
         } else { CHECK(0, "unknown bno055 encode kind %s", kind); continue; }
         check_payload(name, out, n, want);
+        seen_case(c, f0);
     }
     /* refusals: write data length outside 1..128 */
     {
@@ -2171,6 +2570,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(dec) > 0, "bno055 decode cases present");
     for (size_t i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int64_t report = json_as_int(json_obj_get(c, "report"));
         uint8_t *p; size_t n = hex_decode(json_as_str(json_obj_get(c, "payload")), &p);
@@ -2247,6 +2647,7 @@ static void test_bno055(void)
             CHECK(0, "bno055 decode %s: unknown report %lld", name, (long long)report);
         }
         free(p);
+        seen_case(c, f0);
     }
 
     /* units: UNIT_SEL flags, repack drops the undefined bits */
@@ -2254,6 +2655,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(units) > 0, "bno055 units cases present");
     for (size_t i = 0; i < json_arr_size(units); i++) {
         const json_value *c = json_arr_get(units, i);
+        const int f0 = g_fail;
         int64_t sel = json_as_int(json_obj_get(c, "unit_sel"));
         const json_value *e = json_obj_get(c, "expect");
         depz_bno055_units u;
@@ -2278,6 +2680,7 @@ static void test_bno055(void)
                   depz_bno055_euler_lsb(&u) == (u.euler_rad ? 900.0 : 16.0) &&
                   depz_bno055_temp_lsb(&u) == (u.temp_f ? 0.5 : 1.0),
               "bno055 units 0x%02llx LSBs", (long long)sel);
+        seen_case(c, f0);
     }
     CHECK(DEPZ_BNO055_MAG_LSB == 16.0 && DEPZ_BNO055_QUAT_LSB == 16384.0 &&
               DEPZ_BNO055_FUSION_ACCEL_LSB == 100.0, "bno055 fixed LSBs");
@@ -2287,6 +2690,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(cs) > 0, "bno055 calib_stat cases present");
     for (size_t i = 0; i < json_arr_size(cs); i++) {
         const json_value *c = json_arr_get(cs, i);
+        const int f0 = g_fail;
         int64_t v = json_as_int(json_obj_get(c, "value"));
         const json_value *e = json_obj_get(c, "expect");
         depz_bno055_calib_status s;
@@ -2307,6 +2711,7 @@ static void test_bno055(void)
         CHECK(depz_bno055_pack_calib_status(&s) == v,
               "bno055 calib_stat 0x%02llx repack: got 0x%02x", (long long)v,
               depz_bno055_pack_calib_status(&s));
+        seen_case(c, f0);
     }
 
     /* calibration_profile: 11 x i16 LE, byte-exact repack */
@@ -2314,6 +2719,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(prof) > 0, "bno055 calibration_profile cases present");
     for (size_t i = 0; i < json_arr_size(prof); i++) {
         const json_value *c = json_arr_get(prof, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *hex = json_as_str(json_obj_get(c, "bytes"));
         uint8_t *raw; size_t n = hex_decode(hex, &raw);
@@ -2348,6 +2754,7 @@ static void test_bno055(void)
         CHECK(depz_bno055_unpack_calib_profile(raw, n - 1, &pr) == -1,
               "bno055 calibration_profile %s rejects 21 B", name);
         free(raw);
+        seen_case(c, f0);
     }
 
     /* axis_remap: placements P0..P7, unpack / repack / placement lookup */
@@ -2355,6 +2762,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(ar) == 8, "bno055 axis_remap: %zu placements", json_arr_size(ar));
     for (size_t i = 0; i < json_arr_size(ar); i++) {
         const json_value *c = json_arr_get(ar, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t cfg = (uint8_t)json_as_int(json_obj_get(c, "config"));
         uint8_t sgn = (uint8_t)json_as_int(json_obj_get(c, "sign"));
@@ -2389,6 +2797,7 @@ static void test_bno055(void)
               "bno055 placement %s matches the vector", name);
         CHECK(DEPZ_BNO055_PLACEMENTS[i][0] == cfg && DEPZ_BNO055_PLACEMENTS[i][1] == sgn,
               "bno055 PLACEMENTS[%zu] = %s", i, name);
+        seen_case(c, f0);
     }
     {
         depz_bno055_axis_remap pl;
@@ -2405,6 +2814,7 @@ static void test_bno055(void)
     CHECK(json_arr_size(bad) > 0, "bno055 axis_remap_invalid cases present");
     for (size_t i = 0; i < json_arr_size(bad); i++) {
         const json_value *c = json_arr_get(bad, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         depz_bno055_axis_remap a = {
             (uint8_t)json_as_int(json_obj_get(c, "x")),
@@ -2413,6 +2823,7 @@ static void test_bno055(void)
         uint8_t c2 = 0xAA, s2 = 0xBB;
         CHECK(depz_bno055_pack_axis_remap(&a, &c2, &s2) == -1 && c2 == 0xAA && s2 == 0xBB,
               "bno055 axis_remap_invalid %s refused", name);
+        seen_case(c, f0);
     }
     {
         depz_bno055_axis_remap a = { 3, 1, 2, false, false, false };
@@ -2423,6 +2834,7 @@ static void test_bno055(void)
 
     /* sensor_config: page-1 ACC / GYR / MAG config codes */
     const json_value *sc = json_obj_get(root, "sensor_config");
+    const int sc_f0 = g_fail;
     const json_value *acc = json_obj_get(sc, "accel");
     CHECK(json_arr_size(acc) > 0, "bno055 sensor_config accel cases present");
     for (size_t i = 0; i < json_arr_size(acc); i++) {
@@ -2486,12 +2898,14 @@ static void test_bno055(void)
         depz_bno055_unpack_mag_config(0x8B, &m);
         CHECK(depz_bno055_pack_mag_config(&m) == 0x0B, "bno055 mag_config drops bit 7");
     }
+    seen_id("bno055/sensor_config", sc_f0);
 
     /* blocks: channel extraction from any register window */
     const json_value *blocks = json_obj_get(root, "blocks");
     CHECK(json_arr_size(blocks) > 0, "bno055 blocks cases present");
     for (size_t i = 0; i < json_arr_size(blocks); i++) {
         const json_value *c = json_arr_get(blocks, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         uint8_t addr = (uint8_t)json_as_int(json_obj_get(c, "addr"));
         uint8_t *raw; size_t n = hex_decode(json_as_str(json_obj_get(c, "data")), &raw);
@@ -2522,6 +2936,7 @@ static void test_bno055(void)
                   "bno055 block %s calib_stat: got %u", name, b.calib_stat);
         CHECK(e->count == 9, "bno055 block %s: %zu expected fields, 9 checked", name, e->count);
         free(raw);
+        seen_case(c, f0);
     }
     /* window edges beyond the vectors: the full block, and one byte short */
     {
@@ -2548,53 +2963,6 @@ static void test_bno055(void)
 /* ======================================================================== */
 /* tmf8829.json + tmf8829_frame_time.json (contract 14)                      */
 /* ======================================================================== */
-
-/* SHA-256 (FIPS 180-4), test-runner only: the vectors pin frame and image
- * bytes by digest. */
-static void sha256_hex(const uint8_t *msg, size_t len, char out[65])
-{
-    static const uint32_t K[64] = {
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-    uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-    size_t total = ((len + 9 + 63) / 64) * 64, off;
-#define ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
-    for (off = 0; off < total; off += 64) {
-        uint32_t w[64], a, b, c, d, e, f, g, hh;
-        int i;
-        for (i = 0; i < 64; i++) {
-            size_t k = off + (size_t)i;
-            uint8_t byte;
-            if (k < len) byte = msg[k];
-            else if (k == len) byte = 0x80;
-            else if (k >= total - 8) byte = (uint8_t)(((uint64_t)len * 8) >> (8 * (total - 1 - k)));
-            else byte = 0;
-            if (i % 4 == 0) w[i / 4] = 0;
-            w[i / 4] |= (uint32_t)byte << (8 * (3 - i % 4));
-        }
-        for (i = 16; i < 64; i++) {
-            uint32_t s0 = ROR(w[i - 15], 7) ^ ROR(w[i - 15], 18) ^ (w[i - 15] >> 3);
-            uint32_t s1 = ROR(w[i - 2], 17) ^ ROR(w[i - 2], 19) ^ (w[i - 2] >> 10);
-            w[i] = w[i - 16] + s0 + w[i - 7] + s1;
-        }
-        a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4]; f = h[5]; g = h[6]; hh = h[7];
-        for (i = 0; i < 64; i++) {
-            uint32_t t1 = hh + (ROR(e, 6) ^ ROR(e, 11) ^ ROR(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i];
-            uint32_t t2 = (ROR(a, 2) ^ ROR(a, 13) ^ ROR(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
-            hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
-        }
-        h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
-    }
-#undef ROR
-    for (off = 0; off < 8; off++) snprintf(out + 8 * off, 9, "%08x", h[off]);
-}
 
 /* A JSON int array (or null when absent) against n values. */
 static void check_ints(const char *name, const char *field, const json_value *want, bool present,
@@ -2654,6 +3022,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(enc) > 0, "tmf8829 encode cases present");
     for (i = 0; i < json_arr_size(enc); i++) {
         const json_value *c = json_arr_get(enc, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int64_t cmd = json_as_int(json_obj_get(c, "cmd"));
         uint8_t out[1 + DEPZ_TMF8829_WRITE_MAX];
@@ -2671,6 +3040,7 @@ static void test_tmf8829(void)
                                                (int)json_as_int(json_obj_get(c, "flags")), out);
         }
         check_payload(name, out, n, json_as_str(json_obj_get(c, "payload")));
+        seen_case(c, f0);
     }
 
     /* encode_errors: refused before anything is written */
@@ -2678,6 +3048,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(ee) > 0, "tmf8829 encode_errors present");
     for (i = 0; i < json_arr_size(ee); i++) {
         const json_value *c = json_arr_get(ee, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const char *kind = json_as_str(json_obj_get(c, "kind"));
         uint8_t out[2 + DEPZ_TMF8829_WRITE_MAX + 8];
@@ -2696,6 +3067,7 @@ static void test_tmf8829(void)
                                                (int)json_as_int(json_obj_get(c, "flags")), out);
         }
         CHECK(n == 0, "tmf8829 encode_error %s accepted", name);
+        seen_case(c, f0);
     }
     {
         uint8_t out[1 + DEPZ_TMF8829_WRITE_MAX], d = 0;
@@ -2709,6 +3081,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(dec) > 0, "tmf8829 decode cases present");
     for (i = 0; i < json_arr_size(dec); i++) {
         const json_value *c = json_arr_get(dec, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         int64_t rpt = json_as_int(json_obj_get(c, "report"));
         const json_value *e = json_obj_get(c, "expect");
@@ -2755,6 +3128,7 @@ static void test_tmf8829(void)
             TMF_EQ(e, "fifo_status", r.fifo_status);
         }
         free(p);
+        seen_case(c, f0);
     }
 
     /* reassembly */
@@ -2762,6 +3136,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(rs) > 0, "tmf8829 reassembly cases present");
     for (i = 0; i < json_arr_size(rs); i++) {
         const json_value *c = json_arr_get(rs, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *chunks = json_obj_get(c, "chunks");
         const json_value *e = json_obj_get(c, "expect");
@@ -2793,6 +3168,7 @@ static void test_tmf8829(void)
         TMF_EQ(e, "completed", ra->completed);
         TMF_EQ(e, "discarded", ra->discarded);
         TMF_EQ(e, "seq_gaps", ra->seq_gaps);
+        seen_case(c, f0);
     }
 
     /* frames: header / footer, problems, pixels or data digest */
@@ -2800,6 +3176,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(fr) > 0, "tmf8829 frames present");
     for (i = 0; i < json_arr_size(fr); i++) {
         const json_value *c = json_arr_get(fr, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(c, "name"));
         const json_value *h = json_obj_get(c, "header");
         const json_value *probs = json_obj_get(c, "problems");
@@ -2848,6 +3225,7 @@ static void test_tmf8829(void)
             CHECK(depz_tmf8829_parse_results(raw, n, &f, res, NULL, 0) == -1, "tmf8829 %s: not results", name);
         }
         free(raw);
+        seen_case(c, f0);
     }
     {
         uint8_t shortf[32] = {0};
@@ -2860,6 +3238,7 @@ static void test_tmf8829(void)
     CHECK(json_arr_size(ms) > 0, "tmf8829 measurements present");
     for (i = 0; i < json_arr_size(ms); i++) {
         const json_value *s = json_arr_get(ms, i);
+        const int f0 = g_fail;
         const char *name = json_as_str(json_obj_get(s, "name"));
         const json_value *frames = json_obj_get(s, "frames");
         const json_value *expect = json_obj_get(s, "expect");
@@ -2912,6 +3291,7 @@ static void test_tmf8829(void)
         }
         CHECK(got == json_arr_size(expect), "tmf8829 %s: %zu measurements, want %zu", name, got,
               json_arr_size(expect));
+        seen_case(s, f0);
     }
 
     /* the half-frame edge cases (no vector): orphan second half, two first
@@ -2967,6 +3347,7 @@ static void test_tmf8829(void)
     /* config page fields */
     const json_value *cfg = json_obj_get(root, "config");
     {
+        const int f0 = g_fail;
         uint8_t *page, pg[DEPZ_TMF8829_CFG_SIZE];
         size_t n = hex_decode(json_as_str(json_obj_get(cfg, "page")), &page);
         const json_value *fields = json_obj_get(cfg, "fields");
@@ -3010,6 +3391,7 @@ static void test_tmf8829(void)
                   "tmf8829 cfg unknown field / negative value");
         }
         free(page);
+        seen_id("tmf8829/config", f0);
     }
     /* presets */
     {
@@ -3025,12 +3407,14 @@ static void test_tmf8829(void)
     /* firmware image */
     {
         const json_value *fw = json_obj_get(root, "firmware");
+        const int f0 = g_fail;
         char sha[65];
         sha256_hex(depz_tmf8829_firmware, depz_tmf8829_firmware_len, sha);
         CHECK(json_as_int(json_obj_get(fw, "load_addr")) == DEPZ_TMF8829_FIRMWARE_LOAD_ADDR, "tmf8829 firmware load_addr");
         CHECK(json_as_int(json_obj_get(fw, "size")) == (int64_t)depz_tmf8829_firmware_len, "tmf8829 firmware size");
         CHECK(json_as_int(json_obj_get(fw, "words")) == (int64_t)(depz_tmf8829_firmware_len / 4), "tmf8829 firmware words");
         CHECK(!strcmp(sha, json_as_str(json_obj_get(fw, "sha256"))), "tmf8829 firmware sha256 %s", sha);
+        seen_id("tmf8829/firmware", f0);
     }
 
     free(res);
@@ -3038,6 +3422,65 @@ static void test_tmf8829(void)
     free(b);
     free(ra);
     json_free(root);
+}
+
+/* recordings/tmf8829_frame_time.jsonl: the board's own capture the vector was
+ * generated from, replayed raw — each `scenario` line starts a stream. */
+static void test_tmf8829_frame_time_recording(void)
+{
+    char path[512];
+    char *text, *p;
+    depz_tmf8829_clock clock;
+    depz_tmf8829_timer timer;
+    size_t checked = 0, lines = 0;
+    const int f0 = g_fail;
+    snprintf(path, sizeof(path), "%s/recordings/tmf8829_frame_time.jsonl", DEPZ_VECTORS_DIR);
+    text = read_file(path);
+    if (!text) { g_fail++; return; }
+    depz_tmf8829_clock_reset(&clock);
+    depz_tmf8829_timer_reset(&timer);
+    for (p = text; *p;) {
+        char *nl = strchr(p, '\n');
+        if (nl) *nl = '\0';
+        if (*p == '{') {
+            json_value *v = json_parse(p);
+            CHECK(v != NULL, "tmf8829_frame_time.jsonl line %zu parses", lines + 1);
+            if (v && json_obj_get(v, "scenario")) {
+                depz_tmf8829_clock_reset(&clock);
+                depz_tmf8829_timer_reset(&timer);
+            } else if (v) {
+                int64_t fid = json_as_int(json_obj_get(v, "id")), ts = json_as_int(json_obj_get(v, "ts"));
+                uint32_t tick = (uint32_t)json_as_int(json_obj_get(v, "systick"));
+                unsigned kind = (unsigned)fid & 0xF0u;
+                const json_value *exp = json_obj_get(v, "exp");
+                if (kind != 0x30) {
+                    uint8_t flags = depz_tmf8829_clock_add(&clock, ts, tick);
+                    if (kind == 0x20) {
+                        depz_tmf8829_timer_histograms(&timer);
+                    } else {
+                        depz_tmf8829_frame_time t;
+                        depz_tmf8829_timer_results(&timer, &clock, (unsigned)fid & 0x0Fu, tick,
+                                                   (uint32_t)json_as_int(json_obj_get(v, "t0")),
+                                                   (uint32_t)json_as_int(json_obj_get(v, "t1")), ts,
+                                                   json_as_int(json_obj_get(v, "edge_us")), flags, &t);
+                        CHECK(t.timestamp_us == json_as_int(json_obj_get(exp, "timestamp_us")) &&
+                                  t.t1_len_us == json_as_int(json_obj_get(exp, "t1_len_us")) &&
+                                  t.flags == json_as_int(json_obj_get(exp, "flags")) &&
+                                  clock.ratio_q16 == json_as_int(json_obj_get(exp, "ratio_q16")),
+                              "tmf8829_frame_time.jsonl line %zu", lines + 1);
+                        checked++;
+                    }
+                }
+            }
+            json_free(v);
+            lines++;
+        }
+        if (!nl) break;
+        p = nl + 1;
+    }
+    free(text);
+    CHECK(checked == 970, "tmf8829_frame_time.jsonl: %zu results frames checked, want 970", checked);
+    seen_id("recordings/tmf8829_frame_time.jsonl", f0);
 }
 
 /* tmf8829_frame_time.json: the clock model and capture time, bit for bit. */
@@ -3062,6 +3505,7 @@ static void test_tmf8829_frame_time(void)
     streams = json_obj_get(root, "streams");
     for (i = 0; i < json_arr_size(streams); i++) {
         const json_value *s = json_arr_get(streams, i);
+        const int f0 = g_fail;
         const char *scen = json_as_str(json_obj_get(s, "scenario"));
         const json_value *frames = json_obj_get(s, "frames");
         depz_tmf8829_clock clock;
@@ -3087,6 +3531,7 @@ static void test_tmf8829_frame_time(void)
                   t.flags, (long long)COL(row, 10), clock.ratio_q16, (long long)COL(row, 11));
             checked++;
         }
+        seen_case(s, f0);
     }
 #undef COL
     CHECK(checked == 970, "tmf8829_frame_time: %zu results frames checked, want 970", checked);
@@ -3107,6 +3552,442 @@ static void test_tmf8829_frame_time(void)
               "tmf8829 clock: -46 us outside the floored tol -> CLOCK_RESET");
     }
     json_free(root);
+    test_tmf8829_frame_time_recording();
+}
+
+/* ======================================================================== */
+/* probe.json — class resolution (contract 02 §4.4)                          */
+/* ======================================================================== */
+static void test_probe(void)
+{
+    json_value *root = load_vectors("probe");
+    if (!root) { g_fail++; return; }
+    {
+        const json_value *names = json_obj_get(root, "classes");
+        const int f0 = g_fail;
+        CHECK(json_arr_size(names) == DEPZ_SENSOR_CLASS_COUNT, "probe classes: %zu names, SDK has %d",
+              json_arr_size(names), DEPZ_SENSOR_CLASS_COUNT);
+        for (size_t i = 0; i < json_arr_size(names) && i < DEPZ_SENSOR_CLASS_COUNT; i++) {
+            const char *want = json_as_str(json_arr_get(names, i));
+            const char *got = depz_sensor_class_name(i);
+            CHECK(got && want && strcmp(got, want) == 0, "probe class %zu: expected %s got %s", i, want,
+                  got ? got : "NULL");
+        }
+        CHECK(depz_sensor_class_name(DEPZ_SENSOR_CLASS_COUNT) == NULL, "probe class past the end");
+        seen_id("probe/classes", f0);
+    }
+    const json_value *cases = json_obj_get(root, "resolve");
+    for (size_t i = 0; i < json_arr_size(cases); i++) {
+        const json_value *c = json_arr_get(cases, i);
+        const int f0 = g_fail;
+        const json_value *vv = json_obj_get(c, "usb_vid"), *pv = json_obj_get(c, "usb_pid");
+        int vid = json_is_null(vv) ? -1 : (int)json_as_int(vv);
+        int pid = json_is_null(pv) ? -1 : (int)json_as_int(pv);
+        const char *want = json_as_str(json_obj_get(c, "class"));
+        const char *got = depz_resolve_sensor_class(json_as_str(json_obj_get(c, "software_name")),
+                                                    json_as_str(json_obj_get(c, "device_name")), vid, pid);
+        CHECK(got && want && strcmp(got, want) == 0, "probe resolve %s: expected %s got %s",
+              json_as_str(json_obj_get(c, "name")), want, got ? got : "NULL");
+        seen_case(c, f0);
+    }
+    json_free(root);
+}
+
+/* ======================================================================== */
+/* input_rules groups (contract 07 §3), in every file that has one:       */
+/* short payloads rejected, trailing bytes ignored, every encoder argument    */
+/* range-checked. An argument outside the C parameter's own type (300 for a   */
+/* uint8_t, -1 for an unsigned) cannot be passed at all: the case is the C    */
+/* type's rejection (contract 16 §1), asserted as such. Everything inside the */
+/* type goes through the SDK function, which must refuse or decode.           */
+/* ======================================================================== */
+
+/* `key` of `in` as an integer in [lo, hi]; false when absent / outside. */
+static bool ir_int(const json_value *in, const char *key, int64_t lo, int64_t hi, int64_t *out)
+{
+    const json_value *v = json_obj_get(in, key);
+    if (!v || v->kind != JSON_INT || v->range != 0 || v->i < lo || v->i > hi) return false;
+    *out = v->i;
+    return true;
+}
+#define IR_INT(var, key, lo, hi) do { int64_t t_; if (!ir_int(in, key, lo, hi, &t_)) return true; var = t_; } while (0)
+#define IR_U8(var, key)  IR_INT(var, key, 0, 0xFF)
+#define IR_U16(var, key) IR_INT(var, key, 0, 0xFFFF)
+#define IR_U32(var, key) IR_INT(var, key, 0, 0xFFFFFFFFLL)
+#define IR_I32(var, key) IR_INT(var, key, INT32_MIN, INT32_MAX)
+
+static int64_t ex_int(const json_value *e, const char *k) { return json_as_int(json_obj_get(e, k)); }
+
+/* Run one input_rules case; returns true when the SDK (or the C type)
+ * refused it, else checks the decoded / encoded values against `e`. */
+static bool ir_run(const char *label, const char *op, const json_value *in, const json_value *e)
+{
+    const char *kind = json_as_str(json_obj_get(in, "kind"));
+    uint8_t out[256];
+    size_t n = 0;
+    if (!strcmp(op, "common_decode") || !strcmp(op, "sr04_decode")) {
+        int rpt = (int)json_as_int(json_obj_get(in, "report"));
+        uint8_t *p; size_t pn = hex_decode(json_as_str(json_obj_get(in, "payload")), &p);
+        bool rej = false;
+        if (!strcmp(op, "common_decode") && rpt == DEPZ_RPT_STATUS) {
+            depz_status_report r;
+            rej = depz_unpack_status(p, pn, &r) != 0;
+            if (!rej) CHECK(r.cmd == ex_int(e, "cmd") && r.status == ex_int(e, "status"), "%s: fields", label);
+        } else if (!strcmp(op, "common_decode") && rpt == DEPZ_RPT_TEXT) {
+            depz_text_report r;
+            rej = depz_unpack_text(p, pn, &r) != 0;
+            if (!rej) CHECK(r.cmd == ex_int(e, "cmd") && !strcmp(r.text, json_as_str(json_obj_get(e, "text"))),
+                            "%s: fields", label);
+        } else if (!strcmp(op, "common_decode") && rpt == DEPZ_RPT_TEMPERATURE) {
+            depz_temperature_report r;
+            rej = depz_unpack_temperature(p, pn, &r) != 0;
+            if (!rej) CHECK((int64_t)r.timestamp_us == ex_int(e, "timestamp_us") &&
+                            r.raw_decidegrees == ex_int(e, "raw_decidegrees"), "%s: fields", label);
+        } else if (!strcmp(op, "common_decode") && rpt == DEPZ_RPT_SEQUENCE_ERROR) {
+            depz_sequence_error_report r;
+            rej = depz_unpack_sequence_error(p, pn, &r) != 0;
+            if (!rej) CHECK(r.expected_seq == ex_int(e, "expected_seq") &&
+                            r.received_seq == ex_int(e, "received_seq"), "%s: fields", label);
+        } else if (rpt == DEPZ_SR04_RPT_DATA) {
+            depz_sr04_data d;
+            rej = depz_sr04_unpack_data(p, pn, &d) != 0;
+            if (!rej) CHECK(d.source_cmd == ex_int(e, "source_cmd") && (int64_t)d.timestamp_us == ex_int(e, "timestamp_us") &&
+                            d.echo_time_us == ex_int(e, "echo_time_us"), "%s: fields", label);
+        } else if (rpt == DEPZ_SR04_RPT_SAMPLE_PERIOD) {
+            uint32_t v;
+            rej = depz_sr04_unpack_sample_period(p, pn, &v) != 0;
+            if (!rej) CHECK((int64_t)v == ex_int(e, "period_us"), "%s: period", label);
+        } else if (rpt == DEPZ_SR04_RPT_ECHO_DECAY) {
+            uint16_t v;
+            rej = depz_sr04_unpack_echo_decay(p, pn, &v) != 0;
+            if (!rej) CHECK(v == ex_int(e, "decay_us"), "%s: decay", label);
+        } else {
+            CHECK(0, "%s: unknown report 0x%02x", label, rpt);
+        }
+        free(p);
+        return rej;
+    }
+    if (!strcmp(op, "common_encode")) {
+        if (!strcmp(kind, "sync_pin_config")) {
+            depz_sync_pin_config c;
+            IR_U8(c.pin, "pin"); IR_U8(c.mode, "mode"); IR_U8(c.polarity, "polarity");
+            n = depz_pack_sync_pin_config(&c, out);
+        } else if (!strcmp(kind, "sync_time_request")) {
+            const json_value *v = json_obj_get(in, "pc_timestamp_us");
+            uint64_t t;
+            if (!v || v->kind != JSON_INT || v->range == 2 || (v->range == 0 && v->i < 0)) return true; /* not a uint64_t */
+            t = v->range == 1 ? v->u : (uint64_t)v->i;
+            n = depz_pack_sync_time(t, out);
+        }
+    } else if (!strcmp(op, "sr04_encode")) {
+        if (!strcmp(kind, "set_sample_period")) { uint32_t v; IR_U32(v, "period_us"); n = depz_sr04_pack_sample_period(v, out); }
+        else if (!strcmp(kind, "set_echo_decay")) { uint16_t v; IR_U16(v, "decay_us"); n = depz_sr04_pack_echo_decay(v, out); }
+    } else if (!strcmp(op, "framing_encode")) {
+        uint8_t cmd; int ct; unsigned seq;
+        size_t on = 0;
+        uint8_t *p; size_t pn;
+        IR_U8(cmd, "cmd"); IR_I32(ct, "crc_type"); IR_INT(seq, "seq", 0, UINT32_MAX);
+        pn = hex_decode(json_as_str(json_obj_get(in, "payload")), &p);
+        uint8_t frame[DEPZ_MAX_FRAME];
+        int rc = depz_build_packet(cmd, pn ? p : NULL, pn, seq, (depz_crc_type)ct, frame, sizeof frame, &on);
+        free(p);
+        if (rc != 0) return true;
+        check_payload(label, frame, on, json_as_str(json_obj_get(e, "frame")));
+        return false;
+    } else if (!strcmp(op, "bno055_encode")) {
+        if (!strcmp(kind, "read_reg")) {
+            uint8_t a, l; IR_U8(a, "addr"); IR_U8(l, "len");
+            n = depz_bno055_pack_read_reg(a, l, out);
+        } else if (!strcmp(kind, "start_stream")) {
+            uint8_t t, a, l; uint16_t per;
+            IR_U8(t, "trigger"); IR_U8(a, "addr"); IR_U8(l, "len"); IR_U16(per, "period_ms");
+            n = depz_bno055_pack_start_stream(t, a, l, per, out);
+        }
+    } else if (!strcmp(op, "bno055_sensor_config")) {
+        uint8_t *b; size_t bn = hex_decode(json_as_str(json_obj_get(in, "bytes")), &b);
+        depz_bno055_gyro_config g;
+        int rc = depz_bno055_unpack_gyro_config_n(b, bn, &g);
+        free(b);
+        if (rc != 0) return true;
+        CHECK(g.range == ex_int(e, "range") && g.bandwidth == ex_int(e, "bandwidth") && g.power == ex_int(e, "power"),
+              "%s: fields", label);
+        return false;
+    } else if (!strcmp(op, "bno086_shtp_header_pack")) {
+        depz_shtp_header h;
+        const json_value *cv = json_obj_get(in, "continuation");
+        IR_U16(h.length, "length"); IR_U8(h.channel, "channel"); IR_U8(h.seq, "seq");
+        h.continuation = json_as_bool(cv);
+        if (depz_shtp_pack_header_checked(&h, out) != 0) return true;
+        check_payload(label, out, 4, json_as_str(json_obj_get(e, "bytes")));
+        return false;
+    } else if (!strcmp(op, "bno086_shtp_tx_seq")) {
+        depz_shtp_layer l;
+        const json_value *pk = json_obj_get(in, "packets");
+        bool rej = false;
+        depz_shtp_init(&l);
+        for (size_t k = 0; k < json_arr_size(pk) && !rej; k++) {
+            const json_value *pv = json_arr_get(pk, k);
+            int64_t ch;
+            uint8_t *p; size_t pn;
+            if (!ir_int(pv, "channel", 0, 0xFF, &ch)) { rej = true; break; }
+            pn = hex_decode(json_as_str(json_obj_get(pv, "payload")), &p);
+            rej = depz_shtp_next_frame(&l, (uint8_t)ch, p, pn, out, sizeof out) == 0;
+            free(p);
+        }
+        depz_shtp_free(&l);
+        if (!rej) CHECK(0, "%s: accepted, the case has no frames to compare", label);
+        return rej;
+    } else if (!strcmp(op, "bno086_control_encode")) {
+        if (!strcmp(kind, "set_feature")) {
+            uint8_t id, fl; uint16_t sens; uint32_t iv, bt, cw;
+            IR_U8(id, "sensor_id"); IR_U8(fl, "flags"); IR_U16(sens, "sensitivity");
+            IR_U32(iv, "interval_us"); IR_U32(bt, "batch_us"); IR_U32(cw, "cfg_word");
+            n = depz_bno_pack_set_feature(id, fl, sens, iv, bt, cw, out);
+        } else if (!strcmp(kind, "command_request")) {
+            uint8_t sq, cmd; uint8_t *p; size_t pn;
+            IR_U8(sq, "seq"); IR_U8(cmd, "command");
+            pn = hex_decode(json_as_str(json_obj_get(in, "params")), &p);
+            n = depz_bno_pack_command_request(sq, cmd, p, pn, out);
+            free(p);
+        } else if (!strcmp(kind, "frs_write_data")) {
+            uint16_t off; uint32_t w[8];
+            const json_value *wl = json_obj_get(in, "words");
+            size_t wn = json_arr_size(wl);
+            IR_U16(off, "offset_words");
+            for (size_t k = 0; k < wn && k < 8; k++) {
+                const json_value *wv = json_arr_get(wl, k);
+                if (wv->kind != JSON_INT || wv->range != 0 || wv->i < 0 || wv->i > 0xFFFFFFFFLL) return true;
+                w[k] = (uint32_t)wv->i;
+            }
+            n = depz_bno_pack_frs_write_data(off, w, wn, out, sizeof out);
+        }
+    } else if (!strcmp(op, "tmf8829_encode")) {
+        int cmd = (int)json_as_int(json_obj_get(in, "cmd"));
+        if (cmd == DEPZ_TMF8829_CMD_START_STREAM) {
+            int m, f; IR_I32(m, "int_mask"); IR_I32(f, "flags");
+            n = depz_tmf8829_pack_start_stream(m, f, out);
+        }
+    } else if (!strcmp(op, "tmf8829_config_get") || !strcmp(op, "tmf8829_config_set")) {
+        uint8_t *pg; size_t pn = hex_decode(json_as_str(json_obj_get(in, "page")), &pg);
+        const char *field = json_as_str(json_obj_get(in, "field"));
+        int rc;
+        uint32_t v = 0;
+        if (!strcmp(op, "tmf8829_config_get")) rc = depz_tmf8829_cfg_get_n(pg, pn, field, &v);
+        else rc = depz_tmf8829_cfg_set_n(pg, pn, field, json_as_int(json_obj_get(in, "value")));
+        free(pg);
+        if (rc != 0) return true;
+        CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return false;
+    } else if (!strcmp(op, "vl53l4_encode")) {
+        if (!strcmp(kind, "read_reg")) {
+            uint16_t a, l; IR_U16(a, "addr"); IR_U16(l, "len");
+            n = depz_vl53l4_pack_read_reg(a, l, out);
+        } else if (!strcmp(kind, "xshut")) {
+            uint8_t a; IR_U8(a, "action");
+            n = depz_vl53l4_pack_xshut(a, out);
+        }
+    } else if (!strcmp(op, "vl53l4_timing_encode")) {
+        uint32_t b, im; uint16_t osc, pll, ra, rb; uint32_t raw;
+        IR_U32(b, "timing_budget_ms"); IR_U32(im, "inter_measurement_ms");
+        IR_U16(osc, "osc_frequency"); IR_U16(pll, "clock_pll");
+        if (depz_vl53l4_range_timing_registers(b, im, osc, pll, &ra, &rb, &raw) != 0) return true;
+        CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return false;
+    } else if (!strcmp(op, "vl53l4_tuning_encode")) {
+        uint16_t raw = 0;
+        int rc = -1;
+        if (!strcmp(kind, "offset")) { int32_t v; IR_I32(v, "value"); rc = depz_vl53l4_offset_raw_checked(v, &raw); }
+        else if (!strcmp(kind, "xtalk")) { uint16_t v; IR_U16(v, "value"); rc = depz_vl53l4_xtalk_raw_checked(v, &raw); }
+        else if (!strcmp(kind, "signal_threshold")) { uint16_t v; IR_U16(v, "value"); raw = depz_vl53l4_signal_threshold_raw(v); rc = 0; }
+        else if (!strcmp(kind, "sigma_threshold")) { uint16_t v; IR_U16(v, "value"); rc = depz_vl53l4_sigma_threshold_raw(v, &raw); }
+        if (rc != 0) return true;
+        CHECK(raw == ex_int(e, "raw"), "%s: raw %u", label, raw);
+        return false;
+    } else if (!strcmp(op, "vl53l4_tuning_decode")) {
+        uint16_t raw; IR_U16(raw, "raw");
+        (void)raw;
+        CHECK(0, "%s: a u16 raw word decodes; the case expects a refusal", label);
+        return false;
+    } else if (!strcmp(op, "vl53l7_encode")) {
+        if (!strcmp(kind, "pin_ctrl")) { uint8_t a; IR_U8(a, "action"); n = depz_vl53l7_pack_pin_ctrl(a, out); }
+        else if (!strcmp(kind, "read_reg")) {
+            uint16_t a, l; IR_U16(a, "addr"); IR_U16(l, "len");
+            n = depz_vl53l7_pack_read_reg(a, l, out);
+        } else if (!strcmp(kind, "write_reg")) {
+            uint16_t a; uint8_t *d; size_t dn;
+            IR_U16(a, "addr");
+            dn = hex_decode(json_as_str(json_obj_get(in, "data")), &d);
+            uint8_t *big = (uint8_t *)malloc(dn + 2);
+            n = depz_vl53l7_pack_write_reg(a, d, dn, big);
+            free(d);
+            if (n != 0) check_payload(label, big, n, json_as_str(json_obj_get(e, "payload")));
+            free(big);
+            return n == 0;
+        }
+    } else if (!strcmp(op, "bno086_shtp_reassembly")) {
+        const json_value *fr = json_obj_get(in, "frames"), *cap = json_obj_get(in, "captures_us");
+        depz_shtp_layer l;
+        bool rej = false;
+        if (json_arr_size(fr) != json_arr_size(cap)) return true;
+        depz_shtp_init(&l);
+        for (size_t k = 0; k < json_arr_size(fr) && !rej; k++) {
+            const json_value *t = json_arr_get(cap, k);
+            uint8_t *f; size_t fn;
+            depz_shtp_cargo cg;
+            /* capture_us is the API's uint64_t */
+            if (!t || t->kind != JSON_INT || t->range == 2 || (t->range == 0 && t->i < 0)) { rej = true; break; }
+            fn = hex_decode(json_as_str(json_arr_get(fr, k)), &f);
+            rej = depz_shtp_feed_ex(&l, f, fn, t->range == 1 ? t->u : (uint64_t)t->i, &cg) < 0;
+            free(f);
+        }
+        depz_shtp_free(&l);
+        if (!rej) CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return rej;
+    } else if (!strcmp(op, "bno086_input_cargo") || !strcmp(op, "bno086_gyro_rv")) {
+        /* capture_timestamp_us is the API's uint64_t: a negative one is unrepresentable */
+        const json_value *t = json_obj_get(in, "capture_timestamp_us");
+        bool rej = !t || t->kind != JSON_INT || t->range == 2 || (t->range == 0 && t->i < 0);
+        if (!rej) CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return rej;
+    } else if (!strcmp(op, "vl53lx_encode")) {
+        if (!strcmp(kind, "start_stream")) {
+            uint16_t a, l; uint8_t fl;
+            depz_vl53lx_clear_step st[8];
+            const json_value *cl = json_obj_get(in, "clear");
+            size_t cn = json_arr_size(cl);
+            IR_U16(a, "addr"); IR_U16(l, "len"); IR_U8(fl, "flags");
+            for (size_t k = 0; k < cn && k < 8; k++) {
+                const json_value *pr = json_arr_get(cl, k);
+                const json_value *sa = json_arr_get(pr, 0), *sv = json_arr_get(pr, 1);
+                if (!sa || !sv || sa->kind != JSON_INT || sv->kind != JSON_INT || sa->range || sv->range ||
+                    sa->i < 0 || sa->i > 0xFFFF || sv->i < 0 || sv->i > 0xFF)
+                    return true;
+                st[k].addr = (uint16_t)sa->i;
+                st[k].value = (uint8_t)sv->i;
+            }
+            n = depz_vl53lx_pack_start_stream(a, l, fl, st, cn, out);
+        }
+    } else if (!strcmp(op, "vl53l8_detection_thresholds")) {
+        const json_value *tl = json_obj_get(in, "thresholds");
+        size_t tn = json_arr_size(tl);
+        depz_vl53l8_threshold th[DEPZ_VL53L8_NB_THRESHOLDS];
+        uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE], valid[8];
+        if (tn > DEPZ_VL53L8_NB_THRESHOLDS) {
+            /* the checked packer refuses a count past 64 before reading any entry */
+            CHECK(depz_vl53l8_pack_thresholds_checked(th, tn, start, valid) != 0, "%s: %zu entries packed", label, tn);
+            return true;
+        }
+        for (size_t k = 0; k < tn; k++) {
+            const json_value *t = json_arr_get(tl, k);
+            int64_t lo, hi, me, ty, zn, opn;
+            if (!ir_int(t, "low_thresh", INT32_MIN, INT32_MAX, &lo) || !ir_int(t, "high_thresh", INT32_MIN, INT32_MAX, &hi) ||
+                !ir_int(t, "measurement", 0, 0xFF, &me) || !ir_int(t, "type", 0, 0xFF, &ty) ||
+                !ir_int(t, "zone_num", 0, 0xFF, &zn) || !ir_int(t, "operation", 0, 0xFF, &opn))
+                return true;
+            th[k].low_thresh = (int32_t)lo; th[k].high_thresh = (int32_t)hi;
+            th[k].measurement = (uint8_t)me; th[k].type = (uint8_t)ty;
+            th[k].zone_num = (uint8_t)zn; th[k].operation = (uint8_t)opn;
+        }
+        if (depz_vl53l8_pack_thresholds_checked(th, tn, start, valid) != 0) return true;
+        CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return false;
+    } else if (!strcmp(op, "vl53l8_xtalk_margin")) {
+        const json_value *v = json_obj_get(in, "kcps");
+        uint32_t raw;
+        if (!v || (v->kind != JSON_INT && v->kind != JSON_DOUBLE)) return true;
+        if (depz_vl53l8_xtalk_margin_to_raw_checked(v->kind == JSON_INT ? (double)v->i : v->d, &raw) != 0) return true;
+        CHECK((int64_t)raw == ex_int(e, "raw"), "%s: raw %u", label, raw);
+        return false;
+    } else if (!strcmp(op, "usb_identity")) {
+        int vid, pid;
+        bool known;
+        const char *model;
+        IR_I32(vid, "vid"); IR_I32(pid, "pid");
+        if (depz_usb_identity(vid, pid, &known, &model) != 0) return true;
+        CHECK(known == json_as_bool(json_obj_get(e, "known")), "%s: known", label);
+        return false;
+    } else if (!strcmp(op, "bno055_units")) {
+        uint8_t v; depz_bno055_units u;
+        IR_U8(v, "unit_sel");
+        depz_bno055_unpack_units(v, &u);
+        CHECK(0, "%s: a byte unpacks; the case expects a refusal", label);
+        return false;
+    } else if (!strcmp(op, "bno055_decode") || !strcmp(op, "vl53l4_decode")) {
+        int rpt = (int)json_as_int(json_obj_get(in, "report"));
+        uint8_t *p; size_t pn = hex_decode(json_as_str(json_obj_get(in, "payload")), &p);
+        int rc = -1;
+        int64_t ts = 0, addr = 0, len = 0;
+        const uint8_t *data = NULL;
+        if (!strcmp(op, "bno055_decode") && rpt == DEPZ_BNO055_RPT_STREAM) {
+            depz_bno055_stream st;
+            rc = depz_bno055_unpack_stream(p, pn, &st);
+            if (rc == 0) { ts = (int64_t)st.timestamp_us; addr = st.addr; len = st.len; data = st.data; }
+        } else if (!strcmp(op, "vl53l4_decode") && rpt == DEPZ_VL53L4_RPT_STREAM) {
+            depz_vl53l4_stream st;
+            rc = depz_vl53l4_unpack_stream(p, pn, &st);
+            if (rc == 0) { ts = (int64_t)st.timestamp_us; addr = st.addr; len = st.len; data = st.data; }
+        } else {
+            CHECK(0, "%s: no input_rules handler for report 0x%02x", label, rpt);
+        }
+        if (rc == 0) {
+            CHECK(ts == ex_int(e, "timestamp_us") && addr == ex_int(e, "addr") && len == ex_int(e, "len"),
+                  "%s: fields", label);
+            check_payload(label, data, (size_t)len, json_as_str(json_obj_get(e, "data")));
+        }
+        free(p);
+        return rc != 0;
+    } else if (!strcmp(op, "vl53l4_timing_decode")) {
+        uint32_t im, b, it; uint16_t pll, osc, ra;
+        IR_U32(im, "intermeasurement_raw"); IR_U16(pll, "clock_pll"); IR_U16(osc, "osc_frequency");
+        IR_U16(ra, "range_config_a");
+        if (depz_vl53l4_decode_range_timing(im, pll, osc, ra, &b, &it) != 0) return true;
+        CHECK(b == ex_int(e, "timing_budget_ms") && it == ex_int(e, "inter_measurement_ms"), "%s: fields", label);
+        return false;
+    } else if (!strcmp(op, "vl53l8_cnh_decode")) {
+#if DEPZ_VECTORS_HAS_IO
+        const json_value *c = json_obj_get(in, "config"), *am = json_obj_get(c, "agg_map");
+        depz_vl53l8_cnh_setup setup;
+        int m[6];
+        for (int k = 0; k < 6; k++) m[k] = (int)json_as_int(json_arr_get(am, (size_t)k));
+        if (depz_vl53l8_cnh_init_config_checked(&setup, (int)json_as_int(json_obj_get(c, "start_bin")),
+                                                (int)json_as_int(json_obj_get(c, "num_bins")),
+                                                (int)json_as_int(json_obj_get(c, "sub_sample"))) != 0)
+            return true;
+        if (depz_vl53l8_cnh_create_agg_map(&setup, (int)json_as_int(json_obj_get(c, "resolution")),
+                                           m[0], m[1], m[2], m[3], m[4], m[5]) != 0)
+            return true;
+        CHECK(0, "%s: accepted, the case expects a refusal", label);
+        return false;
+#else
+        CHECK(0, "%s: built without the live-hardware layer (CNH setup helpers)", label);
+        return false;
+#endif
+    } else {
+        CHECK(0, "%s: no input_rules handler for op %s", label, op);
+        return false;
+    }
+    if (n == 0) return true;
+    check_payload(label, out, n, json_as_str(json_obj_get(e, "payload")));
+    return false;
+}
+
+static void test_input_rules(const char *stem)
+{
+    json_value *root = load_vectors(stem);
+    if (!root) { g_fail++; return; }
+    const json_value *list = json_obj_get(root, "input_rules");
+    for (size_t i = 0; i < json_arr_size(list); i++) {
+        const json_value *c = json_arr_get(list, i);
+        const int f0 = g_fail;
+        const char *id = json_as_str(json_obj_get(c, "id"));
+        const json_value *e = json_obj_get(c, "expect");
+        const bool want_invalid = json_obj_get(e, "error") != NULL;
+        const bool rejected = ir_run(id, json_as_str(json_obj_get(c, "op")), json_obj_get(c, "in"), e);
+        CHECK(rejected == want_invalid, "%s: %s, expected %s", id, rejected ? "rejected" : "accepted",
+              want_invalid ? "a rejection" : "a decode");
+        seen_case(c, f0);
+    }
+    json_free(root);
 }
 
 /* ======================================================================== */
@@ -3118,6 +3999,7 @@ int main(int argc, char **argv)
     if      (strcmp(stem, "crc") == 0)             test_crc();
     else if (strcmp(stem, "usb_ids") == 0)         test_usb_ids();
     else if (strcmp(stem, "identity") == 0)        test_identity();
+    else if (strcmp(stem, "probe") == 0)           test_probe();
     else if (strcmp(stem, "common_commands") == 0) test_common_commands();
     else if (strcmp(stem, "sr04") == 0)            test_sr04();
     else if (strcmp(stem, "framing_encode") == 0)  test_framing_encode();
@@ -3137,6 +4019,14 @@ int main(int argc, char **argv)
     else if (strcmp(stem, "tmf8829") == 0)         test_tmf8829();
     else if (strcmp(stem, "tmf8829_frame_time") == 0) test_tmf8829_frame_time();
     else { fprintf(stderr, "unknown vector stem: %s\n", stem); return 2; }
+    {
+        /* every vector file that has an input_rules group asserts it too */
+        static const char *const WITH_RULES[] = {"common_commands", "sr04", "framing_encode", "usb_ids", "bno055",
+                                                 "bno086_shtp", "tmf8829", "vl53l4", "vl53l7", "vl53lx",
+                                                 "vl53l8_advanced"};
+        for (size_t k = 0; k < sizeof WITH_RULES / sizeof WITH_RULES[0]; k++)
+            if (strcmp(stem, WITH_RULES[k]) == 0) test_input_rules(stem);
+    }
 
     printf("[%s] %d checks, %d failures\n", stem, g_checks, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -10,15 +10,46 @@ advanced-DCI codec (xtalk, thresholds, motion) work exactly as in the
 [VL53L8CX user guide](../vl53l8cx/guide.md) — read that first. This page covers
 **only the CH additions**: the `Variant.CH` footer and the CNH decode.
 
-This SDK does not drive the board: arming a CNH configuration is done with the
-Python or TypeScript SDK. Keep the configuration's aggregate count and bins per
-aggregate — the decode needs them.
+`Vl53l8chDevice` is a `Vl53l8cxDevice` with one more method, `configureCnh`,
+and downloads the CH firmware (VL53LMZ ULD 2.0.16) at `init()`.
+Keep the configuration's aggregate count and bins per aggregate — the decode
+needs them.
 
 ## Contents
 
+- [Arm CNH on the live device](#arm-cnh-on-the-live-device)
 - [Parsing a CH frame](#parsing-a-ch-frame)
 - [Decode the CNH histograms](#decode-the-cnh-histograms)
 - [Gotchas](#gotchas)
+
+## Arm CNH on the live device
+
+```java
+import ai.depz.sensor.devices.*;
+import ai.depz.sensor.sensors.vl53l8.*;
+import java.time.Duration;
+
+try (Vl53l8chDevice ch = (Vl53l8chDevice) DepzDevices.openVl53l8()) {
+    ch.init();
+    ch.setResolution(64);
+    ch.setRangingFrequencyHz(15);
+
+    Vl53l8CnhSetup setup = new Vl53l8CnhSetup();
+    setup.initConfig(10, 20, 2);              // bins 10.. of the device histogram, 2 per CNH bin
+    setup.createAggMap(64, 0, 0, 2, 2, 4, 4); // 16 aggregates of 2x2 zones
+    ch.configureCnh(setup);                   // refuses a setup over 6160 B
+
+    try (Subscription<Vl53l8Frame> frames = ch.frames()) {
+        ch.startRanging();                    // every frame now carries cnhRaw
+        Vl53l8Frame f = frames.take(Duration.ofSeconds(1));
+        Vl53l8Uld.CnhResult cnh = Vl53l8Uld.decodeCnh(setup.nbOfAggregates(), setup.featureLength(), f.cnhRaw());
+        ch.stopRanging();
+    }
+}
+```
+
+`setup.minMaxDistanceMm()` tells the distance range the histogram captures and
+`setup.binCenterMm(i)` the distance of bin `i`.
 
 ## Parsing a CH frame
 
@@ -95,5 +126,5 @@ power-of-two `histScaler`; the bin value is `histRaw / 2^histScaler`.
   `IllegalArgumentException`.
 - **`cnhRaw` may be `null`** — it is `null` on CX and on CH frames without a CNH
   block; null-check before using it.
-- All the CX gotchas (chunked frames, applied scaling, the stubbed live driver)
+- All the CX gotchas (chunked frames, applied scaling, one driver over any transport)
   apply here too — see the [CX guide](../vl53l8cx/guide.md#gotchas).

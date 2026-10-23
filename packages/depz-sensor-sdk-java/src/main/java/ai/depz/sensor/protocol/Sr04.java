@@ -37,6 +37,7 @@ public final class Sr04 {
     /** {@code sourceCmd}: 0x36 single shot (host or SYNC_IN), 0x37 loop sample. */
     public record Sr04Data(int sourceCmd, long timestampUs, int echoTimeUs) {
         public static Sr04Data unpack(byte[] p) {
+            Wire.needBytes("RPT_SR04_DATA", p, 11);
             int cmd = p[0] & 0xFF;
             long ts = Common.u64le(p, 1);
             int echo = (p[9] & 0xFF) | ((p[10] & 0xFF) << 8);
@@ -44,7 +45,9 @@ public final class Sr04 {
         }
     }
 
+    /** {@code periodUs}: u32; outside 0..2^32-1 → IllegalArgumentException. */
     public static byte[] packSamplePeriod(long periodUs) {
+        Wire.checkUint("periodUs", periodUs, 32);
         return new byte[] {
             (byte) periodUs, (byte) (periodUs >>> 8), (byte) (periodUs >>> 16), (byte) (periodUs >>> 24)
         };
@@ -52,14 +55,18 @@ public final class Sr04 {
 
     /** Reads the u32 sample period as an unsigned value in a long. */
     public static long unpackSamplePeriod(byte[] p) {
+        Wire.needBytes("RPT_SAMPLE_PERIOD", p, 4);
         return (p[0] & 0xFFL) | ((p[1] & 0xFFL) << 8) | ((p[2] & 0xFFL) << 16) | ((p[3] & 0xFFL) << 24);
     }
 
+    /** {@code decayUs}: u16; outside 0..65535 → IllegalArgumentException. */
     public static byte[] packEchoDecay(int decayUs) {
+        Wire.checkUint("decayUs", decayUs, 16);
         return new byte[] {(byte) decayUs, (byte) (decayUs >>> 8)};
     }
 
     public static int unpackEchoDecay(byte[] p) {
+        Wire.needBytes("RPT_ECHO_DECAY", p, 2);
         return (p[0] & 0xFF) | ((p[1] & 0xFF) << 8);
     }
 

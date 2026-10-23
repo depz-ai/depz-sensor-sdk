@@ -1,18 +1,19 @@
 # TMF8829 — user guide
 
-Hands-on guide to the [`tmf8829`](api.md) codec and decode layer. For what the
-sensor is and its concepts, read the [introduction](introduction.md); for
-exact signatures see the [API reference](api.md).
+Hands-on guide to the TMF8829: the live device (`devices::Tmf8829Device`, which
+runs the sensor) and the [`tmf8829`](api.md) codec and decode layer under it.
+For what the sensor is and its concepts, read the
+[introduction](introduction.md); for exact signatures see the
+[API reference](api.md).
 
-This crate does not drive the sensor: there is **no live device class** (no
-`init()`, `configure()`, `start()`). What follows is everything you need to
-build the bridge commands, run the sensor with plain register writes, and turn
-the chunked frame stream into measurements. The ready-made driver is in the
-Python, TypeScript, C and C++ SDKs; the rules the sensor imposes are listed
-where they matter.
+The sections after [Live device](#live-device) are the layers under the device:
+the bridge commands, the sensor sequences as plain register writes, and the
+chunked frame stream turned into measurements — what the device does for you,
+the rules the sensor imposes listed where they matter.
 
 ## Contents
 
+- [Live device](#live-device)
 - [Commands](#commands)
 - [Running the sensor: init, configure, start, stop](#running-the-sensor-init-configure-start-stop)
 - [Hello-world: decode the stream](#hello-world-decode-the-stream)
@@ -23,6 +24,48 @@ where they matter.
 - [Sensor firmware image](#sensor-firmware-image)
 - [Events and bridge info](#events-and-bridge-info)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::{open_on_link, Tmf8829Options};
+
+let tof = open_on_link(link, None, None, None)?.into_tmf8829()?;
+let init = tof.init(None)?;                             // firmware download, ~0.15 s
+println!("app {} serial {:08X}", init.app_version, init.sensor_serial);
+let cfg = tof.configure("16x16", &Tmf8829Options { nr_peaks: 2, ..Default::default() })?;
+println!("{:?} zones", cfg.grid());                    // (16, 16)
+let depth = tof.measurements(16);
+tof.start()?;
+let m = depth.take(Duration::from_secs(1))?;            // a Tmf8829Measurement
+println!("fN {} at {} µs, {:?} mm", m.f_number, m.timestamp_us, m.distance_mm.as_ref().map(|d| d[0]));
+tof.stop()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- `init(progress)` — soft reset, bootloader, firmware download, start; works
+  from any state (recovery = init) and stops a running stream first.
+  `app_version()`, `sensor_serial()`.
+- `configure(preset, &opts)` — one of the ten [`PRESETS`](api.md#presets);
+  writes every field a preset does not reset (period, `kilo_iterations`,
+  peaks, signal / noise / crosstalk, histograms, ref frame, plus
+  `opts.fields` by name) and checks it reads back. `config()` is the last
+  `Tmf8829AppliedConfig` (`grid()`, `field(name)`, the raw `page`). Not
+  while streaming.
+- `start()` (the default 8x8 preset when nothing was configured) / `stop()`;
+  measurements stream to `on_measurement(callback)`, `measurements(capacity)`
+  and `get_measurement(timeout)`. `frames_dropped()`, `frames_discarded()`,
+  `frame_parse_errors()` and `clock_ratio_q16()` restart with each stream.
+- Events: a MOTION / PROXIMITY interrupt or a refused frame header arrives as
+  `DeviceEvent::Sensor` of kind `Tmf8829Device::INTERRUPT_EVENT`
+  (`Tmf8829Device::interrupt_event(&e)` decodes it); the bad header a stop
+  raises mid histogram dump is swallowed.
+- Sensor refusals and timeouts are `DepzError::Sensor` with the sensor's status
+  name (`"sensor cmd 0x15 -> ERR_CONFIG_RESULT_SIZE"`).
+- Diagnostics: `read_registers` / `write_registers` (chunked, FIFO-aware),
+  `sensor_state()`, `config_page()`, `get_bridge_info()` (safe mid-stream).
+- `close()` (and dropping the device) stops a running stream first.
 
 ## Commands
 
@@ -305,8 +348,8 @@ if ev.code == EV_BAD_HEADER && !stopping {
 
 ## Gotchas
 
-- **No live driver here** — the init, configure and start/stop sequences are
-  yours to send; the Python, TypeScript, C and C++ SDKs have them ready.
+- **Doing it by hand** — the sequences above are what `Tmf8829Device` sends;
+  only one register command may be outstanding at a time.
 - **No sleep, recovery = init** — the enable pin is wired high; init starts
   with a soft reset and works from any state. If it fails, only a USB re-plug
   (power cycle) is left.

@@ -11,28 +11,28 @@ Each sensor also has a focused reference with just its own symbols:
 
 ## Contents
 
-- **Discovery**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_SR04`](#depz_pid_sr04), [`DEPZ_PID_VL53L8`](#depz_pid_vl53l8), [`DEPZ_PID_VL53L4CD`](#depz_pid_vl53l4cd), [`DEPZ_PID_TMF8829`](#depz_pid_tmf8829), [`DEPZ_PID_BNO086`](#depz_pid_bno086), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`DEPZ_DEV_USB_VID`](#depz_dev_usb_vid), [`DEPZ_DEV_USB_PID`](#depz_dev_usb_pid), [`depz_is_known_depz_usb`](#depz_is_known_depz_usb), [`depz_usb_model_hint`](#depz_usb_model_hint), [`depz_sensor_type`](#depz_sensor_type), [`depz_identity`](#depz_identity), [`depz_sensor_type_str`](#depz_sensor_type_str), [`depz_strip_device_string`](#depz_strip_device_string), [`depz_parse_software_name`](#depz_parse_software_name)
+- **Discovery**: [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_SR04`](#depz_pid_sr04), [`DEPZ_PID_VL53L8`](#depz_pid_vl53l8), [`DEPZ_PID_VL53L4CD`](#depz_pid_vl53l4cd), [`DEPZ_PID_TMF8829`](#depz_pid_tmf8829), [`DEPZ_PID_BNO086`](#depz_pid_bno086), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`DEPZ_DEV_USB_VID`](#depz_dev_usb_vid), [`DEPZ_DEV_USB_PID`](#depz_dev_usb_pid), [`depz_is_known_depz_usb`](#depz_is_known_depz_usb), [`depz_usb_model_hint`](#depz_usb_model_hint), [`depz_usb_identity`](#depz_usb_identity), [`depz_sensor_type`](#depz_sensor_type), [`depz_identity`](#depz_identity), [`depz_sensor_type_str`](#depz_sensor_type_str), [`depz_strip_device_string`](#depz_strip_device_string), [`depz_device_string_len`](#depz_device_string_len), [`depz_parse_software_name`](#depz_parse_software_name), [`depz_parse_software_name_n`](#depz_parse_software_name_n), [`depz_resolve_sensor_class`](#depz_resolve_sensor_class), [`depz_resolve_sensor_class_n`](#depz_resolve_sensor_class_n), [`DEPZ_SENSOR_CLASS_COUNT`](#depz_sensor_class_count), [`depz_sensor_class_name`](#depz_sensor_class_name)
 - **Transport**: [`depz_crc8_maxim`](#depz_crc8_maxim), [`depz_crc16_modbus`](#depz_crc16_modbus), [`depz_crc32_iso_hdlc`](#depz_crc32_iso_hdlc), [`depz_crc16_ccitt_false`](#depz_crc16_ccitt_false), [`DEPZ_MAGIC0`](#depz_magic0), [`DEPZ_MAGIC1`](#depz_magic1), [`DEPZ_HEADER_SIZE`](#depz_header_size), [`DEPZ_MAX_PAYLOAD`](#depz_max_payload), [`depz_crc_type`](#depz_crc_type), [`DEPZ_MAX_FRAME`](#depz_max_frame), [`depz_build_packet`](#depz_build_packet), [`depz_event_type`](#depz_event_type), [`depz_event`](#depz_event), [`depz_event_cb`](#depz_event_cb), [`depz_parser`](#depz_parser), [`depz_parser_init`](#depz_parser_init), [`depz_parser_free`](#depz_parser_free), [`depz_parser_feed`](#depz_parser_feed)
-- **Common protocol**: [`depz_cmd`](#depz_cmd), [`depz_rpt`](#depz_rpt), [`depz_status`](#depz_status), [`depz_sync_pin_mode`](#depz_sync_pin_mode), [`depz_status_report`](#depz_status_report), [`depz_text_report`](#depz_text_report), [`depz_sync_time_report`](#depz_sync_time_report), [`depz_temperature_report`](#depz_temperature_report), [`depz_sequence_error_report`](#depz_sequence_error_report), [`depz_sync_pin_config`](#depz_sync_pin_config), [`depz_pack_sync_time`](#depz_pack_sync_time), [`depz_pack_set_payload_crc_type`](#depz_pack_set_payload_crc_type), [`depz_pack_sync_pin_config`](#depz_pack_sync_pin_config), [`depz_unpack_status`](#depz_unpack_status), [`depz_unpack_text`](#depz_unpack_text), [`depz_unpack_sync_time`](#depz_unpack_sync_time), [`depz_unpack_temperature`](#depz_unpack_temperature), [`depz_unpack_sequence_error`](#depz_unpack_sequence_error), [`depz_unpack_sync_pin_config`](#depz_unpack_sync_pin_config), [`depz_sync_time_offset_rtt`](#depz_sync_time_offset_rtt)
+- **Common protocol**: [`depz_cmd`](#depz_cmd), [`depz_rpt`](#depz_rpt), [`depz_status`](#depz_status), [`depz_sync_pin_mode`](#depz_sync_pin_mode), [`depz_status_report`](#depz_status_report), [`depz_text_report`](#depz_text_report), [`depz_sync_time_report`](#depz_sync_time_report), [`depz_temperature_report`](#depz_temperature_report), [`depz_sequence_error_report`](#depz_sequence_error_report), [`depz_sync_pin_config`](#depz_sync_pin_config), [`depz_pack_sync_time`](#depz_pack_sync_time), [`depz_pack_set_payload_crc_type`](#depz_pack_set_payload_crc_type), [`depz_pack_sync_pin_config`](#depz_pack_sync_pin_config), [`depz_unpack_status`](#depz_unpack_status), [`depz_unpack_text`](#depz_unpack_text), [`depz_unpack_text_ex`](#depz_unpack_text_ex), [`depz_unpack_sync_time`](#depz_unpack_sync_time), [`depz_unpack_temperature`](#depz_unpack_temperature), [`depz_unpack_sequence_error`](#depz_unpack_sequence_error), [`depz_unpack_sync_pin_config`](#depz_unpack_sync_pin_config), [`depz_sync_time_offset_rtt`](#depz_sync_time_offset_rtt)
 - **SR04**: [`depz_sr04_cmd`](#depz_sr04_cmd), [`depz_sr04_rpt`](#depz_sr04_rpt), [`DEPZ_SR04_ECHO_TIMEOUT`](#depz_sr04_echo_timeout), [`DEPZ_SR04_ECHO_DECAY_MIN_US`](#depz_sr04_echo_decay_min_us), [`DEPZ_SR04_ECHO_DECAY_MAX_US`](#depz_sr04_echo_decay_max_us), [`depz_sr04_data`](#depz_sr04_data), [`depz_sr04_pack_sample_period`](#depz_sr04_pack_sample_period), [`depz_sr04_pack_echo_decay`](#depz_sr04_pack_echo_decay), [`depz_sr04_unpack_data`](#depz_sr04_unpack_data), [`depz_sr04_unpack_sample_period`](#depz_sr04_unpack_sample_period), [`depz_sr04_unpack_echo_decay`](#depz_sr04_unpack_echo_decay), [`depz_sr04_distance_mm`](#depz_sr04_distance_mm)
-- **VL53L4CD (ToF)**: [`depz_vl53l4_cmd`](#depz_vl53l4_cmd), [`depz_vl53l4_rpt`](#depz_vl53l4_rpt), [`DEPZ_VL53L4_XFER_MAX`](#depz_vl53l4_xfer_max), [`DEPZ_VL53L4_XSHUT_OFF`](#depz_vl53l4_xshut_off), [`DEPZ_VL53L4_XSHUT_ON`](#depz_vl53l4_xshut_on), [`DEPZ_VL53L4_XSHUT_RESET`](#depz_vl53l4_xshut_reset), [`DEPZ_VL53L4_SF_INT_ACT_HIGH`](#depz_vl53l4_sf_int_act_high), [`DEPZ_VL53L4_RESULT_BLOCK_ADDR`](#depz_vl53l4_result_block_addr), [`DEPZ_VL53L4_RESULT_BLOCK_LEN`](#depz_vl53l4_result_block_len), [`DEPZ_VL53L4_MODEL_ID`](#depz_vl53l4_model_id), [`DEPZ_VL53L4_CONFIG_ADDR`](#depz_vl53l4_config_addr), [`DEPZ_VL53L4_CONFIG_FMP_BYTE`](#depz_vl53l4_config_fmp_byte), [`depz_vl53l4_pack_read_reg`](#depz_vl53l4_pack_read_reg), [`depz_vl53l4_pack_write_reg`](#depz_vl53l4_pack_write_reg), [`depz_vl53l4_pack_xshut`](#depz_vl53l4_pack_xshut), [`depz_vl53l4_pack_start_stream`](#depz_vl53l4_pack_start_stream), [`depz_vl53l4_pack_set_i2c_speed`](#depz_vl53l4_pack_set_i2c_speed), [`depz_vl53l4_reg_data`](#depz_vl53l4_reg_data), [`depz_vl53l4_unpack_reg_data`](#depz_vl53l4_unpack_reg_data), [`depz_vl53l4_info`](#depz_vl53l4_info), [`depz_vl53l4_unpack_info`](#depz_vl53l4_unpack_info), [`depz_vl53l4_stream`](#depz_vl53l4_stream), [`depz_vl53l4_unpack_stream`](#depz_vl53l4_unpack_stream), [`depz_vl53l4_result`](#depz_vl53l4_result), [`depz_vl53l4_parse_result_block`](#depz_vl53l4_parse_result_block), [`depz_vl53l4_range_timing_registers`](#depz_vl53l4_range_timing_registers), [`depz_vl53l4_decode_range_timing`](#depz_vl53l4_decode_range_timing), [`depz_vl53l4_offset_raw`](#depz_vl53l4_offset_raw), [`depz_vl53l4_decode_offset`](#depz_vl53l4_decode_offset), [`depz_vl53l4_xtalk_raw`](#depz_vl53l4_xtalk_raw), [`depz_vl53l4_decode_xtalk`](#depz_vl53l4_decode_xtalk), [`depz_vl53l4_signal_threshold_raw`](#depz_vl53l4_signal_threshold_raw), [`depz_vl53l4_decode_signal_threshold`](#depz_vl53l4_decode_signal_threshold), [`depz_vl53l4_sigma_threshold_raw`](#depz_vl53l4_sigma_threshold_raw), [`depz_vl53l4_decode_sigma_threshold`](#depz_vl53l4_decode_sigma_threshold), [`DEPZ_VL53L4_DEFAULT_CONFIGURATION`](#depz_vl53l4_default_configuration), [`depz_vl53l4_config_block`](#depz_vl53l4_config_block)
-- **VL53L8 (ToF)**: [`depz_vl53l8_variant`](#depz_vl53l8_variant), [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_read_reg`](#depz_vl53l8_pack_read_reg), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reg_data`](#depz_vl53l8_reg_data), [`depz_vl53l8_unpack_reg_data`](#depz_vl53l8_unpack_reg_data), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`depz_vl53l8ch_decode_frame`](#depz_vl53l8ch_decode_frame), [`DEPZ_VL53L8_CNH_MAX_AGGREGATES`](#depz_vl53l8_cnh_max_aggregates), [`DEPZ_VL53L8_CNH_MAX_FEATURE`](#depz_vl53l8_cnh_max_feature), [`depz_vl53l8ch_cnh_config`](#depz_vl53l8ch_cnh_config), [`depz_vl53l8ch_cnh_frame`](#depz_vl53l8ch_cnh_frame), [`depz_vl53l8ch_decode_cnh`](#depz_vl53l8ch_decode_cnh), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
-- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`depz_vl53l7_model`](#depz_vl53l7_model), [`DEPZ_VL53L7_CMD_PIN_CTRL`](#depz_vl53l7_cmd_pin_ctrl), [`DEPZ_VL53L7_CMD_GET_INFO`](#depz_vl53l7_cmd_get_info), [`DEPZ_VL53L7_CMD_SET_I2C_SPEED`](#depz_vl53l7_cmd_set_i2c_speed), [`DEPZ_VL53L7_RPT_INFO`](#depz_vl53l7_rpt_info), [`DEPZ_VL53L7_PIN_LPN_OFF`](#depz_vl53l7_pin_lpn_off), [`DEPZ_VL53L7_PIN_LPN_ON`](#depz_vl53l7_pin_lpn_on), [`DEPZ_VL53L7_PIN_I2C_RST`](#depz_vl53l7_pin_i2c_rst), [`DEPZ_VL53L7_PIN_SOFT_CYCLE`](#depz_vl53l7_pin_soft_cycle), [`DEPZ_VL53L7_I2C_OK`](#depz_vl53l7_i2c_ok), [`DEPZ_VL53L7_I2C_NACK`](#depz_vl53l7_i2c_nack), [`DEPZ_VL53L7_I2C_TIMEOUT`](#depz_vl53l7_i2c_timeout), [`DEPZ_VL53L7_I2C_BUS_ERROR`](#depz_vl53l7_i2c_bus_error), [`DEPZ_VL53L7_READ_MAX_LEN`](#depz_vl53l7_read_max_len), [`DEPZ_VL53L7_WRITE_MAX_LEN`](#depz_vl53l7_write_max_len), [`DEPZ_VL53L7_STREAM_CHUNK_MAX`](#depz_vl53l7_stream_chunk_max), [`DEPZ_VL53L7_INFO_SIZE`](#depz_vl53l7_info_size), [`DEPZ_VL53L7_FOOTER_ID_OFFSET`](#depz_vl53l7_footer_id_offset), [`depz_vl53l7_pack_read_reg`](#depz_vl53l7_pack_read_reg), [`depz_vl53l7_pack_write_reg`](#depz_vl53l7_pack_write_reg), [`depz_vl53l7_pack_pin_ctrl`](#depz_vl53l7_pack_pin_ctrl), [`depz_vl53l7_pack_set_i2c_speed`](#depz_vl53l7_pack_set_i2c_speed), [`depz_vl53l7_info`](#depz_vl53l7_info), [`depz_vl53l7_unpack_info`](#depz_vl53l7_unpack_info), [`depz_vl53l7_resolve_model`](#depz_vl53l7_resolve_model), [`depz_vl53l7_model_str`](#depz_vl53l7_model_str), [`depz_vl53l7_decode_frame`](#depz_vl53l7_decode_frame)
-- **VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)**: [`DEPZ_VL53LX_CMD_READ_REG`](#depz_vl53lx_cmd_read_reg), [`DEPZ_VL53LX_CMD_WRITE_REG`](#depz_vl53lx_cmd_write_reg), [`DEPZ_VL53LX_CMD_XSHUT`](#depz_vl53lx_cmd_xshut), [`DEPZ_VL53LX_CMD_START_STREAM`](#depz_vl53lx_cmd_start_stream), [`DEPZ_VL53LX_CMD_STOP_STREAM`](#depz_vl53lx_cmd_stop_stream), [`DEPZ_VL53LX_CMD_GET_INFO`](#depz_vl53lx_cmd_get_info), [`DEPZ_VL53LX_CMD_SET_I2C_SPEED`](#depz_vl53lx_cmd_set_i2c_speed), [`DEPZ_VL53LX_CMD_SET_ADDR_WIDTH`](#depz_vl53lx_cmd_set_addr_width), [`DEPZ_VL53LX_CMD_CLEAR_I2C_ERRORS`](#depz_vl53lx_cmd_clear_i2c_errors), [`DEPZ_VL53LX_RPT_REG_DATA`](#depz_vl53lx_rpt_reg_data), [`DEPZ_VL53LX_RPT_INFO`](#depz_vl53lx_rpt_info), [`DEPZ_VL53LX_RPT_STREAM`](#depz_vl53lx_rpt_stream), [`DEPZ_VL53LX_CLEAR_STEPS_MAX`](#depz_vl53lx_clear_steps_max), [`DEPZ_VL53LX_START_STREAM_MAX`](#depz_vl53lx_start_stream_max), [`DEPZ_VL53LX_INFO_SIZE`](#depz_vl53lx_info_size), [`depz_vl53lx_clear_step`](#depz_vl53lx_clear_step), [`depz_vl53lx_pack_set_addr_width`](#depz_vl53lx_pack_set_addr_width), [`depz_vl53lx_pack_start_stream`](#depz_vl53lx_pack_start_stream), [`depz_vl53lx_info`](#depz_vl53lx_info), [`depz_vl53lx_unpack_info`](#depz_vl53lx_unpack_info), [`depz_vl53lx_product`](#depz_vl53lx_product), [`depz_vl53lx_driver`](#depz_vl53lx_driver), [`depz_vl53lx_product_info`](#depz_vl53lx_product_info), [`depz_vl53lx_product_get`](#depz_vl53lx_product_get), [`depz_vl53lx_driver_str`](#depz_vl53lx_driver_str), [`depz_vl53lx_product_from_str`](#depz_vl53lx_product_from_str), [`depz_vl53lx_product_from_board_name`](#depz_vl53lx_product_from_board_name), [`depz_vl53lx_resolve_product`](#depz_vl53lx_resolve_product), [`depz_vl53lx_class`](#depz_vl53lx_class), [`depz_vl53lx_resolve_class`](#depz_vl53lx_resolve_class), [`depz_vl53lx_class_str`](#depz_vl53lx_class_str), [`DEPZ_VL53LX_DIE_BLOCK_ADDR`](#depz_vl53lx_die_block_addr), [`DEPZ_VL53LX_DIE_BLOCK_LEN`](#depz_vl53lx_die_block_len), [`DEPZ_VL53LX_L0X_BLOCK_ADDR`](#depz_vl53lx_l0x_block_addr), [`DEPZ_VL53LX_L0X_BLOCK_LEN`](#depz_vl53lx_l0x_block_len), [`DEPZ_VL53LX_HISTOGRAM_BLOCK_ADDR`](#depz_vl53lx_histogram_block_addr), [`DEPZ_VL53LX_HISTOGRAM_BLOCK_LEN`](#depz_vl53lx_histogram_block_len), [`DEPZ_VL53LX_HISTOGRAM_BINS`](#depz_vl53lx_histogram_bins), [`depz_vl53lx_die_variant`](#depz_vl53lx_die_variant), [`depz_vl53lx_decode_die_block`](#depz_vl53lx_decode_die_block), [`depz_vl53lx_l0x_raw`](#depz_vl53lx_l0x_raw), [`depz_vl53lx_decode_l0x_raw`](#depz_vl53lx_decode_l0x_raw), [`depz_vl53lx_histogram_raw`](#depz_vl53lx_histogram_raw), [`depz_vl53lx_decode_histogram_raw`](#depz_vl53lx_decode_histogram_raw)
-- **BNO086 (IMU)**: [`DEPZ_BNO086_CMD_SENSOR_RESET`](#depz_bno086_cmd_sensor_reset), [`DEPZ_BNO086_CMD_SENSOR_WAKE_UP`](#depz_bno086_cmd_sensor_wake_up), [`DEPZ_BNO086_CMD_SEND_SHTP_PACKET`](#depz_bno086_cmd_send_shtp_packet), [`DEPZ_BNO086_RPT_DATA`](#depz_bno086_rpt_data), [`depz_bno086_unpack_data`](#depz_bno086_unpack_data), [`DEPZ_SHTP_HEADER_SIZE`](#depz_shtp_header_size), [`DEPZ_SHTP_LENGTH_MASK`](#depz_shtp_length_mask), [`DEPZ_SHTP_CONTINUATION`](#depz_shtp_continuation), [`DEPZ_SHTP_NUM_CHANNELS`](#depz_shtp_num_channels), [`DEPZ_SHTP_MAX_TX_FRAME`](#depz_shtp_max_tx_frame), [`depz_shtp_channel_id`](#depz_shtp_channel_id), [`DEPZ_SHTP_EXEC_RESET`](#depz_shtp_exec_reset), [`DEPZ_SHTP_EXEC_ON`](#depz_shtp_exec_on), [`DEPZ_SHTP_EXEC_SLEEP`](#depz_shtp_exec_sleep), [`depz_shtp_header`](#depz_shtp_header), [`depz_shtp_pack_header`](#depz_shtp_pack_header), [`depz_shtp_unpack_header`](#depz_shtp_unpack_header), [`depz_shtp_rx_channel`](#depz_shtp_rx_channel), [`depz_shtp_layer`](#depz_shtp_layer), [`depz_shtp_init`](#depz_shtp_init), [`depz_shtp_free`](#depz_shtp_free), [`depz_shtp_next_frame`](#depz_shtp_next_frame), [`depz_shtp_cargo`](#depz_shtp_cargo), [`depz_shtp_feed`](#depz_shtp_feed), [`depz_bno_pack_set_feature`](#depz_bno_pack_set_feature), [`depz_bno_pack_get_feature_request`](#depz_bno_pack_get_feature_request), [`depz_bno_pack_product_id_request`](#depz_bno_pack_product_id_request), [`depz_bno_pack_command_request`](#depz_bno_pack_command_request), [`depz_bno_pack_frs_read_request`](#depz_bno_pack_frs_read_request), [`depz_bno_pack_frs_write_request`](#depz_bno_pack_frs_write_request), [`depz_bno_pack_frs_write_data`](#depz_bno_pack_frs_write_data), [`DEPZ_BNO_SENSOR_ACCELEROMETER`](#depz_bno_sensor_accelerometer), [`DEPZ_BNO_SENSOR_GYROSCOPE`](#depz_bno_sensor_gyroscope), [`DEPZ_BNO_SENSOR_MAGNETOMETER`](#depz_bno_sensor_magnetometer), [`DEPZ_BNO_SENSOR_LINEAR_ACCELERATION`](#depz_bno_sensor_linear_acceleration), [`DEPZ_BNO_SENSOR_ROTATION_VECTOR`](#depz_bno_sensor_rotation_vector), [`DEPZ_BNO_SENSOR_GRAVITY`](#depz_bno_sensor_gravity), [`DEPZ_BNO_SENSOR_UNCALIBRATED_GYROSCOPE`](#depz_bno_sensor_uncalibrated_gyroscope), [`DEPZ_BNO_SENSOR_GAME_ROTATION_VECTOR`](#depz_bno_sensor_game_rotation_vector), [`DEPZ_BNO_SENSOR_GEOMAGNETIC_ROTATION_VECTOR`](#depz_bno_sensor_geomagnetic_rotation_vector), [`DEPZ_BNO_SENSOR_UNCALIBRATED_MAGNETOMETER`](#depz_bno_sensor_uncalibrated_magnetometer), [`DEPZ_BNO_SENSOR_TAP_DETECTOR`](#depz_bno_sensor_tap_detector), [`DEPZ_BNO_SENSOR_STEP_COUNTER`](#depz_bno_sensor_step_counter), [`DEPZ_BNO_SENSOR_SIGNIFICANT_MOTION`](#depz_bno_sensor_significant_motion), [`DEPZ_BNO_SENSOR_STABILITY_CLASSIFIER`](#depz_bno_sensor_stability_classifier), [`DEPZ_BNO_SENSOR_RAW_ACCELEROMETER`](#depz_bno_sensor_raw_accelerometer), [`DEPZ_BNO_SENSOR_RAW_GYROSCOPE`](#depz_bno_sensor_raw_gyroscope), [`DEPZ_BNO_SENSOR_RAW_MAGNETOMETER`](#depz_bno_sensor_raw_magnetometer), [`DEPZ_BNO_SENSOR_STEP_DETECTOR`](#depz_bno_sensor_step_detector), [`DEPZ_BNO_SENSOR_SHAKE_DETECTOR`](#depz_bno_sensor_shake_detector), [`DEPZ_BNO_SENSOR_FLIP_DETECTOR`](#depz_bno_sensor_flip_detector), [`DEPZ_BNO_SENSOR_PICKUP_DETECTOR`](#depz_bno_sensor_pickup_detector), [`DEPZ_BNO_SENSOR_STABILITY_DETECTOR`](#depz_bno_sensor_stability_detector), [`DEPZ_BNO_SENSOR_PERSONAL_ACTIVITY_CLASSIFIER`](#depz_bno_sensor_personal_activity_classifier), [`DEPZ_BNO_SENSOR_SLEEP_DETECTOR`](#depz_bno_sensor_sleep_detector), [`DEPZ_BNO_SENSOR_TILT_DETECTOR`](#depz_bno_sensor_tilt_detector), [`DEPZ_BNO_SENSOR_POCKET_DETECTOR`](#depz_bno_sensor_pocket_detector), [`DEPZ_BNO_SENSOR_CIRCLE_DETECTOR`](#depz_bno_sensor_circle_detector), [`DEPZ_BNO_SENSOR_HEART_RATE_MONITOR`](#depz_bno_sensor_heart_rate_monitor), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV`](#depz_bno_sensor_arvr_stabilized_rv), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV`](#depz_bno_sensor_arvr_stabilized_game_rv), [`DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV`](#depz_bno_sensor_gyro_integrated_rv), [`DEPZ_SH2_COMMAND_RESPONSE`](#depz_sh2_command_response), [`DEPZ_SH2_COMMAND_REQUEST`](#depz_sh2_command_request), [`DEPZ_SH2_FRS_READ_RESPONSE`](#depz_sh2_frs_read_response), [`DEPZ_SH2_FRS_READ_REQUEST`](#depz_sh2_frs_read_request), [`DEPZ_SH2_FRS_WRITE_RESPONSE`](#depz_sh2_frs_write_response), [`DEPZ_SH2_FRS_WRITE_DATA`](#depz_sh2_frs_write_data), [`DEPZ_SH2_FRS_WRITE_REQUEST`](#depz_sh2_frs_write_request), [`DEPZ_SH2_PRODUCT_ID_RESPONSE`](#depz_sh2_product_id_response), [`DEPZ_SH2_PRODUCT_ID_REQUEST`](#depz_sh2_product_id_request), [`DEPZ_SH2_GET_FEATURE_RESPONSE`](#depz_sh2_get_feature_response), [`DEPZ_SH2_SET_FEATURE_COMMAND`](#depz_sh2_set_feature_command), [`DEPZ_SH2_GET_FEATURE_REQUEST`](#depz_sh2_get_feature_request), [`DEPZ_SH2_CMD_ERRORS`](#depz_sh2_cmd_errors), [`DEPZ_SH2_CMD_COUNTER`](#depz_sh2_cmd_counter), [`DEPZ_SH2_CMD_TARE`](#depz_sh2_cmd_tare), [`DEPZ_SH2_CMD_INITIALIZE`](#depz_sh2_cmd_initialize), [`DEPZ_SH2_CMD_SAVE_DCD`](#depz_sh2_cmd_save_dcd), [`DEPZ_SH2_CMD_ME_CALIBRATE`](#depz_sh2_cmd_me_calibrate), [`DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG`](#depz_sh2_cmd_periodic_dcd_config), [`DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE`](#depz_sh2_cmd_get_oscillator_type), [`DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET`](#depz_sh2_cmd_clear_dcd_and_reset), [`DEPZ_BNO_FEATURE_WAKEUP`](#depz_bno_feature_wakeup), [`DEPZ_BNO_FEATURE_ALWAYS_ON`](#depz_bno_feature_always_on), [`DEPZ_BNO_TARE_X`](#depz_bno_tare_x), [`DEPZ_BNO_TARE_Y`](#depz_bno_tare_y), [`DEPZ_BNO_TARE_Z`](#depz_bno_tare_z), [`DEPZ_BNO_TARE_ALL`](#depz_bno_tare_all), [`DEPZ_BNO_TARE_BASIS_RV`](#depz_bno_tare_basis_rv), [`DEPZ_BNO_TARE_BASIS_GAME_RV`](#depz_bno_tare_basis_game_rv), [`DEPZ_BNO_TARE_BASIS_GEOMAG_RV`](#depz_bno_tare_basis_geomag_rv), [`DEPZ_BNO_TARE_BASIS_GYRO_RV`](#depz_bno_tare_basis_gyro_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_RV`](#depz_bno_tare_basis_arvr_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_GAME_RV`](#depz_bno_tare_basis_arvr_game_rv), [`DEPZ_BNO_OSC_INTERNAL`](#depz_bno_osc_internal), [`DEPZ_BNO_OSC_EXT_CRYSTAL`](#depz_bno_osc_ext_crystal), [`DEPZ_BNO_OSC_EXT_CLOCK`](#depz_bno_osc_ext_clock), [`DEPZ_BNO_ERR_SOURCE_NO_MORE`](#depz_bno_err_source_no_more), [`DEPZ_BNO_FRS_STATIC_CALIBRATION_AGM`](#depz_bno_frs_static_calibration_agm), [`DEPZ_BNO_FRS_NOMINAL_CALIBRATION`](#depz_bno_frs_nominal_calibration), [`DEPZ_BNO_FRS_DYNAMIC_CALIBRATION`](#depz_bno_frs_dynamic_calibration), [`DEPZ_BNO_FRS_ME_POWER_MGMT`](#depz_bno_frs_me_power_mgmt), [`DEPZ_BNO_FRS_SYSTEM_ORIENTATION`](#depz_bno_frs_system_orientation), [`DEPZ_BNO_FRS_ACCEL_ORIENTATION`](#depz_bno_frs_accel_orientation), [`DEPZ_BNO_FRS_GYROSCOPE_ORIENTATION`](#depz_bno_frs_gyroscope_orientation), [`DEPZ_BNO_FRS_MAGNETOMETER_ORIENTATION`](#depz_bno_frs_magnetometer_orientation), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_RV`](#depz_bno_frs_arvr_stabilization_rv), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_GRV`](#depz_bno_frs_arvr_stabilization_grv), [`DEPZ_BNO_FRS_SIG_MOTION_DETECT_CONFIG`](#depz_bno_frs_sig_motion_detect_config), [`DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG`](#depz_bno_frs_shake_detect_config), [`DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG`](#depz_bno_frs_stability_detector_config), [`DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG`](#depz_bno_frs_activity_tracker_config), [`DEPZ_BNO_FRS_READ_NO_ERROR`](#depz_bno_frs_read_no_error), [`DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE`](#depz_bno_frs_read_unrecognized_type), [`DEPZ_BNO_FRS_READ_BUSY`](#depz_bno_frs_read_busy), [`DEPZ_BNO_FRS_READ_COMPLETED`](#depz_bno_frs_read_completed), [`DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE`](#depz_bno_frs_read_offset_out_of_range), [`DEPZ_BNO_FRS_READ_RECORD_EMPTY`](#depz_bno_frs_read_record_empty), [`DEPZ_BNO_FRS_READ_BLOCK_COMPLETED`](#depz_bno_frs_read_block_completed), [`DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED`](#depz_bno_frs_read_block_and_read_completed), [`DEPZ_BNO_FRS_READ_DEVICE_ERROR`](#depz_bno_frs_read_device_error), [`DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED`](#depz_bno_frs_write_words_received), [`DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE`](#depz_bno_frs_write_unrecognized_type), [`DEPZ_BNO_FRS_WRITE_BUSY`](#depz_bno_frs_write_busy), [`DEPZ_BNO_FRS_WRITE_COMPLETED`](#depz_bno_frs_write_completed), [`DEPZ_BNO_FRS_WRITE_MODE_READY`](#depz_bno_frs_write_mode_ready), [`DEPZ_BNO_FRS_WRITE_FAILED`](#depz_bno_frs_write_failed), [`DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE`](#depz_bno_frs_write_not_in_write_mode), [`DEPZ_BNO_FRS_WRITE_INVALID_LENGTH`](#depz_bno_frs_write_invalid_length), [`DEPZ_BNO_FRS_WRITE_RECORD_VALID`](#depz_bno_frs_write_record_valid), [`DEPZ_BNO_FRS_WRITE_RECORD_INVALID`](#depz_bno_frs_write_record_invalid), [`depz_bno_feature`](#depz_bno_feature), [`depz_bno_product_id`](#depz_bno_product_id), [`depz_bno_command_response`](#depz_bno_command_response), [`depz_bno_frs_read_response`](#depz_bno_frs_read_response), [`depz_bno_frs_write_response`](#depz_bno_frs_write_response), [`depz_bno_unpack_feature_response`](#depz_bno_unpack_feature_response), [`depz_bno_unpack_product_id`](#depz_bno_unpack_product_id), [`depz_bno_unpack_command_response`](#depz_bno_unpack_command_response), [`depz_bno_unpack_frs_read_response`](#depz_bno_unpack_frs_read_response), [`depz_bno_unpack_frs_write_response`](#depz_bno_unpack_frs_write_response), [`depz_bno_control_report_len`](#depz_bno_control_report_len), [`depz_bno_metadata`](#depz_bno_metadata), [`depz_bno_metadata_from_words`](#depz_bno_metadata_from_words), [`depz_bno_metadata_record`](#depz_bno_metadata_record), [`DEPZ_BNO_BASE_TIMESTAMP_REF`](#depz_bno_base_timestamp_ref), [`DEPZ_BNO_TIMESTAMP_REBASE`](#depz_bno_timestamp_rebase), [`depz_bno_report_type`](#depz_bno_report_type), [`depz_bno_report_type_str`](#depz_bno_report_type_str), [`depz_bno_report`](#depz_bno_report), [`depz_bno_parse_input_cargo`](#depz_bno_parse_input_cargo), [`depz_bno_parse_gyro_rv`](#depz_bno_parse_gyro_rv), [`DEPZ_BNO_RV_ACCURACY_Q`](#depz_bno_rv_accuracy_q), [`DEPZ_BNO_GYRO_RV_ANGVEL_Q`](#depz_bno_gyro_rv_angvel_q), [`depz_bno_q_point`](#depz_bno_q_point), [`depz_bno_report_xyz`](#depz_bno_report_xyz), [`depz_bno_report_bias`](#depz_bno_report_bias), [`depz_bno_report_quaternion`](#depz_bno_report_quaternion), [`depz_bno_report_accuracy_rad`](#depz_bno_report_accuracy_rad), [`depz_bno_report_angular_velocity`](#depz_bno_report_angular_velocity), [`depz_bno_report_scalar`](#depz_bno_report_scalar)
-- **BNO055 (IMU)**: [`DEPZ_BNO055_CMD_READ_REG`](#depz_bno055_cmd_read_reg), [`DEPZ_BNO055_CMD_WRITE_REG`](#depz_bno055_cmd_write_reg), [`DEPZ_BNO055_CMD_RESET`](#depz_bno055_cmd_reset), [`DEPZ_BNO055_CMD_START_STREAM`](#depz_bno055_cmd_start_stream), [`DEPZ_BNO055_CMD_STOP_STREAM`](#depz_bno055_cmd_stop_stream), [`DEPZ_BNO055_CMD_GET_INFO`](#depz_bno055_cmd_get_info), [`DEPZ_BNO055_RPT_REG_DATA`](#depz_bno055_rpt_reg_data), [`DEPZ_BNO055_RPT_INFO`](#depz_bno055_rpt_info), [`DEPZ_BNO055_RPT_STREAM`](#depz_bno055_rpt_stream), [`DEPZ_BNO055_XFER_MAX`](#depz_bno055_xfer_max), [`DEPZ_BNO055_INFO_SIZE`](#depz_bno055_info_size), [`DEPZ_BNO055_TRIGGER_TIMER`](#depz_bno055_trigger_timer), [`DEPZ_BNO055_TRIGGER_INT`](#depz_bno055_trigger_int), [`depz_bno055_pack_read_reg`](#depz_bno055_pack_read_reg), [`depz_bno055_pack_write_reg`](#depz_bno055_pack_write_reg), [`depz_bno055_pack_start_stream`](#depz_bno055_pack_start_stream), [`depz_bno055_reg_data`](#depz_bno055_reg_data), [`depz_bno055_unpack_reg_data`](#depz_bno055_unpack_reg_data), [`depz_bno055_info`](#depz_bno055_info), [`depz_bno055_unpack_info`](#depz_bno055_unpack_info), [`depz_bno055_stream`](#depz_bno055_stream), [`depz_bno055_unpack_stream`](#depz_bno055_unpack_stream), [`DEPZ_BNO055_REG_CHIP_ID`](#depz_bno055_reg_chip_id), [`DEPZ_BNO055_REG_PAGE_ID`](#depz_bno055_reg_page_id), [`DEPZ_BNO055_REG_ACC_DATA`](#depz_bno055_reg_acc_data), [`DEPZ_BNO055_REG_MAG_DATA`](#depz_bno055_reg_mag_data), [`DEPZ_BNO055_REG_GYR_DATA`](#depz_bno055_reg_gyr_data), [`DEPZ_BNO055_REG_EUL_DATA`](#depz_bno055_reg_eul_data), [`DEPZ_BNO055_REG_QUA_DATA`](#depz_bno055_reg_qua_data), [`DEPZ_BNO055_REG_LIA_DATA`](#depz_bno055_reg_lia_data), [`DEPZ_BNO055_REG_GRV_DATA`](#depz_bno055_reg_grv_data), [`DEPZ_BNO055_REG_TEMP`](#depz_bno055_reg_temp), [`DEPZ_BNO055_REG_CALIB_STAT`](#depz_bno055_reg_calib_stat), [`DEPZ_BNO055_REG_ST_RESULT`](#depz_bno055_reg_st_result), [`DEPZ_BNO055_REG_INT_STA`](#depz_bno055_reg_int_sta), [`DEPZ_BNO055_REG_SYS_CLK_STATUS`](#depz_bno055_reg_sys_clk_status), [`DEPZ_BNO055_REG_SYS_STATUS`](#depz_bno055_reg_sys_status), [`DEPZ_BNO055_REG_SYS_ERR`](#depz_bno055_reg_sys_err), [`DEPZ_BNO055_REG_UNIT_SEL`](#depz_bno055_reg_unit_sel), [`DEPZ_BNO055_REG_OPR_MODE`](#depz_bno055_reg_opr_mode), [`DEPZ_BNO055_REG_PWR_MODE`](#depz_bno055_reg_pwr_mode), [`DEPZ_BNO055_REG_SYS_TRIGGER`](#depz_bno055_reg_sys_trigger), [`DEPZ_BNO055_REG_TEMP_SOURCE`](#depz_bno055_reg_temp_source), [`DEPZ_BNO055_REG_AXIS_MAP_CONFIG`](#depz_bno055_reg_axis_map_config), [`DEPZ_BNO055_REG_AXIS_MAP_SIGN`](#depz_bno055_reg_axis_map_sign), [`DEPZ_BNO055_REG_SIC_MATRIX`](#depz_bno055_reg_sic_matrix), [`DEPZ_BNO055_REG_CALIB_PROFILE`](#depz_bno055_reg_calib_profile), [`DEPZ_BNO055_REG1_ACC_CONFIG`](#depz_bno055_reg1_acc_config), [`DEPZ_BNO055_REG1_MAG_CONFIG`](#depz_bno055_reg1_mag_config), [`DEPZ_BNO055_REG1_GYR_CONFIG_0`](#depz_bno055_reg1_gyr_config_0), [`DEPZ_BNO055_REG1_GYR_CONFIG_1`](#depz_bno055_reg1_gyr_config_1), [`DEPZ_BNO055_REG1_INT_MSK`](#depz_bno055_reg1_int_msk), [`DEPZ_BNO055_REG1_INT_EN`](#depz_bno055_reg1_int_en), [`DEPZ_BNO055_REG1_UNIQUE_ID`](#depz_bno055_reg1_unique_id), [`DEPZ_BNO055_FULL_BLOCK_ADDR`](#depz_bno055_full_block_addr), [`DEPZ_BNO055_FULL_BLOCK_LEN`](#depz_bno055_full_block_len), [`DEPZ_BNO055_QUAT_BLOCK_ADDR`](#depz_bno055_quat_block_addr), [`DEPZ_BNO055_QUAT_BLOCK_LEN`](#depz_bno055_quat_block_len), [`depz_bno055_opr_mode`](#depz_bno055_opr_mode), [`DEPZ_BNO055_UNIT_ACC_MG`](#depz_bno055_unit_acc_mg), [`DEPZ_BNO055_UNIT_GYR_RPS`](#depz_bno055_unit_gyr_rps), [`DEPZ_BNO055_UNIT_EUL_RAD`](#depz_bno055_unit_eul_rad), [`DEPZ_BNO055_UNIT_TEMP_F`](#depz_bno055_unit_temp_f), [`DEPZ_BNO055_UNIT_ORI_ANDROID`](#depz_bno055_unit_ori_android), [`depz_bno055_units`](#depz_bno055_units), [`depz_bno055_unpack_units`](#depz_bno055_unpack_units), [`depz_bno055_pack_units`](#depz_bno055_pack_units), [`depz_bno055_accel_lsb`](#depz_bno055_accel_lsb), [`depz_bno055_gyro_lsb`](#depz_bno055_gyro_lsb), [`depz_bno055_euler_lsb`](#depz_bno055_euler_lsb), [`depz_bno055_temp_lsb`](#depz_bno055_temp_lsb), [`DEPZ_BNO055_MAG_LSB`](#depz_bno055_mag_lsb), [`DEPZ_BNO055_QUAT_LSB`](#depz_bno055_quat_lsb), [`DEPZ_BNO055_FUSION_ACCEL_LSB`](#depz_bno055_fusion_accel_lsb), [`depz_bno055_calib_status`](#depz_bno055_calib_status), [`depz_bno055_unpack_calib_status`](#depz_bno055_unpack_calib_status), [`depz_bno055_pack_calib_status`](#depz_bno055_pack_calib_status), [`depz_bno055_fully_calibrated`](#depz_bno055_fully_calibrated), [`DEPZ_BNO055_CALIB_PROFILE_LEN`](#depz_bno055_calib_profile_len), [`depz_bno055_calib_profile`](#depz_bno055_calib_profile), [`depz_bno055_unpack_calib_profile`](#depz_bno055_unpack_calib_profile), [`depz_bno055_pack_calib_profile`](#depz_bno055_pack_calib_profile), [`DEPZ_BNO055_AXIS_X`](#depz_bno055_axis_x), [`DEPZ_BNO055_AXIS_Y`](#depz_bno055_axis_y), [`DEPZ_BNO055_AXIS_Z`](#depz_bno055_axis_z), [`depz_bno055_axis_remap`](#depz_bno055_axis_remap), [`depz_bno055_unpack_axis_remap`](#depz_bno055_unpack_axis_remap), [`depz_bno055_pack_axis_remap`](#depz_bno055_pack_axis_remap), [`DEPZ_BNO055_PLACEMENTS`](#depz_bno055_placements), [`depz_bno055_placement`](#depz_bno055_placement), [`depz_bno055_accel_config`](#depz_bno055_accel_config), [`depz_bno055_unpack_accel_config`](#depz_bno055_unpack_accel_config), [`depz_bno055_pack_accel_config`](#depz_bno055_pack_accel_config), [`depz_bno055_gyro_config`](#depz_bno055_gyro_config), [`depz_bno055_unpack_gyro_config`](#depz_bno055_unpack_gyro_config), [`depz_bno055_pack_gyro_config`](#depz_bno055_pack_gyro_config), [`depz_bno055_mag_config`](#depz_bno055_mag_config), [`depz_bno055_unpack_mag_config`](#depz_bno055_unpack_mag_config), [`depz_bno055_pack_mag_config`](#depz_bno055_pack_mag_config), [`depz_bno055_block`](#depz_bno055_block), [`depz_bno055_decode_block`](#depz_bno055_decode_block)
-- **TMF8829 (dToF)**: [`DEPZ_TMF8829_CMD_READ_REG`](#depz_tmf8829_cmd_read_reg), [`DEPZ_TMF8829_CMD_WRITE_REG`](#depz_tmf8829_cmd_write_reg), [`DEPZ_TMF8829_CMD_START_STREAM`](#depz_tmf8829_cmd_start_stream), [`DEPZ_TMF8829_CMD_STOP_STREAM`](#depz_tmf8829_cmd_stop_stream), [`DEPZ_TMF8829_CMD_GET_INFO`](#depz_tmf8829_cmd_get_info), [`DEPZ_TMF8829_RPT_REG_DATA`](#depz_tmf8829_rpt_reg_data), [`DEPZ_TMF8829_RPT_INFO`](#depz_tmf8829_rpt_info), [`DEPZ_TMF8829_RPT_FRAME`](#depz_tmf8829_rpt_frame), [`DEPZ_TMF8829_RPT_EVENT`](#depz_tmf8829_rpt_event), [`DEPZ_TMF8829_EV_INT`](#depz_tmf8829_ev_int), [`DEPZ_TMF8829_EV_BAD_HEADER`](#depz_tmf8829_ev_bad_header), [`DEPZ_TMF8829_READ_MAX`](#depz_tmf8829_read_max), [`DEPZ_TMF8829_WRITE_MAX`](#depz_tmf8829_write_max), [`DEPZ_TMF8829_CHUNK_MAX`](#depz_tmf8829_chunk_max), [`DEPZ_TMF8829_INT_RESULTS`](#depz_tmf8829_int_results), [`DEPZ_TMF8829_INT_MOTION`](#depz_tmf8829_int_motion), [`DEPZ_TMF8829_INT_PROXIMITY`](#depz_tmf8829_int_proximity), [`DEPZ_TMF8829_INT_HISTOGRAMS`](#depz_tmf8829_int_histograms), [`DEPZ_TMF8829_INT_MASK_ALL`](#depz_tmf8829_int_mask_all), [`DEPZ_TMF8829_SF_REF_FRAME`](#depz_tmf8829_sf_ref_frame), [`DEPZ_TMF8829_REG_DATA_HEADER_SIZE`](#depz_tmf8829_reg_data_header_size), [`DEPZ_TMF8829_FRAME_CHUNK_HEADER_SIZE`](#depz_tmf8829_frame_chunk_header_size), [`DEPZ_TMF8829_EVENT_SIZE`](#depz_tmf8829_event_size), [`DEPZ_TMF8829_INFO_SIZE`](#depz_tmf8829_info_size), [`depz_tmf8829_pack_read_reg`](#depz_tmf8829_pack_read_reg), [`depz_tmf8829_pack_write_reg`](#depz_tmf8829_pack_write_reg), [`depz_tmf8829_pack_start_stream`](#depz_tmf8829_pack_start_stream), [`depz_tmf8829_reg_data`](#depz_tmf8829_reg_data), [`depz_tmf8829_unpack_reg_data`](#depz_tmf8829_unpack_reg_data), [`depz_tmf8829_info`](#depz_tmf8829_info), [`depz_tmf8829_unpack_info`](#depz_tmf8829_unpack_info), [`depz_tmf8829_frame_chunk`](#depz_tmf8829_frame_chunk), [`depz_tmf8829_unpack_frame_chunk`](#depz_tmf8829_unpack_frame_chunk), [`depz_tmf8829_event`](#depz_tmf8829_event), [`depz_tmf8829_unpack_event`](#depz_tmf8829_unpack_event), [`DEPZ_TMF8829_FRAME_MAX`](#depz_tmf8829_frame_max), [`depz_tmf8829_raw_frame`](#depz_tmf8829_raw_frame), [`depz_tmf8829_reassembler`](#depz_tmf8829_reassembler), [`depz_tmf8829_reassembler_reset`](#depz_tmf8829_reassembler_reset), [`depz_tmf8829_reassembler_feed`](#depz_tmf8829_reassembler_feed), [`DEPZ_TMF8829_PRE_HEADER_SIZE`](#depz_tmf8829_pre_header_size), [`DEPZ_TMF8829_HEADER_SIZE`](#depz_tmf8829_header_size), [`DEPZ_TMF8829_FOOTER_SIZE`](#depz_tmf8829_footer_size), [`DEPZ_TMF8829_FRAME_HEAD`](#depz_tmf8829_frame_head), [`DEPZ_TMF8829_FRAME_EOF`](#depz_tmf8829_frame_eof), [`DEPZ_TMF8829_FID_MASK`](#depz_tmf8829_fid_mask), [`DEPZ_TMF8829_FID_RESULTS`](#depz_tmf8829_fid_results), [`DEPZ_TMF8829_FID_HISTOGRAMS`](#depz_tmf8829_fid_histograms), [`DEPZ_TMF8829_FID_REF_SPAD`](#depz_tmf8829_fid_ref_spad), [`DEPZ_TMF8829_LAYOUT_PEAKS`](#depz_tmf8829_layout_peaks), [`DEPZ_TMF8829_LAYOUT_SIGNAL`](#depz_tmf8829_layout_signal), [`DEPZ_TMF8829_LAYOUT_NOISE`](#depz_tmf8829_layout_noise), [`DEPZ_TMF8829_LAYOUT_XTALK`](#depz_tmf8829_layout_xtalk), [`DEPZ_TMF8829_LAYOUT_SUBFRAME`](#depz_tmf8829_layout_subframe), [`DEPZ_TMF8829_FRAME_VALID`](#depz_tmf8829_frame_valid), [`DEPZ_TMF8829_FRAME_ABORTED`](#depz_tmf8829_frame_aborted), [`DEPZ_TMF8829_FRAME_HV_CP_OVERLOAD`](#depz_tmf8829_frame_hv_cp_overload), [`DEPZ_TMF8829_FRAME_VCDRV_OVERLOAD`](#depz_tmf8829_frame_vcdrv_overload), [`DEPZ_TMF8829_FRAME_VCDRV_BURST_EXCEEDED`](#depz_tmf8829_frame_vcdrv_burst_exceeded), [`DEPZ_TMF8829_FOOTER_DIST_IN_MM`](#depz_tmf8829_footer_dist_in_mm), [`DEPZ_TMF8829_FIFO_TX_UNDERRUN`](#depz_tmf8829_fifo_tx_underrun), [`DEPZ_TMF8829_FIFO_RX_OVERRUN`](#depz_tmf8829_fifo_rx_overrun), [`depz_tmf8829_frame_info`](#depz_tmf8829_frame_info), [`depz_tmf8829_parse_frame`](#depz_tmf8829_parse_frame), [`depz_tmf8829_frame_size`](#depz_tmf8829_frame_size), [`depz_tmf8829_fp_grid`](#depz_tmf8829_fp_grid), [`depz_tmf8829_frame_rows`](#depz_tmf8829_frame_rows), [`depz_tmf8829_fp_name`](#depz_tmf8829_fp_name), [`DEPZ_TMF8829_FRAME_PROBLEMS_MAX`](#depz_tmf8829_frame_problems_max), [`depz_tmf8829_frame_problems`](#depz_tmf8829_frame_problems), [`depz_tmf8829_frame_problems_of`](#depz_tmf8829_frame_problems_of), [`DEPZ_TMF8829_MAX_ZONES`](#depz_tmf8829_max_zones), [`DEPZ_TMF8829_MAX_PEAKS`](#depz_tmf8829_max_peaks), [`depz_tmf8829_results`](#depz_tmf8829_results), [`depz_tmf8829_parse_results`](#depz_tmf8829_parse_results), [`depz_tmf8829_merge_halves`](#depz_tmf8829_merge_halves), [`DEPZ_TMF8829_NOMINAL_Q16`](#depz_tmf8829_nominal_q16), [`DEPZ_TMF8829_WIN_MIN_US`](#depz_tmf8829_win_min_us), [`DEPZ_TMF8829_WIN_SLIDE_US`](#depz_tmf8829_win_slide_us), [`DEPZ_TMF8829_EDGE_LATE_US`](#depz_tmf8829_edge_late_us), [`DEPZ_TMF8829_FT_NOMINAL`](#depz_tmf8829_ft_nominal), [`DEPZ_TMF8829_FT_CLOCK_RESET`](#depz_tmf8829_ft_clock_reset), [`DEPZ_TMF8829_FT_EDGE_LATE`](#depz_tmf8829_ft_edge_late), [`DEPZ_TMF8829_FT_STALLED`](#depz_tmf8829_ft_stalled), [`DEPZ_TMF8829_FT_T1_UNSURE`](#depz_tmf8829_ft_t1_unsure), [`depz_tmf8829_clock`](#depz_tmf8829_clock), [`depz_tmf8829_clock_reset`](#depz_tmf8829_clock_reset), [`depz_tmf8829_clock_add`](#depz_tmf8829_clock_add), [`depz_tmf8829_clock_to_us`](#depz_tmf8829_clock_to_us), [`depz_tmf8829_clock_ratio`](#depz_tmf8829_clock_ratio), [`depz_tmf8829_frame_time`](#depz_tmf8829_frame_time), [`depz_tmf8829_timer`](#depz_tmf8829_timer), [`depz_tmf8829_timer_reset`](#depz_tmf8829_timer_reset), [`depz_tmf8829_timer_histograms`](#depz_tmf8829_timer_histograms), [`depz_tmf8829_timer_results`](#depz_tmf8829_timer_results), [`depz_tmf8829_subints`](#depz_tmf8829_subints), [`DEPZ_TMF8829_PROBLEMS_KEPT`](#depz_tmf8829_problems_kept), [`DEPZ_TMF8829_PROBLEM_LEN`](#depz_tmf8829_problem_len), [`depz_tmf8829_measurement`](#depz_tmf8829_measurement), [`depz_tmf8829_builder`](#depz_tmf8829_builder), [`depz_tmf8829_builder_reset`](#depz_tmf8829_builder_reset), [`depz_tmf8829_builder_add`](#depz_tmf8829_builder_add), [`DEPZ_TMF8829_REG_APP_ID`](#depz_tmf8829_reg_app_id), [`DEPZ_TMF8829_REG_CMD_STAT`](#depz_tmf8829_reg_cmd_stat), [`DEPZ_TMF8829_REG_SERIAL`](#depz_tmf8829_reg_serial), [`DEPZ_TMF8829_REG_CID_RID`](#depz_tmf8829_reg_cid_rid), [`DEPZ_TMF8829_REG_CFG`](#depz_tmf8829_reg_cfg), [`DEPZ_TMF8829_REG_INT_STATUS`](#depz_tmf8829_reg_int_status), [`DEPZ_TMF8829_REG_INT_ENAB`](#depz_tmf8829_reg_int_enab), [`DEPZ_TMF8829_REG_ID`](#depz_tmf8829_reg_id), [`DEPZ_TMF8829_REG_REVID`](#depz_tmf8829_reg_revid), [`DEPZ_TMF8829_REG_RESET`](#depz_tmf8829_reg_reset), [`DEPZ_TMF8829_REG_ENABLE`](#depz_tmf8829_reg_enable), [`DEPZ_TMF8829_REG_FIFOSTATUS`](#depz_tmf8829_reg_fifostatus), [`DEPZ_TMF8829_REG_FIFO`](#depz_tmf8829_reg_fifo), [`DEPZ_TMF8829_DEVICE_ID`](#depz_tmf8829_device_id), [`DEPZ_TMF8829_CFG_SIZE`](#depz_tmf8829_cfg_size), [`DEPZ_TMF8829_CMD_MEASURE`](#depz_tmf8829_cmd_measure), [`DEPZ_TMF8829_CMD_WRITE_PAGE`](#depz_tmf8829_cmd_write_page), [`DEPZ_TMF8829_CMD_LOAD_CONFIG_PAGE`](#depz_tmf8829_cmd_load_config_page), [`DEPZ_TMF8829_CMD_STOP`](#depz_tmf8829_cmd_stop), [`DEPZ_TMF8829_STAT_OK`](#depz_tmf8829_stat_ok), [`DEPZ_TMF8829_STAT_ACCEPTED`](#depz_tmf8829_stat_accepted), [`depz_tmf8829_status_name`](#depz_tmf8829_status_name), [`depz_tmf8829_preset`](#depz_tmf8829_preset), [`DEPZ_TMF8829_PRESET_COUNT`](#depz_tmf8829_preset_count), [`DEPZ_TMF8829_PRESETS`](#depz_tmf8829_presets), [`depz_tmf8829_find_preset`](#depz_tmf8829_find_preset), [`DEPZ_TMF8829_DEFAULT_PERIOD_MS`](#depz_tmf8829_default_period_ms), [`depz_tmf8829_cfg_field`](#depz_tmf8829_cfg_field), [`DEPZ_TMF8829_CFG_FIELD_COUNT`](#depz_tmf8829_cfg_field_count), [`DEPZ_TMF8829_CFG_FIELDS`](#depz_tmf8829_cfg_fields), [`depz_tmf8829_find_cfg_field`](#depz_tmf8829_find_cfg_field), [`depz_tmf8829_cfg_get`](#depz_tmf8829_cfg_get), [`depz_tmf8829_cfg_set`](#depz_tmf8829_cfg_set), [`DEPZ_TMF8829_FIRMWARE_LOAD_ADDR`](#depz_tmf8829_firmware_load_addr), [`depz_tmf8829_firmware`](#depz_tmf8829_firmware), [`depz_tmf8829_firmware_len`](#depz_tmf8829_firmware_len)
+- **VL53L4CD (ToF)**: [`depz_vl53l4_cmd`](#depz_vl53l4_cmd), [`depz_vl53l4_rpt`](#depz_vl53l4_rpt), [`DEPZ_VL53L4_XFER_MAX`](#depz_vl53l4_xfer_max), [`DEPZ_VL53L4_XSHUT_OFF`](#depz_vl53l4_xshut_off), [`DEPZ_VL53L4_XSHUT_ON`](#depz_vl53l4_xshut_on), [`DEPZ_VL53L4_XSHUT_RESET`](#depz_vl53l4_xshut_reset), [`DEPZ_VL53L4_SF_INT_ACT_HIGH`](#depz_vl53l4_sf_int_act_high), [`DEPZ_VL53L4_RESULT_BLOCK_ADDR`](#depz_vl53l4_result_block_addr), [`DEPZ_VL53L4_RESULT_BLOCK_LEN`](#depz_vl53l4_result_block_len), [`DEPZ_VL53L4_MODEL_ID`](#depz_vl53l4_model_id), [`DEPZ_VL53L4_CONFIG_ADDR`](#depz_vl53l4_config_addr), [`DEPZ_VL53L4_CONFIG_FMP_BYTE`](#depz_vl53l4_config_fmp_byte), [`depz_vl53l4_pack_read_reg`](#depz_vl53l4_pack_read_reg), [`depz_vl53l4_pack_write_reg`](#depz_vl53l4_pack_write_reg), [`depz_vl53l4_pack_xshut`](#depz_vl53l4_pack_xshut), [`depz_vl53l4_pack_start_stream`](#depz_vl53l4_pack_start_stream), [`depz_vl53l4_pack_set_i2c_speed`](#depz_vl53l4_pack_set_i2c_speed), [`depz_vl53l4_reg_data`](#depz_vl53l4_reg_data), [`depz_vl53l4_unpack_reg_data`](#depz_vl53l4_unpack_reg_data), [`depz_vl53l4_info`](#depz_vl53l4_info), [`depz_vl53l4_unpack_info`](#depz_vl53l4_unpack_info), [`depz_vl53l4_stream`](#depz_vl53l4_stream), [`depz_vl53l4_unpack_stream`](#depz_vl53l4_unpack_stream), [`depz_vl53l4_result`](#depz_vl53l4_result), [`depz_vl53l4_parse_result_block`](#depz_vl53l4_parse_result_block), [`depz_vl53l4_range_timing_registers`](#depz_vl53l4_range_timing_registers), [`depz_vl53l4_decode_range_timing`](#depz_vl53l4_decode_range_timing), [`depz_vl53l4_offset_raw`](#depz_vl53l4_offset_raw), [`depz_vl53l4_decode_offset`](#depz_vl53l4_decode_offset), [`depz_vl53l4_xtalk_raw`](#depz_vl53l4_xtalk_raw), [`depz_vl53l4_offset_raw_checked`](#depz_vl53l4_offset_raw_checked), [`depz_vl53l4_xtalk_raw_checked`](#depz_vl53l4_xtalk_raw_checked), [`depz_vl53l4_decode_xtalk`](#depz_vl53l4_decode_xtalk), [`depz_vl53l4_signal_threshold_raw`](#depz_vl53l4_signal_threshold_raw), [`depz_vl53l4_decode_signal_threshold`](#depz_vl53l4_decode_signal_threshold), [`depz_vl53l4_sigma_threshold_raw`](#depz_vl53l4_sigma_threshold_raw), [`depz_vl53l4_decode_sigma_threshold`](#depz_vl53l4_decode_sigma_threshold), [`DEPZ_VL53L4_DEFAULT_CONFIGURATION`](#depz_vl53l4_default_configuration), [`depz_vl53l4_config_block`](#depz_vl53l4_config_block)
+- **VL53L8 (ToF)**: [`depz_vl53l8_variant`](#depz_vl53l8_variant), [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_read_reg`](#depz_vl53l8_pack_read_reg), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reg_data`](#depz_vl53l8_reg_data), [`depz_vl53l8_unpack_reg_data`](#depz_vl53l8_unpack_reg_data), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`depz_vl53l8ch_decode_frame`](#depz_vl53l8ch_decode_frame), [`DEPZ_VL53L8_CNH_MAX_AGGREGATES`](#depz_vl53l8_cnh_max_aggregates), [`DEPZ_VL53L8_CNH_MAX_FEATURE`](#depz_vl53l8_cnh_max_feature), [`depz_vl53l8ch_cnh_config`](#depz_vl53l8ch_cnh_config), [`depz_vl53l8ch_cnh_frame`](#depz_vl53l8ch_cnh_frame), [`depz_vl53l8ch_decode_cnh`](#depz_vl53l8ch_decode_cnh), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_to_raw_checked`](#depz_vl53l8_xtalk_margin_to_raw_checked), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_pack_thresholds_checked`](#depz_vl53l8_pack_thresholds_checked), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
+- **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`depz_vl53l7_model`](#depz_vl53l7_model), [`DEPZ_VL53L7_CMD_PIN_CTRL`](#depz_vl53l7_cmd_pin_ctrl), [`DEPZ_VL53L7_CMD_GET_INFO`](#depz_vl53l7_cmd_get_info), [`DEPZ_VL53L7_CMD_SET_I2C_SPEED`](#depz_vl53l7_cmd_set_i2c_speed), [`DEPZ_VL53L7_RPT_INFO`](#depz_vl53l7_rpt_info), [`DEPZ_VL53L7_PIN_LPN_OFF`](#depz_vl53l7_pin_lpn_off), [`DEPZ_VL53L7_PIN_LPN_ON`](#depz_vl53l7_pin_lpn_on), [`DEPZ_VL53L7_PIN_I2C_RST`](#depz_vl53l7_pin_i2c_rst), [`DEPZ_VL53L7_PIN_SOFT_CYCLE`](#depz_vl53l7_pin_soft_cycle), [`DEPZ_VL53L7_I2C_OK`](#depz_vl53l7_i2c_ok), [`DEPZ_VL53L7_I2C_NACK`](#depz_vl53l7_i2c_nack), [`DEPZ_VL53L7_I2C_TIMEOUT`](#depz_vl53l7_i2c_timeout), [`DEPZ_VL53L7_I2C_BUS_ERROR`](#depz_vl53l7_i2c_bus_error), [`DEPZ_VL53L7_READ_MAX_LEN`](#depz_vl53l7_read_max_len), [`DEPZ_VL53L7_WRITE_MAX_LEN`](#depz_vl53l7_write_max_len), [`DEPZ_VL53L7_STREAM_CHUNK_MAX`](#depz_vl53l7_stream_chunk_max), [`DEPZ_VL53L7_INFO_SIZE`](#depz_vl53l7_info_size), [`DEPZ_VL53L7_FOOTER_ID_OFFSET`](#depz_vl53l7_footer_id_offset), [`depz_vl53l7_pack_read_reg`](#depz_vl53l7_pack_read_reg), [`depz_vl53l7_pack_write_reg`](#depz_vl53l7_pack_write_reg), [`depz_vl53l7_pack_pin_ctrl`](#depz_vl53l7_pack_pin_ctrl), [`depz_vl53l7_pack_set_i2c_speed`](#depz_vl53l7_pack_set_i2c_speed), [`depz_vl53l7_info`](#depz_vl53l7_info), [`depz_vl53l7_unpack_info`](#depz_vl53l7_unpack_info), [`depz_vl53l7_resolve_model`](#depz_vl53l7_resolve_model), [`depz_vl53l7_resolve_model_n`](#depz_vl53l7_resolve_model_n), [`depz_vl53l7_model_str`](#depz_vl53l7_model_str), [`depz_vl53l7_decode_frame`](#depz_vl53l7_decode_frame)
+- **VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)**: [`DEPZ_VL53LX_CMD_READ_REG`](#depz_vl53lx_cmd_read_reg), [`DEPZ_VL53LX_CMD_WRITE_REG`](#depz_vl53lx_cmd_write_reg), [`DEPZ_VL53LX_CMD_XSHUT`](#depz_vl53lx_cmd_xshut), [`DEPZ_VL53LX_CMD_START_STREAM`](#depz_vl53lx_cmd_start_stream), [`DEPZ_VL53LX_CMD_STOP_STREAM`](#depz_vl53lx_cmd_stop_stream), [`DEPZ_VL53LX_CMD_GET_INFO`](#depz_vl53lx_cmd_get_info), [`DEPZ_VL53LX_CMD_SET_I2C_SPEED`](#depz_vl53lx_cmd_set_i2c_speed), [`DEPZ_VL53LX_CMD_SET_ADDR_WIDTH`](#depz_vl53lx_cmd_set_addr_width), [`DEPZ_VL53LX_CMD_CLEAR_I2C_ERRORS`](#depz_vl53lx_cmd_clear_i2c_errors), [`DEPZ_VL53LX_RPT_REG_DATA`](#depz_vl53lx_rpt_reg_data), [`DEPZ_VL53LX_RPT_INFO`](#depz_vl53lx_rpt_info), [`DEPZ_VL53LX_RPT_STREAM`](#depz_vl53lx_rpt_stream), [`DEPZ_VL53LX_CLEAR_STEPS_MAX`](#depz_vl53lx_clear_steps_max), [`DEPZ_VL53LX_START_STREAM_MAX`](#depz_vl53lx_start_stream_max), [`DEPZ_VL53LX_INFO_SIZE`](#depz_vl53lx_info_size), [`depz_vl53lx_clear_step`](#depz_vl53lx_clear_step), [`depz_vl53lx_pack_set_addr_width`](#depz_vl53lx_pack_set_addr_width), [`depz_vl53lx_pack_start_stream`](#depz_vl53lx_pack_start_stream), [`depz_vl53lx_info`](#depz_vl53lx_info), [`depz_vl53lx_unpack_info`](#depz_vl53lx_unpack_info), [`depz_vl53lx_product`](#depz_vl53lx_product), [`depz_vl53lx_driver`](#depz_vl53lx_driver), [`depz_vl53lx_product_info`](#depz_vl53lx_product_info), [`depz_vl53lx_product_get`](#depz_vl53lx_product_get), [`depz_vl53lx_driver_str`](#depz_vl53lx_driver_str), [`depz_vl53lx_product_from_str`](#depz_vl53lx_product_from_str), [`depz_vl53lx_product_from_board_name`](#depz_vl53lx_product_from_board_name), [`depz_vl53lx_product_from_board_name_n`](#depz_vl53lx_product_from_board_name_n), [`depz_vl53lx_resolve_product`](#depz_vl53lx_resolve_product), [`depz_vl53lx_resolve_product_n`](#depz_vl53lx_resolve_product_n), [`depz_vl53lx_class`](#depz_vl53lx_class), [`depz_vl53lx_resolve_class`](#depz_vl53lx_resolve_class), [`depz_vl53lx_resolve_class_n`](#depz_vl53lx_resolve_class_n), [`depz_vl53lx_class_str`](#depz_vl53lx_class_str), [`DEPZ_VL53LX_DIE_BLOCK_ADDR`](#depz_vl53lx_die_block_addr), [`DEPZ_VL53LX_DIE_BLOCK_LEN`](#depz_vl53lx_die_block_len), [`DEPZ_VL53LX_L0X_BLOCK_ADDR`](#depz_vl53lx_l0x_block_addr), [`DEPZ_VL53LX_L0X_BLOCK_LEN`](#depz_vl53lx_l0x_block_len), [`DEPZ_VL53LX_HISTOGRAM_BLOCK_ADDR`](#depz_vl53lx_histogram_block_addr), [`DEPZ_VL53LX_HISTOGRAM_BLOCK_LEN`](#depz_vl53lx_histogram_block_len), [`DEPZ_VL53LX_HISTOGRAM_BINS`](#depz_vl53lx_histogram_bins), [`depz_vl53lx_die_variant`](#depz_vl53lx_die_variant), [`depz_vl53lx_decode_die_block`](#depz_vl53lx_decode_die_block), [`depz_vl53lx_l0x_raw`](#depz_vl53lx_l0x_raw), [`depz_vl53lx_decode_l0x_raw`](#depz_vl53lx_decode_l0x_raw), [`depz_vl53lx_histogram_raw`](#depz_vl53lx_histogram_raw), [`depz_vl53lx_decode_histogram_raw`](#depz_vl53lx_decode_histogram_raw)
+- **BNO086 (IMU)**: [`DEPZ_BNO086_CMD_SENSOR_RESET`](#depz_bno086_cmd_sensor_reset), [`DEPZ_BNO086_CMD_SENSOR_WAKE_UP`](#depz_bno086_cmd_sensor_wake_up), [`DEPZ_BNO086_CMD_SEND_SHTP_PACKET`](#depz_bno086_cmd_send_shtp_packet), [`DEPZ_BNO086_RPT_DATA`](#depz_bno086_rpt_data), [`depz_bno086_unpack_data`](#depz_bno086_unpack_data), [`DEPZ_SHTP_HEADER_SIZE`](#depz_shtp_header_size), [`DEPZ_SHTP_LENGTH_MASK`](#depz_shtp_length_mask), [`DEPZ_SHTP_CONTINUATION`](#depz_shtp_continuation), [`DEPZ_SHTP_NUM_CHANNELS`](#depz_shtp_num_channels), [`DEPZ_SHTP_MAX_TX_FRAME`](#depz_shtp_max_tx_frame), [`depz_shtp_channel_id`](#depz_shtp_channel_id), [`DEPZ_SHTP_EXEC_RESET`](#depz_shtp_exec_reset), [`DEPZ_SHTP_EXEC_ON`](#depz_shtp_exec_on), [`DEPZ_SHTP_EXEC_SLEEP`](#depz_shtp_exec_sleep), [`depz_shtp_header`](#depz_shtp_header), [`depz_shtp_pack_header_checked`](#depz_shtp_pack_header_checked), [`depz_shtp_pack_header`](#depz_shtp_pack_header), [`depz_shtp_unpack_header`](#depz_shtp_unpack_header), [`depz_shtp_rx_channel`](#depz_shtp_rx_channel), [`depz_shtp_layer`](#depz_shtp_layer), [`depz_shtp_init`](#depz_shtp_init), [`depz_shtp_free`](#depz_shtp_free), [`depz_shtp_next_frame`](#depz_shtp_next_frame), [`depz_shtp_cargo`](#depz_shtp_cargo), [`depz_shtp_feed`](#depz_shtp_feed), [`depz_shtp_feed_ex`](#depz_shtp_feed_ex), [`depz_bno_pack_set_feature`](#depz_bno_pack_set_feature), [`depz_bno_pack_get_feature_request`](#depz_bno_pack_get_feature_request), [`depz_bno_pack_product_id_request`](#depz_bno_pack_product_id_request), [`depz_bno_pack_command_request`](#depz_bno_pack_command_request), [`depz_bno_pack_frs_read_request`](#depz_bno_pack_frs_read_request), [`depz_bno_pack_frs_write_request`](#depz_bno_pack_frs_write_request), [`depz_bno_pack_frs_write_data`](#depz_bno_pack_frs_write_data), [`DEPZ_BNO_SENSOR_ACCELEROMETER`](#depz_bno_sensor_accelerometer), [`DEPZ_BNO_SENSOR_GYROSCOPE`](#depz_bno_sensor_gyroscope), [`DEPZ_BNO_SENSOR_MAGNETOMETER`](#depz_bno_sensor_magnetometer), [`DEPZ_BNO_SENSOR_LINEAR_ACCELERATION`](#depz_bno_sensor_linear_acceleration), [`DEPZ_BNO_SENSOR_ROTATION_VECTOR`](#depz_bno_sensor_rotation_vector), [`DEPZ_BNO_SENSOR_GRAVITY`](#depz_bno_sensor_gravity), [`DEPZ_BNO_SENSOR_UNCALIBRATED_GYROSCOPE`](#depz_bno_sensor_uncalibrated_gyroscope), [`DEPZ_BNO_SENSOR_GAME_ROTATION_VECTOR`](#depz_bno_sensor_game_rotation_vector), [`DEPZ_BNO_SENSOR_GEOMAGNETIC_ROTATION_VECTOR`](#depz_bno_sensor_geomagnetic_rotation_vector), [`DEPZ_BNO_SENSOR_UNCALIBRATED_MAGNETOMETER`](#depz_bno_sensor_uncalibrated_magnetometer), [`DEPZ_BNO_SENSOR_TAP_DETECTOR`](#depz_bno_sensor_tap_detector), [`DEPZ_BNO_SENSOR_STEP_COUNTER`](#depz_bno_sensor_step_counter), [`DEPZ_BNO_SENSOR_SIGNIFICANT_MOTION`](#depz_bno_sensor_significant_motion), [`DEPZ_BNO_SENSOR_STABILITY_CLASSIFIER`](#depz_bno_sensor_stability_classifier), [`DEPZ_BNO_SENSOR_RAW_ACCELEROMETER`](#depz_bno_sensor_raw_accelerometer), [`DEPZ_BNO_SENSOR_RAW_GYROSCOPE`](#depz_bno_sensor_raw_gyroscope), [`DEPZ_BNO_SENSOR_RAW_MAGNETOMETER`](#depz_bno_sensor_raw_magnetometer), [`DEPZ_BNO_SENSOR_STEP_DETECTOR`](#depz_bno_sensor_step_detector), [`DEPZ_BNO_SENSOR_SHAKE_DETECTOR`](#depz_bno_sensor_shake_detector), [`DEPZ_BNO_SENSOR_FLIP_DETECTOR`](#depz_bno_sensor_flip_detector), [`DEPZ_BNO_SENSOR_PICKUP_DETECTOR`](#depz_bno_sensor_pickup_detector), [`DEPZ_BNO_SENSOR_STABILITY_DETECTOR`](#depz_bno_sensor_stability_detector), [`DEPZ_BNO_SENSOR_PERSONAL_ACTIVITY_CLASSIFIER`](#depz_bno_sensor_personal_activity_classifier), [`DEPZ_BNO_SENSOR_SLEEP_DETECTOR`](#depz_bno_sensor_sleep_detector), [`DEPZ_BNO_SENSOR_TILT_DETECTOR`](#depz_bno_sensor_tilt_detector), [`DEPZ_BNO_SENSOR_POCKET_DETECTOR`](#depz_bno_sensor_pocket_detector), [`DEPZ_BNO_SENSOR_CIRCLE_DETECTOR`](#depz_bno_sensor_circle_detector), [`DEPZ_BNO_SENSOR_HEART_RATE_MONITOR`](#depz_bno_sensor_heart_rate_monitor), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV`](#depz_bno_sensor_arvr_stabilized_rv), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV`](#depz_bno_sensor_arvr_stabilized_game_rv), [`DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV`](#depz_bno_sensor_gyro_integrated_rv), [`DEPZ_BNO_SENSOR_MOTION_REQUEST`](#depz_bno_sensor_motion_request), [`DEPZ_SH2_COMMAND_RESPONSE`](#depz_sh2_command_response), [`DEPZ_SH2_COMMAND_REQUEST`](#depz_sh2_command_request), [`DEPZ_SH2_FRS_READ_RESPONSE`](#depz_sh2_frs_read_response), [`DEPZ_SH2_FRS_READ_REQUEST`](#depz_sh2_frs_read_request), [`DEPZ_SH2_FRS_WRITE_RESPONSE`](#depz_sh2_frs_write_response), [`DEPZ_SH2_FRS_WRITE_DATA`](#depz_sh2_frs_write_data), [`DEPZ_SH2_FRS_WRITE_REQUEST`](#depz_sh2_frs_write_request), [`DEPZ_SH2_PRODUCT_ID_RESPONSE`](#depz_sh2_product_id_response), [`DEPZ_SH2_PRODUCT_ID_REQUEST`](#depz_sh2_product_id_request), [`DEPZ_SH2_GET_FEATURE_RESPONSE`](#depz_sh2_get_feature_response), [`DEPZ_SH2_SET_FEATURE_COMMAND`](#depz_sh2_set_feature_command), [`DEPZ_SH2_GET_FEATURE_REQUEST`](#depz_sh2_get_feature_request), [`DEPZ_SH2_CMD_ERRORS`](#depz_sh2_cmd_errors), [`DEPZ_SH2_CMD_COUNTER`](#depz_sh2_cmd_counter), [`DEPZ_SH2_CMD_TARE`](#depz_sh2_cmd_tare), [`DEPZ_SH2_CMD_INITIALIZE`](#depz_sh2_cmd_initialize), [`DEPZ_SH2_CMD_SAVE_DCD`](#depz_sh2_cmd_save_dcd), [`DEPZ_SH2_CMD_ME_CALIBRATE`](#depz_sh2_cmd_me_calibrate), [`DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG`](#depz_sh2_cmd_periodic_dcd_config), [`DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE`](#depz_sh2_cmd_get_oscillator_type), [`DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET`](#depz_sh2_cmd_clear_dcd_and_reset), [`DEPZ_BNO_FEATURE_WAKEUP`](#depz_bno_feature_wakeup), [`DEPZ_BNO_FEATURE_ALWAYS_ON`](#depz_bno_feature_always_on), [`DEPZ_BNO_TARE_X`](#depz_bno_tare_x), [`DEPZ_BNO_TARE_Y`](#depz_bno_tare_y), [`DEPZ_BNO_TARE_Z`](#depz_bno_tare_z), [`DEPZ_BNO_TARE_ALL`](#depz_bno_tare_all), [`DEPZ_BNO_TARE_BASIS_RV`](#depz_bno_tare_basis_rv), [`DEPZ_BNO_TARE_BASIS_GAME_RV`](#depz_bno_tare_basis_game_rv), [`DEPZ_BNO_TARE_BASIS_GEOMAG_RV`](#depz_bno_tare_basis_geomag_rv), [`DEPZ_BNO_TARE_BASIS_GYRO_RV`](#depz_bno_tare_basis_gyro_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_RV`](#depz_bno_tare_basis_arvr_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_GAME_RV`](#depz_bno_tare_basis_arvr_game_rv), [`DEPZ_BNO_OSC_INTERNAL`](#depz_bno_osc_internal), [`DEPZ_BNO_OSC_EXT_CRYSTAL`](#depz_bno_osc_ext_crystal), [`DEPZ_BNO_OSC_EXT_CLOCK`](#depz_bno_osc_ext_clock), [`DEPZ_BNO_ERR_SOURCE_NO_MORE`](#depz_bno_err_source_no_more), [`DEPZ_BNO_FRS_STATIC_CALIBRATION_AGM`](#depz_bno_frs_static_calibration_agm), [`DEPZ_BNO_FRS_NOMINAL_CALIBRATION`](#depz_bno_frs_nominal_calibration), [`DEPZ_BNO_FRS_DYNAMIC_CALIBRATION`](#depz_bno_frs_dynamic_calibration), [`DEPZ_BNO_FRS_ME_POWER_MGMT`](#depz_bno_frs_me_power_mgmt), [`DEPZ_BNO_FRS_SYSTEM_ORIENTATION`](#depz_bno_frs_system_orientation), [`DEPZ_BNO_FRS_ACCEL_ORIENTATION`](#depz_bno_frs_accel_orientation), [`DEPZ_BNO_FRS_GYROSCOPE_ORIENTATION`](#depz_bno_frs_gyroscope_orientation), [`DEPZ_BNO_FRS_MAGNETOMETER_ORIENTATION`](#depz_bno_frs_magnetometer_orientation), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_RV`](#depz_bno_frs_arvr_stabilization_rv), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_GRV`](#depz_bno_frs_arvr_stabilization_grv), [`DEPZ_BNO_FRS_SIG_MOTION_DETECT_CONFIG`](#depz_bno_frs_sig_motion_detect_config), [`DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG`](#depz_bno_frs_shake_detect_config), [`DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG`](#depz_bno_frs_stability_detector_config), [`DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG`](#depz_bno_frs_activity_tracker_config), [`DEPZ_BNO_FRS_READ_NO_ERROR`](#depz_bno_frs_read_no_error), [`DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE`](#depz_bno_frs_read_unrecognized_type), [`DEPZ_BNO_FRS_READ_BUSY`](#depz_bno_frs_read_busy), [`DEPZ_BNO_FRS_READ_COMPLETED`](#depz_bno_frs_read_completed), [`DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE`](#depz_bno_frs_read_offset_out_of_range), [`DEPZ_BNO_FRS_READ_RECORD_EMPTY`](#depz_bno_frs_read_record_empty), [`DEPZ_BNO_FRS_READ_BLOCK_COMPLETED`](#depz_bno_frs_read_block_completed), [`DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED`](#depz_bno_frs_read_block_and_read_completed), [`DEPZ_BNO_FRS_READ_DEVICE_ERROR`](#depz_bno_frs_read_device_error), [`DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED`](#depz_bno_frs_write_words_received), [`DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE`](#depz_bno_frs_write_unrecognized_type), [`DEPZ_BNO_FRS_WRITE_BUSY`](#depz_bno_frs_write_busy), [`DEPZ_BNO_FRS_WRITE_COMPLETED`](#depz_bno_frs_write_completed), [`DEPZ_BNO_FRS_WRITE_MODE_READY`](#depz_bno_frs_write_mode_ready), [`DEPZ_BNO_FRS_WRITE_FAILED`](#depz_bno_frs_write_failed), [`DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE`](#depz_bno_frs_write_not_in_write_mode), [`DEPZ_BNO_FRS_WRITE_INVALID_LENGTH`](#depz_bno_frs_write_invalid_length), [`DEPZ_BNO_FRS_WRITE_RECORD_VALID`](#depz_bno_frs_write_record_valid), [`DEPZ_BNO_FRS_WRITE_RECORD_INVALID`](#depz_bno_frs_write_record_invalid), [`depz_bno_feature`](#depz_bno_feature), [`depz_bno_product_id`](#depz_bno_product_id), [`depz_bno_command_response`](#depz_bno_command_response), [`depz_bno_frs_read_response`](#depz_bno_frs_read_response), [`depz_bno_frs_write_response`](#depz_bno_frs_write_response), [`depz_bno_unpack_feature_response`](#depz_bno_unpack_feature_response), [`depz_bno_unpack_product_id`](#depz_bno_unpack_product_id), [`depz_bno_unpack_command_response`](#depz_bno_unpack_command_response), [`depz_bno_unpack_frs_read_response`](#depz_bno_unpack_frs_read_response), [`depz_bno_unpack_frs_write_response`](#depz_bno_unpack_frs_write_response), [`depz_bno_control_report_len`](#depz_bno_control_report_len), [`depz_bno_metadata`](#depz_bno_metadata), [`depz_bno_metadata_from_words`](#depz_bno_metadata_from_words), [`depz_bno_metadata_record`](#depz_bno_metadata_record), [`DEPZ_BNO_BASE_TIMESTAMP_REF`](#depz_bno_base_timestamp_ref), [`DEPZ_BNO_TIMESTAMP_REBASE`](#depz_bno_timestamp_rebase), [`DEPZ_BNO_FLUSH_COMPLETED`](#depz_bno_flush_completed), [`depz_bno_report_type`](#depz_bno_report_type), [`depz_bno_report_type_str`](#depz_bno_report_type_str), [`depz_bno_report`](#depz_bno_report), [`depz_bno_parse_input_cargo`](#depz_bno_parse_input_cargo), [`depz_bno_parse_gyro_rv`](#depz_bno_parse_gyro_rv), [`DEPZ_BNO_RV_ACCURACY_Q`](#depz_bno_rv_accuracy_q), [`DEPZ_BNO_GYRO_RV_ANGVEL_Q`](#depz_bno_gyro_rv_angvel_q), [`depz_bno_q_point`](#depz_bno_q_point), [`depz_bno_report_xyz`](#depz_bno_report_xyz), [`depz_bno_report_bias`](#depz_bno_report_bias), [`depz_bno_report_quaternion`](#depz_bno_report_quaternion), [`depz_bno_report_accuracy_rad`](#depz_bno_report_accuracy_rad), [`depz_bno_report_angular_velocity`](#depz_bno_report_angular_velocity), [`depz_bno_report_scalar`](#depz_bno_report_scalar)
+- **BNO055 (IMU)**: [`DEPZ_BNO055_CMD_READ_REG`](#depz_bno055_cmd_read_reg), [`DEPZ_BNO055_CMD_WRITE_REG`](#depz_bno055_cmd_write_reg), [`DEPZ_BNO055_CMD_RESET`](#depz_bno055_cmd_reset), [`DEPZ_BNO055_CMD_START_STREAM`](#depz_bno055_cmd_start_stream), [`DEPZ_BNO055_CMD_STOP_STREAM`](#depz_bno055_cmd_stop_stream), [`DEPZ_BNO055_CMD_GET_INFO`](#depz_bno055_cmd_get_info), [`DEPZ_BNO055_RPT_REG_DATA`](#depz_bno055_rpt_reg_data), [`DEPZ_BNO055_RPT_INFO`](#depz_bno055_rpt_info), [`DEPZ_BNO055_RPT_STREAM`](#depz_bno055_rpt_stream), [`DEPZ_BNO055_XFER_MAX`](#depz_bno055_xfer_max), [`DEPZ_BNO055_INFO_SIZE`](#depz_bno055_info_size), [`DEPZ_BNO055_TRIGGER_TIMER`](#depz_bno055_trigger_timer), [`DEPZ_BNO055_TRIGGER_INT`](#depz_bno055_trigger_int), [`depz_bno055_pack_read_reg`](#depz_bno055_pack_read_reg), [`depz_bno055_pack_write_reg`](#depz_bno055_pack_write_reg), [`depz_bno055_pack_start_stream`](#depz_bno055_pack_start_stream), [`depz_bno055_reg_data`](#depz_bno055_reg_data), [`depz_bno055_unpack_reg_data`](#depz_bno055_unpack_reg_data), [`depz_bno055_info`](#depz_bno055_info), [`depz_bno055_unpack_info`](#depz_bno055_unpack_info), [`depz_bno055_stream`](#depz_bno055_stream), [`depz_bno055_unpack_stream`](#depz_bno055_unpack_stream), [`DEPZ_BNO055_REG_CHIP_ID`](#depz_bno055_reg_chip_id), [`DEPZ_BNO055_REG_PAGE_ID`](#depz_bno055_reg_page_id), [`DEPZ_BNO055_REG_ACC_DATA`](#depz_bno055_reg_acc_data), [`DEPZ_BNO055_REG_MAG_DATA`](#depz_bno055_reg_mag_data), [`DEPZ_BNO055_REG_GYR_DATA`](#depz_bno055_reg_gyr_data), [`DEPZ_BNO055_REG_EUL_DATA`](#depz_bno055_reg_eul_data), [`DEPZ_BNO055_REG_QUA_DATA`](#depz_bno055_reg_qua_data), [`DEPZ_BNO055_REG_LIA_DATA`](#depz_bno055_reg_lia_data), [`DEPZ_BNO055_REG_GRV_DATA`](#depz_bno055_reg_grv_data), [`DEPZ_BNO055_REG_TEMP`](#depz_bno055_reg_temp), [`DEPZ_BNO055_REG_CALIB_STAT`](#depz_bno055_reg_calib_stat), [`DEPZ_BNO055_REG_ST_RESULT`](#depz_bno055_reg_st_result), [`DEPZ_BNO055_REG_INT_STA`](#depz_bno055_reg_int_sta), [`DEPZ_BNO055_REG_SYS_CLK_STATUS`](#depz_bno055_reg_sys_clk_status), [`DEPZ_BNO055_REG_SYS_STATUS`](#depz_bno055_reg_sys_status), [`DEPZ_BNO055_REG_SYS_ERR`](#depz_bno055_reg_sys_err), [`DEPZ_BNO055_REG_UNIT_SEL`](#depz_bno055_reg_unit_sel), [`DEPZ_BNO055_REG_OPR_MODE`](#depz_bno055_reg_opr_mode), [`DEPZ_BNO055_REG_PWR_MODE`](#depz_bno055_reg_pwr_mode), [`DEPZ_BNO055_REG_SYS_TRIGGER`](#depz_bno055_reg_sys_trigger), [`DEPZ_BNO055_REG_TEMP_SOURCE`](#depz_bno055_reg_temp_source), [`DEPZ_BNO055_REG_AXIS_MAP_CONFIG`](#depz_bno055_reg_axis_map_config), [`DEPZ_BNO055_REG_AXIS_MAP_SIGN`](#depz_bno055_reg_axis_map_sign), [`DEPZ_BNO055_REG_SIC_MATRIX`](#depz_bno055_reg_sic_matrix), [`DEPZ_BNO055_REG_CALIB_PROFILE`](#depz_bno055_reg_calib_profile), [`DEPZ_BNO055_REG1_ACC_CONFIG`](#depz_bno055_reg1_acc_config), [`DEPZ_BNO055_REG1_MAG_CONFIG`](#depz_bno055_reg1_mag_config), [`DEPZ_BNO055_REG1_GYR_CONFIG_0`](#depz_bno055_reg1_gyr_config_0), [`DEPZ_BNO055_REG1_GYR_CONFIG_1`](#depz_bno055_reg1_gyr_config_1), [`DEPZ_BNO055_REG1_INT_MSK`](#depz_bno055_reg1_int_msk), [`DEPZ_BNO055_REG1_INT_EN`](#depz_bno055_reg1_int_en), [`DEPZ_BNO055_REG1_UNIQUE_ID`](#depz_bno055_reg1_unique_id), [`DEPZ_BNO055_FULL_BLOCK_ADDR`](#depz_bno055_full_block_addr), [`DEPZ_BNO055_FULL_BLOCK_LEN`](#depz_bno055_full_block_len), [`DEPZ_BNO055_QUAT_BLOCK_ADDR`](#depz_bno055_quat_block_addr), [`DEPZ_BNO055_QUAT_BLOCK_LEN`](#depz_bno055_quat_block_len), [`depz_bno055_opr_mode`](#depz_bno055_opr_mode), [`DEPZ_BNO055_UNIT_ACC_MG`](#depz_bno055_unit_acc_mg), [`DEPZ_BNO055_UNIT_GYR_RPS`](#depz_bno055_unit_gyr_rps), [`DEPZ_BNO055_UNIT_EUL_RAD`](#depz_bno055_unit_eul_rad), [`DEPZ_BNO055_UNIT_TEMP_F`](#depz_bno055_unit_temp_f), [`DEPZ_BNO055_UNIT_ORI_ANDROID`](#depz_bno055_unit_ori_android), [`depz_bno055_units`](#depz_bno055_units), [`depz_bno055_unpack_units`](#depz_bno055_unpack_units), [`depz_bno055_pack_units`](#depz_bno055_pack_units), [`depz_bno055_accel_lsb`](#depz_bno055_accel_lsb), [`depz_bno055_gyro_lsb`](#depz_bno055_gyro_lsb), [`depz_bno055_euler_lsb`](#depz_bno055_euler_lsb), [`depz_bno055_temp_lsb`](#depz_bno055_temp_lsb), [`DEPZ_BNO055_MAG_LSB`](#depz_bno055_mag_lsb), [`DEPZ_BNO055_QUAT_LSB`](#depz_bno055_quat_lsb), [`DEPZ_BNO055_FUSION_ACCEL_LSB`](#depz_bno055_fusion_accel_lsb), [`depz_bno055_calib_status`](#depz_bno055_calib_status), [`depz_bno055_unpack_calib_status`](#depz_bno055_unpack_calib_status), [`depz_bno055_pack_calib_status`](#depz_bno055_pack_calib_status), [`depz_bno055_fully_calibrated`](#depz_bno055_fully_calibrated), [`DEPZ_BNO055_CALIB_PROFILE_LEN`](#depz_bno055_calib_profile_len), [`depz_bno055_calib_profile`](#depz_bno055_calib_profile), [`depz_bno055_unpack_calib_profile`](#depz_bno055_unpack_calib_profile), [`depz_bno055_pack_calib_profile`](#depz_bno055_pack_calib_profile), [`DEPZ_BNO055_AXIS_X`](#depz_bno055_axis_x), [`DEPZ_BNO055_AXIS_Y`](#depz_bno055_axis_y), [`DEPZ_BNO055_AXIS_Z`](#depz_bno055_axis_z), [`depz_bno055_axis_remap`](#depz_bno055_axis_remap), [`depz_bno055_unpack_axis_remap`](#depz_bno055_unpack_axis_remap), [`depz_bno055_pack_axis_remap`](#depz_bno055_pack_axis_remap), [`DEPZ_BNO055_PLACEMENTS`](#depz_bno055_placements), [`depz_bno055_placement`](#depz_bno055_placement), [`depz_bno055_accel_config`](#depz_bno055_accel_config), [`depz_bno055_unpack_accel_config`](#depz_bno055_unpack_accel_config), [`depz_bno055_pack_accel_config`](#depz_bno055_pack_accel_config), [`depz_bno055_gyro_config`](#depz_bno055_gyro_config), [`depz_bno055_unpack_gyro_config`](#depz_bno055_unpack_gyro_config), [`depz_bno055_unpack_gyro_config_n`](#depz_bno055_unpack_gyro_config_n), [`depz_bno055_pack_gyro_config`](#depz_bno055_pack_gyro_config), [`depz_bno055_mag_config`](#depz_bno055_mag_config), [`depz_bno055_unpack_mag_config`](#depz_bno055_unpack_mag_config), [`depz_bno055_pack_mag_config`](#depz_bno055_pack_mag_config), [`depz_bno055_block`](#depz_bno055_block), [`depz_bno055_decode_block`](#depz_bno055_decode_block)
+- **TMF8829 (dToF)**: [`DEPZ_TMF8829_CMD_READ_REG`](#depz_tmf8829_cmd_read_reg), [`DEPZ_TMF8829_CMD_WRITE_REG`](#depz_tmf8829_cmd_write_reg), [`DEPZ_TMF8829_CMD_START_STREAM`](#depz_tmf8829_cmd_start_stream), [`DEPZ_TMF8829_CMD_STOP_STREAM`](#depz_tmf8829_cmd_stop_stream), [`DEPZ_TMF8829_CMD_GET_INFO`](#depz_tmf8829_cmd_get_info), [`DEPZ_TMF8829_RPT_REG_DATA`](#depz_tmf8829_rpt_reg_data), [`DEPZ_TMF8829_RPT_INFO`](#depz_tmf8829_rpt_info), [`DEPZ_TMF8829_RPT_FRAME`](#depz_tmf8829_rpt_frame), [`DEPZ_TMF8829_RPT_EVENT`](#depz_tmf8829_rpt_event), [`DEPZ_TMF8829_EV_INT`](#depz_tmf8829_ev_int), [`DEPZ_TMF8829_EV_BAD_HEADER`](#depz_tmf8829_ev_bad_header), [`DEPZ_TMF8829_READ_MAX`](#depz_tmf8829_read_max), [`DEPZ_TMF8829_WRITE_MAX`](#depz_tmf8829_write_max), [`DEPZ_TMF8829_CHUNK_MAX`](#depz_tmf8829_chunk_max), [`DEPZ_TMF8829_INT_RESULTS`](#depz_tmf8829_int_results), [`DEPZ_TMF8829_INT_MOTION`](#depz_tmf8829_int_motion), [`DEPZ_TMF8829_INT_PROXIMITY`](#depz_tmf8829_int_proximity), [`DEPZ_TMF8829_INT_HISTOGRAMS`](#depz_tmf8829_int_histograms), [`DEPZ_TMF8829_INT_MASK_ALL`](#depz_tmf8829_int_mask_all), [`DEPZ_TMF8829_SF_REF_FRAME`](#depz_tmf8829_sf_ref_frame), [`DEPZ_TMF8829_REG_DATA_HEADER_SIZE`](#depz_tmf8829_reg_data_header_size), [`DEPZ_TMF8829_FRAME_CHUNK_HEADER_SIZE`](#depz_tmf8829_frame_chunk_header_size), [`DEPZ_TMF8829_EVENT_SIZE`](#depz_tmf8829_event_size), [`DEPZ_TMF8829_INFO_SIZE`](#depz_tmf8829_info_size), [`depz_tmf8829_pack_read_reg`](#depz_tmf8829_pack_read_reg), [`depz_tmf8829_pack_write_reg`](#depz_tmf8829_pack_write_reg), [`depz_tmf8829_pack_start_stream`](#depz_tmf8829_pack_start_stream), [`depz_tmf8829_reg_data`](#depz_tmf8829_reg_data), [`depz_tmf8829_unpack_reg_data`](#depz_tmf8829_unpack_reg_data), [`depz_tmf8829_info`](#depz_tmf8829_info), [`depz_tmf8829_unpack_info`](#depz_tmf8829_unpack_info), [`depz_tmf8829_frame_chunk`](#depz_tmf8829_frame_chunk), [`depz_tmf8829_unpack_frame_chunk`](#depz_tmf8829_unpack_frame_chunk), [`depz_tmf8829_event`](#depz_tmf8829_event), [`depz_tmf8829_unpack_event`](#depz_tmf8829_unpack_event), [`DEPZ_TMF8829_FRAME_MAX`](#depz_tmf8829_frame_max), [`depz_tmf8829_raw_frame`](#depz_tmf8829_raw_frame), [`depz_tmf8829_reassembler`](#depz_tmf8829_reassembler), [`depz_tmf8829_reassembler_reset`](#depz_tmf8829_reassembler_reset), [`depz_tmf8829_reassembler_feed`](#depz_tmf8829_reassembler_feed), [`DEPZ_TMF8829_PRE_HEADER_SIZE`](#depz_tmf8829_pre_header_size), [`DEPZ_TMF8829_HEADER_SIZE`](#depz_tmf8829_header_size), [`DEPZ_TMF8829_FOOTER_SIZE`](#depz_tmf8829_footer_size), [`DEPZ_TMF8829_FRAME_HEAD`](#depz_tmf8829_frame_head), [`DEPZ_TMF8829_FRAME_EOF`](#depz_tmf8829_frame_eof), [`DEPZ_TMF8829_FID_MASK`](#depz_tmf8829_fid_mask), [`DEPZ_TMF8829_FID_RESULTS`](#depz_tmf8829_fid_results), [`DEPZ_TMF8829_FID_HISTOGRAMS`](#depz_tmf8829_fid_histograms), [`DEPZ_TMF8829_FID_REF_SPAD`](#depz_tmf8829_fid_ref_spad), [`DEPZ_TMF8829_LAYOUT_PEAKS`](#depz_tmf8829_layout_peaks), [`DEPZ_TMF8829_LAYOUT_SIGNAL`](#depz_tmf8829_layout_signal), [`DEPZ_TMF8829_LAYOUT_NOISE`](#depz_tmf8829_layout_noise), [`DEPZ_TMF8829_LAYOUT_XTALK`](#depz_tmf8829_layout_xtalk), [`DEPZ_TMF8829_LAYOUT_SUBFRAME`](#depz_tmf8829_layout_subframe), [`DEPZ_TMF8829_FRAME_VALID`](#depz_tmf8829_frame_valid), [`DEPZ_TMF8829_FRAME_ABORTED`](#depz_tmf8829_frame_aborted), [`DEPZ_TMF8829_FRAME_HV_CP_OVERLOAD`](#depz_tmf8829_frame_hv_cp_overload), [`DEPZ_TMF8829_FRAME_VCDRV_OVERLOAD`](#depz_tmf8829_frame_vcdrv_overload), [`DEPZ_TMF8829_FRAME_VCDRV_BURST_EXCEEDED`](#depz_tmf8829_frame_vcdrv_burst_exceeded), [`DEPZ_TMF8829_FOOTER_DIST_IN_MM`](#depz_tmf8829_footer_dist_in_mm), [`DEPZ_TMF8829_FIFO_TX_UNDERRUN`](#depz_tmf8829_fifo_tx_underrun), [`DEPZ_TMF8829_FIFO_RX_OVERRUN`](#depz_tmf8829_fifo_rx_overrun), [`depz_tmf8829_frame_info`](#depz_tmf8829_frame_info), [`depz_tmf8829_parse_frame`](#depz_tmf8829_parse_frame), [`depz_tmf8829_frame_size`](#depz_tmf8829_frame_size), [`depz_tmf8829_fp_grid`](#depz_tmf8829_fp_grid), [`depz_tmf8829_frame_rows`](#depz_tmf8829_frame_rows), [`depz_tmf8829_fp_name`](#depz_tmf8829_fp_name), [`DEPZ_TMF8829_FRAME_PROBLEMS_MAX`](#depz_tmf8829_frame_problems_max), [`depz_tmf8829_frame_problems`](#depz_tmf8829_frame_problems), [`depz_tmf8829_frame_problems_of`](#depz_tmf8829_frame_problems_of), [`DEPZ_TMF8829_MAX_ZONES`](#depz_tmf8829_max_zones), [`DEPZ_TMF8829_MAX_PEAKS`](#depz_tmf8829_max_peaks), [`depz_tmf8829_results`](#depz_tmf8829_results), [`depz_tmf8829_parse_results`](#depz_tmf8829_parse_results), [`depz_tmf8829_merge_halves`](#depz_tmf8829_merge_halves), [`DEPZ_TMF8829_NOMINAL_Q16`](#depz_tmf8829_nominal_q16), [`DEPZ_TMF8829_WIN_MIN_US`](#depz_tmf8829_win_min_us), [`DEPZ_TMF8829_WIN_SLIDE_US`](#depz_tmf8829_win_slide_us), [`DEPZ_TMF8829_EDGE_LATE_US`](#depz_tmf8829_edge_late_us), [`DEPZ_TMF8829_FT_NOMINAL`](#depz_tmf8829_ft_nominal), [`DEPZ_TMF8829_FT_CLOCK_RESET`](#depz_tmf8829_ft_clock_reset), [`DEPZ_TMF8829_FT_EDGE_LATE`](#depz_tmf8829_ft_edge_late), [`DEPZ_TMF8829_FT_STALLED`](#depz_tmf8829_ft_stalled), [`DEPZ_TMF8829_FT_T1_UNSURE`](#depz_tmf8829_ft_t1_unsure), [`depz_tmf8829_clock`](#depz_tmf8829_clock), [`depz_tmf8829_clock_reset`](#depz_tmf8829_clock_reset), [`depz_tmf8829_clock_add`](#depz_tmf8829_clock_add), [`depz_tmf8829_clock_add_checked`](#depz_tmf8829_clock_add_checked), [`depz_tmf8829_clock_to_us`](#depz_tmf8829_clock_to_us), [`depz_tmf8829_clock_ratio`](#depz_tmf8829_clock_ratio), [`depz_tmf8829_frame_time`](#depz_tmf8829_frame_time), [`depz_tmf8829_timer`](#depz_tmf8829_timer), [`depz_tmf8829_timer_reset`](#depz_tmf8829_timer_reset), [`depz_tmf8829_timer_histograms`](#depz_tmf8829_timer_histograms), [`depz_tmf8829_timer_results`](#depz_tmf8829_timer_results), [`depz_tmf8829_timer_results_checked`](#depz_tmf8829_timer_results_checked), [`depz_tmf8829_subints`](#depz_tmf8829_subints), [`DEPZ_TMF8829_PROBLEMS_KEPT`](#depz_tmf8829_problems_kept), [`DEPZ_TMF8829_PROBLEM_LEN`](#depz_tmf8829_problem_len), [`depz_tmf8829_measurement`](#depz_tmf8829_measurement), [`depz_tmf8829_builder`](#depz_tmf8829_builder), [`depz_tmf8829_builder_reset`](#depz_tmf8829_builder_reset), [`depz_tmf8829_builder_add`](#depz_tmf8829_builder_add), [`DEPZ_TMF8829_REG_APP_ID`](#depz_tmf8829_reg_app_id), [`DEPZ_TMF8829_REG_CMD_STAT`](#depz_tmf8829_reg_cmd_stat), [`DEPZ_TMF8829_REG_SERIAL`](#depz_tmf8829_reg_serial), [`DEPZ_TMF8829_REG_CID_RID`](#depz_tmf8829_reg_cid_rid), [`DEPZ_TMF8829_REG_CFG`](#depz_tmf8829_reg_cfg), [`DEPZ_TMF8829_REG_INT_STATUS`](#depz_tmf8829_reg_int_status), [`DEPZ_TMF8829_REG_INT_ENAB`](#depz_tmf8829_reg_int_enab), [`DEPZ_TMF8829_REG_ID`](#depz_tmf8829_reg_id), [`DEPZ_TMF8829_REG_REVID`](#depz_tmf8829_reg_revid), [`DEPZ_TMF8829_REG_RESET`](#depz_tmf8829_reg_reset), [`DEPZ_TMF8829_REG_ENABLE`](#depz_tmf8829_reg_enable), [`DEPZ_TMF8829_REG_FIFOSTATUS`](#depz_tmf8829_reg_fifostatus), [`DEPZ_TMF8829_REG_FIFO`](#depz_tmf8829_reg_fifo), [`DEPZ_TMF8829_DEVICE_ID`](#depz_tmf8829_device_id), [`DEPZ_TMF8829_CFG_SIZE`](#depz_tmf8829_cfg_size), [`DEPZ_TMF8829_CMD_MEASURE`](#depz_tmf8829_cmd_measure), [`DEPZ_TMF8829_CMD_WRITE_PAGE`](#depz_tmf8829_cmd_write_page), [`DEPZ_TMF8829_CMD_LOAD_CONFIG_PAGE`](#depz_tmf8829_cmd_load_config_page), [`DEPZ_TMF8829_CMD_STOP`](#depz_tmf8829_cmd_stop), [`DEPZ_TMF8829_STAT_OK`](#depz_tmf8829_stat_ok), [`DEPZ_TMF8829_STAT_ACCEPTED`](#depz_tmf8829_stat_accepted), [`depz_tmf8829_status_name`](#depz_tmf8829_status_name), [`depz_tmf8829_preset`](#depz_tmf8829_preset), [`DEPZ_TMF8829_PRESET_COUNT`](#depz_tmf8829_preset_count), [`DEPZ_TMF8829_PRESETS`](#depz_tmf8829_presets), [`depz_tmf8829_find_preset`](#depz_tmf8829_find_preset), [`DEPZ_TMF8829_DEFAULT_PERIOD_MS`](#depz_tmf8829_default_period_ms), [`depz_tmf8829_cfg_field`](#depz_tmf8829_cfg_field), [`DEPZ_TMF8829_CFG_FIELD_COUNT`](#depz_tmf8829_cfg_field_count), [`DEPZ_TMF8829_CFG_FIELDS`](#depz_tmf8829_cfg_fields), [`depz_tmf8829_find_cfg_field`](#depz_tmf8829_find_cfg_field), [`depz_tmf8829_cfg_get`](#depz_tmf8829_cfg_get), [`depz_tmf8829_cfg_set`](#depz_tmf8829_cfg_set), [`depz_tmf8829_cfg_get_n`](#depz_tmf8829_cfg_get_n), [`depz_tmf8829_cfg_set_n`](#depz_tmf8829_cfg_set_n), [`DEPZ_TMF8829_FIRMWARE_LOAD_ADDR`](#depz_tmf8829_firmware_load_addr), [`depz_tmf8829_firmware`](#depz_tmf8829_firmware), [`depz_tmf8829_firmware_len`](#depz_tmf8829_firmware_len)
 - **Bootloader / firmware update**: [`DEPZ_FWDEPZ_HEADER_SIZE`](#depz_fwdepz_header_size), [`depz_fwdepz_result`](#depz_fwdepz_result), [`depz_fwdepz_image`](#depz_fwdepz_image), [`depz_fwdepz_parse`](#depz_fwdepz_parse), [`depz_bl_cmd`](#depz_bl_cmd), [`depz_flash_info`](#depz_flash_info), [`depz_bl_pack_write_page`](#depz_bl_pack_write_page), [`depz_bl_pack_read_page`](#depz_bl_pack_read_page), [`depz_bl_unpack_flash_info`](#depz_bl_unpack_flash_info)
 - **Datasets (record & replay)**: [`depz_dataset`](#depz_dataset), [`depz_dataset_device`](#depz_dataset_device), [`depz_dataset_record`](#depz_dataset_record), [`depz_dataset_parse`](#depz_dataset_parse), [`depz_dataset_free`](#depz_dataset_free), [`depz_dataset_schema`](#depz_dataset_schema), [`depz_dataset_device_count`](#depz_dataset_device_count), [`depz_dataset_get_device`](#depz_dataset_get_device), [`depz_dataset_record_count`](#depz_dataset_record_count), [`depz_dataset_get_record`](#depz_dataset_get_record), [`depz_dataset_value_int`](#depz_dataset_value_int), [`depz_dataset_value_str`](#depz_dataset_value_str)
 - **Live layer: errors**: [`depz_err`](#depz_err), [`depz_err_str`](#depz_err_str), [`depz_last_error`](#depz_last_error), [`depz_last_status`](#depz_last_status), [`depz_last_status_cmd`](#depz_last_status_cmd)
-- **Live layer: byte links**: [`depz_link`](#depz_link), [`depz_link_vtable`](#depz_link_vtable), [`depz_link_new`](#depz_link_new), [`depz_link_open_serial`](#depz_link_open_serial), [`depz_link_open_replay`](#depz_link_open_replay), [`depz_link_open_recording`](#depz_link_open_recording), [`depz_link_loopback_pair`](#depz_link_loopback_pair), [`depz_link_read`](#depz_link_read), [`depz_link_write`](#depz_link_write), [`depz_link_close`](#depz_link_close), [`depz_link_closed`](#depz_link_closed), [`depz_link_name`](#depz_link_name), [`depz_link_free`](#depz_link_free), [`depz_link_replay_exhausted`](#depz_link_replay_exhausted)
+- **Live layer: byte links**: [`depz_link`](#depz_link), [`depz_link_vtable`](#depz_link_vtable), [`depz_link_new`](#depz_link_new), [`depz_link_open_serial`](#depz_link_open_serial), [`depz_link_open_replay`](#depz_link_open_replay), [`depz_link_open_recording`](#depz_link_open_recording), [`depz_link_loopback_pair`](#depz_link_loopback_pair), [`depz_link_read`](#depz_link_read), [`depz_link_write`](#depz_link_write), [`depz_link_close`](#depz_link_close), [`depz_link_closed`](#depz_link_closed), [`depz_link_name`](#depz_link_name), [`depz_link_free`](#depz_link_free), [`depz_link_replay_exhausted`](#depz_link_replay_exhausted), [`depz_link_replay_pending`](#depz_link_replay_pending)
 - **Live layer: streams**: [`depz_stream`](#depz_stream), [`depz_stream_next`](#depz_stream_next), [`depz_stream_dropped_count`](#depz_stream_dropped_count), [`depz_stream_close`](#depz_stream_close)
-- **Live layer: device core**: [`depz_device`](#depz_device), [`DEPZ_DEFAULT_TIMEOUT_MS`](#depz_default_timeout_ms), [`depz_link_stats`](#depz_link_stats), [`depz_device_open`](#depz_device_open), [`depz_device_open_link`](#depz_device_open_link), [`depz_device_promote`](#depz_device_promote), [`depz_device_close`](#depz_device_close), [`depz_device_set_timeout_ms`](#depz_device_set_timeout_ms), [`depz_device_sensor_type`](#depz_device_sensor_type), [`depz_device_port`](#depz_device_port), [`depz_device_closed`](#depz_device_closed), [`depz_device_stats`](#depz_device_stats), [`depz_matcher`](#depz_matcher), [`depz_device_request`](#depz_device_request), [`depz_device_send`](#depz_device_send), [`depz_device_get_device_name`](#depz_device_get_device_name), [`depz_device_get_software_name`](#depz_device_get_software_name), [`depz_device_get_serial_number`](#depz_device_get_serial_number), [`depz_device_read_mcu_temperature`](#depz_device_read_mcu_temperature), [`depz_device_get_payload_crc_type`](#depz_device_get_payload_crc_type), [`depz_device_set_payload_crc_type`](#depz_device_set_payload_crc_type), [`depz_device_get_sync_pin`](#depz_device_get_sync_pin), [`depz_device_set_sync_pin`](#depz_device_set_sync_pin), [`depz_device_reset`](#depz_device_reset), [`depz_device_enter_bootloader`](#depz_device_enter_bootloader), [`depz_time_sync`](#depz_time_sync), [`depz_host_now_us`](#depz_host_now_us), [`depz_device_sync_time`](#depz_device_sync_time), [`depz_device_time_sync`](#depz_device_time_sync), [`depz_device_to_host_time_us`](#depz_device_to_host_time_us), [`depz_device_event_type`](#depz_device_event_type), [`depz_device_event`](#depz_device_event), [`depz_device_event_cb`](#depz_device_event_cb), [`depz_device_on_event`](#depz_device_on_event), [`depz_device_off_event`](#depz_device_off_event), [`depz_device_events`](#depz_device_events)
+- **Live layer: device core**: [`depz_device`](#depz_device), [`DEPZ_DEFAULT_TIMEOUT_MS`](#depz_default_timeout_ms), [`depz_link_stats`](#depz_link_stats), [`depz_device_open`](#depz_device_open), [`depz_device_open_link`](#depz_device_open_link), [`depz_device_promote`](#depz_device_promote), [`depz_device_promote_ex`](#depz_device_promote_ex), [`depz_attach_sensor_class`](#depz_attach_sensor_class), [`depz_open_on_link`](#depz_open_on_link), [`depz_device_close`](#depz_device_close), [`depz_device_set_timeout_ms`](#depz_device_set_timeout_ms), [`depz_device_sensor_type`](#depz_device_sensor_type), [`depz_device_port`](#depz_device_port), [`depz_device_closed`](#depz_device_closed), [`depz_device_stats`](#depz_device_stats), [`depz_matcher`](#depz_matcher), [`depz_device_request`](#depz_device_request), [`depz_device_send`](#depz_device_send), [`depz_device_get_device_name`](#depz_device_get_device_name), [`depz_device_get_software_name`](#depz_device_get_software_name), [`depz_device_get_serial_number`](#depz_device_get_serial_number), [`depz_device_read_mcu_temperature`](#depz_device_read_mcu_temperature), [`depz_device_get_payload_crc_type`](#depz_device_get_payload_crc_type), [`depz_device_set_payload_crc_type`](#depz_device_set_payload_crc_type), [`depz_device_get_sync_pin`](#depz_device_get_sync_pin), [`depz_device_set_sync_pin`](#depz_device_set_sync_pin), [`depz_device_reset`](#depz_device_reset), [`depz_device_enter_bootloader`](#depz_device_enter_bootloader), [`depz_time_sync`](#depz_time_sync), [`depz_host_now_us`](#depz_host_now_us), [`depz_device_sync_time`](#depz_device_sync_time), [`depz_device_time_sync`](#depz_device_time_sync), [`depz_device_to_host_time_us`](#depz_device_to_host_time_us), [`depz_device_event_type`](#depz_device_event_type), [`depz_device_event`](#depz_device_event), [`depz_device_event_cb`](#depz_device_event_cb), [`depz_device_on_event`](#depz_device_on_event), [`depz_device_off_event`](#depz_device_off_event), [`depz_device_events`](#depz_device_events)
 - **Live layer: discovery**: [`depz_port_info`](#depz_port_info), [`depz_list_serial_ports`](#depz_list_serial_ports), [`depz_free_port_list`](#depz_free_port_list), [`depz_device_info`](#depz_device_info), [`depz_probe_port`](#depz_probe_port), [`depz_list_depz_devices`](#depz_list_depz_devices), [`depz_free_device_list`](#depz_free_device_list), [`depz_open_options`](#depz_open_options), [`DEPZ_OPEN_OPTIONS_INIT`](#depz_open_options_init), [`depz_open_device`](#depz_open_device)
 - **SR04 sensor class (live layer)**: [`depz_sr04_measurement`](#depz_sr04_measurement), [`depz_sr04_measurement_cb`](#depz_sr04_measurement_cb), [`depz_sr04_open_link`](#depz_sr04_open_link), [`depz_is_sr04`](#depz_is_sr04), [`depz_sr04_valid`](#depz_sr04_valid), [`depz_sr04_measurement_distance_mm`](#depz_sr04_measurement_distance_mm), [`depz_sr04_measurement_distance_mm_at`](#depz_sr04_measurement_distance_mm_at), [`depz_sr04_get_sample_period_us`](#depz_sr04_get_sample_period_us), [`depz_sr04_set_sample_period_us`](#depz_sr04_set_sample_period_us), [`depz_sr04_get_echo_decay_us`](#depz_sr04_get_echo_decay_us), [`depz_sr04_set_echo_decay_us`](#depz_sr04_set_echo_decay_us), [`depz_sr04_measure_once`](#depz_sr04_measure_once), [`depz_sr04_start`](#depz_sr04_start), [`depz_sr04_stop`](#depz_sr04_stop), [`depz_sr04_on_measurement`](#depz_sr04_on_measurement), [`depz_sr04_off_measurement`](#depz_sr04_off_measurement), [`depz_sr04_stream`](#depz_sr04_stream)
 - **VL53L4CD sensor class (live layer)**: [`depz_vl53l4cd_measurement`](#depz_vl53l4cd_measurement), [`depz_vl53l4cd_measurement_cb`](#depz_vl53l4cd_measurement_cb), [`DEPZ_VL53L4CD_WINDOW_BELOW`](#depz_vl53l4cd_window_below), [`DEPZ_VL53L4CD_WINDOW_ABOVE`](#depz_vl53l4cd_window_above), [`DEPZ_VL53L4CD_WINDOW_OUT`](#depz_vl53l4cd_window_out), [`DEPZ_VL53L4CD_WINDOW_IN`](#depz_vl53l4cd_window_in), [`DEPZ_VL53L4CD_I2C_KHZ_DEFAULT`](#depz_vl53l4cd_i2c_khz_default), [`depz_vl53l4cd_open_link`](#depz_vl53l4cd_open_link), [`depz_is_vl53l4cd`](#depz_is_vl53l4cd), [`depz_vl53l4cd_status_text`](#depz_vl53l4cd_status_text), [`depz_vl53l4cd_is_alive`](#depz_vl53l4cd_is_alive), [`depz_vl53l4cd_init`](#depz_vl53l4cd_init), [`depz_vl53l4cd_initialized`](#depz_vl53l4cd_initialized), [`depz_vl53l4cd_ranging`](#depz_vl53l4cd_ranging), [`depz_vl53l4cd_xshut`](#depz_vl53l4cd_xshut), [`depz_vl53l4cd_reset_sensor`](#depz_vl53l4cd_reset_sensor), [`depz_vl53l4cd_bridge_info`](#depz_vl53l4cd_bridge_info), [`depz_vl53l4cd_set_i2c_speed_khz`](#depz_vl53l4cd_set_i2c_speed_khz), [`depz_vl53l4cd_set_range_timing`](#depz_vl53l4cd_set_range_timing), [`depz_vl53l4cd_get_range_timing`](#depz_vl53l4cd_get_range_timing), [`depz_vl53l4cd_set_offset_mm`](#depz_vl53l4cd_set_offset_mm), [`depz_vl53l4cd_get_offset_mm`](#depz_vl53l4cd_get_offset_mm), [`depz_vl53l4cd_set_xtalk_kcps`](#depz_vl53l4cd_set_xtalk_kcps), [`depz_vl53l4cd_get_xtalk_kcps`](#depz_vl53l4cd_get_xtalk_kcps), [`depz_vl53l4cd_set_detection_thresholds`](#depz_vl53l4cd_set_detection_thresholds), [`depz_vl53l4cd_get_detection_thresholds`](#depz_vl53l4cd_get_detection_thresholds), [`depz_vl53l4cd_set_signal_threshold_kcps`](#depz_vl53l4cd_set_signal_threshold_kcps), [`depz_vl53l4cd_get_signal_threshold_kcps`](#depz_vl53l4cd_get_signal_threshold_kcps), [`depz_vl53l4cd_set_sigma_threshold_mm`](#depz_vl53l4cd_set_sigma_threshold_mm), [`depz_vl53l4cd_get_sigma_threshold_mm`](#depz_vl53l4cd_get_sigma_threshold_mm), [`depz_vl53l4cd_start_temperature_update`](#depz_vl53l4cd_start_temperature_update), [`depz_vl53l4cd_calibrate_offset`](#depz_vl53l4cd_calibrate_offset), [`depz_vl53l4cd_calibrate_xtalk`](#depz_vl53l4cd_calibrate_xtalk), [`depz_vl53l4cd_start_ranging`](#depz_vl53l4cd_start_ranging), [`depz_vl53l4cd_stop_ranging`](#depz_vl53l4cd_stop_ranging), [`depz_vl53l4cd_measure_once`](#depz_vl53l4cd_measure_once), [`depz_vl53l4cd_on_measurement`](#depz_vl53l4cd_on_measurement), [`depz_vl53l4cd_off_measurement`](#depz_vl53l4cd_off_measurement), [`depz_vl53l4cd_stream`](#depz_vl53l4cd_stream), [`depz_vl53l4cd_get_measurement`](#depz_vl53l4cd_get_measurement), [`depz_vl53l4cd_stream_parse_errors`](#depz_vl53l4cd_stream_parse_errors), [`depz_vl53l4cd_read_reg`](#depz_vl53l4cd_read_reg), [`depz_vl53l4cd_write_reg`](#depz_vl53l4cd_write_reg)
-- **VL53L8 multizone sensor class (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_RANGING_MODE_CONTINUOUS`](#depz_vl53l8_ranging_mode_continuous), [`DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS`](#depz_vl53l8_ranging_mode_autonomous), [`DEPZ_VL53L8_TARGET_ORDER_CLOSEST`](#depz_vl53l8_target_order_closest), [`DEPZ_VL53L8_TARGET_ORDER_STRONGEST`](#depz_vl53l8_target_order_strongest), [`DEPZ_VL53L8_XTALK_BUFFER_SIZE`](#depz_vl53l8_xtalk_buffer_size), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`DEPZ_VL53L8_THRESH_IN_WINDOW`](#depz_vl53l8_thresh_in_window), [`DEPZ_VL53L8_THRESH_OUT_OF_WINDOW`](#depz_vl53l8_thresh_out_of_window), [`DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN`](#depz_vl53l8_thresh_less_than_equal_min), [`DEPZ_VL53L8_THRESH_GREATER_THAN_MAX`](#depz_vl53l8_thresh_greater_than_max), [`DEPZ_VL53L8_THRESH_EQUAL_MIN`](#depz_vl53l8_thresh_equal_min), [`DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN`](#depz_vl53l8_thresh_not_equal_min), [`DEPZ_VL53L8_THRESH_OP_OR`](#depz_vl53l8_thresh_op_or), [`DEPZ_VL53L8_THRESH_OP_AND`](#depz_vl53l8_thresh_op_and), [`DEPZ_VL53L8_THRESH_LAST`](#depz_vl53l8_thresh_last), [`depz_vl53l8_motion`](#depz_vl53l8_motion), [`depz_vl53l8_live_frame`](#depz_vl53l8_live_frame), [`depz_vl53l8_frame_cb`](#depz_vl53l8_frame_cb), [`depz_vl53l8_progress_cb`](#depz_vl53l8_progress_cb), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_open_link`](#depz_vl53l8_open_link), [`depz_is_vl53l8`](#depz_is_vl53l8), [`depz_vl53l8_get_model`](#depz_vl53l8_get_model), [`depz_vl53l8_is_alive`](#depz_vl53l8_is_alive), [`depz_vl53l8_init`](#depz_vl53l8_init), [`depz_vl53l8_initialized`](#depz_vl53l8_initialized), [`depz_vl53l8_ranging`](#depz_vl53l8_ranging), [`depz_vl53l8_get_resolution`](#depz_vl53l8_get_resolution), [`depz_vl53l8_set_resolution`](#depz_vl53l8_set_resolution), [`depz_vl53l8_get_ranging_frequency_hz`](#depz_vl53l8_get_ranging_frequency_hz), [`depz_vl53l8_set_ranging_frequency_hz`](#depz_vl53l8_set_ranging_frequency_hz), [`depz_vl53l8_get_ranging_mode`](#depz_vl53l8_get_ranging_mode), [`depz_vl53l8_set_ranging_mode`](#depz_vl53l8_set_ranging_mode), [`depz_vl53l8_get_integration_time_ms`](#depz_vl53l8_get_integration_time_ms), [`depz_vl53l8_set_integration_time_ms`](#depz_vl53l8_set_integration_time_ms), [`depz_vl53l8_get_sharpener_percent`](#depz_vl53l8_get_sharpener_percent), [`depz_vl53l8_set_sharpener_percent`](#depz_vl53l8_set_sharpener_percent), [`depz_vl53l8_get_target_order`](#depz_vl53l8_get_target_order), [`depz_vl53l8_set_target_order`](#depz_vl53l8_set_target_order), [`depz_vl53l8_get_power_mode`](#depz_vl53l8_get_power_mode), [`depz_vl53l8_set_power_mode`](#depz_vl53l8_set_power_mode), [`depz_vl53l8_get_xtalk_margin`](#depz_vl53l8_get_xtalk_margin), [`depz_vl53l8_set_xtalk_margin`](#depz_vl53l8_set_xtalk_margin), [`depz_vl53l8_calibrate_xtalk`](#depz_vl53l8_calibrate_xtalk), [`depz_vl53l8_get_caldata_xtalk`](#depz_vl53l8_get_caldata_xtalk), [`depz_vl53l8_set_caldata_xtalk`](#depz_vl53l8_set_caldata_xtalk), [`depz_vl53l8_get_detection_thresholds_enable`](#depz_vl53l8_get_detection_thresholds_enable), [`depz_vl53l8_set_detection_thresholds_enable`](#depz_vl53l8_set_detection_thresholds_enable), [`depz_vl53l8_get_detection_thresholds`](#depz_vl53l8_get_detection_thresholds), [`depz_vl53l8_set_detection_thresholds`](#depz_vl53l8_set_detection_thresholds), [`depz_vl53l8_set_detection_thresholds_auto_stop`](#depz_vl53l8_set_detection_thresholds_auto_stop), [`depz_vl53l8_configure_motion_indicator`](#depz_vl53l8_configure_motion_indicator), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_start_ranging`](#depz_vl53l8_start_ranging), [`depz_vl53l8_stop_ranging`](#depz_vl53l8_stop_ranging), [`depz_vl53l8_on_frame`](#depz_vl53l8_on_frame), [`depz_vl53l8_off_frame`](#depz_vl53l8_off_frame), [`depz_vl53l8_frames`](#depz_vl53l8_frames), [`depz_vl53l8_get_frame`](#depz_vl53l8_get_frame), [`depz_vl53l8_frame_parse_errors`](#depz_vl53l8_frame_parse_errors), [`depz_vl53l8_reassembler_discards`](#depz_vl53l8_reassembler_discards), [`depz_vl53l8_module_type`](#depz_vl53l8_module_type), [`depz_vl53l7_bridge_info`](#depz_vl53l7_bridge_info), [`depz_vl53l7_set_i2c_speed_khz`](#depz_vl53l7_set_i2c_speed_khz), [`depz_vl53l7_pin_ctrl`](#depz_vl53l7_pin_ctrl), [`depz_vl53l8_read_reg`](#depz_vl53l8_read_reg), [`depz_vl53l8_write_reg`](#depz_vl53l8_write_reg), [`depz_vl53l8_dci_read`](#depz_vl53l8_dci_read), [`depz_vl53l8_dci_write`](#depz_vl53l8_dci_write)
-- **VL53L 1D family sensor class (live layer)**: [`DEPZ_VL53LX_CAP_MODE`](#depz_vl53lx_cap_mode), [`DEPZ_VL53LX_CAP_TIMING`](#depz_vl53lx_cap_timing), [`DEPZ_VL53LX_CAP_OFFSET`](#depz_vl53lx_cap_offset), [`DEPZ_VL53LX_CAP_XTALK`](#depz_vl53lx_cap_xtalk), [`DEPZ_VL53LX_CAP_CALIB_OFFSET`](#depz_vl53lx_cap_calib_offset), [`DEPZ_VL53LX_CAP_CALIB_XTALK`](#depz_vl53lx_cap_calib_xtalk), [`DEPZ_VL53LX_CAP_THRESHOLDS`](#depz_vl53lx_cap_thresholds), [`DEPZ_VL53LX_CAP_SIGNAL_THRESH`](#depz_vl53lx_cap_signal_thresh), [`DEPZ_VL53LX_CAP_SIGMA_THRESH`](#depz_vl53lx_cap_sigma_thresh), [`DEPZ_VL53LX_CAP_ROI`](#depz_vl53lx_cap_roi), [`DEPZ_VL53LX_CAP_TEMP_UPDATE`](#depz_vl53lx_cap_temp_update), [`DEPZ_VL53LX_CAP_REFSPAD`](#depz_vl53lx_cap_refspad), [`DEPZ_VL53LX_WINDOW_BELOW`](#depz_vl53lx_window_below), [`DEPZ_VL53LX_WINDOW_ABOVE`](#depz_vl53lx_window_above), [`DEPZ_VL53LX_WINDOW_OUT`](#depz_vl53lx_window_out), [`DEPZ_VL53LX_WINDOW_IN`](#depz_vl53lx_window_in), [`DEPZ_VL53LX_MAX_TARGETS`](#depz_vl53lx_max_targets), [`DEPZ_VL53LX_MAX_MODES`](#depz_vl53lx_max_modes), [`depz_vl53lx_target`](#depz_vl53lx_target), [`depz_vl53lx_bins`](#depz_vl53lx_bins), [`depz_vl53lx_measurement`](#depz_vl53lx_measurement), [`depz_vl53lx_measurement_cb`](#depz_vl53lx_measurement_cb), [`depz_vl53lx_status_plottable`](#depz_vl53lx_status_plottable), [`depz_vl53lx_plottable`](#depz_vl53lx_plottable), [`depz_vl53lx_primary_distance`](#depz_vl53lx_primary_distance), [`depz_vl53lx_open_link`](#depz_vl53lx_open_link), [`depz_is_vl53lx`](#depz_is_vl53lx), [`depz_vl53lx_detected_product`](#depz_vl53lx_detected_product), [`depz_vl53lx_driver_kinds`](#depz_vl53lx_driver_kinds), [`depz_vl53lx_init`](#depz_vl53lx_init), [`depz_vl53lx_initialized`](#depz_vl53lx_initialized), [`depz_vl53lx_product_bound`](#depz_vl53lx_product_bound), [`depz_vl53lx_driver_bound`](#depz_vl53lx_driver_bound), [`depz_vl53lx_caveat`](#depz_vl53lx_caveat), [`depz_vl53lx_driver_reach_mm`](#depz_vl53lx_driver_reach_mm), [`depz_vl53lx_supports`](#depz_vl53lx_supports), [`depz_vl53lx_ranging`](#depz_vl53lx_ranging), [`depz_vl53lx_model_id`](#depz_vl53lx_model_id), [`depz_vl53lx_modes`](#depz_vl53lx_modes), [`depz_vl53lx_budget_range`](#depz_vl53lx_budget_range), [`depz_vl53lx_budget_choices`](#depz_vl53lx_budget_choices), [`depz_vl53lx_xshut`](#depz_vl53lx_xshut), [`depz_vl53lx_bridge_info`](#depz_vl53lx_bridge_info), [`depz_vl53lx_configure`](#depz_vl53lx_configure), [`depz_vl53lx_configure_ex`](#depz_vl53lx_configure_ex), [`depz_vl53lx_get_range_timing`](#depz_vl53lx_get_range_timing), [`depz_vl53lx_set_mode`](#depz_vl53lx_set_mode), [`depz_vl53lx_get_mode`](#depz_vl53lx_get_mode), [`depz_vl53lx_get_offset_mm`](#depz_vl53lx_get_offset_mm), [`depz_vl53lx_set_offset_mm`](#depz_vl53lx_set_offset_mm), [`depz_vl53lx_get_xtalk_kcps`](#depz_vl53lx_get_xtalk_kcps), [`depz_vl53lx_set_xtalk_kcps`](#depz_vl53lx_set_xtalk_kcps), [`depz_vl53lx_calibrate_offset`](#depz_vl53lx_calibrate_offset), [`depz_vl53lx_calibrate_xtalk`](#depz_vl53lx_calibrate_xtalk), [`depz_vl53lx_get_detection_thresholds`](#depz_vl53lx_get_detection_thresholds), [`depz_vl53lx_set_detection_thresholds`](#depz_vl53lx_set_detection_thresholds), [`depz_vl53lx_get_signal_threshold_kcps`](#depz_vl53lx_get_signal_threshold_kcps), [`depz_vl53lx_set_signal_threshold_kcps`](#depz_vl53lx_set_signal_threshold_kcps), [`depz_vl53lx_get_sigma_threshold_mm`](#depz_vl53lx_get_sigma_threshold_mm), [`depz_vl53lx_set_sigma_threshold_mm`](#depz_vl53lx_set_sigma_threshold_mm), [`depz_vl53lx_get_roi`](#depz_vl53lx_get_roi), [`depz_vl53lx_set_roi`](#depz_vl53lx_set_roi), [`depz_vl53lx_get_roi_center`](#depz_vl53lx_get_roi_center), [`depz_vl53lx_set_roi_center`](#depz_vl53lx_set_roi_center), [`depz_vl53lx_start_temperature_update`](#depz_vl53lx_start_temperature_update), [`depz_vl53lx_perform_ref_spad_management`](#depz_vl53lx_perform_ref_spad_management), [`depz_vl53lx_start_ranging`](#depz_vl53lx_start_ranging), [`depz_vl53lx_stop_ranging`](#depz_vl53lx_stop_ranging), [`depz_vl53lx_measure_once`](#depz_vl53lx_measure_once), [`depz_vl53lx_on_measurement`](#depz_vl53lx_on_measurement), [`depz_vl53lx_off_measurement`](#depz_vl53lx_off_measurement), [`depz_vl53lx_measurements`](#depz_vl53lx_measurements), [`depz_vl53lx_get_measurement`](#depz_vl53lx_get_measurement), [`depz_vl53lx_stream_parse_errors`](#depz_vl53lx_stream_parse_errors), [`depz_vl53lx_read_reg`](#depz_vl53lx_read_reg), [`depz_vl53lx_write_reg`](#depz_vl53lx_write_reg)
+- **VL53L8 multizone sensor class (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_RANGING_MODE_CONTINUOUS`](#depz_vl53l8_ranging_mode_continuous), [`DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS`](#depz_vl53l8_ranging_mode_autonomous), [`DEPZ_VL53L8_TARGET_ORDER_CLOSEST`](#depz_vl53l8_target_order_closest), [`DEPZ_VL53L8_TARGET_ORDER_STRONGEST`](#depz_vl53l8_target_order_strongest), [`DEPZ_VL53L8_XTALK_BUFFER_SIZE`](#depz_vl53l8_xtalk_buffer_size), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`DEPZ_VL53L8_THRESH_IN_WINDOW`](#depz_vl53l8_thresh_in_window), [`DEPZ_VL53L8_THRESH_OUT_OF_WINDOW`](#depz_vl53l8_thresh_out_of_window), [`DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN`](#depz_vl53l8_thresh_less_than_equal_min), [`DEPZ_VL53L8_THRESH_GREATER_THAN_MAX`](#depz_vl53l8_thresh_greater_than_max), [`DEPZ_VL53L8_THRESH_EQUAL_MIN`](#depz_vl53l8_thresh_equal_min), [`DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN`](#depz_vl53l8_thresh_not_equal_min), [`DEPZ_VL53L8_THRESH_OP_OR`](#depz_vl53l8_thresh_op_or), [`DEPZ_VL53L8_THRESH_OP_AND`](#depz_vl53l8_thresh_op_and), [`DEPZ_VL53L8_THRESH_LAST`](#depz_vl53l8_thresh_last), [`depz_vl53l8_motion`](#depz_vl53l8_motion), [`depz_vl53l8_live_frame`](#depz_vl53l8_live_frame), [`depz_vl53l8_frame_cb`](#depz_vl53l8_frame_cb), [`depz_vl53l8_progress_cb`](#depz_vl53l8_progress_cb), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_init_config_checked`](#depz_vl53l8_cnh_init_config_checked), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_open_link`](#depz_vl53l8_open_link), [`depz_is_vl53l8`](#depz_is_vl53l8), [`depz_vl53l8_get_model`](#depz_vl53l8_get_model), [`depz_vl53l8_is_alive`](#depz_vl53l8_is_alive), [`depz_vl53l8_init`](#depz_vl53l8_init), [`depz_vl53l8_initialized`](#depz_vl53l8_initialized), [`depz_vl53l8_ranging`](#depz_vl53l8_ranging), [`depz_vl53l8_get_resolution`](#depz_vl53l8_get_resolution), [`depz_vl53l8_set_resolution`](#depz_vl53l8_set_resolution), [`depz_vl53l8_get_ranging_frequency_hz`](#depz_vl53l8_get_ranging_frequency_hz), [`depz_vl53l8_set_ranging_frequency_hz`](#depz_vl53l8_set_ranging_frequency_hz), [`depz_vl53l8_get_ranging_mode`](#depz_vl53l8_get_ranging_mode), [`depz_vl53l8_set_ranging_mode`](#depz_vl53l8_set_ranging_mode), [`depz_vl53l8_get_integration_time_ms`](#depz_vl53l8_get_integration_time_ms), [`depz_vl53l8_set_integration_time_ms`](#depz_vl53l8_set_integration_time_ms), [`depz_vl53l8_get_sharpener_percent`](#depz_vl53l8_get_sharpener_percent), [`depz_vl53l8_set_sharpener_percent`](#depz_vl53l8_set_sharpener_percent), [`depz_vl53l8_get_target_order`](#depz_vl53l8_get_target_order), [`depz_vl53l8_set_target_order`](#depz_vl53l8_set_target_order), [`depz_vl53l8_get_power_mode`](#depz_vl53l8_get_power_mode), [`depz_vl53l8_set_power_mode`](#depz_vl53l8_set_power_mode), [`depz_vl53l8_get_xtalk_margin`](#depz_vl53l8_get_xtalk_margin), [`depz_vl53l8_set_xtalk_margin`](#depz_vl53l8_set_xtalk_margin), [`depz_vl53l8_calibrate_xtalk`](#depz_vl53l8_calibrate_xtalk), [`depz_vl53l8_get_caldata_xtalk`](#depz_vl53l8_get_caldata_xtalk), [`depz_vl53l8_set_caldata_xtalk`](#depz_vl53l8_set_caldata_xtalk), [`depz_vl53l8_get_detection_thresholds_enable`](#depz_vl53l8_get_detection_thresholds_enable), [`depz_vl53l8_set_detection_thresholds_enable`](#depz_vl53l8_set_detection_thresholds_enable), [`depz_vl53l8_get_detection_thresholds`](#depz_vl53l8_get_detection_thresholds), [`depz_vl53l8_set_detection_thresholds`](#depz_vl53l8_set_detection_thresholds), [`depz_vl53l8_set_detection_thresholds_auto_stop`](#depz_vl53l8_set_detection_thresholds_auto_stop), [`depz_vl53l8_configure_motion_indicator`](#depz_vl53l8_configure_motion_indicator), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_start_ranging`](#depz_vl53l8_start_ranging), [`depz_vl53l8_stop_ranging`](#depz_vl53l8_stop_ranging), [`depz_vl53l8_on_frame`](#depz_vl53l8_on_frame), [`depz_vl53l8_off_frame`](#depz_vl53l8_off_frame), [`depz_vl53l8_frames`](#depz_vl53l8_frames), [`depz_vl53l8_get_frame`](#depz_vl53l8_get_frame), [`depz_vl53l8_frame_parse_errors`](#depz_vl53l8_frame_parse_errors), [`depz_vl53l8_reassembler_discards`](#depz_vl53l8_reassembler_discards), [`depz_vl53l8_module_type`](#depz_vl53l8_module_type), [`depz_vl53l7_bridge_info`](#depz_vl53l7_bridge_info), [`depz_vl53l7_set_i2c_speed_khz`](#depz_vl53l7_set_i2c_speed_khz), [`depz_vl53l7_pin_ctrl`](#depz_vl53l7_pin_ctrl), [`depz_vl53l8_read_reg`](#depz_vl53l8_read_reg), [`depz_vl53l8_write_reg`](#depz_vl53l8_write_reg), [`depz_vl53l8_dci_read`](#depz_vl53l8_dci_read), [`depz_vl53l8_dci_write`](#depz_vl53l8_dci_write)
+- **VL53L 1D family sensor class (live layer)**: [`DEPZ_VL53LX_CAP_MODE`](#depz_vl53lx_cap_mode), [`DEPZ_VL53LX_CAP_TIMING`](#depz_vl53lx_cap_timing), [`DEPZ_VL53LX_CAP_OFFSET`](#depz_vl53lx_cap_offset), [`DEPZ_VL53LX_CAP_XTALK`](#depz_vl53lx_cap_xtalk), [`DEPZ_VL53LX_CAP_CALIB_OFFSET`](#depz_vl53lx_cap_calib_offset), [`DEPZ_VL53LX_CAP_CALIB_XTALK`](#depz_vl53lx_cap_calib_xtalk), [`DEPZ_VL53LX_CAP_THRESHOLDS`](#depz_vl53lx_cap_thresholds), [`DEPZ_VL53LX_CAP_SIGNAL_THRESH`](#depz_vl53lx_cap_signal_thresh), [`DEPZ_VL53LX_CAP_SIGMA_THRESH`](#depz_vl53lx_cap_sigma_thresh), [`DEPZ_VL53LX_CAP_ROI`](#depz_vl53lx_cap_roi), [`DEPZ_VL53LX_CAP_TEMP_UPDATE`](#depz_vl53lx_cap_temp_update), [`DEPZ_VL53LX_CAP_REFSPAD`](#depz_vl53lx_cap_refspad), [`DEPZ_VL53LX_WINDOW_BELOW`](#depz_vl53lx_window_below), [`DEPZ_VL53LX_WINDOW_ABOVE`](#depz_vl53lx_window_above), [`DEPZ_VL53LX_WINDOW_OUT`](#depz_vl53lx_window_out), [`DEPZ_VL53LX_WINDOW_IN`](#depz_vl53lx_window_in), [`DEPZ_VL53LX_MAX_TARGETS`](#depz_vl53lx_max_targets), [`DEPZ_VL53LX_MAX_MODES`](#depz_vl53lx_max_modes), [`depz_vl53lx_target`](#depz_vl53lx_target), [`depz_vl53lx_bins`](#depz_vl53lx_bins), [`depz_vl53lx_measurement`](#depz_vl53lx_measurement), [`depz_vl53lx_measurement_cb`](#depz_vl53lx_measurement_cb), [`depz_vl53lx_status_plottable`](#depz_vl53lx_status_plottable), [`depz_vl53lx_plottable`](#depz_vl53lx_plottable), [`depz_vl53lx_primary_distance`](#depz_vl53lx_primary_distance), [`depz_vl53lx_open_link`](#depz_vl53lx_open_link), [`depz_is_vl53lx`](#depz_is_vl53lx), [`depz_vl53lx_detected_product`](#depz_vl53lx_detected_product), [`depz_vl53lx_driver_kinds`](#depz_vl53lx_driver_kinds), [`depz_vl53lx_init`](#depz_vl53lx_init), [`depz_vl53lx_initialized`](#depz_vl53lx_initialized), [`depz_vl53lx_product_bound`](#depz_vl53lx_product_bound), [`depz_vl53lx_get_class`](#depz_vl53lx_get_class), [`depz_vl53lx_driver_bound`](#depz_vl53lx_driver_bound), [`depz_vl53lx_caveat`](#depz_vl53lx_caveat), [`depz_vl53lx_driver_reach_mm`](#depz_vl53lx_driver_reach_mm), [`depz_vl53lx_supports`](#depz_vl53lx_supports), [`depz_vl53lx_ranging`](#depz_vl53lx_ranging), [`depz_vl53lx_model_id`](#depz_vl53lx_model_id), [`depz_vl53lx_modes`](#depz_vl53lx_modes), [`depz_vl53lx_budget_range`](#depz_vl53lx_budget_range), [`depz_vl53lx_budget_choices`](#depz_vl53lx_budget_choices), [`depz_vl53lx_xshut`](#depz_vl53lx_xshut), [`depz_vl53lx_bridge_info`](#depz_vl53lx_bridge_info), [`depz_vl53lx_configure`](#depz_vl53lx_configure), [`depz_vl53lx_configure_ex`](#depz_vl53lx_configure_ex), [`depz_vl53lx_get_range_timing`](#depz_vl53lx_get_range_timing), [`depz_vl53lx_set_mode`](#depz_vl53lx_set_mode), [`depz_vl53lx_get_mode`](#depz_vl53lx_get_mode), [`depz_vl53lx_get_offset_mm`](#depz_vl53lx_get_offset_mm), [`depz_vl53lx_set_offset_mm`](#depz_vl53lx_set_offset_mm), [`depz_vl53lx_get_xtalk_kcps`](#depz_vl53lx_get_xtalk_kcps), [`depz_vl53lx_set_xtalk_kcps`](#depz_vl53lx_set_xtalk_kcps), [`depz_vl53lx_calibrate_offset`](#depz_vl53lx_calibrate_offset), [`depz_vl53lx_calibrate_xtalk`](#depz_vl53lx_calibrate_xtalk), [`depz_vl53lx_get_detection_thresholds`](#depz_vl53lx_get_detection_thresholds), [`depz_vl53lx_set_detection_thresholds`](#depz_vl53lx_set_detection_thresholds), [`depz_vl53lx_get_signal_threshold_kcps`](#depz_vl53lx_get_signal_threshold_kcps), [`depz_vl53lx_set_signal_threshold_kcps`](#depz_vl53lx_set_signal_threshold_kcps), [`depz_vl53lx_get_sigma_threshold_mm`](#depz_vl53lx_get_sigma_threshold_mm), [`depz_vl53lx_set_sigma_threshold_mm`](#depz_vl53lx_set_sigma_threshold_mm), [`depz_vl53lx_get_roi`](#depz_vl53lx_get_roi), [`depz_vl53lx_set_roi`](#depz_vl53lx_set_roi), [`depz_vl53lx_get_roi_center`](#depz_vl53lx_get_roi_center), [`depz_vl53lx_set_roi_center`](#depz_vl53lx_set_roi_center), [`depz_vl53lx_start_temperature_update`](#depz_vl53lx_start_temperature_update), [`depz_vl53lx_perform_ref_spad_management`](#depz_vl53lx_perform_ref_spad_management), [`depz_vl53lx_start_ranging`](#depz_vl53lx_start_ranging), [`depz_vl53lx_stop_ranging`](#depz_vl53lx_stop_ranging), [`depz_vl53lx_measure_once`](#depz_vl53lx_measure_once), [`depz_vl53lx_on_measurement`](#depz_vl53lx_on_measurement), [`depz_vl53lx_off_measurement`](#depz_vl53lx_off_measurement), [`depz_vl53lx_measurements`](#depz_vl53lx_measurements), [`depz_vl53lx_get_measurement`](#depz_vl53lx_get_measurement), [`depz_vl53lx_stream_parse_errors`](#depz_vl53lx_stream_parse_errors), [`depz_vl53lx_read_reg`](#depz_vl53lx_read_reg), [`depz_vl53lx_write_reg`](#depz_vl53lx_write_reg)
 - **BNO055 sensor class (live layer)**: [`DEPZ_BNO055_POWER_NORMAL`](#depz_bno055_power_normal), [`DEPZ_BNO055_POWER_LOW`](#depz_bno055_power_low), [`DEPZ_BNO055_POWER_SUSPEND`](#depz_bno055_power_suspend), [`DEPZ_BNO055_TEMP_FROM_ACCEL`](#depz_bno055_temp_from_accel), [`DEPZ_BNO055_TEMP_FROM_GYRO`](#depz_bno055_temp_from_gyro), [`DEPZ_BNO055_HAS_ACCEL`](#depz_bno055_has_accel), [`DEPZ_BNO055_HAS_MAG`](#depz_bno055_has_mag), [`DEPZ_BNO055_HAS_GYRO`](#depz_bno055_has_gyro), [`DEPZ_BNO055_HAS_EULER`](#depz_bno055_has_euler), [`DEPZ_BNO055_HAS_QUATERNION`](#depz_bno055_has_quaternion), [`DEPZ_BNO055_HAS_LINEAR_ACCEL`](#depz_bno055_has_linear_accel), [`DEPZ_BNO055_HAS_GRAVITY`](#depz_bno055_has_gravity), [`DEPZ_BNO055_HAS_TEMPERATURE`](#depz_bno055_has_temperature), [`DEPZ_BNO055_HAS_CALIBRATION`](#depz_bno055_has_calibration), [`depz_bno055_sample`](#depz_bno055_sample), [`depz_bno055_status_regs`](#depz_bno055_status_regs), [`depz_bno055_sample_cb`](#depz_bno055_sample_cb), [`depz_bno055_decode_sample`](#depz_bno055_decode_sample), [`depz_bno055_open_link`](#depz_bno055_open_link), [`depz_is_bno055`](#depz_is_bno055), [`depz_bno055_bridge_info`](#depz_bno055_bridge_info), [`depz_bno055_is_alive`](#depz_bno055_is_alive), [`depz_bno055_reset_sensor`](#depz_bno055_reset_sensor), [`depz_bno055_read_registers`](#depz_bno055_read_registers), [`depz_bno055_write_registers`](#depz_bno055_write_registers), [`depz_bno055_get_operation_mode`](#depz_bno055_get_operation_mode), [`depz_bno055_set_operation_mode`](#depz_bno055_set_operation_mode), [`depz_bno055_get_power_mode`](#depz_bno055_get_power_mode), [`depz_bno055_set_power_mode`](#depz_bno055_set_power_mode), [`depz_bno055_get_units`](#depz_bno055_get_units), [`depz_bno055_set_units`](#depz_bno055_set_units), [`depz_bno055_get_axis_remap`](#depz_bno055_get_axis_remap), [`depz_bno055_set_axis_remap`](#depz_bno055_set_axis_remap), [`depz_bno055_set_axis_placement`](#depz_bno055_set_axis_placement), [`depz_bno055_get_temperature_source`](#depz_bno055_get_temperature_source), [`depz_bno055_set_temperature_source`](#depz_bno055_set_temperature_source), [`depz_bno055_configure`](#depz_bno055_configure), [`depz_bno055_restore_configuration`](#depz_bno055_restore_configuration), [`depz_bno055_system_status`](#depz_bno055_system_status), [`depz_bno055_self_test`](#depz_bno055_self_test), [`depz_bno055_calibration_status`](#depz_bno055_calibration_status), [`depz_bno055_read_calibration_profile`](#depz_bno055_read_calibration_profile), [`depz_bno055_write_calibration_profile`](#depz_bno055_write_calibration_profile), [`depz_bno055_get_sic_matrix`](#depz_bno055_get_sic_matrix), [`depz_bno055_set_sic_matrix`](#depz_bno055_set_sic_matrix), [`depz_bno055_get_accel_config`](#depz_bno055_get_accel_config), [`depz_bno055_set_accel_config`](#depz_bno055_set_accel_config), [`depz_bno055_get_gyro_config`](#depz_bno055_get_gyro_config), [`depz_bno055_set_gyro_config`](#depz_bno055_set_gyro_config), [`depz_bno055_get_mag_config`](#depz_bno055_get_mag_config), [`depz_bno055_set_mag_config`](#depz_bno055_set_mag_config), [`depz_bno055_unique_id`](#depz_bno055_unique_id), [`depz_bno055_get_interrupt_enable`](#depz_bno055_get_interrupt_enable), [`depz_bno055_set_interrupt_enable`](#depz_bno055_set_interrupt_enable), [`depz_bno055_get_interrupt_mask`](#depz_bno055_get_interrupt_mask), [`depz_bno055_set_interrupt_mask`](#depz_bno055_set_interrupt_mask), [`depz_bno055_set_interrupt_setting`](#depz_bno055_set_interrupt_setting), [`depz_bno055_read_interrupt_status`](#depz_bno055_read_interrupt_status), [`depz_bno055_clear_interrupt`](#depz_bno055_clear_interrupt), [`depz_bno055_read_sample`](#depz_bno055_read_sample), [`depz_bno055_read_quaternion`](#depz_bno055_read_quaternion), [`depz_bno055_start_stream`](#depz_bno055_start_stream), [`depz_bno055_stop_stream`](#depz_bno055_stop_stream), [`depz_bno055_streaming`](#depz_bno055_streaming), [`depz_bno055_on_sample`](#depz_bno055_on_sample), [`depz_bno055_off_sample`](#depz_bno055_off_sample), [`depz_bno055_samples`](#depz_bno055_samples), [`depz_bno055_get_sample`](#depz_bno055_get_sample), [`depz_bno055_stream_parse_errors`](#depz_bno055_stream_parse_errors)
 - **TMF8829 sensor class (live layer)**: [`depz_tmf8829_field_value`](#depz_tmf8829_field_value), [`depz_tmf8829_options`](#depz_tmf8829_options), [`DEPZ_TMF8829_OPTIONS_INIT`](#depz_tmf8829_options_init), [`depz_tmf8829_config`](#depz_tmf8829_config), [`depz_tmf8829_stream_stats`](#depz_tmf8829_stream_stats), [`depz_tmf8829_progress_cb`](#depz_tmf8829_progress_cb), [`depz_tmf8829_measurement_cb`](#depz_tmf8829_measurement_cb), [`depz_tmf8829_frame_cb`](#depz_tmf8829_frame_cb), [`depz_tmf8829_event_cb`](#depz_tmf8829_event_cb), [`depz_tmf8829_open_link`](#depz_tmf8829_open_link), [`depz_is_tmf8829`](#depz_is_tmf8829), [`depz_tmf8829_init`](#depz_tmf8829_init), [`depz_tmf8829_sensor_id`](#depz_tmf8829_sensor_id), [`depz_tmf8829_configure`](#depz_tmf8829_configure), [`depz_tmf8829_get_config`](#depz_tmf8829_get_config), [`depz_tmf8829_config_page`](#depz_tmf8829_config_page), [`depz_tmf8829_read_registers`](#depz_tmf8829_read_registers), [`depz_tmf8829_write_registers`](#depz_tmf8829_write_registers), [`depz_tmf8829_bridge_info`](#depz_tmf8829_bridge_info), [`depz_tmf8829_start`](#depz_tmf8829_start), [`depz_tmf8829_stop`](#depz_tmf8829_stop), [`depz_tmf8829_streaming`](#depz_tmf8829_streaming), [`depz_tmf8829_on_measurement`](#depz_tmf8829_on_measurement), [`depz_tmf8829_off_measurement`](#depz_tmf8829_off_measurement), [`depz_tmf8829_on_frame`](#depz_tmf8829_on_frame), [`depz_tmf8829_off_frame`](#depz_tmf8829_off_frame), [`depz_tmf8829_on_event`](#depz_tmf8829_on_event), [`depz_tmf8829_off_event`](#depz_tmf8829_off_event), [`depz_tmf8829_measurements`](#depz_tmf8829_measurements), [`depz_tmf8829_get_measurement`](#depz_tmf8829_get_measurement), [`depz_tmf8829_get_stream_stats`](#depz_tmf8829_get_stream_stats)
 - **BNO085 / BNO086 sensor class (live layer)**: [`DEPZ_BNO086_BUSY_RETRIES`](#depz_bno086_busy_retries), [`DEPZ_BNO086_BUSY_BACKOFF_MS`](#depz_bno086_busy_backoff_ms), [`DEPZ_BNO086_RATE_LOW_FACTOR`](#depz_bno086_rate_low_factor), [`DEPZ_BNO086_RATE_HIGH_FACTOR`](#depz_bno086_rate_high_factor), [`depz_bno086_feature_request`](#depz_bno086_feature_request), [`depz_bno086_calibration`](#depz_bno086_calibration), [`depz_bno086_error_record`](#depz_bno086_error_record), [`depz_bno086_counts`](#depz_bno086_counts), [`depz_bno086_report_cb`](#depz_bno086_report_cb), [`depz_bno086_open_link`](#depz_bno086_open_link), [`depz_is_bno086`](#depz_is_bno086), [`depz_bno086_hardware_reset`](#depz_bno086_hardware_reset), [`depz_bno086_wake`](#depz_bno086_wake), [`depz_bno086_sleep`](#depz_bno086_sleep), [`depz_bno086_power_on`](#depz_bno086_power_on), [`depz_bno086_advertisement`](#depz_bno086_advertisement), [`depz_bno086_product_id`](#depz_bno086_product_id), [`depz_bno086_product_ids`](#depz_bno086_product_ids), [`depz_bno086_enable`](#depz_bno086_enable), [`depz_bno086_enable_ex`](#depz_bno086_enable_ex), [`depz_bno086_rate_ok`](#depz_bno086_rate_ok), [`depz_bno086_disable`](#depz_bno086_disable), [`depz_bno086_get_feature`](#depz_bno086_get_feature), [`depz_bno086_on_report`](#depz_bno086_on_report), [`depz_bno086_off_report`](#depz_bno086_off_report), [`depz_bno086_reports`](#depz_bno086_reports), [`depz_bno086_get_report`](#depz_bno086_get_report), [`depz_bno086_shtp_discarded`](#depz_bno086_shtp_discarded), [`depz_bno086_tare_now`](#depz_bno086_tare_now), [`depz_bno086_persist_tare`](#depz_bno086_persist_tare), [`depz_bno086_set_reorientation`](#depz_bno086_set_reorientation), [`depz_bno086_set_calibration`](#depz_bno086_set_calibration), [`depz_bno086_get_calibration`](#depz_bno086_get_calibration), [`depz_bno086_save_dcd`](#depz_bno086_save_dcd), [`depz_bno086_configure_periodic_dcd`](#depz_bno086_configure_periodic_dcd), [`depz_bno086_frs_read`](#depz_bno086_frs_read), [`depz_bno086_frs_write`](#depz_bno086_frs_write), [`depz_bno086_get_metadata`](#depz_bno086_get_metadata), [`depz_bno086_get_oscillator_type`](#depz_bno086_get_oscillator_type), [`depz_bno086_clear_dcd_and_reset`](#depz_bno086_clear_dcd_and_reset), [`depz_bno086_get_errors`](#depz_bno086_get_errors), [`depz_bno086_get_counts`](#depz_bno086_get_counts), [`depz_bno086_clear_counts`](#depz_bno086_clear_counts), [`depz_bno086_command`](#depz_bno086_command), [`depz_bno086_send_shtp`](#depz_bno086_send_shtp)
@@ -131,6 +131,16 @@ const char *depz_usb_model_hint(int vid, int pid);
 
 Best-guess model name for a (vid, pid), or NULL. Informational only.
 
+### depz_usb_identity
+
+```c
+int depz_usb_identity(int vid, int pid, bool *known, const char **model);
+```
+
+Both at once, checked: -1 when vid or pid is not a u16 (0..0xFFFF) — an
+invalid id, not an unknown one (contract 07 §3); else 0 with *known /
+*model (either may be NULL) as the two functions above give them.
+
 ### depz_sensor_type
 
 ```c
@@ -181,8 +191,22 @@ const char *depz_sensor_type_str(depz_sensor_type t);
 size_t depz_strip_device_string(const uint8_t *data, size_t len, char *out, size_t out_cap);
 ```
 
-Strip trailing 0x00/0xFF filler and copy as an ASCII C-string into `out`.
-Returns the resulting string length.
+Strip trailing 0x00/0xFF filler and decode the rest as ASCII into `out`
+(contract 02 §4.1): every byte >= 0x80 becomes U+FFFD (written as UTF-8,
+EF BF BD), and an embedded 0x00 before the filler is KEPT as a character.
+`out` is NUL-filled to `out_cap`; a character that does not fit whole is
+dropped with the rest. Returns the string length written (embedded NULs
+included) — or, when out_cap == 0, the length the whole string needs.
+
+### depz_device_string_len
+
+```c
+size_t depz_device_string_len(const char *buf, size_t cap);
+```
+
+Length of a stripped device string held in a NUL-filled buffer of `cap`
+bytes (depz_text_report.text, depz_identity.software_name): up to its last
+non-NUL byte, so embedded NULs count.
 
 ### depz_parse_software_name
 
@@ -190,7 +214,68 @@ Returns the resulting string length.
 void depz_parse_software_name(const char *name, depz_identity *out);
 ```
 
-Classify a GET_NAME_ACTIVE_SOFTWARE string (already stripped).
+Classify a GET_NAME_ACTIVE_SOFTWARE string (already stripped). Product
+tokens are checked in the contract's order (SR04, VL53L4, VL53L8, VL53L7,
+VL53L0_4, VL53LX, BNO086, BNO055, TMF8829): the first one found wins.
+`software_name` / `version` are NUL-filled copies, truncated to fit.
+
+### depz_parse_software_name_n
+
+```c
+void depz_parse_software_name_n(const char *name, size_t len, depz_identity *out);
+```
+
+The same over name[0..len): a name holding embedded NULs (as
+depz_strip_device_string keeps them) is classified whole.
+
+### depz_resolve_sensor_class
+
+```c
+const char *depz_resolve_sensor_class(const char *software_name, const char *device_name, int usb_vid, int usb_pid);
+```
+
+Class resolution (contract 02 §4.4, pure): the canonical class name for a
+device's probe answers — `software_name` (GET_NAME_ACTIVE_SOFTWARE) and
+`device_name` (GET_DEVICE_NAME; NULL or "" when there was none) — and its
+port's USB id (-1 = unknown: a replay, a bridge). One of the
+DEPZ_SENSOR_CLASS_COUNT names of depz_sensor_class_name():
+  - BOOTDEPZ_*  -> "bootloader" (no sensor class: contract 06 client);
+  - APP_VL53L8  -> "vl53l8ch" if the USB model is VL53L8CH, else "vl53l8cx";
+  - APP_VL53L7  -> depz_vl53l7_resolve_model() (USB model, then the name);
+  - APP_VL53L0_4 -> depz_vl53lx_resolve_class() (USB model, then the name,
+    else the generic "vl53lx"; VL53L4CD is generic on this firmware);
+  - any other known token -> its class; unknown APP_* or a name that is
+    neither APP_ nor BOOTDEPZ -> "device" (the base device).
+Returns a static string. Vectors: contracts/vectors/probe.json.
+
+### depz_resolve_sensor_class_n
+
+```c
+const char *depz_resolve_sensor_class_n(const char *software_name, size_t software_name_len, const char *device_name, size_t device_name_len, const int *usb_vid, const int *usb_pid);
+```
+
+The same with explicit lengths (strings may hold embedded NULs);
+`device_name` may be NULL (its length is then ignored). The USB ids are
+pointers: NULL = unknown; a given id must be a u16, else the result is
+NULL (an invalid id, contract 07 §3).
+
+### DEPZ_SENSOR_CLASS_COUNT
+
+```c
+#define DEPZ_SENSOR_CLASS_COUNT 18
+```
+
+The canonical class names (SENSOR_CLASS_NAMES), in contract order:
+"sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx",
+"vl53l7ch", "vl53l0x", "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx",
+"vl53lx", "bno086", "bno055", "tmf8829", "device", "bootloader".
+depz_sensor_class_name(i) is NULL for i >= DEPZ_SENSOR_CLASS_COUNT.
+
+### depz_sensor_class_name
+
+```c
+const char *depz_sensor_class_name(size_t i);
+```
 
 ## Transport
 
@@ -275,7 +360,8 @@ Frame one packet into `out` (capacity `out_cap`), writing the length to
 *out_len. crc_type bits are set in the header even for an empty payload
 (matching device TX), but a CRC trailer is appended only for a non-empty
 payload (ERRATA E6). `seq` is taken modulo 256.
-Returns 0 on success, -1 on payload-too-long, -2 on insufficient capacity.
+Returns 0 on success, -1 on payload-too-long, -2 on insufficient capacity,
+-3 when crc_type is not one of the listed depz_crc_type values.
 
 ### depz_event_type
 
@@ -476,7 +562,8 @@ size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out);
 size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out);
 ```
 
-/* 3 B */
+3 B, or 0 (nothing written) unless pin is 1..5, mode a depz_sync_pin_mode
+(0..4) and polarity 0 (idle low) or 1 (idle high) — contract 02 §6.
 
 ### depz_unpack_status
 
@@ -484,13 +571,28 @@ size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out);
 int depz_unpack_status(const uint8_t *p, size_t len, depz_status_report *out);
 ```
 
-Decoders (return 0 on success, -1 on wrong payload length).
+Decoders (contract 07 §3): return 0 on success, -1 when the payload is
+shorter than the report's fields; trailing bytes are ignored. RPT_TEXT's
+text is depz_strip_device_string()'s (NUL-filled; embedded NULs kept —
+depz_device_string_len() gives its length).
 
 ### depz_unpack_text
 
 ```c
 int depz_unpack_text(const uint8_t *p, size_t len, depz_text_report *out);
 ```
+
+### depz_unpack_text_ex
+
+```c
+int depz_unpack_text_ex(const uint8_t *p, size_t len, uint8_t *cmd, char *text, size_t text_cap, size_t *text_len);
+```
+
+RPT_TEXT into a caller buffer of any size (depz_text_report.text holds 255
+bytes): *cmd, the stripped text in text[text_cap] (as
+depz_strip_device_string; text_cap = 3 * (len - 1) + 1 always holds it
+whole) and its length in *text_len (may be NULL). 0, or -1 for an empty
+payload.
 
 ### depz_unpack_sync_time
 
@@ -878,7 +980,8 @@ the word read from 0x0006; `clock_pll` is the word read from
 RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
 inter_ms > 0). inter_ms == 0 selects continuous mode; a value greater than
 the budget selects autonomous low power. Returns 0 on success, -1 when
-osc_frequency == 0, budget_ms outside 10..200, or 0 < inter_ms <= budget_ms.
+osc_frequency == 0, budget_ms outside 10..200, 0 < inter_ms <= budget_ms,
+or an INTERMEASUREMENT_MS value that would overflow u32.
 
 ### depz_vl53l4_decode_range_timing
 
@@ -915,6 +1018,23 @@ uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps);
 ```
 
 /* XTALK_PLANE_OFFSET: kcps*512 */
+
+### depz_vl53l4_offset_raw_checked
+
+```c
+int depz_vl53l4_offset_raw_checked(int32_t mm, uint16_t *raw);
+```
+
+Range-checked forms (contract 07 §3 — prefer these; the unchecked ones
+above wrap): offset -1024..1023 mm (the 11-bit word decode_offset reads
+back), xtalk 0..127 kcps (fits the word after << 9). 0, or -1 with *raw
+untouched.
+
+### depz_vl53l4_xtalk_raw_checked
+
+```c
+int depz_vl53l4_xtalk_raw_checked(uint16_t kcps, uint16_t *raw);
+```
 
 ### depz_vl53l4_decode_xtalk
 
@@ -1167,21 +1287,23 @@ typedef struct {
     uint64_t timestamp_us;
     int      resolution;                 /* 16 | 64 (zone count present)      */
     int8_t   silicon_temp_degc;
-    int32_t  distance_mm[DEPZ_VL53L8_MAX_ZONES];
+    int32_t  distance_mm[DEPZ_VL53L8_MAX_ZONES];       /* mm, >= 0            */
     uint8_t  target_status[DEPZ_VL53L8_MAX_ZONES];
     uint8_t  nb_target_detected[DEPZ_VL53L8_MAX_ZONES];
-    uint32_t signal_per_spad[DEPZ_VL53L8_MAX_ZONES];   /* kcps/SPAD raw       */
-    uint32_t ambient_per_spad[DEPZ_VL53L8_MAX_ZONES];  /* kcps/SPAD raw       */
+    double   signal_per_spad[DEPZ_VL53L8_MAX_ZONES];   /* kcps/SPAD           */
+    double   ambient_per_spad[DEPZ_VL53L8_MAX_ZONES];  /* kcps/SPAD           */
     uint32_t nb_spads_enabled[DEPZ_VL53L8_MAX_ZONES];
-    uint16_t range_sigma_mm_raw[DEPZ_VL53L8_MAX_ZONES];/* mm = raw/128        */
-    uint8_t  reflectance[DEPZ_VL53L8_MAX_ZONES];       /* %                   */
+    double   range_sigma_mm[DEPZ_VL53L8_MAX_ZONES];    /* mm                  */
+    double   reflectance[DEPZ_VL53L8_MAX_ZONES];       /* %                   */
 } depz_vl53l8_frame;
 ```
 
 One decoded ranging frame. Arrays are valid for [0, resolution); zone index
-runs row-major. Values are RAW fixed-point integers exactly as on the wire
-(no float scaling — the host applies range_sigma/128, signal/kcps, etc.).
-distance_mm is the ST-scaled value (raw/4, floored) to match GetRangingData.
+runs row-major. Values are in the real units ST's GetRangingData gives
+(contract 04 §5): distance_mm = raw/4 floored, a negative result clamped to
+0; signal/ambient = raw/2048 kcps/SPAD; range_sigma_mm = raw/128 mm;
+reflectance = raw/2 %. ST divides integers; the floating-point fields here
+keep the fraction.
 
 ### depz_vl53l8_decode_frame
 
@@ -1233,7 +1355,7 @@ CNH feature_length is packed as a uint8 on the device (num_bins & 0xFF).
 ```c
 typedef struct {
     int nb_of_aggregates; /* 1..DEPZ_VL53L8_CNH_MAX_AGGREGATES */
-    int feature_length;   /* 1..DEPZ_VL53L8_CNH_MAX_FEATURE    */
+    int feature_length;   /* 0..DEPZ_VL53L8_CNH_MAX_FEATURE (0: empty histograms) */
 } depz_vl53l8ch_cnh_config;
 ```
 
@@ -1364,7 +1486,15 @@ Detection-threshold measurement selectors (get divides / set multiplies).
 uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps);
 ```
 
-Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048).
+Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048) (a negative
+margin clamps to 0). The checked form refuses (-1, *raw untouched) a margin
+outside 0..10000 kcps (or NaN), else 0.
+
+### depz_vl53l8_xtalk_margin_to_raw_checked
+
+```c
+int depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw);
+```
 
 ### depz_vl53l8_xtalk_margin_from_raw
 
@@ -1398,6 +1528,17 @@ void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n, uint
 Pack up to 64 detection thresholds into the DCI_DET_THRESH_START payload
 (768 B) plus the 8-byte valid-status block (all 0x05). Missing entries are
 zero-filled. low/high are scaled by the entry's measurement selector.
+
+### depz_vl53l8_pack_thresholds_checked
+
+```c
+int depz_vl53l8_pack_thresholds_checked(const depz_vl53l8_threshold *th, size_t n, uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE], uint8_t valid[8]);
+```
+
+The same, refusing (-1, nothing written) more than 64 entries or an entry
+whose scaled low/high does not fit the i32 DCI field (contract 07 §3); 0
+on success. The
+unchecked form above wraps such a value to 32 bits.
 
 ### depz_vl53l8_motion_cfg_default_pack
 
@@ -1622,6 +1763,14 @@ model (`usb_model` as returned by depz_usb_model_hint(): "vl53l5cx" |
 "vl53l7cx" | "vl53l7ch"; NULL or anything else = none), else the first
 match of `VL53L([57])(CX|CH)` in GET_DEVICE_NAME (`device_name`, may be
 NULL), else DEPZ_VL53L7_MODEL_L7CX.
+
+### depz_vl53l7_resolve_model_n
+
+```c
+depz_vl53l7_model depz_vl53l7_resolve_model_n(const char *usb_model, size_t usb_model_len, const char *device_name, size_t device_name_len);
+```
+
+The same with explicit lengths (strings may hold embedded NULs; NULL = none).
 
 ### depz_vl53l7_model_str
 
@@ -1889,6 +2038,12 @@ Product named on the board (GET_DEVICE_NAME): the first
 `VL53L<digit>[A-Z0-9]*` in the upper-cased name, NONE when there is no
 match or the match is not a family product. `name` may be NULL.
 
+### depz_vl53lx_product_from_board_name_n
+
+```c
+depz_vl53lx_product depz_vl53lx_product_from_board_name_n(const char *name, size_t len);
+```
+
 ### depz_vl53lx_resolve_product
 
 ```c
@@ -1897,6 +2052,12 @@ depz_vl53lx_product depz_vl53lx_resolve_product(const char *usb_model, const cha
 
 The PID model (`usb_model` as from depz_usb_model_hint(), may be NULL) if
 it names a family product, else depz_vl53lx_product_from_board_name().
+
+### depz_vl53lx_resolve_product_n
+
+```c
+depz_vl53lx_product depz_vl53lx_resolve_product_n(const char *usb_model, size_t usb_model_len, const char *device_name, size_t device_name_len);
+```
 
 ### depz_vl53lx_class
 
@@ -1920,6 +2081,14 @@ and an unresolved product, open as the generic class.
 ```c
 depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model, const char *device_name);
 ```
+
+### depz_vl53lx_resolve_class_n
+
+```c
+depz_vl53lx_class depz_vl53lx_resolve_class_n(const char *usb_model, size_t usb_model_len, const char *device_name, size_t device_name_len);
+```
+
+_n variants: explicit lengths, strings may hold embedded NULs (NULL = none).
 
 ### depz_vl53lx_class_str
 
@@ -2163,6 +2332,17 @@ typedef struct {
 } depz_shtp_header;
 ```
 
+### depz_shtp_pack_header_checked
+
+```c
+int depz_shtp_pack_header_checked(const depz_shtp_header *hdr, uint8_t out[4]);
+```
+
+Pack a header. `length` is a 15-bit field: depz_shtp_pack_header_checked
+returns -1 and writes nothing when it is > 0x7FFF (contract 07 §3), else 0.
+depz_shtp_pack_header (kept for compatibility) cannot report that and
+masks the length to 15 bits — prefer the checked form.
+
 ### depz_shtp_pack_header
 
 ```c
@@ -2185,6 +2365,7 @@ typedef struct {
     size_t   cap;
     uint8_t  seq;
     bool     active;
+    uint64_t capture_us;  /* capture of the fragment that started the cargo */
 } depz_shtp_rx_channel;
 ```
 
@@ -2230,6 +2411,7 @@ typedef struct {
     uint8_t  seq;         /* first fragment's seq */
     const uint8_t *payload;
     size_t   payload_len;
+    uint64_t capture_us;  /* first fragment's capture (contract 05 §3); 0 via depz_shtp_feed */
 } depz_shtp_cargo;
 ```
 
@@ -2243,7 +2425,18 @@ int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len, d
 
 Feed one inbound frame. Returns 1 when a cargo completes (fills *out, whose
 payload points into the channel buffer, valid until the next feed on that
-channel), 0 otherwise. Returns -1 on allocation failure.
+channel), 0 otherwise. Returns -1 on allocation failure. Same as
+depz_shtp_feed_ex with capture_us = 0.
+
+### depz_shtp_feed_ex
+
+```c
+int depz_shtp_feed_ex(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len, uint64_t capture_us, depz_shtp_cargo *out);
+```
+
+depz_shtp_feed with the frame's RPT_DATA capture time. The completed cargo
+carries the FIRST fragment's capture in out->capture_us — the base its 0xFB
+timestamps refer to (contract 05 §3, §5).
 
 ### depz_bno_pack_set_feature
 
@@ -2275,7 +2468,8 @@ PRODUCT_ID_REQUEST 0xF9, 2 B.
 size_t depz_bno_pack_command_request(uint8_t seq, uint8_t command, const uint8_t *params, size_t nparams, uint8_t out[12]);
 ```
 
-COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B).
+COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B). Returns 12, or
+0 (nothing written) when nparams > 9.
 
 ### depz_bno_pack_frs_read_request
 
@@ -2299,7 +2493,9 @@ FRS_WRITE_REQUEST 0xF7, 6 B.
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words, size_t nwords, uint8_t *out, size_t out_cap);
 ```
 
-FRS_WRITE_DATA 0xF6, 4 + 4*nwords B. Returns 0 on capacity error.
+FRS_WRITE_DATA 0xF6, always 12 B (contract 05 §6): `nwords` is 1 or 2, and
+a single word is followed by a zero word1. Returns 12, or 0 when nwords is
+not 1 or 2 or out_cap < 12.
 
 ### DEPZ_BNO_SENSOR_ACCELEROMETER
 
@@ -2489,6 +2685,14 @@ SH-2 sensor ids (the input report ids) — what Set Feature takes, and the
 ```c
 #define DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV       0x2Au
 ```
+
+### DEPZ_BNO_SENSOR_MOTION_REQUEST
+
+```c
+#define DEPZ_BNO_SENSOR_MOTION_REQUEST           0x2Bu
+```
+
+interactive calibration, BNO086 only
 
 ### DEPZ_SH2_COMMAND_RESPONSE
 
@@ -3083,6 +3287,14 @@ The metadata FRS record of a sensor id, 0 when none is known.
 #define DEPZ_BNO_TIMESTAMP_REBASE   0xFA
 ```
 
+### DEPZ_BNO_FLUSH_COMPLETED
+
+```c
+#define DEPZ_BNO_FLUSH_COMPLETED    0xEF
+```
+
++ u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0)
+
 ### depz_bno_report_type
 
 ```c
@@ -3104,7 +3316,9 @@ typedef enum {
     DEPZ_BNO_RAW_SENSOR,
     DEPZ_BNO_GENERIC_EVENT,
     DEPZ_BNO_GYRO_INTEGRATED_RV,
-    DEPZ_BNO_UNKNOWN_REPORT
+    DEPZ_BNO_UNKNOWN_REPORT,
+    DEPZ_BNO_MOTION_REQUEST,   /* 0x2B: intent, request */
+    DEPZ_BNO_FLUSH_COMPLETED_REPORT /* 0xEF: flushed_sensor; no seq/accuracy/delay */
 } depz_bno_report_type;
 ```
 
@@ -3123,7 +3337,8 @@ typedef struct {
     depz_bno_report_type type;
     uint8_t  sensor_id;
     int64_t  timestamp_us;    /* capture - base_delta*100 + delay*100 */
-    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT) */
+    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT /
+     * FLUSH_COMPLETED_REPORT) */
     uint8_t  seq;
     uint8_t  accuracy;
     int32_t  delay_us;
@@ -3147,6 +3362,12 @@ typedef struct {
     bool     end_of_sequence;
     int32_t  most_likely_state;
     uint8_t  confidences[10];
+    /* motion request (0x2B): the motion intent the hub was last told and what
+     * it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still) */
+    int32_t  intent;
+    int32_t  request;
+    /* flush completed (0xEF): the sensor whose batched reports are all sent */
+    int32_t  flushed_sensor;
     /* raw sensor */
     uint32_t sensor_timestamp_us;
     int32_t  temperature_raw;
@@ -3169,8 +3390,9 @@ size_t depz_bno_parse_input_cargo(const uint8_t *payload, size_t len, uint64_t c
 
 Parse a channel-3/4 input cargo into typed reports. `capture_timestamp_us`
 is the bridge RPT_DATA capture time. Writes up to `cap` reports into `out`,
-returns the count. Handles 0xFB base and 0xFA rebase; an unknown report id
-stops the parse (last entry is UNKNOWN_REPORT).
+returns the count. Handles 0xFB base and 0xFA rebase, and a bare 0xEF
+Flush Completed (2 bytes, timestamp = the current base); an unknown report
+id stops the parse (last entry is UNKNOWN_REPORT).
 
 ### depz_bno_parse_gyro_rv
 
@@ -3999,6 +4221,15 @@ bandwidth<5:3>; byte 1 power<2:0>. Power-on 0x38/0x00.
 void depz_bno055_unpack_gyro_config(const uint8_t bytes[2], depz_bno055_gyro_config *out);
 ```
 
+### depz_bno055_unpack_gyro_config_n
+
+```c
+int depz_bno055_unpack_gyro_config_n(const uint8_t *bytes, size_t len, depz_bno055_gyro_config *out);
+```
+
+The same from a buffer of `len` bytes: -1 when shorter than 2 (contract 07
+§3), else 0; trailing bytes are ignored.
+
 ### depz_bno055_pack_gyro_config
 
 ```c
@@ -4797,6 +5028,15 @@ uint8_t depz_tmf8829_clock_add(depz_tmf8829_clock *c, int64_t us, uint32_t tick)
 Add a pair -> DEPZ_TMF8829_FT_CLOCK_RESET when it does not fit the model
 (which then restarts from it), else 0.
 
+### depz_tmf8829_clock_add_checked
+
+```c
+int depz_tmf8829_clock_add_checked(depz_tmf8829_clock *c, int64_t us, uint32_t tick, uint8_t *flags);
+```
+
+The same, refusing (-1, clock untouched) a negative MCU time — it is a u64
+(contract 07 §3); else 0 with the flags in *flags.
+
 ### depz_tmf8829_clock_to_us
 
 ```c
@@ -4864,6 +5104,15 @@ void depz_tmf8829_timer_results(depz_tmf8829_timer *t, const depz_tmf8829_clock 
 ```
 
 `flags` = what clock_add returned for this frame.
+
+### depz_tmf8829_timer_results_checked
+
+```c
+int depz_tmf8829_timer_results_checked(depz_tmf8829_timer *t, const depz_tmf8829_clock *c, unsigned fp_mode, uint32_t systick, uint32_t t0_tick, uint32_t t1_tick, int64_t pair_us, int64_t edge_us, uint8_t flags, depz_tmf8829_frame_time *out);
+```
+
+The same, refusing (-1, nothing changed) fp_mode > 255 or a negative
+pair_us / edge_us (contract 07 §3); else 0.
 
 ### depz_tmf8829_subints
 
@@ -4958,7 +5207,9 @@ int depz_tmf8829_builder_add(depz_tmf8829_builder *b, const uint8_t *raw, size_t
 ```
 
 One frame with the MCU time of its header read and its INT edge (0 =
-none). Returns 1 and fills *out when it completes a measurement, else 0.
+none). Returns 1 and fills *out when it completes a measurement, else 0;
+-1 (nothing changed) when timestamp_us or edge_us is negative — they are
+u64 MCU times (contract 07 §3).
 
 ### DEPZ_TMF8829_REG_APP_ID
 
@@ -5194,6 +5445,21 @@ int depz_tmf8829_cfg_set(uint8_t page[190], const char *name, int64_t value);
 
 Set a field. 0; -1 unknown name; -2 value outside 0 .. 2^width - 1 (page
 untouched).
+
+### depz_tmf8829_cfg_get_n
+
+```c
+int depz_tmf8829_cfg_get_n(const uint8_t *page, size_t page_len, const char *name, uint32_t *value);
+```
+
+The same over a page of `page_len` bytes (a partial page read is fine as
+long as it holds the field): -3 when it is too short for the field.
+
+### depz_tmf8829_cfg_set_n
+
+```c
+int depz_tmf8829_cfg_set_n(uint8_t *page, size_t page_len, const char *name, int64_t value);
+```
 
 ### DEPZ_TMF8829_FIRMWARE_LOAD_ADDR
 
@@ -5571,6 +5837,15 @@ bool depz_link_replay_exhausted(const depz_link *l);
 
 Replay only: true once every recorded rx chunk has been served.
 
+### depz_link_replay_pending
+
+```c
+int depz_link_replay_pending(const depz_link *l, size_t *tx_bytes_left, size_t *rx_chunks_left);
+```
+
+Replay only: recorded tx bytes not yet written and rx chunks not yet served
+(both 0 = the whole capture was played). DEPZ_E_ARG on another link.
+
 ## Live layer: streams
 
 ### depz_stream
@@ -5653,9 +5928,51 @@ int depz_device_open_link(depz_link *link, depz_device **out);
 int depz_device_promote(depz_device *dev);
 ```
 
-Ask GET_NAME_ACTIVE_SOFTWARE and attach the matching sensor class, as
-depz_open_device() does after its probe. DEPZ_E_BOOTLOADER in bootloader
-mode.
+The in-place probe captures older than contract 02 §4.4 hold (contract 15
+`probe: "legacy"`): ask GET_NAME_ACTIVE_SOFTWARE — plus GET_DEVICE_NAME
+for the L5/L7 and 1D families only — then attach the class
+depz_resolve_sensor_class() picks, in place. DEPZ_E_BOOTLOADER in
+bootloader mode. New code opens with depz_open_device() or
+depz_open_on_link() (the §4.4 probe).
+
+### depz_device_promote_ex
+
+```c
+int depz_device_promote_ex(depz_device *dev, int usb_vid, int usb_pid, depz_identity *ident);
+```
+
+depz_device_promote() with the board's USB id (-1 = unknown), which picks
+the class the probe alone cannot (VL53L8CX vs VL53L8CH, the L5/L7 and
+1D-family models); *ident (optional) receives the parsed answer.
+
+### depz_attach_sensor_class
+
+```c
+int depz_attach_sensor_class(depz_device *dev, const char *class_name);
+```
+
+Continue the open plain device `dev` as the class `class_name` (one of
+depz_sensor_class_name(), as from depz_resolve_sensor_class()) on the same
+connection — contract 02 §4.4 attach_sensor_class: no reopen, the reader
+and the host sequence numbers run on. `dev` must have no class yet and no
+request in flight (DEPZ_E_ARG otherwise); "device" leaves it the base
+device; "bootloader" fails with DEPZ_E_BOOTLOADER.
+
+### depz_open_on_link
+
+```c
+int depz_open_on_link(depz_link *link, int usb_vid, int usb_pid, int timeout_ms, depz_device **out);
+```
+
+Open a device on a connection that cannot be reopened — a replay or
+recording link, an adopted transport (contract 02 §4.4 open_on_link).
+Takes ownership of `link` (also on failure), runs the probe
+depz_probe_port() runs — GET_NAME_ACTIVE_SOFTWARE, GET_DEVICE_NAME,
+GET_SERIAL — on it, resolves the class with depz_resolve_sensor_class()
+from the answers and (`usb_vid`, `usb_pid`) (-1 = unknown), and continues
+as that class on the same link. `timeout_ms` <= 0 = default. No answer to
+GET_NAME_ACTIVE_SOFTWARE -> DEPZ_E_NO_DEVICE; a bootloader ->
+DEPZ_E_BOOTLOADER.
 
 ### depz_device_close
 
@@ -5762,13 +6079,17 @@ int depz_device_get_payload_crc_type(depz_device *dev, depz_crc_type *out);
 int depz_device_set_payload_crc_type(depz_device *dev, depz_crc_type t);
 ```
 
-Device->host payload CRC; host->device CRC is per packet.
+Device->host payload CRC; host->device CRC is per packet. DEPZ_E_ARG for a
+value that is not a listed depz_crc_type.
 
 ### depz_device_get_sync_pin
 
 ```c
 int depz_device_get_sync_pin(depz_device *dev, uint8_t pin, depz_sync_pin_config *out);
 ```
+
+Sync pins 1..5, mode 0..4, polarity 0..1 (contract 02 §6): DEPZ_E_ARG
+outside, nothing sent.
 
 ### depz_device_set_sync_pin
 
@@ -5941,7 +6262,8 @@ typedef struct {
 int depz_probe_port(const char *port, int timeout_ms, depz_device_info *out);
 ```
 
-Open `port`, ask the software name (+ device name, serial), close.
+Open `port`, run the contract 02 §4.4 probe (GET_NAME_ACTIVE_SOFTWARE,
+then GET_DEVICE_NAME and GET_SERIAL, each optional), close.
 DEPZ_E_NO_DEVICE when nothing DEPZ-shaped answers.
 
 ### depz_list_depz_devices
@@ -5984,7 +6306,10 @@ int depz_open_device(const depz_open_options *opt, depz_device **out);
 ```
 
 Find, probe and open a DEPZ device with its sensor class attached.
-`opt` NULL = the candidate with the smallest USB serial.
+`opt` NULL = the candidate with the smallest USB serial. Contract 02
+§4.4: the probe runs on a connection of its own, which is closed; the
+class (depz_resolve_sensor_class() of the answers and the port's USB id)
+then opens the port afresh.
 
 ## SR04 sensor class (live layer)
 
@@ -6271,6 +6596,9 @@ int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32
 int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm);
 ```
 
+Offset -1024..1023 mm, xtalk 0..127 kcps (0 = off): DEPZ_E_ARG outside,
+nothing written.
+
 ### depz_vl53l4cd_get_offset_mm
 
 ```c
@@ -6282,8 +6610,6 @@ int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm);
 ```c
 int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps);
 ```
-
-/* 0 = off */
 
 ### depz_vl53l4cd_get_xtalk_kcps
 
@@ -6612,7 +6938,16 @@ the plugin helpers that fill it (vl53lmz_plugin_cnh.c).
 void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins, int sub_sample);
 ```
 
-vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH bin.
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. num_bins / sub_sample are u8 fields: this form masks them to 8 bits;
+the _checked form (preferred, contract 07 §3) answers DEPZ_E_ARG outside
+0..255 and leaves `s` untouched.
+
+### depz_vl53l8_cnh_init_config_checked
+
+```c
+int depz_vl53l8_cnh_init_config_checked(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins, int sub_sample);
+```
 
 ### depz_vl53l8_cnh_create_agg_map
 
@@ -6621,6 +6956,8 @@ int depz_vl53l8_cnh_create_agg_map(depz_vl53l8_cnh_setup *s, int resolution, int
 ```
 
 vl53lmz_cnh_create_agg_map: map zones (resolution 16 | 64) to aggregates.
+DEPZ_E_ARG for another resolution, start_x / start_y < 0, merge_x /
+merge_y / cols / rows < 1, or a map past the zone grid.
 
 ### depz_vl53l8_cnh_required_memory
 
@@ -6804,7 +7141,7 @@ int depz_vl53l8_get_xtalk_margin(depz_device *dev, double *kcps_per_spad);
 int depz_vl53l8_set_xtalk_margin(depz_device *dev, double kcps_per_spad);
 ```
 
-/* <= 10000 */
+/* 0..10000 */
 
 ### depz_vl53l8_calibrate_xtalk
 
@@ -7278,6 +7615,14 @@ bool depz_vl53lx_initialized(const depz_device *dev);
 ```c
 depz_vl53lx_product depz_vl53lx_product_bound(const depz_device *dev);
 ```
+
+### depz_vl53lx_get_class
+
+```c
+depz_vl53lx_class depz_vl53lx_get_class(const depz_device *dev);
+```
+
+The class the board opened as (fixed at open: PID / device name).
 
 ### depz_vl53lx_driver_bound
 

@@ -14,7 +14,7 @@ in the header, not this file.
 
 ## Contents
 
-- **BNO086 (IMU)**: [`DEPZ_BNO086_CMD_SENSOR_RESET`](#depz_bno086_cmd_sensor_reset), [`DEPZ_BNO086_CMD_SENSOR_WAKE_UP`](#depz_bno086_cmd_sensor_wake_up), [`DEPZ_BNO086_CMD_SEND_SHTP_PACKET`](#depz_bno086_cmd_send_shtp_packet), [`DEPZ_BNO086_RPT_DATA`](#depz_bno086_rpt_data), [`depz_bno086_unpack_data`](#depz_bno086_unpack_data), [`DEPZ_SHTP_HEADER_SIZE`](#depz_shtp_header_size), [`DEPZ_SHTP_LENGTH_MASK`](#depz_shtp_length_mask), [`DEPZ_SHTP_CONTINUATION`](#depz_shtp_continuation), [`DEPZ_SHTP_NUM_CHANNELS`](#depz_shtp_num_channels), [`DEPZ_SHTP_MAX_TX_FRAME`](#depz_shtp_max_tx_frame), [`depz_shtp_channel_id`](#depz_shtp_channel_id), [`DEPZ_SHTP_EXEC_RESET`](#depz_shtp_exec_reset), [`DEPZ_SHTP_EXEC_ON`](#depz_shtp_exec_on), [`DEPZ_SHTP_EXEC_SLEEP`](#depz_shtp_exec_sleep), [`depz_shtp_header`](#depz_shtp_header), [`depz_shtp_pack_header`](#depz_shtp_pack_header), [`depz_shtp_unpack_header`](#depz_shtp_unpack_header), [`depz_shtp_rx_channel`](#depz_shtp_rx_channel), [`depz_shtp_layer`](#depz_shtp_layer), [`depz_shtp_init`](#depz_shtp_init), [`depz_shtp_free`](#depz_shtp_free), [`depz_shtp_next_frame`](#depz_shtp_next_frame), [`depz_shtp_cargo`](#depz_shtp_cargo), [`depz_shtp_feed`](#depz_shtp_feed), [`depz_bno_pack_set_feature`](#depz_bno_pack_set_feature), [`depz_bno_pack_get_feature_request`](#depz_bno_pack_get_feature_request), [`depz_bno_pack_product_id_request`](#depz_bno_pack_product_id_request), [`depz_bno_pack_command_request`](#depz_bno_pack_command_request), [`depz_bno_pack_frs_read_request`](#depz_bno_pack_frs_read_request), [`depz_bno_pack_frs_write_request`](#depz_bno_pack_frs_write_request), [`depz_bno_pack_frs_write_data`](#depz_bno_pack_frs_write_data), [`DEPZ_BNO_SENSOR_ACCELEROMETER`](#depz_bno_sensor_accelerometer), [`DEPZ_BNO_SENSOR_GYROSCOPE`](#depz_bno_sensor_gyroscope), [`DEPZ_BNO_SENSOR_MAGNETOMETER`](#depz_bno_sensor_magnetometer), [`DEPZ_BNO_SENSOR_LINEAR_ACCELERATION`](#depz_bno_sensor_linear_acceleration), [`DEPZ_BNO_SENSOR_ROTATION_VECTOR`](#depz_bno_sensor_rotation_vector), [`DEPZ_BNO_SENSOR_GRAVITY`](#depz_bno_sensor_gravity), [`DEPZ_BNO_SENSOR_UNCALIBRATED_GYROSCOPE`](#depz_bno_sensor_uncalibrated_gyroscope), [`DEPZ_BNO_SENSOR_GAME_ROTATION_VECTOR`](#depz_bno_sensor_game_rotation_vector), [`DEPZ_BNO_SENSOR_GEOMAGNETIC_ROTATION_VECTOR`](#depz_bno_sensor_geomagnetic_rotation_vector), [`DEPZ_BNO_SENSOR_UNCALIBRATED_MAGNETOMETER`](#depz_bno_sensor_uncalibrated_magnetometer), [`DEPZ_BNO_SENSOR_TAP_DETECTOR`](#depz_bno_sensor_tap_detector), [`DEPZ_BNO_SENSOR_STEP_COUNTER`](#depz_bno_sensor_step_counter), [`DEPZ_BNO_SENSOR_SIGNIFICANT_MOTION`](#depz_bno_sensor_significant_motion), [`DEPZ_BNO_SENSOR_STABILITY_CLASSIFIER`](#depz_bno_sensor_stability_classifier), [`DEPZ_BNO_SENSOR_RAW_ACCELEROMETER`](#depz_bno_sensor_raw_accelerometer), [`DEPZ_BNO_SENSOR_RAW_GYROSCOPE`](#depz_bno_sensor_raw_gyroscope), [`DEPZ_BNO_SENSOR_RAW_MAGNETOMETER`](#depz_bno_sensor_raw_magnetometer), [`DEPZ_BNO_SENSOR_STEP_DETECTOR`](#depz_bno_sensor_step_detector), [`DEPZ_BNO_SENSOR_SHAKE_DETECTOR`](#depz_bno_sensor_shake_detector), [`DEPZ_BNO_SENSOR_FLIP_DETECTOR`](#depz_bno_sensor_flip_detector), [`DEPZ_BNO_SENSOR_PICKUP_DETECTOR`](#depz_bno_sensor_pickup_detector), [`DEPZ_BNO_SENSOR_STABILITY_DETECTOR`](#depz_bno_sensor_stability_detector), [`DEPZ_BNO_SENSOR_PERSONAL_ACTIVITY_CLASSIFIER`](#depz_bno_sensor_personal_activity_classifier), [`DEPZ_BNO_SENSOR_SLEEP_DETECTOR`](#depz_bno_sensor_sleep_detector), [`DEPZ_BNO_SENSOR_TILT_DETECTOR`](#depz_bno_sensor_tilt_detector), [`DEPZ_BNO_SENSOR_POCKET_DETECTOR`](#depz_bno_sensor_pocket_detector), [`DEPZ_BNO_SENSOR_CIRCLE_DETECTOR`](#depz_bno_sensor_circle_detector), [`DEPZ_BNO_SENSOR_HEART_RATE_MONITOR`](#depz_bno_sensor_heart_rate_monitor), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV`](#depz_bno_sensor_arvr_stabilized_rv), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV`](#depz_bno_sensor_arvr_stabilized_game_rv), [`DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV`](#depz_bno_sensor_gyro_integrated_rv), [`DEPZ_SH2_COMMAND_RESPONSE`](#depz_sh2_command_response), [`DEPZ_SH2_COMMAND_REQUEST`](#depz_sh2_command_request), [`DEPZ_SH2_FRS_READ_RESPONSE`](#depz_sh2_frs_read_response), [`DEPZ_SH2_FRS_READ_REQUEST`](#depz_sh2_frs_read_request), [`DEPZ_SH2_FRS_WRITE_RESPONSE`](#depz_sh2_frs_write_response), [`DEPZ_SH2_FRS_WRITE_DATA`](#depz_sh2_frs_write_data), [`DEPZ_SH2_FRS_WRITE_REQUEST`](#depz_sh2_frs_write_request), [`DEPZ_SH2_PRODUCT_ID_RESPONSE`](#depz_sh2_product_id_response), [`DEPZ_SH2_PRODUCT_ID_REQUEST`](#depz_sh2_product_id_request), [`DEPZ_SH2_GET_FEATURE_RESPONSE`](#depz_sh2_get_feature_response), [`DEPZ_SH2_SET_FEATURE_COMMAND`](#depz_sh2_set_feature_command), [`DEPZ_SH2_GET_FEATURE_REQUEST`](#depz_sh2_get_feature_request), [`DEPZ_SH2_CMD_ERRORS`](#depz_sh2_cmd_errors), [`DEPZ_SH2_CMD_COUNTER`](#depz_sh2_cmd_counter), [`DEPZ_SH2_CMD_TARE`](#depz_sh2_cmd_tare), [`DEPZ_SH2_CMD_INITIALIZE`](#depz_sh2_cmd_initialize), [`DEPZ_SH2_CMD_SAVE_DCD`](#depz_sh2_cmd_save_dcd), [`DEPZ_SH2_CMD_ME_CALIBRATE`](#depz_sh2_cmd_me_calibrate), [`DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG`](#depz_sh2_cmd_periodic_dcd_config), [`DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE`](#depz_sh2_cmd_get_oscillator_type), [`DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET`](#depz_sh2_cmd_clear_dcd_and_reset), [`DEPZ_BNO_FEATURE_WAKEUP`](#depz_bno_feature_wakeup), [`DEPZ_BNO_FEATURE_ALWAYS_ON`](#depz_bno_feature_always_on), [`DEPZ_BNO_TARE_X`](#depz_bno_tare_x), [`DEPZ_BNO_TARE_Y`](#depz_bno_tare_y), [`DEPZ_BNO_TARE_Z`](#depz_bno_tare_z), [`DEPZ_BNO_TARE_ALL`](#depz_bno_tare_all), [`DEPZ_BNO_TARE_BASIS_RV`](#depz_bno_tare_basis_rv), [`DEPZ_BNO_TARE_BASIS_GAME_RV`](#depz_bno_tare_basis_game_rv), [`DEPZ_BNO_TARE_BASIS_GEOMAG_RV`](#depz_bno_tare_basis_geomag_rv), [`DEPZ_BNO_TARE_BASIS_GYRO_RV`](#depz_bno_tare_basis_gyro_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_RV`](#depz_bno_tare_basis_arvr_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_GAME_RV`](#depz_bno_tare_basis_arvr_game_rv), [`DEPZ_BNO_OSC_INTERNAL`](#depz_bno_osc_internal), [`DEPZ_BNO_OSC_EXT_CRYSTAL`](#depz_bno_osc_ext_crystal), [`DEPZ_BNO_OSC_EXT_CLOCK`](#depz_bno_osc_ext_clock), [`DEPZ_BNO_ERR_SOURCE_NO_MORE`](#depz_bno_err_source_no_more), [`DEPZ_BNO_FRS_STATIC_CALIBRATION_AGM`](#depz_bno_frs_static_calibration_agm), [`DEPZ_BNO_FRS_NOMINAL_CALIBRATION`](#depz_bno_frs_nominal_calibration), [`DEPZ_BNO_FRS_DYNAMIC_CALIBRATION`](#depz_bno_frs_dynamic_calibration), [`DEPZ_BNO_FRS_ME_POWER_MGMT`](#depz_bno_frs_me_power_mgmt), [`DEPZ_BNO_FRS_SYSTEM_ORIENTATION`](#depz_bno_frs_system_orientation), [`DEPZ_BNO_FRS_ACCEL_ORIENTATION`](#depz_bno_frs_accel_orientation), [`DEPZ_BNO_FRS_GYROSCOPE_ORIENTATION`](#depz_bno_frs_gyroscope_orientation), [`DEPZ_BNO_FRS_MAGNETOMETER_ORIENTATION`](#depz_bno_frs_magnetometer_orientation), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_RV`](#depz_bno_frs_arvr_stabilization_rv), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_GRV`](#depz_bno_frs_arvr_stabilization_grv), [`DEPZ_BNO_FRS_SIG_MOTION_DETECT_CONFIG`](#depz_bno_frs_sig_motion_detect_config), [`DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG`](#depz_bno_frs_shake_detect_config), [`DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG`](#depz_bno_frs_stability_detector_config), [`DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG`](#depz_bno_frs_activity_tracker_config), [`DEPZ_BNO_FRS_READ_NO_ERROR`](#depz_bno_frs_read_no_error), [`DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE`](#depz_bno_frs_read_unrecognized_type), [`DEPZ_BNO_FRS_READ_BUSY`](#depz_bno_frs_read_busy), [`DEPZ_BNO_FRS_READ_COMPLETED`](#depz_bno_frs_read_completed), [`DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE`](#depz_bno_frs_read_offset_out_of_range), [`DEPZ_BNO_FRS_READ_RECORD_EMPTY`](#depz_bno_frs_read_record_empty), [`DEPZ_BNO_FRS_READ_BLOCK_COMPLETED`](#depz_bno_frs_read_block_completed), [`DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED`](#depz_bno_frs_read_block_and_read_completed), [`DEPZ_BNO_FRS_READ_DEVICE_ERROR`](#depz_bno_frs_read_device_error), [`DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED`](#depz_bno_frs_write_words_received), [`DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE`](#depz_bno_frs_write_unrecognized_type), [`DEPZ_BNO_FRS_WRITE_BUSY`](#depz_bno_frs_write_busy), [`DEPZ_BNO_FRS_WRITE_COMPLETED`](#depz_bno_frs_write_completed), [`DEPZ_BNO_FRS_WRITE_MODE_READY`](#depz_bno_frs_write_mode_ready), [`DEPZ_BNO_FRS_WRITE_FAILED`](#depz_bno_frs_write_failed), [`DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE`](#depz_bno_frs_write_not_in_write_mode), [`DEPZ_BNO_FRS_WRITE_INVALID_LENGTH`](#depz_bno_frs_write_invalid_length), [`DEPZ_BNO_FRS_WRITE_RECORD_VALID`](#depz_bno_frs_write_record_valid), [`DEPZ_BNO_FRS_WRITE_RECORD_INVALID`](#depz_bno_frs_write_record_invalid), [`depz_bno_feature`](#depz_bno_feature), [`depz_bno_product_id`](#depz_bno_product_id), [`depz_bno_command_response`](#depz_bno_command_response), [`depz_bno_frs_read_response`](#depz_bno_frs_read_response), [`depz_bno_frs_write_response`](#depz_bno_frs_write_response), [`depz_bno_unpack_feature_response`](#depz_bno_unpack_feature_response), [`depz_bno_unpack_product_id`](#depz_bno_unpack_product_id), [`depz_bno_unpack_command_response`](#depz_bno_unpack_command_response), [`depz_bno_unpack_frs_read_response`](#depz_bno_unpack_frs_read_response), [`depz_bno_unpack_frs_write_response`](#depz_bno_unpack_frs_write_response), [`depz_bno_control_report_len`](#depz_bno_control_report_len), [`depz_bno_metadata`](#depz_bno_metadata), [`depz_bno_metadata_from_words`](#depz_bno_metadata_from_words), [`depz_bno_metadata_record`](#depz_bno_metadata_record), [`DEPZ_BNO_BASE_TIMESTAMP_REF`](#depz_bno_base_timestamp_ref), [`DEPZ_BNO_TIMESTAMP_REBASE`](#depz_bno_timestamp_rebase), [`depz_bno_report_type`](#depz_bno_report_type), [`depz_bno_report_type_str`](#depz_bno_report_type_str), [`depz_bno_report`](#depz_bno_report), [`depz_bno_parse_input_cargo`](#depz_bno_parse_input_cargo), [`depz_bno_parse_gyro_rv`](#depz_bno_parse_gyro_rv), [`DEPZ_BNO_RV_ACCURACY_Q`](#depz_bno_rv_accuracy_q), [`DEPZ_BNO_GYRO_RV_ANGVEL_Q`](#depz_bno_gyro_rv_angvel_q), [`depz_bno_q_point`](#depz_bno_q_point), [`depz_bno_report_xyz`](#depz_bno_report_xyz), [`depz_bno_report_bias`](#depz_bno_report_bias), [`depz_bno_report_quaternion`](#depz_bno_report_quaternion), [`depz_bno_report_accuracy_rad`](#depz_bno_report_accuracy_rad), [`depz_bno_report_angular_velocity`](#depz_bno_report_angular_velocity), [`depz_bno_report_scalar`](#depz_bno_report_scalar)
+- **BNO086 (IMU)**: [`DEPZ_BNO086_CMD_SENSOR_RESET`](#depz_bno086_cmd_sensor_reset), [`DEPZ_BNO086_CMD_SENSOR_WAKE_UP`](#depz_bno086_cmd_sensor_wake_up), [`DEPZ_BNO086_CMD_SEND_SHTP_PACKET`](#depz_bno086_cmd_send_shtp_packet), [`DEPZ_BNO086_RPT_DATA`](#depz_bno086_rpt_data), [`depz_bno086_unpack_data`](#depz_bno086_unpack_data), [`DEPZ_SHTP_HEADER_SIZE`](#depz_shtp_header_size), [`DEPZ_SHTP_LENGTH_MASK`](#depz_shtp_length_mask), [`DEPZ_SHTP_CONTINUATION`](#depz_shtp_continuation), [`DEPZ_SHTP_NUM_CHANNELS`](#depz_shtp_num_channels), [`DEPZ_SHTP_MAX_TX_FRAME`](#depz_shtp_max_tx_frame), [`depz_shtp_channel_id`](#depz_shtp_channel_id), [`DEPZ_SHTP_EXEC_RESET`](#depz_shtp_exec_reset), [`DEPZ_SHTP_EXEC_ON`](#depz_shtp_exec_on), [`DEPZ_SHTP_EXEC_SLEEP`](#depz_shtp_exec_sleep), [`depz_shtp_header`](#depz_shtp_header), [`depz_shtp_pack_header_checked`](#depz_shtp_pack_header_checked), [`depz_shtp_pack_header`](#depz_shtp_pack_header), [`depz_shtp_unpack_header`](#depz_shtp_unpack_header), [`depz_shtp_rx_channel`](#depz_shtp_rx_channel), [`depz_shtp_layer`](#depz_shtp_layer), [`depz_shtp_init`](#depz_shtp_init), [`depz_shtp_free`](#depz_shtp_free), [`depz_shtp_next_frame`](#depz_shtp_next_frame), [`depz_shtp_cargo`](#depz_shtp_cargo), [`depz_shtp_feed`](#depz_shtp_feed), [`depz_shtp_feed_ex`](#depz_shtp_feed_ex), [`depz_bno_pack_set_feature`](#depz_bno_pack_set_feature), [`depz_bno_pack_get_feature_request`](#depz_bno_pack_get_feature_request), [`depz_bno_pack_product_id_request`](#depz_bno_pack_product_id_request), [`depz_bno_pack_command_request`](#depz_bno_pack_command_request), [`depz_bno_pack_frs_read_request`](#depz_bno_pack_frs_read_request), [`depz_bno_pack_frs_write_request`](#depz_bno_pack_frs_write_request), [`depz_bno_pack_frs_write_data`](#depz_bno_pack_frs_write_data), [`DEPZ_BNO_SENSOR_ACCELEROMETER`](#depz_bno_sensor_accelerometer), [`DEPZ_BNO_SENSOR_GYROSCOPE`](#depz_bno_sensor_gyroscope), [`DEPZ_BNO_SENSOR_MAGNETOMETER`](#depz_bno_sensor_magnetometer), [`DEPZ_BNO_SENSOR_LINEAR_ACCELERATION`](#depz_bno_sensor_linear_acceleration), [`DEPZ_BNO_SENSOR_ROTATION_VECTOR`](#depz_bno_sensor_rotation_vector), [`DEPZ_BNO_SENSOR_GRAVITY`](#depz_bno_sensor_gravity), [`DEPZ_BNO_SENSOR_UNCALIBRATED_GYROSCOPE`](#depz_bno_sensor_uncalibrated_gyroscope), [`DEPZ_BNO_SENSOR_GAME_ROTATION_VECTOR`](#depz_bno_sensor_game_rotation_vector), [`DEPZ_BNO_SENSOR_GEOMAGNETIC_ROTATION_VECTOR`](#depz_bno_sensor_geomagnetic_rotation_vector), [`DEPZ_BNO_SENSOR_UNCALIBRATED_MAGNETOMETER`](#depz_bno_sensor_uncalibrated_magnetometer), [`DEPZ_BNO_SENSOR_TAP_DETECTOR`](#depz_bno_sensor_tap_detector), [`DEPZ_BNO_SENSOR_STEP_COUNTER`](#depz_bno_sensor_step_counter), [`DEPZ_BNO_SENSOR_SIGNIFICANT_MOTION`](#depz_bno_sensor_significant_motion), [`DEPZ_BNO_SENSOR_STABILITY_CLASSIFIER`](#depz_bno_sensor_stability_classifier), [`DEPZ_BNO_SENSOR_RAW_ACCELEROMETER`](#depz_bno_sensor_raw_accelerometer), [`DEPZ_BNO_SENSOR_RAW_GYROSCOPE`](#depz_bno_sensor_raw_gyroscope), [`DEPZ_BNO_SENSOR_RAW_MAGNETOMETER`](#depz_bno_sensor_raw_magnetometer), [`DEPZ_BNO_SENSOR_STEP_DETECTOR`](#depz_bno_sensor_step_detector), [`DEPZ_BNO_SENSOR_SHAKE_DETECTOR`](#depz_bno_sensor_shake_detector), [`DEPZ_BNO_SENSOR_FLIP_DETECTOR`](#depz_bno_sensor_flip_detector), [`DEPZ_BNO_SENSOR_PICKUP_DETECTOR`](#depz_bno_sensor_pickup_detector), [`DEPZ_BNO_SENSOR_STABILITY_DETECTOR`](#depz_bno_sensor_stability_detector), [`DEPZ_BNO_SENSOR_PERSONAL_ACTIVITY_CLASSIFIER`](#depz_bno_sensor_personal_activity_classifier), [`DEPZ_BNO_SENSOR_SLEEP_DETECTOR`](#depz_bno_sensor_sleep_detector), [`DEPZ_BNO_SENSOR_TILT_DETECTOR`](#depz_bno_sensor_tilt_detector), [`DEPZ_BNO_SENSOR_POCKET_DETECTOR`](#depz_bno_sensor_pocket_detector), [`DEPZ_BNO_SENSOR_CIRCLE_DETECTOR`](#depz_bno_sensor_circle_detector), [`DEPZ_BNO_SENSOR_HEART_RATE_MONITOR`](#depz_bno_sensor_heart_rate_monitor), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_RV`](#depz_bno_sensor_arvr_stabilized_rv), [`DEPZ_BNO_SENSOR_ARVR_STABILIZED_GAME_RV`](#depz_bno_sensor_arvr_stabilized_game_rv), [`DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV`](#depz_bno_sensor_gyro_integrated_rv), [`DEPZ_BNO_SENSOR_MOTION_REQUEST`](#depz_bno_sensor_motion_request), [`DEPZ_SH2_COMMAND_RESPONSE`](#depz_sh2_command_response), [`DEPZ_SH2_COMMAND_REQUEST`](#depz_sh2_command_request), [`DEPZ_SH2_FRS_READ_RESPONSE`](#depz_sh2_frs_read_response), [`DEPZ_SH2_FRS_READ_REQUEST`](#depz_sh2_frs_read_request), [`DEPZ_SH2_FRS_WRITE_RESPONSE`](#depz_sh2_frs_write_response), [`DEPZ_SH2_FRS_WRITE_DATA`](#depz_sh2_frs_write_data), [`DEPZ_SH2_FRS_WRITE_REQUEST`](#depz_sh2_frs_write_request), [`DEPZ_SH2_PRODUCT_ID_RESPONSE`](#depz_sh2_product_id_response), [`DEPZ_SH2_PRODUCT_ID_REQUEST`](#depz_sh2_product_id_request), [`DEPZ_SH2_GET_FEATURE_RESPONSE`](#depz_sh2_get_feature_response), [`DEPZ_SH2_SET_FEATURE_COMMAND`](#depz_sh2_set_feature_command), [`DEPZ_SH2_GET_FEATURE_REQUEST`](#depz_sh2_get_feature_request), [`DEPZ_SH2_CMD_ERRORS`](#depz_sh2_cmd_errors), [`DEPZ_SH2_CMD_COUNTER`](#depz_sh2_cmd_counter), [`DEPZ_SH2_CMD_TARE`](#depz_sh2_cmd_tare), [`DEPZ_SH2_CMD_INITIALIZE`](#depz_sh2_cmd_initialize), [`DEPZ_SH2_CMD_SAVE_DCD`](#depz_sh2_cmd_save_dcd), [`DEPZ_SH2_CMD_ME_CALIBRATE`](#depz_sh2_cmd_me_calibrate), [`DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG`](#depz_sh2_cmd_periodic_dcd_config), [`DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE`](#depz_sh2_cmd_get_oscillator_type), [`DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET`](#depz_sh2_cmd_clear_dcd_and_reset), [`DEPZ_BNO_FEATURE_WAKEUP`](#depz_bno_feature_wakeup), [`DEPZ_BNO_FEATURE_ALWAYS_ON`](#depz_bno_feature_always_on), [`DEPZ_BNO_TARE_X`](#depz_bno_tare_x), [`DEPZ_BNO_TARE_Y`](#depz_bno_tare_y), [`DEPZ_BNO_TARE_Z`](#depz_bno_tare_z), [`DEPZ_BNO_TARE_ALL`](#depz_bno_tare_all), [`DEPZ_BNO_TARE_BASIS_RV`](#depz_bno_tare_basis_rv), [`DEPZ_BNO_TARE_BASIS_GAME_RV`](#depz_bno_tare_basis_game_rv), [`DEPZ_BNO_TARE_BASIS_GEOMAG_RV`](#depz_bno_tare_basis_geomag_rv), [`DEPZ_BNO_TARE_BASIS_GYRO_RV`](#depz_bno_tare_basis_gyro_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_RV`](#depz_bno_tare_basis_arvr_rv), [`DEPZ_BNO_TARE_BASIS_ARVR_GAME_RV`](#depz_bno_tare_basis_arvr_game_rv), [`DEPZ_BNO_OSC_INTERNAL`](#depz_bno_osc_internal), [`DEPZ_BNO_OSC_EXT_CRYSTAL`](#depz_bno_osc_ext_crystal), [`DEPZ_BNO_OSC_EXT_CLOCK`](#depz_bno_osc_ext_clock), [`DEPZ_BNO_ERR_SOURCE_NO_MORE`](#depz_bno_err_source_no_more), [`DEPZ_BNO_FRS_STATIC_CALIBRATION_AGM`](#depz_bno_frs_static_calibration_agm), [`DEPZ_BNO_FRS_NOMINAL_CALIBRATION`](#depz_bno_frs_nominal_calibration), [`DEPZ_BNO_FRS_DYNAMIC_CALIBRATION`](#depz_bno_frs_dynamic_calibration), [`DEPZ_BNO_FRS_ME_POWER_MGMT`](#depz_bno_frs_me_power_mgmt), [`DEPZ_BNO_FRS_SYSTEM_ORIENTATION`](#depz_bno_frs_system_orientation), [`DEPZ_BNO_FRS_ACCEL_ORIENTATION`](#depz_bno_frs_accel_orientation), [`DEPZ_BNO_FRS_GYROSCOPE_ORIENTATION`](#depz_bno_frs_gyroscope_orientation), [`DEPZ_BNO_FRS_MAGNETOMETER_ORIENTATION`](#depz_bno_frs_magnetometer_orientation), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_RV`](#depz_bno_frs_arvr_stabilization_rv), [`DEPZ_BNO_FRS_ARVR_STABILIZATION_GRV`](#depz_bno_frs_arvr_stabilization_grv), [`DEPZ_BNO_FRS_SIG_MOTION_DETECT_CONFIG`](#depz_bno_frs_sig_motion_detect_config), [`DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG`](#depz_bno_frs_shake_detect_config), [`DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG`](#depz_bno_frs_stability_detector_config), [`DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG`](#depz_bno_frs_activity_tracker_config), [`DEPZ_BNO_FRS_READ_NO_ERROR`](#depz_bno_frs_read_no_error), [`DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE`](#depz_bno_frs_read_unrecognized_type), [`DEPZ_BNO_FRS_READ_BUSY`](#depz_bno_frs_read_busy), [`DEPZ_BNO_FRS_READ_COMPLETED`](#depz_bno_frs_read_completed), [`DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE`](#depz_bno_frs_read_offset_out_of_range), [`DEPZ_BNO_FRS_READ_RECORD_EMPTY`](#depz_bno_frs_read_record_empty), [`DEPZ_BNO_FRS_READ_BLOCK_COMPLETED`](#depz_bno_frs_read_block_completed), [`DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED`](#depz_bno_frs_read_block_and_read_completed), [`DEPZ_BNO_FRS_READ_DEVICE_ERROR`](#depz_bno_frs_read_device_error), [`DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED`](#depz_bno_frs_write_words_received), [`DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE`](#depz_bno_frs_write_unrecognized_type), [`DEPZ_BNO_FRS_WRITE_BUSY`](#depz_bno_frs_write_busy), [`DEPZ_BNO_FRS_WRITE_COMPLETED`](#depz_bno_frs_write_completed), [`DEPZ_BNO_FRS_WRITE_MODE_READY`](#depz_bno_frs_write_mode_ready), [`DEPZ_BNO_FRS_WRITE_FAILED`](#depz_bno_frs_write_failed), [`DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE`](#depz_bno_frs_write_not_in_write_mode), [`DEPZ_BNO_FRS_WRITE_INVALID_LENGTH`](#depz_bno_frs_write_invalid_length), [`DEPZ_BNO_FRS_WRITE_RECORD_VALID`](#depz_bno_frs_write_record_valid), [`DEPZ_BNO_FRS_WRITE_RECORD_INVALID`](#depz_bno_frs_write_record_invalid), [`depz_bno_feature`](#depz_bno_feature), [`depz_bno_product_id`](#depz_bno_product_id), [`depz_bno_command_response`](#depz_bno_command_response), [`depz_bno_frs_read_response`](#depz_bno_frs_read_response), [`depz_bno_frs_write_response`](#depz_bno_frs_write_response), [`depz_bno_unpack_feature_response`](#depz_bno_unpack_feature_response), [`depz_bno_unpack_product_id`](#depz_bno_unpack_product_id), [`depz_bno_unpack_command_response`](#depz_bno_unpack_command_response), [`depz_bno_unpack_frs_read_response`](#depz_bno_unpack_frs_read_response), [`depz_bno_unpack_frs_write_response`](#depz_bno_unpack_frs_write_response), [`depz_bno_control_report_len`](#depz_bno_control_report_len), [`depz_bno_metadata`](#depz_bno_metadata), [`depz_bno_metadata_from_words`](#depz_bno_metadata_from_words), [`depz_bno_metadata_record`](#depz_bno_metadata_record), [`DEPZ_BNO_BASE_TIMESTAMP_REF`](#depz_bno_base_timestamp_ref), [`DEPZ_BNO_TIMESTAMP_REBASE`](#depz_bno_timestamp_rebase), [`DEPZ_BNO_FLUSH_COMPLETED`](#depz_bno_flush_completed), [`depz_bno_report_type`](#depz_bno_report_type), [`depz_bno_report_type_str`](#depz_bno_report_type_str), [`depz_bno_report`](#depz_bno_report), [`depz_bno_parse_input_cargo`](#depz_bno_parse_input_cargo), [`depz_bno_parse_gyro_rv`](#depz_bno_parse_gyro_rv), [`DEPZ_BNO_RV_ACCURACY_Q`](#depz_bno_rv_accuracy_q), [`DEPZ_BNO_GYRO_RV_ANGVEL_Q`](#depz_bno_gyro_rv_angvel_q), [`depz_bno_q_point`](#depz_bno_q_point), [`depz_bno_report_xyz`](#depz_bno_report_xyz), [`depz_bno_report_bias`](#depz_bno_report_bias), [`depz_bno_report_quaternion`](#depz_bno_report_quaternion), [`depz_bno_report_accuracy_rad`](#depz_bno_report_accuracy_rad), [`depz_bno_report_angular_velocity`](#depz_bno_report_angular_velocity), [`depz_bno_report_scalar`](#depz_bno_report_scalar)
 - **BNO085 / BNO086 sensor class (live layer)**: [`DEPZ_BNO086_BUSY_RETRIES`](#depz_bno086_busy_retries), [`DEPZ_BNO086_BUSY_BACKOFF_MS`](#depz_bno086_busy_backoff_ms), [`DEPZ_BNO086_RATE_LOW_FACTOR`](#depz_bno086_rate_low_factor), [`DEPZ_BNO086_RATE_HIGH_FACTOR`](#depz_bno086_rate_high_factor), [`depz_bno086_feature_request`](#depz_bno086_feature_request), [`depz_bno086_calibration`](#depz_bno086_calibration), [`depz_bno086_error_record`](#depz_bno086_error_record), [`depz_bno086_counts`](#depz_bno086_counts), [`depz_bno086_report_cb`](#depz_bno086_report_cb), [`depz_bno086_open_link`](#depz_bno086_open_link), [`depz_is_bno086`](#depz_is_bno086), [`depz_bno086_hardware_reset`](#depz_bno086_hardware_reset), [`depz_bno086_wake`](#depz_bno086_wake), [`depz_bno086_sleep`](#depz_bno086_sleep), [`depz_bno086_power_on`](#depz_bno086_power_on), [`depz_bno086_advertisement`](#depz_bno086_advertisement), [`depz_bno086_product_id`](#depz_bno086_product_id), [`depz_bno086_product_ids`](#depz_bno086_product_ids), [`depz_bno086_enable`](#depz_bno086_enable), [`depz_bno086_enable_ex`](#depz_bno086_enable_ex), [`depz_bno086_rate_ok`](#depz_bno086_rate_ok), [`depz_bno086_disable`](#depz_bno086_disable), [`depz_bno086_get_feature`](#depz_bno086_get_feature), [`depz_bno086_on_report`](#depz_bno086_on_report), [`depz_bno086_off_report`](#depz_bno086_off_report), [`depz_bno086_reports`](#depz_bno086_reports), [`depz_bno086_get_report`](#depz_bno086_get_report), [`depz_bno086_shtp_discarded`](#depz_bno086_shtp_discarded), [`depz_bno086_tare_now`](#depz_bno086_tare_now), [`depz_bno086_persist_tare`](#depz_bno086_persist_tare), [`depz_bno086_set_reorientation`](#depz_bno086_set_reorientation), [`depz_bno086_set_calibration`](#depz_bno086_set_calibration), [`depz_bno086_get_calibration`](#depz_bno086_get_calibration), [`depz_bno086_save_dcd`](#depz_bno086_save_dcd), [`depz_bno086_configure_periodic_dcd`](#depz_bno086_configure_periodic_dcd), [`depz_bno086_frs_read`](#depz_bno086_frs_read), [`depz_bno086_frs_write`](#depz_bno086_frs_write), [`depz_bno086_get_metadata`](#depz_bno086_get_metadata), [`depz_bno086_get_oscillator_type`](#depz_bno086_get_oscillator_type), [`depz_bno086_clear_dcd_and_reset`](#depz_bno086_clear_dcd_and_reset), [`depz_bno086_get_errors`](#depz_bno086_get_errors), [`depz_bno086_get_counts`](#depz_bno086_get_counts), [`depz_bno086_clear_counts`](#depz_bno086_clear_counts), [`depz_bno086_command`](#depz_bno086_command), [`depz_bno086_send_shtp`](#depz_bno086_send_shtp)
 
 ## BNO086 (IMU)
@@ -136,6 +136,17 @@ typedef struct {
 } depz_shtp_header;
 ```
 
+### depz_shtp_pack_header_checked
+
+```c
+int depz_shtp_pack_header_checked(const depz_shtp_header *hdr, uint8_t out[4]);
+```
+
+Pack a header. `length` is a 15-bit field: depz_shtp_pack_header_checked
+returns -1 and writes nothing when it is > 0x7FFF (contract 07 §3), else 0.
+depz_shtp_pack_header (kept for compatibility) cannot report that and
+masks the length to 15 bits — prefer the checked form.
+
 ### depz_shtp_pack_header
 
 ```c
@@ -158,6 +169,7 @@ typedef struct {
     size_t   cap;
     uint8_t  seq;
     bool     active;
+    uint64_t capture_us;  /* capture of the fragment that started the cargo */
 } depz_shtp_rx_channel;
 ```
 
@@ -203,6 +215,7 @@ typedef struct {
     uint8_t  seq;         /* first fragment's seq */
     const uint8_t *payload;
     size_t   payload_len;
+    uint64_t capture_us;  /* first fragment's capture (contract 05 §3); 0 via depz_shtp_feed */
 } depz_shtp_cargo;
 ```
 
@@ -216,7 +229,18 @@ int depz_shtp_feed(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len, d
 
 Feed one inbound frame. Returns 1 when a cargo completes (fills *out, whose
 payload points into the channel buffer, valid until the next feed on that
-channel), 0 otherwise. Returns -1 on allocation failure.
+channel), 0 otherwise. Returns -1 on allocation failure. Same as
+depz_shtp_feed_ex with capture_us = 0.
+
+### depz_shtp_feed_ex
+
+```c
+int depz_shtp_feed_ex(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len, uint64_t capture_us, depz_shtp_cargo *out);
+```
+
+depz_shtp_feed with the frame's RPT_DATA capture time. The completed cargo
+carries the FIRST fragment's capture in out->capture_us — the base its 0xFB
+timestamps refer to (contract 05 §3, §5).
 
 ### depz_bno_pack_set_feature
 
@@ -248,7 +272,8 @@ PRODUCT_ID_REQUEST 0xF9, 2 B.
 size_t depz_bno_pack_command_request(uint8_t seq, uint8_t command, const uint8_t *params, size_t nparams, uint8_t out[12]);
 ```
 
-COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B).
+COMMAND_REQUEST 0xF2, 12 B (params zero-padded, up to 9 B). Returns 12, or
+0 (nothing written) when nparams > 9.
 
 ### depz_bno_pack_frs_read_request
 
@@ -272,7 +297,9 @@ FRS_WRITE_REQUEST 0xF7, 6 B.
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words, size_t nwords, uint8_t *out, size_t out_cap);
 ```
 
-FRS_WRITE_DATA 0xF6, 4 + 4*nwords B. Returns 0 on capacity error.
+FRS_WRITE_DATA 0xF6, always 12 B (contract 05 §6): `nwords` is 1 or 2, and
+a single word is followed by a zero word1. Returns 12, or 0 when nwords is
+not 1 or 2 or out_cap < 12.
 
 ### DEPZ_BNO_SENSOR_ACCELEROMETER
 
@@ -462,6 +489,14 @@ SH-2 sensor ids (the input report ids) — what Set Feature takes, and the
 ```c
 #define DEPZ_BNO_SENSOR_GYRO_INTEGRATED_RV       0x2Au
 ```
+
+### DEPZ_BNO_SENSOR_MOTION_REQUEST
+
+```c
+#define DEPZ_BNO_SENSOR_MOTION_REQUEST           0x2Bu
+```
+
+interactive calibration, BNO086 only
 
 ### DEPZ_SH2_COMMAND_RESPONSE
 
@@ -1056,6 +1091,14 @@ The metadata FRS record of a sensor id, 0 when none is known.
 #define DEPZ_BNO_TIMESTAMP_REBASE   0xFA
 ```
 
+### DEPZ_BNO_FLUSH_COMPLETED
+
+```c
+#define DEPZ_BNO_FLUSH_COMPLETED    0xEF
+```
+
++ u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0)
+
 ### depz_bno_report_type
 
 ```c
@@ -1077,7 +1120,9 @@ typedef enum {
     DEPZ_BNO_RAW_SENSOR,
     DEPZ_BNO_GENERIC_EVENT,
     DEPZ_BNO_GYRO_INTEGRATED_RV,
-    DEPZ_BNO_UNKNOWN_REPORT
+    DEPZ_BNO_UNKNOWN_REPORT,
+    DEPZ_BNO_MOTION_REQUEST,   /* 0x2B: intent, request */
+    DEPZ_BNO_FLUSH_COMPLETED_REPORT /* 0xEF: flushed_sensor; no seq/accuracy/delay */
 } depz_bno_report_type;
 ```
 
@@ -1096,7 +1141,8 @@ typedef struct {
     depz_bno_report_type type;
     uint8_t  sensor_id;
     int64_t  timestamp_us;    /* capture - base_delta*100 + delay*100 */
-    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT) */
+    /* channel-3/4 header (absent for GYRO_INTEGRATED_RV / UNKNOWN_REPORT /
+     * FLUSH_COMPLETED_REPORT) */
     uint8_t  seq;
     uint8_t  accuracy;
     int32_t  delay_us;
@@ -1120,6 +1166,12 @@ typedef struct {
     bool     end_of_sequence;
     int32_t  most_likely_state;
     uint8_t  confidences[10];
+    /* motion request (0x2B): the motion intent the hub was last told and what
+     * it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still) */
+    int32_t  intent;
+    int32_t  request;
+    /* flush completed (0xEF): the sensor whose batched reports are all sent */
+    int32_t  flushed_sensor;
     /* raw sensor */
     uint32_t sensor_timestamp_us;
     int32_t  temperature_raw;
@@ -1142,8 +1194,9 @@ size_t depz_bno_parse_input_cargo(const uint8_t *payload, size_t len, uint64_t c
 
 Parse a channel-3/4 input cargo into typed reports. `capture_timestamp_us`
 is the bridge RPT_DATA capture time. Writes up to `cap` reports into `out`,
-returns the count. Handles 0xFB base and 0xFA rebase; an unknown report id
-stops the parse (last entry is UNKNOWN_REPORT).
+returns the count. Handles 0xFB base and 0xFA rebase, and a bare 0xEF
+Flush Completed (2 bytes, timestamp = the current base); an unknown report
+id stops the parse (last entry is UNKNOWN_REPORT).
 
 ### depz_bno_parse_gyro_rv
 

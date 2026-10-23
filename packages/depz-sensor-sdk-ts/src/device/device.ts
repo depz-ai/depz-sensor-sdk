@@ -24,6 +24,7 @@ import {
   Rpt,
   Status,
   UNSOLICITED,
+  checkSyncPin,
   packSyncPinConfig,
   packSyncTime,
   syncTimeOffsetRtt,
@@ -145,14 +146,14 @@ export class StreamQueue<T> implements AsyncIterableIterator<T> {
     }
   }
 
-  next(): Promise<IteratorResult<T>> {
+  async next(): Promise<IteratorResult<T>> {
     const item = this.buf.shift();
     if (item !== undefined) return Promise.resolve({ value: item, done: false });
     if (this.closed) return Promise.resolve({ value: undefined, done: true });
     return new Promise((resolve) => this.waiters.push(resolve));
   }
 
-  return(): Promise<IteratorResult<T>> {
+  async return(): Promise<IteratorResult<T>> {
     this.close();
     this.onDone?.();
     return Promise.resolve({ value: undefined, done: true });
@@ -168,6 +169,28 @@ export class StreamQueue<T> implements AsyncIterableIterator<T> {
 export interface DeviceOptions {
   timeoutMs?: number;
   txCrcType?: CrcType;
+  /**
+   * @internal Continue on this already-started link instead of creating one
+   * (the hand-over of `attachSensorClass`, contract 02 §4.4). Not for apps.
+   */
+  [ADOPT_LINK]?: DepzLink;
+}
+
+/**
+ * @internal Key of the hand-over option: a constructor given
+ * `{ [ADOPT_LINK]: link }` continues on that (started) link — same transport,
+ * same read pump, host sequence numbers running on — and its `open()` is a
+ * no-op. Produced only by `DepzDevice[HAND_OVER]()`.
+ */
+export const ADOPT_LINK: unique symbol = Symbol("depz.adoptLink");
+
+/** @internal Key of the method that detaches a device's link for hand-over. */
+export const HAND_OVER: unique symbol = Symbol("depz.handOver");
+
+/** What a device hands over: its started link and the transport under it. */
+export interface HandedOverConnection {
+  link: DepzLink;
+  transport: SerialTransport;
 }
 
 /**
@@ -185,26 +208,57 @@ export class DepzDevice {
   private timeSyncState: TimeSync | null = null;
   private closing = false;
   private torndown = false;
+  private handedOver = false;
+  private readonly unsubLink: Array<() => void>;
 
   constructor(transport: SerialTransport, opts?: DeviceOptions) {
     this.transport = transport;
     this.timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.link = new DepzLink(transport, { txCrcType: opts?.txCrcType ?? CrcType.None });
-    this.link.onParserEvent((ev) => this.handleParserEvent(ev));
-    this.link.onClose(() => this.handleLinkClosed());
+    this.link = opts?.[ADOPT_LINK] ?? new DepzLink(transport, { txCrcType: opts?.txCrcType ?? CrcType.None });
+    this.unsubLink = [
+      this.link.onParserEvent((ev) => this.handleParserEvent(ev)),
+      this.link.onClose(() => this.handleLinkClosed()),
+    ];
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
 
-  /** Open the transport and start the read pump. */
+  /**
+   * Open the transport and start the read pump. A no-op on a device that
+   * continues an adopted connection (`attachSensorClass`) — already open.
+   */
   async open(): Promise<void> {
+    if (this.link.isStarted) return;
     await this.transport.open();
     this.link.start();
   }
 
+  /** Close the connection. A device that handed its connection over owns none. */
   async close(): Promise<void> {
+    if (this.handedOver) return;
     this.closing = true;
     await this.link.close();
+  }
+
+  /**
+   * @internal Detach this device from its open connection so another device
+   * object can continue on it (`attachSensorClass`, contract 02 §4.4). Must
+   * be called with nothing in flight and no stream open; afterwards this
+   * object sends nothing and its `close()` is a no-op. The caller constructs
+   * the successor with `{ [ADOPT_LINK]: link }` in the same synchronous turn,
+   * so no received byte goes to nobody.
+   */
+  [HAND_OVER](): HandedOverConnection {
+    if (this.handedOver) throw new DepzError("connection already handed over");
+    if (!this.link.isStarted || this.torndown || this.closing) {
+      throw new DepzError("hand-over needs an open connection");
+    }
+    if (this.pending.size > 0 || this.streams.length > 0) {
+      throw new DepzError("hand-over with a request in flight or a stream open");
+    }
+    for (const unsub of this.unsubLink) unsub();
+    this.handedOver = true;
+    return { link: this.link, transport: this.transport };
   }
 
   get stats(): LinkStats {
@@ -396,6 +450,7 @@ export class DepzDevice {
     if (matcher === undefined && !okCompletes) {
       throw new DepzError("configure matcher or okCompletes");
     }
+    if (this.handedOver) throw new LinkClosedError("connection handed over to another device object");
     if (this.pending.has(cmd)) throw new BusyError(cmd);
     const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
     const result = new Promise<T>((resolve, reject) => {
@@ -446,19 +501,19 @@ export class DepzDevice {
 
   // ── common commands (contract 02) ──────────────────────────────────────────
 
-  getDeviceName(): Promise<string> {
+  async getDeviceName(): Promise<string> {
     return this.request(Cmd.GetDeviceName, undefined, {
       matcher: DepzDevice.expectText(Cmd.GetDeviceName),
     });
   }
 
-  getSoftwareName(): Promise<string> {
+  async getSoftwareName(): Promise<string> {
     return this.request(Cmd.GetNameActiveSoftware, undefined, {
       matcher: DepzDevice.expectText(Cmd.GetNameActiveSoftware),
     });
   }
 
-  getSerialNumber(): Promise<string> {
+  async getSerialNumber(): Promise<string> {
     return this.request(Cmd.GetSerial, undefined, {
       matcher: DepzDevice.expectText(Cmd.GetSerial),
     });
@@ -516,8 +571,8 @@ export class DepzDevice {
     await this.request(Cmd.SetPayloadCrcType, Uint8Array.of(crcType), { okCompletes: true });
   }
 
-  getSyncPin(pin: number): Promise<SyncPinConfig> {
-    return this.request(Cmd.GetSyncPinConfig, Uint8Array.of(pin), {
+  async getSyncPin(pin: number): Promise<SyncPinConfig> {
+    return this.request(Cmd.GetSyncPinConfig, Uint8Array.of(checkSyncPin(pin)), {
       matcher: DepzDevice.expectReport(Rpt.SyncPinConfig, unpackSyncPinConfig),
     });
   }

@@ -18,6 +18,8 @@ import math
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
+from ..protocol._wire import check_uint
+
 ULD_VERSION = (2, 2, 3, 0)
 
 # ── Registers (VL53L4CD_api.h) ───────────────────────────────────────────────
@@ -124,6 +126,14 @@ class Vl53l4cdError(RuntimeError):
     pass
 
 
+def _in_range(name: str, v: int, lo: int, hi: int) -> int:
+    """`v` when it is an integer in lo..hi, else Vl53l4cdError (contract 07 §3:
+    never wrap)."""
+    if not isinstance(v, int) or not lo <= v <= hi:
+        raise Vl53l4cdError(f"{name} {v} out of range {lo}..{hi}")
+    return v
+
+
 class Vl53l4Platform(Protocol):
     """What the ULD needs from the register bridge."""
 
@@ -208,6 +218,11 @@ def range_timing_registers(
         raise Vl53l4cdError("osc_frequency reads 0")
     if not 10 <= timing_budget_ms <= 200:
         raise Vl53l4cdError("timing_budget_ms must be 10..200")
+    # Register words (u16) and the u32 period: out of range is refused, never wrapped.
+    _in_range("osc_frequency", osc_frequency, 1, 0xFFFF)
+    _in_range("clock_pll", clock_pll, 0, 0xFFFF)
+    _in_range("timing_budget_ms", timing_budget_ms, 10, 200)
+    _in_range("inter_measurement_ms", inter_measurement_ms, 0, 0xFFFFFFFF)
 
     timing_budget_us = timing_budget_ms * 1000
     macro_period_us = ((2304 * (0x40000000 // osc_frequency)) & 0xFFFFFFFF) >> 6
@@ -218,6 +233,10 @@ def range_timing_registers(
     elif inter_measurement_ms > timing_budget_ms:  # autonomous low power
         factor = 1.055 * inter_measurement_ms * (clock_pll & 0x3FF)
         intermeasurement_raw = int(factor)
+        if intermeasurement_raw > 0xFFFFFFFF:
+            raise Vl53l4cdError(
+                f"inter_measurement_ms {inter_measurement_ms}: INTERMEASUREMENT_MS overflows u32"
+            )
         timing_budget_us = (timing_budget_us - 4300) // 2
     else:
         raise Vl53l4cdError("inter_measurement_ms must be 0 or > timing_budget_ms")
@@ -226,6 +245,10 @@ def range_timing_registers(
     words = []
     for mult in (16, 12):  # RANGE_CONFIG_A, RANGE_CONFIG_B
         tmp = ((macro_period_us * mult) & 0xFFFFFFFF) >> 6
+        # the reference divides by tmp: an osc_frequency whose macro period
+        # truncates to 0 is refused, not divided by
+        if tmp == 0:
+            raise Vl53l4cdError(f"osc_frequency {osc_frequency}: macro period truncates to 0")
         ls_byte = ((timing_budget_us + (tmp >> 1)) // tmp) - 1
         ms_byte = 0
         while ls_byte & 0xFFFFFF00:
@@ -246,6 +269,11 @@ def decode_range_timing(
     Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
     RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
     word."""
+    # Raw register reads: a dword and three words (contract 07 §3).
+    check_uint("intermeasurement_raw", intermeasurement_raw, 32)
+    check_uint("clock_pll", clock_pll, 16)
+    check_uint("osc_frequency", osc_frequency, 16)
+    check_uint("range_config_a", range_config_a, 16)
     if osc_frequency == 0:
         raise Vl53l4cdError("osc_frequency reads 0")
 
@@ -270,18 +298,20 @@ def decode_range_timing(
 
 def offset_raw(offset_mm: int) -> int:
     """RANGE_OFFSET_MM word for SetOffset (INNER/OUTER are zeroed alongside)."""
-    return (offset_mm * 4) & 0xFFFF
+    # 11-bit signed mm (decode_offset's range); & 0xFFFF is the two's complement of a negative value
+    return (_in_range("offset_mm", offset_mm, -1024, 1023) * 4) & 0xFFFF
 
 
 def decode_offset(raw_word: int) -> int:
     """GetOffset: RANGE_OFFSET_MM word → signed millimetres."""
+    _in_range("raw_word", raw_word, 0, 0xFFFF)
     temp = ((raw_word << 3) & 0xFFFF) >> 5
     return temp - 2048 if temp > 1024 else temp
 
 
 def xtalk_raw(xtalk_kcps: int) -> int:
     """XTALK_PLANE_OFFSET_KCPS word for SetXtalk."""
-    return (xtalk_kcps << 9) & 0xFFFF
+    return _in_range("xtalk_kcps", xtalk_kcps, 0, 0xFFFF >> 9) << 9
 
 
 def round_half_away(x: float) -> int:
@@ -297,24 +327,28 @@ def round_half_away(x: float) -> int:
 
 def decode_xtalk(raw_word: int) -> int:
     """GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps."""
+    _in_range("raw_word", raw_word, 0, 0xFFFF)
     return round_half_away(raw_word / 512.0)
 
 
 def signal_threshold_raw(signal_kcps: int) -> int:
-    return signal_kcps >> 3
+    return _in_range("signal_kcps", signal_kcps, 0, 0xFFFF) >> 3
 
 
 def decode_signal_threshold(raw_word: int) -> int:
+    _in_range("raw_word", raw_word, 0, 0xFFFF)
     return (raw_word << 3) & 0xFFFF
 
 
 def sigma_threshold_raw(sigma_mm: int) -> int:
     if sigma_mm > (0xFFFF >> 2):
         raise Vl53l4cdError("sigma_mm must be <= 16383")
+    _in_range("sigma_mm", sigma_mm, 0, 0xFFFF >> 2)
     return sigma_mm << 2
 
 
 def decode_sigma_threshold(raw_word: int) -> int:
+    _in_range("raw_word", raw_word, 0, 0xFFFF)
     return raw_word >> 2
 
 

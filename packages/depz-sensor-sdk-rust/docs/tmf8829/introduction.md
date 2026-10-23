@@ -31,8 +31,10 @@ is simpler; for 8×8 with CNH histograms see the
 
 ## What this crate offers
 
-The [`tmf8829`](api.md) module is the verifiable **codec and decode layer** —
-everything except talking to a port:
+`devices::Tmf8829Device` is the **live device**: `init()` (firmware
+download), `configure()`, `start()` / `stop()`, measurements as a stream —
+see the [guide](guide.md#live-device). Under it, the [`tmf8829`](api.md)
+module is the verifiable **codec and decode layer**:
 
 - the bridge wire codecs — `TMF_READ_REG`, `TMF_WRITE_REG`,
   `TMF_START_STREAM` / `TMF_STOP_STREAM`, `TMF_GET_INFO` payloads
@@ -54,11 +56,9 @@ everything except talking to a port:
 - the embedded **sensor firmware image** ([`FIRMWARE_IMAGE`](api.md#firmware_image),
   14 444 B) with its MIT license text.
 
-What it does **not** do: open a port or run the sensor. There is **no live
-device class** in this crate — no `init()`, `configure()`, `start()`. The init
-sequence (soft reset, bootloader, firmware download), configuration and
-start/stop are register writes you send yourself (contract 14 §4 lists them);
-the Python, TypeScript, C and C++ SDKs ship them as a ready driver.
+The crate does not open a serial port itself: the device runs on any byte
+pipe you hand it (a port opened with the crate of your choice, a socket, a
+`.depzrec` replay).
 
 ## Key concepts
 
@@ -87,6 +87,7 @@ the Python, TypeScript, C and C++ SDKs ship them as a ready driver.
 
 ## See also
 
-- [TMF8829 user guide](guide.md) — commands, reassembly, frame decode,
-  measurements, capture time, config page, firmware image, gotchas.
-- [API reference](api.md) — the `tmf8829` module.
+- [TMF8829 user guide](guide.md) — the live device, commands, reassembly,
+  frame decode, measurements, capture time, config page, firmware image,
+  gotchas.
+- [API reference](api.md) — `Tmf8829Device` and the `tmf8829` module.

@@ -6,6 +6,7 @@
  */
 
 import { crc8Maxim, crc16Modbus, crc32IsoHdlc } from "./crc.js";
+import { checkUint } from "./wire.js";
 
 export const MAGIC0 = 0xa5;
 export const MAGIC1 = 0xc3;
@@ -51,6 +52,11 @@ export function buildPacket(
   if (payload.length > MAX_PAYLOAD) {
     throw new RangeError(`payload too long: ${payload.length} > ${MAX_PAYLOAD}`);
   }
+  checkUint("cmd", cmd, 8);
+  // `seq` is a free-running u32 counter, taken modulo 256 on the wire (vector
+  // seq_wraps_modulo_256); a negative or fractional one is invalid.
+  checkUint("seq", seq, 32);
+  if (CRC_SIZES[crcType] === undefined) throw new RangeError(`crcType: ${crcType} is not a CrcType`);
   const trailer = payloadCrcBytes(crcType, payload);
   const out = new Uint8Array(HEADER_SIZE + payload.length + trailer.length);
   const dataSize = payload.length | (crcType << 14);

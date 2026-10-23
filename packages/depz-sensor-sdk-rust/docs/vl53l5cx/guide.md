@@ -5,8 +5,10 @@ same board commands, same 1536-byte transfer ceilings, same frame decode with
 `Variant::L7`. Everything in the VL53L7CX guide applies unchanged; this page
 shows the two L5 specifics. For signatures see the [API reference](api.md).
 
-This crate does not drive the board: initialising and streaming is done with
-the Python or TypeScript SDK.
+The live device is `devices::Vl53l5cxDevice`: it derefs to
+`Vl53l7cxDevice` (the board commands) and on to `Vl53l8cxDevice` (init,
+configuration, ranging — see the [VL53L8CX guide](../vl53l8cx/guide.md#live-device)).
+After `init`, `module_type()` is `Some(MODULE_TYPE_MZ)` on an L5.
 
 ## Resolve the class
 

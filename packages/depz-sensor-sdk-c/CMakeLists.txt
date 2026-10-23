@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.6.0 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.7.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -200,6 +200,18 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   target_include_directories(test_vectors PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(test_vectors PRIVATE
     DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
+  if(DEPZ_SENSOR_SDK_C_BUILD_IO)
+    target_compile_definitions(test_vectors PRIVATE DEPZ_VECTORS_HAS_IO=1)
+  endif()
+
+  # Contract 16 differential-testing adapter: a JSON-lines process the driver
+  # (scripts/difftest.py) builds and starts. Not part of `all`.
+  add_executable(difftest_adapter EXCLUDE_FROM_ALL tests/difftest_adapter.c tests/json.c)
+  target_link_libraries(difftest_adapter PRIVATE depz_sensor_sdk_c)
+  target_include_directories(difftest_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+  if(DEPZ_SENSOR_SDK_C_BUILD_IO)
+    target_compile_definitions(difftest_adapter PRIVATE DEPZ_DIFFTEST_HAS_IO=1)
+  endif()
 
   # One CTest per consumed vector / replay target: the transport+protocol
   # foundation (8) plus the sensor-decode layer (7) across the five sensors
@@ -219,17 +231,37 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   # measurements, config page, firmware; tmf8829_frame_time = the clock model
   # and capture time over 27 recorded streams.
   foreach(stem
-      crc usb_ids identity common_commands sr04 framing_encode framing_decode fwdepz
+      crc usb_ids identity probe common_commands sr04 framing_encode framing_decode fwdepz
       vl53l8_advanced vl53l4 bno086_shtp bno086_reports vl53l8_replay vl53l8_cnh
       dataset vl53l7 vl53lx bno055 tmf8829 tmf8829_frame_time)
     add_test(NAME vec_${stem} COMMAND test_vectors ${stem})
   endforeach()
   # The live-hardware layer against a fake SR04 over loopback (no device).
   if(DEPZ_SENSOR_SDK_C_BUILD_IO)
-    add_executable(test_io tests/test_io.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/fake_tmf8829.c tests/json.c)
+    # Contract 15 device scenarios run inside test_io (one CTest each, and all
+    # of them in a bare `test_io` run, which the sanitizer jobs use).
+    set(DEPZ_SCENARIOS_DIR "${DEPZ_VECTORS_DIR}/../scenarios")
+    file(GLOB _depz_scenarios CONFIGURE_DEPENDS "${DEPZ_SCENARIOS_DIR}/*.json")
+    set(_depz_scenario_ids "")
+    foreach(_f ${_depz_scenarios})
+      get_filename_component(_n "${_f}" NAME)
+      string(REGEX REPLACE "\\.json$" "" _id "${_n}")
+      list(APPEND _depz_scenario_ids "${_id}")
+    endforeach()
+    set(_ids_h "")
+    foreach(_id ${_depz_scenario_ids})
+      string(APPEND _ids_h "    \"${_id}\",\n")
+    endforeach()
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h.in" "${_ids_h}")
+    configure_file("${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h.in" "${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h" COPYONLY)
+    add_executable(test_io tests/test_io.c tests/scenarios.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/fake_tmf8829.c tests/json.c)
     target_link_libraries(test_io PRIVATE depz_sensor_sdk_c)
-    target_include_directories(test_io PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-    target_compile_definitions(test_io PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
+    target_include_directories(test_io PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR})
+    target_compile_definitions(test_io PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}"
+                               DEPZ_SCENARIOS_DIR="${DEPZ_SCENARIOS_DIR}")
+    foreach(_id ${_depz_scenario_ids})
+      add_test(NAME scenario_${_id} COMMAND test_io scenario:${_id})
+    endforeach()
     foreach(t
         identity_roundtrip temperature sync_time_produces_offset
         unknown_cmd_raises_status_error sync_pin_validation timeout_when_device_silent
@@ -238,19 +270,11 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         measure_once_busy_during_loop no_echo_timeout_sentinel temperature_compensated_distance
         stream_drop_oldest_counter two_independent_streams sync_in_single_shot_reaches_stream
         events_and_disconnect same_opcode_in_flight_is_busy record_then_replay
-        sr04_session_replay
         l4_init_boot_speed_then_retimes l4_init_at_400_never_retimes l4_init_config_block_and_vhv
         l4_range_timing_roundtrip_and_bounds l4_tuning_roundtrips l4_is_alive_checks_model_id
         l4_config_refused_while_ranging l4_stream_decodes_and_counts_short_blocks
-        l4_measure_once_polls_and_stops l4_session_replay
-        l8_guards_and_cnh_math l8cx_replay l8ch_replay l8ch_cnh_replay
-        l5cx_replay l5cx_4x4_replay l7ch_replay l7ch_cnh_replay
-        bno_imu_replay bno_ndof_replay
-        bno086_session_replay bno086_features bno086_busy_retry bno086_reports bno086_commands
-        bno086_frs bno086_codecs tmf8829_fake_session
-        vlx_l4cd_uld_replay vlx_l1cx_uld_replay vlx_l1cb_uld_replay vlx_l3cx_ulp_replay
-        vlx_l0x_uld_replay vlx_l4cx_hist_medium_replay vlx_l4cx_hist_short_replay
-        vlx_l1cx_hist_replay vlx_l1cb_hist_replay vlx_l3cx_hist_replay)
+        l4_measure_once_polls_and_stops l8_guards_and_cnh_math bno086_features bno086_busy_retry bno086_reports bno086_cargo_capture bno086_commands
+        bno086_frs bno086_codecs tmf8829_fake_session vlx_unsupported_group_refused)
       add_test(NAME io_${t} COMMAND test_io ${t})
     endforeach()
   endif()

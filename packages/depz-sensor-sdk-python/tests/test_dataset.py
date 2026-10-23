@@ -216,3 +216,20 @@ def test_reader_sorts_within_a_device(tmp_path: Path):
     w.close()
     assert [(r.device_id, r.t_host_us) for r in DatasetReader(path)] == [
         ("d1", 50), ("d0", 100), ("d1", 200), ("d0", 250), ("d0", 300)]
+
+
+def test_committed_dual_sr04_dataset(seen):
+    """The committed fixture reads back record for record: header devices,
+    every line as a record, one host-time-sorted timeline (TS reads it too)."""
+    path = Path(__file__).resolve().parents[3] / "contracts/vectors/recordings/dataset_dual_sr04.depzdata"
+    lines = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    reader = DatasetReader(path)
+    assert reader.devices == lines[0]["devices"]
+    assert set(reader.devices) == {"d0", "d1"}
+    recs = list(reader)
+    assert [(r.device_id, r.t_host_us, r.kind, r.value) for r in recs] == [
+        (ev["d"], ev["t"], ev["k"], ev["v"]) for ev in lines[1:]
+    ]
+    assert [r.t_host_us for r in recs] == sorted(r.t_host_us for r in recs)
+    assert {r.kind for r in recs} == {"sr04"}
+    seen("recordings/dataset_dual_sr04.depzdata")

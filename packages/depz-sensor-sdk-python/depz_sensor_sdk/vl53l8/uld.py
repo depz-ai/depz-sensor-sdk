@@ -30,6 +30,8 @@ save/restore IS the 776-byte xtalk blob — get_caldata_xtalk / set_caldata_xtal
 import struct
 from pathlib import Path
 
+from ..protocol._wire import check_int, check_uint, checked_pack
+
 # Absorbed from depz-usb-sensor-line/tof_vl53l8/tools/vl53l8cx_uld.py
 # (blob data relocated to package data under data/{cx,ch}).
 _DATA_ROOT = Path(__file__).parent / 'data'
@@ -71,6 +73,16 @@ I2C_VARIANTS = ('l7cx', 'l7ch')
 SI_REVISION_CUT11 = 0x01        # VL53L5CX / VL53L7CX, first cut
 SI_REVISION_CUT12 = 0x02        # VL53L5CX / VL53L7CX / VL53L7CH
 SI_REVISION_L8    = 0x0C        # VL53L8CX / VL53L8CH
+
+
+def silicon_id_matches(device_id, revision_id, i2c):
+    """Whether the silicon ids are the sensor's (vl53l8cx_is_alive() /
+    vl53lmz_is_alive()): (0xF0, 0x0C) on L8 over SPI; revision 0x02, or 0x01
+    with device_id 0xF0, on L5/L7 over I2C."""
+    if i2c:
+        return (revision_id == SI_REVISION_CUT12
+                or (device_id == 0xF0 and revision_id == SI_REVISION_CUT11))
+    return device_id == 0xF0 and revision_id == SI_REVISION_L8
 
 DCI_FW_FLAGS = 0xE0C4           # byte[1] = module_type, byte[6] = laser safety
 MODULE_TYPE_MZ     = 0          # VL53L5CX
@@ -696,9 +708,8 @@ class VL53L8CX:
     # ---------------- public API ----------------
 
     def is_alive(self):
-        """Returns (device_id, revision_id) and caches them; alive when
-        (0xF0, 0x0C) on L8, revision 0x02 (or 0x01 with device_id 0xF0) on
-        L5/L7."""
+        """Returns (device_id, revision_id) and caches them;
+        silicon_id_matches() tells whether they are the sensor's."""
         self._wr_byte(0x7FFF, 0x00)
         device_id = self._rd_byte(0x00)
         revision_id = self._rd_byte(0x01)
@@ -710,8 +721,7 @@ class VL53L8CX:
         """I2C variants only: refuse to boot an L5/L7 blob on anything but
         L5/L7 silicon (vl53lmz_is_alive())."""
         device_id, revision_id = self.is_alive()
-        if not (revision_id == SI_REVISION_CUT12
-                or (device_id == 0xF0 and revision_id == SI_REVISION_CUT11)):
+        if not silicon_id_matches(device_id, revision_id, True):
             raise Vl53l8cxError(
                 STATUS_ERROR,
                 f'not a VL53L5/L7 sensor: device_id=0x{device_id:02X} '
@@ -1127,9 +1137,9 @@ class VL53L8CX:
         """Parse one raw results frame (data_read_size bytes read from reg 0x00).
         Used both by poll-mode get_ranging_data() and by the host when the MCU
         pushes frames over the INT-driven stream. Returns a dict with per-zone
-        lists distance_mm[int], target_status, nb_target_detected,
-        signal_per_spad (kcps/SPAD), ambient_per_spad (kcps/SPAD),
-        nb_spads_enabled, range_sigma_mm (float), reflectance (%), plus the
+        lists distance_mm[int, >= 0], target_status, nb_target_detected,
+        signal_per_spad (float kcps/SPAD), ambient_per_spad (float kcps/SPAD),
+        nb_spads_enabled, range_sigma_mm (float mm), reflectance (float %), plus the
         per-frame scalar silicon_temp_degc."""
         self.streamcount = raw[0]
         buf = swap_buffer(raw)
@@ -1202,9 +1212,15 @@ class VL53L8CX:
                         'range_sigma_mm', 'reflectance'):
                 del results[key][n * NB_TARGET_PER_ZONE:]
 
-        # Convert to real format (fixed-point scaling, per ST GetRangingData).
-        results['distance_mm'] = [d // 4 for d in results['distance_mm']]
+        # Convert to real units, as ST GetRangingData: distance /4 with a
+        # negative distance clamped to 0; reflectance /2 (%); signal and
+        # ambient /2048 (kcps/SPAD); sigma /128 (mm). ST divides integers; the
+        # scaled values here keep their fraction (contract 04 §5).
+        results['distance_mm'] = [max(0, d // 4) for d in results['distance_mm']]
         results['range_sigma_mm'] = [s / 128.0 for s in results['range_sigma_mm']]
+        results['reflectance'] = [r / 2.0 for r in results['reflectance']]
+        results['signal_per_spad'] = [s / 2048.0 for s in results['signal_per_spad']]
+        results['ambient_per_spad'] = [a / 2048.0 for a in results['ambient_per_spad']]
 
         # No target detected -> status 255. Iterate the zones actually present
         # in this frame (16 for 4x4, 64 for 8x8), not a fixed 64.
@@ -1328,10 +1344,11 @@ class VL53L8CX:
         return struct.unpack_from('<I', buf, 0)[0] / 2048.0
 
     def set_xtalk_margin(self, margin_kcps):
-        if margin_kcps > 10000:
+        # 0..10000 kcps; below 0 (or NaN) is refused too, never wrapped (contract 07 §3)
+        if not 0 <= margin_kcps <= 10000:
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_xtalk_margin')
         raw = int(round(margin_kcps * 2048))
-        self.dci_replace_data(DCI_XTALK_CFG, 16, struct.pack('<I', raw & 0xFFFFFFFF), 0x00)
+        self.dci_replace_data(DCI_XTALK_CFG, 16, struct.pack('<I', raw), 0x00)
 
     def get_caldata_xtalk(self):
         """Read the live 776-byte xtalk calibration blob back from the sensor
@@ -1396,19 +1413,27 @@ class VL53L8CX:
 
     def set_detection_thresholds(self, thresholds):
         """Program the 64 detection thresholds. `thresholds` is a list of dicts
-        (see get_detection_thresholds); missing entries default to zeros."""
+        (see get_detection_thresholds); missing entries default to zeros, more
+        than 64 is a ValueError (never silently dropped)."""
+        if len(thresholds) > NB_THRESHOLDS:
+            raise ValueError(f'thresholds: {len(thresholds)} entries, at most {NB_THRESHOLDS}')
         valid = bytes([0x05] * 8)
         packed = bytearray(NB_THRESHOLDS * 12)
         for k in range(NB_THRESHOLDS):
             t = thresholds[k] if k < len(thresholds) else {}
-            meas = int(t.get('measurement', 0))
+            # a fraction, or anything out of its field's range (before or after
+            # the scaling), is refused, never truncated or wrapped (contract 07 §3)
+            meas = check_uint(f'thresholds[{k}].measurement', t.get('measurement', 0), 8)
             scale = _THRESH_SCALE.get(meas, 1)
-            low = int(t.get('low_thresh', 0)) * scale
-            high = int(t.get('high_thresh', 0)) * scale
-            struct.pack_into('<iiBBBB', packed, k * 12,
-                             low, high, meas,
-                             int(t.get('type', 0)), int(t.get('zone_num', 0)),
-                             int(t.get('operation', 0)))
+            low = check_int(f'thresholds[{k}].low_thresh', t.get('low_thresh', 0), 32) * scale
+            high = check_int(f'thresholds[{k}].high_thresh', t.get('high_thresh', 0), 32) * scale
+            packed[k * 12:k * 12 + 12] = checked_pack(
+                '<iiBBBB',
+                **{f'thresholds[{k}].low_thresh': low, f'thresholds[{k}].high_thresh': high,
+                   f'thresholds[{k}].measurement': meas,
+                   f'thresholds[{k}].type': t.get('type', 0),
+                   f'thresholds[{k}].zone_num': t.get('zone_num', 0),
+                   f'thresholds[{k}].operation': t.get('operation', 0)})
         self.dci_write_data(DCI_DET_THRESH_VALID_STATUS, valid)
         self.dci_write_data(DCI_DET_THRESH_START, bytes(packed))
 
@@ -1467,46 +1492,6 @@ class VL53L8CX:
         self.dci_write_data(DCI_MOTION_DETECTOR_CFG, cfg.pack())
 
     # ---------------- xtalk calibration run (plugin) ----------------
-
-    def _program_output_config(self, resolution, cnh_data_size=None):
-        """Program the sensor output list/config/enables for `resolution`.
-        Self-contained copy of the block start_ranging() uses inline (kept
-        separate so start_ranging stays byte-identical for the replay gate);
-        used by calibrate_xtalk. Returns data_read_size."""
-        data_read_size = 0
-        output_bh_enable = [0x00000FFF, 0, 0, self._output_enable_w3]
-        output = [START_BH, METADATA_BH, COMMONDATA_BH, AMBIENT_RATE_BH,
-                  SPAD_COUNT_BH, NB_TARGET_DETECTED_BH, SIGNAL_RATE_BH,
-                  RANGE_SIGMA_MM_BH, DISTANCE_BH, REFLECTANCE_BH,
-                  TARGET_STATUS_BH, MOTION_DETECT_BH]
-        if cnh_data_size is not None:
-            cnh_bh = (CNH_DATA_IDX << 16) | (((cnh_data_size // 4) & 0xFFF) << 4) | 4
-            output.append(cnh_bh)
-            output_bh_enable[0] |= (1 << (len(output) - 1))
-        for i in range(len(output)):
-            if output[i] == 0 or not (output_bh_enable[i // 32] & (1 << (i % 32))):
-                continue
-            bh_type, bh_size, bh_idx = _bh_fields(output[i])
-            if 0x1 <= bh_type < 0x0D:
-                if 0x54D0 <= bh_idx < 0x54D0 + 960:
-                    bh_size = resolution
-                elif bh_idx == CNH_DATA_IDX:
-                    pass
-                else:
-                    bh_size = resolution * NB_TARGET_PER_ZONE
-                output[i] = _bh_set_size(output[i], bh_size)
-                data_read_size += bh_type * bh_size
-            else:
-                data_read_size += bh_size
-            data_read_size += 4
-        data_read_size += self._frame_tail
-        self.dci_write_data(DCI_OUTPUT_LIST,
-                            struct.pack('<%dI' % len(output), *output))
-        self.dci_write_data(DCI_OUTPUT_CONFIG,
-                            struct.pack('<2I', data_read_size, len(output) + 1))
-        self.dci_write_data(DCI_OUTPUT_ENABLES,
-                            struct.pack('<4I', *output_bh_enable))
-        return data_read_size
 
     def _program_xtalk_output_config(self, resolution):
         """_vlxxx_program_output_config() of the ST xtalk plugin (every

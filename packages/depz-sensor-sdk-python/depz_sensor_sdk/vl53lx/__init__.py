@@ -250,9 +250,11 @@ class Vl53lx(DeviceBase):
         drv.sensor_init()
         self._bridge.clear_i2c_errors()
 
-    def identify(self) -> dict:
+    def identify_product(self) -> dict:
         """Everything about what is connected (needs init()). `model_id_ok`
-        is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids."""
+        is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
+        (Until 0.7.0 this was `identify()`, which now is the base class's
+        parsed firmware name, as on every device.)"""
         drv = self.driver
         model_id = drv.model_id()
         return {
@@ -356,7 +358,7 @@ class Vl53lx(DeviceBase):
         re-init."""
         self._require_not_ranging()
         drv = self.driver
-        for group, value in (("offset", offset_mm), ("xtalk", xtalk_kcps),
+        for group, value in (("mode", mode), ("offset", offset_mm), ("xtalk", xtalk_kcps),
                              ("signal_thresh", signal_kcps)):
             if value is not None:
                 self._need(group)
@@ -382,7 +384,7 @@ class Vl53lx(DeviceBase):
 
     def budget_choices(self) -> tuple[int, ...]:
         """The only budgets accepted right now (ascending), or () when any
-        integer in ``identify()['budget_ms']`` will do. Can move with the mode
+        integer in ``identify_product()['budget_ms']`` will do. Can move with the mode
         (VL53L1: 15 ms exists in short mode only)."""
         return tuple(self.driver.budget_choices())
 
@@ -566,6 +568,11 @@ class Vl53lx(DeviceBase):
         """Stream reports dropped because the driver failed to decode them."""
         return self._stream_parse_errors
 
+    @property
+    def stream_dropped_counts(self) -> list[int]:
+        """Drop-oldest counters of all live measurement queues (diagnostics)."""
+        return [q.dropped_count for q in self._measure_queues]
+
     # ── internal ─────────────────────────────────────────────────────────────
 
     def _need(self, group: str) -> SensorDriver:
@@ -602,8 +609,9 @@ class Vl53lx(DeviceBase):
         drv = self._driver
         if drv is None:
             return True
-        sample = StreamData.unpack(pkt.payload)
         try:
+            # a report shorter than its own length field is refused by the decoder
+            sample = StreamData.unpack(pkt.payload)
             m, bins = self._decode(drv, sample.data)
         except Exception:  # noqa: BLE001 — a bad sample must not kill the reader
             self._stream_parse_errors += 1

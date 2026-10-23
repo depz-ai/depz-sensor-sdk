@@ -102,12 +102,14 @@ public final class Common {
     /** {@code cmd}: echoed request opcode; 0x00 = unsolicited. */
     public record StatusReport(int cmd, int status) {
         public static StatusReport unpack(byte[] p) {
+            Wire.needBytes("RPT_STATUS", p, 2);
             return new StatusReport(p[0] & 0xFF, p[1] & 0xFF);
         }
     }
 
     public record TextReport(int cmd, String text) {
         public static TextReport unpack(byte[] p) {
+            Wire.needBytes("RPT_TEXT", p, 1);
             byte[] rest = new byte[p.length - 1];
             System.arraycopy(p, 1, rest, 0, rest.length);
             return new TextReport(p[0] & 0xFF, stripDeviceString(rest));
@@ -117,6 +119,7 @@ public final class Common {
     /** {@code pcTimestampUs}=T1 echoed, {@code mcuRxUs}=T2, {@code mcuTxUs}=T3. */
     public record SyncTimeReport(long pcTimestampUs, long mcuRxUs, long mcuTxUs) {
         public static SyncTimeReport unpack(byte[] p) {
+            Wire.needBytes("RPT_SYNC_TIME", p, 24);
             return new SyncTimeReport(u64le(p, 0), u64le(p, 8), u64le(p, 16));
         }
     }
@@ -124,6 +127,7 @@ public final class Common {
     /** {@code rawDecidegrees}: int16, units of 0.1 °C. */
     public record TemperatureReport(long timestampUs, int rawDecidegrees) {
         public static TemperatureReport unpack(byte[] p) {
+            Wire.needBytes("RPT_TEMPERATURE", p, 10);
             return new TemperatureReport(u64le(p, 0), i16le(p, 8));
         }
 
@@ -134,23 +138,40 @@ public final class Common {
 
     public record SequenceErrorReport(int expectedSeq, int receivedSeq) {
         public static SequenceErrorReport unpack(byte[] p) {
+            Wire.needBytes("RPT_SEQUENCE_ERROR", p, 2);
             return new SequenceErrorReport(p[0] & 0xFF, p[1] & 0xFF);
         }
     }
 
-    /** {@code pin}: 1..5. */
+    /** {@code pin}: a logical AUX sync pin 1..5 (contract 02 §6), else IllegalArgumentException. */
     public record SyncPinConfig(int pin, SyncPinMode mode, SyncPinPolarity polarity) {
+        public static final int PIN_MIN = 1;
+        public static final int PIN_MAX = 5;
+
         public byte[] pack() {
-            return new byte[] {(byte) pin, (byte) mode.value, (byte) polarity.value};
+            return new byte[] {(byte) checkPin(pin), (byte) mode.value, (byte) polarity.value};
+        }
+
+        /** {@code pin} as a sync pin 1..5, else IllegalArgumentException. */
+        public static int checkPin(int pin) {
+            if (pin < PIN_MIN || pin > PIN_MAX) {
+                throw new IllegalArgumentException("pin: " + pin + " is not a sync pin " + PIN_MIN + ".." + PIN_MAX);
+            }
+            return pin;
         }
 
         public static SyncPinConfig unpack(byte[] p) {
+            Wire.needBytes("RPT_SYNC_PIN_CONFIG", p, 3);
             return new SyncPinConfig(p[0] & 0xFF, SyncPinMode.fromValue(p[1] & 0xFF), SyncPinPolarity.fromValue(p[2] & 0xFF));
         }
     }
 
     // ── codecs ───────────────────────────────────────────────────────────────
 
+    /**
+     * {@code pcTimestampUs} is a u64 in Java's two's-complement convention: every
+     * {@code long} is a valid bit pattern (a value ≥ 2^63 arrives negative).
+     */
     public static byte[] packSyncTime(long pcTimestampUs) {
         return u64leBytes(pcTimestampUs);
     }

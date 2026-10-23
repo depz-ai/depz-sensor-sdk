@@ -38,7 +38,7 @@ async function loadSerialport(): Promise<{
         list(): Promise<Array<{ path: string; serialNumber?: string; vendorId?: string; productId?: string }>>;
       };
     };
-    return { SerialPort: mod.SerialPort, list: () => mod.SerialPort.list() };
+    return { SerialPort: mod.SerialPort, list: async () => mod.SerialPort.list() };
   } catch (err) {
     throw new Error(
       "the optional peer dependency 'serialport' is required for NodeSerialTransport " +

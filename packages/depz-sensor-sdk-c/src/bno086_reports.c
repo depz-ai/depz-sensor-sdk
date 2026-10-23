@@ -28,7 +28,7 @@ static size_t report_length(uint8_t rid)
 {
     switch (rid) {
     case 0x01: case 0x02: case 0x03: case 0x04: case 0x06: return 10;
-    case 0x05: case 0x09: case 0x28:                       return 14;
+    case 0x05: case 0x09: case 0x28: case 0x2a:            return 14;
     case 0x07: case 0x0f: case 0x14: case 0x15: case 0x16:
     case 0x1e:                                             return 16;
     case 0x08: case 0x29: case 0x11:                       return 12;
@@ -36,7 +36,7 @@ static size_t report_length(uint8_t rid)
     case 0x10:                                             return 5;
     case 0x0c: case 0x0d: case 0x0e: case 0x12: case 0x13:
     case 0x19: case 0x1a: case 0x1c: case 0x1f: case 0x20:
-    case 0x21: case 0x22: case 0x23:                       return 6;
+    case 0x21: case 0x22: case 0x23: case 0x2b:            return 6;
     default:                                               return 0;
     }
 }
@@ -61,6 +61,8 @@ const char *depz_bno_report_type_str(depz_bno_report_type t)
     case DEPZ_BNO_RAW_SENSOR:           return "RawSensor";
     case DEPZ_BNO_GENERIC_EVENT:        return "GenericEvent";
     case DEPZ_BNO_GYRO_INTEGRATED_RV:   return "GyroIntegratedRV";
+    case DEPZ_BNO_MOTION_REQUEST:       return "MotionRequest";
+    case DEPZ_BNO_FLUSH_COMPLETED_REPORT: return "FlushCompleted";
     case DEPZ_BNO_UNKNOWN_REPORT:       return "UnknownReport";
     default:                            return "UnknownReport";
     }
@@ -138,6 +140,11 @@ static void decode_report(uint8_t rid, const uint8_t *rep, int64_t ts,
         r->type = DEPZ_BNO_STABILITY_CLASSIFIER;
         r->classification = rep[4];
         break;
+    case 0x2b:
+        r->type = DEPZ_BNO_MOTION_REQUEST;
+        r->intent = rep[4];
+        r->request = rep[5];
+        break;
     case 0x19:
         r->type = DEPZ_BNO_SHAKE_DETECTOR;
         r->flags = rd_u16(rep + 4);
@@ -162,6 +169,8 @@ static void decode_report(uint8_t rid, const uint8_t *rep, int64_t ts,
         r->sensor_timestamp_us = rd_u32(rep + 12);
         break;
     default:
+        /* A table length but no dedicated decoder (e.g. 0x2A on an input
+         * channel, contract 05 §5): header + value_raw u16 at byte 4. */
         r->type = DEPZ_BNO_GENERIC_EVENT;
         r->value_raw = (int64_t)rd_u16(rep + 4);
         break;
@@ -189,6 +198,16 @@ size_t depz_bno_parse_input_cargo(const uint8_t *payload, size_t len,
             int32_t delta = rd_i32(payload + pos + 1);
             base += (int64_t)delta * 100;
             pos += 5;
+            continue;
+        }
+        if (rid == DEPZ_BNO_FLUSH_COMPLETED && pos + 2 <= len) { /* no SH-2 header */
+            depz_bno_report *r = &out[count++];
+            memset(r, 0, sizeof(*r));
+            r->type = DEPZ_BNO_FLUSH_COMPLETED_REPORT;
+            r->sensor_id = rid;
+            r->timestamp_us = base;
+            r->flushed_sensor = payload[pos + 1];
+            pos += 2;
             continue;
         }
         size_t length = report_length(rid);

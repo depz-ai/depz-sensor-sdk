@@ -44,10 +44,11 @@ DOCS = Path(__file__).resolve().parents[1] / "docs"
 # Domain (documentation group) → section title, in reading order. Mirrors the
 # Python api.md grouping: the four sensors first, then the shared foundation.
 DOMAIN_ORDER = [
-    "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
+    "devices", "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "tmf8829", "firmware", "dataset", "transport", "protocol",
 ]
 DOMAIN_TITLE = {
+    "devices": "Live devices (connection, streams, discovery)",
     "usb": "USB identity",
     "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)",
@@ -65,29 +66,43 @@ DOMAIN_TITLE = {
 
 # Nicer-than-alphabetical file ordering within a domain (headline codecs first).
 FILE_PRIORITY = [
-    "Sr04.cs",
-    "Vl53l4Wire.cs", "Vl53l4Uld.cs",
-    "FrameDecoder.cs", "Vl53l8Stream.cs", "Advanced.cs", "Cnh.cs", "Vl53l8Uld.cs",
+    "DepzDevices.cs", "DepzDevice.cs", "Subscription.cs", "Links.cs", "SerialPorts.cs", "Errors.cs",
+    "Sr04Device.cs", "Sr04.cs",
+    "Vl53l4cdDevice.cs", "Vl53l4Wire.cs", "Vl53l4Uld.cs", "Vl53l4cdDriver.cs",
+    "Vl53l8cxDevice.cs", "Vl53l8Driver.cs", "FrameDecoder.cs", "Vl53l8Stream.cs", "Advanced.cs", "Cnh.cs", "CnhSetup.cs", "Vl53l8Tables.g.cs",
     "Vl53l7Wire.cs", "Vl53l7Model.cs",
     "Vl53lxWire.cs", "Vl53lxProducts.cs", "Vl53lxDecode.cs",
-    "Reports.cs", "Sh2Control.cs", "Shtp.cs",
+    "Bno086Device.cs", "Reports.cs", "Sh2Control.cs", "Sh2Hub.cs", "Shtp.cs",
     "Bno055Wire.cs", "Bno055Regs.cs",
-    "Tmf8829Wire.cs", "Tmf8829Frames.cs", "Tmf8829Builder.cs", "Tmf8829Clock.cs",
+    "Tmf8829Device.cs", "Tmf8829Wire.cs", "Tmf8829Frames.cs", "Tmf8829Builder.cs", "Tmf8829Clock.cs",
     "Tmf8829Config.cs", "Tmf8829Firmware.cs",
     "FwDepz.cs",
-    "Dataset.cs",
+    "Dataset.cs", "DatasetWriter.cs", "DatasetPlayer.cs", "DatasetRecords.cs", "JsonText.cs",
     "Framing.cs", "PacketParser.cs", "Events.cs", "Crc.cs", "CrcType.cs",
     "Common.cs", "Identity.cs",
-    "UsbIds.cs",
+    "UsbIds.cs", "Discovery.cs",
 ]
+
+# Sensor classes of the device layer (Devices/) go to their sensor's reference.
+DEVICE_CLASS_DOMAIN = {
+    "Sr04Device.cs": "sr04",
+    "Vl53l4cdDevice.cs": "vl53l4",
+    "Vl53l8cxDevice.cs": "vl53l8",
+    "Vl53l7Devices.cs": "vl53l7",
+    "Bno055Device.cs": "bno055",
+    "Bno086Device.cs": "bno086",
+    "Vl53lxDevice.cs": "vl53lx",
+    "Tmf8829Device.cs": "tmf8829",
+}
 
 # The VL53L8 ToF domain is one namespace but two sensors. CH-specific top-level
 # symbols go to the vl53l8ch reference; everything else is the shared CX base.
-VL53L8CH_SYMBOLS = {"Vl53l8Cnh", "Vl53l8CnhConfig", "Vl53l8CnhAggregate", "Vl53l8CnhResult"}
+VL53L8CH_SYMBOLS = {"Vl53l8chDevice", "Vl53l8Cnh", "Vl53l8CnhSetup", "Vl53l8CnhConfig", "Vl53l8CnhAggregate",
+                    "Vl53l8CnhResult"}
 
 # Types a board page needs from a shared namespace, by name.
 VL53L7_PICKS = ["FrameChunk", "FrameReassembler", "Vl53l8FrameDecoder", "Vl53l8Frame"]
-VL53L7CH_EXTRA_PICKS = ["Vl53l8Cnh", "Vl53l8CnhConfig", "Vl53l8CnhResult", "Vl53l8CnhAggregate"]
+VL53L7CH_EXTRA_PICKS = ["Vl53l8Cnh", "Vl53l8CnhSetup", "Vl53l8CnhConfig", "Vl53l8CnhResult", "Vl53l8CnhAggregate"]
 VL53LX_PICKS = ["Vl53l4RegData", "Vl53l4StreamData", "Vl53l4Xshut"]
 VL53LX_BOARDS = [
     ("vl53l0x", "VL53L0X (ToF)"), ("vl53l1cx", "VL53L1CX (ToF)"),
@@ -334,6 +349,7 @@ class Parser:
             return m.group(2)
         # member: last identifier before '(' or before '{'/'=>'/end
         h = re.split(r"[({=]", head, maxsplit=1)[0]
+        h = re.sub(r"<[^<>]*>\s*$", "", h)  # a generic name: Request<T>(…) is Request
         ids = re.findall(r"[A-Za-z_]\w*", h)
         return ids[-1] if ids else "?"
 
@@ -565,11 +581,13 @@ def _collect():
     for path in sorted(files, key=prio):
         folder = path.parent.name
         base = path.name
-        if folder == "Usb":
+        if folder == "Devices":
+            domain = DEVICE_CLASS_DOMAIN.get(base, "devices")
+        elif folder == "Usb":
             domain = "usb"
         elif folder == "Transport":
             domain = "transport"
-        elif folder == "Dataset":
+        elif folder in ("Dataset", "Json"):
             domain = "dataset"
         elif folder == "Vl53l4":
             domain = "vl53l4"
@@ -579,7 +597,7 @@ def _collect():
             domain = "bno086"
         elif folder == "Vl53l7":
             domain = "vl53l7"
-        elif folder == "Vl53lx":
+        elif folder in ("Vl53lx", "Bare"):
             domain = "vl53lx"
         elif folder == "Bno055":
             domain = "bno055"

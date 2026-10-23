@@ -37,6 +37,9 @@ const BNO086_RECORD_KEYS: [string, string][] = [
   ["classification", "classification"],
   ["mostLikelyState", "most_likely_state"],
   ["value", "value"],
+  ["intent", "intent"],
+  ["request", "request"],
+  ["flushedSensor", "flushed_sensor"],
 ];
 
 /** The raw ADC streams (0x14..0x16): only these keep their integer counts. */
@@ -49,6 +52,12 @@ const BNO086_RAW_IDS = new Set([0x14, 0x15, 0x16]);
  * outputs, and the integer counts of the raw ADC streams. Shared by the SDK
  * recorder and the viewer's, so both write the same record.
  */
+/** JSON.stringify that prints a bigint as its exact integer digits. */
+function jsonExactBigint(obj: unknown): string {
+  const text = JSON.stringify(obj, (_k, x: unknown) => (typeof x === "bigint" ? `@@bigint:${x}@@` : x));
+  return text.replace(/"@@bigint:(-?\d+)@@"/g, "$1");
+}
+
 export function bno086RecordValue(r: Bno086Report): Record<string, unknown> {
   const f = r as unknown as Record<string, unknown>;
   const v: Record<string, unknown> = { type: r.type, sensor_id: r.sensorId };
@@ -76,7 +85,12 @@ export function bno086RecordValue(r: Bno086Report): Record<string, unknown> {
       if (typeof f[key] === "number") v[out] = f[key];
     }
   }
-  if (typeof r.timestampUs === "bigint") v.timestamp_us = Number(r.timestampUs);
+  // u64 device µs passed through untouched (contract 07): a number while
+  // exact, the bigint beyond 2^53 (the writer prints it as an exact integer)
+  if (typeof r.timestampUs === "bigint") {
+    const n = Number(r.timestampUs);
+    v.timestamp_us = Number.isSafeInteger(n) ? n : r.timestampUs;
+  }
   return v;
 }
 
@@ -129,7 +143,7 @@ export class DatasetWriter {
   }
 
   write(deviceId: string, tHostUs: number, kind: string, value: Record<string, unknown>): void {
-    this.lines.push(JSON.stringify({ d: deviceId, t: tHostUs, k: kind, v: value }));
+    this.lines.push(jsonExactBigint({ d: deviceId, t: tHostUs, k: kind, v: value }));
     this.recordsWritten += 1;
   }
 
@@ -345,65 +359,154 @@ export class DatasetReader {
 
 export type PlayerState = "idle" | "playing" | "paused" | "done";
 
+/** Options of a {@link DatasetPlayer}. */
+export interface DatasetPlayerOptions {
+  /** Playback speed, finite and ≥ 0; 0 = as fast as possible. Default 1. */
+  speed?: number;
+  /** Monotonic clock in ms (default `performance.now`); injectable for tests. */
+  clock?: () => number;
+}
+
+/** Timers resolve to ~1 ms: a record due within this is delivered now. */
+const DUE_SLACK_MS = 1;
+/** At speed 0 the player yields to the event loop after this much work. */
+const BURST_MS = 10;
+
 /**
- * Timeline player: paced delivery with play/pause/seek/speed — the engine
- * behind the viewer's playback mode.
+ * Timeline player: paced delivery with play / pause / seek / speed — the
+ * engine behind the viewer's playback mode (contract 09 §Player; reference:
+ * Python `DatasetPlayer`).
+ *
+ * Timing: a media clock anchored to the host clock. Record i is due at
+ * `anchorWall + (t_i − anchorT) / speed`; the anchor is (now, t of the last
+ * delivered record — of the first record when none was) at play / resume /
+ * seek, so the first record goes out at once and every later one after its
+ * gap to the previous one. Pacing is against the clock, not cumulative: a
+ * slow consumer gets overdue records back to back and playback does not
+ * drift.
+ *
+ * Records and the `done` state are delivered from timers, never inside
+ * `play` / `seekUs` / a speed change; state changes made by those calls are
+ * reported before they return. An error thrown by an `onRecord` callback
+ * pauses the player (the record counts as delivered) and is rethrown from the
+ * timer, i.e. it reaches the global uncaught-error handler.
  */
 export class DatasetPlayer {
-  private idx = 0;
+  private idx = 0; // next record to deliver
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stateCbs: Array<(s: PlayerState) => void> = [];
   private recordCbs: Array<(r: DatasetRecord) => void> = [];
   private _state: PlayerState = "idle";
-  speed = 1.0;
+  private _speed: number;
+  private anchorWall = 0;
+  private anchorT = 0;
+  private readonly clock: () => number;
 
-  constructor(readonly reader: DatasetReader) {}
+  constructor(
+    readonly reader: DatasetReader,
+    opts: DatasetPlayerOptions = {},
+  ) {
+    this._speed = checkSpeed(opts.speed ?? 1);
+    this.clock = opts.clock ?? (() => performance.now());
+  }
 
   get state(): PlayerState {
     return this._state;
   }
 
-  /** Current position in µs from the first record. */
+  /** Span of the timeline: last record's `tHostUs` minus the first's. */
+  get durationUs(): number {
+    return this.reader.durationUs;
+  }
+
+  /**
+   * Current position, µs from the first record: the `t` of the last
+   * delivered record (after a seek: of the record just before the target).
+   * 0 before anything was delivered.
+   */
   get positionUs(): number {
     const recs = this.reader.records;
     if (recs.length === 0 || this.idx === 0) return 0;
     return recs[Math.min(this.idx, recs.length) - 1]!.tHostUs - recs[0]!.tHostUs;
   }
 
+  get speed(): number {
+    return this._speed;
+  }
+
+  /**
+   * Change the speed (finite, ≥ 0; 0 = as fast as possible; else RangeError).
+   * While playing it applies at once: the rest of the current wait is
+   * rescaled, records already delivered stay delivered.
+   */
+  set speed(value: number) {
+    const v = checkSpeed(value);
+    if (this._state === "playing") {
+      const now = this.clock();
+      this.anchorT = this.mediaNow(now);
+      this.anchorWall = now;
+    }
+    this._speed = v;
+    if (this._state === "playing") this.kick();
+  }
+
+  /** Subscribe to delivered records; returns an idempotent unsubscribe. */
   onRecord(cb: (r: DatasetRecord) => void): () => void {
     this.recordCbs.push(cb);
     return () => {
-      this.recordCbs = this.recordCbs.filter((c) => c !== cb);
+      const i = this.recordCbs.indexOf(cb);
+      if (i >= 0) this.recordCbs.splice(i, 1);
     };
   }
 
+  /** Subscribe to state changes; returns an idempotent unsubscribe. */
   onState(cb: (s: PlayerState) => void): () => void {
     this.stateCbs.push(cb);
     return () => {
-      this.stateCbs = this.stateCbs.filter((c) => c !== cb);
+      const i = this.stateCbs.indexOf(cb);
+      if (i >= 0) this.stateCbs.splice(i, 1);
     };
   }
 
-  private setState(s: PlayerState): void {
-    this._state = s;
-    this.stateCbs.forEach((cb) => cb(s));
-  }
-
+  /**
+   * Start, or resume after `pause`. No-op while playing. From `done` (or
+   * after a seek past the end) playback restarts at the first record. An
+   * empty dataset goes straight to `done`.
+   */
   play(): void {
     if (this._state === "playing") return;
-    if (this.idx >= this.reader.records.length) this.idx = 0;
+    const recs = this.reader.records;
+    if (this.idx >= recs.length) this.idx = 0;
+    this.anchor(this.clock());
     this.setState("playing");
-    this.scheduleNext();
+    if (recs.length === 0) {
+      this.setState("done");
+      return;
+    }
+    this.kick();
   }
 
+  /**
+   * Stop delivering; `play` resumes from the next record, which then waits
+   * its full gap again. No-op unless playing.
+   */
   pause(): void {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = null;
-    if (this._state === "playing") this.setState("paused");
+    if (this._state !== "playing") return;
+    this.clearTimer();
+    this.setState("paused");
   }
 
-  /** Seek to µs offset from the start; delivery resumes from there. */
+  /**
+   * Move to `offsetUs` µs from the first record: the next record delivered
+   * is the first with `t >= t_first + offsetUs` (negative = the start);
+   * records in between are skipped. The state does not change, except that
+   * a seek past the end while playing ends playback (`done`). A non-number
+   * offset is a RangeError; on an empty dataset this is a no-op.
+   */
   seekUs(offsetUs: number): void {
+    if (typeof offsetUs !== "number" || Number.isNaN(offsetUs)) {
+      throw new RangeError(`seekUs: offset must be a number, got ${String(offsetUs)}`);
+    }
     const recs = this.reader.records;
     if (recs.length === 0) return;
     const target = recs[0]!.tHostUs + offsetUs;
@@ -415,34 +518,93 @@ export class DatasetPlayer {
       else hi = mid;
     }
     this.idx = lo;
-    if (this._state === "playing") {
-      this.pause();
-      this.play();
+    if (this._state !== "playing") return;
+    if (this.idx >= recs.length) {
+      this.clearTimer();
+      this.setState("done");
+    } else {
+      this.anchor(this.clock());
+      this.kick();
     }
   }
 
-  private scheduleNext(): void {
+  private setState(s: PlayerState): void {
+    this._state = s;
+    for (const cb of [...this.stateCbs]) cb(s);
+  }
+
+  private clearTimer(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  /** (Re)start delivery from a fresh timer turn. */
+  private kick(): void {
+    this.clearTimer();
+    this.timer = setTimeout(() => this.pump(), 0);
+  }
+
+  /** The media clock restarts at `now` from the last delivered record's t. */
+  private anchor(now: number): void {
     const recs = this.reader.records;
-    if (this.idx >= recs.length) {
-      this.setState("done");
-      return;
+    this.anchorWall = now;
+    this.anchorT = recs.length ? recs[Math.max(this.idx - 1, 0)]!.tHostUs : 0;
+  }
+
+  /** Media time (µs, host timeline) at `now` while playing. */
+  private mediaNow(now: number): number {
+    if (this._speed <= 0) {
+      const recs = this.reader.records;
+      return recs.length ? recs[Math.max(this.idx - 1, 0)]!.tHostUs : 0;
     }
-    const rec = recs[this.idx]!;
-    const emit = () => {
+    return this.anchorT + (now - this.anchorWall) * 1000 * this._speed;
+  }
+
+  /** Deliver every record that is due, then arm a timer for the next one. */
+  private pump(): void {
+    this.timer = null;
+    const recs = this.reader.records;
+    const started = this.clock();
+    while (this._state === "playing") {
+      if (this.idx >= recs.length) {
+        this.setState("done");
+        return;
+      }
+      const rec = recs[this.idx]!;
+      const now = this.clock();
+      if (this._speed > 0) {
+        const due = this.anchorWall + (rec.tHostUs - this.anchorT) / 1000 / this._speed;
+        if (due - now > DUE_SLACK_MS) {
+          this.timer = setTimeout(() => this.pump(), due - now);
+          return;
+        }
+      }
+      if (now - started > BURST_MS) {
+        // let the page (and pause / seek) in between records
+        this.timer = setTimeout(() => this.pump(), 0);
+        return;
+      }
       this.idx += 1;
-      this.recordCbs.forEach((cb) => cb(rec));
-      if (this._state === "playing") this.scheduleNext();
-    };
-    if (this.speed <= 0 || this.idx === 0) {
-      emit();
-      return;
-    }
-    const prev = recs[this.idx - 1]!;
-    const gapMs = (rec.tHostUs - prev.tHostUs) / 1000 / this.speed;
-    if (gapMs <= 1) {
-      emit();
-    } else {
-      this.timer = setTimeout(emit, gapMs);
+      try {
+        for (const cb of [...this.recordCbs]) cb(rec);
+      } catch (e) {
+        if (this._state === "playing") {
+          this.clearTimer();
+          this.setState("paused");
+        }
+        throw e;
+      }
+      if (this._state === "playing" && this.idx >= recs.length) {
+        this.setState("done");
+        return;
+      }
     }
   }
+}
+
+function checkSpeed(value: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new RangeError(`speed must be a finite number >= 0, got ${String(value)}`);
+  }
+  return value;
 }

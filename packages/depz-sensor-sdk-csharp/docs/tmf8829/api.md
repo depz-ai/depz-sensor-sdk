@@ -10,9 +10,243 @@ in the source, not this file.
 
 ## Contents
 
-- **TMF8829 (dToF)**: [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`Tmf8829EventCode`](#tmf8829eventcode), [`Tmf8829Wire`](#tmf8829wire), [`Tmf8829RegData`](#tmf8829regdata), [`Tmf8829Info`](#tmf8829info), [`Tmf8829FrameChunk`](#tmf8829framechunk), [`Tmf8829Event`](#tmf8829event), [`Tmf8829RawFrame`](#tmf8829rawframe), [`Tmf8829FrameReassembler`](#tmf8829framereassembler), [`Tmf8829FrameException`](#tmf8829frameexception), [`Tmf8829FrameInfo`](#tmf8829frameinfo), [`Tmf8829PixelResults`](#tmf8829pixelresults), [`Tmf8829HistogramFrame`](#tmf8829histogramframe), [`Tmf8829Frames`](#tmf8829frames), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829MeasurementBuilder`](#tmf8829measurementbuilder), [`Tmf8829TimeFlags`](#tmf8829timeflags), [`Tmf8829SensorClock`](#tmf8829sensorclock), [`Tmf8829FrameTime`](#tmf8829frametime), [`Tmf8829CaptureTimer`](#tmf8829capturetimer), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Firmware`](#tmf8829firmware)
+- **TMF8829 (dToF)**: [`Tmf8829Exception`](#tmf8829exception), [`Tmf8829InterruptEvent`](#tmf8829interruptevent), [`Tmf8829AppliedConfig`](#tmf8829appliedconfig), [`Tmf8829Device`](#tmf8829device), [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`Tmf8829EventCode`](#tmf8829eventcode), [`Tmf8829Wire`](#tmf8829wire), [`Tmf8829RegData`](#tmf8829regdata), [`Tmf8829Info`](#tmf8829info), [`Tmf8829FrameChunk`](#tmf8829framechunk), [`Tmf8829Event`](#tmf8829event), [`Tmf8829RawFrame`](#tmf8829rawframe), [`Tmf8829FrameReassembler`](#tmf8829framereassembler), [`Tmf8829FrameException`](#tmf8829frameexception), [`Tmf8829FrameInfo`](#tmf8829frameinfo), [`Tmf8829PixelResults`](#tmf8829pixelresults), [`Tmf8829HistogramFrame`](#tmf8829histogramframe), [`Tmf8829Frames`](#tmf8829frames), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829MeasurementBuilder`](#tmf8829measurementbuilder), [`Tmf8829TimeFlags`](#tmf8829timeflags), [`Tmf8829SensorClock`](#tmf8829sensorclock), [`Tmf8829FrameTime`](#tmf8829frametime), [`Tmf8829CaptureTimer`](#tmf8829capturetimer), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Firmware`](#tmf8829firmware)
 
 ## TMF8829 (dToF)
+
+### Tmf8829Exception
+
+```csharp
+public sealed class Tmf8829Exception : DepzException
+```
+
+The sensor refused or did not answer (bootloader / application status).
+
+#### Tmf8829Exception.Tmf8829Exception *(constructor)*
+
+```csharp
+public Tmf8829Exception(string message) : base(message)
+```
+
+### Tmf8829InterruptEvent
+
+```csharp
+public sealed record Tmf8829InterruptEvent(Tmf8829Event Event) : DeviceEvent
+```
+
+RPT_TMF_EVENT that is not an expected stop artefact: a MOTION / PROXIMITY interrupt (code 0) or a refused frame header (code 1 — the sensor is lost, run `Init` again).
+
+### Tmf8829AppliedConfig
+
+```csharp
+public sealed record Tmf8829AppliedConfig(string Preset, byte[] Page, bool Histograms, bool RefFrame, IReadOnlyDictionary<string, int> Fields)
+```
+
+The config `Configure` wrote, as read back from the sensor.
+
+#### Tmf8829AppliedConfig.public
+
+```csharp
+public (int Rows, int Cols) Grid
+```
+
+(rows, cols) of a measurement.
+
+### Tmf8829Device
+
+```csharp
+public sealed class Tmf8829Device : DepzDevice
+```
+
+TMF8829 multizone dToF (8×8 … 48×32 zones, up to 4 peaks per zone, histograms) over the SPI register bridge (contract 14). The board is a thin bridge: this class runs the sensor. `Init` downloads the 14.4 KB sensor firmware (~0.15 s), `Configure` writes the config page, `Start` streams measurements to `OnMeasurement` / `Measurements`, `Stop` ends it. The sensor's EN pin is wired high: there is no sleep, and recovery from any state is `Init` (it starts with a soft reset).
+
+#### Tmf8829Device.Tmf8829Device *(constructor)*
+
+```csharp
+public Tmf8829Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Tmf8829Device.Tmf8829Device *(constructor)*
+
+```csharp
+#if NET public Tmf8829Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Tmf8829Device.AppVersion *(property)*
+
+```csharp
+public string? AppVersion
+```
+
+The RAM application version `Init` started ("2.200.0"), or null.
+
+#### Tmf8829Device.SensorSerial *(property)*
+
+```csharp
+public uint? SensorSerial
+```
+
+The sensor's serial number, read by `Init`, or null.
+
+#### Tmf8829Device.Config *(property)*
+
+```csharp
+public Tmf8829AppliedConfig? Config
+```
+
+The last `Configure` result (null after `Init`).
+
+#### Tmf8829Device.Streaming *(property)*
+
+```csharp
+public bool Streaming
+```
+
+#### Tmf8829Device.ReadRegisters
+
+```csharp
+public byte[] ReadRegisters(int addr, int length)
+```
+
+Read `length` bytes from `addr` in ≤1024-byte requests; reads that reach the FIFO port 0xFF stay there (the sensor does not auto-increment it).
+
+#### Tmf8829Device.ReadRegister
+
+```csharp
+public int ReadRegister(int addr)
+```
+
+#### Tmf8829Device.WriteRegisters
+
+```csharp
+public void WriteRegisters(int addr, byte[] data, Action<int, int>? progress = null)
+```
+
+Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF); `progress` gets (done, total) after each.
+
+#### Tmf8829Device.WriteRegister
+
+```csharp
+public void WriteRegister(int addr, int value)
+```
+
+Write one register; the low byte of `value`.
+
+#### Tmf8829Device.SensorState
+
+```csharp
+public IReadOnlyDictionary<string, int> SensorState()
+```
+
+Raw host-interface registers, for diagnostics.
+
+#### Tmf8829Device.GetBridgeInfo
+
+```csharp
+public Tmf8829Info GetBridgeInfo()
+```
+
+Bridge counters (never touches the sensor, safe mid-stream).
+
+#### Tmf8829Device.public
+
+```csharp
+public (string AppVersion, uint SensorSerial) Init(Action<int, int>? progress = null)
+```
+
+Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware download, start. Returns (application version, sensor serial). Stops a running stream first. `progress` (done, total) tracks the image download.
+
+#### Tmf8829Device.ConfigPage
+
+```csharp
+public byte[] ConfigPage()
+```
+
+LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
+
+#### Tmf8829Device.Configure
+
+```csharp
+public Tmf8829AppliedConfig Configure(string preset = "8x8", int periodMs = Tmf8829Config.DefaultPeriodMs, int? kiloIterations = null, int nrPeaks = 1, bool signalStrength = false, bool noiseStrength = false, bool xtalk = false, bool histograms = false, bool refFrame = false, IReadOnlyDictionary<string, int>? fields = null)
+```
+
+Load `preset` and write the config page. Every field a preset does not reset is written (contract 14 §4), so the result never depends on an earlier config; `fields` sets any other page field by name. Not while streaming.
+
+#### Tmf8829Device.Start
+
+```csharp
+public void Start()
+```
+
+MEASURE with the bridge stream armed. Configures the default 8x8 preset first when `Configure` was not called since `Init`.
+
+#### Tmf8829Device.Stop
+
+```csharp
+public void Stop()
+```
+
+Sensor STOP, then the bridge stream (the frames already queued drain). The bad-header event a STOP raises mid histogram dump is expected and swallowed.
+
+#### Tmf8829Device.OnMeasurement
+
+```csharp
+public IDisposable OnMeasurement(Action<Tmf8829Measurement> callback)
+```
+
+Call `callback` for every measurement (reader thread; don't block).
+
+#### Tmf8829Device.Measurements
+
+```csharp
+public Subscription<Tmf8829Measurement> Measurements(int capacity = 16)
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Tmf8829Device.GetMeasurement
+
+```csharp
+public Tmf8829Measurement GetMeasurement(TimeSpan? timeout = null)
+```
+
+The next measurement (contract 07 §3).
+
+#### Tmf8829Device.StreamDroppedCounts *(property)*
+
+```csharp
+public IReadOnlyList<long> StreamDroppedCounts
+```
+
+#### Tmf8829Device.FramesDropped *(property)*
+
+```csharp
+public int FramesDropped
+```
+
+Frames the bridge dropped (frame_seq gaps) in this stream.
+
+#### Tmf8829Device.FramesDiscarded *(property)*
+
+```csharp
+public int FramesDiscarded
+```
+
+Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
+
+#### Tmf8829Device.FrameParseErrors *(property)*
+
+```csharp
+public int FrameParseErrors
+```
+
+#### Tmf8829Device.ClockRatioQ16 *(property)*
+
+```csharp
+public uint ClockRatioQ16
+```
+
+Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal 8 << 16 = 8 µs per SYSTICK), for diagnostics.
 
 ### Tmf8829Cmd
 

@@ -9,7 +9,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`MODE_SWITCH_FROM_CONFIG`](#mode_switch_from_config), [`MODE_SWITCH_TO_CONFIG`](#mode_switch_to_config), [`SELF_TEST_TIME`](#self_test_time), [`BOOT_SETTLE_TIMEOUT`](#boot_settle_timeout), [`STUCK_SELF_TEST_POLLS`](#stuck_self_test_polls), [`FUSION_START_TIMEOUT`](#fusion_start_timeout), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
 - **Shared (re-exported from `vl53l4`)**: [`i2c_error_name`](#i2c_error_name)
 
 ## BNO055 (IMU)
@@ -119,13 +119,23 @@ pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2]
 
 `BNO_READ_REG` payload: `addr u8, len u8`.
 
+### try_pack_write_reg
+
+```rust
+pub fn try_pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError>
+```
+
+`BNO_WRITE_REG` payload: `addr u8, data[1..128]`; a data length outside
+1..=[`XFER_MAX`] is refused (contract 07 §3), never sent.
+
 ### pack_write_reg
 
 ```rust
 pub fn pack_write_reg(addr: u8, data: &[u8]) -> Vec<u8>
 ```
 
-`BNO_WRITE_REG` payload: `addr u8, data[1..128]`.
+`BNO_WRITE_REG` payload: `addr u8, data[1..128]`, unchecked — prefer
+[`try_pack_write_reg`].
 
 ### pack_reset
 
@@ -1196,6 +1206,534 @@ pub fn decode_block(addr: u8, data: &[u8]) -> RawBlock
 Unpack whatever channels the register window starting at `addr` holds
 (offsets are `reg − addr`). `data` is the block as read — e.g.
 [`crate::bno055::StreamData::data`] with its `addr`.
+
+### MODE_SWITCH_FROM_CONFIG
+
+```rust
+pub const MODE_SWITCH_FROM_CONFIG: Duration = Duration::from_millis(10);
+```
+
+Settle time after an OPR_MODE write out of CONFIG (datasheet: 7 ms).
+
+### MODE_SWITCH_TO_CONFIG
+
+```rust
+pub const MODE_SWITCH_TO_CONFIG: Duration = Duration::from_millis(25);
+```
+
+Settle time after an OPR_MODE write into CONFIG (datasheet: 19 ms).
+
+### SELF_TEST_TIME
+
+```rust
+pub const SELF_TEST_TIME: Duration = Duration::from_millis(450);
+```
+
+The built-in self-test runs ~400 ms (datasheet §3.9.2).
+
+### BOOT_SETTLE_TIMEOUT
+
+```rust
+pub const BOOT_SETTLE_TIMEOUT: Duration = Duration::from_secs(1);
+```
+
+How long the sensor's own boot may take.
+
+### STUCK_SELF_TEST_POLLS
+
+```rust
+pub const STUCK_SELF_TEST_POLLS: u32 = 20;
+```
+
+SYS_STATUS 4 polls in a row taken as the leftover of a self-test run in CONFIG, not POST.
+
+### FUSION_START_TIMEOUT
+
+```rust
+pub const FUSION_START_TIMEOUT: Duration = Duration::from_secs(1);
+```
+
+After CONFIG → a fusion mode the fusion outputs read zero for ~70 ms.
+
+### Bno055SystemStatus
+
+```rust
+pub struct Bno055SystemStatus {
+    pub self_test: u8,
+    pub clk_status: u8,
+    pub status: u8,
+    pub error: u8,
+}
+```
+
+ST_RESULT (0x36) + SYS_CLK_STATUS / SYS_STATUS / SYS_ERR (0x38..0x3A); INT_STA (0x37) sits in
+between and clears on read, so it is not read.
+
+#### Bno055SystemStatus::status_text
+
+```rust
+pub fn status_text(&self) -> String
+```
+
+#### Bno055SystemStatus::error_text
+
+```rust
+pub fn error_text(&self) -> String
+```
+
+Meaningful when `status` is 1 (system error).
+
+#### Bno055SystemStatus::self_test_passed
+
+```rust
+pub fn self_test_passed(&self) -> bool
+```
+
+### Bno055Sample
+
+```rust
+pub struct Bno055Sample {
+    pub timestamp_us: u64,
+    pub addr: u8,
+    pub raw: Vec<u8>,
+    pub units: Units,
+    pub accel: Option<[f64; 3]>,
+    pub mag: Option<[f64; 3]>,
+    pub gyro: Option<[f64; 3]>,
+    pub euler: Option<[f64; 3]>,
+    pub quaternion: Option<[f64; 4]>,
+    pub linear_accel: Option<[f64; 3]>,
+    pub gravity: Option<[f64; 3]>,
+    pub temperature: Option<f64>,
+    pub calibration: Option<CalibStatus>,
+}
+```
+
+One decoded BNO055 register block (streamed or polled). A channel is `None` when the block did not
+cover it; values are scaled by `units`, the units in effect when the stream started. Euler is
+(heading, roll, pitch), the quaternion (w, x, y, z); linear acceleration and gravity are always
+m/s². In non-fusion modes the fusion outputs read zero; in CONFIG everything does.
+
+#### Bno055Sample::decode
+
+```rust
+pub fn decode(timestamp_us: u64, addr: u8, data: &[u8], units: Units) -> Bno055Sample
+```
+
+Decode `data` read at `addr` with `units`.
+
+### Bno055Device
+
+```rust
+pub struct Bno055Device {
+    dev: DepzDevice,
+    req: Requester,
+    streams: Arc<Streams>,
+    // One lock serialises multi-step register sequences (page switch + access, CONFIG round trips).
+    state: Mutex<State>,
+    streaming: AtomicBool,
+}
+```
+
+BNO055 absolute-orientation IMU (contract 13). The board is a thin I2C register bridge: mode,
+units, axis remap and calibration are register access here; the sensor fuses on chip at 100 Hz.
+Typical use: [`Bno055Device::configure`], then [`Bno055Device::start_stream`] and read
+[`Bno055Device::samples`], or poll [`Bno055Device::read_sample`]. Page 1 (sensor configs,
+interrupts, unique id) is reached through PAGE_ID and refused while streaming.
+
+#### Bno055Device::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Bno055Device
+```
+
+Continue the open connection `dev` as a BNO055.
+
+#### Bno055Device::bridge_info
+
+```rust
+pub fn bridge_info(&self) -> Result<Bno055Info>
+```
+
+RPT_BNO_INFO: chip ids, sensor firmware revision, bridge counters. Safe while streaming.
+
+#### Bno055Device::is_alive
+
+```rust
+pub fn is_alive(&self) -> bool
+```
+
+True when the bridge passed the chip-id handshake and the sensor answers with the BNO055 ids.
+
+#### Bno055Device::reset_sensor
+
+```rust
+pub fn reset_sensor(&self) -> Result<()>
+```
+
+Hardware reset through nRESET (the bridge answers after the ~0.5 s boot handshake). Stops a
+stream; the sensor returns in CONFIG with power-on units and no calibration — configure again,
+or [`Bno055Device::restore_configuration`].
+
+#### Bno055Device::read_registers
+
+```rust
+pub fn read_registers(&self, addr: u8, length: usize, page: u8) -> Result<Vec<u8>>
+```
+
+Read `length` bytes at `addr` on `page` (0 or 1; 128-byte transfers). Page 1 is refused while
+streaming.
+
+#### Bno055Device::write_registers
+
+```rust
+pub fn write_registers(&self, addr: u8, data: &[u8], page: u8) -> Result<()>
+```
+
+Write at `addr` on `page`. Most configuration registers only take writes in CONFIG mode (the
+sensor ignores the rest); the typed setters handle that.
+
+#### Bno055Device::read_register
+
+```rust
+pub fn read_register(&self, addr: u8, page: u8) -> Result<u8>
+```
+
+#### Bno055Device::write_register
+
+```rust
+pub fn write_register(&self, addr: u8, value: u8, page: u8) -> Result<()>
+```
+
+#### Bno055Device::get_operation_mode
+
+```rust
+pub fn get_operation_mode(&self) -> Result<OprMode>
+```
+
+#### Bno055Device::set_operation_mode
+
+```rust
+pub fn set_operation_mode(&self, mode: OprMode) -> Result<()>
+```
+
+Switch OPR_MODE and wait out the switching time; into a fusion mode also wait (up to 1 s) for
+the fusion outputs. The sensor only switches between CONFIG and another mode, so a switch
+between two operating modes goes through CONFIG.
+
+#### Bno055Device::get_power_mode
+
+```rust
+pub fn get_power_mode(&self) -> Result<PwrMode>
+```
+
+#### Bno055Device::set_power_mode
+
+```rust
+pub fn set_power_mode(&self, mode: PwrMode) -> Result<()>
+```
+
+Normal / low power / suspend, written in CONFIG with the operating mode restored after. A
+suspended chip ignores OPR_MODE writes, so the mode is kept here and put back on wake-up (NDOF
+when the chip was already asleep at connect, contract 13 §4.6).
+
+#### Bno055Device::get_units
+
+```rust
+pub fn get_units(&self) -> Result<Units>
+```
+
+#### Bno055Device::set_units
+
+```rust
+pub fn set_units(&self, units: Units) -> Result<()>
+```
+
+#### Bno055Device::get_axis_remap
+
+```rust
+pub fn get_axis_remap(&self) -> Result<AxisRemap>
+```
+
+#### Bno055Device::set_axis_remap
+
+```rust
+pub fn set_axis_remap(&self, remap: &AxisRemap) -> Result<()>
+```
+
+Remap the output axes for the board's mounting (`AxisRemap::placement` gives the datasheet
+placements P0..P7; P1 is the default).
+
+#### Bno055Device::get_temperature_source
+
+```rust
+pub fn get_temperature_source(&self) -> Result<TempSource>
+```
+
+#### Bno055Device::set_temperature_source
+
+```rust
+pub fn set_temperature_source(&self, source: TempSource) -> Result<()>
+```
+
+#### Bno055Device::configure
+
+```rust
+pub fn configure(
+    &self,
+    mode: OprMode,
+    units: Option<Units>,
+    axis_remap: Option<AxisRemap>,
+    calibration: Option<CalibrationProfile>,
+) -> Result<()>
+```
+
+The usual session setup: CONFIG → units → axis remap → calibration profile → `mode`; in a
+fusion mode it returns once the fusion outputs are live (~70 ms). Remembered for
+[`Bno055Device::restore_configuration`]. `units` `None`: the power-on units; `axis_remap` /
+`calibration` `None` leave the sensor's.
+
+#### Bno055Device::restore_configuration
+
+```rust
+pub fn restore_configuration(&self) -> Result<()>
+```
+
+Re-apply the last [`Bno055Device::configure`] — after [`Bno055Device::reset_sensor`], or when
+`bridge_info().sensor_resets` rose (bus recovery pulses nRESET). A running stream keeps running.
+
+#### Bno055Device::system_status
+
+```rust
+pub fn system_status(&self) -> Result<Bno055SystemStatus>
+```
+
+ST_RESULT, SYS_CLK_STATUS, SYS_STATUS, SYS_ERR.
+
+#### Bno055Device::self_test
+
+```rust
+pub fn self_test(&self) -> Result<Bno055SystemStatus>
+```
+
+The built-in self-test (datasheet §3.9.2), in CONFIG, ~400 ms; the operating mode is restored
+after. Not while streaming.
+
+#### Bno055Device::calibration_status
+
+```rust
+pub fn calibration_status(&self) -> Result<CalibStatus>
+```
+
+CALIB_STAT: 0..3 per sensor; in NDOF the sensor calibrates in the background.
+
+#### Bno055Device::read_calibration_profile
+
+```rust
+pub fn read_calibration_profile(&self) -> Result<CalibrationProfile>
+```
+
+Offsets and radii (0x55..0x6A), only readable in CONFIG: the driver switches there and back.
+
+#### Bno055Device::write_calibration_profile
+
+```rust
+pub fn write_calibration_profile(&self, profile: &CalibrationProfile) -> Result<()>
+```
+
+Restore a stored profile (datasheet §3.11.5). A starting point, not a lock: the background
+calibration refines it once fusion resumes.
+
+#### Bno055Device::get_sic_matrix
+
+```rust
+pub fn get_sic_matrix(&self) -> Result<[i16; 9]>
+```
+
+Soft-iron compensation matrix, 9 × i16 row-major, 1.0 = 16384.
+
+#### Bno055Device::set_sic_matrix
+
+```rust
+pub fn set_sic_matrix(&self, matrix: Option<[i16; 9]>) -> Result<()>
+```
+
+`matrix` `None` writes the identity.
+
+#### Bno055Device::get_accel_config
+
+```rust
+pub fn get_accel_config(&self) -> Result<AccelConfig>
+```
+
+#### Bno055Device::set_accel_config
+
+```rust
+pub fn set_accel_config(&self, config: &AccelConfig) -> Result<()>
+```
+
+Accelerometer range / bandwidth / power; fusion modes override it.
+
+#### Bno055Device::get_gyro_config
+
+```rust
+pub fn get_gyro_config(&self) -> Result<GyroConfig>
+```
+
+#### Bno055Device::set_gyro_config
+
+```rust
+pub fn set_gyro_config(&self, config: &GyroConfig) -> Result<()>
+```
+
+#### Bno055Device::get_mag_config
+
+```rust
+pub fn get_mag_config(&self) -> Result<MagConfig>
+```
+
+#### Bno055Device::set_mag_config
+
+```rust
+pub fn set_mag_config(&self, config: &MagConfig) -> Result<()>
+```
+
+#### Bno055Device::unique_id
+
+```rust
+pub fn unique_id(&self) -> Result<Vec<u8>>
+```
+
+The chip's 16-byte unique id (page 1, 0x50..0x5F).
+
+#### Bno055Device::get_interrupt_enable
+
+```rust
+pub fn get_interrupt_enable(&self) -> Result<u8>
+```
+
+#### Bno055Device::set_interrupt_enable
+
+```rust
+pub fn set_interrupt_enable(&self, mask: u8) -> Result<()>
+```
+
+INT_EN: which interrupt engines run.
+
+#### Bno055Device::get_interrupt_mask
+
+```rust
+pub fn get_interrupt_mask(&self) -> Result<u8>
+```
+
+#### Bno055Device::set_interrupt_mask
+
+```rust
+pub fn set_interrupt_mask(&self, mask: u8) -> Result<()>
+```
+
+INT_MSK: which enabled interrupts drive the INT pin.
+
+#### Bno055Device::set_interrupt_setting
+
+```rust
+pub fn set_interrupt_setting(&self, register: u8, value: u8) -> Result<()>
+```
+
+One motion-interrupt setting register (page 1, 0x11..0x1F), as a raw byte. Not while streaming.
+
+#### Bno055Device::read_interrupt_status
+
+```rust
+pub fn read_interrupt_status(&self) -> Result<u8>
+```
+
+INT_STA — which interrupts fired. Clears on read.
+
+#### Bno055Device::clear_interrupt
+
+```rust
+pub fn clear_interrupt(&self) -> Result<()>
+```
+
+SYS_TRIGGER RST_INT: reset the interrupt status bits and the INT pin.
+
+#### Bno055Device::read_sample
+
+```rust
+pub fn read_sample(&self, block: Option<(u8, u8)>) -> Result<Bno055Sample>
+```
+
+Poll one register block `(addr, length)` (`None`: the full 46 bytes 0x08..0x35) and decode it.
+Works alongside a stream.
+
+#### Bno055Device::read_quaternion
+
+```rust
+pub fn read_quaternion(&self) -> Result<[f64; 4]>
+```
+
+(w, x, y, z) — the cheapest orientation read (8 bytes).
+
+#### Bno055Device::start_stream
+
+```rust
+pub fn start_stream(&self, period_ms: u16, block: Option<(u8, u8)>, int_trigger: bool) -> Result<()>
+```
+
+Arm the bridge to read `block` (`None`: the full block) every `period_ms` and push it. Fusion
+runs at 100 Hz, so 10 ms is the useful floor. `int_trigger` reads on the INT edge, `period_ms`
+then a missed-edge watchdog (0 = none). Replaces a running stream.
+
+#### Bno055Device::stop_stream
+
+```rust
+pub fn stop_stream(&self) -> Result<()>
+```
+
+#### Bno055Device::streaming
+
+```rust
+pub fn streaming(&self) -> bool
+```
+
+#### Bno055Device::on_sample
+
+```rust
+pub fn on_sample(&self, callback: impl Fn(&Bno055Sample) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every streamed sample (reader thread).
+
+#### Bno055Device::samples
+
+```rust
+pub fn samples(&self, capacity: usize) -> Subscription<Bno055Sample>
+```
+
+A pull queue of streamed samples (bounded, drop-oldest).
+
+#### Bno055Device::get_sample
+
+```rust
+pub fn get_sample(&self, timeout: Option<Duration>) -> Result<Bno055Sample>
+```
+
+The next streamed sample (contract 07 §3); `timeout` `None`: 1 s.
+
+#### Bno055Device::stream_parse_errors
+
+```rust
+pub fn stream_parse_errors(&self) -> u64
+```
+
+Stream reports dropped because they did not decode (a short block).
+
+#### Bno055Device::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
 
 ## Shared (re-exported from `vl53l4`)
 

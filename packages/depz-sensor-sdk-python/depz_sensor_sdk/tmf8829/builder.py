@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..protocol._wire import check_uint
 from .clock import CaptureTimer, FrameTime, SensorClock
 from .frames import (
     FID_HISTOGRAMS,
@@ -94,6 +95,9 @@ class MeasurementBuilder:
     ) -> Tmf8829Measurement | None:
         """One frame with the MCU time of its header read and its INT edge
         (0 = none) → the measurement it completes, or None."""
+        # contract 07 §3: MCU µs times are u64 — checked before the frame is parsed
+        check_uint("timestamp_us", timestamp_us, 64)
+        check_uint("edge_us", edge_us, 64)
         try:
             f = parse_frame(raw)
         except FrameError as e:

@@ -40,5 +40,8 @@ void     fake_bno086_calibration_status(fake_bno086 *f, uint8_t status);
 /* Push an input cargo on SHTP `channel` as RPT_DATA captured at `capture_us`. */
 void     fake_bno086_send_input(fake_bno086 *f, uint8_t channel, uint64_t capture_us, const uint8_t *cargo,
                                 size_t len);
+/* Push one raw SHTP frame (header included, e.g. one fragment of a cargo) as
+ * RPT_DATA captured at `capture_us`. */
+void     fake_bno086_send_frame(fake_bno086 *f, uint64_t capture_us, const uint8_t *frame, size_t len);
 
 #endif

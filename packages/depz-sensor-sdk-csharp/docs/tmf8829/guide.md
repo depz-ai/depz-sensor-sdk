@@ -1,21 +1,21 @@
 # TMF8829 — user guide
 
-Hands-on guide to the TMF8829 codecs in `Depz.Sensor.Tmf8829`: the bridge wire
+Hands-on guide to the TMF8829: the live device
+(`Depz.Sensor.Devices.Tmf8829Device`, which runs the sensor sequence on the
+host) and the codecs under it in `Depz.Sensor.Tmf8829`: the bridge wire
 codecs ([`Tmf8829Wire`](api.md#tmf8829wire)), the frame decode
 ([`Tmf8829Frames`](api.md#tmf8829frames)), the measurement builder and clock
 model, and the config page. For what the sensor is and its concepts, read the
 [introduction](introduction.md); for exact signatures see the
 [API reference](api.md).
 
-This SDK does not drive the sensor: there is no `Tmf8829` device class. The
-sensor sequence — `init()` with the firmware download, `configure()`,
-`start()` / `stop()` — runs in the Python or TypeScript SDK (the C and C++
-SDKs have it too). What follows is everything you need to build the commands
-and decode what the board sends; the rules the sensor imposes are listed where
-they matter.
+The sections after the live device are the layers under it, for replaying
+captures or writing your own transport; the rules the sensor imposes are
+listed where they matter.
 
 ## Contents
 
+- [Live device](#live-device)
 - [Commands](#commands)
 - [Hello-world: decode a captured stream](#hello-world-decode-a-captured-stream)
 - [The measurement](#the-measurement)
@@ -26,6 +26,44 @@ they matter.
 - [Events and bridge info](#events-and-bridge-info)
 - [Datasets](#datasets)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+using Depz.Sensor.Tmf8829;
+
+using var tof = DepzDevices.OpenTmf8829();
+var (app, serial) = tof.Init();                  // soft reset, 14.4 KB firmware download, ~0.15 s
+Console.WriteLine($"application {app}, sensor serial {serial}");
+Tmf8829AppliedConfig cfg = tof.Configure("32x32", periodMs: 100, nrPeaks: 2);
+Console.WriteLine($"{cfg.Grid.Rows}x{cfg.Grid.Cols}, fp_mode {cfg.Fields["fp_mode"]}");
+
+using var frames = tof.Measurements();
+tof.Start();
+Tmf8829Measurement m = frames.Take(TimeSpan.FromSeconds(2));
+var (rows, cols) = m.Shape;
+Console.WriteLine($"{rows}x{cols}, {m.Peaks} peak(s), centre {m.DistanceMm?[rows / 2 * cols + cols / 2]:F0} mm");
+tof.Stop();
+```
+
+- `Init()` brings the sensor from **any** state to its running application
+  (it starts with a soft reset), so it is also the recovery: after a
+  `Tmf8829InterruptEvent` with code 1 (a refused frame header) run it again.
+- `Configure(preset, …)` loads a preset (`Tmf8829Config.Presets`: 8x8 …
+  48x32) and writes **every** field a preset does not reset — the result never
+  depends on an earlier config; `fields:` sets any other page field by name.
+  A field that does not read back, or a page the sensor refuses (e.g.
+  `ERR_CONFIG_RESULT_SIZE`: too many peaks / strengths for the grid), throws
+  `Tmf8829Exception`. It throws `InvalidOperationException` while streaming.
+- `Start()` configures 8x8 when `Configure` was not called since `Init`;
+  `histograms: true` / `refFrame: true` add the histogram and ref-SPAD frames
+  to each measurement (`m.Histograms`, `m.RefFrames`).
+- Frame loss is counted, not raised: `FramesDropped` (bridge gaps),
+  `FramesDiscarded` (incomplete reassembly), `FrameParseErrors`;
+  `ClockRatioQ16` is the live clock model. `Close()` stops a running stream.
+- `ReadRegisters` / `WriteRegisters` / `SensorState()` / `GetBridgeInfo()`
+  are the escape hatches.
 
 ## Commands
 
@@ -242,7 +280,7 @@ is safe to poll mid-stream.
 
 ## Datasets
 
-A `.depzdata` file recorded by the Python or TypeScript SDK has one
+A `.depzdata` file (`SessionRecorder`, or any SDK's recorder) has one
 `tmf8829` record per measurement (contract 09): `DatasetRecord.Value` carries
 `fp_mode`, `rows`, `cols`, `peaks`, `f_number`, `flags`, `temperature_c`,
 `distance_mm[]` (mm, rounded to 0.1, flat `[peak][row][col]`), `snr[]` and,
@@ -260,8 +298,8 @@ Histogram and ref-SPAD frames are not recorded.
 
 ## Gotchas
 
-- **No live class** — this SDK decodes and encodes; init, configure and
-  start/stop are your register traffic (contract 14 §4) or the Python / TS SDK.
+- **One sensor sequence** — `Tmf8829Device` is contract 14 §4; driving the
+  bridge yourself means repeating that register traffic in the same order.
 - **Reset per stream** — call `Reset()` on the reassembler and the builder at
   every stream start: `frame_seq`, the clock model and T1 are per stream.
 - **Never stitch across `frame_seq`** — the reassembler already refuses; do

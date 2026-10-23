@@ -3,6 +3,8 @@
  * Mirrors the Python reference `depz_sensor_sdk.protocol.vl53l4`.
  */
 
+import { checkUint, needBytes } from "./wire.js";
+
 export enum Vl53l4Cmd {
   ReadReg = 0x32,
   WriteReg = 0x33,
@@ -44,12 +46,19 @@ export const I2C_KHZ_STEPS: readonly number[] = [100, 200, 400, 500, 600, 700, 8
 export function packReadReg(addr: number, length: number): Uint8Array {
   const out = new Uint8Array(4);
   const dv = new DataView(out.buffer);
-  dv.setUint16(0, addr, true);
-  dv.setUint16(2, length, true);
+  dv.setUint16(0, checkUint("addr", addr, 16), true);
+  dv.setUint16(2, checkUint("length", length, 16), true);
   return out;
 }
 
+/** VL53_WRITE_REG data length limit (contracts 10/12 §2: 1..253 bytes). */
+export const WRITE_MAX_LEN = 253;
+
 export function packWriteReg(addr: number, data: Uint8Array): Uint8Array {
+  checkUint("addr", addr, 16);
+  if (data.length < 1 || data.length > WRITE_MAX_LEN) {
+    throw new RangeError(`WRITE_REG data must be 1..${WRITE_MAX_LEN} bytes`);
+  }
   const out = new Uint8Array(2 + data.length);
   new DataView(out.buffer).setUint16(0, addr, true);
   out.set(data, 2);
@@ -57,21 +66,21 @@ export function packWriteReg(addr: number, data: Uint8Array): Uint8Array {
 }
 
 export function packXshut(action: number): Uint8Array {
-  return Uint8Array.of(action & 0xff);
+  return Uint8Array.of(checkUint("action", action, 8));
 }
 
 export function packStartStream(addr: number, length: number, flags = 0): Uint8Array {
   const out = new Uint8Array(5);
   const dv = new DataView(out.buffer);
-  dv.setUint16(0, addr, true);
-  dv.setUint16(2, length, true);
-  dv.setUint8(4, flags);
+  dv.setUint16(0, checkUint("addr", addr, 16), true);
+  dv.setUint16(2, checkUint("length", length, 16), true);
+  dv.setUint8(4, checkUint("flags", flags, 8));
   return out;
 }
 
 export function packSetI2cSpeed(khz: number): Uint8Array {
   const out = new Uint8Array(2);
-  new DataView(out.buffer).setUint16(0, khz, true);
+  new DataView(out.buffer).setUint16(0, checkUint("khz", khz, 16), true);
   return out;
 }
 
@@ -150,8 +159,11 @@ export interface Vl53l4StreamData {
 }
 
 export function unpackStream(payload: Uint8Array): Vl53l4StreamData {
+  needBytes("RPT_VL53_STREAM", payload, 12);
   const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   const length = dv.getUint16(10, true);
+  // contract 07 §3: checked against its own length field; trailing bytes ignored
+  needBytes("RPT_VL53_STREAM data", payload, 12 + length);
   return {
     timestampUs: dv.getBigUint64(0, true),
     addr: dv.getUint16(8, true),

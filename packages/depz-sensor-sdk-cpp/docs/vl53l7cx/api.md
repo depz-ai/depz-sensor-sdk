@@ -144,6 +144,7 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 ```
 
 VL53_READ_REG payload: addr u16, len u16 (both little-endian; VL53L8 format).
+std::invalid_argument unless len is 1..READ_MAX_LEN and addr + len <= 0x10000.
 
 ### pack_write_reg
 
@@ -152,6 +153,8 @@ bytes pack_write_reg(std::uint16_t addr, byte_span data);
 ```
 
 VL53_WRITE_REG payload: addr u16 then the raw register data (VL53L8 format).
+std::invalid_argument unless data is 1..WRITE_MAX_LEN bytes and
+addr + size <= 0x10000.
 
 ### pack_pin_ctrl
 

@@ -17,15 +17,15 @@ export class BridgePlatform {
   constructor(
     readonly dev: BridgeDevice,
     /** Sleep implementation (tests inject an instant one). */
-    readonly sleepImpl: (ms: number) => Promise<void> = (ms) =>
+    readonly sleepImpl: (ms: number) => Promise<void> = async (ms) =>
       new Promise((r) => setTimeout(r, ms)),
   ) {}
 
-  rdMulti(addr: number, size: number): Promise<Uint8Array> {
+  async rdMulti(addr: number, size: number): Promise<Uint8Array> {
     return this.dev.readReg(addr, size);
   }
 
-  wrMulti(addr: number, data: Uint8Array): Promise<void> {
+  async wrMulti(addr: number, data: Uint8Array): Promise<void> {
     return this.dev.writeReg(addr, data);
   }
 
@@ -43,16 +43,16 @@ export class BridgePlatform {
     return ((b[0]! << 24) | (b[1]! << 16) | (b[2]! << 8) | b[3]!) >>> 0;
   }
 
-  wrByte(addr: number, value: number): Promise<void> {
+  async wrByte(addr: number, value: number): Promise<void> {
     return this.dev.writeReg(addr, Uint8Array.of(value & 0xff));
   }
 
-  wrWord(addr: number, value: number): Promise<void> {
+  async wrWord(addr: number, value: number): Promise<void> {
     const v = value & 0xffff;
     return this.dev.writeReg(addr, Uint8Array.of(v >> 8, v & 0xff));
   }
 
-  wrDword(addr: number, value: number): Promise<void> {
+  async wrDword(addr: number, value: number): Promise<void> {
     const v = value >>> 0;
     return this.dev.writeReg(
       addr,
@@ -61,21 +61,21 @@ export class BridgePlatform {
   }
 
   /** Outside the C platform layer: only a driver re-times the bus. */
-  setI2cSpeed(khz: number): Promise<void> {
+  async setI2cSpeed(khz: number): Promise<void> {
     return this.dev.setI2cSpeed(khz);
   }
 
   /** Outside the C platform layer: register-address width, sticky. */
-  setAddrWidth(width: number): Promise<void> {
+  async setAddrWidth(width: number): Promise<void> {
     return this.dev.setAddrWidth(width);
   }
 
   /** Outside the C platform layer: the bridge owns XSHUT. */
-  xshutReset(): Promise<void> {
+  async xshutReset(): Promise<void> {
     return this.dev.xshut(VL53_XSHUT_RESET);
   }
 
-  sleepMs(ms: number): Promise<void> {
+  async sleepMs(ms: number): Promise<void> {
     return this.sleepImpl(ms);
   }
 }

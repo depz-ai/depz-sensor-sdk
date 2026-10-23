@@ -122,7 +122,7 @@ class Sr04(DeviceBase):
         the default timeout is generous."""
 
         def match(pkt: Packet):
-            if pkt.cmd != Sr04Rpt.DATA or len(pkt.payload) != 11:
+            if pkt.cmd != Sr04Rpt.DATA or len(pkt.payload) < 11:
                 return DeviceBase.NO_MATCH
             data = Sr04Data.unpack(pkt.payload)
             if data.source_cmd != Sr04Cmd.MEASURE_ONCE:
@@ -157,7 +157,7 @@ class Sr04(DeviceBase):
     # ── internal ─────────────────────────────────────────────────────────────
 
     def _handle_report(self, pkt: Packet) -> bool:
-        if pkt.cmd == Sr04Rpt.DATA and len(pkt.payload) == 11:
+        if pkt.cmd == Sr04Rpt.DATA and len(pkt.payload) >= 11:
             m = Sr04Measurement._from_data(Sr04Data.unpack(pkt.payload))
             for cb in list(self._measure_cbs):
                 cb(m)

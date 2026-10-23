@@ -11,6 +11,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ..protocol._wire import check_uint
+
 # ── page 0 ──────────────────────────────────────────────────────────────────
 REG_CHIP_ID = 0x00
 REG_PAGE_ID = 0x07
@@ -220,6 +222,7 @@ class Units:
 
     @classmethod
     def unpack(cls, value: int) -> "Units":
+        check_uint("UNIT_SEL", value, 8)
         return cls(
             accel_mg=bool(value & UNIT_ACC_MG),
             gyro_rps=bool(value & UNIT_GYR_RPS),
@@ -268,6 +271,7 @@ class CalibStatus:
 
     @classmethod
     def unpack(cls, value: int) -> "CalibStatus":
+        check_uint("CALIB_STAT", value, 8)
         return cls(value >> 6 & 3, value >> 4 & 3, value >> 2 & 3, value & 3)
 
     def pack(self) -> int:
@@ -378,6 +382,8 @@ class AxisRemap:
 
     @classmethod
     def unpack(cls, config: int, sign: int) -> "AxisRemap":
+        check_uint("AXIS_MAP_CONFIG", config, 8)
+        check_uint("AXIS_MAP_SIGN", sign, 8)
         return cls(
             x=config & 3,
             y=config >> 2 & 3,
@@ -438,6 +444,7 @@ class AccelConfig:
 
     @classmethod
     def unpack(cls, value: int) -> "AccelConfig":
+        check_uint("ACC_CONFIG", value, 8)
         return cls(value & 3, value >> 2 & 7, value >> 5 & 7)
 
 
@@ -456,6 +463,8 @@ class GyroConfig:
 
     @classmethod
     def unpack(cls, data: bytes) -> "GyroConfig":
+        if len(data) < 2:
+            raise ValueError(f"GYR_CONFIG is 2 bytes, got {len(data)}")
         return cls(data[0] & 7, data[0] >> 3 & 7, data[1] & 7)
 
 
@@ -474,6 +483,7 @@ class MagConfig:
 
     @classmethod
     def unpack(cls, value: int) -> "MagConfig":
+        check_uint("MAG_CONFIG", value, 8)
         return cls(value & 7, value >> 3 & 3, value >> 5 & 3)
 
 
@@ -536,6 +546,7 @@ class RawBlock:
 
 def decode_block(addr: int, data: bytes) -> RawBlock:
     """Unpack whatever channels the register window starting at `addr` holds."""
+    check_uint("addr", addr, 8)
     end = addr + len(data)
     out: dict = {}
     for name, (reg, n) in CHANNELS.items():

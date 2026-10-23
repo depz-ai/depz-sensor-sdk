@@ -1,6 +1,8 @@
 # VL53L8CX — user guide
 
-Hands-on guide to the base ToF codecs (`Depz.Sensor.Vl53l8`). For what the
+Hands-on guide to the VL53L8CX: the live device
+(`Depz.Sensor.Devices.Vl53l8cxDevice`, which runs the ST ULD on the host as
+`Vl53l8Driver`) and the codecs under it (`Depz.Sensor.Vl53l8`). For what the
 sensor is, CX vs CH, and the concepts, read the [introduction](introduction.md);
 for exact signatures see the [API reference](api.md). The **VL53L8CH** superset
 (CNH histograms) has its [own guide](../vl53l8ch/guide.md) — it reuses everything
@@ -8,12 +10,46 @@ below.
 
 ## Contents
 
+- [Live device](#live-device)
 - [The decode pipeline](#the-decode-pipeline)
 - [Reassembling a frame](#reassembling-a-frame)
 - [Decoding a frame](#decoding-a-frame)
 - [The frame: fields and the grid](#the-frame-fields-and-the-grid)
 - [Advanced DCI codecs](#advanced-dci-codecs)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Devices;
+using Depz.Sensor.Vl53l8;
+
+using var tof = DepzDevices.OpenVl53l8();         // a Vl53l8cxDevice, or a Vl53l8chDevice for a CH board
+tof.Init(progress: Console.WriteLine);           // ~84 KB sensor firmware over the bridge, about a second
+tof.SetResolution(Vl53l8Driver.Resolution8x8);
+tof.SetRangingFrequencyHz(15);                   // 2..15 Hz at 8x8, up to 60 at 4x4
+
+using var frames = tof.Frames();
+tof.StartRanging();
+Vl53l8Frame f = frames.Take(TimeSpan.FromSeconds(1));
+Console.WriteLine($"centre zone: {f.DistanceMm[27]} mm, {f.SiliconTempDegc} °C");
+tof.StopRanging();
+```
+
+- Configuration needs `Init()` and throws `InvalidOperationException` while
+  ranging: the stream owns the register bank.
+- The rest of ST's API is there: ranging mode, integration time, sharpener,
+  target order, power modes (`SetPowerMode`), xtalk margin and calibration
+  (`CalibrateXtalk`, `GetCaldataXtalk` / `SetCaldataXtalk` to save and restore
+  the 776-byte buffer), detection thresholds, the motion indicator
+  (`ConfigureMotionIndicator`, then `Vl53l8Frame.Motion`).
+- A frame that does not parse is dropped and counted in `FrameParseErrors`;
+  chunk gaps in `ReassemblerDiscards`.
+- `tof.Uld` is the driver itself (DCI access, poll mode: `CheckDataReady` /
+  `GetRangingData`).
+
+The sections below are the layers under the device, for replaying captures or
+writing your own transport.
 
 ## The decode pipeline
 
@@ -78,18 +114,20 @@ disagree.
 ## The frame: fields and the grid
 
 `Vl53l8Frame` carries every per-zone output as an array sized to the active
-resolution (`Resolution` = 16 or 64), plus the per-frame silicon temperature:
+resolution (`Resolution` = 16 or 64), plus the per-frame silicon temperature.
+Values come in the real units ST's `GetRangingData` gives (contract 04 §5); ST
+divides integers, the SDK keeps the fraction:
 
 | field | type | meaning |
 |---|---|---|
-| `DistanceMm` | `int[]` | per-zone distance in mm (ST ÷4 applied) |
+| `DistanceMm` | `int[]` | per-zone distance in mm (raw ÷4; a negative distance is clamped to 0, as ST) |
 | `TargetStatus` | `byte[]` | 5/9 = valid, 255 = no target |
 | `NbTargetDetected` | `byte[]` | targets found in the zone |
-| `SignalPerSpad` | `uint[]` | signal rate, kcps/SPAD |
-| `AmbientPerSpad` | `uint[]` | ambient rate, kcps/SPAD |
+| `SignalPerSpad` | `double[]` | signal rate, kcps/SPAD (raw ÷2048) |
+| `AmbientPerSpad` | `double[]` | ambient rate, kcps/SPAD (raw ÷2048) |
 | `NbSpadsEnabled` | `uint[]` | SPADs enabled in the zone |
-| `RangeSigmaMm` | `double[]` | range std-dev estimate, mm (ST ÷128 applied) |
-| `Reflectance` | `byte[]` | estimated reflectance, % |
+| `RangeSigmaMm` | `double[]` | range std-dev estimate, mm (raw ÷128) |
+| `Reflectance` | `double[]` | estimated reflectance, % (raw ÷2) |
 | `SiliconTempDegc` | `int` | per-frame sensor temperature, °C |
 
 Zone index runs row-major, so a 4×4 grid is `zone = row*4 + col` and an 8×8 grid
@@ -106,9 +144,8 @@ for (int z = 0; z < frame.Resolution; z++)
 ## Advanced DCI codecs
 
 `Vl53l8Advanced` and `MotionConfig` are pure, verifiable ports of the ST ULD
-plugin **encoders** — they produce the DCI payloads. The live DCI read/write
-transport that carries them to the sensor is hardware-dependent and out of scope
-(`Vl53l8Uld.Init` is a throwing stub, by design).
+plugin **encoders** — they produce the DCI payloads; `Vl53l8Driver` writes them
+to the sensor.
 
 ```csharp
 using Depz.Sensor.Vl53l8;
@@ -145,7 +182,7 @@ factors the encoder applies.
 - **Arrays are sized to `Resolution`** — don't assume 64; a 4×4 frame has 16.
 - **`TargetStatus == 255` means no target** — the decoder sets it per zone when
   `NbTargetDetected == 0`; skip those zones.
-- **Live init/config is out of scope** — `Vl53l8Uld.Init` throws on purpose. This
-  SDK decodes the frames the hardware already produces.
+- **Below 2 Hz nothing streams** — the sensor never enters its ranging loop;
+  `SetRangingFrequencyHz` refuses it.
 - **CNH is CH-only** — histogram decode lives in `Vl53l8Cnh.DecodeHistogram`;
   see the [VL53L8CH guide](../vl53l8ch/guide.md).

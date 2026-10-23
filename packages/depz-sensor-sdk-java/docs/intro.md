@@ -28,18 +28,14 @@ and API reference:
 - **[BNO085](bno085/introduction.md)** · **[BNO086](bno086/introduction.md)** —
   9-axis IMU: orientation and motion.
 
-The 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055 have the
-decode and codec layer in this SDK; initialising and streaming them is done with the
-Python or TypeScript SDK.
-
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.6.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.7.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.6.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.7.0")
 ```
 
 Maven:
@@ -48,7 +44,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
 </dependency>
 ```
 

@@ -55,8 +55,8 @@ DOCS = ROOT / "docs"
 # own sensor domain (mirrors how the Python generator groups by defining
 # submodule, not by re-export).
 DOMAIN_ORDER = [
-    "transport", "usb", "protocol", "sr04", "fwdepz",
-    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "tmf8829", "bno086", "bno055", "dataset",
+    "transport", "usb", "protocol", "devices", "sr04", "fwdepz",
+    "vl53l4", "vl53l8", "vl53l7", "vl53lx", "tmf8829", "bno086", "bno055", "dataset", "json",
 ]
 DOMAIN_TITLE = {
     "transport": "Transport",
@@ -72,6 +72,8 @@ DOMAIN_TITLE = {
     "tmf8829": "TMF8829 (dToF)",
     "bno055": "BNO055 (IMU)",
     "dataset": "Datasets (record & replay)",
+    "devices": "Live devices",
+    "json": "JSON",
 }
 # Per-class domain overrides (fully-qualified simple name of the top-level type).
 DOMAIN_OF_TYPE = {
@@ -82,17 +84,44 @@ DOMAIN_OF_TYPE = {
     "Vl53lx": "vl53lx",
     "Bno055": "bno055",
     "Tmf8829": "tmf8829",
+    # Sensor classes of the device layer go to their sensor's reference.
+    "Sr04Device": "sr04",
+    "Sr04Measurement": "sr04",
+    "Vl53l4cdDevice": "vl53l4",
+    "Vl53l4Measurement": "vl53l4",
+    "Vl53l8": "vl53l8",
+    "Vl53l8cxDevice": "vl53l8",
+    "Vl53l8chDevice": "vl53l8",
+    "Vl53l7cxDevice": "vl53l7",
+    "Vl53l5cxDevice": "vl53l7",
+    "Vl53l7chDevice": "vl53l7",
+    "Bno055Device": "bno055",
+    "Bno055Sample": "bno055",
+    "Bno086": "bno086",
+    "Bno086Device": "bno086",
+    "Vl53lxDevice": "vl53lx",
+    "Vl53lxMeasurement": "vl53lx",
+    "Vl53l0xDevice": "vl53lx",
+    "Vl53l1cxDevice": "vl53lx",
+    "Vl53l1cbDevice": "vl53lx",
+    "Vl53l3cxDevice": "vl53lx",
+    "Vl53l4cxDevice": "vl53lx",
+    "Tmf8829Device": "tmf8829",
+    "Tmf8829AppliedConfig": "tmf8829",
+    "Tmf8829Exception": "tmf8829",
+    "Tmf8829InterruptEvent": "tmf8829",
 }
 
 # The single ``vl53l8`` package is TWO sensors. Everything shared is the CX base;
 # these symbols (types or ``Type.method`` members) are the CH-only additions and
 # render on the VL53L8CH page instead of / in addition to the CX one.
 VL53L8CH_PICKS = ["Vl53l8Uld.Variant", "Vl53l8Uld.decodeCnh", "Vl53l8Uld.CnhResult",
-                  "Vl53l8Uld.CnhAggregate"]
+                  "Vl53l8Uld.CnhAggregate", "Vl53l8chDevice", "Vl53l8CnhSetup"]
 
 # Symbols a board page needs from a shared package (resolved like the CH picks).
-VL53L7_PICKS = ["FrameReassembler", "Vl53l8Uld.Results"]
-VL53L7CH_EXTRA_PICKS = ["Vl53l8Uld.decodeCnh", "Vl53l8Uld.CnhResult", "Vl53l8Uld.CnhAggregate"]
+VL53L7_PICKS = ["FrameReassembler", "Vl53l8Uld.Results", "Vl53l8Frame"]
+VL53L7CH_EXTRA_PICKS = ["Vl53l8Uld.decodeCnh", "Vl53l8Uld.CnhResult", "Vl53l8Uld.CnhAggregate",
+                        "Vl53l8CnhSetup"]
 VL53LX_PICKS = ["Vl53l4.RegData", "Vl53l4.StreamData", "Vl53l4Uld.Results"]
 VL53LX_BOARDS = [
     ("vl53l0x", "VL53L0X (ToF)"), ("vl53l1cx", "VL53L1CX (ToF)"),
@@ -397,6 +426,8 @@ def _domain_for(package: str, top_name: str) -> str:
         return "vl53l8"
     if package.endswith("sensors.bno086"):
         return "bno086"
+    if package.endswith("sensors.vl53lx.bare"):
+        return "vl53lx"  # the histogram driver's internals
     return leaf
 
 
@@ -566,7 +597,7 @@ def main() -> None:
     ch_syms, ch_rows = _resolve_picks(index, VL53L8CH_PICKS)
     ch_note = [
         "`VL53L8CH` is a decode-superset of the VL53L8CX: it shares the entire",
-        "results-frame decode and advanced-DCI surface, so only the CH-specific",
+        "results-frame decode, advanced-DCI surface and live driver, so only the CH-specific",
         "additions are listed here. For the frame decoder, the reassembler and",
         "every advanced-DCI codec, see the",
         "[VL53L8CX API reference](../vl53l8cx/api.md).",
@@ -586,8 +617,9 @@ def main() -> None:
         l7_note = [
             "One package serves the VL53L5CX, VL53L7CX and VL53L7CH boards (one",
             "`APP_VL53L7` firmware), so this page lists the whole L5/L7 surface",
-            "and is the same on all three. Frames decode through the VL53L8",
-            "decoder with the L5/L7 geometry; the advanced-DCI codecs are",
+            "and is the same on all three. The live devices extend",
+            "`Vl53l8cxDevice` and frames decode through the VL53L8 decoder with",
+            "the L5/L7 geometry; the driver and the advanced-DCI codecs are",
             "documented in the [VL53L8CX API reference](../vl53l8cx/api.md).",
             "",
         ]

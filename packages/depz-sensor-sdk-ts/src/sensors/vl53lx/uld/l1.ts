@@ -142,12 +142,12 @@ export class VL53L1 extends VL53L1Die {
 
   // ── init (VL53L1X_SensorInit(), on the die's sequence) ──
   /** A hung sensor never reaches boot state on its own: reset first. */
-  protected override initBoot(): Promise<void> {
+  protected override async initBoot(): Promise<void> {
     return this.resetDevice();
   }
 
   /** ST ships this blob with an active-high interrupt; the bridge wants low. */
-  protected override initAfterConfig(): Promise<void> {
+  protected override async initAfterConfig(): Promise<void> {
     return this.setInterruptPolarity(0);
   }
 

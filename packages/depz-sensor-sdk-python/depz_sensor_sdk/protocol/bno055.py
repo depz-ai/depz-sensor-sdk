@@ -6,6 +6,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ._wire import checked_pack, need_bytes
+
 
 class Bno055Cmd(IntEnum):
     READ_REG = 0x32
@@ -34,15 +36,21 @@ RESET_TIMEOUT_S = 3.0
 
 
 def pack_read_reg(addr: int, length: int) -> bytes:
-    return struct.pack("<BB", addr, length)
+    return checked_pack("<BB", addr=addr, length=length)
+
+
+WRITE_MAX = 128  # BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes)
 
 
 def pack_write_reg(addr: int, data: bytes) -> bytes:
-    return struct.pack("<B", addr) + data
+    head = checked_pack("<B", addr=addr)
+    if not 1 <= len(data) <= WRITE_MAX:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX} bytes")
+    return head + bytes(data)
 
 
 def pack_start_stream(trigger: int, addr: int, length: int, period_ms: int) -> bytes:
-    return struct.pack("<BBBH", trigger, addr, length, period_ms)
+    return checked_pack("<BBBH", trigger=trigger, addr=addr, length=length, period_ms=period_ms)
 
 
 @dataclass(frozen=True)
@@ -130,4 +138,6 @@ class StreamData:
     @classmethod
     def unpack(cls, payload: bytes) -> "StreamData":
         ts, addr, length = struct.unpack_from("<QBB", payload)
+        # contract 07 §3: checked against its own length field; trailing bytes ignored
+        need_bytes("RPT_BNO_REG_STREAM data", payload, 10 + length)
         return cls(ts, addr, length, payload[10 : 10 + length])

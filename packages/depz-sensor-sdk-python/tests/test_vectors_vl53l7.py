@@ -12,7 +12,7 @@ from depz_sensor_sdk.protocol.vl53l7 import (
 from depz_sensor_sdk.protocol.vl53l8 import pack_read_reg, pack_write_reg
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for case in vectors("vl53l7.json")["encode"]:
         kind = case["kind"]
         if kind == "read_reg":
@@ -26,14 +26,16 @@ def test_encode_vectors(vectors):
         else:
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == case["payload"], case["name"]
+        seen(case)
 
 
-def test_decode_vectors(vectors):
+def test_decode_vectors(vectors, seen):
     for case in vectors("vl53l7.json")["decode"]:
         assert case["report"] == 0x92, case["name"]
         info = Vl53l7Info.unpack(bytes.fromhex(case["payload"]))
         for field, value in case["expect"].items():
             assert getattr(info, field) == value, (case["name"], field)
+        seen(case)
 
 
 def test_info_rejects_a_short_payload():
@@ -41,7 +43,8 @@ def test_info_rejects_a_short_payload():
         Vl53l7Info.unpack(bytes(INFO_SIZE - 1))
 
 
-def test_model_vectors(vectors):
+def test_model_vectors(vectors, seen):
     for case in vectors("vl53l7.json")["model"]:
         cls = _vl53l7_class(case["usb_model"], case["device_name"])
         assert cls.__name__.lower() == case["expect"], case["name"]
+        seen(case)

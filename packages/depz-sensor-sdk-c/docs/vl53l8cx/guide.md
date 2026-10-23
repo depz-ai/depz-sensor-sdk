@@ -249,22 +249,23 @@ features add:
 | `cnh_len` / `cnh[]` | the raw CNH block — VL53L8CH with CNH armed only, see the [CH guide](../vl53l8ch/guide.md) |
 
 `depz_vl53l8_frame` carries every per-zone output as a flat array valid for
-`[0, resolution)`, plus the per-frame data. Values are the **raw wire
-integers** — apply the scaling yourself:
+`[0, resolution)`, plus the per-frame data. Values are already in **real
+units**, the same as ST's `GetRangingData` gives — no scaling left to do. ST
+divides integers; the SDK keeps the fraction (`double` fields):
 
 | field | type | meaning |
 |---|---|---|
 | `timestamp_us` | uint64 | MCU µs at the data-ready INT |
 | `resolution` | int | 16 or 64 zones |
 | `silicon_temp_degc` | int8 | sensor temperature, °C |
-| `distance_mm[z]` | int32 | distance, mm (already `raw/4`, floored) |
+| `distance_mm[z]` | int32 | distance, mm (wire value `/4`, floored; a negative distance comes out as 0, as ST) |
 | `target_status[z]` | uint8 | 5 / 9 = valid, 255 = no target |
 | `nb_target_detected[z]` | uint8 | targets found in the zone |
-| `signal_per_spad[z]` | uint32 | return-signal rate, kcps/SPAD (raw) |
-| `ambient_per_spad[z]` | uint32 | ambient-light rate, kcps/SPAD (raw) |
+| `signal_per_spad[z]` | double | return-signal rate, kcps/SPAD (wire value `/2048`) |
+| `ambient_per_spad[z]` | double | ambient-light rate, kcps/SPAD (wire value `/2048`) |
 | `nb_spads_enabled[z]` | uint32 | SPADs (light-detecting cells) enabled |
-| `range_sigma_mm_raw[z]` | uint16 | distance standard deviation; mm = `raw/128` |
-| `reflectance[z]` | uint8 | estimated reflectance, % |
+| `range_sigma_mm[z]` | double | distance standard deviation, mm (wire value `/128`) |
+| `reflectance[z]` | double | estimated reflectance, % (wire value `/2`) |
 
 Zones run **row-major**, so index `z = row*cols + col` where `cols` is 4 (16
 zones) or 8 (64 zones):
@@ -627,7 +628,8 @@ static void advanced_codecs(void)
 - **Frames are big.** A `depz_vl53l8_live_frame` is ~7.5 KB: keep stream
   `maxsize` small and don't put frames on a small thread stack.
 - **Check `target_status`** — 255 means no target; only 5 and 9 are valid
-  ranges. Values are raw fixed-point except `distance_mm`.
+  ranges. A `distance_mm` of 0 can be a clamped negative reading (ST does the
+  same), so trust the status, not the distance.
 - **Crosstalk calibration can "succeed" without calibrating.** With no cover
   glass `calibrate_xtalk()` returns `DEPZ_OK` with `failed == true` and keeps
   the default data.

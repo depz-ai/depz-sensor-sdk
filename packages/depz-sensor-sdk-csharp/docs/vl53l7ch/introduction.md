@@ -34,9 +34,9 @@ decoder hands back the raw CNH block as `Vl53l8Frame.CnhRaw`, and
 per-aggregate histograms.
 The CNH decode is the one the VL53L8CH uses (same blob, same layout).
 
-Initialising the sensor, arming a CNH configuration and running a ranging
-session is done today with the Python or TypeScript SDK; this SDK decodes
-what the board streams.
+The live device, `Vl53l7chDevice`, downloads the CH firmware, arms CNH
+(`ConfigureCnh`) and streams the frames with their histogram blocks: see the
+[VL53L7CH guide](guide.md).
 
 ## Key concepts
 

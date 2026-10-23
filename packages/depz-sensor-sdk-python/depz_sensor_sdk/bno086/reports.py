@@ -19,6 +19,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ..protocol._wire import check_uint
+
 
 class SensorId(IntEnum):
     """SH-2 input report IDs (datasheet §1.3.5, sh2 reference driver)."""
@@ -59,11 +61,13 @@ class SensorId(IntEnum):
     ARVR_STABILIZED_RV = 0x28  # quaternion Q14 + accuracy rad Q12
     ARVR_STABILIZED_GAME_RV = 0x29  # quaternion Q14, no accuracy
     GYRO_INTEGRATED_RV = 0x2A  # channel 5 dense: quat Q14 + ang vel Q10
+    MOTION_REQUEST = 0x2B  # interactive calibration, BNO086 only
 
 
 # In-cargo control IDs on the input channels
 BASE_TIMESTAMP_REF = 0xFB  # + i32 base delta (100 µs ticks)
 TIMESTAMP_REBASE = 0xFA  # + i32 rebase delta (100 µs ticks), batching
+FLUSH_COMPLETED = 0xEF  # + u8 sensor ID; answer to Force Sensor Flush (0xF0)
 
 
 # Q point of the primary fields (value = raw / 2**Q); see module docstring.
@@ -132,9 +136,26 @@ REPORT_LENGTHS: dict[int, int] = {
     SensorId.ARVR_STABILIZED_RV: 14,
     SensorId.ARVR_STABILIZED_GAME_RV: 12,
     SensorId.GYRO_INTEGRATED_RV: 14,
+    SensorId.MOTION_REQUEST: 6,
 }
 
 STABILITY_NAMES = {0: "unknown", 1: "on_table", 2: "stationary", 3: "stable", 4: "motion"}
+# SH-2 §6.5.45.2. Value 2 (stay stationary, optional) is deprecated by CEVA:
+# "ignore this request".
+MOTION_REQUEST_NAMES = {
+    0: "no_constraint",
+    1: "stay_stationary_required",
+    2: "stay_stationary_optional",
+    3: "stationary_non_urgent",
+    4: "stationary_urgent",
+}
+MOTION_INTENT_NAMES = {
+    0: "unknown",
+    1: "stationary_no_vibration",
+    2: "stationary_with_vibration",
+    3: "in_motion",
+    4: "in_motion_accelerating",
+}
 ACTIVITY_NAMES = {
     0: "unknown",
     1: "in_vehicle",
@@ -465,6 +486,38 @@ class RawSensor(InputReport):
 
 
 @dataclass(frozen=True)
+class MotionRequest(InputReport):
+    """0x2B motion request (BNO086 interactive calibration): the motion
+    intent the hub was last told, and what it asks of the device. Sent when
+    the request changes, not periodically, whatever the granted rate."""
+
+    intent: int
+    request: int
+
+    @property
+    def intent_name(self) -> str:
+        return MOTION_INTENT_NAMES.get(self.intent, str(self.intent))
+
+    @property
+    def request_name(self) -> str:
+        return MOTION_REQUEST_NAMES.get(self.request, str(self.request))
+
+    @property
+    def wants_stillness(self) -> bool:
+        """True when the hub asks the device to stop (the deprecated
+        optional request 2 does not count)."""
+        return self.request in (1, 3, 4)
+
+
+@dataclass(frozen=True)
+class FlushCompleted(Report):
+    """0xEF Flush Completed: every batched report of `flushed_sensor` as of
+    the matching Force Sensor Flush has been sent. `sensor_id` is 0xEF."""
+
+    flushed_sensor: int
+
+
+@dataclass(frozen=True)
 class UnknownReport(Report):
     """Unrecognized report ID: raw bytes from the ID to end of cargo (the
     length is unknowable, so parsing stops here)."""
@@ -486,6 +539,7 @@ def parse_input_cargo(payload: bytes, capture_timestamp_us: int) -> list[Report]
     Handles 0xFB base timestamp references and 0xFA rebases; every report's
     timestamp is `base + delay` where base = capture − base_delta·100 µs.
     """
+    check_uint("capture_timestamp_us", capture_timestamp_us, 64)
     out: list[Report] = []
     base_us = capture_timestamp_us
     pos = 0
@@ -501,6 +555,10 @@ def parse_input_cargo(payload: bytes, capture_timestamp_us: int) -> list[Report]
             (delta,) = struct.unpack_from("<i", payload, pos + 1)
             base_us += delta * 100
             pos += 5
+            continue
+        if rid == FLUSH_COMPLETED and pos + 2 <= n:  # no SH-2 header
+            out.append(FlushCompleted(rid, base_us, payload[pos + 1]))
+            pos += 2
             continue
         length = REPORT_LENGTHS.get(rid)
         if length is None or pos + length > n:
@@ -561,6 +619,8 @@ def _decode_report(
         return SignificantMotion(*head, struct.unpack_from("<H", rep, 4)[0])
     if rid == SensorId.STABILITY_CLASSIFIER:
         return StabilityClassifier(*head, rep[4])
+    if rid == SensorId.MOTION_REQUEST:
+        return MotionRequest(*head, rep[4], rep[5])
     if rid == SensorId.SHAKE_DETECTOR:
         return ShakeDetector(*head, struct.unpack_from("<H", rep, 4)[0])
     if rid == SensorId.PERSONAL_ACTIVITY_CLASSIFIER:
@@ -584,6 +644,7 @@ def parse_gyro_rv_cargo(payload: bytes, capture_timestamp_us: int) -> GyroIntegr
 
     Two shapes seen on hardware (vendor tool): 7×i16 bare, or prefixed with
     0xFB + i32 base delta + u16 delay (both 100 µs ticks)."""
+    check_uint("capture_timestamp_us", capture_timestamp_us, 64)
     ts = capture_timestamp_us
     if payload[:1] == bytes([BASE_TIMESTAMP_REF]):
         if len(payload) < 5 + 2 + 14:

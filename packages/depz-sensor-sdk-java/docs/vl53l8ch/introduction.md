@@ -38,8 +38,9 @@ golden vector `contracts/vectors/vl53l8_cnh.json`:
   reference-residual word. It needs the aggregate count and bins per aggregate
   the sensor runs; the block itself does not record them.
 
-Arming a CNH configuration on the board is not done from this SDK — the
-Python or TypeScript SDK drives the board.
+On the board, `ai.depz.sensor.devices.Vl53l8chDevice` arms a CNH
+configuration built with `Vl53l8CnhSetup` (`configureCnh`); every frame then
+carries the block.
 
 ## When to use CH over CX
 

@@ -11,9 +11,15 @@ VL53L4CD register-bridge codecs + host-ULD math, the VL53L5CX / L7CX / L7CH
 board codecs and frame decode, the shared VL53L8 results-frame decoder +
 advanced-DCI codecs + CNH histogram decode, the TMF8829 register-bridge codecs +
 frame / measurement decode + capture time, the BNO055 register-bridge and
-register codecs, and the BNO086 SH-2 / SHTP layer. This SDK is **decode-layer only** — pure, host-verifiable codecs
-covered by golden vectors; live hardware bring-up (register bridges, ULD init)
-is out of scope.
+register codecs, and the BNO086 SH-2 / SHTP layer — pure, host-verifiable codecs
+covered by golden vectors. On top of them, the **live device layer** (contract
+07, `ai.depz.sensor.devices`: reader thread, requests, streams, events, time
+sync, `.depzrec` record / replay, port discovery over jSerialComm) with the
+SR04, VL53L4CD (the ST ULD 2.2.3 on the host), VL53L8CX / CH, VL53L5CX,
+VL53L7CX / CH (the ST ULD with its firmware download on the host), the VL53L
+1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX: ST's ULD, ULP and histogram
+drivers on the host), TMF8829 (firmware download and the sensor sequence),
+BNO055 and BNO085 / BNO086 (the SH-2 host stack) classes.
 
 ## Documentation
 
@@ -42,18 +48,14 @@ a wire frame but ship as different parts:
 | Sensor       | What it is                                                      | Coverage today |
 | ------------ | -------------------------------------------------------------- | -------------- |
 | **SR04**     | Ultrasonic range finder.                                       | Full codecs (encode + decode). |
-| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware (protocol v2.00). | v2.00 wire codecs, the product table + class resolution, die-block / VL53L0X raw / histogram-block decode. |
+| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware (protocol v2.00). | Live devices `Vl53lxDevice` (+ one class per product) running ST's ULD / ULP / histogram drivers; v2.00 wire codecs, the product table + class resolution, die-block / VL53L0X raw / histogram-block decode. |
 | **VL53L4CD** | Single-zone ToF (~1.3 m) behind a thin I2C register bridge; production USB PID **0xED45**. | Full wire codecs + host-ULD math (result block, range timing, tuning words, init config block). |
-| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH); PIDs **0xED48 / 0xED49 / 0xED4A**. | Board codecs (pin control, bus speed, info), class resolution, frame decode through the VL53L8 decoder with the L5/L7 geometry, CNH decode on the L7CH. |
-| **VL53L8CX** | Base multizone ToF. Dev-default; enumerates on the ST dev USB id (VID 0x0483 / PID 0x56DC). | Shared VL53L8 frame decode + advanced-DCI codecs. |
-| **VL53L8CH** | CX **plus** CNH (compact histograms) and its own production USB PID **0xED40**. | Shares the VL53L8 frame decode + advanced-DCI with CX, plus the CNH histogram decode (`Vl53l8Uld.decodeCnh`). |
-| **TMF8829**  | ams-OSRAM multizone dToF (8×8 … 48×32 zones, up to 4 peaks, histograms) behind a thin SPI register bridge; PID **0xED4C**. | Wire codecs, chunk reassembly, frame / pixel decode + half-frame merge, config-page fields, clock model + capture time, measurement builder, embedded sensor firmware (MIT). |
-| **BNO055**   | 9-axis IMU with on-chip fusion behind an I2C register bridge; PID **0xEE0A**. | Wire codecs, units / calibration / axis-remap / page-1 codecs, register-window decode. |
-| **BNO085 / BNO086** | 9-axis IMU (SH-2 over SHTP).                                   | SHTP framing/reassembly, SH-2 control encoders, input-report decode. |
-
-For the 1D family, the VL53L5CX / L7CX / L7CH, the TMF8829 and the BNO055, initialising and
-streaming the board is done with the Python or TypeScript SDK; this SDK
-decodes what they send and builds the command payloads.
+| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH); PIDs **0xED48 / 0xED49 / 0xED4A**. | Live devices `Vl53l5cxDevice` / `Vl53l7cxDevice` / `Vl53l7chDevice` (the L5/L7 ULD on the host); board codecs (pin control, bus speed, info), class resolution, frame decode through the VL53L8 decoder with the L5/L7 geometry, CNH decode on the L7CH. |
+| **VL53L8CX** | Base multizone ToF. Dev-default; enumerates on the ST dev USB id (VID 0x0483 / PID 0x56DC). | Live device `Vl53l8cxDevice` (the ST ULD on the host); shared VL53L8 frame decode + advanced-DCI codecs. |
+| **VL53L8CH** | CX **plus** CNH (compact histograms) and its own production USB PID **0xED40**. | Live device `Vl53l8chDevice` (CNH armed with `Vl53l8CnhSetup`); shares the VL53L8 frame decode + advanced-DCI with CX, plus the CNH histogram decode (`Vl53l8Uld.decodeCnh`). |
+| **TMF8829**  | ams-OSRAM multizone dToF (8×8 … 48×32 zones, up to 4 peaks, histograms) behind a thin SPI register bridge; PID **0xED4C**. | Live device `Tmf8829Device` (firmware download, config page, the sensor sequence); wire codecs, chunk reassembly, frame / pixel decode + half-frame merge, config-page fields, clock model + capture time, measurement builder, embedded sensor firmware (MIT). |
+| **BNO055**   | 9-axis IMU with on-chip fusion behind an I2C register bridge; PID **0xEE0A**. | Live device `Bno055Device` (session logic, scaled samples); wire codecs, units / calibration / axis-remap / page-1 codecs, register-window decode. |
+| **BNO085 / BNO086** | 9-axis IMU (SH-2 over SHTP).                                   | Live device `Bno086Device` (the SH-2 host stack); SHTP framing/reassembly, SH-2 control encoders and response decoders, input-report decode + Q-point scaling. |
 
 `VL53L8CX` and `VL53L8CH` are byte-identical in the results-frame path this SDK
 decodes, so `Vl53l8Uld.parseFrame` serves both — the only wire difference is the
@@ -89,12 +91,12 @@ register-bridge driver (both variants) is an extension point and intentionally
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.6.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.7.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.6.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.7.0")
 ```
 
 Maven:
@@ -103,7 +105,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
 </dependency>
 ```
 

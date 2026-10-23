@@ -40,6 +40,8 @@ static int depz_candidates(depz_port_info **out, size_t *count)
     return DEPZ_OK;
 }
 
+static int probe_requests(depz_device *dev, depz_device_info *out);
+
 static int probe(const char *port, int timeout_ms, depz_device_info *out)
 {
     depz_device *dev;
@@ -52,18 +54,17 @@ static int probe(const char *port, int timeout_ms, depz_device_info *out)
     rc = depz_device_open(port, &dev);
     if (rc) return rc;
     depz_device_set_timeout_ms(dev, timeout_ms);
-    rc = depz_device_get_software_name(dev, out->software_name, sizeof out->software_name);
+    rc = probe_requests(dev, out);
     if (rc == DEPZ_OK) {
-        depz_parse_software_name(out->software_name, &ident);
+        depz_parse_software_name_n(out->software_name,
+                                   depz_device_string_len(out->software_name, sizeof out->software_name),
+                                   &ident);
         depz_strlcpy(out->port, port, sizeof out->port);
         depz_strlcpy(out->mode, ident.mode, sizeof out->mode);
         depz_strlcpy(out->fw_version, ident.version, sizeof out->fw_version);
         out->sensor_type = ident.sensor_type;
-        if (depz_device_get_device_name(dev, out->device_name, sizeof out->device_name))
-            out->device_name[0] = '\0';
-        if (depz_device_get_serial_number(dev, out->serial_number, sizeof out->serial_number))
-            out->serial_number[0] = '\0';
     } else {
+        out->software_name[0] = '\0';
         rc = depz_fail(DEPZ_E_NO_DEVICE, "no DEPZ device answered on %s", port);
     }
     depz_device_close(dev);
@@ -114,55 +115,126 @@ int depz_list_depz_devices(bool match_usb, int timeout_ms, depz_device_info **ou
     return DEPZ_OK;
 }
 
-/* Attach the sensor class for `type` to an open device. `usb_pid` (-1 when
- * unknown) picks between classes one firmware serves: VL53L8CX and VL53L8CH
- * share APP_VL53L8 and their silicon; only the production PID tells them
- * apart (no PID -> the CX base, safe since CH is a superset). The L5/L7
- * boards (APP_VL53L7) resolve by PID, then the device name (contract 11 §1). */
-static int attach_type(depz_device *dev, depz_sensor_type type, int usb_vid, int usb_pid,
-                       const char *device_name)
+/* Continue the open device `dev` as `name` in place (contract 02 §4.4). */
+int depz_attach_sensor_class(depz_device *dev, const char *name)
 {
-    if (type == DEPZ_SENSOR_VL53L7) {
-        static const depz_vl53l8_model by_l7[3] = {DEPZ_VL53L8_MODEL_L7CX, DEPZ_VL53L8_MODEL_L5CX,
-                                                   DEPZ_VL53L8_MODEL_L7CH};
-        depz_vl53l7_model m = depz_vl53l7_resolve_model(depz_usb_model_hint(usb_vid, usb_pid), device_name);
-        return depz_vl53l8_attach(dev, by_l7[m]);
-    }
-    if (type == DEPZ_SENSOR_SR04) return depz_sr04_attach(dev);
-    if (type == DEPZ_SENSOR_VL53L4) return depz_vl53l4cd_attach(dev);
-    if (type == DEPZ_SENSOR_BNO055) return depz_bno055_attach(dev);
-    if (type == DEPZ_SENSOR_TMF8829) return depz_tmf8829_attach(dev);
-    if (type == DEPZ_SENSOR_BNO086) return depz_bno086_attach(dev);
-    if (type == DEPZ_SENSOR_VL53LX)
-        return depz_vl53lx_attach(dev, depz_usb_model_hint(usb_vid, usb_pid), device_name);
-    if (type == DEPZ_SENSOR_VL53L8)
-        return depz_vl53l8_attach(dev, usb_pid == (int)DEPZ_PID_VL53L8 ? DEPZ_VL53L8_MODEL_L8CH
-                                                                      : DEPZ_VL53L8_MODEL_L8CX);
-    /* No class yet: the base device, with its type known. */
+    static const struct { const char *name; depz_vl53l8_model model; } mz[] = {
+        {"vl53l8cx", DEPZ_VL53L8_MODEL_L8CX}, {"vl53l8ch", DEPZ_VL53L8_MODEL_L8CH},
+        {"vl53l5cx", DEPZ_VL53L8_MODEL_L5CX}, {"vl53l7cx", DEPZ_VL53L8_MODEL_L7CX},
+        {"vl53l7ch", DEPZ_VL53L8_MODEL_L7CH},
+    };
+    size_t i;
+    bool plain, idle;
+    if (!dev || !name) return depz_fail(DEPZ_E_ARG, "attach_sensor_class: NULL argument");
+    if (!strcmp(name, "bootloader"))
+        return depz_fail(DEPZ_E_BOOTLOADER, "%s: device is in bootloader mode; use the bootloader client (contract 06)",
+                         dev->port);
+    for (i = 0; i < DEPZ_SENSOR_CLASS_COUNT; i++)
+        if (!strcmp(name, depz_sensor_class_name(i))) break;
+    if (i == DEPZ_SENSOR_CLASS_COUNT) return depz_fail(DEPZ_E_ARG, "attach_sensor_class: no sensor class %s", name);
     depz_mutex_lock(&dev->lock);
-    dev->sensor_type = type;
+    plain = dev->ops == NULL;
+    idle = dev->pending == NULL && !dev->closing;
     depz_mutex_unlock(&dev->lock);
-    return DEPZ_OK;
+    if (!plain) return depz_fail(DEPZ_E_ARG, "attach_sensor_class: %s already has a sensor class", dev->port);
+    if (!idle) return depz_fail(DEPZ_E_ARG, "attach_sensor_class: a request in flight, or the device is closing");
+    if (!strcmp(name, "device")) return DEPZ_OK;
+    if (!strcmp(name, "sr04")) return depz_sr04_attach(dev);
+    if (!strcmp(name, "vl53l4cd")) return depz_vl53l4cd_attach(dev);
+    if (!strcmp(name, "bno086")) return depz_bno086_attach(dev);
+    if (!strcmp(name, "bno055")) return depz_bno055_attach(dev);
+    if (!strcmp(name, "tmf8829")) return depz_tmf8829_attach(dev);
+    for (i = 0; i < sizeof mz / sizeof mz[0]; i++)
+        if (!strcmp(name, mz[i].name)) return depz_vl53l8_attach(dev, mz[i].model);
+    /* The 1D family: the class name names the product ("vl53lx" none). */
+    return depz_vl53lx_attach(dev, name, NULL);
 }
+
+/* Resolve the class from probe answers and attach it; a base device keeps
+ * the parsed firmware type (DEPZ_SENSOR_UNKNOWN for an unknown APP_*). */
+/* The names are stripped device strings in NUL-filled buffers (embedded
+ * NULs kept, contract 02 §4.1): their lengths come from the buffers. */
+static int attach_resolved_n(depz_device *dev, const char *software_name, size_t sw_cap,
+                             const char *device_name, size_t dn_cap, int usb_vid, int usb_pid)
+{
+    size_t sw_len = depz_device_string_len(software_name, sw_cap);
+    const char *cls = depz_resolve_sensor_class_n(software_name, sw_len, device_name,
+                                                  depz_device_string_len(device_name, dn_cap),
+                                                  usb_vid >= 0 && usb_vid <= 0xFFFF ? &usb_vid : NULL,
+                                                  usb_pid >= 0 && usb_pid <= 0xFFFF ? &usb_pid : NULL);
+    int rc = depz_attach_sensor_class(dev, cls);
+    if (rc == DEPZ_OK && !strcmp(cls, "device")) {
+        depz_identity ident;
+        depz_parse_software_name_n(software_name, sw_len, &ident);
+        depz_mutex_lock(&dev->lock);
+        dev->sensor_type = ident.sensor_type;
+        depz_mutex_unlock(&dev->lock);
+    }
+    return rc;
+}
+#define attach_resolved(dev, sw, dn, vid, pid) attach_resolved_n(dev, sw, sizeof(sw), dn, sizeof(dn), vid, pid)
 
 int depz_device_promote(depz_device *dev)
 {
-    char name[64];
+    return depz_device_promote_ex(dev, -1, -1, NULL);
+}
+
+/* The pre-§4.4 in-place probe (contract 15 `probe: "legacy"`):
+ * GET_NAME_ACTIVE_SOFTWARE, plus GET_DEVICE_NAME for the L5/L7 and 1D
+ * families only, then the class attached in place. */
+int depz_device_promote_ex(depz_device *dev, int usb_vid, int usb_pid, depz_identity *out)
+{
+    char name[64], dn[128] = "";
     depz_identity ident;
     int rc;
     if (!dev) return depz_fail(DEPZ_E_ARG, "promote: NULL device");
     rc = depz_device_get_software_name(dev, name, sizeof name);
     if (rc) return rc;
-    depz_parse_software_name(name, &ident);
-    if (!strcmp(ident.mode, "bootloader"))
-        return depz_fail(DEPZ_E_BOOTLOADER, "%s: device is in bootloader mode", dev->port);
+    depz_parse_software_name_n(name, depz_device_string_len(name, sizeof name), &ident);
+    if (out) *out = ident;
     if (ident.sensor_type == DEPZ_SENSOR_VL53L7 || ident.sensor_type == DEPZ_SENSOR_VL53LX) {
-        /* Over a bare link the device name is all there is (as the Python SDK). */
-        char dn[128];
         if (depz_device_get_device_name(dev, dn, sizeof dn) != DEPZ_OK) dn[0] = '\0';
-        return attach_type(dev, ident.sensor_type, -1, -1, dn);
     }
-    return attach_type(dev, ident.sensor_type, -1, -1, NULL);
+    return attach_resolved(dev, name, dn, usb_vid, usb_pid);
+}
+
+/* The contract 02 §4.4 probe on an open device: GET_NAME_ACTIVE_SOFTWARE
+ * (required: its failure is returned), then GET_DEVICE_NAME and GET_SERIAL
+ * (optional: a failure leaves ""). */
+static int probe_requests(depz_device *dev, depz_device_info *out)
+{
+    int rc = depz_device_get_software_name(dev, out->software_name, sizeof out->software_name);
+    if (rc) return rc;
+    if (depz_device_get_device_name(dev, out->device_name, sizeof out->device_name))
+        out->device_name[0] = '\0';
+    if (depz_device_get_serial_number(dev, out->serial_number, sizeof out->serial_number))
+        out->serial_number[0] = '\0';
+    return DEPZ_OK;
+}
+
+int depz_open_on_link(depz_link *link, int usb_vid, int usb_pid, int timeout_ms, depz_device **out)
+{
+    depz_device_info info;
+    depz_device *dev;
+    int rc;
+    if (!out) {
+        depz_link_free(link);
+        return depz_fail(DEPZ_E_ARG, "open_on_link: NULL output");
+    }
+    *out = NULL;
+    if (!link) return depz_fail(DEPZ_E_ARG, "open_on_link: NULL link");
+    rc = depz_device_open_link(link, &dev); /* takes the link, also on failure */
+    if (rc) return rc;
+    depz_device_set_timeout_ms(dev, timeout_ms > 0 ? timeout_ms : DEPZ_DEFAULT_TIMEOUT_MS);
+    memset(&info, 0, sizeof info);
+    rc = probe_requests(dev, &info);
+    if (rc == DEPZ_E_IO || rc == DEPZ_E_CLOSED || rc == DEPZ_E_TIMEOUT || rc == DEPZ_E_STATUS ||
+        rc == DEPZ_E_BUSY || rc == DEPZ_E_PROTOCOL)
+        rc = depz_fail(DEPZ_E_NO_DEVICE, "no DEPZ device answered on %s", dev->port);
+    if (rc == DEPZ_OK) rc = attach_resolved(dev, info.software_name, info.device_name, usb_vid, usb_pid);
+    if (rc) { depz_device_close(dev); return rc; }
+    *out = dev;
+    return DEPZ_OK;
 }
 
 /* The USB VID / PID of `port`, -1 when the OS does not know them. */
@@ -192,9 +264,10 @@ static int open_probed(const char *port, int timeout_ms, depz_device **out)
     if (rc) return rc;
     if (timeout_ms > 0) depz_device_set_timeout_ms(dev, timeout_ms);
     {
+        /* The probe's connection is closed; the class runs on a fresh one. */
         int vid, pid;
         port_ids(port, &vid, &pid);
-        rc = attach_type(dev, info.sensor_type, vid, pid, info.device_name);
+        rc = attach_resolved(dev, info.software_name, info.device_name, vid, pid);
     }
     if (rc) { depz_device_close(dev); return rc; }
     *out = dev;

@@ -16,6 +16,8 @@
  * Mirrors the Python reference `depz_sensor_sdk.bno086.reports`.
  */
 
+import { checkU64 } from "../../protocol/wire.js";
+
 /** SH-2 input report IDs (datasheet §1.3.5, sh2 reference driver). */
 export enum SensorId {
   Accelerometer = 0x01, // calibrated, m/s², Q8
@@ -54,11 +56,13 @@ export enum SensorId {
   ArvrStabilizedRv = 0x28, // quaternion Q14 + accuracy rad Q12
   ArvrStabilizedGameRv = 0x29, // quaternion Q14, no accuracy
   GyroIntegratedRv = 0x2a, // channel 5 dense: quat Q14 + ang vel Q10
+  MotionRequest = 0x2b, // interactive calibration, BNO086 only
 }
 
 // In-cargo control IDs on the input channels
 export const BASE_TIMESTAMP_REF = 0xfb; // + i32 base delta (100 µs ticks)
 export const TIMESTAMP_REBASE = 0xfa; // + i32 rebase delta (100 µs ticks), batching
+export const FLUSH_COMPLETED = 0xef; // + u8 sensor ID; answer to Force Sensor Flush (0xF0)
 
 /** Q point of the primary fields (value = raw / 2**Q); see module docs. */
 export const Q_POINTS: Record<number, number> = {
@@ -128,6 +132,26 @@ export const REPORT_LENGTHS: Record<number, number> = {
   [SensorId.ArvrStabilizedRv]: 14,
   [SensorId.ArvrStabilizedGameRv]: 12,
   [SensorId.GyroIntegratedRv]: 14,
+  [SensorId.MotionRequest]: 6,
+};
+
+/**
+ * SH-2 §6.5.45.2. Value 2 (stay stationary, optional) is deprecated by CEVA:
+ * "ignore this request".
+ */
+export const MOTION_REQUEST_NAMES: Record<number, string> = {
+  0: "no_constraint",
+  1: "stay_stationary_required",
+  2: "stay_stationary_optional",
+  3: "stationary_non_urgent",
+  4: "stationary_urgent",
+};
+export const MOTION_INTENT_NAMES: Record<number, string> = {
+  0: "unknown",
+  1: "stationary_no_vibration",
+  2: "stationary_with_vibration",
+  3: "in_motion",
+  4: "in_motion_accelerating",
 };
 
 export const STABILITY_NAMES: Record<number, string> = {
@@ -367,6 +391,30 @@ export interface RawSensor extends InputReportBase {
 }
 
 /**
+ * 0x2B motion request (BNO086 interactive calibration): the motion intent the
+ * hub was last told, and what it asks of the device. Sent when the request
+ * changes, not periodically, whatever the granted rate.
+ */
+export interface MotionRequest extends InputReportBase {
+  type: "MotionRequest";
+  intent: number;
+  request: number;
+  intentName: string;
+  requestName: string;
+  /** The hub asks the device to stop (the deprecated optional request 2 does not count). */
+  wantsStillness: boolean;
+}
+
+/**
+ * 0xEF Flush Completed: every batched report of `flushedSensor` as of the
+ * matching Force Sensor Flush has been sent. `sensorId` is 0xEF.
+ */
+export interface FlushCompleted extends ReportBase {
+  type: "FlushCompleted";
+  flushedSensor: number;
+}
+
+/**
  * Unrecognized report ID: raw bytes from the ID to end of cargo (the length
  * is unknowable, so parsing stops here).
  */
@@ -392,10 +440,11 @@ export type InputReport =
   | ShakeDetector
   | GenericEvent
   | PersonalActivityClassifier
-  | RawSensor;
+  | RawSensor
+  | MotionRequest;
 
 /** Anything the sensor pushes. */
-export type Report = InputReport | GyroIntegratedRV | UnknownReport;
+export type Report = InputReport | GyroIntegratedRV | FlushCompleted | UnknownReport;
 
 // ── parsers ───────────────────────────────────────────────────────────────────
 
@@ -411,6 +460,7 @@ function view(p: Uint8Array): DataView {
  * timestamp is `base + delay` where base = capture − baseDelta·100 µs.
  */
 export function parseInputCargo(payload: Uint8Array, captureTimestampUs: bigint): Report[] {
+  checkU64("captureTimestampUs", captureTimestampUs);
   const out: Report[] = [];
   const v = view(payload);
   let baseUs = captureTimestampUs;
@@ -428,6 +478,12 @@ export function parseInputCargo(payload: Uint8Array, captureTimestampUs: bigint)
       const delta = v.getInt32(pos + 1, true);
       baseUs += BigInt(delta) * 100n;
       pos += 5;
+      continue;
+    }
+    if (rid === FLUSH_COMPLETED && pos + 2 <= n) {
+      // no SH-2 header
+      out.push({ type: "FlushCompleted", sensorId: rid, timestampUs: baseUs, flushedSensor: payload[pos + 1]! });
+      pos += 2;
       continue;
     }
     const length = REPORT_LENGTHS[rid];
@@ -569,6 +625,19 @@ function decodeReport(
         name: STABILITY_NAMES[classification] ?? String(classification),
       };
     }
+    case SensorId.MotionRequest: {
+      const intent = rep[4]!;
+      const request = rep[5]!;
+      return {
+        type: "MotionRequest",
+        ...head,
+        intent,
+        request,
+        intentName: MOTION_INTENT_NAMES[intent] ?? String(intent),
+        requestName: MOTION_REQUEST_NAMES[request] ?? String(request),
+        wantsStillness: request === 1 || request === 3 || request === 4,
+      };
+    }
     case SensorId.ShakeDetector:
       return { type: "ShakeDetector", ...head, flags: v.getUint16(4, true) };
     case SensorId.PersonalActivityClassifier: {
@@ -620,6 +689,7 @@ export function parseGyroRvCargo(
   payload: Uint8Array,
   captureTimestampUs: bigint,
 ): GyroIntegratedRV | null {
+  checkU64("captureTimestampUs", captureTimestampUs);
   let ts = captureTimestampUs;
   let body = payload;
   if (payload.length >= 1 && payload[0] === BASE_TIMESTAMP_REF) {

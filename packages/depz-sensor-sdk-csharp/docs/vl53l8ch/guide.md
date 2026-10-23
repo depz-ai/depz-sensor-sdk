@@ -11,15 +11,40 @@ exactly as in the [VL53L8CX user guide](../vl53l8cx/guide.md) — read that firs
 This page covers **only the CH-specific bits**: selecting the CH decoder and
 decoding the CNH histograms.
 
-This SDK does not drive the board: arming a CNH configuration is done with the
-Python or TypeScript SDK. Keep the configuration's aggregate count and bins per
-aggregate — the decode needs them.
+`Vl53l8chDevice` is a `Vl53l8cxDevice` with one more method, `ConfigureCnh`,
+and downloads the CH firmware (VL53LMZ ULD 2.0.16) at `Init()`.
 
 ## Contents
 
+- [Arm CNH on the live device](#arm-cnh-on-the-live-device)
 - [Decoding CH frames](#decoding-ch-frames)
 - [Decode the CNH histograms](#decode-the-cnh-histograms)
 - [Gotchas](#gotchas)
+
+## Arm CNH on the live device
+
+```csharp
+using Depz.Sensor.Devices;
+using Depz.Sensor.Vl53l8;
+
+var ch = (Vl53l8chDevice)DepzDevices.OpenVl53l8();
+ch.Init();
+ch.SetResolution(64);
+ch.SetRangingFrequencyHz(15);
+
+var setup = new Vl53l8CnhSetup();
+setup.InitConfig(startBin: 10, numBins: 20, subSample: 2);                // bins 10.. of the device histogram, 2 per CNH bin
+setup.CreateAggMap(64, startX: 0, startY: 0, mergeX: 2, mergeY: 2, cols: 4, rows: 4); // 16 aggregates of 2x2 zones
+ch.ConfigureCnh(setup);                                                   // refuses a setup over 6160 B
+
+using var frames = ch.Frames();
+ch.StartRanging();                                                        // every frame now carries CnhRaw
+Vl53l8CnhResult cnh = Vl53l8Cnh.DecodeHistogram(setup.ToDecodeConfig(), frames.Take(TimeSpan.FromSeconds(1)).CnhRaw);
+ch.StopRanging();
+```
+
+`setup.MinMaxDistanceMm()` tells the distance range the histogram captures and
+`setup.BinCenterMm(i)` the distance of bin `i`.
 
 ## Decoding CH frames
 
@@ -72,19 +97,18 @@ static void PrintCnh(Vl53l8Frame f)
     for (int a = 0; a < cnh.Aggregates.Count; a++)
     {
         Vl53l8CnhAggregate agg = cnh.Aggregates[a];
-        double[] hist = agg.HistRaw.Select((v, i) => v / Math.Pow(2, agg.HistScaler[i])).ToArray();   // raw / 2^scaler
-        Console.WriteLine($"aggregate {a}: {string.Join(", ", hist)}");
+        Console.WriteLine($"aggregate {a}: {string.Join(", ", agg.Hist)} (ambient {agg.Ambient})");
     }
-    double refResidual = cnh.RefResidualWord / 2048.0;       // 11 fractional bits
-    Console.WriteLine($"ref residual {refResidual}");
+    Console.WriteLine($"ref residual {cnh.RefResidual}");    // 11 fractional bits
 }
 ```
 
 Each `Vl53l8CnhAggregate` holds `FeatureLength` bins as an integer `HistRaw`
-plus a power-of-two `HistScaler`; the bin value is `HistRaw / 2^HistScaler`.
-`DecodeHistogram` throws `ArgumentOutOfRangeException` for a non-positive
-aggregate or bin count, and `ArgumentException` when the block is shorter than
-the layout the config implies.
+plus a power-of-two `HistScaler`; the bin value is `HistRaw / 2^HistScaler`
+(`Hist`). The aggregate's ambient level is `AmbientRaw / 2^AmbientScaler`
+(`Ambient`). `DecodeHistogram` throws `ArgumentOutOfRangeException` for a
+negative aggregate or bin count, and `ArgumentException` when the block is
+shorter than the layout the config implies.
 
 ## Gotchas
 
@@ -95,5 +119,5 @@ the layout the config implies.
   wrong pair decodes to wrong bins or throws `ArgumentException`.
 - **`CnhRaw` is null** on CX frames and on CH frames without a CNH block.
 - **Everything else is the CX surface** — chunk gaps, `Resolution`-sized arrays,
-  `TargetStatus == 255`, out-of-scope live init — all apply here too; see the
+  `TargetStatus == 255`, the 2 Hz floor — all apply here too; see the
   [CX gotchas](../vl53l8cx/guide.md#gotchas).

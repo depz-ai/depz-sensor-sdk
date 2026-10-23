@@ -29,7 +29,7 @@ pub const POWER_MODE_DEEP_SLEEP: u8 = 2;
 
 /// Per-measurement fixed-point scale applied to threshold low/high on set
 /// (get divides by the same factor); unlisted measurements scale by 1.
-fn thresh_scale(measurement: u8) -> i64 {
+pub(crate) fn thresh_scale(measurement: u8) -> i64 {
     match measurement {
         DIST_MM => 4,
         SIGNAL_PER_SPAD_KCPS => 2048,
@@ -41,9 +41,51 @@ fn thresh_scale(measurement: u8) -> i64 {
     }
 }
 
-/// Xtalk margin (kcps/SPAD) → raw DCI value: `round(kcps * 2048)`.
-pub fn xtalk_margin_to_raw(margin_kcps: f64) -> u32 {
-    (margin_kcps * 2048.0).round() as u32
+/// Advanced-codec argument error (contract 07 §3: an argument the driver
+/// would refuse, or one that does not fit its DCI field, is rejected before
+/// anything is written — the ULD's `VL53L8CX_STATUS_INVALID_PARAM`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdvancedError {
+    /// Motion indicator resolution other than 16 (4×4) or 64 (8×8).
+    InvalidResolution(usize),
+    /// Xtalk margin outside 0..=10000 kcps (or not a number).
+    XtalkMarginOutOfRange,
+    /// Threshold `index`: low/high × its measurement scale does not fit i32.
+    ThresholdOverflow(usize),
+    /// More than [`NB_THRESHOLDS`] thresholds.
+    TooManyThresholds(usize),
+}
+
+impl std::fmt::Display for AdvancedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AdvancedError::InvalidResolution(r) => {
+                write!(f, "VL53L8 motion resolution {}: 16 or 64", r)
+            }
+            AdvancedError::XtalkMarginOutOfRange => write!(f, "VL53L8 xtalk margin out of range 0..10000"),
+            AdvancedError::ThresholdOverflow(k) => {
+                write!(f, "VL53L8 thresholds[{}]: scaled low/high out of range for i32", k)
+            }
+            AdvancedError::TooManyThresholds(n) => {
+                write!(f, "VL53L8 at most {} thresholds, got {}", NB_THRESHOLDS, n)
+            }
+        }
+    }
+}
+
+impl std::error::Error for AdvancedError {}
+
+/// Largest xtalk margin `set_xtalk_margin` accepts, kcps/SPAD.
+pub const XTALK_MARGIN_MAX_KCPS: f64 = 10000.0;
+
+/// Xtalk margin (kcps/SPAD) → raw DCI value `round(kcps * 2048)`, as
+/// `set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`], else
+/// [`AdvancedError::XtalkMarginOutOfRange`].
+pub fn try_xtalk_margin_to_raw(margin_kcps: f64) -> Result<u32, AdvancedError> {
+    if !(0.0..=XTALK_MARGIN_MAX_KCPS).contains(&margin_kcps) {
+        return Err(AdvancedError::XtalkMarginOutOfRange);
+    }
+    Ok((margin_kcps * 2048.0).round() as u32)
 }
 
 /// Mirror of `VL53L8CX_Motion_Configuration` (156 bytes, plugin source).
@@ -125,8 +167,18 @@ impl MotionConfig {
         out
     }
 
-    /// Set `map_id` for the resolution (pure; mirrors `_set_resolution`).
-    pub fn set_resolution(&mut self, resolution: usize) {
+    /// Set `map_id` for the resolution (pure; mirrors `_set_resolution`):
+    /// 16 or 64 zones, else [`AdvancedError::InvalidResolution`] with
+    /// `map_id` untouched.
+    pub fn try_set_resolution(&mut self, resolution: usize) -> Result<(), AdvancedError> {
+        if resolution != RESOLUTION_4X4 && resolution != RESOLUTION_8X8 {
+            return Err(AdvancedError::InvalidResolution(resolution));
+        }
+        self.set_resolution_unchecked(resolution);
+        Ok(())
+    }
+
+    fn set_resolution_unchecked(&mut self, resolution: usize) {
         if resolution == RESOLUTION_4X4 {
             for i in 0..16 {
                 self.map_id[i] = i as i8;
@@ -143,9 +195,16 @@ impl MotionConfig {
 }
 
 /// The default motion-indicator configuration `motion_indicator_init` programs
-/// for a resolution (the exact bytes written to the sensor).
-pub fn default_motion_config(resolution: usize) -> MotionConfig {
-    let mut cfg = MotionConfig {
+/// for a resolution (the exact bytes written to the sensor); a resolution
+/// other than 16 or 64 is [`AdvancedError::InvalidResolution`].
+pub fn try_default_motion_config(resolution: usize) -> Result<MotionConfig, AdvancedError> {
+    let mut cfg = base_motion_config();
+    cfg.try_set_resolution(resolution)?;
+    Ok(cfg)
+}
+
+fn base_motion_config() -> MotionConfig {
+    MotionConfig {
         ref_bin_offset: 13633,
         detection_threshold: 2_883_584,
         extra_noise_sigma: 0,
@@ -160,9 +219,7 @@ pub fn default_motion_config(resolution: usize) -> MotionConfig {
         global_indicator_format_1: 8,
         global_indicator_format_2: 0,
         ..MotionConfig::default()
-    };
-    cfg.set_resolution(resolution);
-    cfg
+    }
 }
 
 /// One detection-threshold entry (real units; scaled on pack).
@@ -187,8 +244,27 @@ pub struct DetectionThresholdBlocks {
 
 /// Pack up to 64 detection thresholds into their DCI blocks. Entries beyond
 /// the supplied list are zero-filled. Each entry's low/high are multiplied by
-/// its measurement's fixed-point scale.
-pub fn pack_detection_thresholds(thresholds: &[DetectionThreshold]) -> DetectionThresholdBlocks {
+/// its measurement's fixed-point scale; a product that does not fit the i32
+/// field is [`AdvancedError::ThresholdOverflow`] (never wrapped), more than
+/// 64 entries [`AdvancedError::TooManyThresholds`].
+pub fn try_pack_detection_thresholds(
+    thresholds: &[DetectionThreshold],
+) -> Result<DetectionThresholdBlocks, AdvancedError> {
+    if thresholds.len() > NB_THRESHOLDS {
+        return Err(AdvancedError::TooManyThresholds(thresholds.len()));
+    }
+    for (k, t) in thresholds.iter().enumerate() {
+        let scale = thresh_scale(t.measurement);
+        for v in [t.low_thresh, t.high_thresh] {
+            if i32::try_from(v as i64 * scale).is_err() {
+                return Err(AdvancedError::ThresholdOverflow(k));
+            }
+        }
+    }
+    Ok(pack_detection_thresholds_unchecked(thresholds))
+}
+
+fn pack_detection_thresholds_unchecked(thresholds: &[DetectionThreshold]) -> DetectionThresholdBlocks {
     let valid = vec![0x05u8; 8];
     let mut start = vec![0u8; NB_THRESHOLDS * 12];
     for k in 0..NB_THRESHOLDS {

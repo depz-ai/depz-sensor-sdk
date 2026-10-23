@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 #include "depz/detail/byteio.hpp"
 
@@ -24,6 +25,9 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len) {
 }
 
 bytes pack_write_reg(std::uint16_t addr, byte_span data) {
+    // contracts 10/12 §2: data 1..253 bytes (refused, never sent)
+    if (data.empty() || data.size() > XFER_MAX)
+        throw std::invalid_argument("VL53_WRITE_REG: data must be 1..253 bytes");
     bytes out;
     out.reserve(2 + data.size());
     wr_le(out, addr, 2);
@@ -84,8 +88,9 @@ std::optional<StreamData> StreamData::unpack(byte_span payload) {
     r.timestamp_us = rd_u64(payload, 0);
     r.addr = rd_u16(payload, 8);
     r.len = rd_u16(payload, 10);
-    const std::size_t n = std::min<std::size_t>(r.len, payload.size() - 12);
-    r.data.assign(payload.begin() + 12, payload.begin() + 12 + n);
+    // checked against its own len field; trailing bytes ignored (contract 07 §3)
+    if (payload.size() < 12u + r.len) return std::nullopt;
+    r.data.assign(payload.begin() + 12, payload.begin() + 12 + r.len);
     return r;
 }
 
@@ -146,6 +151,8 @@ std::optional<RangeTimingRegs> range_timing_registers(std::uint32_t budget_ms,
     } else if (inter_ms > budget_ms) {  // autonomous low power
         const double factor =
             1.055 * static_cast<double>(inter_ms) * static_cast<double>(clock_pll & 0x3FF);
+        // INTERMEASUREMENT_MS is a u32 register: an overflow is refused, never wrapped
+        if (factor >= 4294967296.0) return std::nullopt;
         intermeasurement_raw = static_cast<std::uint32_t>(factor);
         timing_budget_us = (timing_budget_us - 4300u) / 2u;
     } else {
@@ -198,6 +205,8 @@ std::optional<RangeTiming> decode_range_timing(std::uint32_t intermeasurement_ra
 // ── tuning-register codecs ──────────────────────────────────────────────────
 
 std::uint16_t offset_raw(int offset_mm) {
+    // 11-bit signed mm (decode_offset's range): refused outside, never wrapped
+    if (offset_mm < -1024 || offset_mm > 1023) throw std::out_of_range("offset_mm outside -1024..1023");
     return static_cast<std::uint16_t>(offset_mm * 4);
 }
 
@@ -207,6 +216,7 @@ int decode_offset(std::uint16_t raw_word) {
 }
 
 std::uint16_t xtalk_raw(int xtalk_kcps) {
+    if (xtalk_kcps < 0 || xtalk_kcps > (0xFFFF >> 9)) throw std::out_of_range("xtalk_kcps outside 0..127");
     return static_cast<std::uint16_t>(static_cast<std::uint32_t>(xtalk_kcps) << 9);
 }
 
@@ -215,6 +225,7 @@ int decode_xtalk(std::uint16_t raw_word) {
 }
 
 std::uint16_t signal_threshold_raw(int signal_kcps) {
+    if (signal_kcps < 0 || signal_kcps > 0xFFFF) throw std::out_of_range("signal_kcps outside 0..65535");
     return static_cast<std::uint16_t>(signal_kcps >> 3);
 }
 
@@ -223,7 +234,7 @@ int decode_signal_threshold(std::uint16_t raw_word) {
 }
 
 std::optional<std::uint16_t> sigma_threshold_raw(int sigma_mm) {
-    if (sigma_mm > (0xFFFF >> 2)) return std::nullopt;
+    if (sigma_mm < 0 || sigma_mm > (0xFFFF >> 2)) return std::nullopt;
     return static_cast<std::uint16_t>(static_cast<std::uint32_t>(sigma_mm) << 2);
 }
 

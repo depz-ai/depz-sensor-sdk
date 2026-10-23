@@ -11,9 +11,14 @@
 //!
 //! Mirrors the TS/Python `parse_input_cargo` / `parse_gyro_rv_cargo`.
 
+use crate::protocol::common::CodecError;
+
 /// In-cargo control IDs on the input channels.
 pub const BASE_TIMESTAMP_REF: u8 = 0xfb;
 pub const TIMESTAMP_REBASE: u8 = 0xfa;
+/// Flush Completed: + u8 sensor ID, no SH-2 header; the answer to Force Sensor
+/// Flush (0xF0).
+pub const FLUSH_COMPLETED: u8 = 0xef;
 
 /// Rotation-vector accuracy estimate Q point (radians).
 pub const RV_ACCURACY_Q: u32 = 12;
@@ -46,7 +51,7 @@ pub fn report_length(sensor_id: u8) -> Option<usize> {
         0x0c | 0x0d | 0x0e => 6,
         0x10 => 5,
         0x11 => 12,
-        0x12 | 0x13 | 0x19 | 0x1a | 0x1c | 0x1f | 0x20 | 0x21 | 0x22 | 0x23 => 6,
+        0x12 | 0x13 | 0x19 | 0x1a | 0x1c | 0x1f | 0x20 | 0x21 | 0x22 | 0x23 | 0x2b => 6,
         0x18 | 0x1b => 8,
         _ => return None,
     };
@@ -153,6 +158,19 @@ pub enum Report {
         delay_us: i64,
         classification: u8,
     },
+    /// 0x2B motion request (BNO086 interactive calibration): the motion
+    /// intent the hub was last told, and what it asks of the device (SH-2
+    /// §6.5.45.2; 1, 3, 4 = stay still). Sent when the request changes, not
+    /// periodically, whatever the granted rate.
+    MotionRequest {
+        sensor_id: u8,
+        timestamp_us: i64,
+        seq: u8,
+        accuracy: u8,
+        delay_us: i64,
+        intent: u8,
+        request: u8,
+    },
     /// 0x19 shake detector; bits 0/1/2 = X/Y/Z.
     ShakeDetector {
         sensor_id: u8,
@@ -208,12 +226,68 @@ pub enum Report {
         vy_raw: i32,
         vz_raw: i32,
     },
+    /// 0xEF Flush Completed: every batched report of `flushed_sensor` as of
+    /// the matching Force Sensor Flush has been sent. `sensor_id` is 0xEF; no
+    /// SH-2 header, so the timestamp is the cargo's current base.
+    FlushCompleted {
+        sensor_id: u8,
+        timestamp_us: i64,
+        flushed_sensor: u8,
+    },
     /// Unrecognized report ID: raw bytes from the ID to the end of the cargo.
     Unknown {
         sensor_id: u8,
         timestamp_us: i64,
         data: Vec<u8>,
     },
+}
+
+impl Report {
+    /// The report id (0xEF for Flush Completed).
+    pub fn sensor_id(&self) -> u8 {
+        match self {
+            Report::Vector3 { sensor_id, .. }
+            | Report::Vector3WithBias { sensor_id, .. }
+            | Report::RotationVector { sensor_id, .. }
+            | Report::Scalar { sensor_id, .. }
+            | Report::TapDetector { sensor_id, .. }
+            | Report::StepCounter { sensor_id, .. }
+            | Report::StepDetector { sensor_id, .. }
+            | Report::SignificantMotion { sensor_id, .. }
+            | Report::StabilityClassifier { sensor_id, .. }
+            | Report::MotionRequest { sensor_id, .. }
+            | Report::ShakeDetector { sensor_id, .. }
+            | Report::PersonalActivityClassifier { sensor_id, .. }
+            | Report::RawSensor { sensor_id, .. }
+            | Report::GenericEvent { sensor_id, .. }
+            | Report::GyroIntegratedRv { sensor_id, .. }
+            | Report::FlushCompleted { sensor_id, .. }
+            | Report::Unknown { sensor_id, .. } => *sensor_id,
+        }
+    }
+
+    /// The report's measurement time on the MCU clock, µs.
+    pub fn timestamp_us(&self) -> i64 {
+        match self {
+            Report::Vector3 { timestamp_us, .. }
+            | Report::Vector3WithBias { timestamp_us, .. }
+            | Report::RotationVector { timestamp_us, .. }
+            | Report::Scalar { timestamp_us, .. }
+            | Report::TapDetector { timestamp_us, .. }
+            | Report::StepCounter { timestamp_us, .. }
+            | Report::StepDetector { timestamp_us, .. }
+            | Report::SignificantMotion { timestamp_us, .. }
+            | Report::StabilityClassifier { timestamp_us, .. }
+            | Report::MotionRequest { timestamp_us, .. }
+            | Report::ShakeDetector { timestamp_us, .. }
+            | Report::PersonalActivityClassifier { timestamp_us, .. }
+            | Report::RawSensor { timestamp_us, .. }
+            | Report::GenericEvent { timestamp_us, .. }
+            | Report::GyroIntegratedRv { timestamp_us, .. }
+            | Report::FlushCompleted { timestamp_us, .. }
+            | Report::Unknown { timestamp_us, .. } => *timestamp_us,
+        }
+    }
 }
 
 /// Which of the plain 3-vector reports.
@@ -240,8 +314,27 @@ fn i32_le(b: &[u8], i: usize) -> i32 {
     i32::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3]])
 }
 
+/// [`parse_input_cargo`] that refuses a negative `capture_timestamp_us`: the
+/// capture time is the MCU uptime, a u64 (contract 07 §3).
+pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Vec<Report>, CodecError> {
+    if capture_timestamp_us < 0 {
+        return Err(CodecError("capture_timestamp_us must not be negative"));
+    }
+    Ok(parse_input_cargo(payload, capture_timestamp_us))
+}
+
+/// [`parse_gyro_rv_cargo`] that refuses a negative `capture_timestamp_us`
+/// (contract 07 §3).
+pub fn try_parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Option<Report>, CodecError> {
+    if capture_timestamp_us < 0 {
+        return Err(CodecError("capture_timestamp_us must not be negative"));
+    }
+    Ok(parse_gyro_rv_cargo(payload, capture_timestamp_us))
+}
+
 /// Parse a channel-3/4 cargo into typed reports. `capture_timestamp_us` is the
-/// bridge RPT_DATA capture time (MCU uptime).
+/// bridge RPT_DATA capture time (MCU uptime); a negative one is not checked —
+/// prefer [`try_parse_input_cargo`].
 pub fn parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Vec<Report> {
     let mut out = Vec::new();
     let mut base_us = capture_timestamp_us;
@@ -259,6 +352,16 @@ pub fn parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Vec<Repor
             let delta = i32_le(payload, pos + 1) as i64;
             base_us += delta * 100;
             pos += 5;
+            continue;
+        }
+        if rid == FLUSH_COMPLETED && pos + 2 <= n {
+            // no SH-2 header
+            out.push(Report::FlushCompleted {
+                sensor_id: rid,
+                timestamp_us: base_us,
+                flushed_sensor: payload[pos + 1],
+            });
+            pos += 2;
             continue;
         }
         let length = match report_length(rid) {
@@ -399,6 +502,15 @@ fn decode_report(rid: u8, rep: &[u8], ts: i64, seq: u8, accuracy: u8, delay_us: 
             delay_us,
             classification: rep[4],
         },
+        0x2b => Report::MotionRequest {
+            sensor_id: rid,
+            timestamp_us: ts,
+            seq,
+            accuracy,
+            delay_us,
+            intent: rep[4],
+            request: rep[5],
+        },
         0x19 => Report::ShakeDetector {
             sensor_id: rid,
             timestamp_us: ts,
@@ -456,7 +568,8 @@ fn decode_report(rid: u8, rep: &[u8], ts: i64, seq: u8, accuracy: u8, delay_us: 
 /// Parse a channel-5 cargo (gyro-integrated RV, dense format).
 ///
 /// Two shapes: 7×i16 bare, or prefixed with 0xFB + i32 base delta + u16 delay
-/// (both 100 µs ticks). Returns `None` if the cargo is too short.
+/// (both 100 µs ticks). Returns `None` if the cargo is too short. A negative
+/// `capture_timestamp_us` is not checked — prefer [`try_parse_gyro_rv_cargo`].
 pub fn parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Option<Report> {
     let mut ts = capture_timestamp_us;
     let mut body: &[u8] = payload;

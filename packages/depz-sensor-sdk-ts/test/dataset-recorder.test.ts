@@ -37,7 +37,7 @@ function emitFrame(dev: Vl53l8cx, timestampUs: bigint, resolution = 16): void {
     ambientPerSpad: new Float64Array(n),
     nbSpadsEnabled: new Int32Array(n),
     rangeSigmaMm: new Float64Array(n),
-    reflectance: new Uint8Array(n),
+    reflectance: new Float64Array(n),
     siliconTempDegc: 25,
     cnhRaw: null,
     motion: null,

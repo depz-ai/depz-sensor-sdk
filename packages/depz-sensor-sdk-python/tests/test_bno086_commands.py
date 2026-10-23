@@ -9,7 +9,8 @@ import time
 import pytest
 
 from depz_sensor_sdk import Bno086, SensorId
-from depz_sensor_sdk.bno086 import FeatureFlag, TareAxis, TareBasis
+from depz_sensor_sdk.bno086 import FeatureFlag, MotionIntent, TareAxis, TareBasis
+from depz_sensor_sdk.errors import DepzTimeoutError
 from depz_sensor_sdk.bno086.sh2 import build_set_feature
 
 from fake_bno086 import FakeBno086
@@ -109,6 +110,44 @@ def test_tare_now_default_all_axes(rig):
     _wait(lambda: len(fake.tare_requests) == 1)
     (req,) = fake.tare_requests
     assert req[3:6] == bytes((0x00, TareAxis.ALL, TareBasis.ROTATION_VECTOR))
+
+
+# ── interactive calibration / force flush (BNO086 only) ───────────────────────
+
+
+def test_set_motion_intent_sends_command_0x0e(rig):
+    fake, dev = rig
+    dev.set_motion_intent(MotionIntent.STATIONARY_WITH_VIBRATION)  # no response
+    _wait(lambda: fake.motion_intents == [2])
+
+
+def test_set_motion_intent_rejects_out_of_range(rig):
+    _, dev = rig
+    with pytest.raises(ValueError):
+        dev.set_motion_intent(256)
+
+
+def test_enable_motion_request_skips_rate_check(rig):
+    fake, dev = rig
+    assert dev.enable_motion_request() is None  # verify off: no granted-rate warning
+    _wait(lambda: fake.features.get(SensorId.MOTION_REQUEST) == 1_000_000)
+
+
+def test_flush_returns_on_flush_completed(rig):
+    fake, dev = rig
+    seen = []
+    dev.on_report(seen.append)
+    dev.flush(SensorId.ACCELEROMETER)
+    assert fake.flush_requests == [SensorId.ACCELEROMETER]
+    assert any(getattr(r, "flushed_sensor", None) == SensorId.ACCELEROMETER for r in seen)
+
+
+def test_flush_times_out_without_answer(rig, monkeypatch):
+    fake, dev = rig
+    monkeypatch.setattr(fake, "push_input_cargo", lambda *a, **k: 0)  # hub stays silent
+    with pytest.raises(DepzTimeoutError):
+        dev.flush(SensorId.ACCELEROMETER, timeout=0.1)
+    assert dev._flush_waiters[SensorId.ACCELEROMETER] == []
 
 
 # ── hub power: sleep / power_on (contract 05 §6a) ─────────────────────────────

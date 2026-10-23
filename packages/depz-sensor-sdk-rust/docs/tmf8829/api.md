@@ -9,9 +9,313 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **TMF8829 (dToF)**: [`Tmf8829Measurement`](#tmf8829measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`FT_NAMES`](#ft_names), [`flag_names`](#flag_names), [`fp_subints`](#fp_subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`REG_CFG`](#reg_cfg), [`CFG_SIZE`](#cfg_size), [`PRESETS`](#presets), [`PRESET_KILO_ITERATIONS`](#preset_kilo_iterations), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`preset_cmd`](#preset_cmd), [`preset_kilo_iterations`](#preset_kilo_iterations), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`cfg_field`](#cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`FIRMWARE_IMAGE`](#firmware_image), [`FIRMWARE_LICENSE`](#firmware_license), [`firmware_image`](#firmware_image), [`firmware_words`](#firmware_words), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_WARNINGS`](#frame_warnings), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`fp_grid`](#fp_grid), [`fp_name`](#fp_name), [`frame_rows`](#frame_rows), [`FrameError`](#frameerror), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`pixel_size`](#pixel_size), [`parse_results`](#parse_results), [`parse_results_info`](#parse_results_info), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe)
+- **TMF8829 (dToF)**: [`Tmf8829InitResult`](#tmf8829initresult), [`Tmf8829AppliedConfig`](#tmf8829appliedconfig), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Device`](#tmf8829device), [`Tmf8829Measurement`](#tmf8829measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`FT_NAMES`](#ft_names), [`flag_names`](#flag_names), [`fp_subints`](#fp_subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`REG_CFG`](#reg_cfg), [`CFG_SIZE`](#cfg_size), [`PRESETS`](#presets), [`PRESET_KILO_ITERATIONS`](#preset_kilo_iterations), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`preset_cmd`](#preset_cmd), [`preset_kilo_iterations`](#preset_kilo_iterations), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`cfg_field`](#cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`FIRMWARE_IMAGE`](#firmware_image), [`FIRMWARE_LICENSE`](#firmware_license), [`firmware_image`](#firmware_image), [`firmware_words`](#firmware_words), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_WARNINGS`](#frame_warnings), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`fp_grid`](#fp_grid), [`fp_name`](#fp_name), [`frame_rows`](#frame_rows), [`FrameError`](#frameerror), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`pixel_size`](#pixel_size), [`parse_results`](#parse_results), [`parse_results_info`](#parse_results_info), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe)
 
 ## TMF8829 (dToF)
+
+### Tmf8829InitResult
+
+```rust
+pub struct Tmf8829InitResult {
+    pub app_version: String,
+    pub sensor_serial: u32,
+}
+```
+
+What [`Tmf8829Device::init`] reports: the RAM application version and the sensor's serial number.
+
+### Tmf8829AppliedConfig
+
+```rust
+pub struct Tmf8829AppliedConfig {
+    pub preset: String,
+    pub page: Vec<u8>,
+    pub histograms: bool,
+    pub ref_frame: bool,
+    pub fields: Vec<(&'static str, u16)>,
+}
+```
+
+The config [`Tmf8829Device::configure`] wrote, as read back from the sensor: the preset name, the
+190-byte page 0x22..0xDF, whether histogram frames are dumped and a ref-SPAD frame comes with each
+measurement, and every named field of the page (table order).
+
+#### Tmf8829AppliedConfig::field
+
+```rust
+pub fn field(&self, name: &str) -> Option<u16>
+```
+
+A named field of the page.
+
+#### Tmf8829AppliedConfig::grid
+
+```rust
+pub fn grid(&self) -> (usize, usize)
+```
+
+(rows, cols) of a measurement.
+
+### Tmf8829Options
+
+```rust
+pub struct Tmf8829Options {
+    pub period_ms: u32,
+    /// `None`: the preset's own.
+    pub kilo_iterations: Option<u32>,
+    /// 1..4.
+    pub nr_peaks: u32,
+    pub signal_strength: bool,
+    pub noise_strength: bool,
+    pub xtalk: bool,
+    /// Dump histogram frames with each measurement.
+    pub histograms: bool,
+    /// A ref-SPAD frame before each results frame.
+    pub ref_frame: bool,
+    /// Any other page field by name, written last.
+    pub fields: Vec<(String, u32)>,
+}
+```
+
+[`Tmf8829Device::configure`]'s options beyond the preset. `Default`: the default period, the
+preset's `kilo_iterations`, one peak, nothing optional.
+
+### Tmf8829Device
+
+```rust
+pub struct Tmf8829Device {
+    dev: DepzDevice,
+    streams: Arc<Streams>,
+    reg: Mutex<()>, // the bridge takes one register command at a time
+    streaming: AtomicBool,
+    app_version: Mutex<Option<String>>,
+    sensor_serial: Mutex<Option<u32>>,
+    config: Mutex<Option<Tmf8829AppliedConfig>>,
+}
+```
+
+TMF8829 multizone dToF (8×8 … 48×32 zones, up to 4 peaks per zone, histograms) over the SPI register
+bridge (contract 14). The board is a thin bridge: this class runs the sensor.
+[`Tmf8829Device::init`] downloads the 14.4 KB sensor firmware (~0.15 s),
+[`Tmf8829Device::configure`] writes the config page, [`Tmf8829Device::start`] streams measurements
+to [`Tmf8829Device::on_measurement`] / [`Tmf8829Device::measurements`], [`Tmf8829Device::stop`]
+ends it. The sensor's EN pin is wired high: there is no sleep, and recovery from any state is
+[`Tmf8829Device::init`] (it starts with a soft reset). Closing (or dropping) the device stops a
+running stream first.
+
+#### Tmf8829Device::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Tmf8829Device
+```
+
+Continue the open connection `dev` as a TMF8829.
+
+#### Tmf8829Device::interrupt_event
+
+```rust
+pub fn interrupt_event(event: &DeviceEvent) -> Option<Tmf8829Event>
+```
+
+The `RPT_TMF_EVENT` an [`Tmf8829Device::INTERRUPT_EVENT`] event carries (`None` for any other
+event).
+
+#### Tmf8829Device::app_version
+
+```rust
+pub fn app_version(&self) -> Option<String>
+```
+
+The RAM application version [`Tmf8829Device::init`] started ("2.200.0").
+
+#### Tmf8829Device::sensor_serial
+
+```rust
+pub fn sensor_serial(&self) -> Option<u32>
+```
+
+The sensor's serial number, read by [`Tmf8829Device::init`].
+
+#### Tmf8829Device::config
+
+```rust
+pub fn config(&self) -> Option<Tmf8829AppliedConfig>
+```
+
+The last [`Tmf8829Device::configure`] result (`None` after [`Tmf8829Device::init`]).
+
+#### Tmf8829Device::streaming
+
+```rust
+pub fn streaming(&self) -> bool
+```
+
+#### Tmf8829Device::read_registers
+
+```rust
+pub fn read_registers(&self, addr: u8, length: usize) -> Result<Vec<u8>>
+```
+
+Read `length` bytes from `addr` in ≤1024-byte requests; reads that reach the FIFO port 0xFF stay
+there (the sensor does not auto-increment it). A reply shorter or longer than asked is
+[`DepzError::Protocol`].
+
+#### Tmf8829Device::read_register
+
+```rust
+pub fn read_register(&self, addr: u8) -> Result<u8>
+```
+
+#### Tmf8829Device::write_registers
+
+```rust
+pub fn write_registers(&self, addr: u8, data: &[u8], progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<()>
+```
+
+Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF); `progress` gets
+(done, total) after each.
+
+#### Tmf8829Device::write_register
+
+```rust
+pub fn write_register(&self, addr: u8, value: u8) -> Result<()>
+```
+
+Write one register.
+
+#### Tmf8829Device::sensor_state
+
+```rust
+pub fn sensor_state(&self) -> Result<Vec<(&'static str, u8)>>
+```
+
+Raw host-interface registers, for diagnostics (name, value; in a fixed order).
+
+#### Tmf8829Device::get_bridge_info
+
+```rust
+pub fn get_bridge_info(&self) -> Result<Tmf8829Info>
+```
+
+Bridge counters (never touches the sensor, safe mid-stream).
+
+#### Tmf8829Device::init
+
+```rust
+pub fn init(&self, progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<Tmf8829InitResult>
+```
+
+Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware
+download, start. Stops a running stream first. `progress` (done, total) tracks the image
+download. A sensor that refuses or does not answer is [`DepzError::Sensor`].
+
+#### Tmf8829Device::config_page
+
+```rust
+pub fn config_page(&self) -> Result<Vec<u8>>
+```
+
+LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
+
+#### Tmf8829Device::configure
+
+```rust
+pub fn configure(&self, preset: &str, opts: &Tmf8829Options) -> Result<Tmf8829AppliedConfig>
+```
+
+Load `preset` (a name of [`PRESETS`]) and write the config page. Every field a preset does not
+reset is written (contract 14 §4), so the result never depends on an earlier config;
+`opts.fields` sets any other page field by name. Not while streaming
+([`DepzError::InvalidState`]). [`DepzError::Sensor`]: the sensor refuses the page (e.g.
+ERR_CONFIG_RESULT_SIZE: the result format is too big for the grid) or a written field does not
+read back.
+
+#### Tmf8829Device::start
+
+```rust
+pub fn start(&self) -> Result<()>
+```
+
+MEASURE with the bridge stream armed. Configures the default 8x8 preset first when
+[`Tmf8829Device::configure`] was not called since [`Tmf8829Device::init`]. No-op while streaming.
+
+#### Tmf8829Device::stop
+
+```rust
+pub fn stop(&self) -> Result<()>
+```
+
+Sensor STOP, then the bridge stream (the frames already queued drain). The bad-header event a STOP
+raises mid histogram dump is expected and swallowed.
+
+#### Tmf8829Device::close
+
+```rust
+pub fn close(&self)
+```
+
+Stop a running stream (a failing stop is ignored), then close the link.
+
+#### Tmf8829Device::on_measurement
+
+```rust
+pub fn on_measurement(&self, callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static) -> Hook
+```
+
+Call `callback` for every measurement (reader thread; don't block).
+
+#### Tmf8829Device::measurements
+
+```rust
+pub fn measurements(&self, capacity: usize) -> Subscription<Tmf8829Measurement>
+```
+
+A pull queue of measurements (bounded, drop-oldest); subscribed when this returns.
+
+#### Tmf8829Device::get_measurement
+
+```rust
+pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Tmf8829Measurement>
+```
+
+The next measurement (contract 07 §3); `timeout` `None`: 2 s.
+
+#### Tmf8829Device::stream_dropped_counts
+
+```rust
+pub fn stream_dropped_counts(&self) -> Vec<u64>
+```
+
+#### Tmf8829Device::frames_dropped
+
+```rust
+pub fn frames_dropped(&self) -> u64
+```
+
+Frames the bridge dropped (frame_seq gaps) in this stream.
+
+#### Tmf8829Device::frames_discarded
+
+```rust
+pub fn frames_discarded(&self) -> u64
+```
+
+Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
+
+#### Tmf8829Device::frame_parse_errors
+
+```rust
+pub fn frame_parse_errors(&self) -> u64
+```
+
+#### Tmf8829Device::clock_ratio_q16
+
+```rust
+pub fn clock_ratio_q16(&self) -> u32
+```
+
+Current sensor-vs-board clock ratio in Q16 (contract 14 §5; nominal 8 << 16 = 8 µs per
+SYSTICK), for diagnostics.
 
 ### Tmf8829Measurement
 

@@ -19,7 +19,7 @@ def _lists(d: dict) -> dict:
     return {k: (list(v) if isinstance(v, tuple) else v) for k, v in d.items()}
 
 
-def test_encode_vectors(vectors):
+def test_encode_vectors(vectors, seen):
     for c in vectors("bno055.json")["encode"]:
         kind = c["kind"]
         if kind == "read_reg":
@@ -33,9 +33,10 @@ def test_encode_vectors(vectors):
         else:
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == c["payload"], c["name"]
+        seen(c)
 
 
-def test_decode_vectors(vectors):
+def test_decode_vectors(vectors, seen):
     for c in vectors("bno055.json")["decode"]:
         payload = bytes.fromhex(c["payload"])
         if c["report"] == 0x92:
@@ -58,43 +59,49 @@ def test_decode_vectors(vectors):
             ), c["name"]
         else:
             raise AssertionError(f"unknown report {c['report']:#x}")
+        seen(c)
 
 
-def test_units_vectors(vectors):
+def test_units_vectors(vectors, seen):
     for c in vectors("bno055.json")["units"]:
         u = R.Units.unpack(c["unit_sel"])
         assert asdict(u) == c["expect"], c["unit_sel"]
         assert u.pack() == c["repack"]
+        seen(c)
 
 
-def test_calib_stat_vectors(vectors):
+def test_calib_stat_vectors(vectors, seen):
     for c in vectors("bno055.json")["calib_stat"]:
         s = R.CalibStatus.unpack(c["value"])
         assert asdict(s) == c["expect"]
         assert s.fully_calibrated == c["fully_calibrated"]
         assert s.pack() == c["value"]
+        seen(c)
 
 
-def test_calibration_profile_vectors(vectors):
+def test_calibration_profile_vectors(vectors, seen):
     for c in vectors("bno055.json")["calibration_profile"]:
         p = R.CalibrationProfile.unpack(bytes.fromhex(c["bytes"]))
         assert _lists(asdict(p)) == c["expect"], c["name"]
         assert p.pack().hex() == c["bytes"]
+        seen(c)
 
 
-def test_axis_remap_vectors(vectors):
+def test_axis_remap_vectors(vectors, seen):
     v = vectors("bno055.json")
     for c in v["axis_remap"]:
         a = R.AxisRemap.unpack(c["config"], c["sign"])
         assert asdict(a) == c["expect"], c["name"]
         assert list(a.pack()) == c["repack"] == [c["config"], c["sign"]]
         assert R.AxisRemap.placement(c["name"]) == a
+        seen(c)
     for c in v["axis_remap_invalid"]:
         with pytest.raises(ValueError):
             R.AxisRemap(c["x"], c["y"], c["z"]).pack()
+        seen(c)
 
 
-def test_sensor_config_vectors(vectors):
+def test_sensor_config_vectors(vectors, seen):
     sc = vectors("bno055.json")["sensor_config"]
     for c in sc["accel"]:
         a = R.AccelConfig.unpack(c["value"])
@@ -108,9 +115,11 @@ def test_sensor_config_vectors(vectors):
         m = R.MagConfig.unpack(c["value"])
         assert asdict(m) == c["expect"]
         assert m.pack() == c["value"] & 0x7F  # bit 7 reserved
+    seen("bno055/sensor_config")
 
 
-def test_block_vectors(vectors):
+def test_block_vectors(vectors, seen):
     for c in vectors("bno055.json")["blocks"]:
         got = R.decode_block(c["addr"], bytes.fromhex(c["data"]))
         assert _lists(asdict(got)) == c["expect"], c["name"]
+        seen(c)

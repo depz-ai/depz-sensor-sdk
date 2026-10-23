@@ -3,8 +3,10 @@
 The **VL53L8CX** is a STMicroelectronics multizone Time-of-Flight ranging
 sensor: a tiny laser depth **imager** that returns a 4×4 or 8×8 grid of
 distances up to ~4 m. On the DEPZ sensor line the MCU is a thin SPI **register
-bridge** — the full ST ULD (Ultra-Lite Driver) runs on the host. This Java SDK
-ports the **pure decode half** of that driver:
+bridge** — the full ST ULD (Ultra-Lite Driver) runs on the host. The Java SDK
+runs it: the live device `ai.depz.sensor.devices.Vl53l8cxDevice` with the ULD
+port (`ai.depz.sensor.sensors.vl53l8.Vl53l8Driver`: firmware download, DCI,
+configuration, calibration), over the pure decode layer
 `ai.depz.sensor.sensors.vl53l8.Vl53l8Uld` (results-frame parsing +
 advanced-DCI codecs) and `FrameReassembler` (chunk transport).
 
@@ -18,7 +20,7 @@ Network Histograms — has its own [introduction](../vl53l8ch/introduction.md) a
   60 Hz (4×4) / 15 Hz (8×8).
 - Each frame carries far more than distance: per-zone target status, number of
   targets, signal and ambient rate, range sigma, reflectance, plus a per-frame
-  silicon temperature — all surfaced as raw-integer arrays on
+  silicon temperature — all surfaced in ST's real units (mm, kcps/SPAD, %) on
   `Vl53l8Uld.Results`.
 - INT-driven **push streaming**: the MCU ships each frame to the host in
   ≤`FrameReassembler.STREAM_CHUNK_MAX` (1528) byte chunks; `FrameReassembler`
@@ -40,14 +42,17 @@ difference is the footer-id offset, selected by `Vl53l8Uld.Variant`:
   Histograms (CNH)** and carries its own production USB PID `0xED40`,
   footer-id offset 4. See the [VL53L8CH docs](../vl53l8ch/introduction.md).
 
-## Scope: decode only
+## The live driver
 
-The **live ULD init / register-bridge driver** — firmware download, DCI
-read/write, `setResolution`, `startRanging`, power modes, xtalk calibration — is
-hardware-dependent and out of scope; it is surfaced as the stub
-`Vl53l8Uld.liveDriverStubbed()`. The advanced-DCI codecs here **build/pack** the
-payloads that driver would send; wiring them to a live bridge is the extension
-point. Frame parsing and the advanced-DCI codecs are complete and vector-tested.
+`Vl53l8Driver` is ST's ULD 2.1.0 (CX) / VL53LMZ 2.0.16 (CH) ported to Java over
+a small `Vl53l8Platform` interface (register read / write and a delay):
+`init()` downloads the ~84 KB sensor firmware and uploads the NVM, offset,
+xtalk and default configuration; the rest of ST's API — resolution,
+frequency, ranging mode, integration time, sharpener, target order, power
+modes, xtalk calibration and save / restore, detection thresholds, the motion
+indicator — follows it. `Vl53l8cxDevice` maps the platform onto the board's
+register bridge and turns the pushed frames into `Vl53l8Frame`s. The firmware
+blobs ship inside the jar.
 
 ## When to use it
 
@@ -66,8 +71,9 @@ you need raw return histograms.
   chunk report; `feed` rebuilds the frame; `parseFrame` decodes it. Reset on
   `offset == 0`; a gap discards the frame in progress.
 - **`Vl53l8Uld.Results`** — one parsed frame. Arrays are sized to the active
-  resolution (16 or 64 zones), row-major; `resolution()` reports which. Fixed-
-  point scaling is applied (distance /4, range sigma /128). `targetStatus == 255`
+  resolution (16 or 64 zones), row-major; `resolution()` reports which. Values
+  are in ST's real units (distance mm with a negative one clamped to 0; signal
+  and ambient kcps/SPAD; range sigma mm; reflectance %). `targetStatus == 255`
   = no target.
 - **Variant footer** — pass `Variant.CX` or `Variant.CH` to `parseFrame`; a
   header/footer id mismatch throws `Vl53l8Uld.Vl53l8Error`.

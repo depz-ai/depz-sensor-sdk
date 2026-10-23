@@ -10,9 +10,291 @@ in the source, not this file.
 
 ## Contents
 
-- **VL53L4CD (ToF, single-zone)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`Vl53l4Xshut`](#vl53l4xshut), [`Vl53l4Wire`](#vl53l4wire), [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4Info`](#vl53l4info), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Exception`](#vl53l4exception), [`Vl53l4Results`](#vl53l4results), [`Vl53l4Uld`](#vl53l4uld)
+- **VL53L4CD (ToF, single-zone)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`Vl53l4Xshut`](#vl53l4xshut), [`Vl53l4Wire`](#vl53l4wire), [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4Info`](#vl53l4info), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Exception`](#vl53l4exception), [`Vl53l4Results`](#vl53l4results), [`Vl53l4Uld`](#vl53l4uld), [`IVl53l4Platform`](#ivl53l4platform), [`Vl53l4cdDriver`](#vl53l4cddriver)
 
 ## VL53L4CD (ToF, single-zone)
+
+### Vl53l4Measurement
+
+```csharp
+public sealed record Vl53l4Measurement(ulong TimestampUs, int RangeStatus, int DistanceMm, int SigmaMm, int SignalRateKcps, int AmbientRateKcps, int SignalPerSpadKcps, int AmbientPerSpadKcps, int NumberOfSpad, int StreamCount)
+```
+
+One VL53L4CD ranging result (VL53L4CD_ResultsData_t plus the MCU timestamp: of the INT edge when streamed, of the result read when polled).
+
+#### Vl53l4Measurement.Valid *(property)*
+
+```csharp
+public bool Valid
+```
+
+#### Vl53l4Measurement.StatusText *(property)*
+
+```csharp
+public string StatusText
+```
+
+What `RangeStatus` means (`RangeStatusNames`).
+
+### Vl53l4cdDevice
+
+```csharp
+public sealed class Vl53l4cdDevice : DepzDevice
+```
+
+VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here (`Uld`). `Init` first, then configure and `StartRanging`: one result block per INT edge streams to `Measurements`. Configuration while ranging throws `InvalidOperationException` — the stream owns the register bank.
+
+#### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
+
+```csharp
+public Vl53l4cdDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
+
+```csharp
+#if NET public Vl53l4cdDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+```
+
+#### Vl53l4cdDevice.Uld *(property)*
+
+```csharp
+public Vl53l4cdDriver Uld
+```
+
+The ULD driver (escape hatch for raw register access).
+
+#### Vl53l4cdDevice.Initialized *(property)*
+
+```csharp
+public bool Initialized
+```
+
+True after a successful `Init`; cleared by `Xshut` — a power-cycled sensor holds none of the ULD configuration.
+
+#### Vl53l4cdDevice.Ranging *(property)*
+
+```csharp
+public bool Ranging
+```
+
+#### Vl53l4cdDevice.IsAlive
+
+```csharp
+public bool IsAlive()
+```
+
+True when the sensor answers with the VL53L4CD model id (0xEBAA).
+
+#### Vl53l4cdDevice.Init
+
+```csharp
+public void Init(int busKhz = Vl53l4Uld.I2cKhzDefault)
+```
+
+Default configuration block + VHV calibration (ULD sensor_init); the bus is left at `busKhz` (one of `I2cKhzSteps`).
+
+#### Vl53l4cdDevice.Xshut
+
+```csharp
+public void Xshut(byte action)
+```
+
+Drive XSHUT: `Off` / `On` / `Reset`. Off and Reset stop a stream; `Init` again after.
+
+#### Vl53l4cdDevice.ResetSensor
+
+```csharp
+public void ResetSensor()
+```
+
+Hardware reset through XSHUT (~3 ms on the MCU); call `Init` again.
+
+#### Vl53l4cdDevice.BridgeInfo
+
+```csharp
+public Vl53l4Info BridgeInfo()
+```
+
+RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+
+#### Vl53l4cdDevice.SetI2cSpeedKhz
+
+```csharp
+public void SetI2cSpeedKhz(int khz)
+```
+
+Re-time the bridge's I2C bus to the step nearest `khz`. Not while ranging.
+
+#### Vl53l4cdDevice.public
+
+```csharp
+public (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+(timing budget ms, inter-measurement ms; 0 = continuous).
+
+#### Vl53l4cdDevice.SetRangeTiming
+
+```csharp
+public void SetRangeTiming(int timingBudgetMs, long interMeasurementMs = 0)
+```
+
+Timing budget 10–200 ms; inter-measurement 0 = continuous, larger than the budget = autonomous low power.
+
+#### Vl53l4cdDevice.GetOffsetMm
+
+```csharp
+public int GetOffsetMm()
+```
+
+#### Vl53l4cdDevice.SetOffsetMm
+
+```csharp
+public void SetOffsetMm(int offsetMm)
+```
+
+#### Vl53l4cdDevice.GetXtalkKcps
+
+```csharp
+public int GetXtalkKcps()
+```
+
+Crosstalk compensation, kcps (0 = off).
+
+#### Vl53l4cdDevice.SetXtalkKcps
+
+```csharp
+public void SetXtalkKcps(int xtalkKcps)
+```
+
+#### Vl53l4cdDevice.public
+
+```csharp
+public (int DistanceLowMm, int DistanceHighMm, int Window) GetDetectionThresholds()
+```
+
+(distance low mm, distance high mm, window: `WindowBelow` …).
+
+#### Vl53l4cdDevice.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt: INT only fires while the window holds.
+
+#### Vl53l4cdDevice.GetSignalThresholdKcps
+
+```csharp
+public int GetSignalThresholdKcps()
+```
+
+#### Vl53l4cdDevice.SetSignalThresholdKcps
+
+```csharp
+public void SetSignalThresholdKcps(int signalKcps)
+```
+
+Drop measurements whose return signal is below `signalKcps`.
+
+#### Vl53l4cdDevice.GetSigmaThresholdMm
+
+```csharp
+public int GetSigmaThresholdMm()
+```
+
+#### Vl53l4cdDevice.SetSigmaThresholdMm
+
+```csharp
+public void SetSigmaThresholdMm(int sigmaMm)
+```
+
+Drop measurements whose sigma exceeds `sigmaMm` (≤ 16383).
+
+#### Vl53l4cdDevice.StartTemperatureUpdate
+
+```csharp
+public void StartTemperatureUpdate()
+```
+
+Re-run VHV calibration, recommended after a >8 °C ambient change.
+
+#### Vl53l4cdDevice.CalibrateOffset
+
+```csharp
+public int CalibrateOffset(int targetDistMm, int nbSamples = 20)
+```
+
+Offset calibration against a target at `targetDistMm` (10–1000 mm); returns the offset now programmed.
+
+#### Vl53l4cdDevice.CalibrateXtalk
+
+```csharp
+public int CalibrateXtalk(int targetDistMm, int nbSamples = 20)
+```
+
+Crosstalk calibration against a target at `targetDistMm` (10–5000 mm); returns the xtalk now programmed, kcps.
+
+#### Vl53l4cdDevice.StartRanging
+
+```csharp
+public void StartRanging()
+```
+
+Start the sensor and arm the MCU stream: one RPT_VL53_STREAM per INT edge.
+
+#### Vl53l4cdDevice.StopRanging
+
+```csharp
+public void StopRanging()
+```
+
+#### Vl53l4cdDevice.MeasureOnce
+
+```csharp
+public Vl53l4Measurement MeasureOnce(TimeSpan? timeout = null)
+```
+
+One polled measurement: start, wait for data ready, read, stop. Not while streaming.
+
+#### Vl53l4cdDevice.OnMeasurement
+
+```csharp
+public IDisposable OnMeasurement(Action<Vl53l4Measurement> callback)
+```
+
+Call `callback` for every streamed measurement (reader thread).
+
+#### Vl53l4cdDevice.Measurements
+
+```csharp
+public Subscription<Vl53l4Measurement> Measurements(int capacity = 64)
+```
+
+A pull queue of streamed measurements (bounded, drop-oldest).
+
+#### Vl53l4cdDevice.GetMeasurement
+
+```csharp
+public Vl53l4Measurement GetMeasurement(TimeSpan? timeout = null)
+```
+
+The next streamed measurement (contract 07 §3).
+
+#### Vl53l4cdDevice.StreamParseErrors *(property)*
+
+```csharp
+public long StreamParseErrors
+```
+
+Stream reports dropped because their result block did not decode.
+
+#### Vl53l4cdDevice.StreamDroppedCounts *(property)*
+
+```csharp
+public IReadOnlyList<long> StreamDroppedCounts
+```
 
 ### Vl53l4Cmd
 
@@ -116,7 +398,7 @@ VL53_READ_REG payload: addr u16 LE, len u16 LE.
 public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
 ```
 
-VL53_WRITE_REG payload: addr u16 LE, then the raw register data.
+VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`XferMax` bytes).
 
 #### Vl53l4Wire.PackXshut
 
@@ -220,7 +502,7 @@ public static class Vl53l4Uld
 
 VL53L4CD ULD codec/math layer (ST STSW-IMG026 2.2.3, contract 10 §5): the pure register-word codecs of `VL53L4CD_api.c` — result-block decode, SetRangeTiming/GetRangeTiming register math, tuning-word codecs and the init configuration block — ported byte-exact from the reference Python `vl53l4/uld.py` and pinned to the golden vectors.
 
-The live register-sequence driver (init/calibration over the CDC link) is hardware-dependent and out of scope for the decode SDK, mirroring `Vl53l8Uld` (`LiveDriverStubbed`).
+The register sequences on top of it (init, ranging, calibration) are `Vl53l4cdDriver`; `Vl53l4cdDevice` runs them over the board.
 
 #### Vl53l4Uld.SoftReset *(constant)*
 
@@ -514,13 +796,13 @@ public static ReadOnlySpan<byte> StatusRtn
 
 GetResult() raw status → ULD status (status_rtn[24] in VL53L4CD_api.c; raw 9 → 0 valid).
 
-#### Vl53l4Uld.LiveDriverStubbed *(property)*
+#### Vl53l4Uld.RangeStatusNames *(field)*
 
 ```csharp
-public static bool LiveDriverStubbed
+public static readonly IReadOnlyDictionary<int, string> RangeStatusNames = …
 ```
 
-The live ULD register-sequence driver (sensor_init / calibration over the CDC link) is deliberately stubbed: it only means anything against real silicon and cannot be verified from golden vectors. The verifiable codec/math layer below is what this SDK ships.
+Range status (after the ST mapping) → its meaning; 0 is a valid measurement.
 
 #### Vl53l4Uld.ConfigBlock
 
@@ -541,7 +823,7 @@ Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult() decodes
 #### Vl53l4Uld.static
 
 ```csharp
-public static (ushort RangeConfigA, ushort RangeConfigB, uint IntermeasurementRaw) RangeTimingRegisters(int timingBudgetMs, int interMeasurementMs, int oscFrequency, int clockPll = 0)
+public static (ushort RangeConfigA, ushort RangeConfigB, uint IntermeasurementRaw) RangeTimingRegisters(int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll = 0)
 ```
 
 SetRangeTiming register math → (RANGE_CONFIG_A, RANGE_CONFIG_B, INTERMEASUREMENT_MS raw dword). `oscFrequency` is the word read from 0x0006; `clockPll` is the word read from RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when `interMeasurementMs` > 0). Bit-exact port of the C ULD, 32-bit truncations and the 1.055 PLL factor included.
@@ -617,3 +899,227 @@ public static int DecodeSigmaThreshold(int raw)
 ```
 
 GetSigmaThreshold: RANGE_CONFIG__SIGMA_THRESH word → mm.
+
+### IVl53l4Platform
+
+```csharp
+public interface IVl53l4Platform
+```
+
+What the ULD needs from the board: the register bridge (16-bit addresses, auto-increment), a delay, and the bus speed. `Vl53l4cdDevice` maps it onto the firmware bridge; a test can script it.
+
+### Vl53l4cdDriver
+
+```csharp
+public sealed class Vl53l4cdDriver
+```
+
+The ST VL53L4CD ULD 2.2.3 (VL53L4CD_api.c + VL53L4CD_calibration.c) on the host, ported from the reference Python driver: init, ranging, timing, offset, crosstalk, thresholds, temperature update, calibration. Every request sequence is the Python one, so captures of either replay in both. Register contents are big-endian.
+
+#### Vl53l4cdDriver.Vl53l4cdDriver *(constructor)*
+
+```csharp
+public Vl53l4cdDriver(IVl53l4Platform platform)
+```
+
+#### Vl53l4cdDriver.ReadByte
+
+```csharp
+public int ReadByte(ushort addr)
+```
+
+#### Vl53l4cdDriver.ReadWord
+
+```csharp
+public int ReadWord(ushort addr)
+```
+
+#### Vl53l4cdDriver.ReadDword
+
+```csharp
+public uint ReadDword(ushort addr)
+```
+
+#### Vl53l4cdDriver.WriteByte
+
+```csharp
+public void WriteByte(ushort addr, int value)
+```
+
+#### Vl53l4cdDriver.WriteWord
+
+```csharp
+public void WriteWord(ushort addr, int value)
+```
+
+#### Vl53l4cdDriver.WriteDword
+
+```csharp
+public void WriteDword(ushort addr, uint value)
+```
+
+#### Vl53l4cdDriver.GetSensorId
+
+```csharp
+public int GetSensorId()
+```
+
+#### Vl53l4cdDriver.IsAlive
+
+```csharp
+public bool IsAlive()
+```
+
+#### Vl53l4cdDriver.WaitBoot
+
+```csharp
+public void WaitBoot(int timeoutMs = 1000)
+```
+
+#### Vl53l4cdDriver.SensorInit
+
+```csharp
+public void SensorInit(int busKhz = Vl53l4Uld.I2cKhzDefault)
+```
+
+Initialise the sensor and leave the bus at `busKhz`. The configuration block goes at 400 kHz, the only speed an unconfigured sensor is specified for; the bridge is re-timed after it.
+
+#### Vl53l4cdDriver.ClearInterrupt
+
+```csharp
+public void ClearInterrupt()
+```
+
+#### Vl53l4cdDriver.StartRanging
+
+```csharp
+public void StartRanging()
+```
+
+#### Vl53l4cdDriver.StopRanging
+
+```csharp
+public void StopRanging()
+```
+
+#### Vl53l4cdDriver.CheckForDataReady
+
+```csharp
+public bool CheckForDataReady()
+```
+
+#### Vl53l4cdDriver.WaitDataReady
+
+```csharp
+public void WaitDataReady(int timeoutMs = 1000)
+```
+
+#### Vl53l4cdDriver.GetResult
+
+```csharp
+public Vl53l4Results GetResult()
+```
+
+One block read instead of the C driver's six register reads; the decoding is identical.
+
+#### Vl53l4cdDriver.SetRangeTiming
+
+```csharp
+public void SetRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+#### Vl53l4cdDriver.public
+
+```csharp
+public (int TimingBudgetMs, int InterMeasurementMs) GetRangeTiming()
+```
+
+(timing budget ms, inter-measurement ms; 0 = continuous).
+
+#### Vl53l4cdDriver.SetOffset
+
+```csharp
+public void SetOffset(int offsetMm)
+```
+
+#### Vl53l4cdDriver.GetOffset
+
+```csharp
+public int GetOffset()
+```
+
+#### Vl53l4cdDriver.SetXtalk
+
+```csharp
+public void SetXtalk(int xtalkKcps)
+```
+
+#### Vl53l4cdDriver.GetXtalk
+
+```csharp
+public int GetXtalk()
+```
+
+#### Vl53l4cdDriver.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt; `window` is one of `WindowBelow` … `WindowIn`.
+
+#### Vl53l4cdDriver.public
+
+```csharp
+public (int DistanceLowMm, int DistanceHighMm, int Window) GetDetectionThresholds()
+```
+
+(distance low mm, distance high mm, window).
+
+#### Vl53l4cdDriver.SetSignalThreshold
+
+```csharp
+public void SetSignalThreshold(int signalKcps)
+```
+
+#### Vl53l4cdDriver.GetSignalThreshold
+
+```csharp
+public int GetSignalThreshold()
+```
+
+#### Vl53l4cdDriver.SetSigmaThreshold
+
+```csharp
+public void SetSigmaThreshold(int sigmaMm)
+```
+
+#### Vl53l4cdDriver.GetSigmaThreshold
+
+```csharp
+public int GetSigmaThreshold()
+```
+
+#### Vl53l4cdDriver.StartTemperatureUpdate
+
+```csharp
+public void StartTemperatureUpdate()
+```
+
+Re-run VHV; recommended after a >8 °C ambient change (ST Example_3).
+
+#### Vl53l4cdDriver.CalibrateOffset
+
+```csharp
+public int CalibrateOffset(int targetDistMm, int nbSamples = 20)
+```
+
+Offset calibration against a target at `targetDistMm` (10–1000); returns the offset now programmed, mm.
+
+#### Vl53l4cdDriver.CalibrateXtalk
+
+```csharp
+public int CalibrateXtalk(int targetDistMm, int nbSamples = 20)
+```
+
+Crosstalk calibration against a target at `targetDistMm` (10–5000); returns the xtalk now programmed, kcps (C rounding).

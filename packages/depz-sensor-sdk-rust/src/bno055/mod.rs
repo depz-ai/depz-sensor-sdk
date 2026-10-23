@@ -22,7 +22,7 @@ pub mod regs;
 pub use crate::vl53l4::i2c_error_name;
 pub use codecs::{
     pack_get_info, pack_read_reg, pack_reset, pack_start_stream, pack_stop_stream,
-    pack_write_reg, Bno055Cmd, Bno055Info, Bno055Rpt, RegData, StreamData, EXPECTED_ACC_ID,
+    pack_write_reg, try_pack_write_reg, Bno055Cmd, Bno055Info, Bno055Rpt, RegData, StreamData, EXPECTED_ACC_ID,
     EXPECTED_CHIP_ID, EXPECTED_GYR_ID, EXPECTED_MAG_ID, I2C_ADDR, INFO_SIZE, TRIGGER_INT,
     TRIGGER_TIMER, XFER_MAX,
 };

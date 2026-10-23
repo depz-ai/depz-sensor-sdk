@@ -50,13 +50,19 @@ public final class Vl53l4 {
 
     /** VL53_READ_REG payload: {@code addr u16, len u16} little-endian. */
     public static byte[] packReadReg(int addr, int len) {
+        Wire.checkUint("addr", addr, 16);
+        Wire.checkUint("length", len, 16);
         return new byte[] {
             (byte) addr, (byte) (addr >>> 8), (byte) len, (byte) (len >>> 8)
         };
     }
 
-    /** VL53_WRITE_REG payload: {@code addr u16, data[1..253]}. */
+    /** VL53_WRITE_REG payload: {@code addr u16, data[1..253]}, else IllegalArgumentException. */
     public static byte[] packWriteReg(int addr, byte[] data) {
+        Wire.checkUint("addr", addr, 16);
+        if (data.length < 1 || data.length > XFER_MAX) {
+            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes");
+        }
         byte[] out = new byte[2 + data.length];
         out[0] = (byte) addr;
         out[1] = (byte) (addr >>> 8);
@@ -66,11 +72,14 @@ public final class Vl53l4 {
 
     /** VL53_XSHUT payload: {@code action u8} (XSHUT_OFF/ON/RESET). */
     public static byte[] packXshut(int action) {
-        return new byte[] {(byte) action};
+        return new byte[] {(byte) Wire.checkUintI("action", action, 8)};
     }
 
     /** VL53_START_STREAM payload: {@code addr u16, len u16, flags u8}. */
     public static byte[] packStartStream(int addr, int len, int flags) {
+        Wire.checkUint("addr", addr, 16);
+        Wire.checkUint("length", len, 16);
+        Wire.checkUint("flags", flags, 8);
         return new byte[] {
             (byte) addr, (byte) (addr >>> 8), (byte) len, (byte) (len >>> 8), (byte) flags
         };
@@ -78,6 +87,7 @@ public final class Vl53l4 {
 
     /** VL53_SET_I2C_SPEED payload: {@code khz u16}. */
     public static byte[] packSetI2cSpeed(int khz) {
+        Wire.checkUint("khz", khz, 16);
         return new byte[] {(byte) khz, (byte) (khz >>> 8)};
     }
 
@@ -89,6 +99,7 @@ public final class Vl53l4 {
      */
     public record RegData(int cmd, long timestampUs, byte[] data) {
         public static RegData unpack(byte[] p) {
+            Wire.needBytes("RPT_VL53_REG_DATA", p, 9);
             int cmd = p[0] & 0xFF;
             long ts = Common.u64le(p, 1);
             byte[] data = java.util.Arrays.copyOfRange(p, 9, p.length);
@@ -107,6 +118,7 @@ public final class Vl53l4 {
             int modelId, int fwStatus, int initialized, int xshutLevel,
             int intLevel, int i2cKhz) {
         public static Vl53l4Info unpack(byte[] p) {
+            Wire.needBytes("RPT_VL53_INFO", p, 21);
             return new Vl53l4Info(
                 u32le(p, 0),
                 u32le(p, 4),
@@ -127,10 +139,13 @@ public final class Vl53l4 {
      * {@code timestampUs} is MCU uptime at the INT edge (the sensor event).
      */
     public record StreamData(long timestampUs, int addr, int len, byte[] data) {
+        /** Rejects a payload shorter than its header or than the {@code len} data bytes it announces. */
         public static StreamData unpack(byte[] p) {
+            Wire.needBytes("RPT_VL53_STREAM", p, 12);
             long ts = Common.u64le(p, 0);
             int addr = u16le(p, 8);
             int len = u16le(p, 10);
+            Wire.needBytes("RPT_VL53_STREAM data", p, 12 + len);
             byte[] data = java.util.Arrays.copyOfRange(p, 12, 12 + len);
             return new StreamData(ts, addr, len, data);
         }

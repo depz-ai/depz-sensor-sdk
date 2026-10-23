@@ -16,6 +16,8 @@ import {
   ShtpLayer,
   buildPacket,
   buildCommandRequest,
+  buildForceFlush,
+  interactiveCalibrationParams,
   buildFrsReadRequest,
   buildFrsWriteData,
   buildFrsWriteRequest,
@@ -28,15 +30,16 @@ import {
   parseInputCargo,
   unpackShtpHeader,
   type Report,
-  type ShtpCargo,
 } from "../../src/index.js";
-import { fromHex, loadVectors, toHex } from "./vectors.js";
+import { bno086Cargo, bno086Fields, plain } from "./shapes.js";
+import { fromHex, loadVectors, toHex, seen, seenAfter } from "./vectors.js";
 
 const shtpData = loadVectors("bno086_shtp.json");
 const reportsData = loadVectors("bno086_reports.json");
 
 describe("bno086 shtp header vectors", () => {
   for (const c of shtpData.header) {
+    const done = seenAfter(c.id, 2); // pack + unpack
     it(`${c.name} pack`, () => {
       const packed = packShtpHeader({
         length: c.length,
@@ -45,6 +48,7 @@ describe("bno086 shtp header vectors", () => {
         continuation: c.continuation,
       });
       expect(toHex(packed)).toBe(c.bytes);
+      done();
     });
     it(`${c.name} unpack`, () => {
       const hdr = unpackShtpHeader(fromHex(c.bytes));
@@ -52,6 +56,7 @@ describe("bno086 shtp header vectors", () => {
       expect(hdr.channel).toBe(c.channel);
       expect(hdr.seq).toBe(c.seq);
       expect(hdr.continuation).toBe(c.continuation);
+      done();
     });
   }
 });
@@ -61,6 +66,7 @@ describe("bno086 shtp tx_seq vectors", () => {
     const layer = new ShtpLayer();
     for (const c of shtpData.tx_seq) {
       expect(toHex(layer.nextFrame(c.channel, fromHex(c.payload)))).toBe(c.frame);
+      seen(c);
     }
   });
 });
@@ -69,18 +75,27 @@ describe("bno086 shtp reassembly vectors", () => {
   for (const c of shtpData.reassembly) {
     it(c.name, () => {
       const layer = new ShtpLayer();
-      const cargos: ShtpCargo[] = [];
-      for (const frame of c.frames) {
-        const cargo = layer.feed(fromHex(frame));
-        if (cargo !== null) cargos.push(cargo);
-      }
-      expect(cargos.length).toBe(c.expect.cargos.length);
-      c.expect.cargos.forEach((exp: any, i: number) => {
-        expect(cargos[i]!.channel).toBe(exp.channel);
-        expect(cargos[i]!.seq).toBe(exp.seq);
-        expect(toHex(cargos[i]!.payload)).toBe(exp.payload);
+      const cargos: unknown[] = [];
+      c.frames.forEach((frame: string, i: number) => {
+        const cargo = layer.feed(fromHex(frame), BigInt(c.captures_us[i]));
+        if (cargo !== null) cargos.push(bno086Cargo(cargo));
       });
+      expect(plain(cargos)).toEqual(c.expect.cargos);
       expect(layer.discarded).toBe(c.expect.discarded);
+      seen(c);
+    });
+  }
+});
+
+describe("bno086 interactive calibration / force flush encode vectors", () => {
+  for (const c of shtpData.interactive_and_flush) {
+    it(c.name, () => {
+      const encoded =
+        c.kind === "command_request"
+          ? buildCommandRequest(c.seq, c.command, interactiveCalibrationParams(fromHex(c.params)[0]!))
+          : buildForceFlush(c.sensor_id);
+      expect(toHex(encoded)).toBe(c.payload);
+      seen(c);
     });
   }
 });
@@ -114,6 +129,7 @@ describe("bno086 sh2 control encode vectors", () => {
         throw new Error(c.kind);
       }
       expect(toHex(encoded)).toBe(c.payload);
+      seen(c);
     });
   }
 });
@@ -135,6 +151,7 @@ describe("bno086 executable-channel vectors (sleep / power_on)", () => {
       expect(toHex(frame)).toBe(c.shtp_frame);
       expect(c.bridge_cmd).toBe(Bno086Cmd.SendShtpPacket);
       expect(toHex(buildPacket(c.bridge_cmd, frame, c.bridge_seq, c.crc_type))).toBe(c.bridge_frame);
+      seen(c);
     }
   });
 
@@ -143,6 +160,7 @@ describe("bno086 executable-channel vectors (sleep / power_on)", () => {
       wakeup: FeatureFlag.Wakeup,
       always_on: FeatureFlag.AlwaysOn,
     });
+    seen("bno086_shtp/feature_flags");
   });
 });
 
@@ -151,31 +169,16 @@ describe("bno086 report tables", () => {
     for (const [key, q] of Object.entries(reportsData.q_points)) {
       expect(Q_POINTS[parseInt(key, 16)]).toBe(q);
     }
+    seen("bno086_reports/q_points");
     expect(RV_ACCURACY_Q).toBe(reportsData.rv_accuracy_q);
+    seen("bno086_reports/rv_accuracy_q");
     expect(GYRO_RV_ANGVEL_Q).toBe(reportsData.gyro_rv_angvel_q);
+    seen("bno086_reports/gyro_rv_angvel_q");
   });
 });
 
-function snakeToCamel(name: string): string {
-  return name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
-}
-
 function checkFields(rep: Report, fields: Record<string, unknown>): void {
-  const r = rep as unknown as Record<string, unknown>;
-  for (const [key, exp] of Object.entries(fields)) {
-    const actual = r[snakeToCamel(key)];
-    if (key === "timestamp_us") {
-      expect(actual).toBe(BigInt(exp as number));
-    } else if (key === "data") {
-      expect(toHex(actual as Uint8Array)).toBe(exp);
-    } else if (key === "end_of_sequence") {
-      expect(actual).toBe(Boolean(exp));
-    } else if (Array.isArray(exp)) {
-      expect(actual).toEqual(exp);
-    } else {
-      expect(actual).toBe(exp);
-    }
-  }
+  expect(plain(bno086Fields(rep))).toEqual(fields);
 }
 
 /** Scaled values follow raw / 2**Q exactly (raw ints are authoritative). */
@@ -220,7 +223,7 @@ function checkScaled(rep: Report, fields: Record<string, number | null>): void {
 }
 
 describe("bno086 input cargo vectors", () => {
-  for (const c of reportsData.input_cargos) {
+  for (const c of [...reportsData.input_cargos, ...reportsData.interactive_and_flush]) {
     it(c.name, () => {
       const reports = parseInputCargo(fromHex(c.cargo), BigInt(c.capture_timestamp_us));
       expect(reports.length).toBe(c.expect.length);
@@ -232,6 +235,7 @@ describe("bno086 input cargo vectors", () => {
         // the contract 09 dataset record the recorders write
         expect(bno086RecordValue(rep)).toEqual(exp.record);
       });
+      seen(c);
     });
   }
 });
@@ -245,6 +249,7 @@ describe("bno086 gyro-integrated RV vectors", () => {
       checkFields(rep!, c.expect.fields);
       checkScaled(rep!, c.expect.fields);
       expect(bno086RecordValue(rep!)).toEqual(c.expect.record);
+      seen(c);
     });
   }
 });

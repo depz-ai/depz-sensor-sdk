@@ -44,10 +44,9 @@ layer**:
   die block ([`decode_die_block`](api.md#decode_die_block) with
   `DieVariant::L4`) when running as a VL53L4CD.
 
-What it does **not** do: initialise the sensor, apply presets and budgets, or
-turn the 24 bins into targets — that is the full driver. Initialising and
-streaming the board is done today with the Python or TypeScript SDK; this
-crate decodes what the board streams and builds the command payloads.
+Above it, the live device class (`devices::Vl53l4cxDevice`, see the
+[guide](guide.md#live-device)) runs ST's histogram driver on the host: init,
+presets and budgets, and the 24 bins turned into targets.
 
 ## Key concepts
 

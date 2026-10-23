@@ -33,6 +33,18 @@ impl CrcType {
         }
     }
 
+    /// The listed wire value (0..=3) as a `CrcType`; `None` for any other
+    /// value (contract 07 §3: an unlisted enum value is refused, never masked).
+    pub fn from_value(v: u8) -> Option<CrcType> {
+        match v {
+            0 => Some(CrcType::None),
+            1 => Some(CrcType::Crc8),
+            2 => Some(CrcType::Crc16),
+            3 => Some(CrcType::Crc32),
+            _ => None,
+        }
+    }
+
     fn size(self) -> usize {
         match self {
             CrcType::None => 0,

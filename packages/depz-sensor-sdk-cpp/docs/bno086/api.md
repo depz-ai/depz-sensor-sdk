@@ -18,7 +18,7 @@ the headers, not this file.
 
 ## Contents
 
-- **BNO086 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO086 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
 - **BNO085 / BNO086 live class (depz/device.hpp)**: [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`open_bno086`](#open_bno086)
 
 ## BNO086 codecs (depz/bno086.hpp)
@@ -101,6 +101,8 @@ struct ShtpHeader {
 bytes pack() const;
 ```
 
+std::invalid_argument when length > 0x7FFF (never masked, contract 07 §3).
+
 #### ShtpHeader.unpack
 
 ```cpp
@@ -114,6 +116,7 @@ struct ShtpCargo {
     int channel = 0;
     int seq = 0;  // seq of the first fragment
     bytes payload;
+    std::uint64_t capture_us = 0;  // capture time of the first fragment (contract 05 §3)
 };
 ```
 
@@ -154,6 +157,8 @@ bytes next_frame(int channel, byte_span payload);
 ```
 
 Build a single-fragment frame, consuming the channel's TX seq.
+std::out_of_range for a channel outside 0..5, std::invalid_argument for
+a payload past the 64-byte MCU slot.
 
 #### ShtpLayer.tx_seq
 
@@ -161,13 +166,17 @@ Build a single-fragment frame, consuming the channel's TX seq.
 int tx_seq(int channel) const;
 ```
 
+std::out_of_range for a channel outside 0..5.
+
 #### ShtpLayer.feed
 
 ```cpp
-std::optional<ShtpCargo> feed(byte_span frame);
+std::optional<ShtpCargo> feed(byte_span frame, std::uint64_t capture_us = 0);
 ```
 
 Consume one inbound frame; return the cargo when complete, else nullopt.
+`capture_us` is the frame's RPT_DATA capture time; the cargo carries the
+FIRST fragment's — the base its 0xFB timestamps refer to (§3, §5).
 
 #### ShtpLayer.reset
 
@@ -247,6 +256,14 @@ In-cargo control IDs on the input channels.
 inline constexpr std::uint8_t TIMESTAMP_REBASE = 0xFA;
 ```
 
+### FLUSH_COMPLETED
+
+```cpp
+inline constexpr std::uint8_t FLUSH_COMPLETED = 0xEF;
+```
+
++ u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0).
+
 ### RV_ACCURACY_Q
 
 ```cpp
@@ -281,6 +298,8 @@ enum class ReportType {
     RawSensor,
     GyroIntegratedRV,
     UnknownReport,
+    MotionRequest,   // 0x2B, BNO086 interactive calibration: intent, request
+    FlushCompleted,  // 0xEF: flushed_sensor; no seq / accuracy / delay
 };
 ```
 
@@ -309,6 +328,9 @@ struct Report {
     bool end_of_sequence = false;
     int most_likely_state = 0;
     std::vector<int> confidences;
+    int intent = 0;
+    int request = 0;
+    int flushed_sensor = 0;
     std::int64_t sensor_timestamp_us = 0;
     std::int64_t temperature_raw = 0;
     std::int64_t vx_raw = 0, vy_raw = 0, vz_raw = 0;
@@ -327,7 +349,9 @@ std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_ti
 
 Parse a channel-3/4 cargo into typed reports. Handles 0xFB base timestamp
 references and 0xFA rebases; every report's timestamp is base + delay where
-base = capture − base_delta·100 µs.
+base = capture − base_delta·100 µs. A bare 0xEF Flush Completed (2 bytes, no
+SH-2 header) is stamped with the current base. A negative capture_timestamp_us (the MCU
+uptime) is std::invalid_argument.
 
 ### parse_gyro_rv_cargo
 
@@ -336,7 +360,8 @@ std::optional<Report> parse_gyro_rv_cargo(byte_span payload, std::int64_t captur
 ```
 
 Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes: 7×i16
-bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks).
+bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks). A
+negative capture_timestamp_us is std::invalid_argument.
 
 ## BNO085 / BNO086 live class (depz/device.hpp)
 
@@ -353,6 +378,7 @@ enum class SensorId : std::uint8_t {
     PersonalActivityClassifier = 0x1E, SleepDetector = 0x1F, TiltDetector = 0x20, PocketDetector = 0x21,
     CircleDetector = 0x22, HeartRateMonitor = 0x23, ArvrStabilizedRv = 0x28,
     ArvrStabilizedGameRv = 0x29, GyroIntegratedRv = 0x2A,
+    MotionRequest = 0x2B,  // interactive calibration, BNO086 only
 };
 ```
 
@@ -457,6 +483,7 @@ struct SensorMetadata {
     std::uint32_t min_period_us = 0, max_period_us = 0;
     std::uint16_t fifo_max = 0, fifo_reserved = 0, batch_buffer_bytes = 0;
     std::uint16_t q_point_1 = 0, q_point_2 = 0, q_point_3 = 0;
+    std::vector<std::uint32_t> raw_words;  // the FRS record as read; authoritative
 };
 ```
 

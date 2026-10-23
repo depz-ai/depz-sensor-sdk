@@ -1,6 +1,6 @@
 {
   "name": "@depz/sensor-sdk",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "TypeScript SDK for the DEPZ USB sensor line (SR04, VL53L0X/L1CX/L1CB/L3CX/L4CD/L4CX, VL53L5CX/L7CX/L7CH/L8CX/L8CH, BNO086, BNO055) — WebSerial + Node",
   "type": "module",
   "license": "MIT",
@@ -66,7 +66,8 @@
     "docs": "npm run docs:root && npm run docs:sensors",
     "docs:root": "typedoc --out docs/.api-md && node scripts/merge-api-md.mjs docs/.api-md docs/api.md",
     "docs:sensors": "node scripts/gen-sensor-api-md.mjs",
-    "docs:json": "typedoc --json docs/api.json --out docs/.api-json && node -e \"require('node:fs').rmSync('docs/.api-json',{recursive:true,force:true})\""
+    "docs:json": "typedoc --json docs/api.json --out docs/.api-json && node -e \"require('node:fs').rmSync('docs/.api-json',{recursive:true,force:true})\"",
+    "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
     "serialport": ""
@@ -78,6 +79,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@vitest/coverage-v8": "3.2.6",
     "serialport": "^12.0.0",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0",

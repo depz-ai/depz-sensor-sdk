@@ -136,18 +136,19 @@ depz_vl53lx_product depz_vl53lx_product_from_str(const char *name)
     return product_from_span(name, strlen(name));
 }
 
-depz_vl53lx_product depz_vl53lx_product_from_board_name(const char *name)
+depz_vl53lx_product depz_vl53lx_product_from_board_name_n(const char *name, size_t len)
 {
     /* Regex `VL53L(\d[A-Z0-9]*)` searched in name.upper(): the leftmost
      * match decides; a match that is not a family product is NONE (the scan
      * does not continue past it). */
     if (!name)
         return DEPZ_VL53LX_PRODUCT_NONE;
-    for (const char *p = name; *p; p++) {
+    for (size_t i = 0; i + 6 <= len; i++) {
+        const char *p = name + i;
         if (!eq_upper_n(p, 5, "VL53L") || !(p[5] >= '0' && p[5] <= '9'))
             continue;
         size_t n = 6;
-        for (;;) {
+        while (i + n < len) {
             char c = up(p[n]);
             if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
                 n++;
@@ -159,19 +160,32 @@ depz_vl53lx_product depz_vl53lx_product_from_board_name(const char *name)
     return DEPZ_VL53LX_PRODUCT_NONE;
 }
 
+depz_vl53lx_product depz_vl53lx_product_from_board_name(const char *name)
+{
+    return depz_vl53lx_product_from_board_name_n(name, name ? strlen(name) : 0);
+}
+
+depz_vl53lx_product depz_vl53lx_resolve_product_n(const char *usb_model, size_t usb_model_len,
+                                                  const char *device_name, size_t device_name_len)
+{
+    depz_vl53lx_product p = usb_model ? product_from_span(usb_model, usb_model_len)
+                                      : DEPZ_VL53LX_PRODUCT_NONE;
+    if (p != DEPZ_VL53LX_PRODUCT_NONE)
+        return p;
+    return depz_vl53lx_product_from_board_name_n(device_name, device_name_len);
+}
+
 depz_vl53lx_product depz_vl53lx_resolve_product(const char *usb_model,
                                                 const char *device_name)
 {
-    depz_vl53lx_product p = depz_vl53lx_product_from_str(usb_model);
-    if (p != DEPZ_VL53LX_PRODUCT_NONE)
-        return p;
-    return depz_vl53lx_product_from_board_name(device_name);
+    return depz_vl53lx_resolve_product_n(usb_model, usb_model ? strlen(usb_model) : 0,
+                                         device_name, device_name ? strlen(device_name) : 0);
 }
 
-depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model,
-                                            const char *device_name)
+depz_vl53lx_class depz_vl53lx_resolve_class_n(const char *usb_model, size_t usb_model_len,
+                                              const char *device_name, size_t device_name_len)
 {
-    switch (depz_vl53lx_resolve_product(usb_model, device_name)) {
+    switch (depz_vl53lx_resolve_product_n(usb_model, usb_model_len, device_name, device_name_len)) {
     case DEPZ_VL53LX_PRODUCT_L0X:  return DEPZ_VL53LX_CLASS_L0X;
     case DEPZ_VL53LX_PRODUCT_L1CX: return DEPZ_VL53LX_CLASS_L1CX;
     case DEPZ_VL53LX_PRODUCT_L1CB: return DEPZ_VL53LX_CLASS_L1CB;
@@ -179,6 +193,13 @@ depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model,
     case DEPZ_VL53LX_PRODUCT_L4CX: return DEPZ_VL53LX_CLASS_L4CX;
     default:                       return DEPZ_VL53LX_CLASS_GENERIC; /* L4CD too */
     }
+}
+
+depz_vl53lx_class depz_vl53lx_resolve_class(const char *usb_model,
+                                            const char *device_name)
+{
+    return depz_vl53lx_resolve_class_n(usb_model, usb_model ? strlen(usb_model) : 0,
+                                       device_name, device_name ? strlen(device_name) : 0);
 }
 
 const char *depz_vl53lx_class_str(depz_vl53lx_class c)

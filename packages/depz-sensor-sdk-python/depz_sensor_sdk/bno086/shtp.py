@@ -21,6 +21,8 @@ import struct
 from dataclasses import dataclass
 from enum import IntEnum
 
+from ..protocol._wire import check_uint
+
 
 class ShtpChannel(IntEnum):
     COMMAND = 0  # SHTP command channel (advertisements)
@@ -61,8 +63,8 @@ class ShtpHeader:
     continuation: bool = False
 
     def pack(self) -> bytes:
-        word = (self.length & LENGTH_MASK) | (CONTINUATION_BIT if self.continuation else 0)
-        return struct.pack("<HBB", word, self.channel, self.seq)
+        word = check_uint("length", self.length, 15) | (CONTINUATION_BIT if self.continuation else 0)
+        return struct.pack("<HBB", word, check_uint("channel", self.channel, 8), check_uint("seq", self.seq, 8))
 
     @classmethod
     def unpack(cls, data: bytes) -> "ShtpHeader":
@@ -77,6 +79,7 @@ class ShtpCargo:
     channel: int
     seq: int  # seq of the first fragment
     payload: bytes
+    capture_us: int = 0  # capture time of the first fragment (contract 05 §3)
 
 
 def build_frame(channel: int, payload: bytes, seq: int) -> bytes:
@@ -111,12 +114,13 @@ def fragment_cargo(
 
 
 class _ChannelRx:
-    __slots__ = ("buf", "expected", "seq")
+    __slots__ = ("buf", "expected", "seq", "capture_us")
 
     def __init__(self) -> None:
         self.buf = bytearray()
         self.expected = 0  # total cargo payload bytes (headers excluded)
         self.seq = 0
+        self.capture_us = 0
 
 
 class ShtpLayer:
@@ -144,6 +148,8 @@ class ShtpLayer:
             raise ValueError(
                 f"TX cargo {len(payload)}B exceeds the {MAX_TX_FRAME}B MCU slot"
             )
+        if not isinstance(channel, int) or not 0 <= channel < NUM_CHANNELS:
+            raise ValueError(f"SHTP channel {channel} out of range 0..{NUM_CHANNELS - 1}")
         seq = self._tx_seq[channel]
         self._tx_seq[channel] = (seq + 1) & 0xFF
         return build_frame(channel, payload, seq)
@@ -153,13 +159,16 @@ class ShtpLayer:
 
     # ── RX ───────────────────────────────────────────────────────────────────
 
-    def feed(self, frame: bytes) -> ShtpCargo | None:
+    def feed(self, frame: bytes, capture_us: int = 0) -> ShtpCargo | None:
         """Consume one inbound frame; return the cargo when complete.
 
         Rules (contract 05 §3): a non-continuation fragment starts a new
         cargo (discarding any partial one on that channel); a continuation
         without a cargo in progress is dropped; the cargo completes when the
-        accumulated bytes reach the first fragment's advertised total."""
+        accumulated bytes reach the first fragment's advertised total.
+        `capture_us` is the frame's RPT_DATA capture time; the cargo carries
+        the FIRST fragment's — the base its 0xFB timestamps refer to."""
+        check_uint("capture_us", capture_us, 64)  # MCU uptime µs (contract 05 §3)
         if len(frame) < SHTP_HEADER_SIZE:
             return None
         hdr = ShtpHeader.unpack(frame)
@@ -173,6 +182,7 @@ class ShtpLayer:
             rx.buf = bytearray(chunk)
             rx.expected = hdr.length - SHTP_HEADER_SIZE
             rx.seq = hdr.seq
+            rx.capture_us = capture_us
         else:
             if not rx.expected:
                 self.discarded += 1
@@ -185,7 +195,7 @@ class ShtpLayer:
             rx.buf = bytearray()
             rx.expected = 0
             return None
-        cargo = ShtpCargo(hdr.channel, rx.seq, bytes(rx.buf))
+        cargo = ShtpCargo(hdr.channel, rx.seq, bytes(rx.buf), rx.capture_us)
         rx.buf = bytearray()
         rx.expected = 0
         return cargo

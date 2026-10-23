@@ -49,11 +49,12 @@ DOCS = ROOT / "docs"
 # Domain (module group) → section title, in reading order — mirrors the Python
 # SDK's DOMAIN_ORDER / DOMAIN_TITLE.
 DOMAIN_ORDER = [
-    "discovery", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
+    "discovery", "devices", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "tmf8829", "fwdepz", "dataset", "transport", "protocol", "json",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery",
+    "devices": "Live devices",
     "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)",
     "vl53l8": "VL53L8 (ToF)",
@@ -97,11 +98,29 @@ VL53LX_BOARDS = [
     ("vl53l4cx", "VL53L4CX (ToF)"),
 ]
 
+# devices/<file> → the sensor reference a live class belongs to.
+DEVICE_CLASS_DOMAIN = {
+    "sr04.rs": "sr04",
+    "vl53l4cd.rs": "vl53l4",
+    "bno055.rs": "bno055",
+    "bno086.rs": "bno086",
+    "vl53l8.rs": "vl53l8",
+    "vl53l7.rs": "vl53l7",
+    "tmf8829.rs": "tmf8829",
+    "vl53lx.rs": "vl53lx",
+}
+
 
 def domain_for(path: Path) -> str | None:
     """Group key for a source file, or None for files with nothing to document
     (``lib.rs`` and the ``mod.rs`` re-export shims)."""
     p = str(path.relative_to(SRC)).replace("\\", "/")
+    if p.startswith("devices/"):
+        # A sensor class goes to its sensor's reference; the core is "Live devices".
+        sensor = DEVICE_CLASS_DOMAIN.get(p[len("devices/"):])
+        if sensor:
+            return sensor
+        return None if p == "devices/mod.rs" else "devices"
     if p.startswith("vl53l4/"):
         return "vl53l4"
     if p.startswith("vl53l8/"):
@@ -122,20 +141,20 @@ def domain_for(path: Path) -> str | None:
         return "discovery"
     if p == "protocol/common.rs":
         return "protocol"
-    if p == "usb_ids.rs":
+    if p in ("usb_ids.rs", "discovery.rs"):
         return "discovery"
     if p in ("framing.rs", "crc.rs"):
         return "transport"
     if p == "fwdepz.rs":
         return "fwdepz"
-    if p == "dataset.rs":
+    if p == "dataset.rs" or p.startswith("dataset/"):
         return "dataset"
     if p == "json.rs":
         return "json"
     return None
 
 
-ITEM_RE = re.compile(r"^pub\s+(fn|struct|enum|const|static|type)\s+([A-Za-z_][A-Za-z0-9_]*)")
+ITEM_RE = re.compile(r"^pub\s+(fn|struct|enum|trait|const|static|type)\s+([A-Za-z_][A-Za-z0-9_]*)")
 METHOD_RE = re.compile(r"^\s{4}pub\s+fn\s+([A-Za-z_][A-Za-z0-9_]*)")
 IMPL_RE = re.compile(r"^impl(?:<[^>]*>)?\s+(.*?)\s*\{")
 
@@ -264,7 +283,7 @@ def parse_file(path: Path):
         m_item = ITEM_RE.match(raw)
         if m_item:
             kind, name = m_item.group(1), m_item.group(2)
-            if kind in ("struct", "enum"):
+            if kind in ("struct", "enum", "trait"):
                 if "{" in raw:
                     end = _capture_braced(lines, i)
                     sig = _dedent(lines[i:end + 1])

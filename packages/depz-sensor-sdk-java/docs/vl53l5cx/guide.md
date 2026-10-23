@@ -6,8 +6,8 @@ same board commands, same 1536-byte transfer ceilings, same frame decode with
 this page shows the two L5 specifics. For signatures see the
 [API reference](api.md).
 
-This SDK does not drive the board: initialising and streaming is done with
-the Python or TypeScript SDK.
+The live device is `Vl53l5cxDevice`, a `Vl53l7cxDevice` that expects module
+type MZ: see the [VL53L7CX live device](../vl53l7cx/guide.md#live-device).
 
 ## Resolve the class
 

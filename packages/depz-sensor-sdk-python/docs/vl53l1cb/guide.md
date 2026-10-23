@@ -26,12 +26,12 @@ from depz_sensor_sdk import Vl53l1cb, open_device
 dev = open_device("/dev/ttyACM0")   # returns a Vl53l1cb (from the board name)
 assert isinstance(dev, Vl53l1cb)
 dev.init()                          # driver "uld"
-print(dev.identify()["driver_class"], dev.notes())
+print(dev.identify_product()["driver_class"], dev.notes())
 ```
 
 `open_device()` picks the class from the board's USB id or its device name
 (`… VL53L1CB USB v2.1 …`) — every 1D board runs the same firmware, so the
-firmware name cannot tell them apart. `identify()` returns everything about
+firmware name cannot tell them apart. `identify_product()` returns everything about
 the bound pair: product, driver, model id, reach, supported groups, modes and
 budgets.
 

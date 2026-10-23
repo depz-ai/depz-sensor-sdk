@@ -1,13 +1,15 @@
 <!-- generated from ../bno086/ by scripts/gen_bno085_docs.py — edit those pages -->
 # BNO085 — user guide
 
-Hands-on guide to the SH-2 decode layer in [`bno086`](api.md). For what the
+Hands-on guide to the BNO085: the live device (`devices::Bno086Device`, which runs
+the SH-2 hub session) and the SH-2 decode layer in [`bno086`](api.md) under it. For what the
 sensor is and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md). Framing, CRC and discovery are
 shared across sensors — see the [common guide](../guide.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The two layers: SHTP then SH-2](#the-two-layers-shtp-then-sh-2)
 - [Hello-world: decode orientation](#hello-world-decode-orientation)
 - [Enabling a report](#enabling-a-report)
@@ -16,6 +18,43 @@ shared across sensors — see the [common guide](../guide.md).
 - [Control requests and FRS](#control-requests-and-frs)
 - [Sleep and power on](#sleep-and-power-on)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::open_on_link;
+
+let imu = open_on_link(link, None, None, None)?.into_bno086()?;
+imu.hardware_reset(None)?;
+println!("{}", imu.product_id(None)?.sw_part_number);   // 10004563 = BNO086, 10004148 = BNO085
+let rv = imu.reports(Some(&[0x05]), 256);               // the rotation vector only
+let granted = imu.enable(0x05, 100.0)?;                  // the rate the hub granted
+let report = rv.take(Duration::from_secs(1))?;
+imu.disable(0x05)?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+- `enable(sensor, hz)` (or `enable_interval(sensor, interval_us, batch_us,
+  sensitivity, flags, cfg_word, verify, timeout)`) sends Set Feature and reads
+  the rate back; a rate the hub granted outside 0.9–2.1 × the request is
+  reported on stderr as a warning. `get_feature`, `disable`.
+- Reports stream to `on_report(callback)` and `reports(sensors, capacity)`
+  (filter by sensor id, or `None` for all). Batched sensors: `flush(sensor,
+  None)` returns once the hub's Flush Completed arrives.
+- Calibration: `set_calibration` / `get_calibration`, `save_dcd`,
+  `configure_periodic_dcd`, `clear_dcd_and_reset`; tare: `tare_now`,
+  `persist_tare`, `set_reorientation`; `set_motion_intent` and
+  `enable_motion_request` (interactive calibration, BNO085 only).
+- FRS records: `frs_read` / `frs_write` (`hub::FRS_*` record ids),
+  `get_metadata(sensor, None)`.
+- Hub state: `sleep` / `power_on` (SH-2), `wake` (the WAKE pin),
+  `get_oscillator_type`, `get_errors`, `get_counts` / `clear_counts`.
+- Every request goes as one SHTP frame through the bridge; when both of its
+  transmit slots are full the bridge answers ERR_BUSY and the device backs off
+  200 ms and resends (`set_busy_retry`).
+
+The sections below are the layers under the device.
 
 ## The two layers: SHTP then SH-2
 
@@ -38,7 +77,8 @@ if let Some(cargo) = shtp.feed(&shtp_frame) {          // one reassembled cargo
 ```
 
 `ShtpLayer` also owns the per-channel TX sequence counters: build an outbound
-frame with `shtp.next_frame(channel, &payload)`.
+frame with `shtp.try_next_frame(channel, &payload)?` (a bad channel or a cargo
+over one MCU transmit slot is an error).
 
 ## Hello-world: decode orientation
 
@@ -49,7 +89,7 @@ use depz_sensor_sdk::bno086::{parse_input_cargo, reports::Report, sh2::build_set
 
 // Host → device: enable ROTATION_VECTOR (0x05) at 100 Hz (10 000 µs interval).
 let set = build_set_feature(0x05, 10_000, 0, 0, 0, 0);
-let frame = shtp.next_frame(2 /* control */, &set);    // ... write to your transport ...
+let frame = shtp.try_next_frame(2 /* control */, &set)?;    // ... write to your transport ...
 
 // Device → host: decode quaternions (raw Q14).
 for r in parse_input_cargo(&cargo.payload, capture_timestamp_us) {
@@ -157,8 +197,8 @@ use depz_sensor_sdk::bno086::ShtpChannel;
 // a gyroscope at 50 Hz that keeps going while the hub sleeps
 let flags = FEATURE_FLAG_WAKEUP | FEATURE_FLAG_ALWAYS_ON;
 let gyro = build_set_feature(0x02, 20_000, 0, 0, flags, 0);
-let sleep = shtp.next_frame(ShtpChannel::Executable as u8, &build_sleep());    // [0x03]
-let on = shtp.next_frame(ShtpChannel::Executable as u8, &build_power_on());    // [0x02]
+let sleep = shtp.try_next_frame(ShtpChannel::Executable as u8, &build_sleep())?;    // [0x03]
+let on = shtp.try_next_frame(ShtpChannel::Executable as u8, &build_power_on())?;    // [0x02]
 ```
 
 Measured on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16): after sleep all reports
@@ -186,5 +226,6 @@ the WAKE pin, a hardware signal. "On" is the SH-2 command that ends sleep.
 - **Host→device frames must fit one MCU slot** — keep TX frames within
   [`MAX_TX_FRAME`](api.md) = 64 bytes (ERRATA E2). `ShtpLayer::reset` clears TX
   seq counters and partial cargos on a sensor reset.
-- **This crate does not own a port** — you supply the bytes and write the framed
-  requests; see the [common guide](../guide.md#getting-started).
+- **One device, any link** — `Bno086Device` runs over any `devices::Link`; the
+  layers below it work on bytes you supply, see the
+  [common guide](../guide.md#getting-started).

@@ -1,17 +1,13 @@
 # BNO055 — user guide
 
-Hands-on guide to the [`bno055`](api.md) codec and decode layer. For what the
+Hands-on guide to the BNO055 live device (`devices::Bno055Device`) and the
+[`bno055`](api.md) codec and decode layer under it. For what the
 sensor is and its concepts, read the [introduction](introduction.md); for
 exact signatures see the [API reference](api.md).
 
-This crate does not drive the sensor. The session logic — going through
-CONFIG for every mode change, waiting for the boot and the fusion start, page
-discipline — runs in the Python or TypeScript SDK. What follows is everything
-you need to build the commands and decode what the board sends; the rules the
-sensor imposes are listed where they matter.
-
 ## Contents
 
+- [Live device](#live-device)
 - [Commands](#commands)
 - [Hello-world: decode the stream](#hello-world-decode-the-stream)
 - [Units and scaling](#units-and-scaling)
@@ -21,6 +17,37 @@ sensor imposes are listed where they matter.
 - [Page 1: sensor configs](#page-1-sensor-configs)
 - [Bridge info](#bridge-info)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::bno055::regs::{OprMode, Units};
+use depz_sensor_sdk::devices::open_on_link;
+
+let imu = open_on_link(link, None, None, None)?.into_bno055()?;
+imu.configure(OprMode::Ndof, Some(Units::default()), None, None)?; // returns once fusion runs
+let samples = imu.samples(256);
+imu.start_stream(10, None, false)?;          // the full 46-byte block at 100 Hz
+let s = samples.take(Duration::from_secs(1))?;
+println!("q = {:?}  calib {:?}", s.quaternion, s.calibration);
+imu.stop_stream()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+The device does the session logic the sensor imposes: every mode change goes
+through CONFIG with the datasheet settle times, `configure` waits for the boot
+and the fusion start, page 1 is entered and left around each access (and
+refused while streaming), settings that need CONFIG (`set_units`,
+`set_axis_remap`, the calibration profile, the SIC matrix) switch there and
+back. `set_power_mode(PwrMode::Suspend)` remembers the mode and puts it back on
+wake-up; `self_test()` runs the built-in test; `reset_sensor()` pulses nRESET
+and `restore_configuration()` re-applies the last `configure`. Streamed samples
+use the units in effect when the stream started; a short report is dropped and
+counted in `stream_parse_errors()`.
+
+The sections below are the layers under the device; the rules the sensor
+imposes are listed where they matter.
 
 ## Commands
 

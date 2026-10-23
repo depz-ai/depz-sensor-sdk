@@ -2,8 +2,10 @@ package ai.depz.sensor.sensors.vl53l8;
 
 import java.util.List;
 
+import ai.depz.sensor.protocol.Wire;
+
 /**
- * VL53L8CX/CH ULD — the host-verifiable decode layer only.
+ * VL53L8CX/CH ULD — the frame decode and DCI codecs under the driver.
  *
  * <p>The DEPZ ToF is <b>two</b> sensors: <b>VL53L8CX</b> (the base multizone
  * part, also the dev/unprogrammed default) and <b>VL53L8CH</b> (CX plus CNH
@@ -14,17 +16,9 @@ import java.util.List;
  * The only variant difference in the decode path is the footer-id offset —
  * see {@link Variant}. Semantics mirror the TS/Python references 1:1.
  *
- * <p>This is a port of the parts of the ST ULD ({@code vl53l8cx_api.c}, ULD
- * 2.1.0) that are pure, hardware-independent and covered by golden vectors.
- *
- * <p>OUT OF SCOPE (extension points, intentionally not ported):
- * <ul>
- *   <li><b>Live ULD init / config register-bridge driver</b> (both variants):
- *       sensor-firmware download, {@code dciReadData}/{@code dciWriteData},
- *       {@code setResolution}, {@code startRanging}, power-mode transitions,
- *       xtalk calibration. Those depend on a live SPI bridge and cannot be
- *       replayed deterministically; see {@link #liveDriverStubbed()}.
- * </ul>
+ * <p>These are the pure parts of the ST ULD ({@code vl53l8cx_api.c}, ULD 2.1.0)
+ * that golden vectors pin; the live driver over the register bridge (firmware
+ * download, DCI access, ranging, power modes, calibration) is {@link Vl53l8Driver}.
  */
 public final class Vl53l8Uld {
     private Vl53l8Uld() {}
@@ -94,7 +88,7 @@ public final class Vl53l8Uld {
     public static final int POWER_MODE_WAKEUP = 1;
     public static final int POWER_MODE_DEEP_SLEEP = 2;
 
-    private static int threshScale(int measurement) {
+    static int threshScale(int measurement) {
         return switch (measurement) {
             case DIST_MM -> 4;
             case SIGNAL_PER_SPAD_KCPS -> 2048;
@@ -104,15 +98,6 @@ public final class Vl53l8Uld {
             case MOTION_INDICATOR -> 65535;
             default -> 1;
         };
-    }
-
-    /**
-     * The live ULD init/config register-bridge driver is intentionally not
-     * ported to Java — it is hardware-dependent and out of the decode scope.
-     * Applies to both VL53L8CX and VL53L8CH.
-     */
-    public static boolean liveDriverStubbed() {
-        return true;
     }
 
     // ── CNH (Compact Network Histogram) decode ───────────────────────────────
@@ -169,12 +154,12 @@ public final class Vl53l8Uld {
      * @param nbOfAggregates number of CNH aggregates (from the CNH config)
      * @param featureLength  CNH bins per aggregate (from the CNH config)
      * @param raw            captured CNH block bytes
-     * @throws IllegalArgumentException counts outside 1..64 / 1..255, or a block
+     * @throws IllegalArgumentException counts outside 1..64 / 0..255, or a block
      *         shorter than those counts imply (as the C / C++ / Rust / C# decoders)
      */
     public static CnhResult decodeCnh(int nbOfAggregates, int featureLength, byte[] raw) {
         if (nbOfAggregates <= 0 || nbOfAggregates > CNH_MAX_AGGREGATES
-                || featureLength <= 0 || featureLength > CNH_MAX_FEATURE_LENGTH) {
+                || featureLength < 0 || featureLength > CNH_MAX_FEATURE_LENGTH) {
             throw new IllegalArgumentException("decodeCnh: aggregates / feature length out of range");
         }
         if (raw.length < CNH_PER_HEADER_WORDS * 4) {
@@ -245,16 +230,27 @@ public final class Vl53l8Uld {
 
     // ── results-frame decoder ────────────────────────────────────────────────
 
-    /** Parsed raw results frame (raw-integer per-zone arrays). */
+    /**
+     * Parsed results frame, in the real units ST's GetRangingData gives (contract
+     * 04 §5). ST divides integers; the scaled values here keep their fraction.
+     */
     public static final class Results {
+        /** mm: raw / 4 floored, a negative distance clamped to 0 (as ST). */
         public int[] distanceMm = new int[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
+        /** 5 or 9 = valid measurement; 255 = no target detected. */
         public int[] targetStatus = new int[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
+        /** Targets found per zone. */
         public int[] nbTargetDetected = new int[RESOLUTION_8X8];
-        public long[] signalPerSpad = new long[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
-        public long[] ambientPerSpad = new long[RESOLUTION_8X8];
+        /** Signal rate, kcps/SPAD (raw / 2048). */
+        public double[] signalPerSpad = new double[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
+        /** Ambient rate, kcps/SPAD (raw / 2048), one per zone. */
+        public double[] ambientPerSpad = new double[RESOLUTION_8X8];
+        /** Active SPAD count per zone. */
         public long[] nbSpadsEnabled = new long[RESOLUTION_8X8];
+        /** Measurement noise, mm (raw / 128). */
         public double[] rangeSigmaMm = new double[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
-        public int[] reflectance = new int[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
+        /** Estimated target reflectance, % (raw / 2). */
+        public double[] reflectance = new double[RESOLUTION_8X8 * NB_TARGET_PER_ZONE];
         public int siliconTempDegc = 0;
         /**
          * Raw CNH (compact-histogram) block bytes (VL53L8CH / VL53L7CH, block
@@ -350,9 +346,9 @@ public final class Vl53l8Uld {
             } else if (bhIdx == NB_TARGET_DETECTED_IDX) {
                 r.nbTargetDetected = u8slice(buf, i + 4, msize);
             } else if (bhIdx == SIGNAL_RATE_IDX) {
-                r.signalPerSpad = u32slice(buf, i + 4, msize);
+                r.signalPerSpad = scaled(u32slice(buf, i + 4, msize), 2048.0);
             } else if (bhIdx == AMBIENT_RATE_IDX) {
-                r.ambientPerSpad = u32slice(buf, i + 4, msize);
+                r.ambientPerSpad = scaled(u32slice(buf, i + 4, msize), 2048.0);
                 ambientZones = r.ambientPerSpad.length;
             } else if (bhIdx == SPAD_COUNT_IDX) {
                 r.nbSpadsEnabled = u32slice(buf, i + 4, msize);
@@ -363,7 +359,12 @@ public final class Vl53l8Uld {
                 }
                 r.rangeSigmaMm = out;
             } else if (bhIdx == REFLECTANCE_EST_PC_IDX) {
-                r.reflectance = u8slice(buf, i + 4, msize);
+                int[] refl = u8slice(buf, i + 4, msize);
+                double[] out = new double[refl.length];
+                for (int k = 0; k < out.length; k++) {
+                    out[k] = refl[k] / 2.0;
+                }
+                r.reflectance = out;
             } else if (bhIdx == CNH_DATA_IDX) {
                 r.cnhRaw = java.util.Arrays.copyOfRange(buf, i + 4, i + 4 + msize);
             }
@@ -383,9 +384,12 @@ public final class Vl53l8Uld {
             r.reflectance = trim(r.reflectance, nt);
         }
 
-        // Fixed-point scaling (per ST GetRangingData). Floor division for signed mm.
+        // Real units, as ST GetRangingData (contract 04 §5): distance / 4 with a
+        // negative distance clamped to 0; reflectance / 2 (%) and signal / ambient
+        // / 2048 (kcps/SPAD) above; sigma / 128 (mm). ST divides integers; the
+        // scaled values here keep their fraction.
         for (int k = 0; k < r.distanceMm.length; k++) {
-            r.distanceMm[k] = Math.floorDiv(r.distanceMm[k], 4);
+            r.distanceMm[k] = Math.max(0, Math.floorDiv(r.distanceMm[k], 4));
         }
         for (int k = 0; k < r.rangeSigmaMm.length; k++) {
             r.rangeSigmaMm[k] = r.rangeSigmaMm[k] / 128.0;
@@ -415,9 +419,17 @@ public final class Vl53l8Uld {
 
     // ── advanced-feature DCI codecs (pure) ───────────────────────────────────
 
-    /** Xtalk margin (kcps/spad) -> raw DCI value (round(kcps * 2048)). */
+    /**
+     * Xtalk margin (kcps/spad) -> raw DCI value (round(kcps * 2048)). The margin
+     * is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN
+     * included, throws {@link Vl53l8Error} (INVALID_PARAM) — never wrapped
+     * (contract 07 §3).
+     */
     public static long xtalkMarginToRaw(double marginKcps) {
-        return (long) Math.round(marginKcps * 2048) & 0xFFFFFFFFL;
+        if (!(marginKcps >= 0 && marginKcps <= 10000)) {
+            throw new Vl53l8Error(STATUS_INVALID_PARAM, "set_xtalk_margin");
+        }
+        return Math.round(marginKcps * 2048);
     }
 
     /** One detection-threshold entry (real units). */
@@ -431,24 +443,35 @@ public final class Vl53l8Uld {
      * Pack up to 64 detection thresholds into the DCI_DET_THRESH_START payload
      * plus the 8-byte valid-status block. Each threshold's low/high are scaled
      * by its measurement selector. Mirror of set_detection_thresholds.
+     * Anything out of its field's range (measurement/type/zone/operation u8,
+     * scaled low/high i32) or more than 64 entries throws
+     * {@link IllegalArgumentException}, never wrapped or dropped.
      */
     public static PackedThresholds packDetectionThresholds(List<DetectionThreshold> thresholds) {
+        if (thresholds.size() > NB_THRESHOLDS) {
+            throw new IllegalArgumentException(
+                "thresholds: " + thresholds.size() + " entries, at most " + NB_THRESHOLDS);
+        }
         byte[] valid = new byte[8];
         java.util.Arrays.fill(valid, (byte) 0x05);
         byte[] start = new byte[NB_THRESHOLDS * 12];
         for (int k = 0; k < NB_THRESHOLDS; k++) {
             DetectionThreshold t = k < thresholds.size() ? thresholds.get(k) : null;
-            int meas = t == null ? 0 : t.measurement();
-            int scale = threshScale(meas);
-            int low = (t == null ? 0 : t.lowThresh()) * scale;
-            int high = (t == null ? 0 : t.highThresh()) * scale;
+            String at = "thresholds[" + k + "].";
+            int meas = Wire.checkUintI(at + "measurement", t == null ? 0 : t.measurement(), 8);
+            long scale = threshScale(meas);
+            int low = Wire.checkInt(at + "lowThresh", (t == null ? 0 : t.lowThresh()) * scale, 32);
+            int high = Wire.checkInt(at + "highThresh", (t == null ? 0 : t.highThresh()) * scale, 32);
+            int type = Wire.checkUintI(at + "type", t == null ? 0 : t.type(), 8);
+            int zone = Wire.checkUintI(at + "zoneNum", t == null ? 0 : t.zoneNum(), 8);
+            int op = Wire.checkUintI(at + "operation", t == null ? 0 : t.operation(), 8);
             int off = k * 12;
             putI32le(start, off, low);
             putI32le(start, off + 4, high);
             start[off + 8] = (byte) meas;
-            start[off + 9] = (byte) (t == null ? 0 : t.type());
-            start[off + 10] = (byte) (t == null ? 0 : t.zoneNum());
-            start[off + 11] = (byte) (t == null ? 0 : t.operation());
+            start[off + 9] = (byte) type;
+            start[off + 10] = (byte) zone;
+            start[off + 11] = (byte) op;
         }
         return new PackedThresholds(start, valid);
     }
@@ -546,12 +569,38 @@ public final class Vl53l8Uld {
     }
 
     /** ULD status error. */
+    /** A VL53L8 / L5 / L7 ULD status (vl53l8cx_api.h codes) with where it happened. */
     public static final class Vl53l8Error extends RuntimeException {
+        public static final int STATUS_TIMEOUT_ERROR = 1;
+        public static final int STATUS_CORRUPTED_FRAME = 2;
+        public static final int STATUS_LASER_SAFETY = 3;
+        public static final int STATUS_FW_CHECKSUM_FAIL = 5;
+        public static final int MCU_ERROR = 66;
+        public static final int STATUS_INVALID_PARAM = 127;
+        public static final int STATUS_ERROR = 255;
+
         public final int code;
 
         public Vl53l8Error(int code, String where) {
-            super("VL53L8CX code " + code + " " + where);
+            super(("VL53L8CX " + nameOf(code) + " (code " + code + ") " + where).trim());
             this.code = code;
+        }
+
+        public Vl53l8Error(int code) {
+            this(code, "");
+        }
+
+        private static String nameOf(int code) {
+            return switch (code) {
+                case STATUS_TIMEOUT_ERROR -> "TIMEOUT";
+                case STATUS_CORRUPTED_FRAME -> "CORRUPTED_FRAME";
+                case STATUS_LASER_SAFETY -> "LASER_SAFETY";
+                case STATUS_FW_CHECKSUM_FAIL -> "FW_CHECKSUM_FAIL";
+                case MCU_ERROR -> "MCU_ERROR";
+                case STATUS_INVALID_PARAM -> "INVALID_PARAM";
+                case STATUS_ERROR -> "ERROR";
+                default -> "0x" + Integer.toHexString(code);
+            };
         }
     }
 
@@ -605,6 +654,14 @@ public final class Vl53l8Uld {
         long[] out = new long[msize / 4];
         for (int k = 0; k < out.length; k++) {
             out[k] = u32le(b, off + 4 * k);
+        }
+        return out;
+    }
+
+    private static double[] scaled(long[] raw, double div) {
+        double[] out = new double[raw.length];
+        for (int k = 0; k < raw.length; k++) {
+            out[k] = raw[k] / div;
         }
         return out;
     }

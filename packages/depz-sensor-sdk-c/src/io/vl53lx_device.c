@@ -220,7 +220,14 @@ static bool vlx_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t l
     if (cmd != DEPZ_VL53LX_RPT_STREAM || len < 12) return false;
     /* The driver's decode state is only touched here while ranging, and
      * configuration is refused then — no other thread uses the driver. */
-    if (!s->drv || depz_vl53l4_unpack_stream(p, len, &sd) != 0) return true;
+    if (!s->drv) return true;
+    if (depz_vl53l4_unpack_stream(p, len, &sd) != 0) {
+        /* shorter than its own length field: count it, keep the reader alive */
+        depz_mutex_lock(&s->lock);
+        s->parse_errors++;
+        depz_mutex_unlock(&s->lock);
+        return true;
+    }
     vlx_measurement_init(&m);
     rc = s->drv->ops->decode(s->drv, sd.data, sd.len, &m);
     if (rc) {
@@ -467,6 +474,19 @@ bool depz_vl53lx_initialized(const depz_device *dev) { return depz_is_vl53lx(dev
 depz_vl53lx_product depz_vl53lx_product_bound(const depz_device *dev)
 {
     return depz_is_vl53lx(dev) ? st((depz_device *)dev)->product : DEPZ_VL53LX_PRODUCT_NONE;
+}
+
+depz_vl53lx_class depz_vl53lx_get_class(const depz_device *dev)
+{
+    if (!depz_is_vl53lx(dev)) return DEPZ_VL53LX_CLASS_GENERIC;
+    switch (st((depz_device *)dev)->class_product) {
+    case DEPZ_VL53LX_PRODUCT_L0X:  return DEPZ_VL53LX_CLASS_L0X;
+    case DEPZ_VL53LX_PRODUCT_L1CX: return DEPZ_VL53LX_CLASS_L1CX;
+    case DEPZ_VL53LX_PRODUCT_L1CB: return DEPZ_VL53LX_CLASS_L1CB;
+    case DEPZ_VL53LX_PRODUCT_L3CX: return DEPZ_VL53LX_CLASS_L3CX;
+    case DEPZ_VL53LX_PRODUCT_L4CX: return DEPZ_VL53LX_CLASS_L4CX;
+    default:                       return DEPZ_VL53LX_CLASS_GENERIC;
+    }
 }
 
 depz_vl53lx_driver depz_vl53lx_driver_bound(const depz_device *dev)

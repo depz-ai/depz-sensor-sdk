@@ -34,6 +34,9 @@ size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out)
 
 size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out)
 {
+    /* contract 02 §6: logical pins 1..5, modes 0..4, polarity 0..1 */
+    if (c->pin < 1 || c->pin > 5 || c->mode > DEPZ_SYNC_PIN_OUT_BOTH || c->polarity > 1)
+        return 0;
     out[0] = c->pin;
     out[1] = c->mode;
     out[2] = c->polarity;
@@ -42,7 +45,7 @@ size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out)
 
 int depz_unpack_status(const uint8_t *p, size_t len, depz_status_report *out)
 {
-    if (len != 2)
+    if (len < 2)
         return -1;
     out->cmd = p[0];
     out->status = p[1];
@@ -58,9 +61,22 @@ int depz_unpack_text(const uint8_t *p, size_t len, depz_text_report *out)
     return 0;
 }
 
+int depz_unpack_text_ex(const uint8_t *p, size_t len, uint8_t *cmd,
+                        char *text, size_t text_cap, size_t *text_len)
+{
+    size_t n;
+    if (len < 1)
+        return -1;
+    *cmd = p[0];
+    n = depz_strip_device_string(p + 1, len - 1, text, text_cap);
+    if (text_len)
+        *text_len = n;
+    return 0;
+}
+
 int depz_unpack_sync_time(const uint8_t *p, size_t len, depz_sync_time_report *out)
 {
-    if (len != 24)
+    if (len < 24)
         return -1;
     out->pc_timestamp_us = get_u64_le(p);
     out->mcu_rx_us = get_u64_le(p + 8);
@@ -70,7 +86,7 @@ int depz_unpack_sync_time(const uint8_t *p, size_t len, depz_sync_time_report *o
 
 int depz_unpack_temperature(const uint8_t *p, size_t len, depz_temperature_report *out)
 {
-    if (len != 10)
+    if (len < 10)
         return -1;
     out->timestamp_us = get_u64_le(p);
     out->raw_decidegrees = (int16_t)((uint16_t)p[8] | ((uint16_t)p[9] << 8));
@@ -79,7 +95,7 @@ int depz_unpack_temperature(const uint8_t *p, size_t len, depz_temperature_repor
 
 int depz_unpack_sequence_error(const uint8_t *p, size_t len, depz_sequence_error_report *out)
 {
-    if (len != 2)
+    if (len < 2)
         return -1;
     out->expected_seq = p[0];
     out->received_seq = p[1];
@@ -88,7 +104,7 @@ int depz_unpack_sequence_error(const uint8_t *p, size_t len, depz_sequence_error
 
 int depz_unpack_sync_pin_config(const uint8_t *p, size_t len, depz_sync_pin_config *out)
 {
-    if (len != 3)
+    if (len < 3)
         return -1;
     out->pin = p[0];
     out->mode = p[1];

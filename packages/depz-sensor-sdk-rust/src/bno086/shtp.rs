@@ -46,7 +46,7 @@ pub enum ExecutableCommand {
 }
 
 /// SH-2 "Sleep" payload for the executable channel: `[0x03]`. Send it with
-/// `next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
+/// `try_next_frame(ShtpChannel::Executable as u8, &build_sleep())` through the
 /// bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
 ///
 /// Every report stops, except those enabled with flags wake-up | always-on,
@@ -78,22 +78,62 @@ pub struct ShtpHeader {
     pub continuation: bool,
 }
 
-/// Serialize an SHTP header to 4 bytes.
-pub fn pack_shtp_header(hdr: &ShtpHeader) -> [u8; 4] {
-    let word = (hdr.length & LENGTH_MASK) | if hdr.continuation { CONTINUATION_BIT } else { 0 };
-    let w = word.to_le_bytes();
-    [w[0], w[1], hdr.channel, hdr.seq]
+/// SHTP codec error (contract 07 §3: an argument that does not fit its wire
+/// field, or input shorter than the fields it must hold, is rejected —
+/// never masked, wrapped or read past).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShtpError {
+    /// `length` does not fit the 15-bit length field (max 0x7FFF).
+    LengthTooWide(usize),
+    /// Fewer than the 4 header bytes.
+    ShortHeader(usize),
+    /// Channel outside 0..[`NUM_CHANNELS`].
+    ChannelOutOfRange(u8),
+    /// A host→sensor frame larger than one MCU transmit slot ([`MAX_TX_FRAME`]).
+    TxCargoTooLong(usize),
 }
 
-/// Decode a 4-byte SHTP header (reads the first 4 bytes of `data`).
-pub fn unpack_shtp_header(data: &[u8]) -> ShtpHeader {
+impl std::fmt::Display for ShtpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShtpError::LengthTooWide(n) => write!(f, "SHTP length {} out of range for u15", n),
+            ShtpError::ShortHeader(n) => write!(f, "SHTP header needs 4 bytes, got {}", n),
+            ShtpError::ChannelOutOfRange(c) => {
+                write!(f, "SHTP channel {} out of range 0..{}", c, NUM_CHANNELS - 1)
+            }
+            ShtpError::TxCargoTooLong(n) => {
+                write!(f, "TX cargo {}B exceeds the {}B MCU slot", n, MAX_TX_FRAME)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ShtpError {}
+
+/// Serialize an SHTP header to 4 bytes; `length` must fit 15 bits
+/// ([`ShtpError::LengthTooWide`] otherwise — never masked).
+pub fn try_pack_shtp_header(hdr: &ShtpHeader) -> Result<[u8; 4], ShtpError> {
+    if hdr.length > LENGTH_MASK {
+        return Err(ShtpError::LengthTooWide(hdr.length as usize));
+    }
+    let word = hdr.length | if hdr.continuation { CONTINUATION_BIT } else { 0 };
+    let w = word.to_le_bytes();
+    Ok([w[0], w[1], hdr.channel, hdr.seq])
+}
+
+/// Decode an SHTP header from the first 4 bytes of `data` (trailing bytes —
+/// the cargo — are ignored); [`ShtpError::ShortHeader`] when shorter.
+pub fn try_unpack_shtp_header(data: &[u8]) -> Result<ShtpHeader, ShtpError> {
+    if data.len() < SHTP_HEADER_SIZE {
+        return Err(ShtpError::ShortHeader(data.len()));
+    }
     let word = u16::from_le_bytes([data[0], data[1]]);
-    ShtpHeader {
+    Ok(ShtpHeader {
         length: word & LENGTH_MASK,
         channel: data[2],
         seq: data[3],
         continuation: (word & CONTINUATION_BIT) != 0,
-    }
+    })
 }
 
 /// One reassembled cargo: `payload` excludes all SHTP headers.
@@ -103,20 +143,23 @@ pub struct ShtpCargo {
     /// seq of the first fragment.
     pub seq: u8,
     pub payload: Vec<u8>,
+    /// `RPT_DATA.timestamp_us` of the FIRST fragment (contract 05 §3) — the
+    /// capture the cargo's 0xFB base delta refers to; 0 when fed via [`ShtpLayer::feed`].
+    pub capture_us: u64,
 }
 
-/// Single-fragment frame: length = header + payload.
-pub fn build_frame(channel: u8, payload: &[u8], seq: u8) -> Vec<u8> {
-    let hdr = pack_shtp_header(&ShtpHeader {
-        length: (SHTP_HEADER_SIZE + payload.len()) as u16,
-        channel,
-        seq,
-        continuation: false,
-    });
-    let mut out = Vec::with_capacity(SHTP_HEADER_SIZE + payload.len());
+/// Single-fragment frame: length = header + payload. A frame longer than the
+/// 15-bit length field holds is [`ShtpError::LengthTooWide`].
+pub fn try_build_frame(channel: u8, payload: &[u8], seq: u8) -> Result<Vec<u8>, ShtpError> {
+    let total = SHTP_HEADER_SIZE + payload.len();
+    if total > LENGTH_MASK as usize {
+        return Err(ShtpError::LengthTooWide(total));
+    }
+    let hdr = try_pack_shtp_header(&ShtpHeader { length: total as u16, channel, seq, continuation: false })?;
+    let mut out = Vec::with_capacity(total);
     out.extend_from_slice(&hdr);
     out.extend_from_slice(payload);
-    out
+    Ok(out)
 }
 
 #[derive(Debug, Default, Clone)]
@@ -126,6 +169,7 @@ struct ChannelRx {
     /// Total cargo payload bytes (headers excluded).
     expected: usize,
     seq: u8,
+    capture_us: u64,
 }
 
 /// Per-channel TX sequence counters + RX cargo reassembly.
@@ -152,17 +196,39 @@ impl ShtpLayer {
         ShtpLayer::default()
     }
 
-    /// Build a single-fragment frame, consuming the channel's TX seq.
-    pub fn next_frame(&mut self, channel: u8, payload: &[u8]) -> Vec<u8> {
+    /// Build a single-fragment frame, consuming the channel's TX seq (the seq
+    /// wraps 255 → 0 by design). The frame must fit one MCU transmit slot
+    /// ([`ShtpError::TxCargoTooLong`]; host-side control payloads are ≤ 21
+    /// bytes) and `channel` must be 0..[`NUM_CHANNELS`]
+    /// ([`ShtpError::ChannelOutOfRange`]). Nothing is consumed on an error.
+    pub fn try_next_frame(&mut self, channel: u8, payload: &[u8]) -> Result<Vec<u8>, ShtpError> {
+        if SHTP_HEADER_SIZE + payload.len() > MAX_TX_FRAME {
+            return Err(ShtpError::TxCargoTooLong(payload.len()));
+        }
         let ch = channel as usize;
+        if ch >= NUM_CHANNELS {
+            return Err(ShtpError::ChannelOutOfRange(channel));
+        }
         let seq = self.tx_seqs[ch];
+        let frame = try_build_frame(channel, payload, seq)?;
         self.tx_seqs[ch] = seq.wrapping_add(1);
-        build_frame(channel, payload, seq)
+        Ok(frame)
+    }
+
+    /// Current TX seq counter for a channel (next frame's seq); `None` for a
+    /// channel outside 0..[`NUM_CHANNELS`].
+    pub fn try_tx_seq(&self, channel: u8) -> Option<u8> {
+        self.tx_seqs.get(channel as usize).copied()
     }
 
     /// Current TX seq counter for a channel (next frame's seq).
+    ///
+    /// # Panics
+    ///
+    /// When `channel` ≥ [`NUM_CHANNELS`]; use [`ShtpLayer::try_tx_seq`].
     pub fn tx_seq(&self, channel: u8) -> u8 {
-        self.tx_seqs[channel as usize]
+        self.try_tx_seq(channel)
+            .unwrap_or_else(|| panic!("{}", ShtpError::ChannelOutOfRange(channel)))
     }
 
     /// Consume one inbound frame; return the cargo when complete.
@@ -171,11 +237,19 @@ impl ShtpLayer {
     /// (discarding any partial one on that channel); a continuation without a
     /// cargo in progress is dropped; the cargo completes when the accumulated
     /// bytes reach the first fragment's advertised total.
+    ///
+    /// Same as [`ShtpLayer::feed_at`] with capture 0 (cargo `capture_us` = 0).
     pub fn feed(&mut self, frame: &[u8]) -> Option<ShtpCargo> {
-        if frame.len() < SHTP_HEADER_SIZE {
-            return None;
-        }
-        let hdr = unpack_shtp_header(frame);
+        self.feed_at(frame, 0)
+    }
+
+    /// [`ShtpLayer::feed`] with the frame's `RPT_DATA.timestamp_us`: the cargo
+    /// carries the FIRST fragment's capture in `capture_us` — the base its 0xFB
+    /// timestamps refer to (contract 05 §3), not the fragment that completed it.
+    pub fn feed_at(&mut self, frame: &[u8], capture_us: u64) -> Option<ShtpCargo> {
+        let Ok(hdr) = try_unpack_shtp_header(frame) else {
+            return None; // shorter than a header: junk
+        };
         if hdr.channel as usize >= NUM_CHANNELS || (hdr.length as usize) < SHTP_HEADER_SIZE {
             return None; // padding/"no data" header or junk
         }
@@ -194,6 +268,7 @@ impl ShtpLayer {
             rx.received = chunk.len();
             rx.expected = hdr.length as usize - SHTP_HEADER_SIZE;
             rx.seq = hdr.seq;
+            rx.capture_us = capture_us;
         } else {
             if self.rx[ch].expected == 0 {
                 self.discarded += 1;
@@ -219,6 +294,7 @@ impl ShtpLayer {
             channel: hdr.channel,
             seq: rx.seq,
             payload: std::mem::take(&mut rx.chunks),
+            capture_us: rx.capture_us,
         };
         rx.received = 0;
         rx.expected = 0;

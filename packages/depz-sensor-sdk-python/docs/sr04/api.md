@@ -201,6 +201,15 @@ get_software_name(self) -> str
 get_serial_number(self) -> str
 ```
 
+#### Sr04.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
 #### Sr04.read_mcu_temperature
 
 ```python

@@ -157,10 +157,12 @@ static void swap_buffer(uint8_t *d, size_t n)
 #define BH_REFL_IDX     0xe044u
 #define BH_STATUS_IDX   0xe084u
 
-/* floor division toward negative infinity (distances can be negative). */
-static int32_t floordiv4(int32_t v)
+/* ST GetRangingData distance: raw / 4 floored, a negative result clamped to 0
+ * (contract 04 §5). Flooring a negative raw gives a negative result, so the
+ * whole negative range is 0. */
+static int32_t distance_mm_from_raw(int32_t v)
 {
-    return (v >= 0) ? (v / 4) : -(((-v) + 3) / 4);
+    return (v <= 0) ? 0 : (v / 4);
 }
 
 #define BH_CNH_IDX      0xc048u /* VL53LMZ_CNH_DATA_IDX (CH-only output block) */
@@ -225,12 +227,12 @@ static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
         } else if (idx == BH_SIGNAL_IDX) {
             sig_n = (int)(msize / 4);
             if (sig_n > DEPZ_VL53L8_MAX_ZONES) sig_n = DEPZ_VL53L8_MAX_ZONES;
-            for (int k = 0; k < sig_n; k++) out->signal_per_spad[k] = rd_u32(body + 4 * k);
+            for (int k = 0; k < sig_n; k++) out->signal_per_spad[k] = rd_u32(body + 4 * k) / 2048.0;
         } else if (idx == BH_AMBIENT_IDX) {
             amb_n = (int)(msize / 4);
             amb_seen = true;
             if (amb_n > DEPZ_VL53L8_MAX_ZONES) amb_n = DEPZ_VL53L8_MAX_ZONES;
-            for (int k = 0; k < amb_n; k++) out->ambient_per_spad[k] = rd_u32(body + 4 * k);
+            for (int k = 0; k < amb_n; k++) out->ambient_per_spad[k] = rd_u32(body + 4 * k) / 2048.0;
         } else if (idx == BH_SPAD_IDX) {
             spad_n = (int)(msize / 4);
             spad_seen = true;
@@ -239,11 +241,11 @@ static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
         } else if (idx == BH_SIGMA_IDX) {
             sigma_n = (int)(msize / 2);
             if (sigma_n > DEPZ_VL53L8_MAX_ZONES) sigma_n = DEPZ_VL53L8_MAX_ZONES;
-            for (int k = 0; k < sigma_n; k++) out->range_sigma_mm_raw[k] = rd_u16(body + 2 * k);
+            for (int k = 0; k < sigma_n; k++) out->range_sigma_mm[k] = rd_u16(body + 2 * k) / 128.0;
         } else if (idx == BH_REFL_IDX) {
             refl_n = (int)msize;
             if (refl_n > DEPZ_VL53L8_MAX_ZONES) refl_n = DEPZ_VL53L8_MAX_ZONES;
-            for (int k = 0; k < refl_n; k++) out->reflectance[k] = body[k];
+            for (int k = 0; k < refl_n; k++) out->reflectance[k] = body[k] / 2.0;
         } else if (idx == BH_CNH_IDX && cnh_out) {
             if (msize > cnh_cap)
                 return -3;
@@ -272,14 +274,17 @@ static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
             out->signal_per_spad[k] = 0;
             out->ambient_per_spad[k] = 0;
             out->nb_spads_enabled[k] = 0;
-            out->range_sigma_mm_raw[k] = 0;
+            out->range_sigma_mm[k] = 0;
             out->reflectance[k] = 0;
         }
     }
 
-    /* ST GetRangingData fixed-point scaling: distance_mm = raw / 4 (floored). */
+    /* Real units, as ST GetRangingData (contract 04 §5): distance raw / 4
+     * floored, negative -> 0. Signal, ambient, sigma and reflectance were
+     * scaled as they were read (/2048, /2048, /128, /2), keeping the fraction
+     * that ST's integer division drops. */
     for (int k = 0; k < dist_n; k++)
-        out->distance_mm[k] = floordiv4(out->distance_mm[k]);
+        out->distance_mm[k] = distance_mm_from_raw(out->distance_mm[k]);
 
     /* Zone count = nb_target_detected block length (16 for 4x4, 64 for 8x8;
      * on L5/L7 after the trim above). */
@@ -374,7 +379,7 @@ int depz_vl53l8ch_decode_cnh(const depz_vl53l8ch_cnh_config *cfg,
     int nb_agg = cfg->nb_of_aggregates;
     int feat = cfg->feature_length;
     if (nb_agg <= 0 || nb_agg > DEPZ_VL53L8_CNH_MAX_AGGREGATES ||
-        feat <= 0 || feat > DEPZ_VL53L8_CNH_MAX_FEATURE)
+        feat < 0 || feat > DEPZ_VL53L8_CNH_MAX_FEATURE)
         return -1;
 
     /* Need at least the 5-word persistent-data header. */

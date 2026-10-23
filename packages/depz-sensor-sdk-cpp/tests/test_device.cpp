@@ -1,6 +1,7 @@
 // test_device.cpp — the C++ live-hardware wrapper against the C SDK's fakes
-// (SR04, VL53L4CD, BNO086, TMF8829) over loopback and recorded sessions:
-// RAII, exceptions, callbacks, streams, replay.
+// (SR04, VL53L4CD, BNO086, TMF8829) over loopback: RAII, exceptions,
+// callbacks, streams, record/replay. The lab captures replay as contract 15
+// scenarios (test_scenarios.cpp).
 // Usage: depz_test_device [name] (no name = all).
 #include "depz/device.hpp"
 
@@ -10,6 +11,7 @@
 #include <cstring>
 #include <fstream>
 #include <mutex>
+#include <stdexcept>
 #include <sstream>
 #include <iostream>
 #include <string>
@@ -42,6 +44,15 @@ int g_failed = 0;
             return;                                                                \
         }                                                                          \
     } while (0)
+
+testjson::Value load_sidecar(const std::string& stem)
+{
+    std::ifstream f(std::string(DEPZ_VECTORS_DIR) + "/recordings/" + stem + ".expected.json", std::ios::binary);
+    if (!f) throw std::runtime_error("no sidecar for " + stem);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return testjson::parse(ss.str());
+}
 
 template <class E, class F>
 bool throws(F&& f)
@@ -215,42 +226,6 @@ void promote_and_record_replay()
     std::remove(path.c_str());
 }
 
-// The lab SR04's session, recorded by the Python SDK: strict replay makes the
-// C++ SDK re-issue every request byte for byte and decode the same values.
-void sr04_session_replay()
-{
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + "sr04_session.expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto same = [](const depz::Sr04Measurement& m, const testjson::Value& w) {
-        return m.timestamp_us == w.at("timestamp_us").as_u64() &&
-               m.echo_time_us == w.at("echo_time_us").as_int() &&
-               m.from_loop == (w.at("source").as_string() == "loop");
-    };
-    auto plain = depz::Device::open(depz::Link::replay(dir + "sr04_session.depzrec", true));
-    plain->set_timeout(2000ms);
-    auto dev = depz::Device::promote(std::move(plain));
-    auto* s = dynamic_cast<depz::Sr04*>(dev.get());
-    CHECK(s != nullptr);
-    CHECK(s->software_name() == exp.at("software_name").as_string());
-    CHECK(s->device_name() == exp.at("device_name").as_string());
-    s->set_sample_period_us(20000);
-    CHECK(s->sample_period_us() == exp.at("sample_period_us").as_u64());
-    CHECK(s->echo_decay_us() == exp.at("echo_decay_us").as_int());
-    for (const auto& w : exp.at("once").as_array()) CHECK(same(s->measure_once(2000ms), w));
-    const auto& loop = exp.at("loop").as_array();
-    auto stream = s->stream(loop.size() + 64);
-    s->start();
-    for (const auto& w : loop) {
-        auto m = stream.next(2000ms);
-        CHECK(m && same(*m, w));
-    }
-    s->stop();
-}
-
 void l4_fake_roundtrips_and_guards()
 {
     depz_link* host = nullptr;
@@ -280,195 +255,6 @@ void l4_fake_roundtrips_and_guards()
         CHECK(dev->bridge_info().model_id == depz::vl53l4::MODEL_ID);
     }
     fake_vl53l4_stop(f);
-}
-
-// The lab VL53L4CD's session (Python SDK capture), strict replay.
-void l4_session_replay()
-{
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + "vl53l4cd_session.expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto same = [](const depz::Vl53l4cdMeasurement& m, const testjson::Value& w) {
-        return m.timestamp_us == w.at("timestamp_us").as_u64() && m.r.range_status == w.at("range_status").as_int() &&
-               m.r.distance_mm == w.at("distance_mm").as_int() && m.r.sigma_mm == w.at("sigma_mm").as_int() &&
-               m.r.signal_rate_kcps == w.at("signal_rate_kcps").as_int() &&
-               m.r.ambient_rate_kcps == w.at("ambient_rate_kcps").as_int() &&
-               m.r.signal_per_spad_kcps == w.at("signal_per_spad_kcps").as_int() &&
-               m.r.ambient_per_spad_kcps == w.at("ambient_per_spad_kcps").as_int() &&
-               m.r.number_of_spad == w.at("number_of_spad").as_int() &&
-               m.r.stream_count == w.at("stream_count").as_int();
-    };
-    auto plain = depz::Device::open(depz::Link::replay(dir + "vl53l4cd_session.depzrec", true));
-    plain->set_timeout(2000ms);
-    auto dev = depz::Device::promote(std::move(plain));
-    auto* l4 = dynamic_cast<depz::Vl53l4cd*>(dev.get());
-    CHECK(l4 != nullptr);
-    CHECK(l4->software_name() == exp.at("software_name").as_string());
-    CHECK(l4->device_name() == exp.at("device_name").as_string());
-    auto info = l4->bridge_info();
-    CHECK(info.model_id == exp.at("info").at("model_id").as_int());
-    CHECK(info.i2c_khz == exp.at("info").at("i2c_khz").as_int());
-    l4->init();
-    l4->set_range_timing(33, 0);
-    auto t = l4->range_timing();
-    CHECK(t.timing_budget_ms == exp.at("timing").as_array()[0].as_u64());
-    CHECK(l4->offset_mm() == exp.at("offset_mm").as_int());
-    CHECK(l4->xtalk_kcps() == exp.at("xtalk_kcps").as_int());
-    for (const auto& w : exp.at("once").as_array()) CHECK(same(l4->measure_once(), w));
-    const auto& frames = exp.at("frames").as_array();
-    auto stream = l4->measurements(frames.size() + 64);
-    l4->start_ranging();
-    for (const auto& w : frames) {
-        auto m = stream.next(2000ms);
-        CHECK(m && same(*m, w));
-    }
-    l4->stop_ranging();
-    CHECK(l4->stream_parse_errors() == 0);
-}
-
-// The lab VL53L8CH with CNH (Python SDK capture), strict replay: the whole
-// ULD init with the firmware download, 8x8 @ 15 Hz, the CNH block per frame.
-void l8ch_cnh_replay()
-{
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + "vl53l8ch_cnh_8x8_15hz.expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto dev = depz::Vl53l8::open(depz::Link::replay(dir + "vl53l8ch_cnh_8x8_15hz.depzrec", true),
-                                  depz::Vl53l8Model::L8CH);
-    dev->set_timeout(2000ms);
-    CHECK(dev->software_name() == exp.at("software_name").as_string());
-    int phases = 0;
-    dev->init([&](const std::string&, std::size_t, std::size_t) { phases++; });
-    CHECK(phases > 5);
-    dev->set_resolution(depz::vl53l8::RESOLUTION_8X8);
-    dev->set_ranging_frequency_hz(15);
-    depz::CnhSetup cnh;
-    cnh.init_config(10, 20, 2);
-    cnh.create_agg_map(depz::vl53l8::RESOLUTION_8X8, 0, 0, 2, 2, 4, 4);
-    CHECK(cnh.required_memory() == 1708);
-    dev->configure_cnh(cnh);
-    const auto& frames = exp.at("frames").as_array();
-    auto stream = dev->frames(frames.size() + 8);
-    dev->start_ranging();
-    for (const auto& w : frames) {
-        auto m = stream.next(5000ms);
-        CHECK(m);
-        const auto& fr = m->frame;
-        CHECK(fr.timestamp_us == w.at("timestamp_us").as_u64());
-        CHECK(fr.resolution == 64 && fr.silicon_temp_degc == w.at("silicon_temp_degc").as_int());
-        const auto& d = w.at("distance_mm").as_array();
-        for (int k = 0; k < 64; k++) CHECK(fr.distance_mm[k] == d[k].as_int());
-        CHECK(fr.cnh_raw && fr.cnh_raw->size() * 2 == w.at("cnh_raw").as_string().size());
-    }
-    dev->stop_ranging();
-    CHECK(dev->frame_parse_errors() == 0);
-}
-
-// The lab BNO055's NDOF capture (Python SDK), strict replay: reset with the
-// boot-settle poll, configure with the fusion-start poll, the calibration
-// profile round trip through CONFIG, system status, a 100 Hz full-block stream.
-void bno_ndof_replay()
-{
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + "bno055_ndof_full_100hz.expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto plain = depz::Device::open(depz::Link::replay(dir + "bno055_ndof_full_100hz.depzrec", true));
-    plain->set_timeout(2000ms);
-    auto dev = depz::Device::promote(std::move(plain));
-    auto* b = dynamic_cast<depz::Bno055*>(dev.get());
-    CHECK(b != nullptr);
-    CHECK(b->software_name() == exp.at("software_name").as_string());
-    CHECK(b->device_name() == exp.at("device_name").as_string());
-    CHECK(b->bridge_info().chip_id == 0xA0);
-    b->reset_sensor();
-    const auto units = depz::bno055::Units::unpack(static_cast<std::uint8_t>(exp.at("unit_sel").as_int()));
-    b->configure(static_cast<depz::bno055::OprMode>(exp.at("mode").as_int()), units);
-    CHECK(b->calibration_profile().accel_radius == exp.at("calibration_profile").at("accel_radius").as_int());
-    CHECK(b->system_status().status == exp.at("system_status").at("status").as_int());
-    const auto& frames = exp.at("frames").as_array();
-    auto stream = b->samples(frames.size() + 8);
-    b->start_stream(static_cast<std::uint16_t>(exp.at("period_ms").as_int()));
-    for (const auto& w : frames) {
-        auto s = stream.next(2000ms);
-        CHECK(s && s->timestamp_us == w.at("timestamp_us").as_u64());
-        CHECK(s->quaternion && s->accel && s->calibration && s->temperature);
-        CHECK(s->units == units);
-    }
-    b->stop_stream();
-    CHECK(b->stream_parse_errors() == 0);
-}
-
-// The lab BNO085's session (Python SDK), strict replay: reset, product id,
-// three enables with their read-backs, 150 mixed reports, calibration,
-// oscillator, the rotation vector's metadata record, counts, errors.
-void bno086_session_replay()
-{
-    using depz::bno086::SensorId;
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + "bno086_session.expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto plain = depz::Device::open(depz::Link::replay(dir + "bno086_session.depzrec", true));
-    plain->set_timeout(2000ms);
-    auto dev = depz::Device::promote(std::move(plain));
-    auto* b = dynamic_cast<depz::Bno086*>(dev.get());
-    CHECK(b != nullptr);
-    CHECK(b->sensor_type() == depz::SensorType::Bno086);
-    CHECK(b->software_name() == exp.at("software_name").as_string());
-    CHECK(b->device_name() == exp.at("device_name").as_string());
-    b->hardware_reset();
-    const auto pid = b->product_id();
-    CHECK(pid.sw_part_number == exp.at("product_id").at("sw_part_number").as_u64());
-    const auto& reps = exp.at("reports").as_array();
-    auto stream = b->reports(reps.size() + 512);
-    const auto& en = exp.at("enable").as_array();
-    for (std::size_t i = 0; i < en.size(); i++) {
-        const auto sid = static_cast<SensorId>(en[i].as_array()[0].as_int());
-        const auto g = b->enable(sid, static_cast<double>(en[i].as_array()[1].as_int()));
-        CHECK(g.interval_us == exp.at("features").as_array()[i].at("interval_us").as_u64());
-    }
-    for (const auto& w : reps) {
-        auto r = stream.next(2000ms);
-        CHECK(r);
-        CHECK(r->timestamp_us == w.at("timestamp_us").as_int() && r->sensor_id == w.at("sensor_id").as_int());
-        const auto& type = w.at("type").as_string();
-        if (type == "RotationVector") {
-            CHECK(r->type == depz::bno086::ReportType::RotationVector && r->i_raw == w.at("i_raw").as_int());
-            CHECK(r->accuracy_rad() && r->real_raw == w.at("real_raw").as_int());
-            const auto q = r->quaternion();
-            const double norm = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
-            CHECK(std::fabs(norm - 1.0) < 0.01);
-        } else if (type == "Acceleration") {
-            CHECK(r->type == depz::bno086::ReportType::Acceleration && r->z_raw == w.at("z_raw").as_int());
-            const auto a = r->xyz();
-            const double g = std::sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
-            CHECK(g > 9.0 && g < 10.6);  // the board lay still: gravity only
-        } else {
-            CHECK(type == "GyroIntegratedRV" && r->type == depz::bno086::ReportType::GyroIntegratedRV);
-            CHECK(r->vz_raw == w.at("vz_raw").as_int());
-        }
-    }
-    for (const auto& e : en) b->disable(static_cast<SensorId>(e.as_array()[0].as_int()));
-    const auto cal = b->calibration();
-    CHECK(cal.accel == exp.at("calibration").at("accel").as_bool() && cal.gyro == exp.at("calibration").at("gyro").as_bool());
-    CHECK(b->oscillator_type() == exp.at("oscillator").as_int());
-    const auto md = b->metadata(SensorId::RotationVector);
-    CHECK(md.revision == 4 && md.q_point_1 == 14 && md.power_ma() > 5.0 && md.power_ma() < 5.5);
-    const auto cn = b->counts(SensorId::RotationVector);
-    CHECK(cn.offered == exp.at("counts_rv").at("offered").as_u64());
-    CHECK(b->errors().size() == exp.at("errors").as_array().size());
-    CHECK(b->shtp_discarded() == 0);
 }
 
 // The fake hub: typed errors, the report enum mapping, FRS round trip.
@@ -535,98 +321,55 @@ void bno086_fake_errors_and_reports()
     fake_bno086_stop(fk);
 }
 
-// A 1D-family capture (Python SDK), strict replay through depz::Vl53lx:
-// init(driver, product), configure(budget, mode), the timing read-back, the
-// streamed frames (distance, status, targets, histogram bins).
-void vlx_replay(const std::string& stem)
+// Replays of the lab captures (sessions, init transcripts, streams) are the
+// contract 15 scenarios (tests/test_scenarios.cpp). What a scenario step
+// cannot say stays here.
+
+// CNH setup for the lab CH captures (start bin 10, 20 bins, sub-sample 2,
+// 4x4 aggregates of 2x2 zones): the on-device buffer it needs.
+void cnh_required_memory()
 {
-    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
-    std::ifstream f(dir + stem + ".expected.json", std::ios::binary);
-    CHECK(f);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    const testjson::Value exp = testjson::parse(ss.str());
-    auto plain = depz::Device::open(depz::Link::replay(dir + stem + ".depzrec", true));
-    plain->set_timeout(2000ms);
-    auto dev = depz::Device::promote(std::move(plain));
-    auto* v = dynamic_cast<depz::Vl53lx*>(dev.get());
-    CHECK(v != nullptr);
-    CHECK(v->software_name() == exp.at("software_name").as_string());
-    const std::string kind = exp.at("driver").as_string();
-    const auto dk = kind == "uld" ? depz::vl53lx::DriverKind::Uld
-                  : kind == "ulp" ? depz::vl53lx::DriverKind::Ulp : depz::vl53lx::DriverKind::Histogram;
-    const auto& parg = exp.at("product_arg");
-    v->init(dk, parg.is_null() ? std::nullopt : std::optional<std::string>(parg.as_string()));
-    CHECK(v->product() == exp.at("product").as_string());
-    const auto& mode = exp.at("mode");
-    if (exp.has("refused")) {
-        // A configuration the driver no longer accepts (short on an L4 die):
-        // init still replays, configure refuses the mode.
-        const auto& after = exp.at("refused").at("after_init");
-        const auto& want_modes = after.at("modes").as_array();
-        const auto modes = v->modes();
-        CHECK(modes.size() == want_modes.size());
-        for (std::size_t k = 0; k < modes.size(); k++) CHECK(modes[k] == want_modes[k].as_string());
-        const auto budget = v->budget_range();
-        CHECK(budget.first == after.at("budget_ms").as_array()[0].as_int() &&
-              budget.second == after.at("budget_ms").as_array()[1].as_int());
-        CHECK(v->driver_reach_mm() == static_cast<std::uint32_t>(after.at("driver_reach_mm").as_int()));
-        bool refused = false;
-        try {
-            v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0, mode.as_string());
-        } catch (const depz::ArgumentError&) {
-            refused = true;
-        }
-        CHECK(refused);
-        return;
-    }
-    if (!v->supports(depz::Vl53lxCap::SignalThresh)) {
-        // A group the driver lacks is refused before the re-init: no traffic,
-        // so the capture's own configure below still replays strictly.
-        bool refused = false;
-        try {
-            v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0,
-                         mode.is_null() ? std::nullopt : std::optional<std::string>(mode.as_string()),
-                         std::nullopt, std::nullopt, 512);
-        } catch (const depz::ArgumentError&) {
-            refused = true;
-        }
-        CHECK(refused);
-    }
-    v->configure(static_cast<int>(exp.at("budget_ms").as_int()), 0,
-                 mode.is_null() ? std::nullopt : std::optional<std::string>(mode.as_string()));
-    const auto timing = v->range_timing();
-    CHECK(timing.first == exp.at("timing").as_array()[0].as_int() &&
-          timing.second == exp.at("timing").as_array()[1].as_int());
-    const auto& frames = exp.at("frames").as_array();
-    auto stream = v->measurements(frames.size() + 8);
-    v->start_ranging();
-    for (const auto& w : frames) {
-        auto m = stream.next(3000ms);
-        CHECK(m);
-        CHECK(m->timestamp_us == w.at("timestamp_us").as_u64());
-        CHECK(m->distance_mm == w.at("distance_mm").as_int() && m->status == w.at("status").as_int());
-        const auto& t = w.at("targets").as_array();
-        CHECK(m->targets.size() == t.size());
-        for (std::size_t k = 0; k < t.size(); k++)
-            CHECK(m->targets[k].distance_mm == t[k].as_array()[0].as_int() &&
-                  m->targets[k].status == t[k].as_array()[1].as_int());
-        CHECK(w.has("bins") == m->bins.has_value());
-        if (m->bins) {
-            const auto& bd = w.at("bins").at("bin_data").as_array();
-            CHECK(m->bins->bin_data.size() == bd.size());
-            for (std::size_t k = 0; k < bd.size(); k++) CHECK(m->bins->bin_data[k] == bd[k].as_int());
-        }
-    }
-    v->stop_ranging();
-    CHECK(v->stream_parse_errors() == 0);
+    depz::CnhSetup cnh;
+    cnh.init_config(10, 20, 2);
+    cnh.create_agg_map(depz::vl53l8::RESOLUTION_8X8, 0, 0, 2, 2, 4, 4);
+    CHECK(cnh.required_memory() == 1708);
 }
 
-void vlx_l4cd_uld_replay() { vlx_replay("vl53l4cx_uld_as_l4cd_50ms"); }
-void vlx_l1cx_uld_replay() { vlx_replay("vl53l1cx_uld_long_33ms"); }
-void vlx_l3cx_ulp_replay() { vlx_replay("vl53l3cx_ulp_33ms"); }
-void vlx_l0x_uld_replay() { vlx_replay("vl53l0x_uld_long-range_33ms"); }
-void vlx_l4cx_hist_short_replay() { vlx_replay("vl53l4cx_histogram_short_33ms"); }
+// A configuration group the bound VL53Lx driver lacks (the signal threshold)
+// is refused before the re-init, with nothing written: the capture's own
+// configure still replays strictly right after it. No scenario step can say
+// "and nothing was written", so this replays each 1D capture up to there.
+void vlx_refusal_before_traffic()
+{
+    const char* stems[] = {"vl53l4cx_uld_as_l4cd_50ms", "vl53l1cx_uld_long_33ms", "vl53l1cb_uld_short_50ms",
+                           "vl53l3cx_ulp_33ms", "vl53l0x_uld_long-range_33ms", "vl53l4cx_histogram_medium_50ms",
+                           "vl53l1cx_histogram_long_33ms", "vl53l1cb_histogram_medium_33ms",
+                           "vl53l3cx_histogram_medium_33ms"};
+    const std::string dir = std::string(DEPZ_VECTORS_DIR) + "/recordings/";
+    int refused_total = 0;
+    for (const char* stem : stems) {
+        const testjson::Value exp = load_sidecar(stem);
+        auto plain = depz::Device::open(depz::Link::replay(dir + stem + ".depzrec", true));
+        plain->set_timeout(2000ms);
+        auto dev = depz::Device::promote(std::move(plain));
+        auto* v = dynamic_cast<depz::Vl53lx*>(dev.get());
+        CHECK(v != nullptr);
+        CHECK(v->software_name() == exp.at("software_name").as_string());  // as the capture did
+        const std::string kind = exp.at("driver").as_string();
+        const auto dk = kind == "uld" ? depz::vl53lx::DriverKind::Uld
+                      : kind == "ulp" ? depz::vl53lx::DriverKind::Ulp : depz::vl53lx::DriverKind::Histogram;
+        const auto& parg = exp.at("product_arg");
+        v->init(dk, parg.is_null() ? std::nullopt : std::optional<std::string>(parg.as_string()));
+        if (v->supports(depz::Vl53lxCap::SignalThresh)) continue;
+        const auto& mode = exp.at("mode");
+        const auto mode_arg = mode.is_null() ? std::nullopt : std::optional<std::string>(mode.as_string());
+        const int budget = static_cast<int>(exp.at("budget_ms").as_int());
+        CHECK(throws<depz::ArgumentError>([&] { v->configure(budget, 0, mode_arg, std::nullopt, std::nullopt, 512); }));
+        v->configure(budget, 0, mode_arg);  // strict replay: the refusal wrote nothing
+        refused_total++;
+    }
+    CHECK(refused_total > 0);
+}
 
 // The TMF8829 wrapper against the C SDK's fake bridge (tests/fake_tmf8829.c)
 // with the frames of contracts/vectors/tmf8829.json: promote, init (firmware
@@ -871,18 +614,10 @@ const Case k_cases[] = {
     {"measure_stream_and_callbacks", measure_stream_and_callbacks},
     {"disconnect_ends_streams", disconnect_ends_streams},
     {"promote_and_record_replay", promote_and_record_replay},
-    {"sr04_session_replay", sr04_session_replay},
     {"l4_fake_roundtrips_and_guards", l4_fake_roundtrips_and_guards},
-    {"l4_session_replay", l4_session_replay},
-    {"l8ch_cnh_replay", l8ch_cnh_replay},
-    {"bno_ndof_replay", bno_ndof_replay},
-    {"bno086_session_replay", bno086_session_replay},
     {"bno086_fake_errors_and_reports", bno086_fake_errors_and_reports},
-    {"vlx_l4cd_uld_replay", vlx_l4cd_uld_replay},
-    {"vlx_l1cx_uld_replay", vlx_l1cx_uld_replay},
-    {"vlx_l3cx_ulp_replay", vlx_l3cx_ulp_replay},
-    {"vlx_l0x_uld_replay", vlx_l0x_uld_replay},
-    {"vlx_l4cx_hist_short_replay", vlx_l4cx_hist_short_replay},
+    {"cnh_required_memory", cnh_required_memory},
+    {"vlx_refusal_before_traffic", vlx_refusal_before_traffic},
     {"tmf8829_fake_session", tmf8829_fake_session},
 };
 

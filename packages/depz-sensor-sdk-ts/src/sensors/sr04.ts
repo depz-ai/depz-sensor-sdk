@@ -53,7 +53,7 @@ export class Sr04 extends DepzDevice {
   // ── configuration ──────────────────────────────────────────────────────────
 
   /** Minimum interval between measurement starts (default 50000). */
-  getSamplePeriodUs(): Promise<number> {
+  async getSamplePeriodUs(): Promise<number> {
     return this.request(Sr04Cmd.GetSamplePeriod, undefined, {
       matcher: DepzDevice.expectReport(Sr04Rpt.SamplePeriod, unpackSamplePeriod),
     });
@@ -69,7 +69,7 @@ export class Sr04 extends DepzDevice {
     });
   }
 
-  getEchoDecayUs(): Promise<number> {
+  async getEchoDecayUs(): Promise<number> {
     return this.request(Sr04Cmd.GetEchoDecay, undefined, {
       matcher: DepzDevice.expectReport(Sr04Rpt.EchoDecay, unpackEchoDecay),
     });
@@ -91,9 +91,9 @@ export class Sr04 extends DepzDevice {
    * reply arrives only when the echo completes (or times out at ~65.5 ms),
    * so the default timeout is generous.
    */
-  measureOnce(timeoutMs = 1000): Promise<Sr04Measurement> {
+  async measureOnce(timeoutMs = 1000): Promise<Sr04Measurement> {
     const matcher: Matcher<Sr04Measurement> = (pkt: PacketEvent) => {
-      if (pkt.cmd !== Sr04Rpt.Data || pkt.payload.length !== 11) return NO_MATCH;
+      if (pkt.cmd !== Sr04Rpt.Data || pkt.payload.length < 11) return NO_MATCH;
       const data = unpackSr04Data(pkt.payload);
       if (data.sourceCmd !== Sr04Cmd.MeasureOnce) return NO_MATCH;
       return measurementFromData(data);
@@ -145,7 +145,7 @@ export class Sr04 extends DepzDevice {
   // ── internal ───────────────────────────────────────────────────────────────
 
   protected override handleReport(pkt: PacketEvent): boolean {
-    if (pkt.cmd === Sr04Rpt.Data && pkt.payload.length === 11) {
+    if (pkt.cmd === Sr04Rpt.Data && pkt.payload.length >= 11) {
       const m = measurementFromData(unpackSr04Data(pkt.payload));
       for (const cb of [...this.measureCbs]) cb(m);
       for (const q of [...this.measureQueues]) q.push(m);

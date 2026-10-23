@@ -1,18 +1,44 @@
 # SR04 — user guide
 
-Hands-on guide to the SR04 codecs in [`protocol::sr04`](api.md). For what the
+Hands-on guide to the SR04: the live device (`devices::Sr04Device`) and the codecs
+under it in [`protocol::sr04`](api.md). For what the
 sensor is and its concepts, read the [introduction](introduction.md); for exact
 signatures see the [API reference](api.md). Framing, CRC and discovery are
 shared across sensors — see the [common guide](../guide.md).
 
 ## Contents
 
+- [Live device](#live-device)
 - [The command / report set](#the-command--report-set)
 - [Hello-world: decode a distance](#hello-world-decode-a-distance)
 - [Framing configuration commands](#framing-configuration-commands)
 - [Single shot vs the loop](#single-shot-vs-the-loop)
 - [Distance and temperature compensation](#distance-and-temperature-compensation)
 - [Gotchas](#gotchas)
+
+## Live device
+
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::{DepzDevice, ReplayLink, Sr04Device};
+
+let sr04 = Sr04Device::attach(DepzDevice::new(ReplayLink::open("sr04.depzrec", true, false)?, None));
+sr04.set_sample_period_us(20_000)?;         // the stored minimum interval between starts
+let once = sr04.measure_once(None)?;        // waits for the echo (1 s default)
+println!("{} µs echo, {:?} mm", once.echo_time_us, once.distance_mm());
+
+let q = sr04.measurements(256);
+sr04.start()?;                              // the loop: samples stream to callbacks and queues
+let m = q.take(Duration::from_secs(1))?;
+sr04.stop()?;
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
+```
+
+`set_echo_decay_us` returns the value the device kept (it clamps to
+4000–65000 µs). `measure_once` is busy while the loop runs. Single shots an AUX
+SYNC_IN edge triggers arrive on the stream with `source == "once"`.
+
+The sections below are the layers under the device.
 
 ## The command / report set
 

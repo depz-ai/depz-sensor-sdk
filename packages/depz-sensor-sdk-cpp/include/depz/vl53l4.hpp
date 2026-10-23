@@ -73,7 +73,8 @@ inline constexpr std::uint8_t CONFIG_FMP_BYTE = 0x12;
 // VL53_READ_REG payload: addr u16, len u16 (both little-endian).
 bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 
-// VL53_WRITE_REG payload: addr u16 then the raw register data (1..XFER_MAX).
+// VL53_WRITE_REG payload: addr u16 then the raw register data; std::invalid_argument
+// unless it is 1..XFER_MAX bytes.
 bytes pack_write_reg(std::uint16_t addr, byte_span data);
 
 // VL53_XSHUT payload: action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET).
@@ -166,7 +167,8 @@ struct RangeTimingRegs {
 // `clock_pll` the word from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
 // mode). budget 10..200 ms; inter_ms == 0 selects continuous mode, a value
 // greater than the budget selects autonomous low power. Returns nullopt when
-// osc_frequency is 0, the budget is out of range, or 0 < inter_ms <= budget.
+// osc_frequency is 0, the budget is out of range, 0 < inter_ms <= budget, or
+// the INTERMEASUREMENT_MS value would overflow u32 (never wrapped).
 // Bit-exact with the ULD (32-bit truncations, 1.055 PLL factor).
 std::optional<RangeTimingRegs> range_timing_registers(std::uint32_t budget_ms,
                                                       std::uint32_t inter_ms,
@@ -191,26 +193,28 @@ std::optional<RangeTiming> decode_range_timing(std::uint32_t intermeasurement_ra
 // ── tuning-register codecs (register word <-> user units) ───────────────────
 
 // RANGE_OFFSET_MM (0x001E) word for SetOffset (offset x4; INNER/OUTER zeroed
-// alongside).
+// alongside). std::out_of_range outside -1024..1023 mm (contract 07 §3).
 std::uint16_t offset_raw(int offset_mm);
 
 // GetOffset: RANGE_OFFSET_MM word -> signed millimetres.
 int decode_offset(std::uint16_t raw_word);
 
 // XTALK_PLANE_OFFSET_KCPS (0x0016) word for SetXtalk (kcps x512).
+// std::out_of_range outside 0..127 kcps (the word would overflow).
 std::uint16_t xtalk_raw(int xtalk_kcps);
 
 // GetXtalk: XTALK_PLANE_OFFSET_KCPS word -> kcps (std::lround(raw / 512.0)).
 int decode_xtalk(std::uint16_t raw_word);
 
 // MIN_COUNT_RATE_RTN_LIMIT_MCPS (0x0066) word for SetSignalThreshold (kcps /8).
+// std::out_of_range outside 0..65535 kcps.
 std::uint16_t signal_threshold_raw(int signal_kcps);
 
 // GetSignalThreshold: register word -> kcps.
 int decode_signal_threshold(std::uint16_t raw_word);
 
 // RANGE_CONFIG__SIGMA_THRESH (0x0064) word for SetSigmaThreshold (mm x4);
-// nullopt when sigma_mm > 16383 (the word would overflow).
+// nullopt when sigma_mm is negative or > 16383 (the word would overflow).
 std::optional<std::uint16_t> sigma_threshold_raw(int sigma_mm);
 
 // GetSigmaThreshold: register word -> millimetres.

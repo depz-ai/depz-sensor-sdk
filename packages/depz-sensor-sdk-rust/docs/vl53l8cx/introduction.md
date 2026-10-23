@@ -4,7 +4,8 @@ The **VL53L8CX** is a STMicroelectronics multizone Time-of-Flight ranging
 sensor: a tiny laser depth **imager** that returns a 4×4 or 8×8 grid of
 distances up to ~4 m. On the DEPZ sensor line the MCU is a thin SPI **register
 bridge** — the ST ULD (Ultra-Lite Driver) frame layout is decoded **on the
-host**, and this crate provides that verifiable decode layer
+host**: the live device `devices::Vl53l8cxDevice` runs the ULD (the firmware
+download, configuration, ranging) over the verifiable decode layer
 ([`vl53l8`](api.md)): chunk reassembly, the raw results-frame decoder, and the
 advanced DCI byte codecs.
 
@@ -61,9 +62,10 @@ return histograms (multi-return analysis, material work).
   ([`FrameChunk`](api.md), ≤ [`STREAM_CHUNK_MAX`](api.md) = 1528 data bytes);
   the reassembler resets on `offset == 0`, requires contiguous offsets, and
   completes at `full_size`.
-- **Raw fixed-point is authoritative** — `Vl53l8Results` keeps wire integers:
-  distance is pre-scaled `floor(raw/4)` mm; `signal_per_spad` / `ambient_per_spad`
-  are ÷2048 for real units, `range_sigma_mm_raw` ÷128. `target_status` 5/9 =
+- **Real units, as ST** — `Vl53l8Results` gives what ST `GetRangingData` gives:
+  distance in mm (`floor(raw/4)`, a negative one clamped to 0), signal and
+  ambient in kcps/SPAD (`raw/2048`), sigma in mm (`raw/128`), reflectance in %
+  (`raw/2`); the scaled values keep their fraction. `target_status` 5/9 =
   valid, 255 = no target.
 - **Resolution follows the frame** — arrays are sized to the zones actually
   present ([`Vl53l8Results::resolution`](api.md), 16 or 64), row-major.

@@ -5,6 +5,8 @@
  * `bigint`.
  */
 
+import { checkU64, checkUint, needBytes } from "./wire.js";
+
 export enum Cmd {
   Bootloader = 0x01,
   DeviceReset = 0x02,
@@ -101,14 +103,17 @@ function dv(p: Uint8Array): DataView {
 }
 
 export function unpackStatus(p: Uint8Array): StatusReport {
+  needBytes("RPT_STATUS", p, 2);
   return { cmd: p[0]!, status: p[1]! };
 }
 
 export function unpackText(p: Uint8Array): TextReport {
+  needBytes("RPT_TEXT", p, 1);
   return { cmd: p[0]!, text: stripDeviceString(p.subarray(1)) };
 }
 
 export function unpackSyncTime(p: Uint8Array): SyncTimeReport {
+  needBytes("RPT_SYNC_TIME", p, 24);
   const v = dv(p);
   return {
     pcTimestampUs: v.getBigUint64(0, true),
@@ -118,25 +123,44 @@ export function unpackSyncTime(p: Uint8Array): SyncTimeReport {
 }
 
 export function unpackTemperature(p: Uint8Array): TemperatureReport {
+  needBytes("RPT_TEMPERATURE", p, 10);
   const v = dv(p);
   return { timestampUs: v.getBigUint64(0, true), rawDecidegrees: v.getInt16(8, true) };
 }
 
 export function unpackSequenceError(p: Uint8Array): SequenceErrorReport {
+  needBytes("RPT_SEQUENCE_ERROR", p, 2);
   return { expectedSeq: p[0]!, receivedSeq: p[1]! };
 }
 
 export function packSyncTime(pcTimestampUs: bigint): Uint8Array {
   const out = new Uint8Array(8);
-  new DataView(out.buffer).setBigUint64(0, pcTimestampUs, true);
+  new DataView(out.buffer).setBigUint64(0, checkU64("pcTimestampUs", pcTimestampUs), true);
   return out;
 }
 
+/** Logical AUX sync pins (contract 02 §6). */
+export const SYNC_PIN_MIN = 1;
+export const SYNC_PIN_MAX = 5;
+
+/** `pin` as a logical AUX sync pin 1..5 (contract 02 §6), else RangeError. */
+export function checkSyncPin(pin: number): number {
+  if (checkUint("pin", pin, 8) < SYNC_PIN_MIN || pin > SYNC_PIN_MAX) {
+    throw new RangeError(`pin: ${pin} is not a sync pin ${SYNC_PIN_MIN}..${SYNC_PIN_MAX}`);
+  }
+  return pin;
+}
+
 export function packSyncPinConfig(cfg: SyncPinConfig): Uint8Array {
-  return Uint8Array.of(cfg.pin, cfg.mode, cfg.polarity);
+  const mode = checkUint("mode", cfg.mode, 8);
+  if (mode > SyncPinMode.OutBoth) throw new RangeError(`mode: ${mode} is not a SyncPinMode`);
+  const polarity = checkUint("polarity", cfg.polarity, 8);
+  if (polarity > SyncPinPolarity.IdleHigh) throw new RangeError(`polarity: ${polarity} is not a SyncPinPolarity`);
+  return Uint8Array.of(checkSyncPin(cfg.pin), mode, polarity);
 }
 
 export function unpackSyncPinConfig(p: Uint8Array): SyncPinConfig {
+  needBytes("RPT_SYNC_PIN_CONFIG", p, 3);
   return { pin: p[0]!, mode: p[1]! as SyncPinMode, polarity: p[2]! as SyncPinPolarity };
 }
 

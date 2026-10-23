@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;netstandard2.1</TargetFrameworks>
     <RootNamespace>Depz.Sensor</RootNamespace>
     <AssemblyName>Depz.Sensor</AssemblyName>
     <Nullable>enable</Nullable>
@@ -14,7 +14,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Depz.Sensor</PackageId>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
     <Authors>DEPZ</Authors>
     <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU, TMF8829 dToF) — transport, protocol codecs, and sensor decode.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -29,6 +29,29 @@
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Serial ports on .NET 8. Unity (netstandard2.1) brings its own System.IO.Ports, or none:
+       there the host opens the port and hands the SDK an ILink. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- VL53L8 / L5 / L7 sensor firmware and configuration blobs (ST, BSD-3-Clause), embedded from
+       the Python SDK's vl53l8/data: the single source of truth the C and TS SDKs read too. -->
+  <PropertyGroup>
+    <Vl53l8Data>../../../depz-sensor-sdk-python/depz_sensor_sdk/vl53l8/data</Vl53l8Data>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.cx.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.cx.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/default_xtalk.bin" LogicalName="Depz.Sensor.Vl53l8.cx.default_xtalk.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/get_nvm_cmd.bin" LogicalName="Depz.Sensor.Vl53l8.cx.get_nvm_cmd.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/ch/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.ch.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/ch/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.ch.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7cx/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.l7cx.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7cx/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.l7cx.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7ch/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.l7ch.default_configuration.bin" />
   </ItemGroup>
 
   <!-- TMF8829 sensor firmware (ams, MIT): embedded in the assembly; the license

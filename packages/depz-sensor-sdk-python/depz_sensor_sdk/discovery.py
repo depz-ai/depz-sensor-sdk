@@ -18,7 +18,8 @@ from serial.tools import list_ports
 
 from .device import DeviceBase
 from .errors import DepzError, DepzTimeoutError, DeviceLostError, NoDepzDeviceError
-from .protocol.identity import Identity, SensorType, parse_software_name
+from .protocol._wire import check_uint
+from .protocol.identity import SensorType, parse_software_name
 from .sr04 import Sr04
 from .transport.link import Link
 from .usb_ids import is_known_depz_usb, usb_model_hint
@@ -73,8 +74,26 @@ def _depz_candidates() -> list[_PortId]:
     return cands
 
 
+def _probe(dev: DeviceBase) -> tuple[str, str, str]:
+    """The probe of contract 02 §4.4 on an open connection: exactly
+    GET_NAME_ACTIVE_SOFTWARE (required — its failure propagates), then
+    GET_DEVICE_NAME and GET_SERIAL (optional — a timeout or error leaves ""),
+    in that order. Returns (software_name, device_name, serial_number)."""
+    software = dev.get_software_name()
+    try:
+        device_name = dev.get_device_name()
+    except DepzError:
+        device_name = ""
+    try:
+        serial_number = dev.get_serial_number()
+    except DepzError:
+        serial_number = ""
+    return software, device_name, serial_number
+
+
 def probe_port(port: str, *, timeout: float = 0.2) -> DeviceInfo | None:
-    """Open `port`, ask GET_NAME_ACTIVE_SOFTWARE (+ name/serial), close.
+    """Open `port`, run the contract 02 §4.4 probe (GET_NAME_ACTIVE_SOFTWARE,
+    GET_DEVICE_NAME, GET_SERIAL), close.
 
     Returns None when nothing DEPZ-shaped answers. Note: probing opens the
     port — skip ports owned by other software via the `ports=` argument of
@@ -85,16 +104,8 @@ def probe_port(port: str, *, timeout: float = 0.2) -> DeviceInfo | None:
     except (DeviceLostError, DepzError):
         return None
     try:
-        software = dev.get_software_name()
+        software, device_name, serial_number = _probe(dev)
         ident = parse_software_name(software)
-        try:
-            device_name = dev.get_device_name()
-        except (DepzTimeoutError, DepzError):
-            device_name = ""
-        try:
-            serial_number = dev.get_serial_number()
-        except (DepzTimeoutError, DepzError):
-            serial_number = ""
         return DeviceInfo(
             port=port,
             mode=ident.mode,  # type: ignore[arg-type]
@@ -157,7 +168,7 @@ def open_device(
     serial: str | None = None,
     timeout: float = 0.2,
 ):
-    """Open the right sensor class for `target`.
+    """Open the right sensor class for `target` (contract 02 §4.3, §4.4).
 
     - ``None`` (default): the DEPZ candidate port with the alphabetically
       smallest USB serial (index 0); with ``serial=`` the candidate whose USB
@@ -166,16 +177,16 @@ def open_device(
       (0-based). Out of range → `NoDepzDeviceError`.
     - ``str`` (a port path): open exactly that port; if its USB (vid, pid) is
       not a known DEPZ id, warn but proceed.
-    - ``DeviceInfo``: its ``.port``.
-    - ``Link``/transport: opened directly (loopback/replay).
+    - ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.
+    - ``Link``/transport: `open_on_link` (probe and continue on that link).
 
-    Bootloader-mode devices raise until the bootloader client lands
-    (contract 06).
+    On a port the probe runs on a connection of its own (`probe_port`), which
+    is closed; the resolved class then opens the port afresh, so host packet
+    sequence numbers restart at 0. Bootloader-mode devices raise (use the
+    contract 06 client).
     """
     if isinstance(target, Link):
-        dev = DeviceBase(target, timeout=timeout)
-        ident = _identify(dev)
-        return _promote(dev, ident)
+        return open_on_link(target, timeout=timeout)
 
     if isinstance(target, DeviceInfo):
         if serial is not None and target.usb_serial not in (None, serial):
@@ -184,14 +195,7 @@ def open_device(
                 f"{target.usb_serial!r}",
                 stacklevel=2,
             )
-        return _open_port(
-            target.port,
-            target.sensor_type,
-            target.mode,
-            timeout,
-            usb_model_hint(target.usb_vid, target.usb_pid),
-            target.device_name,
-        )
+        return _open_resolved(target.port, target, target.usb_vid, target.usb_pid, timeout)
 
     if isinstance(target, bool):  # guard: bool is an int subclass
         raise TypeError("open_device target must be None, int, str, DeviceInfo or Link")
@@ -239,6 +243,39 @@ def open_device(
     return _open_probed(candidates[0].port, timeout)
 
 
+def open_on_link(
+    link: Link,
+    usb_vid: int | None = None,
+    usb_pid: int | None = None,
+    *,
+    timeout: float = 0.2,
+):
+    """Open a device on an already-open `link` that cannot be reopened (a
+    replay or recording link, an adopted transport) — contract 02 §4.4.
+
+    Runs the same probe as `probe_port` on that link (GET_NAME_ACTIVE_SOFTWARE,
+    GET_DEVICE_NAME, GET_SERIAL), resolves the class with
+    `resolve_sensor_class` from the answers and the port's USB (vid, pid) —
+    which the caller supplies, a link knows none — and continues as that class
+    on the same connection (`attach_sensor_class`); host sequence numbers run
+    on from the probe. The returned device owns `link`: on failure it is
+    closed. No answer to GET_NAME_ACTIVE_SOFTWARE → `NoDepzDeviceError`;
+    a bootloader → `DepzError`.
+    """
+    dev = DeviceBase(link, timeout=timeout)
+    try:
+        try:
+            software, device_name, _serial = _probe(dev)
+        except DepzError as exc:
+            raise NoDepzDeviceError(f"no DEPZ device answered on the link ({exc})") from exc
+        return attach_sensor_class(
+            dev, resolve_sensor_class(software, device_name, usb_vid, usb_pid)
+        )
+    except BaseException:
+        dev.close()
+        raise
+
+
 def _fmt_vidpid(vid: int | None, pid: int | None) -> str:
     if vid is None or pid is None:
         return "unknown"
@@ -250,158 +287,170 @@ def _open_probed(port: str, timeout: float):
     if info is None:
         raise DeviceLostError(f"no DEPZ device answered on {port}")
     pi = {p.port: p for p in _enumerate_ports()}.get(port)
-    model = usb_model_hint(pi.vid, pi.pid) if pi is not None else None
-    return _open_port(port, info.sensor_type, info.mode, timeout, model, info.device_name)
+    vid, pid = (pi.vid, pi.pid) if pi is not None else (None, None)
+    return _open_resolved(port, info, vid, pid, timeout)
 
 
-def _open_port(
-    port: str,
-    sensor: SensorType | None,
-    mode: str,
-    timeout: float,
-    usb_model: str | None = None,
-    device_name: str = "",
-):
-    if mode == "bootloader":
-        raise DepzError("device is in bootloader mode; use the bootloader client (M2)")
-    return _open_by_sensor(port, sensor, timeout, usb_model, device_name)
+def _open_resolved(port: str, info: DeviceInfo, usb_vid: int | None, usb_pid: int | None,
+                   timeout: float):
+    """Open the class the probe answers resolve to on a fresh connection."""
+    name = resolve_sensor_class(info.software_name, info.device_name, usb_vid, usb_pid)
+    if name == "bootloader":
+        raise DepzError("device is in bootloader mode; use the bootloader client (contract 06)")
+    return sensor_class(name)(port, timeout=timeout)
 
 
-def _identify(dev: DeviceBase) -> Identity:
-    return parse_software_name(dev.get_software_name())
+# ── class resolution (contract 02 §4.4) ───────────────────────────────────────
 
+#: Every name `resolve_sensor_class` returns: the canonical sensor classes of
+#: contract 07 §1, ``"vl53lx"`` (the generic 1D-family class: an unstamped
+#: board, or a VL53L4CD on the APP_VL53L0_4 firmware), ``"tmf8829"``,
+#: ``"device"`` (the base device: an unknown application, or a name that is
+#: neither APP_ nor BOOTDEPZ) and ``"bootloader"`` (no sensor class: use the
+#: contract 06 client). BNO085 boards run APP_BNO086 and resolve to ``"bno086"``.
+SENSOR_CLASS_NAMES: tuple[str, ...] = (
+    "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx", "vl53l7ch",
+    "vl53l0x", "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx", "vl53lx",
+    "bno086", "bno055", "tmf8829", "device", "bootloader",
+)
 
 _VL53L7_PART_RE = re.compile(r"VL53L([57])(CX|CH)")
+_VL53L7_MODELS = ("vl53l5cx", "vl53l7cx", "vl53l7ch")
+# 1D products with a class of their own; VL53L4CD on APP_VL53L0_4 is generic.
+_VL53LX_OWN_CLASS = ("VL53L0X", "VL53L1CX", "VL53L1CB", "VL53L3CX", "VL53L4CX")
 
 
-def _vl53l7_class(usb_model: str | None, device_name: str):
-    """Pick the L5/L7 class. All three boards run APP_VL53L7 and the silicon
-    only tells L5 from L7 after init() (module_type), never CX from CH — so
-    the production USB PID decides, then the device name the bootloader was
-    stamped with (`… VL53L7CH USB v2.1 …`), then the CX base (safe: its blob
-    runs on every L5/L7 part)."""
-    from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx
-
-    by_model = {"vl53l5cx": Vl53l5cx, "vl53l7cx": Vl53l7cx, "vl53l7ch": Vl53l7ch}
-    if usb_model in by_model:
-        return by_model[usb_model]
+def _vl53l7_model(usb_model: str | None, device_name: str) -> str:
+    """L5/L7 model: the production USB model, then the part stamped in the
+    device name (`… VL53L7CH USB v2.1 …`), then the CX base (contract 11 §1;
+    the silicon cannot tell CX from CH, and the CX blob runs on every part)."""
+    if usb_model in _VL53L7_MODELS:
+        return usb_model  # type: ignore[return-value]
     m = _VL53L7_PART_RE.search(device_name or "")
     if m:
-        return by_model.get(f"vl53l{m.group(1)}{m.group(2)}".lower(), Vl53l7cx)
-    return Vl53l7cx
+        part = f"vl53l{m.group(1)}{m.group(2)}".lower()
+        if part in _VL53L7_MODELS:
+            return part
+    return "vl53l7cx"
 
 
-def _vl53lx_class(usb_model: str | None, device_name: str):
-    """Pick the 1D-family class: the production PID model, then the product
-    the device name carries, then the generic class (it reads the product
-    from the device name itself, or takes product= at init)."""
-    from .vl53lx import CLASS_BY_PRODUCT, Vl53lx
+def _vl53lx_name(usb_model: str | None, device_name: str) -> str:
+    """1D-family class: the production USB model if it is one of the six
+    products, else the product stamped in the device name, else the generic
+    class (contract 12 §1)."""
     from .vl53lx.uld import registry
 
     product = (usb_model or "").upper() or None
     if product not in registry.PRODUCTS:
         product = registry.product_from_board_name(device_name or "")
-    return CLASS_BY_PRODUCT.get(product or "", Vl53lx)
+    return product.lower() if product in _VL53LX_OWN_CLASS else "vl53lx"
 
 
-def _open_by_sensor(
-    port: str,
-    sensor: SensorType | None,
-    timeout: float,
-    usb_model: str | None = None,
+def resolve_sensor_class(
+    software_name: str,
     device_name: str = "",
-):
-    if sensor == SensorType.SR04:
-        return Sr04(port, timeout=timeout)
-    if sensor == SensorType.VL53L8:
-        # CX and CH both report firmware name APP_VL53L8_v*, and the silicon
-        # device_id/revision is identical (0xF0/0x0C), so the USB PID is the
-        # only thing that tells them apart: 0xED4B → CX, 0xED40 → CH (both
-        # ship; both are hw-verified in usb_ids.py). A dev unit carrying the
-        # STMicro default 0x56DC can't be identified at all, so it falls back
-        # to the CX base — the safe choice, since CH is a strict superset.
-        from .vl53l8 import Vl53l8ch, Vl53l8cx
+    usb_vid: int | None = None,
+    usb_pid: int | None = None,
+) -> str:
+    """The canonical class name for a device's probe answers and its port's
+    USB (vid, pid) — contract 02 §4.4, pure. One of `SENSOR_CLASS_NAMES`.
 
-        cls = Vl53l8ch if usb_model == "vl53l8ch" else Vl53l8cx
-        return cls(port, timeout=timeout)
+    `software_name` is the GET_NAME_ACTIVE_SOFTWARE answer, `device_name` the
+    GET_DEVICE_NAME answer ("" when there was none); the USB id is None when
+    unknown (a replay, a bridge). Vectors: ``vectors/probe.json``.
+    """
+    # Each USB id, when known, is a u16 (contract 07 §3) — even if the other is not.
+    if usb_vid is not None:
+        check_uint("usb_vid", usb_vid, 16)
+    if usb_pid is not None:
+        check_uint("usb_pid", usb_pid, 16)
+    ident = parse_software_name(software_name)
+    if ident.mode == "bootloader":
+        return "bootloader"
+    model = usb_model_hint(usb_vid, usb_pid)
+    sensor = ident.sensor_type
+    if sensor == SensorType.SR04:
+        return "sr04"
+    if sensor == SensorType.VL53L8:
+        # CX and CH share firmware name and silicon ids: only the production
+        # PID tells them apart; the dev default (0483:56DC) falls to the CX base.
+        return "vl53l8ch" if model == "vl53l8ch" else "vl53l8cx"
     if sensor == SensorType.VL53L7:
-        return _vl53l7_class(usb_model, device_name)(port, timeout=timeout)
+        return _vl53l7_model(model, device_name)
     if sensor == SensorType.VL53LX:
-        return _vl53lx_class(usb_model, device_name)(port, timeout=timeout)
+        return _vl53lx_name(model, device_name)
     if sensor == SensorType.VL53L4:
+        return "vl53l4cd"
+    if sensor == SensorType.BNO086:
+        return "bno086"
+    if sensor == SensorType.BNO055:
+        return "bno055"
+    if sensor == SensorType.TMF8829:
+        return "tmf8829"
+    return "device"
+
+
+def sensor_class(name: str) -> type[DeviceBase]:
+    """The Python class for a `resolve_sensor_class` name (not "bootloader")."""
+    if name == "device":
+        return DeviceBase
+    if name == "sr04":
+        return Sr04
+    if name == "vl53l4cd":
         from .vl53l4 import Vl53l4cd
 
-        return Vl53l4cd(port, timeout=timeout)
-    if sensor == SensorType.BNO086:
+        return Vl53l4cd
+    if name in ("vl53l8cx", "vl53l8ch"):
+        from . import vl53l8
+
+        return vl53l8.Vl53l8ch if name == "vl53l8ch" else vl53l8.Vl53l8cx
+    if name in _VL53L7_MODELS:
+        from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx
+
+        return {"vl53l5cx": Vl53l5cx, "vl53l7cx": Vl53l7cx, "vl53l7ch": Vl53l7ch}[name]
+    if name == "vl53lx" or name.upper() in _VL53LX_OWN_CLASS:
+        from .vl53lx import CLASS_BY_PRODUCT, Vl53lx
+
+        return CLASS_BY_PRODUCT.get(name.upper(), Vl53lx)
+    if name == "bno086":
         from .bno086 import Bno086
 
-        return Bno086(port, timeout=timeout)
-    if sensor == SensorType.BNO055:
+        return Bno086
+    if name == "bno055":
         from .bno055 import Bno055
 
-        return Bno055(port, timeout=timeout)
-    if sensor == SensorType.TMF8829:
+        return Bno055
+    if name == "tmf8829":
         from .tmf8829 import Tmf8829
 
-        return Tmf8829(port, timeout=timeout)
-    return DeviceBase(port, timeout=timeout)
+        return Tmf8829
+    raise ValueError(f"no sensor class {name!r}")
 
 
-def _promote(dev: DeviceBase, ident: Identity):
-    """Re-wrap an already-open Link-based DeviceBase as the right subclass.
+def attach_sensor_class(dev: DeviceBase, class_name: str):
+    """Continue the open base device `dev` as `class_name` on the same
+    connection — no reopen, sequence numbers and reader run on (contract 02
+    §4.4). `dev` must be a plain `DeviceBase` (no subclass yet); returns it,
+    now an instance of that class. "bootloader" raises `DepzError`.
 
     State first, class swap second: the reader thread may dispatch a report
     between the two statements."""
-    if ident.sensor_type == SensorType.SR04:
-        Sr04._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Sr04
+    if class_name == "bootloader":
+        raise DepzError("device is in bootloader mode; use the bootloader client (contract 06)")
+    cls = sensor_class(class_name)
+    if type(dev) is not DeviceBase:
+        raise TypeError(f"attach_sensor_class needs a plain DeviceBase, got {type(dev).__name__}")
+    if cls is DeviceBase:
         return dev
-    if ident.sensor_type == SensorType.VL53L8:
-        from .vl53l8 import Vl53l8
-
-        Vl53l8._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Vl53l8
-        return dev
-    if ident.sensor_type == SensorType.VL53L7:
-        try:
-            name = dev.get_device_name()
-        except DepzError:
-            name = ""
-        cls = _vl53l7_class(None, name)
-        cls._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = cls
-        return dev
-    if ident.sensor_type == SensorType.VL53LX:
-        try:
-            name = dev.get_device_name()
-        except DepzError:
-            name = ""
-        cls = _vl53lx_class(None, name)
-        cls._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = cls
-        return dev
-    if ident.sensor_type == SensorType.VL53L4:
-        from .vl53l4 import Vl53l4cd
-
-        Vl53l4cd._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Vl53l4cd
-        return dev
-    if ident.sensor_type == SensorType.BNO086:
-        from .bno086 import Bno086
-
-        Bno086._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Bno086
-        return dev
-    if ident.sensor_type == SensorType.BNO055:
-        from .bno055 import Bno055
-
-        Bno055._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Bno055
-        return dev
-    if ident.sensor_type == SensorType.TMF8829:
-        from .tmf8829 import Tmf8829
-
-        Tmf8829._init_subclass_state(dev)  # type: ignore[arg-type]
-        dev.__class__ = Tmf8829
-        return dev
+    cls._init_subclass_state(dev)  # type: ignore[arg-type]
+    dev.__class__ = cls
     return dev
+
+
+# Kept for the vector generators and tests that pick a family class directly.
+def _vl53l7_class(usb_model: str | None, device_name: str):
+    return sensor_class(_vl53l7_model(usb_model, device_name))
+
+
+def _vl53lx_class(usb_model: str | None, device_name: str):
+    return sensor_class(_vl53lx_name(usb_model, device_name))

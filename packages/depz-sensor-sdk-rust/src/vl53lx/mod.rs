@@ -14,15 +14,18 @@
 //!   result block (`l4` / `l1` ULD variants), VL53L0X raw fields, histogram
 //!   status bytes + 24 bins.
 //!
-//! The live drivers (init, configuration, histogram target extraction) are a
-//! documented extension point, out of scope for this decode-layer crate.
+//! - [`driver`] — the contract every live driver implements ([`driver::Vl53lxDriver`]) and the
+//!   platform layer it runs on ([`driver::Vl53lxPlatform`]).
 
+pub mod bare;
 pub mod codecs;
 pub mod decode;
+pub mod driver;
 pub mod products;
+pub mod uld;
 
 pub use crate::vl53l4::{
-    i2c_error_name, pack_read_reg, pack_set_i2c_speed, pack_write_reg, pack_xshut, RegData,
+    i2c_error_name, pack_read_reg, pack_set_i2c_speed, pack_write_reg, pack_xshut, try_pack_write_reg, RegData,
     StreamData, I2C_KHZ_STEPS, SF_INT_ACT_HIGH, XFER_MAX, XSHUT_OFF, XSHUT_ON, XSHUT_RESET,
 };
 pub use codecs::{
