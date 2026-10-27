@@ -15,10 +15,10 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Iterator
+from typing import Any, Callable, Iterator
 
 from ..device import DeviceBase, StreamIterator, StreamQueue
-from ..errors import DepzError, DepzTimeoutError, LinkClosedError, StatusError
+from ..errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError
 from ..protocol.bno055 import (
     I2C_ERROR_NAMES,
     RESET_TIMEOUT_S,
@@ -154,21 +154,26 @@ class Bno055Sample:
     def decode(timestamp_us: int, addr: int, data: bytes, units: Units) -> "Bno055Sample":
         r = decode_block(addr, data)
 
-        def scale(v, lsb):
-            return None if v is None else tuple(x / lsb for x in v)
+        def vec3(v: tuple[int, int, int] | None, lsb: float) -> tuple[float, float, float] | None:
+            return None if v is None else (v[0] / lsb, v[1] / lsb, v[2] / lsb)
+
+        def vec4(
+            v: tuple[int, int, int, int] | None, lsb: float
+        ) -> tuple[float, float, float, float] | None:
+            return None if v is None else (v[0] / lsb, v[1] / lsb, v[2] / lsb, v[3] / lsb)
 
         return Bno055Sample(
             timestamp_us=timestamp_us,
             addr=addr,
             raw=bytes(data),
             units=units,
-            accel=scale(r.accel, units.accel_lsb),
-            mag=scale(r.mag, MAG_LSB),
-            gyro=scale(r.gyro, units.gyro_lsb),
-            euler=scale(r.euler, units.euler_lsb),
-            quaternion=scale(r.quaternion, QUAT_LSB),
-            linear_accel=scale(r.linear_accel, FUSION_ACCEL_LSB),
-            gravity=scale(r.gravity, FUSION_ACCEL_LSB),
+            accel=vec3(r.accel, units.accel_lsb),
+            mag=vec3(r.mag, MAG_LSB),
+            gyro=vec3(r.gyro, units.gyro_lsb),
+            euler=vec3(r.euler, units.euler_lsb),
+            quaternion=vec4(r.quaternion, QUAT_LSB),
+            linear_accel=vec3(r.linear_accel, FUSION_ACCEL_LSB),
+            gravity=vec3(r.gravity, FUSION_ACCEL_LSB),
             temperature=None if r.temperature is None else r.temperature / units.temp_lsb,
             calibration=None if r.calib_stat is None else CalibStatus.unpack(r.calib_stat),
         )
@@ -197,9 +202,9 @@ class Bno055(DeviceBase):
         self._stream_block: tuple[int, int] | None = None
         self._stream_units = Units()
         self._sample_cbs: list[Callable[[Bno055Sample], None]] = []
-        self._sample_queues: list[StreamQueue] = []
+        self._sample_queues: list[StreamQueue[Bno055Sample]] = []
         self._stream_parse_errors = 0
-        self._configured: dict | None = None  # last configure() arguments
+        self._configured: dict[str, Any] | None = None  # last configure() arguments
         self._mode_before_suspend: OprMode | None = None  # put back on wake-up
 
     # ── identity & bridge diagnostics ────────────────────────────────────────
@@ -388,7 +393,7 @@ class Bno055(DeviceBase):
         nRESET and the sensor comes back in CONFIG mode). A running stream
         keeps running across it."""
         if self._configured is None:
-            raise DepzError("configure() has not been called")
+            raise InvalidStateError("configure() has not been called")
         self.configure(**self._configured)
 
     # ── status, self-test, calibration ──────────────────────────────────────
@@ -544,15 +549,14 @@ class Bno055(DeviceBase):
         addr, length = block
         if not 1 <= length <= XFER_MAX or addr + length > 0x100:
             raise ValueError(f"block 0x{addr:02X}+{length} outside 1..{XFER_MAX} / page")
+        # Encoded (and so range-checked: TIMER period 1..60000) before the
+        # units read below — a refused argument puts nothing on the wire.
+        payload = pack_start_stream(trigger, addr, length, period_ms)
         with self._reg_lock:
             # Units first: the reader thread may decode the first sample
             # before request() below even returns.
             self._stream_units = self._current_units()
-            self.request(
-                Bno055Cmd.START_STREAM,
-                pack_start_stream(trigger, addr, length, period_ms),
-                ok_completes=True,
-            )
+            self.request(Bno055Cmd.START_STREAM, payload, ok_completes=True)
             self._stream_block = (addr, length)
             self._streaming = True
 
@@ -575,7 +579,7 @@ class Bno055(DeviceBase):
         self._sample_cbs.append(cb)
         return lambda: self._sample_cbs.remove(cb)
 
-    def samples(self, maxsize: int = 256) -> StreamIterator:
+    def samples(self, maxsize: int = 256) -> StreamIterator[Bno055Sample]:
         """Blocking iterator over streamed samples (bounded, drop-oldest;
         `dropped_count` on the returned iterator). Subscribes immediately."""
         return StreamIterator(self._sample_queues, maxsize, lambda: self.closed)
@@ -586,7 +590,7 @@ class Bno055(DeviceBase):
         is closed while waiting."""
         if self.closed:
             raise LinkClosedError("device is closed")
-        q = StreamQueue(1)
+        q: StreamQueue[Bno055Sample] = StreamQueue(1)
         self._sample_queues.append(q)
         try:
             deadline = time.monotonic() + timeout
@@ -715,7 +719,7 @@ class Bno055(DeviceBase):
 
     def _require_not_streaming(self) -> None:
         if self._streaming:
-            raise DepzError("stop_stream() first — the stream reads page 0")
+            raise InvalidStateError("stop_stream() first — the stream reads page 0")
 
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd != Bno055Rpt.STREAM:
@@ -730,9 +734,6 @@ class Bno055(DeviceBase):
             self._stream_parse_errors += 1
             return True
         sample = Bno055Sample.decode(s.timestamp_us, s.addr, s.data, self._stream_units)
-        for cb in list(self._sample_cbs):
-            cb(sample)
-        for q in list(self._sample_queues):
-            q.put(sample)
+        self._deliver(self._sample_cbs, self._sample_queues, sample)
         return True
 

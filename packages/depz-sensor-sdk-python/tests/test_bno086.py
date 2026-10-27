@@ -1,5 +1,6 @@
 """Bno086 device behavior against the in-process fake bridge + sensor hub."""
 
+import math
 import struct
 import time
 
@@ -246,6 +247,14 @@ def test_tare_and_calibration_facade(rig):
     assert cal == CalibrationConfig(accel=True, gyro=True, mag=False, planar=False)
 
 
+def test_set_calibration_planar_sets_p4(rig):
+    """Planar accelerometer calibration (SH-2 §6.4.6): P4 = 1 of the ME
+    Calibration command; accel on, gyro and mag off, P3 = 0 (configure)."""
+    fake, dev = rig
+    dev.set_calibration(accel=True, gyro=False, mag=False, planar=True)
+    assert fake.me_cal_requests[-1][:5] == bytes((1, 0, 0, 0, 1))
+
+
 # ── FRS ───────────────────────────────────────────────────────────────────────
 
 
@@ -266,6 +275,54 @@ def test_frs_write_roundtrip(rig):
     payload = [0x11111111, 0x22222222, 0x33333333]
     dev.frs_write(FrsRecordId.SYSTEM_ORIENTATION, payload)
     assert fake.frs_writes[FrsRecordId.SYSTEM_ORIENTATION] == payload
+
+
+def test_frs_dcd_backup_restore_delete(rig):
+    """Saved calibration (FRS 0x1F1F): back up = read the record, restore =
+    write the words back, delete = a 0-word write (SH-2 §6.3.3) — after which
+    the record reads as unrecognized."""
+    fake, dev = rig
+    backup = dev.frs_read(FrsRecordId.DYNAMIC_CALIBRATION)
+    assert backup == tuple(FakeBno086.FRS_RECORDS[0x1F1F])
+    dev.frs_write(FrsRecordId.DYNAMIC_CALIBRATION, backup)
+    assert fake.frs_writes[FrsRecordId.DYNAMIC_CALIBRATION] == list(backup)
+    dev.frs_write(FrsRecordId.DYNAMIC_CALIBRATION, [])
+    assert FrsRecordId.DYNAMIC_CALIBRATION in fake.frs_erased
+    with pytest.raises(Sh2Error, match="UNRECOGNIZED"):
+        dev.frs_read(FrsRecordId.DYNAMIC_CALIBRATION)
+
+
+def test_frs_user_record_64_words_reads_back(rig):
+    """User record (FRS 0x74B4, SH-2 §4.3.21): the 64-word maximum goes out
+    in 32 Write Data packets and reads back word for word."""
+    _, dev = rig
+    words = [(0xA5000000 | i) for i in range(64)]
+    dev.frs_write(FrsRecordId.USER_RECORD, words)
+    assert dev.frs_read(FrsRecordId.USER_RECORD) == tuple(words)
+
+
+def test_frs_serial_number_single_word(rig):
+    _, dev = rig
+    assert dev.frs_read(FrsRecordId.SERIAL_NUMBER) == (0x00086A5C,)
+
+
+def test_frs_detector_config_records_write_then_read(rig):
+    """Detector tuning records (SH-2 §4.3.6/7/15, §4.3.3, §4.3.5, §4.3.24):
+    each is a plain word list through frs_write / frs_read."""
+    _, dev = rig
+    records = {
+        FrsRecordId.SIG_MOTION_DETECT_CONFIG: [round(12.0 * 2**24), 3],
+        FrsRecordId.SHAKE_DETECT_CONFIG: [50_000, 400_000, round(8.0 * 2**26), 4, 0x03],
+        FrsRecordId.STABILITY_DETECTOR_CONFIG: [round(0.784 * 2**24), 500_000],
+        FrsRecordId.ME_POWER_MGMT: [round(0.2 * 2**28), 1 << 25, (50 << 16) | 3],
+        FrsRecordId.ARVR_STABILIZATION_GRV: [round(0.2 * 2**30), round(0.127 * 2**29), round(0.785 * 2**29), 0],
+        FrsRecordId.GYRO_INTEGRATED_RV_CONFIG: [0x0207, 10_000, round(math.pi / 6 * 2**29), round(0.028 * 2**10),
+                                                round(0.303072543909142 * 2**20), round(0.113295896384921 * 2**20),
+                                                round(0.002776219713054 * 2**20)],
+    }
+    for record_id, words in records.items():
+        dev.frs_write(record_id, words)
+        assert dev.frs_read(record_id) == tuple(words), record_id
 
 
 def test_get_metadata(rig):

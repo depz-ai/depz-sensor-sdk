@@ -12,6 +12,7 @@ pub mod sh2;
 pub mod shtp;
 
 pub use reports::{
-    parse_gyro_rv_cargo, parse_input_cargo, try_parse_gyro_rv_cargo, try_parse_input_cargo, Report, Vector3Kind,
+    parse_gyro_rv_cargo, parse_input_cargo, try_parse_gyro_rv_cargo, try_parse_input_cargo, Report,
+    Vector3Kind,
 };
 pub use shtp::{ExecutableCommand, ShtpCargo, ShtpChannel, ShtpError, ShtpHeader, ShtpLayer};

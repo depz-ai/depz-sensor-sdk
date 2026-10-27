@@ -14,12 +14,25 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <memory>
+#include <cstdlib>
+#include <ctime>
+#include <cmath>
+#include <limits>
+#include <cstring>
 
 #include "depz/bno055.hpp"
 #include "depz/bno086.hpp"
 #include "depz/common.hpp"
 #include "depz/crc.hpp"
 #include "depz/dataset.hpp"
+#ifdef DEPZ_TEST_HAS_IO
+#include "depz/recorder.hpp"
+#endif
 #include "depz/framing.hpp"
 #include "depz/fwdepz.hpp"
 #include "depz/identity.hpp"
@@ -314,8 +327,8 @@ static void test_usb_ids() {
         seen(c, f0);
     }
     // None inputs.
-    check(!depz::is_known_depz_usb(std::nullopt, 0xEC78), "is_known null vid");
-    check(!depz::is_known_depz_usb(0x1BCF, std::nullopt), "is_known null pid");
+    check(!depz::is_known_depz_usb(std::nullopt, std::uint16_t{0xEC78}), "is_known null vid");
+    check(!depz::is_known_depz_usb(std::uint16_t{0x1BCF}, std::nullopt), "is_known null pid");
 
     // The id constants themselves.
     {
@@ -382,6 +395,17 @@ static void test_common_commands() {
         check_eq(to_hex(got), c.at("payload").as_string(), "common encode " + nm);
         seen(c, f0);
     }
+    {
+        // contract 02 §2 (ERRATA A2): SET_PAYLOAD_CRC_TYPE takes 0..3, refused on the host
+        check_eq(to_hex(depz::pack_set_payload_crc_type(3)), std::string("03"), "crc_type 3 packs");
+        bool threw = false;
+        try {
+            (void)depz::pack_set_payload_crc_type(4);
+        } catch (const std::out_of_range&) {
+            threw = true;
+        }
+        check(threw, "crc_type 4 throws out_of_range");
+    }
 
     for (const Value& c : v.at("decode").as_array()) {
         const int f0 = g_fails;
@@ -424,6 +448,54 @@ static void test_common_commands() {
         check_eq(res.first, c.at("offset_us").as_int(), "sync_time offset " + nm);
         check_eq(res.second, c.at("rtt_us").as_int(), "sync_time rtt " + nm);
         seen(c, f0);
+    }
+
+    {
+        // contract 02 §6: pin 1..5, mode 0..4, polarity 0..1 — refused on the host
+        using depz::SyncPinConfig;
+        using depz::SyncPinMode;
+        using depz::SyncPinPolarity;
+        auto refused = [](const SyncPinConfig& c) {
+            try {
+                (void)c.pack();
+            } catch (const std::out_of_range&) {
+                return true;
+            }
+            return false;
+        };
+        check(refused(SyncPinConfig{0, SyncPinMode::In, SyncPinPolarity::IdleLow}), "sync_pin pin 0 refused");
+        check(refused(SyncPinConfig{6, SyncPinMode::In, SyncPinPolarity::IdleLow}), "sync_pin pin 6 refused");
+        check(refused(SyncPinConfig{1, static_cast<SyncPinMode>(5), SyncPinPolarity::IdleLow}), "sync_pin mode 5 refused");
+        check(refused(SyncPinConfig{1, SyncPinMode::In, static_cast<SyncPinPolarity>(2)}), "sync_pin polarity 2 refused");
+        const auto c = SyncPinConfig::unpack(depz::as_bytes(from_hex("030201")));
+        check(c.pin == 3 && c.mode == SyncPinMode::OutStart && c.polarity == SyncPinPolarity::IdleHigh, "sync_pin unpack");
+        bool threw = false;
+        try {
+            (void)SyncPinConfig::unpack(depz::as_bytes(from_hex("0302")));
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "sync_pin unpack short throws");
+
+        // RPT_SYNC_TIME: T1 echoed, T2, T3 (contract 02 §5)
+        const auto st = depz::SyncTimeReport::unpack(
+            depz::as_bytes(from_hex("0100000000000000" "0200000000000000" "0300000000000000")));
+        check(st.pc_timestamp_us == 1 && st.mcu_rx_us == 2 && st.mcu_tx_us == 3, "sync_time report unpack");
+        threw = false;
+        try {
+            (void)depz::SyncTimeReport::unpack(depz::as_bytes(from_hex("01000000000000000200000000000000")));
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "sync_time report short throws");
+
+        // contract 02 §4.1: trailing 0x00 / 0xFF padding goes, an embedded 0x00
+        // stays, a byte >= 0x80 is U+FFFD
+        check_eq(depz::strip_device_string(depz::as_bytes(from_hex("41ff42ffff0000"))),
+                 std::string("A\xEF\xBF\xBD" "B"), "device string: padding and U+FFFD");
+        check_eq(depz::strip_device_string(depz::as_bytes(from_hex("410042"))), std::string("A\0B", 3),
+                 "device string: embedded NUL kept");
+        check_eq(depz::strip_device_string(depz::as_bytes(from_hex("ffff00"))), std::string(), "device string: all padding");
     }
 }
 
@@ -523,6 +595,17 @@ static void test_sr04() {
         }
         seen(c, f0);
     }
+
+    // Contract 03 §4: distance = echo · c / 2 at 343 m/s, or at the
+    // temperature-compensated 331.3 + 0.606·T m/s; the no-echo sentinel has none.
+    check(!depz::distance_mm_from_echo(depz::ECHO_TIMEOUT, std::nullopt).has_value(), "sr04 distance: no echo");
+    check(!depz::distance_mm_from_echo(depz::ECHO_TIMEOUT, 20.0).has_value(), "sr04 distance: no echo at 20 C");
+    auto d = depz::distance_mm_from_echo(5831, std::nullopt);
+    check(d && std::fabs(*d - 1000.0165) < 1e-9, "sr04 distance at 343 m/s");
+    d = depz::distance_mm_from_echo(5831, 20.0);
+    check(d && std::fabs(*d - 1001.24101) < 1e-9, "sr04 distance at 20 C");
+    d = depz::distance_mm_from_echo(100, -10.0);
+    check(d && std::fabs(*d - 16.262) < 1e-9, "sr04 distance at -10 C");
 }
 
 // ---- fwdepz ----------------------------------------------------------------
@@ -543,6 +626,7 @@ static void test_fwdepz() {
                     case depz::FwDepzErrorKind::Magic: got_kind = "magic"; break;
                     case depz::FwDepzErrorKind::HeaderCrc: got_kind = "header_crc"; break;
                     case depz::FwDepzErrorKind::Size: got_kind = "size"; break;
+                    case depz::FwDepzErrorKind::Section: got_kind = "section"; break;
                 }
             }
             check_eq(got_kind, want, "fwdepz error " + nm);
@@ -567,6 +651,62 @@ static void test_fwdepz() {
             }
         }
         seen(c, f0);
+    }
+
+    // Contract 06: build() and parse() are inverses (the header CRC and the
+    // payload CRC-32 hold; a damaged payload parses with payload_crc_ok()
+    // false), and the bootloader payloads the flashing client sends and
+    // reads — WRITE_PAGE (addr u32, size u16, data), READ_PAGE (addr u32,
+    // size u16), RPT_FLASH_INFO (cmd, page_size u16, rsvd u16, app_start u32,
+    // app_size u32) — byte for byte the Python reference.
+    {
+        const depz::bytes payload = from_hex("deadbeef0102030405");
+        const depz::bytes file = depz::FwDepzImage::build(0x08004000u, depz::as_bytes(payload));
+        check_eq(file.size(), depz::FWDEPZ_HEADER_SIZE + payload.size(), "fwdepz build size");
+        try {
+            const auto img = depz::FwDepzImage::parse(depz::as_bytes(file));
+            check_eq(img.load_addr, 0x08004000u, "fwdepz build load_addr");
+            check_eq(img.fw_size, static_cast<std::uint32_t>(payload.size()), "fwdepz build fw_size");
+            check_eq(img.fw_crc32, depz::crc32_iso_hdlc(depz::as_bytes(payload)), "fwdepz build fw_crc32");
+            check(img.cur_sec == 0 && img.tot_sec == 1, "fwdepz build sections: 0 of 1 by default");
+            check(img.payload == payload && img.payload_crc_ok(), "fwdepz build payload");
+        } catch (const depz::FwDepzError& e) {
+            check(false, std::string("fwdepz build does not parse: ") + e.what());
+        }
+        // A well-formed header naming another section is refused (ERRATA B9).
+        std::string sec_kind = "none";
+        try {
+            depz::FwDepzImage::parse(depz::as_bytes(
+                depz::FwDepzImage::build(0x08004000u, depz::as_bytes(payload), 2, 5)));
+        } catch (const depz::FwDepzError& e) {
+            if (e.kind == depz::FwDepzErrorKind::Section) sec_kind = "section";
+        }
+        check_eq(sec_kind, std::string("section"), "fwdepz build section 2 of 5 refused");
+        depz::bytes damaged = file;
+        damaged[depz::FWDEPZ_HEADER_SIZE + 3] ^= std::byte{0x01};
+        try {
+            check(!depz::FwDepzImage::parse(depz::as_bytes(damaged)).payload_crc_ok(), "fwdepz damaged payload: crc false");
+        } catch (const depz::FwDepzError& e) {
+            check(false, std::string("fwdepz damaged payload must still parse: ") + e.what());
+        }
+
+        check_eq(to_hex(depz::pack_write_page(0x08001000u, depz::as_bytes(from_hex("aabbcc")))),
+                 std::string("001000080300aabbcc"), "bootloader write_page");
+        check_eq(to_hex(depz::pack_write_page(0x08001000u, {})), std::string("001000080000"),
+                 "bootloader write_page empty");
+        check_eq(to_hex(depz::pack_read_page(0x0800F800u, 0x0100)), std::string("00f800080001"),
+                 "bootloader read_page");
+        const depz::bytes rpt = from_hex("8900080000004000080" "0c00100");
+        const auto fi = depz::FlashInfo::unpack(depz::as_bytes(rpt));
+        check(fi.page_size == 2048 && fi.app_start == 0x08004000u && fi.app_size == 0x0001C000u,
+              "bootloader flash_info");
+        bool threw = false;
+        try {
+            (void)depz::FlashInfo::unpack(depz::byte_span(rpt).first(12));
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "bootloader flash_info short payload throws");
     }
 }
 
@@ -745,8 +885,11 @@ static void test_vl53l8_advanced() {
     for (const Value& x : v.at("xtalk_margin").as_array()) {
         const int f0 = g_fails;
         std::string nm = x.at("name").as_string();
-        check_eq(static_cast<std::int64_t>(depz::vl53l8::xtalk_margin_raw(x.at("kcps").as_double())),
-                 x.at("raw").as_int(), "vl53l8 xtalk " + nm);
+        const auto kcps = static_cast<std::uint32_t>(x.at("kcps").as_int());
+        const std::uint32_t raw = depz::vl53l8::xtalk_margin_raw(kcps);
+        check_eq(static_cast<std::int64_t>(raw), x.at("raw").as_int(), "vl53l8 xtalk " + nm);
+        check_eq(static_cast<std::int64_t>(depz::vl53l8::xtalk_margin_kcps(raw)), static_cast<std::int64_t>(kcps),
+                 "vl53l8 xtalk kcps " + nm);
         seen(x, f0);
     }
 }
@@ -806,6 +949,76 @@ static void test_vl53l8_cnh() {
     }
     check_eq(agg_pass, static_cast<int>(want_aggs.size()), "vl53l8 cnh all aggregates exact");
     seen_id("vl53l8_cnh", f0);
+}
+
+// ---- vl53l8 SPI bridge, the streaming side (vl53l8.json, contract 04 §2–§4) --
+// START_STREAM encode, RPT_VL53_FRAME chunk decode and the FrameReassembler
+// rules 1–3 over chunks a live board emitted.
+static void test_vl53l8_wire() {
+    namespace L8 = depz::vl53l8;
+    Value v = load_vector("vl53l8.json");
+    for (const Value& c : v.at("encode").as_array()) {
+        const int f0 = g_fails;
+        std::string nm = c.at("name").as_string();
+        check_eq(c.at("kind").as_string(), std::string("start_stream"), "vl53l8 encode kind " + nm);
+        check_eq(to_hex(L8::pack_start_stream(static_cast<std::uint16_t>(c.at("frame_size").as_int()))),
+                 c.at("payload").as_string(), "vl53l8 encode " + nm);
+        seen(c, f0);
+    }
+
+    for (const Value& c : v.at("decode").as_array()) {
+        const int f0 = g_fails;
+        std::string nm = c.at("name").as_string();
+        const Value& ex = c.at("expect");
+        check_eq(c.at("report").as_int(), static_cast<std::int64_t>(0x93), "vl53l8 report " + nm);
+        depz::bytes payload = from_hex(c.at("payload").as_string());
+        L8::FrameChunk ch = L8::FrameChunk::unpack(depz::as_bytes(payload));
+        check_eq(static_cast<std::int64_t>(ch.timestamp_us), ex.at("timestamp_us").as_int(),
+                 "vl53l8 chunk.timestamp_us " + nm);
+        check_eq(static_cast<std::int64_t>(ch.full_size), ex.at("full_size").as_int(), "vl53l8 chunk.full_size " + nm);
+        check_eq(static_cast<std::int64_t>(ch.offset), ex.at("offset").as_int(), "vl53l8 chunk.offset " + nm);
+        check_eq(to_hex(ch.data), ex.at("data").as_string(), "vl53l8 chunk.data " + nm);
+        seen(c, f0);
+    }
+    {
+        depz::bytes hdr(12, std::byte{0});
+        bool rejected = false;
+        try {
+            (void)L8::FrameChunk::unpack(depz::byte_span(hdr.data(), 11));
+        } catch (const std::exception&) {
+            rejected = true;
+        }
+        check(rejected, "vl53l8 chunk rejects 11 B");
+        check(L8::FrameChunk::unpack(depz::as_bytes(hdr)).data.empty(), "vl53l8 chunk accepts 12 B");
+    }
+
+    for (const Value& c : v.at("reassembly").as_array()) {
+        const int f0 = g_fails;
+        std::string nm = c.at("name").as_string();
+        const Value& ex = c.at("expect");
+        const auto& want = ex.at("frames").as_array();
+        L8::FrameReassembler r;
+        std::size_t done = 0;
+        for (const Value& h : c.at("chunks").as_array()) {
+            depz::bytes payload = from_hex(h.as_string());
+            auto f = r.feed(L8::FrameChunk::unpack(depz::as_bytes(payload)));
+            if (!f) continue;
+            if (done < want.size()) {
+                const Value& w = want[done];
+                check_eq(static_cast<std::int64_t>(f->first), w.at("timestamp_us").as_int(),
+                         "vl53l8 reassembly timestamp_us " + nm + " #" + std::to_string(done));
+                check_eq(static_cast<std::int64_t>(f->second.size()), w.at("size").as_int(),
+                         "vl53l8 reassembly size " + nm + " #" + std::to_string(done));
+                check_eq(sha256_hex(depz::as_bytes(f->second)), w.at("sha256").as_string(),
+                         "vl53l8 reassembly sha256 " + nm + " #" + std::to_string(done));
+            }
+            ++done;
+        }
+        check_eq(done, want.size(), "vl53l8 reassembly frame-count " + nm);
+        check_eq(static_cast<std::int64_t>(r.completed), ex.at("completed").as_int(), "vl53l8 reassembly completed " + nm);
+        check_eq(static_cast<std::int64_t>(r.discarded), ex.at("discarded").as_int(), "vl53l8 reassembly discarded " + nm);
+        seen(c, f0);
+    }
 }
 
 // ---- vl53l7 bridge codecs + class resolution (vl53l7.json, contract 11) ----
@@ -941,6 +1154,37 @@ static void test_vl53l4() {
         }
         check_eq(to_hex(got), c.at("payload").as_string(), "vl53l4 encode " + nm);
         seen(c, f0);
+    }
+    {
+        // contract 10 §1 (ERRATA A13): READ_REG len 1..253 and addr+len <= 0x10000, like WRITE_REG
+        auto refused = [](const std::function<void()>& f) {
+            try {
+                f();
+            } catch (const std::invalid_argument&) {
+                return true;
+            }
+            return false;
+        };
+        const std::uint8_t two[2] = {1, 2};
+        check(refused([] { (void)L4::pack_read_reg(0x89, 0); }), "vl53l4 read_reg rejects 0 B");
+        check(refused([] { (void)L4::pack_read_reg(0, L4::XFER_MAX + 1); }), "vl53l4 read_reg rejects 254 B");
+        check(refused([] { (void)L4::pack_read_reg(0xFFFF, 2); }), "vl53l4 read_reg rejects addr+len > 0x10000");
+        check(L4::pack_read_reg(0xFF03, L4::XFER_MAX).size() == 4 && L4::pack_read_reg(0xFFFF, 1).size() == 4,
+              "vl53l4 read_reg accepts the limits");
+        check(refused([&] { (void)L4::pack_write_reg(0xFFFF, depz::byte_span(reinterpret_cast<const std::byte*>(two), 2)); }),
+              "vl53l4 write_reg rejects addr+len > 0x10000");
+        check(L4::pack_write_reg(0xFFFF, depz::byte_span(reinterpret_cast<const std::byte*>(two), 1)).size() == 3,
+              "vl53l4 write_reg accepts the last byte");
+        // contract 10 §5 (ERRATA A8): the result block is 17 bytes — 15 and 16 are short, a tail is ignored
+        const depz::bytes zero(19, std::byte{0});
+        check(!L4::parse_result_block(depz::byte_span(zero.data(), 14)) && !L4::parse_result_block(depz::byte_span(zero.data(), 15)) &&
+                  !L4::parse_result_block(depz::byte_span(zero.data(), 16)),
+              "vl53l4 result block < 17 B is rejected");
+        const auto a = L4::parse_result_block(depz::byte_span(zero.data(), 17));
+        const auto b = L4::parse_result_block(depz::byte_span(zero.data(), 19));
+        check(a && b && a->distance_mm == b->distance_mm && a->range_status == b->range_status &&
+                  a->stream_count == b->stream_count && a->sigma_mm == b->sigma_mm,
+              "vl53l4 result block: 17 B decodes, a tail is ignored");
     }
 
     for (const Value& c : v.at("decode").as_array()) {
@@ -1327,7 +1571,7 @@ static void replay_vl53l7(const std::string& stem, int resolution, bool with_cnh
 
     std::string rec = load_recording(stem + ".depzrec");
     depz::PacketParser parser;
-    depz::vl53l8::FrameReassembler reasm;
+    depz::vl53l8::FrameReassembler reasm(depz::vl53l7::STREAM_CHUNK_MAX);
     std::vector<depz::vl53l8::Vl53l8Frame> frames;
     std::size_t parse_errors = 0;
     std::size_t max_chunk = 0;
@@ -1553,6 +1797,31 @@ static void test_bno086_shtp() {
         seen(c, f0);
     }
 
+    // Interactive Calibration (command 0x0E, P0 = motion intent) and Force Sensor Flush (0xF0).
+    for (const Value& c : v.at("interactive_and_flush").as_array()) {
+        const int f0 = g_fails;
+        std::string nm = c.at("name").as_string();
+        std::string kind = c.at("kind").as_string();
+        depz::bytes got;
+        if (kind == "command_request") {
+            depz::bytes params = from_hex(c.at("params").as_string());
+            check_eq(c.at("command").as_int(),
+                     static_cast<std::int64_t>(depz::bno086::CMD_INTERACTIVE_CALIBRATION),
+                     "shtp interactive command id " + nm);
+            check_eq(params.size(), std::size_t{1}, "shtp interactive one parameter " + nm);
+            got = depz::bno086::sh2_build_interactive_calibration(
+                static_cast<std::uint8_t>(c.at("seq").as_int()),
+                static_cast<depz::bno086::MotionIntent>(params.empty() ? 0 : std::to_integer<int>(params[0])));
+        } else if (kind == "force_flush") {
+            got = depz::bno086::sh2_build_force_flush(static_cast<std::uint8_t>(c.at("sensor_id").as_int()));
+        } else {
+            check(false, "shtp interactive_and_flush unknown kind " + kind);
+            continue;
+        }
+        check_eq(to_hex(got), c.at("payload").as_string(), "shtp interactive_and_flush " + nm);
+        seen(c, f0);
+    }
+
     // Executable channel: sleep / power_on (contract 05 §6a), fresh layer → seq 0, 1.
     depz::bno086::ShtpLayer exec;
     std::size_t n_exec = 0;
@@ -1589,6 +1858,7 @@ static void test_bno086_shtp() {
     check_eq(n_exec, std::size_t{2}, "shtp executable case count");
 
     // Set Feature flag bits (depz/device.hpp).
+
 #ifdef DEPZ_TEST_HAS_IO
     {
         const int f0 = g_fails;
@@ -1653,6 +1923,38 @@ static void check_report(const depz::bno086::Report& r, const Value& e, const st
     if (f.has("data")) check_eq(to_hex(r.data), f.at("data").as_string(), nm + " data");
 }
 
+// A vector JSON value against an SDK dataset Value: same shape, same keys,
+// same values (reals exact: the vectors hold binary-exact numbers).
+static bool json_matches(const Value& want, const depz::dataset::Value& got, const std::string& nm, const std::string& where) {
+    using DT = depz::dataset::Value::Type;
+    bool ok = true;
+    switch (want.type) {
+        case testjson::Type::Null: ok = got.is_null(); break;
+        case testjson::Type::Bool: ok = got.is_bool() && got.as_bool() == want.b; break;
+        case testjson::Type::Int: ok = got.is_int() && got.as_int() == want.i; break;
+        case testjson::Type::Double: ok = got.is_double() && got.as_double() == want.d; break;
+        case testjson::Type::String: ok = got.is_string() && got.as_string() == want.s; break;
+        case testjson::Type::Array:
+            ok = got.is_array() && got.size() == want.arr.size();
+            for (std::size_t i = 0; ok && i < want.arr.size(); ++i)
+                ok = json_matches(want.arr[i], got[i], nm, where + "[" + std::to_string(i) + "]");
+            return ok;
+        case testjson::Type::Object:
+            ok = got.type() == DT::Object && got.size() == want.obj.size();
+            check(ok, nm + " " + where + ": object of " + std::to_string(want.obj.size()) + " keys, got " +
+                          std::to_string(got.size()));
+            for (const auto& [k, v] : want.obj) {
+                if (!ok) break;
+                const depz::dataset::Value* g = got.find(k);
+                check(g != nullptr, nm + " " + where + "." + k + ": missing");
+                ok = g && json_matches(v, *g, nm, where + "." + k);
+            }
+            return ok;
+    }
+    check(ok, nm + " " + where + ": value differs");
+    return ok;
+}
+
 #ifdef DEPZ_TEST_HAS_IO
 // `record`: the contract 09 dataset value, i.e. the report in SI units (raw /
 // 2^Q, exact in binary). Its integer keys repeat `fields` (check_report); here
@@ -1660,6 +1962,8 @@ static void check_report(const depz::bno086::Report& r, const Value& e, const st
 static void check_report_record(const depz::bno086::Report& raw, const Value& rec, const std::string& nm) {
     const depz::Bno086Report r{raw};
     check_eq(report_type_name(r.type), rec.at("type").as_string(), nm + " record type");
+    // the whole value, as the session recorder writes it
+    json_matches(rec, depz::dataset::records::bno086(r), nm, "record");
     auto three = [&](const char* key, const std::array<double, 3>& got) {
         const auto& want = rec.at(key).as_array();
         check_eq(want.size(), std::size_t{3}, nm + " record " + key + " size");
@@ -1776,6 +2080,10 @@ static void test_bno086_reports() {
 }
 
 // ---- dataset read (.depzdata, contract 09) ---------------------------------
+static void test_dataset_json();
+static void test_dataset_writer_round_trip();
+static void test_dataset_gzip();
+
 static void test_dataset() {
     const int f0 = g_fails;
     std::string content = load_recording("dataset_dual_sr04.depzdata");
@@ -1814,16 +2122,16 @@ static void test_dataset() {
         check_eq(r0.device_id, std::string("d0"), "dataset r0 device");
         check_eq(r0.kind, std::string("sr04"), "dataset r0 kind");
         check_eq(r0.t_host_us, static_cast<std::int64_t>(8525788852), "dataset r0 t");
-        auto echo = r0.ints.find("echo_us");
-        check(echo != r0.ints.end() && echo->second == 5831, "dataset r0 echo_us");
-        auto src = r0.strings.find("source");
-        check(src != r0.strings.end() && src->second == "loop", "dataset r0 source");
+        const auto* echo = r0.value.find("echo_us");
+        check(echo && echo->is_int() && echo->as_int() == 5831, "dataset r0 echo_us");
+        const auto* src = r0.value.find("source");
+        check(src && src->is_string() && src->as_string() == "loop", "dataset r0 source");
     }
     // A record with source=="once" exists (d1 second sample).
     bool has_once = false;
     for (const auto& r : ds.records) {
-        auto s = r.strings.find("source");
-        if (s != r.strings.end() && s->second == "once") has_once = true;
+        const auto* s = r.value.find("source");
+        if (s && s->is_string() && s->as_string() == "once") has_once = true;
     }
     check(has_once, "dataset has a 'once' source record");
 
@@ -1856,16 +2164,606 @@ static void test_dataset() {
                       r.kind == w.at("k").as_string(),
                   tag);
             const Value& val = w.at("v");
-            auto echo = r.ints.find("echo_us");
-            auto src = r.strings.find("source");
-            check(val.as_object().size() == 2 && r.ints.size() == 1 && r.strings.size() == 1 &&
-                      r.arrays.empty() && echo != r.ints.end() &&
-                      echo->second == val.at("echo_us").as_int() && src != r.strings.end() &&
-                      src->second == val.at("source").as_string(),
-                  tag + " value");
+            check(val.as_object().size() == 2 && json_matches(val, r.value, tag, "value"), tag + " value");
         }
     }
     seen_id("recordings/dataset_dual_sr04.depzdata", f0);
+
+    test_dataset_json();
+    test_dataset_writer_round_trip();
+    test_dataset_gzip();
+}
+
+
+// ---- datasets: the JSON value, the writer, the gzip container ---------------
+
+namespace ds = depz::dataset;
+
+// A scratch file path (the OS temp dir; unique per process and call).
+static std::string tmp_path(const std::string& name) {
+    static int n = 0;
+    const char* dir = std::getenv("TMPDIR");
+#ifdef _WIN32
+    if (!dir) dir = std::getenv("TEMP");
+#endif
+    if (!dir) dir = "/tmp";
+    return std::string(dir) + "/depz_cpp_vectors_" + std::to_string(static_cast<long>(std::time(nullptr))) + "_" +
+           std::to_string(n++) + "_" + name;
+}
+
+static std::string read_whole(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+static void test_dataset_json() {
+    ds::Value o = ds::Value::object();
+    o.set("arr", ds::Value(ds::Value::Array{1, 2.5, 2.0, 0.1, true, ds::Value()}));
+    o.set("s", "a\"b\\c\né");
+    o.set("big", static_cast<std::int64_t>(-9007199254740993LL));
+    o.set("s", "replaced");
+    const std::string text = o.to_json();
+    check_eq(text, std::string("{\"arr\":[1,2.5,2.0,0.1,true,null],\"s\":\"replaced\",\"big\":-9007199254740993}"), "json dump");
+    check(ds::Value::parse(text) == o, "json round trip");
+    const ds::Value v = ds::Value::parse("{\"k\": [\"\\u00e9\\ud83d\\ude00\\u0000x\", {\"n\": -3e2}], \"t\": true}");
+    check_eq(v.at("k")[0].as_string(), std::string("\xc3\xa9\xf0\x9f\x98\x80\0x", 8), "json string decode");
+    check(v.at("k")[1].at("n").is_double() && v.at("k")[1].at("n").as_double() == -300.0, "json exponent is a real");
+    check(v.at("t").as_bool(), "json bool");
+    check(v.to_json().find("\\u00e9\\ud83d\\ude00\\u0000x") != std::string::npos, "json re-escapes");
+    for (const char* bad : {"{\"a\": }", "[1, 2] x", ""}) {
+        bool threw = false;
+        try {
+            ds::Value::parse(bad);
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+        check(threw, std::string("json rejects '") + bad + "'");
+    }
+    check(ds::Value(2) == ds::Value(2.0) && ds::Value(2) != ds::Value("2"), "json equality");
+}
+
+static ds::Value::Object two_devices() {
+    ds::Value d0 = ds::Value::object(), d1 = ds::Value::object();
+    d0.set("sensor_type", "sr04");
+    d0.set("time_sync", ds::Value::object().set("offset_us", 100).set("rtt_us", 5));
+    d1.set("sensor_type", "vl53l8");
+    d1.set("time_sync", ds::Value::object().set("offset_us", -5000).set("rtt_us", 7));
+    return {{"d0", d0}, {"d1", d1}};
+}
+
+// The Python / TS player fixture writer: one `sr04` record {"n": i} per event.
+static void write_events(const std::string& path, const std::vector<std::pair<const char*, std::int64_t>>& events) {
+    ds::Writer w(path, two_devices(), "test");
+    for (std::size_t i = 0; i < events.size(); ++i)
+        w.write(events[i].first, events[i].second, "sr04", ds::Value::object().set("n", static_cast<std::int64_t>(i)));
+    check_eq(w.records_written(), static_cast<std::uint64_t>(events.size()), "records written");
+    w.close();
+    bool threw = false;
+    try {
+        w.write("d0", 1, "sr04", ds::Value());
+    } catch (const depz::ArgumentError&) {  // invalid_state (ERRATA A17)
+        threw = true;
+    }
+    check(threw, "writes after close are refused");
+}
+
+static void test_dataset_writer_round_trip() {
+    const std::string path = tmp_path("rt.depzdata");
+    write_events(path, {{"d0", 300}, {"d0", 100}, {"d1", 200}, {"d0", 250}, {"d1", 50}});
+    const std::string text = read_whole(path);
+    const std::size_t nl = text.find('\n');
+    const Value h = testjson::parse(text.substr(0, nl));
+    check_eq(h.at("schema").as_string(), std::string(ds::SCHEMA), "header schema");
+    check_eq(h.at("note").as_string(), std::string("test"), "header note");
+    check_eq(h.at("created_utc").as_string().size(), std::size_t{20}, "header created_utc");
+    check(h.at("devices").at("d1").has("time_sync"), "header devices");
+    const std::string first = "{\"d\":\"d0\",\"t\":300,\"k\":\"sr04\",\"v\":{\"n\":0}}\n";
+    check_eq(text.substr(nl + 1, first.size()), first, "first record line");
+
+    const ds::Reader r = ds::Reader::open(path);
+    std::remove(path.c_str());
+    check_eq(r.schema, std::string(ds::SCHEMA), "schema read back");
+    check_eq(r.note, std::string("test"), "note read back");
+    check(r.records.size() == 5 && r.duration_us() == 250, "count / duration");
+    std::vector<std::string> order;
+    for (const auto& rec : r.records) order.push_back(rec.device_id + ":" + std::to_string(rec.t_host_us));
+    check(order == std::vector<std::string>{"d1:50", "d0:100", "d1:200", "d0:250", "d0:300"}, "merged order");
+    check(r.records[0].value.at("n").as_int() == 4, "record value");
+    const auto d1 = r.devices.find("d1");
+    check(r.devices.size() == 2 && d1 != r.devices.end() && d1->second.time_sync.offset_us == -5000 &&
+              d1->second.time_sync.rtt_us == 7 && d1->second.sensor_type == "vl53l8" && d1->second.raw.has("time_sync"),
+          "devices read back");
+
+    const std::string empty = tmp_path("empty.depzdata");
+    write_events(empty, {});
+    const ds::Reader e = ds::Reader::open(empty);
+    std::remove(empty.c_str());
+    check(e.records.empty() && e.duration_us() == 0, "empty dataset");
+    bool threw = false;
+    try {
+        ds::Reader::open(empty);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    check(threw, "a missing file throws");
+}
+
+static void test_dataset_gzip() {
+    const std::string path = tmp_path("big.depzdata.gz");
+    constexpr int N = 3000;  // several 64 KiB stored blocks
+    std::vector<std::pair<const char*, std::int64_t>> events;
+    for (int i = 0; i < N; ++i) events.emplace_back(i & 1 ? "d1" : "d0", 1000000 + static_cast<std::int64_t>(i) * 1000);
+    write_events(path, events);
+    std::string raw = read_whole(path);
+    check(raw.size() > 2 && static_cast<unsigned char>(raw[0]) == 0x1F && static_cast<unsigned char>(raw[1]) == 0x8B,
+          ".gz is a gzip file");
+    const ds::Reader r = ds::Reader::open(path);
+    std::remove(path.c_str());
+    check_eq(r.records.size(), static_cast<std::size_t>(N), "gzip record count");
+    check(r.records.back().t_host_us == 1000000 + (N - 1) * 1000LL && r.records.back().value.at("n").as_int() == N - 1,
+          "gzip last record");
+
+    // a corrupt trailer is refused
+    raw[raw.size() - 8] ^= 1;
+    bool threw = false;
+    try {
+        ds::Reader bad(raw);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    check(threw, "a corrupt gzip trailer is refused");
+
+    // compressed members (Python gzip.compress): fixed and dynamic Huffman codes
+    const std::vector<std::uint8_t> fixed = {0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0xcb, 0x48, 0xcd, 0xc9,
+                                             0xc9, 0x57, 0xc8, 0x40, 0x90, 0x5c, 0x00, 0x3b, 0x7c, 0x8a, 0xdf, 0x12, 0x00,
+                                             0x00, 0x00};
+    const depz::bytes hello = ds::gunzip(depz::byte_span(reinterpret_cast<const std::byte*>(fixed.data()), fixed.size()));
+    check_eq(std::string(reinterpret_cast<const char*>(hello.data()), hello.size()), std::string("hello hello hello\n"),
+             "a fixed-Huffman member inflates");
+    const std::string hex =
+        "1f8b08000000000002039d94bd0a023110847b1f63eb2b76926cfe5ec6c213040bc1539b70efee8995a4b8386502c3c0"
+        "f07ddb64962ab3ca240fa93ac9757b2e770ddbc74b6a93f3e9723b3e17a9a6aaeb7a683f81cfe74e085d08ba9f727d6a"
+        "a0cb772937d015fad4409775293fd015fbd440573f7c5066f960ccf2a6ccf266ccf25199e5a331cb2765964f14f39962"
+        "3e53cc178af94231ff75f9efe9a114f500853d40710f47810f47910f4fa10f4fb18f40c18fc05d7c234f3ec53f222500"
+        "226740e20c489c01993320730614ce803268c01bbba45af17e080000";
+    const depz::bytes gz = from_hex(hex);
+    const depz::bytes lines = ds::gunzip(gz);
+    std::string want;
+    for (int i = 0; i < 40; ++i)
+        want += "{\"d\":\"d0\",\"t\":" + std::to_string(i * 50000) + ",\"k\":\"sr04\",\"v\":{\"echo_us\":" +
+                std::to_string(5000 + i % 7) + "}}\n";
+    check_eq(std::string(reinterpret_cast<const char*>(lines.data()), lines.size()), want, "a dynamic-Huffman member inflates");
+    // the reader inflates: a header member, then the records member
+    const std::string head = "{\"schema\":\"depz.dataset/2\",\"devices\":{}}\n";
+    std::string doc;
+    doc += std::string("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff", 10);
+    doc.push_back(1);
+    doc.push_back(static_cast<char>(head.size()));
+    doc.push_back(static_cast<char>(head.size() >> 8));
+    doc.push_back(static_cast<char>(~head.size()));
+    doc.push_back(static_cast<char>((~head.size()) >> 8));
+    doc += head;
+    const std::uint32_t crc = depz::crc32_iso_hdlc(depz::byte_span(reinterpret_cast<const std::byte*>(head.data()), head.size()));
+    for (int i = 0; i < 4; ++i) doc.push_back(static_cast<char>(crc >> (8 * i)));
+    for (int i = 0; i < 4; ++i) doc.push_back(static_cast<char>(head.size() >> (8 * i)));
+    doc.append(reinterpret_cast<const char*>(gz.data()), gz.size());
+    const ds::Reader inflated(doc);
+    check(inflated.records.size() == 40 && inflated.records[39].t_host_us == 39 * 50000 &&
+              inflated.records[39].value.at("echo_us").as_int() == 5000 + 39 % 7,
+          "a gzip dataset of two members reads");
+}
+
+// ---- player (contract 09 §Player), on a fake clock --------------------------
+
+struct FakeClock {
+    double t = 100.0;
+    std::function<double()> fn() { return [this] { return t; }; }
+};
+
+struct Trace {
+    std::unique_ptr<ds::DatasetPlayer> p;
+    FakeClock clock;
+    std::vector<std::int64_t> seen;
+    std::vector<ds::PlayerState> states;
+};
+
+static void open_player(Trace& t, const ds::Reader& r, double speed) {
+    ds::PlayerOptions o;
+    o.speed = speed;
+    o.clock = t.clock.fn();
+    o.threaded = false;
+    t.p = std::make_unique<ds::DatasetPlayer>(r, o);
+    t.p->on_record([&t](const ds::Record& rec) { t.seen.push_back(rec.t_host_us); });
+    t.p->on_state([&t](ds::PlayerState s) { t.states.push_back(s); });
+}
+
+static ds::Reader evenly(int n, std::int64_t gap_us) {
+    const std::string path = tmp_path("even.depzdata");
+    std::vector<std::pair<const char*, std::int64_t>> events;
+    for (int i = 0; i < n; ++i) events.emplace_back("d0", 1000000 + i * gap_us);
+    write_events(path, events);
+    ds::Reader r = ds::Reader::open(path);
+    std::remove(path.c_str());
+    return r;
+}
+
+static bool nearly(std::optional<double> a, double b) { return a && std::fabs(*a - b) < 1e-6; }
+
+static void test_dataset_player() {
+    using S = ds::PlayerState;
+    using States = std::vector<S>;
+    Trace t;
+
+    // the TS scenario: paced, pause, resume, seek, speed 0
+    const std::string path = tmp_path("s.depzdata");
+    write_events(path, {{"d0", 1000}, {"d1", 900}, {"d0", 51000}, {"d1", 30900}});
+    const ds::Reader sample = ds::Reader::open(path);
+    std::remove(path.c_str());
+    open_player(t, sample, 1.0);
+    check(t.p->state() == S::Idle && t.p->position_us() == 0 && t.p->duration_us() == 50100, "idle");
+    t.p->play();
+    check(t.seen.empty(), "delivery happens in tick");
+    check(nearly(t.p->tick(), 100e-6) && t.seen == std::vector<std::int64_t>{900}, "the first record goes out at once");
+    t.clock.t += 100e-6 + 1e-6;
+    t.p->tick();
+    check(t.seen.size() == 2 && t.seen[1] == 1000, "second record");
+    t.clock.t += 0.0299 - 2e-6;
+    t.p->tick();
+    check(t.seen.size() == 2, "not yet due");
+    t.clock.t += 2e-6;
+    t.p->tick();
+    check(t.seen.size() == 3 && t.seen[2] == 30900 && t.p->position_us() == 30000, "third record");
+    t.p->pause();
+    t.clock.t += 1.0;
+    check(!t.p->tick() && t.seen.size() == 3, "paused: nothing goes out");
+    t.p->play();  // resume: the next record waits its full gap (20.1 ms) again
+    t.clock.t += 0.0201 - 1e-6;
+    t.p->tick();
+    check(t.seen.size() == 3, "resume waits the full gap");
+    t.clock.t += 2e-6;
+    check(!t.p->tick() && t.seen.size() == 4 && t.seen[3] == 51000, "last record");
+    check(t.p->state() == S::Done && t.p->position_us() == 50100, "done");
+    check(t.states == States{S::Playing, S::Paused, S::Playing, S::Done}, "state sequence");
+    t.seen.clear();
+    t.p->seek_us(30000);  // -> 30900
+    check(t.p->state() == S::Done && t.p->position_us() == 100, "seek never changes the state; position = last before target");
+    t.p->set_speed(0);
+    t.p->play();
+    t.p->tick();
+    check(t.seen == std::vector<std::int64_t>{30900, 51000} && t.p->state() == S::Done, "speed 0 from the seek target");
+
+    // speed scales the gaps
+    const ds::Reader even = evenly(5, 100000);
+    open_player(t, even, 2.0);
+    t.seen.clear();
+    t.p->play();
+    check(nearly(t.p->tick(), 0.05), "2x: 50 ms gap");
+    t.clock.t += 0.05;
+    check(nearly(t.p->tick(), 0.05) && t.seen.size() == 2, "2x: second gap");
+
+    // a speed change mid-wait rescales the remainder
+    open_player(t, even, 1.0);
+    t.seen.clear();
+    t.p->play();
+    t.p->tick();
+    t.clock.t += 0.05;
+    t.p->tick();
+    check(t.seen.size() == 1, "half of the gap played");
+    t.p->set_speed(0.5);  // remaining 50 ms of media -> 100 ms of wall time
+    check(nearly(t.p->tick(), 0.1), "remainder rescaled");
+    t.clock.t += 0.1 - 1e-6;
+    t.p->tick();
+    check(t.seen.size() == 1, "still waiting");
+    t.clock.t += 2e-6;
+    t.p->tick();
+    check(t.seen.size() == 2, "delivered after the rescaled wait");
+    t.p->set_speed(4.0);
+    const auto w = t.p->tick();
+    check(w && *w > 0.0249 && *w < 0.0251, "4x: 25 ms gaps");
+
+    // speed 0 delivers everything at once; back to paced mid-play
+    open_player(t, even, 0.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->play();
+    check(!t.p->tick() && t.seen.size() == 5 && t.states == States{S::Playing, S::Done}, "speed 0: all at once");
+    open_player(t, even, 1.0);
+    t.p->play();
+    t.p->tick();
+    t.p->set_speed(0);
+    t.p->set_speed(1.0);
+    check(nearly(t.p->tick(), 0.1), "from 0 back to paced: the next record waits its gap");
+
+    // a slow consumer catches up without drift
+    open_player(t, even, 1.0);
+    t.seen.clear();
+    t.p->play();
+    t.p->tick();
+    t.clock.t += 0.35;  // records 1..3 are overdue
+    check(nearly(t.p->tick(), 0.05) && t.seen.size() == 4, "overdue records go out back to back, record 4 on schedule");
+
+    // speed validation
+    for (double bad : {-1.0, std::nan(""), std::numeric_limits<double>::infinity()}) {
+        bool threw = false;
+        try {
+            t.p->set_speed(bad);
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw && t.p->speed() == 1.0, "bad speed refused");
+    }
+    {
+        bool threw = false;
+        try {
+            ds::PlayerOptions o;
+            o.speed = -0.5;
+            ds::DatasetPlayer bad(even, o);
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "negative speed refused at construction");
+    }
+
+    // seek while paused skips and waits the gap
+    open_player(t, even, 1.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->play();
+    t.p->tick();
+    t.p->pause();
+    t.p->seek_us(250000);  // between records 2 (200 ms) and 3 (300 ms)
+    check(t.p->position_us() == 200000 && t.p->state() == S::Paused, "seek while paused");
+    t.p->play();
+    check(nearly(t.p->tick(), 0.1), "gap from record 2 to record 3");
+    t.clock.t += 0.1;
+    t.p->tick();
+    check(t.seen == std::vector<std::int64_t>{1000000, 1300000}, "records 1 and 2 were skipped");
+    check(t.states == States{S::Playing, S::Paused, S::Playing}, "seek states");
+
+    // seek while playing continues without state events
+    open_player(t, even, 1.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->play();
+    t.p->tick();
+    t.clock.t += 0.03;
+    t.p->seek_us(300000);  // exactly a record: it is the next one delivered
+    check(t.p->state() == S::Playing && nearly(t.p->tick(), 0.1), "seek while playing");
+    t.clock.t += 0.1;
+    t.p->tick();
+    check(t.seen == std::vector<std::int64_t>{1000000, 1300000} && t.states == States{S::Playing}, "seek while playing delivered");
+
+    // seek backwards / negative; past the end; NaN
+    open_player(t, even, 0.0);
+    t.seen.clear();
+    t.p->play();
+    t.p->tick();
+    t.p->seek_us(-5);
+    check(t.p->position_us() == 0, "negative seek -> the start");
+    t.p->play();
+    t.p->tick();
+    check(t.seen.size() == 10, "replayed from the start");
+    open_player(t, even, 1.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->play();
+    t.p->tick();
+    t.p->seek_us(1e9);  // while playing -> done
+    check(t.p->state() == S::Done && t.p->position_us() == 400000 && !t.p->tick() && t.seen.size() == 1 &&
+              t.states == States{S::Playing, S::Done},
+          "seek past the end while playing");
+    open_player(t, even, 0.0);
+    t.seen.clear();
+    t.p->seek_us(1e9);  // while idle: play() restarts from the top
+    check(t.p->state() == S::Idle, "seek while idle keeps idle");
+    t.p->play();
+    t.p->tick();
+    check(t.seen.size() == 5, "play after a seek past the end restarts");
+    {
+        bool threw = false;
+        try {
+            t.p->seek_us(std::nan(""));
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        check(threw, "NaN seek refused");
+    }
+
+    // play / pause idempotent; done then play restarts; a callback controls the player
+    open_player(t, even, 1.0);
+    t.states.clear();
+    t.p->pause();  // idle: no-op
+    check(t.p->state() == S::Idle, "pause while idle");
+    t.p->play();
+    t.p->play();
+    t.p->pause();
+    t.p->pause();
+    check(t.states == States{S::Playing, S::Paused}, "idempotent play / pause");
+    const ds::Reader two = evenly(2, 100000);
+    open_player(t, two, 0.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->play();
+    t.p->tick();
+    t.p->play();
+    t.p->tick();
+    check(t.seen == std::vector<std::int64_t>{1000000, 1100000, 1000000, 1100000} &&
+              t.states == States{S::Playing, S::Done, S::Playing, S::Done},
+          "done then play restarts");
+    open_player(t, even, 0.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->on_record([&t](const ds::Record& r) {
+        if (r.t_host_us == 1100000) t.p->pause();
+    });
+    t.p->play();
+    check(!t.p->tick() && t.seen.size() == 2 && t.states == States{S::Playing, S::Paused}, "a callback paused the player");
+
+    // a record callback's exception pauses and propagates; the record counts as delivered
+    open_player(t, even, 0.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->on_record([](const ds::Record& r) {
+        if (r.t_host_us == 1200000) throw std::runtime_error("consumer failed");
+    });
+    t.p->play();
+    {
+        bool threw = false;
+        try {
+            t.p->tick();
+        } catch (const std::runtime_error& e) {
+            threw = std::string(e.what()) == "consumer failed";
+        }
+        check(threw && t.p->state() == S::Paused && t.p->position_us() == 200000, "callback error pauses");
+        t.p->play();
+        t.p->tick();
+        check(t.seen.size() == 5 && t.states == States{S::Playing, S::Paused, S::Playing, S::Done}, "resumes after the error");
+    }
+
+    // unsubscribe is idempotent
+    {
+        ds::PlayerOptions o;
+        o.speed = 0;
+        o.clock = t.clock.fn();
+        o.threaded = false;
+        ds::DatasetPlayer p(even, o);
+        int got = 0;
+        auto unsub = p.on_record([&got](const ds::Record&) { got++; });
+        auto unsub_s = p.on_state([&got](ds::PlayerState) { got++; });
+        unsub();
+        unsub();
+        unsub_s();
+        unsub_s();
+        p.play();
+        p.tick();
+        check(got == 0, "unsubscribed callbacks are silent");
+        bool threw = false;
+        try {
+            p.wait(std::chrono::milliseconds(0));
+        } catch (const depz::ArgumentError&) {  // invalid_state (ERRATA A17)
+            threw = true;
+        }
+        check(threw, "wait() needs the player thread");
+        p.close();
+        p.close();  // idempotent
+        threw = false;
+        try {
+            p.play();
+        } catch (const depz::ArgumentError&) {
+            threw = true;
+        }
+        check(threw, "play after close is refused");
+        threw = false;
+        try {
+            p.seek_us(0);
+        } catch (const depz::ArgumentError&) {
+            threw = true;
+        }
+        check(threw, "seek after close is refused");
+    }
+
+    // an empty dataset goes straight to done
+    const std::string empty = tmp_path("e.depzdata");
+    write_events(empty, {});
+    const ds::Reader none = ds::Reader::open(empty);
+    std::remove(empty.c_str());
+    open_player(t, none, 1.0);
+    t.seen.clear();
+    t.states.clear();
+    t.p->seek_us(100);  // no-op
+    check(t.p->position_us() == 0 && t.p->duration_us() == 0, "empty: zero");
+    t.p->play();
+    check(t.states == States{S::Playing, S::Done} && !t.p->tick() && t.seen.empty(), "empty -> done at once");
+
+    // the committed fixture plays in reader order
+    const ds::Reader fixture = ds::Reader::open(std::string(DEPZ_RECORDINGS_DIR) + "/dataset_dual_sr04.depzdata");
+    open_player(t, fixture, 0.0);
+    t.seen.clear();
+    t.p->play();
+    t.p->tick();
+    bool in_order = t.seen.size() == fixture.records.size() && t.seen.size() == 10;
+    for (std::size_t i = 0; in_order && i < t.seen.size(); ++i) in_order = t.seen[i] == fixture.records[i].t_host_us;
+    check(in_order && t.p->position_us() == fixture.duration_us() && fixture.duration_us() > 0, "fixture plays in reader order");
+    t.p.reset();
+
+    // the threaded driver (real time, loose bounds)
+    {
+        const ds::Reader four = evenly(4, 20000);
+        ds::PlayerOptions o;
+        o.speed = 1.0;
+        ds::DatasetPlayer p(four, o);
+        std::vector<std::thread::id> threads;
+        std::vector<std::int64_t> seen;
+        std::mutex m;
+        p.on_record([&](const ds::Record& r) {
+            std::lock_guard<std::mutex> g(m);
+            threads.push_back(std::this_thread::get_id());
+            seen.push_back(r.t_host_us);
+        });
+        p.play();
+        check(p.wait(std::chrono::seconds(5)) && p.state() == S::Done, "threaded: plays to done");
+        {
+            std::lock_guard<std::mutex> g(m);
+            bool other = seen.size() == 4;
+            for (auto id : threads) other = other && id != std::this_thread::get_id();
+            check(other, "threaded: records on the player thread");
+            seen.clear();
+        }
+        p.set_speed(0);
+        p.play();  // replay after done reuses the thread
+        check(p.wait(std::chrono::seconds(5)), "threaded: replay");
+        std::lock_guard<std::mutex> g(m);
+        check(seen.size() == 4, "threaded: replayed all");
+    }
+    {
+        const ds::Reader fifty = evenly(16, 100000);
+        ds::DatasetPlayer p(fifty, ds::PlayerOptions());
+        std::mutex m;
+        std::condition_variable cv;
+        std::vector<std::int64_t> seen;
+        p.on_record([&](const ds::Record& r) {
+            std::lock_guard<std::mutex> g(m);
+            seen.push_back(r.t_host_us);
+            cv.notify_all();
+        });
+        p.play();
+        {
+            std::unique_lock<std::mutex> g(m);
+            check(cv.wait_for(g, std::chrono::seconds(5), [&] { return !seen.empty(); }), "threaded: first record");
+        }
+        p.pause();
+        const std::size_t n = seen.size();
+        check(p.wait(std::chrono::milliseconds(0)) && p.state() == S::Paused, "threaded: paused from another thread");
+        p.seek_us(1400000);  // paused: nothing delivered by seeking
+        check(seen.size() == n, "threaded: seek while paused delivers nothing");
+        p.set_speed(0);
+        p.play();
+        check(p.wait(std::chrono::seconds(5)), "threaded: finishes");
+        std::lock_guard<std::mutex> g(m);
+        check(seen.size() == n + 2 && seen[n] == 2400000 && seen[n + 1] == 2500000, "threaded: records after the seek");
+    }
+    {
+        ds::PlayerOptions o;
+        o.speed = 0;
+        ds::DatasetPlayer p(even, o);
+        std::vector<std::string> errors;
+        std::mutex m;
+        p.on_delivery_error([&](const std::string& e) {
+            std::lock_guard<std::mutex> g(m);
+            errors.push_back(e);
+        });
+        p.on_record([](const ds::Record&) { throw std::runtime_error("x"); });
+        p.play();
+        check(p.wait(std::chrono::seconds(5)) && p.state() == S::Paused, "threaded: a throwing callback pauses");
+        // the error callback runs on the player thread right after the pause
+        bool reported = false;
+        for (int i = 0; i < 500 && !reported; i++) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::lock_guard<std::mutex> g(m);
+            reported = errors == std::vector<std::string>{"x"};
+        }
+        check(reported, "threaded: the error reaches on_delivery_error");
+    }
 }
 
 // ---- BNO055 register bridge (bno055.json, contract 13) ----------------------
@@ -1932,6 +2830,33 @@ static void test_bno055() {
         }
         check_eq(to_hex(got), c.at("payload").as_string(), "bno055 encode " + nm);
         seen(c, f0);
+    }
+    {
+        auto refused = [](const std::function<void()>& f) {
+            try {
+                f();
+            } catch (const std::invalid_argument&) {
+                return true;
+            }
+            return false;
+        };
+        // contract 13 §1 (ERRATA A13): READ_REG len 1..128 and addr+len <= 0x100, like WRITE_REG
+        check(refused([] { (void)B::pack_read_reg(0x00, 0); }) && refused([] { (void)B::pack_read_reg(0x00, 129); }) &&
+                  refused([] { (void)B::pack_read_reg(0xFF, 2); }),
+              "bno055 read_reg refuses 0 / 129 B and past the page");
+        check(B::pack_read_reg(0x80, 128).size() == 2 && B::pack_read_reg(0xFF, 1).size() == 2,
+              "bno055 read_reg accepts the limits");
+        const std::uint8_t two[2] = {1, 2};
+        check(refused([&] { (void)B::pack_write_reg(0xFF, depz::byte_span(reinterpret_cast<const std::byte*>(two), 2)); }),
+              "bno055 write_reg refuses a write past the page");
+        // contract 13 §2: TIMER period 1..60000 ms; INT: the watchdog, 0 = none
+        check(refused([] { (void)B::pack_start_stream(B::TRIGGER_TIMER, 0x08, 46, 0); }) &&
+                  refused([] { (void)B::pack_start_stream(B::TRIGGER_TIMER, 0x08, 46, 60001); }),
+              "bno055 start_stream refuses a TIMER period of 0 / 60001 ms");
+        check(B::pack_start_stream(B::TRIGGER_TIMER, 0x08, 46, 1).size() == 5 &&
+                  B::pack_start_stream(B::TRIGGER_TIMER, 0x08, 46, 60000).size() == 5 &&
+                  B::pack_start_stream(B::TRIGGER_INT, 0x35, 1, 0).size() == 5,
+              "bno055 start_stream accepts the TIMER limits and an INT watchdog of 0");
     }
 
     // decode: RPT_BNO_INFO 0x92, RPT_BNO_REG_DATA 0x91, RPT_BNO_REG_STREAM 0x93.
@@ -2445,7 +3370,16 @@ static void test_tmf8829()
         for (const Value& p : c.at("problems").as_array()) want_problems.push_back(p.as_string());
         check(fi.problems() == want_problems, "tmf8829 problems " + nm);
         check_eq(depz::tmf8829::frame_size(depz::as_bytes(raw)), raw.size(), "tmf8829 frame_size " + nm);
-        if (fi.kind() == T::FID_RESULTS) {
+        if (c.has("error")) {
+            // a results frame whose pixel decode must fail
+            bool frame_error = false;
+            try {
+                T::parse_results(depz::as_bytes(raw), fi);
+            } catch (const T::FrameError&) {
+                frame_error = true;
+            }
+            check(frame_error, "tmf8829 decode refused " + nm);
+        } else if (fi.kind() == T::FID_RESULTS) {
             check_tmf_results(T::parse_results(depz::as_bytes(raw), fi), c.at("results"), nm);
         } else {
             depz::byte_span data = depz::as_bytes(raw).subspan(21, raw.size() - 33);
@@ -2793,6 +3727,8 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
                 const Value& v = in.at("pc_timestamp_us");
                 if (v.type != testjson::Type::Int || v.range == 2 || (v.range == 0 && v.i < 0)) throw Refused{};
                 want_payload(depz::pack_sync_time(v.range == 1 ? v.u : static_cast<std::uint64_t>(v.i)));
+            } else if (kind == "set_payload_crc_type") {
+                want_payload(depz::pack_set_payload_crc_type(ir_u8(in, "crc_type")));
             } else {
                 check(false, label + ": no handler");
             }
@@ -2821,8 +3757,14 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
             check(depz::is_known_depz_usb(vid, pid) == e.at("known").as_bool(), label + ": known");
         } else if (op == "bno055_encode") {
             if (kind == "read_reg") want_payload(B::pack_read_reg(ir_u8(in, "addr"), ir_u8(in, "len")));
-            else want_payload(B::pack_start_stream(ir_u8(in, "trigger"), ir_u8(in, "addr"), ir_u8(in, "len"),
-                                                   ir_u16(in, "period_ms")));
+            else if (kind == "write_reg") {
+                const depz::bytes d = from_hex(in.at("data").as_string());
+                want_payload(B::pack_write_reg(ir_u8(in, "addr"), depz::as_bytes(d)));
+            } else if (kind == "start_stream")
+                want_payload(B::pack_start_stream(ir_u8(in, "trigger"), ir_u8(in, "addr"), ir_u8(in, "len"),
+                                                  ir_u16(in, "period_ms")));
+            else
+                check(false, label + ": no input_rules handler for bno055_encode kind " + kind);
         } else if (op == "bno055_sensor_config") {
             const auto g = ir_need(B::GyroConfig::unpack(from_hex(in.at("bytes").as_string())));
             check(g.range == e.at("range").as_int() && g.bandwidth == e.at("bandwidth").as_int() &&
@@ -2885,9 +3827,21 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
             depz::bytes page = from_hex(in.at("page").as_string());
             T::cfg_set(page, in.at("field").as_string(), in.at("value").as_int());
             check(false, label + ": accepted, the case expects a refusal");
-        } else if (op == "vl53l4_encode") {
+        } else if (op == "vl53l4_encode" || (op == "vl53lx_encode" && kind != "start_stream")) {
+            // contract 12 §2: the VL53LX bridge shares contract 10's READ_REG / WRITE_REG codecs
             if (kind == "read_reg") want_payload(L4::pack_read_reg(ir_u16(in, "addr"), ir_u16(in, "len")));
-            else want_payload(L4::pack_xshut(ir_u8(in, "action")));
+            else if (kind == "write_reg") {
+                const depz::bytes d = from_hex(in.at("data").as_string());
+                want_payload(L4::pack_write_reg(ir_u16(in, "addr"), depz::as_bytes(d)));
+            } else if (kind == "xshut")
+                want_payload(L4::pack_xshut(ir_u8(in, "action")));
+            else
+                check(false, label + ": no input_rules handler for " + op + " kind " + kind);
+        } else if (op == "vl53l4_result_block") {
+            const depz::bytes raw = from_hex(in.at("raw").as_string());
+            const auto r = L4::parse_result_block(depz::as_bytes(raw));
+            if (!r) throw Refused{};
+            check_l4_result(r, e, label);
         } else if (op == "vl53l4_timing_encode") {
             (void)ir_need(L4::range_timing_registers(ir_u32(in, "timing_budget_ms"), ir_u32(in, "inter_measurement_ms"),
                                                      ir_u16(in, "osc_frequency"), ir_u16(in, "clock_pll")));
@@ -2907,6 +3861,16 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
         } else if (op == "vl53l4_tuning_decode") {
             (void)ir_u16(in, "raw");
             check(false, label + ": a u16 raw word decodes; the case expects a refusal");
+        } else if (op == "vl53l8_encode") {
+            if (kind != "start_stream") throw std::invalid_argument("unknown vl53l8 encode kind " + kind);
+            want_payload(L8::pack_start_stream(ir_u16(in, "frame_size")));
+        } else if (op == "vl53l8_decode") {
+            if (in.at("report").as_int() != 0x93) throw Refused{};
+            const auto ch = L8::FrameChunk::unpack(depz::as_bytes(from_hex(in.at("payload").as_string())));
+            check(static_cast<std::int64_t>(ch.timestamp_us) == e.at("timestamp_us").as_int() &&
+                      ch.full_size == e.at("full_size").as_int() && ch.offset == e.at("offset").as_int(),
+                  label + ": fields");
+            check_eq(to_hex(ch.data), e.at("data").as_string(), label + ": data");
         } else if (op == "vl53l7_encode") {
             if (kind == "pin_ctrl") want_payload(L7::pack_pin_ctrl(ir_u8(in, "action")));
             else if (kind == "read_reg") want_payload(L7::pack_read_reg(ir_u16(in, "addr"), ir_u16(in, "len")));
@@ -2953,9 +3917,8 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
             (void)L8::pack_detection_thresholds(th);
             check(false, label + ": accepted, the case expects a refusal");
         } else if (op == "vl53l8_xtalk_margin") {
-            const Value& v = in.at("kcps");
-            if (v.type != testjson::Type::Int && v.type != testjson::Type::Double) throw Refused{};
-            check(L8::xtalk_margin_raw(v.as_double()) == e.at("raw").as_u64(), label + ": raw");
+            // a fraction or a negative is not a std::uint32_t: refused by the type
+            check(L8::xtalk_margin_raw(ir_u32(in, "kcps")) == e.at("raw").as_u64(), label + ": raw");
         } else if (op == "vl53l8_cnh_decode") {
 #ifdef DEPZ_TEST_HAS_IO
             const Value& c = in.at("config");
@@ -2974,6 +3937,174 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
 #else
             check(false, label + ": built without the live-hardware layer (depz::CnhSetup)");
 #endif
+        } else if (op == "common_event") {
+#ifdef DEPZ_TEST_HAS_IO
+            // the unsolicited path: the report goes through the device dispatcher
+            const std::uint8_t rpt = ir_u8(in, "report");
+            const depz::bytes payload = from_hex(in.at("payload").as_string());
+            auto [host, side] = depz::Link::loopback_pair();
+            auto dev = depz::Device::open(std::move(host));
+            auto events = dev->events(8);
+            side.write(depz::build_packet(rpt, payload));
+            const std::optional<depz::DeviceEvent> ev = events.next(std::chrono::seconds(2));
+            dev.reset();
+            check(ev.has_value(), label + ": the device emitted no event");
+            if (ev) {
+                using T = depz::DeviceEvent::Type;
+                const std::string want = e.at("event").as_string();
+                if (ev->type == T::Temperature) {
+                    check(want == "temperature" && ev->timestamp_us == e.at("timestamp_us").as_u64() &&
+                              ev->celsius == e.at("celsius").as_double(), label + ": temperature event fields");
+                } else if (ev->type == T::SequenceError) {
+                    check(want == "sequence_error" && ev->expected_seq == e.at("expected_seq").as_int() &&
+                              ev->received_seq == e.at("received_seq").as_int() &&
+                              ev->by_device == e.at("reported_by_device").as_bool(),
+                          label + ": sequence_error event fields");
+                } else if (ev->type == T::Text) {
+                    check(want == "text" && ev->cmd == e.at("cmd").as_int() && ev->text == e.at("text").as_string(),
+                          label + ": text event fields");
+                } else if (ev->type == T::UnsolicitedStatus) {
+                    check(want == "unsolicited_status" && ev->status == e.at("status").as_int(),
+                          label + ": unsolicited_status event fields");
+                } else {
+                    check(false, label + ": unexpected event type, expected " + want);
+                }
+            }
+#else
+            check(false, label + ": built without the live-hardware layer (the device dispatcher)");
+#endif
+        } else if (op == "common_seq_gap") {
+#ifdef DEPZ_TEST_HAS_IO
+            // host-observed gaps in the device->host seq (ERRATA A1): one packet per seq
+            // (report 0x7F, payload 00 — each a hex text event); once every packet's text
+            // event is out, the seq_gap events (each emitted ahead of its packet) are all in
+            std::vector<std::uint8_t> seqs;
+            for (const Value& v : in.at("seqs").as_array()) {
+                if (v.type != testjson::Type::Int || v.range != 0 || v.i < 0 || v.i > 0xFF) throw Refused{};
+                seqs.push_back(static_cast<std::uint8_t>(v.i));
+            }
+            auto [host, side] = depz::Link::loopback_pair();
+            auto dev = depz::Device::open(std::move(host));
+            auto events = dev->events(256);
+            const depz::bytes payload{std::byte{0x00}};
+            for (const std::uint8_t s : seqs) side.write(depz::build_packet(0x7F, payload, s));
+            std::vector<depz::DeviceEvent> gaps;
+            std::size_t texts = 0;
+            while (texts < seqs.size()) {
+                const std::optional<depz::DeviceEvent> ev = events.next(std::chrono::seconds(2));
+                if (!ev) break;
+                if (ev->type == depz::DeviceEvent::Type::Text) ++texts;
+                if (ev->type == depz::DeviceEvent::Type::SeqGap) gaps.push_back(*ev);
+            }
+            const std::uint64_t seq_gaps = dev->stats().seq_gaps;
+            dev.reset();
+            check(texts == seqs.size(), label + ": not every packet produced its event");
+            const auto& want = e.at("gaps").as_array();
+            check(gaps.size() == want.size(), label + ": seq_gap event count");
+            for (std::size_t k = 0; k < gaps.size() && k < want.size(); ++k)
+                check(gaps[k].expected_seq == want[k].at("expected_seq").as_int() &&
+                          gaps[k].received_seq == want[k].at("received_seq").as_int() &&
+                          gaps[k].missed == want[k].at("missed").as_int(),
+                      label + ": seq_gap event " + std::to_string(k) + " fields");
+            check(seq_gaps == e.at("seq_gaps").as_u64(), label + ": stats.seq_gaps");
+#else
+            check(false, label + ": built without the live-hardware layer (the device dispatcher)");
+#endif
+        } else if (op == "bno086_control_decode") {
+            // a control response shorter than its fields is refused (contract 05 §4 table)
+            const depz::bytes p = from_hex(in.at("payload").as_string());
+            if (kind == "feature_response") {
+                const auto f = ir_need(S::Feature::unpack(p));
+                check(f.sensor_id == e.at("sensor_id").as_int() && f.flags == e.at("flags").as_int() &&
+                          f.sensitivity == e.at("sensitivity").as_int() && f.interval_us == e.at("interval_us").as_int() &&
+                          f.batch_us == e.at("batch_us").as_int() && f.cfg_word == e.at("cfg_word").as_int(),
+                      label + ": fields");
+            } else if (kind == "product_id") {
+                const auto r = ir_need(S::ProductId::unpack(p));
+                check(r.reset_cause == e.at("reset_cause").as_int() &&
+                          r.sw_version_major == e.at("sw_version_major").as_int() &&
+                          r.sw_version_minor == e.at("sw_version_minor").as_int() &&
+                          r.sw_part_number == e.at("sw_part_number").as_int() &&
+                          r.sw_build_number == e.at("sw_build_number").as_int() &&
+                          r.sw_version_patch == e.at("sw_version_patch").as_int(),
+                      label + ": fields");
+            } else if (kind == "command_response") {
+                const auto r = ir_need(S::CommandResponse::unpack(p));
+                const auto& rr = e.at("r").as_array();
+                bool same = rr.size() == r.r.size();
+                for (std::size_t k = 0; same && k < rr.size(); ++k) same = r.r[k] == rr[k].as_int();
+                check(same && r.seq == e.at("seq").as_int() && r.command == e.at("command").as_int() &&
+                          r.command_seq == e.at("command_seq").as_int() && r.response_seq == e.at("response_seq").as_int(),
+                      label + ": fields");
+            } else if (kind == "frs_read_response") {
+                const auto r = ir_need(S::FrsReadResponse::unpack(p));
+                check(r.status == e.at("status").as_int() && r.data_length == e.at("data_length").as_int() &&
+                          r.offset_words == e.at("offset_words").as_int() && r.data0 == e.at("data0").as_int() &&
+                          r.data1 == e.at("data1").as_int() && r.frs_type == e.at("frs_type").as_int(),
+                      label + ": fields");
+            } else if (kind == "frs_write_response") {
+                const auto r = ir_need(S::FrsWriteResponse::unpack(p));
+                check(r.status == e.at("status").as_int() && r.offset_words == e.at("offset_words").as_int(),
+                      label + ": fields");
+            } else {
+                check(false, label + ": no input_rules handler for " + op + " kind " + kind);
+            }
+        } else if (op == "depzdata_read") {
+            // a damaged dataset is refused whole, as a bad argument naming the line (contract 09)
+            std::optional<ds::Reader> r;
+            try {
+                r.emplace(in.at("text").as_string());
+            } catch (const std::invalid_argument& bad) {
+                check(bad.what()[0] != '\0', label + ": a refusal without a message");
+                return true;
+            }
+            const auto& want = e.at("records").as_array();
+            check_eq(r->records.size(), want.size(), label + ": record count");
+            for (std::size_t k = 0; k < r->records.size() && k < want.size(); ++k) {
+                const auto& w = want[k].as_array();
+                const ds::Record& rec = r->records[k];
+                check(w.size() == 3 && rec.device_id == w[0].as_string() && rec.t_host_us == w[1].as_int() &&
+                          rec.kind == w[2].as_string(),
+                      label + ": record " + std::to_string(k) + " is " + rec.device_id + "/" +
+                          std::to_string(rec.t_host_us) + "/" + rec.kind);
+            }
+        } else if (op == "depzrec_read") {
+#ifdef DEPZ_TEST_HAS_IO
+            // a damaged capture is refused whole, as a bad argument naming the line (contract 08)
+            const std::string path = tmp_path("ir.depzrec");
+            {
+                std::ofstream f(path, std::ios::binary);
+                f << in.at("text").as_string();
+            }
+            std::optional<depz::Link> link;
+            try {
+                link.emplace(depz::Link::replay(path, false, false));
+            } catch (const depz::ArgumentError& bad) {
+                std::remove(path.c_str());
+                check(bad.what()[0] != '\0', label + ": a refusal without a message");
+                return true;
+            } catch (...) {
+                std::remove(path.c_str());
+                throw;
+            }
+            std::remove(path.c_str());
+            // 64 KiB of tx first, so every rx event's gate is open; then every
+            // rx chunk (timeout 0) until the replay is exhausted
+            const depz::bytes zeros(65536, std::byte{0});
+            link->write(zeros);
+            depz::bytes rx;
+            while (!link->replay_exhausted()) {
+                const depz::bytes chunk = link->read(std::chrono::milliseconds(0));
+                if (chunk.empty()) {
+                    check(false, label + ": an rx event stays gated after 64 KiB of tx");
+                    break;
+                }
+                rx.insert(rx.end(), chunk.begin(), chunk.end());
+            }
+            check_eq(to_hex(rx), e.at("rx").as_string(), label + ": rx");
+#else
+            check(false, label + ": built without the live-hardware layer (the replay link)");
+#endif
         } else {
             check(false, label + ": no input_rules handler for op " + op);
         }
@@ -2989,7 +4120,7 @@ bool ir_run(const std::string& label, const std::string& op, const Value& in, co
 static void test_input_rules() {
     for (const char* file : {"common_commands.json", "sr04.json", "framing_encode.json", "usb_ids.json", "bno055.json",
                              "bno086_shtp.json", "tmf8829.json", "vl53l4.json", "vl53l7.json", "vl53lx.json",
-                             "vl53l8_advanced.json"}) {
+                             "vl53l8.json", "vl53l8_advanced.json", "depzrec.json", "depzdata.json"}) {
         Value v = load_vector(file);
         if (!v.has("input_rules")) continue;
         for (const Value& c : v.at("input_rules").as_array()) {
@@ -3013,6 +4144,8 @@ int main(int argc, char** argv) {
         test_vl53l8_advanced();
     } else if (suite == "vl53l8_cnh") {
         test_vl53l8_cnh();
+    } else if (suite == "vl53l8_wire") {
+        test_vl53l8_wire();
     } else if (suite == "vl53l7_codecs") {
         test_vl53l7_codecs();
     } else if (suite == "vl53l7_frame") {
@@ -3033,6 +4166,8 @@ int main(int argc, char** argv) {
         test_bno086_reports();
     } else if (suite == "dataset") {
         test_dataset();
+    } else if (suite == "dataset_player") {
+        test_dataset_player();
     } else if (suite == "input_rules") {
         test_input_rules();
     } else if (suite == "foundation") {

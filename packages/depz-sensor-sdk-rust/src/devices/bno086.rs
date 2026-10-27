@@ -11,10 +11,13 @@ use super::device::{DepzDevice, ReportHandler};
 use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
 use crate::bno086::hub::{
-    self, Bno086Cmd, Bno086Data, CalibrationConfig, CommandResponse, Counts, ErrorRecord, FeatureResponse, FrsReadResponse,
-    FrsReadSession, FrsWriteResponse, FrsWriteSession, MotionIntent, ProductId, SensorMetadata, Sh2HubError, TareBasis,
+    self, Bno086Cmd, Bno086Data, CalibrationConfig, CommandResponse, Counts, ErrorRecord,
+    FeatureResponse, FrsReadResponse, FrsReadSession, FrsWriteResponse, FrsWriteSession,
+    MotionIntent, ProductId, SensorMetadata, Sh2HubError, TareBasis,
 };
-use crate::bno086::{parse_gyro_rv_cargo, parse_input_cargo, sh2, shtp, Report, ShtpChannel, ShtpLayer};
+use crate::bno086::{
+    parse_gyro_rv_cargo, parse_input_cargo, sh2, shtp, Report, ShtpChannel, ShtpLayer,
+};
 use crate::framing::Packet;
 
 /// Granted rates outside [0.9, 2.1] × the requested one are worth a warning, never an error
@@ -37,12 +40,23 @@ impl From<Sh2HubError> for DepzError {
     }
 }
 
+/// A control response the hub answered a request with, decoded; one shorter than its fields fails
+/// that request with [`DepzError::Protocol`] (`invalid_reply`, contract 07 §3), never a sensor error.
+fn decode_reply<T>(
+    raw: &[u8],
+    unpack: impl Fn(&[u8]) -> std::result::Result<T, Sh2HubError>,
+) -> Result<T> {
+    unpack(raw).map_err(|e| DepzError::Protocol(e.0))
+}
+
 type Filter = Option<HashSet<u8>>;
+/// Per-channel queue of (waiter id, reply sender) pairs.
+type Waiters<T> = Mutex<HashMap<u8, Vec<(u64, Sender<T>)>>>;
 
 struct Hub {
     shtp: Mutex<ShtpLayer>,
-    control_waiters: Mutex<HashMap<u8, Vec<(u64, Sender<Vec<u8>>)>>>,
-    flush_waiters: Mutex<HashMap<u8, Vec<(u64, Sender<()>)>>>,
+    control_waiters: Waiters<Vec<u8>>,
+    flush_waiters: Waiters<()>,
     next_waiter: Mutex<u64>,
     reports: Fanout<Report>,
     filtered: Mutex<Vec<(Filter, Fanout<Report>)>>,
@@ -61,7 +75,11 @@ impl Hub {
     fn dispatch_cargo(&self, cargo: shtp::ShtpCargo) {
         let payload = &cargo.payload;
         match cargo.channel {
-            c if c == ShtpChannel::Command as u8 => self.advertisement.lock().unwrap().extend_from_slice(payload),
+            c if c == ShtpChannel::Command as u8 => self
+                .advertisement
+                .lock()
+                .unwrap()
+                .extend_from_slice(payload),
             c if c == ShtpChannel::Executable as u8 => {
                 if payload.first() == Some(&hub::EXECUTABLE_RESET_COMPLETE) {
                     let (m, cv) = &self.reset_complete;
@@ -137,8 +155,14 @@ impl ReportHandler for Hub {
         if packet.cmd != hub::RPT_DATA || packet.payload.len() < STREAM_MIN_BYTES {
             return false;
         }
-        let Ok(data) = Bno086Data::unpack(&packet.payload) else { return false };
-        let cargo = self.shtp.lock().unwrap().feed_at(&data.shtp, data.timestamp_us);
+        let Ok(data) = Bno086Data::unpack(&packet.payload) else {
+            return false;
+        };
+        let cargo = self
+            .shtp
+            .lock()
+            .unwrap()
+            .feed_at(&data.shtp, data.timestamp_us);
         if let Some(c) = cargo {
             self.dispatch_cargo(c); // the first fragment's capture: 0xFB base deltas refer to it
         }
@@ -172,7 +196,9 @@ impl Drop for Wait<'_> {
 impl Wait<'_> {
     fn next(&self, deadline: Instant, timeout: Duration) -> Result<Vec<u8>> {
         let left = deadline.saturating_duration_since(Instant::now());
-        self.rx.recv_timeout(left).map_err(|_| DepzError::timeout(self.rid, timeout))
+        self.rx
+            .recv_timeout(left)
+            .map_err(|_| DepzError::timeout(self.rid, timeout))
     }
 }
 
@@ -205,7 +231,7 @@ impl Bno086Device {
             control_waiters: Mutex::new(HashMap::new()),
             flush_waiters: Mutex::new(HashMap::new()),
             next_waiter: Mutex::new(0),
-            reports: Fanout::new(),
+            reports: Fanout::new(dev.callback_errors_counter()),
             filtered: Mutex::new(Vec::new()),
             advertisement: Mutex::new(Vec::new()),
             features: Mutex::new(HashMap::new()),
@@ -225,7 +251,9 @@ impl Bno086Device {
     /// 200 ms per the bridge spec).
     pub fn set_busy_retry(&self, retries: u32, backoff: Duration) -> Result<()> {
         if retries < 1 {
-            return Err(DepzError::InvalidArgument(format!("busy retries must be at least 1, got {retries}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "busy retries must be at least 1, got {retries}"
+            )));
         }
         *self.busy.lock().unwrap() = (retries, backoff);
         Ok(())
@@ -264,8 +292,19 @@ impl Bno086Device {
     fn wait(&self, rid: u8) -> Wait<'_> {
         let (tx, rx) = channel();
         let id = self.hub.waiter_id();
-        self.hub.control_waiters.lock().unwrap().entry(rid).or_default().push((id, tx));
-        Wait { hub: &self.hub, rid, id, rx }
+        self.hub
+            .control_waiters
+            .lock()
+            .unwrap()
+            .entry(rid)
+            .or_default()
+            .push((id, tx));
+        Wait {
+            hub: &self.hub,
+            rid,
+            id,
+            rx,
+        }
     }
 
     // Send a control payload and wait for the first response of report id `rid` that `accept` takes.
@@ -281,7 +320,7 @@ impl Bno086Device {
         self.send_shtp(ShtpChannel::Control, payload)?;
         let deadline = Instant::now() + timeout;
         loop {
-            let obj = parse(&w.next(deadline, timeout)?)?;
+            let obj = decode_reply(&w.next(deadline, timeout)?, &parse)?;
             if accept(&obj) {
                 return Ok(obj);
             }
@@ -293,9 +332,15 @@ impl Bno086Device {
     }
 
     // A Command Request with its response, correlated on (command, command_seq).
-    fn command(&self, command: u8, params: &[u8], timeout: Option<Duration>) -> Result<CommandResponse> {
+    fn command(
+        &self,
+        command: u8,
+        params: &[u8],
+        timeout: Option<Duration>,
+    ) -> Result<CommandResponse> {
         let seq = self.next_cmd_seq();
-        let payload = sh2::build_command_request(seq, command, params).map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
+        let payload = sh2::build_command_request(seq, command, params)
+            .map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
         self.control_request(
             &payload,
             sh2::REPORT_COMMAND_RESPONSE,
@@ -307,8 +352,8 @@ impl Bno086Device {
 
     // A Command Request the hub does not answer.
     fn command_no_response(&self, command: u8, params: &[u8]) -> Result<()> {
-        let payload =
-            sh2::build_command_request(self.next_cmd_seq(), command, params).map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
+        let payload = sh2::build_command_request(self.next_cmd_seq(), command, params)
+            .map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
         self.send_shtp(ShtpChannel::Control, &payload)
     }
 
@@ -321,13 +366,14 @@ impl Bno086Device {
         timeout: Duration,
     ) -> Result<Vec<CommandResponse>> {
         let seq = self.next_cmd_seq();
-        let payload = sh2::build_command_request(seq, command, params).map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
+        let payload = sh2::build_command_request(seq, command, params)
+            .map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
         let w = self.wait(sh2::REPORT_COMMAND_RESPONSE);
         self.send_shtp(ShtpChannel::Control, &payload)?;
         let deadline = Instant::now() + timeout;
         let mut results = Vec::new();
         loop {
-            let resp = CommandResponse::unpack(&w.next(deadline, timeout)?)?;
+            let resp = decode_reply(&w.next(deadline, timeout)?, CommandResponse::unpack)?;
             if resp.command != command || resp.command_seq != seq {
                 continue;
             }
@@ -389,23 +435,32 @@ impl Bno086Device {
 
     /// Every component's Product ID Response, the SH-2 application first. Collects until no response
     /// came for `settle` (default 150 ms), so late ones cannot answer the next request.
-    pub fn product_ids(&self, timeout: Option<Duration>, settle: Option<Duration>) -> Result<Vec<ProductId>> {
+    pub fn product_ids(
+        &self,
+        timeout: Option<Duration>,
+        settle: Option<Duration>,
+    ) -> Result<Vec<ProductId>> {
         let rid = sh2::REPORT_PRODUCT_ID_RESPONSE;
         let w = self.wait(rid);
         self.send_shtp(ShtpChannel::Control, &sh2::build_product_id_request())?;
         let t = timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let mut out = vec![ProductId::unpack(&w.next(Instant::now() + t, t)?)?];
+        let mut out = vec![decode_reply(
+            &w.next(Instant::now() + t, t)?,
+            ProductId::unpack,
+        )?];
         let s = settle.unwrap_or(PRODUCT_ID_SETTLE);
         while let Ok(more) = w.rx.recv_timeout(s) {
-            out.push(ProductId::unpack(&more)?);
+            out.push(decode_reply(&more, ProductId::unpack)?);
         }
         Ok(out)
     }
 
     /// Hz → the Set Feature interval, rounded like the reference (half to even), at least 1 µs.
     pub fn interval_us(hz: f64) -> Result<u32> {
-        if !(hz > 0.0) || hz.is_infinite() {
-            return Err(DepzError::InvalidArgument(format!("hz must be positive and finite, got {hz}; use disable()")));
+        if !hz.is_finite() || hz <= 0.0 {
+            return Err(DepzError::InvalidArgument(format!(
+                "hz must be positive and finite, got {hz}; use disable()"
+            )));
         }
         Ok((1_000_000.0 / hz).round_ties_even().max(1.0) as u32)
     }
@@ -414,7 +469,7 @@ impl Bno086Device {
     /// with `verify` the granted rate is read back through Get Feature and a rate outside 0.9–2.1 × the
     /// request is reported on stderr as a warning (contract 05 §7). Returns that read-back (`None`
     /// without verify).
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // the Python SDK's enable() keyword list, kept 1:1
     pub fn enable_interval(
         &self,
         sensor: u8,
@@ -426,13 +481,24 @@ impl Bno086Device {
         verify: bool,
         timeout: Option<Duration>,
     ) -> Result<Option<FeatureResponse>> {
-        self.send_shtp(ShtpChannel::Control, &sh2::build_set_feature(sensor, interval_us, batch_us, sensitivity, flags, cfg_word))?;
+        self.send_shtp(
+            ShtpChannel::Control,
+            &sh2::build_set_feature(sensor, interval_us, batch_us, sensitivity, flags, cfg_word),
+        )?;
         if !verify {
             return Ok(None);
         }
         let resp = self.verify_feature(sensor, timeout.unwrap_or(DEFAULT_TIMEOUT))?;
-        let requested = if interval_us != 0 { 1_000_000.0 / interval_us as f64 } else { 0.0 };
-        let actual = if resp.interval_us != 0 { 1_000_000.0 / resp.interval_us as f64 } else { 0.0 };
+        let requested = if interval_us != 0 {
+            1_000_000.0 / interval_us as f64
+        } else {
+            0.0
+        };
+        let actual = if resp.interval_us != 0 {
+            1_000_000.0 / resp.interval_us as f64
+        } else {
+            0.0
+        };
         if !(RATE_LOW_FACTOR * requested <= actual && actual <= RATE_HIGH_FACTOR * requested) {
             eprintln!(
                 "warning: BNO086 sensor 0x{sensor:02X}: requested {requested:.1} Hz, granted {actual:.1} Hz (outside {RATE_LOW_FACTOR}–{RATE_HIGH_FACTOR}× band)"
@@ -443,7 +509,9 @@ impl Bno086Device {
 
     /// [`Bno086Device::enable_interval`] at `hz`, verified.
     pub fn enable(&self, sensor: u8, hz: f64) -> Result<FeatureResponse> {
-        Ok(self.enable_interval(sensor, Self::interval_us(hz)?, 0, 0, 0, 0, true, None)?.unwrap())
+        Ok(self
+            .enable_interval(sensor, Self::interval_us(hz)?, 0, 0, 0, 0, true, None)?
+            .unwrap())
     }
 
     // Read back a feature just enabled, skipping stale "disabled" answers (see VERIFY_STALE_RETRIES).
@@ -460,7 +528,10 @@ impl Bno086Device {
 
     /// Disable `sensor` (Set Feature with interval 0).
     pub fn disable(&self, sensor: u8) -> Result<()> {
-        self.send_shtp(ShtpChannel::Control, &sh2::build_set_feature(sensor, 0, 0, 0, 0, 0))?;
+        self.send_shtp(
+            ShtpChannel::Control,
+            &sh2::build_set_feature(sensor, 0, 0, 0, 0, 0),
+        )?;
         self.hub.features.lock().unwrap().remove(&sensor);
         Ok(())
     }
@@ -489,9 +560,13 @@ impl Bno086Device {
         match sensors {
             None => self.hub.reports.subscribe(capacity),
             Some(s) => {
-                let fan = Fanout::new();
+                let fan = Fanout::new(self.callback_errors_counter());
                 let sub = fan.subscribe(capacity);
-                self.hub.filtered.lock().unwrap().push((Some(s.iter().copied().collect()), fan));
+                self.hub
+                    .filtered
+                    .lock()
+                    .unwrap()
+                    .push((Some(s.iter().copied().collect()), fan));
                 sub
             }
         }
@@ -521,52 +596,82 @@ impl Bno086Device {
     /// applied on the hub's side, in the hub's own axes: x and y swapped and z negated relative to the
     /// reports.
     pub fn set_reorientation(&self, x: f64, y: f64, z: f64, w: f64) -> Result<()> {
-        let p = hub::set_reorientation_params(x, y, z, w).map_err(|e| DepzError::InvalidArgument(e.0))?;
+        let p = hub::set_reorientation_params(x, y, z, w)
+            .map_err(|e| DepzError::InvalidArgument(e.0))?;
         self.command_no_response(hub::CMD_TARE, &p)
     }
 
     /// Configure the motion-engine calibration; fails on a non-zero status.
     pub fn set_calibration(&self, accel: bool, gyro: bool, mag: bool, planar: bool) -> Result<()> {
-        let resp = self.command(hub::CMD_ME_CALIBRATE, &hub::me_calibration_params(accel, gyro, mag, planar, 0), None)?;
+        let resp = self.command(
+            hub::CMD_ME_CALIBRATE,
+            &hub::me_calibration_params(accel, gyro, mag, planar, 0),
+            None,
+        )?;
         if resp.status() != 0 {
-            return Err(DepzError::Sensor(format!("ME calibration configure failed: status {}", resp.status())));
+            return Err(DepzError::Sensor(format!(
+                "ME calibration configure failed: status {}",
+                resp.status()
+            )));
         }
         Ok(())
     }
 
     /// Which motion-engine calibrations run.
     pub fn get_calibration(&self) -> Result<CalibrationConfig> {
-        let resp = self.command(hub::CMD_ME_CALIBRATE, &hub::me_calibration_params(false, false, false, false, hub::ME_CAL_GET), None)?;
+        let resp = self.command(
+            hub::CMD_ME_CALIBRATE,
+            &hub::me_calibration_params(false, false, false, false, hub::ME_CAL_GET),
+            None,
+        )?;
         if resp.status() != 0 {
-            return Err(DepzError::Sensor(format!("ME calibration get failed: status {}", resp.status())));
+            return Err(DepzError::Sensor(format!(
+                "ME calibration get failed: status {}",
+                resp.status()
+            )));
         }
-        Ok(CalibrationConfig { accel: resp.r[1] != 0, gyro: resp.r[2] != 0, mag: resp.r[3] != 0, planar: resp.r[4] != 0 })
+        Ok(CalibrationConfig {
+            accel: resp.r[1] != 0,
+            gyro: resp.r[2] != 0,
+            mag: resp.r[3] != 0,
+            planar: resp.r[4] != 0,
+        })
     }
 
     /// Save the dynamic calibration data to flash (DCD Save Now).
     pub fn save_dcd(&self) -> Result<()> {
         let resp = self.command(hub::CMD_SAVE_DCD, &[], None)?;
         if resp.status() != 0 {
-            return Err(DepzError::Sensor(format!("DCD save failed: status {}", resp.status())));
+            return Err(DepzError::Sensor(format!(
+                "DCD save failed: status {}",
+                resp.status()
+            )));
         }
         Ok(())
     }
 
     /// The hub's periodic DCD autosave (no response).
     pub fn configure_periodic_dcd(&self, enable: bool) -> Result<()> {
-        self.command_no_response(hub::CMD_PERIODIC_DCD_CONFIG, &hub::periodic_dcd_params(enable))
+        self.command_no_response(
+            hub::CMD_PERIODIC_DCD_CONFIG,
+            &hub::periodic_dcd_params(enable),
+        )
     }
 
     /// Interactive Calibration (0x0E, BNO086 only): how the device is about to move, so the hub can
     /// refine the gyro zero-rate offset while it is still. No response; a BNO085 ignores it.
     pub fn set_motion_intent(&self, intent: MotionIntent) -> Result<()> {
-        self.command_no_response(hub::CMD_INTERACTIVE_CALIBRATION, &hub::interactive_calibration_params(intent as u8))
+        self.command_no_response(
+            hub::CMD_INTERACTIVE_CALIBRATION,
+            &hub::interactive_calibration_params(intent as u8),
+        )
     }
 
     /// Enable MotionRequest (0x2B) reports; the hub sends one when its request changes, and reads the
     /// rate back late, so the granted rate is not checked.
     pub fn enable_motion_request(&self, hz: f64) -> Result<()> {
-        self.enable_interval(0x2B, Self::interval_us(hz)?, 0, 0, 0, 0, false, None).map(|_| ())
+        self.enable_interval(0x2B, Self::interval_us(hz)?, 0, 0, 0, 0, false, None)
+            .map(|_| ())
     }
 
     // ── batching ─────────────────────────────────────────────────────────────
@@ -577,10 +682,19 @@ impl Bno086Device {
         let t = timeout.unwrap_or(DEFAULT_TIMEOUT);
         let (tx, rx) = channel();
         let id = self.hub.waiter_id();
-        self.hub.flush_waiters.lock().unwrap().entry(sensor).or_default().push((id, tx));
-        let r = self.send_shtp(ShtpChannel::Control, &hub::force_flush(sensor)).and_then(|_| {
-            rx.recv_timeout(t).map_err(|_| DepzError::timeout(crate::bno086::reports::FLUSH_COMPLETED, t))
-        });
+        self.hub
+            .flush_waiters
+            .lock()
+            .unwrap()
+            .entry(sensor)
+            .or_default()
+            .push((id, tx));
+        let r = self
+            .send_shtp(ShtpChannel::Control, &hub::force_flush(sensor))
+            .and_then(|_| {
+                rx.recv_timeout(t)
+                    .map_err(|_| DepzError::timeout(crate::bno086::reports::FLUSH_COMPLETED, t))
+            });
         if let Some(l) = self.hub.flush_waiters.lock().unwrap().get_mut(&sensor) {
             l.retain(|(i, _)| *i != id);
         }
@@ -597,20 +711,29 @@ impl Bno086Device {
         self.send_shtp(ShtpChannel::Control, &session.request())?;
         let deadline = Instant::now() + t;
         while !session.done {
-            session.feed(&FrsReadResponse::unpack(&w.next(deadline, t)?)?)?;
+            session.feed(&decode_reply(
+                &w.next(deadline, t)?,
+                FrsReadResponse::unpack,
+            )?)?;
         }
         Ok(session.words)
     }
 
     /// Write a whole FRS record.
-    pub fn frs_write(&self, record_id: u16, words: &[u32], timeout: Option<Duration>) -> Result<()> {
+    pub fn frs_write(
+        &self,
+        record_id: u16,
+        words: &[u32],
+        timeout: Option<Duration>,
+    ) -> Result<()> {
         let t = timeout.unwrap_or(FRS_TIMEOUT);
         let mut session = FrsWriteSession::new(record_id, words);
         let w = self.wait(sh2::REPORT_FRS_WRITE_RESPONSE);
         self.send_shtp(ShtpChannel::Control, &session.request())?;
         let deadline = Instant::now() + t;
         while !session.done {
-            if let Some(next) = session.feed(&FrsWriteResponse::unpack(&w.next(deadline, t)?)?)? {
+            let resp = decode_reply(&w.next(deadline, t)?, FrsWriteResponse::unpack)?;
+            if let Some(next) = session.feed(&resp)? {
                 self.send_shtp(ShtpChannel::Control, &next)?;
             }
         }
@@ -623,7 +746,11 @@ impl Bno086Device {
             .iter()
             .find(|(s, _)| *s == sensor)
             .map(|(_, r)| *r)
-            .ok_or_else(|| DepzError::Sensor(format!("no metadata FRS record known for sensor 0x{sensor:02X}")))?;
+            .ok_or_else(|| {
+                DepzError::Sensor(format!(
+                    "no metadata FRS record known for sensor 0x{sensor:02X}"
+                ))
+            })?;
         Ok(SensorMetadata::from_words(&self.frs_read(record, timeout)?))
     }
 
@@ -676,17 +803,31 @@ impl Bno086Device {
             },
             DEFAULT_TIMEOUT,
         )?;
-        let r0 = rs.iter().find(|r| r.response_seq == 0).ok_or_else(|| DepzError::Sensor("counts: no response_seq 0".into()))?.r;
+        let r0 = rs
+            .iter()
+            .find(|r| r.response_seq == 0)
+            .ok_or_else(|| DepzError::Sensor("counts: no response_seq 0".into()))?
+            .r;
         let r1 = rs.iter().find(|r| r.response_seq == 1).unwrap().r;
-        let u = |b: &[u8; 11], at: usize| u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]);
-        Ok(Counts { sensor_id: sensor, offered: u(&r0, 3), accepted: u(&r0, 7), on: u(&r1, 3), attempted: u(&r1, 7) })
+        let u =
+            |b: &[u8; 11], at: usize| u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]);
+        Ok(Counts {
+            sensor_id: sensor,
+            offered: u(&r0, 3),
+            accepted: u(&r0, 7),
+            on: u(&r1, 3),
+            attempted: u(&r1, 7),
+        })
     }
 
     /// Clear a sensor's event counts (0x02, subcommand 1).
     pub fn clear_counts(&self, sensor: u8) -> Result<()> {
         let resp = self.command(hub::CMD_COUNTER, &hub::counts_clear_params(sensor), None)?;
         if resp.status() != 0 {
-            return Err(DepzError::Sensor(format!("clear counts failed: status {}", resp.status())));
+            return Err(DepzError::Sensor(format!(
+                "clear counts failed: status {}",
+                resp.status()
+            )));
         }
         Ok(())
     }

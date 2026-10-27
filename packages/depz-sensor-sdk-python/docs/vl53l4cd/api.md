@@ -16,7 +16,7 @@ the source, not this file.
 ### Vl53l4cd
 
 ```python
-class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L4CD single-zone ToF device.
@@ -70,7 +70,8 @@ needs init() again.
 reset_sensor(self) -> None
 ```
 
-Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD
+Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ.
+~2 ms; the reply is awaited up to 2 s). The ULD
 configuration is wiped — call init() again.
 
 #### Vl53l4cd.bridge_info
@@ -80,8 +81,8 @@ bridge_info(self) -> depz_sensor_sdk.protocol.vl53l4.Vl53l4Info
 ```
 
 RPT_VL53_INFO: sensor identity, pin levels and bridge counters.
-Counters are free-running (wrap silently) — watch increments. Safe to
-call while streaming.
+Counters wrap silently — watch increments; `i2c_errors` is cleared by
+a successful XSHUT reset. Safe to call while streaming.
 
 #### Vl53l4cd.set_i2c_speed_khz
 
@@ -257,7 +258,7 @@ block). Returns an unsubscribe function.
 #### Vl53l4cd.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l4.Vl53l4Measurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest;
@@ -303,7 +304,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l4cd.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -320,7 +321,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l4cd.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -330,12 +331,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l4cd.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -343,7 +346,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l4cd.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -462,6 +465,10 @@ One decoded ranging result (VL53L4CD_ResultsData_t + MCU timestamp).
 ```python
 class Vl53l4cdError
 ```
+
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is a ValueError (contract 07 §3).
 
 #### Vl53l4cdError.with_traceback
 

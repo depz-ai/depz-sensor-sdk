@@ -18,6 +18,12 @@ whole buffer first and drops each block at its own offset, so the reserved byte
 goes out as 0x00. `push_range()` does the same, for the same bytes on the wire.
 """
 
+from __future__ import annotations
+
+from typing import Collection
+
+from depz_sensor_sdk.errors import InvalidStateError
+from depz_sensor_sdk.vl53lx.uld.base import BridgePlatform
 from depz_sensor_sdk.vl53lx.uld.bare.regs import BLOCKS, RegBlock
 
 # The blocks `init_and_start_range` pushes, in address order. Named here because
@@ -35,13 +41,16 @@ class DeviceImage:
     touches the host copy; `push()` is what reaches the sensor.
     """
 
-    def __init__(self, platform):
+    def __init__(self, platform: BridgePlatform) -> None:
         self.p = platform
-        self._blocks = {name: RegBlock(name) for name in BLOCKS}
+        self._blocks: dict[str, RegBlock] = {name: RegBlock(name) for name in BLOCKS}
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str) -> RegBlock:
+        # Through __dict__, not self._blocks: an instance without `_blocks`
+        # yet (copy, pickle) would recurse into this very method.
+        blocks: dict[str, RegBlock] = self.__dict__['_blocks']
         try:
-            return self.__dict__['_blocks'][key]
+            return blocks[key]
         except KeyError:
             raise AttributeError(f'no register block {key}') from None
 
@@ -51,23 +60,23 @@ class DeviceImage:
         blk = self._blocks[name]
         return blk.decode(self.p.rd_multi(blk.base, blk.size))
 
-    def push(self, name: str):
+    def push(self, name: str) -> None:
         """Write one block from the image to the sensor."""
         blk = self._blocks[name]
         if not BLOCKS[name].writable:
-            raise ValueError(f'{name} is read-only')
+            raise InvalidStateError(f'{name} is read-only')
         self.p.wr_multi(blk.base, blk.encode())
 
     # ── a run of blocks, as one transfer ──
     @staticmethod
-    def _span(names):
+    def _span(names: Collection[str]) -> tuple[int, int]:
         """-> (base, total size) covering the named blocks. Any reserved bytes
         between them are part of the span, exactly as in the C driver."""
         base = min(BLOCKS[n].base for n in names)
         end = max(BLOCKS[n].base + BLOCKS[n].size for n in names)
         return base, end - base
 
-    def pull_range(self, names):
+    def pull_range(self, names: Collection[str]) -> None:
         base, size = self._span(names)
         raw = self.p.rd_multi(base, size)
         for name in names:
@@ -75,21 +84,21 @@ class DeviceImage:
             off = blk.base - base
             blk.decode(raw[off:off + blk.size])
 
-    def push_range(self, names):
+    def push_range(self, names: Collection[str]) -> None:
         base, size = self._span(names)
         buf = bytearray(size)
         for name in names:
             if not BLOCKS[name].writable:
-                raise ValueError(f'{name} is read-only')
+                raise InvalidStateError(f'{name} is read-only')
             blk = self._blocks[name]
             off = blk.base - base
             buf[off:off + blk.size] = blk.encode()
         self.p.wr_multi(base, bytes(buf))
 
     # ── diagnostics ──
-    def dump(self, names=None) -> str:
+    def dump(self, names: Collection[str] | None = None) -> str:
         """Every field of the named blocks (default: all), one per line."""
-        lines = []
+        lines: list[str] = []
         for name in (names or BLOCKS):
             blk = self._blocks[name]
             lines.append(f'--- {name} @ 0x{blk.base:04X} ({blk.size} B)')

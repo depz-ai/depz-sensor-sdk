@@ -1071,9 +1071,10 @@ static int apply_mode(vlx_driver *d, dist_mode mode)
 /* Short is refused on an L4 die, as the L4CX BareDriver does: there the A
  * frame of the short pair ranges on the wrong side of the wrap, one frame in
  * two, measured on the L4CX board. */
-static int set_mode(vlx_driver *d, const char *name)
+static int set_mode(vlx_driver *d, const char *name, int *budget_ms)
 {
     int m;
+    (void)budget_ms;
     for (m = is_l4(bd(d)) ? MODE_MEDIUM : MODE_SHORT; m < 3; m++)
         if (!strcmp(name, MODE_NAMES[m])) return apply_mode(d, (dist_mode)m);
     return depz_fail(DEPZ_E_ARG, "vl53lx: no such mode: %s (have %s)", name,

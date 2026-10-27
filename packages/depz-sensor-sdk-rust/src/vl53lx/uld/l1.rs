@@ -4,10 +4,11 @@ use std::sync::Arc;
 
 use super::die::{
     collect, die_common, round_half_away, uld_err, Die, DieConfig, DieDriver, INNER_OFFSET_MM,
-    INTERMEASUREMENT_MS, OUTER_OFFSET_MM, PHASECAL_CONFIG_TIMEOUT_MACROP, RANGE_CONFIG_TIMEOUT_MACROP_A_HI,
-    RANGE_CONFIG_TIMEOUT_MACROP_B_HI, RANGE_CONFIG_VALID_PHASE_HIGH, RANGE_CONFIG_VCSEL_PERIOD_A,
-    RANGE_CONFIG_VCSEL_PERIOD_B, RANGE_OFFSET_MM, RESULT_OSC_CALIBRATE_VAL, SD_CONFIG_INITIAL_PHASE_SD0,
-    SD_CONFIG_WOI_SD0, SYSTEM_INTERRUPT_CONFIG_GPIO, SYSTEM_MODE_START, THRESH_HIGH, THRESH_LOW,
+    INTERMEASUREMENT_MS, OUTER_OFFSET_MM, PHASECAL_CONFIG_TIMEOUT_MACROP,
+    RANGE_CONFIG_TIMEOUT_MACROP_A_HI, RANGE_CONFIG_TIMEOUT_MACROP_B_HI,
+    RANGE_CONFIG_VALID_PHASE_HIGH, RANGE_CONFIG_VCSEL_PERIOD_A, RANGE_CONFIG_VCSEL_PERIOD_B,
+    RANGE_OFFSET_MM, RESULT_OSC_CALIBRATE_VAL, SD_CONFIG_INITIAL_PHASE_SD0, SD_CONFIG_WOI_SD0,
+    SYSTEM_INTERRUPT_CONFIG_GPIO, SYSTEM_MODE_START, THRESH_HIGH, THRESH_LOW,
     XTALK_PLANE_OFFSET_KCPS,
 };
 use crate::devices::{DepzError, Result};
@@ -26,7 +27,10 @@ static CONFIGURATION: [u8; 91] = [
 ];
 
 // VL53L1X_SetTimingBudgetInMs(): budget ms → (MACROP_A_HI, MACROP_B_HI), ascending; 15 ms in short only.
-const SHORT_BUDGETS: &[(u32, (u16, u16))] = &[
+/// (timing budget ms, (range config A, range config B)) rows of one distance mode.
+type BudgetTable = &'static [(u32, (u16, u16))];
+
+const SHORT_BUDGETS: BudgetTable = &[
     (15, (0x001D, 0x0027)),
     (20, (0x0051, 0x006E)),
     (33, (0x00D6, 0x006E)),
@@ -35,7 +39,7 @@ const SHORT_BUDGETS: &[(u32, (u16, u16))] = &[
     (200, (0x03E1, 0x0496)),
     (500, (0x0591, 0x05C1)),
 ];
-const LONG_BUDGETS: &[(u32, (u16, u16))] = &[
+const LONG_BUDGETS: BudgetTable = &[
     (20, (0x001E, 0x0022)),
     (33, (0x0060, 0x006E)),
     (50, (0x00AD, 0x00C6)),
@@ -44,13 +48,25 @@ const LONG_BUDGETS: &[(u32, (u16, u16))] = &[
     (500, (0x048F, 0x04A4)),
 ];
 // In the Java map's iteration order: short, then long.
-const TIMING_BUDGETS: [(u8, &[(u32, (u16, u16))]); 2] = [(DISTANCE_SHORT, SHORT_BUDGETS), (DISTANCE_LONG, LONG_BUDGETS)];
+const TIMING_BUDGETS: [(u8, BudgetTable); 2] = [
+    (DISTANCE_SHORT, SHORT_BUDGETS),
+    (DISTANCE_LONG, LONG_BUDGETS),
+];
 
 const MODE_NAMES: [&str; 2] = ["long", "short"]; // the blob boots in long
 
 const GROUPS: &[&str] = &[
-    "mode", "timing", "offset", "xtalk", "thresholds", "signal_thresh", "sigma_thresh", "temp_update", "calib_offset",
-    "calib_xtalk", "roi",
+    "mode",
+    "timing",
+    "offset",
+    "xtalk",
+    "thresholds",
+    "signal_thresh",
+    "sigma_thresh",
+    "temp_update",
+    "calib_offset",
+    "calib_xtalk",
+    "roi",
 ];
 
 fn table(mode: u8) -> &'static [(u32, (u16, u16))] {
@@ -81,8 +97,16 @@ pub struct Vl53l1UldDriver {
 impl Vl53l1UldDriver {
     /// A driver over `platform`, bound for `product`.
     pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l1UldDriver {
-        let cfg = DieConfig { configuration: &CONFIGURATION, stop_mode: 0x00, signal_at: 15, per_spad_k: 25 };
-        Vl53l1UldDriver { die: Die::new(platform, product, cfg), applied_mode: "long" }
+        let cfg = DieConfig {
+            configuration: &CONFIGURATION,
+            stop_mode: 0x00,
+            signal_at: 15,
+            per_spad_k: 25,
+        };
+        Vl53l1UldDriver {
+            die: Die::new(platform, product, cfg),
+            applied_mode: "long",
+        }
     }
 
     /// The die underneath (boot state, reset, interrupt polarity).
@@ -91,7 +115,10 @@ impl Vl53l1UldDriver {
     }
 
     fn mode_code(&self) -> Result<u8> {
-        let temp = self.die.platform().read_byte(PHASECAL_CONFIG_TIMEOUT_MACROP)?;
+        let temp = self
+            .die
+            .platform()
+            .read_byte(PHASECAL_CONFIG_TIMEOUT_MACROP)?;
         match temp {
             0x14 => Ok(DISTANCE_SHORT),
             0x0A => Ok(DISTANCE_LONG),
@@ -164,7 +191,10 @@ impl Vl53lxDriver for Vl53l1UldDriver {
     }
 
     /// "short" or "long"; the budget is re-applied (the VCSEL periods change what it means).
-    fn set_mode(&mut self, name: &str) -> Result<()> {
+    /// → the budget in effect after the change, ms: one the new mode does not tabulate moves to
+    /// the nearest one it does (contract 12 §5, the one exception to "refuse, don't round"), so
+    /// the caller sees it.
+    fn set_mode(&mut self, name: &str) -> Result<Option<u32>> {
         let mode = code(name);
         if mode == 0 {
             return Err(DepzError::InvalidArgument(format!(
@@ -173,7 +203,11 @@ impl Vl53lxDriver for Vl53l1UldDriver {
             )));
         }
         let (mut budget_ms, inter_ms) = self.get_range_timing()?;
-        self.applied_mode = if mode == DISTANCE_SHORT { "short" } else { "long" };
+        self.applied_mode = if mode == DISTANCE_SHORT {
+            "short"
+        } else {
+            "long"
+        };
         let p = self.die.platform().clone();
         if mode == DISTANCE_SHORT {
             p.write_byte(PHASECAL_CONFIG_TIMEOUT_MACROP, 0x14)?;
@@ -201,11 +235,17 @@ impl Vl53lxDriver for Vl53l1UldDriver {
             }
             budget_ms = best;
         }
-        self.set_range_timing(budget_ms, inter_ms)
+        self.set_range_timing(budget_ms, inter_ms)?;
+        Ok(Some(budget_ms))
     }
 
     fn get_mode(&mut self) -> Result<String> {
-        Ok(if self.mode_code()? == DISTANCE_SHORT { "short" } else { "long" }.to_string())
+        Ok(if self.mode_code()? == DISTANCE_SHORT {
+            "short"
+        } else {
+            "long"
+        }
+        .to_string())
     }
 
     /// Only the tabulated budgets of the mode exist; a period of 0 is written as the budget itself
@@ -213,7 +253,8 @@ impl Vl53lxDriver for Vl53l1UldDriver {
     fn set_range_timing(&mut self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()> {
         let mode = self.mode_code()?;
         let t = table(mode);
-        let Some(&(_, (macrop_a, macrop_b))) = t.iter().find(|(ms, _)| *ms == timing_budget_ms) else {
+        let Some(&(_, (macrop_a, macrop_b))) = t.iter().find(|(ms, _)| *ms == timing_budget_ms)
+        else {
             let have: Vec<String> = t.iter().map(|(ms, _)| ms.to_string()).collect();
             return Err(uld_err(format!(
                 "timing budget {timing_budget_ms} ms is not one the {} mode has - pick one of {} ms",
@@ -224,14 +265,21 @@ impl Vl53lxDriver for Vl53l1UldDriver {
         let p = self.die.platform();
         p.write_word(RANGE_CONFIG_TIMEOUT_MACROP_A_HI, macrop_a)?;
         p.write_word(RANGE_CONFIG_TIMEOUT_MACROP_B_HI, macrop_b)?;
-        let inter = if inter_measurement_ms == 0 { timing_budget_ms } else { inter_measurement_ms };
+        let inter = if inter_measurement_ms == 0 {
+            timing_budget_ms
+        } else {
+            inter_measurement_ms
+        };
         let clock_pll = (p.read_word(RESULT_OSC_CALIBRATE_VAL)? & 0x3FF) as i32;
         let product = clock_pll.wrapping_mul(inter as i32); // a Java int product
         p.write_dword(INTERMEASUREMENT_MS, (product as f64 * 1.075) as i64 as u32)
     }
 
     fn budget_choices(&self) -> Vec<u32> {
-        table(code(self.applied_mode)).iter().map(|(ms, _)| *ms).collect()
+        table(code(self.applied_mode))
+            .iter()
+            .map(|(ms, _)| *ms)
+            .collect()
     }
 
     fn get_range_timing(&mut self) -> Result<(u32, u32)> {
@@ -247,11 +295,20 @@ impl Vl53lxDriver for Vl53l1UldDriver {
         }
         let tmp = p.read_dword(INTERMEASUREMENT_MS)? as f64;
         let clock_pll = (p.read_word(RESULT_OSC_CALIBRATE_VAL)? & 0x3FF) as i32;
-        let inter_ms = if clock_pll != 0 { (tmp / (clock_pll as f64 * 1.065)) as i32 } else { 0 };
+        let inter_ms = if clock_pll != 0 {
+            (tmp / (clock_pll as f64 * 1.065)) as i32
+        } else {
+            0
+        };
         Ok((budget_ms, inter_ms as u32))
     }
 
-    fn set_detection_thresholds(&mut self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()> {
+    fn set_detection_thresholds(
+        &mut self,
+        distance_low_mm: u16,
+        distance_high_mm: u16,
+        window: u8,
+    ) -> Result<()> {
         self.set_detection_thresholds_ext(distance_low_mm, distance_high_mm, window, false)
     }
 
@@ -288,7 +345,8 @@ impl Vl53lxDriver for Vl53l1UldDriver {
         if avg_spad_nb == 0.0 {
             return Err(uld_err("xtalk calibration failed: no SPADs enabled"));
         }
-        let cal = (512.0 * (avg_signal * (1.0 - avg_distance / target_dist_mm as f64)) / avg_spad_nb) as i64;
+        let cal = (512.0 * (avg_signal * (1.0 - avg_distance / target_dist_mm as f64))
+            / avg_spad_nb) as i64;
         let cal = cal.clamp(0, 0xFFFF);
         p.write_word(XTALK_PLANE_OFFSET_KCPS, cal as u16)?;
         Ok(round_half_away(cal as f64 / 512.0) as i32)

@@ -321,7 +321,9 @@ System.out.printf("ids ok: %b, sensor firmware %s, block read avg %d µs, %d slo
         info.sensorResets(), Bno055.I2C_ERROR_NAMES[info.lastI2cError()]);
 ```
 
-The counters are free-running and wrap silently — watch increments. A rising
+The counters wrap silently — watch increments. `i2cErrors` is cleared by every
+successful reset handshake (the chip-ID poll after nRESET), so it counts failed
+transfers since the last one, not since power-up. A rising
 `sensorResets` means the bridge recovered a stuck bus by pulsing nRESET: the
 stream keeps running, but the sensor is back in CONFIG with power-on settings
 (every output zero) and must be configured again.

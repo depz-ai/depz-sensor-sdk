@@ -31,17 +31,32 @@ export const BNO055_TRIGGER_INT = 1;
 /** BNO_RESET answers after the sensor's ~0.5 s boot handshake. */
 export const BNO055_RESET_TIMEOUT_MS = 3000;
 
+const REG_SPACE = 0x100; // 8-bit register addresses: a transfer never runs past 0xFF
+
+/** BNO_START_STREAM TIMER period limits, ms (contract 13 §2). */
+export const BNO055_TIMER_PERIOD_MIN_MS = 1;
+export const BNO055_TIMER_PERIOD_MAX_MS = 60000;
+
+/**
+ * BNO_READ_REG payload `addr u8, len u8` with the transfer limit of
+ * contract 13 §1: `len` 1..128 and `addr + len <= 0x100`, else RangeError.
+ */
 export function packBno055ReadReg(addr: number, length: number): Uint8Array {
-  return Uint8Array.of(checkUint("addr", addr, 8), checkUint("length", length, 8));
+  const out = Uint8Array.of(checkUint("addr", addr, 8), checkUint("length", length, 8));
+  if (length < 1 || length > BNO055_XFER_MAX || addr + length > REG_SPACE) {
+    throw new RangeError(`READ_REG length must be 1..${BNO055_XFER_MAX} and addr+length <= 0x100`);
+  }
+  return out;
 }
 
 /** BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes). */
-export const BNO055_WRITE_MAX = 128;
+export const BNO055_WRITE_MAX = BNO055_XFER_MAX;
 
+/** BNO_WRITE_REG payload `addr u8, data[N]`: N 1..128 and `addr + N <= 0x100`, else RangeError. */
 export function packBno055WriteReg(addr: number, data: Uint8Array): Uint8Array {
   checkUint("addr", addr, 8);
-  if (data.length < 1 || data.length > BNO055_WRITE_MAX) {
-    throw new RangeError(`WRITE_REG data must be 1..${BNO055_WRITE_MAX} bytes`);
+  if (data.length < 1 || data.length > BNO055_WRITE_MAX || addr + data.length > REG_SPACE) {
+    throw new RangeError(`WRITE_REG data must be 1..${BNO055_WRITE_MAX} bytes and addr+N <= 0x100`);
   }
   const out = new Uint8Array(1 + data.length);
   out[0] = addr;
@@ -49,6 +64,11 @@ export function packBno055WriteReg(addr: number, data: Uint8Array): Uint8Array {
   return out;
 }
 
+/**
+ * BNO_START_STREAM payload `trigger u8, addr u8, len u8, period_ms u16`. With
+ * the TIMER trigger the period is 1..60000 ms (contract 13 §2), else
+ * RangeError; with INT it is the missed-edge watchdog and 0 disables it.
+ */
 export function packBno055StartStream(
   trigger: number,
   addr: number,
@@ -61,6 +81,14 @@ export function packBno055StartStream(
   dv.setUint8(1, checkUint("addr", addr, 8));
   dv.setUint8(2, checkUint("length", length, 8));
   dv.setUint16(3, checkUint("periodMs", periodMs, 16), true);
+  if (
+    trigger === BNO055_TRIGGER_TIMER &&
+    (periodMs < BNO055_TIMER_PERIOD_MIN_MS || periodMs > BNO055_TIMER_PERIOD_MAX_MS)
+  ) {
+    throw new RangeError(
+      `periodMs: ${periodMs} outside ${BNO055_TIMER_PERIOD_MIN_MS}..${BNO055_TIMER_PERIOD_MAX_MS} for the TIMER trigger`,
+    );
+  }
   return out;
 }
 
@@ -91,7 +119,9 @@ export const BNO055_EXPECTED_IDS = { chipId: 0xa0, accId: 0xfb, magId: 0x32, gyr
 
 /**
  * RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
- * diagnostics. Counters are free-running and wrap silently. A rising
+ * diagnostics. Counters wrap silently; `i2cErrors` is cleared by every
+ * successful reset handshake, the read timings and `slotsSkipped` at
+ * START_STREAM. A rising
  * `sensorResets` means the bridge pulsed nRESET to recover the bus: the
  * sensor is back in CONFIG mode and the host must restore its configuration.
  */
@@ -116,6 +146,7 @@ export interface Bno055Info {
   readAvgUs: number;
   /** Packets refused by a full USB TX ring. */
   txDropped: number;
+  /** Failed transfers since the last successful reset handshake. */
   i2cErrors: number;
   /** Stream slots dropped: bus still busy. */
   slotsSkipped: number;

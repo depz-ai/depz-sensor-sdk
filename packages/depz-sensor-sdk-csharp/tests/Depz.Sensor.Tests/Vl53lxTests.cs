@@ -244,6 +244,129 @@ public class Vl53lxVectorTests
         Assert.Throws<ArgumentException>(() => Vl53lxDecode.DecodeHistogramRaw(new byte[Vl53lxDecode.HistogramBlockLen - 1]));
     }
 
+    /// <summary>The scripted platform of the l0x_uld cases: every register op the driver issues must be the
+    /// next one of the vector's trace, a read answered with its recorded bytes.</summary>
+    private sealed class TracePlatform : Vl53lxPlatform
+    {
+        private readonly List<JsonElement> _ops;
+        public int Next;
+
+        public TracePlatform(JsonElement trace) => _ops = trace.EnumerateArray().ToList();
+
+        public int Count => _ops.Count;
+
+        private byte[] Take(string op, int addr)
+        {
+            Assert.True(Next < _ops.Count, $"op #{Next} beyond the trace: {op} 0x{addr:X2}");
+            var want = _ops[Next++];
+            string wantOp = want.GetProperty("op").GetString()!;
+            int wantAddr = want.GetProperty("addr").GetInt32();
+            Assert.True(wantOp == op && wantAddr == addr,
+                $"op #{Next - 1}: expected {wantOp} 0x{wantAddr:X2}, got {op} 0x{addr:X2}");
+            return Vectors.Hex(want.GetProperty("data").GetString()!);
+        }
+
+        public override byte[] ReadMulti(int addr, int size)
+        {
+            byte[] data = Take("r", addr);
+            Assert.True(data.Length == size, $"read 0x{addr:X2}: {size} B asked, {data.Length} recorded");
+            return data;
+        }
+
+        public override void WriteMulti(int addr, byte[] data) =>
+            Assert.True(Take("w", addr).SequenceEqual(data), $"write 0x{addr:X2}: {Convert.ToHexString(data)}");
+
+        public override void SetI2cSpeed(int khz) => throw new InvalidOperationException("SET_I2C_SPEED is not in the trace");
+
+        public override void SetAddrWidth(int width) => throw new InvalidOperationException("SET_ADDR_WIDTH is not in the trace");
+
+        public override void XshutReset() => throw new InvalidOperationException("XSHUT is not in the trace");
+
+        public override void SleepMs(int ms) { }
+    }
+
+    /// <summary>The VL53L0X ULD calls over the recorded register traces (the three ST divergences of 2fa4be5), on
+    /// a fresh driver: the ops must come out in the recorded order, the trace must be used up, the host state /
+    /// error match.</summary>
+    [Fact]
+    public void L0xUld_RegisterTrace()
+    {
+        int n = 0;
+        foreach (var c in Root.GetProperty("l0x_uld").EnumerateArray())
+        {
+            string name = c.GetProperty("name").GetString()!;
+            string kind = c.GetProperty("kind").GetString()!;
+            var trace = new TracePlatform(c.GetProperty("trace"));
+            var drv = new Vl53l0xUldDriver(trace, "VL53L0X");
+            Action call = kind switch
+            {
+                "nvm_offset" => () => drv.GetInfoFromDevice(c.GetProperty("option").GetInt32()),
+                "timing_budget" => () => drv.SetRangeTiming(
+                    c.GetProperty("timing_budget_ms").GetInt32(), c.GetProperty("inter_measurement_ms").GetInt32()),
+                "tuning" => () => drv.LoadTuningSettings(Vectors.Hex(c.GetProperty("buffer").GetString()!)),
+                _ => throw new InvalidOperationException($"unknown l0x_uld kind {kind}"),
+            };
+            if (c.TryGetProperty("error", out var error))
+            {
+                var ex = Assert.Throws<Vl53lxException>(call);
+                Assert.Contains(error.GetString()!, ex.Message);
+            }
+            else
+            {
+                call();
+                c.TryGetProperty("expect", out var expect); // the budget case has none: its trace is the expectation
+                if (kind == "nvm_offset")
+                    Assert.True(expect.GetProperty("part2part_offset_adjustment_nvm_um").GetInt64() == drv.Part2PartOffsetAdjustmentNvmUm,
+                        $"{name}: offset {drv.Part2PartOffsetAdjustmentNvmUm}");
+                else if (kind == "tuning")
+                    Assert.Equal(
+                        new[]
+                        {
+                            expect.GetProperty("sigma_est_ref_array").GetInt32(),
+                            expect.GetProperty("sigma_est_eff_pulse_width").GetInt32(),
+                            expect.GetProperty("sigma_est_eff_amb_width").GetInt32(),
+                            expect.GetProperty("target_ref_rate").GetInt32(),
+                        },
+                        new[] { drv.SigmaEstRefArray, drv.SigmaEstEffPulseWidth, drv.SigmaEstEffAmbWidth, drv.TargetRefRate });
+            }
+            Assert.True(trace.Next == trace.Count, $"{name}: {trace.Next} of {trace.Count} ops issued");
+            Vectors.Seen(c);
+            n++;
+        }
+        Assert.True(n >= 8, $"l0x_uld cases: {n}");
+    }
+
+    /// <summary>VL53L1X SetMode over the recorded register traces, on a fresh driver (ERRATA A9): the ops come
+    /// out in the recorded order and use the trace up, and the call returns the budget in effect — one the new
+    /// mode does not tabulate moved to the nearest one — or fails as the case says.</summary>
+    [Fact]
+    public void L1Uld_RegisterTrace()
+    {
+        int n = 0;
+        foreach (var c in Root.GetProperty("l1_uld").EnumerateArray())
+        {
+            string name = c.GetProperty("name").GetString()!;
+            Assert.Equal("set_mode", c.GetProperty("kind").GetString());
+            var trace = new TracePlatform(c.GetProperty("trace"));
+            var drv = new Vl53l1UldDriver(trace, "VL53L1CX");
+            string mode = c.GetProperty("mode").GetString()!;
+            if (c.TryGetProperty("error", out var error))
+            {
+                var ex = Assert.Throws<ArgumentException>(() => drv.SetMode(mode));
+                Assert.Contains(error.GetString()!, ex.Message);
+            }
+            else
+            {
+                Assert.True(c.GetProperty("expect").GetProperty("timing_budget_ms").GetInt32() == drv.SetMode(mode),
+                    $"{name}: budget returned");
+            }
+            Assert.True(trace.Next == trace.Count, $"{name}: {trace.Next} of {trace.Count} ops issued");
+            Vectors.Seen(c);
+            n++;
+        }
+        Assert.True(n >= 3, $"l1_uld cases: {n}");
+    }
+
     [Fact]
     public void HistogramRaw_Bin23Patch()
     {

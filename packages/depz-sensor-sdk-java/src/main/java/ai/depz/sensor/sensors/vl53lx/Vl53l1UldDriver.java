@@ -129,9 +129,13 @@ public final class Vl53l1UldDriver extends Vl53l1Die {
         p.writeByte(SYSTEM_MODE_START, 0x40);
     }
 
-    /** "short" or "long"; the budget is re-applied (the VCSEL periods change what it means). */
+    /**
+     * "short" or "long"; the budget is re-applied (the VCSEL periods change what it means). Returns the budget in
+     * effect after the change, ms: one the new mode does not tabulate moves to the nearest one it does (contract 12
+     * §5, the one exception to "refuse, don't round"), so the caller sees it.
+     */
     @Override
-    public void setMode(String name) {
+    public Integer setMode(String name) {
         int mode = code(name);
         if (mode == 0) {
             throw new IllegalArgumentException("no such mode: " + name + " (have " + String.join(", ", MODE_NAMES) + ")");
@@ -165,6 +169,7 @@ public final class Vl53l1UldDriver extends Vl53l1Die {
             budgetMs = best;
         }
         setRangeTiming(budgetMs, t.interMeasurementMs());
+        return budgetMs;
     }
 
     @Override

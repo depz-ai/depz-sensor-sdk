@@ -4,10 +4,11 @@
 foundation** for the DEPZ USB sensor line: byte-exact codecs, framing/parsing,
 CRCs, the USB-id table, per-sensor frame/report decoders, the `.fwdepz`
 firmware-container parser, the `.depzdata` datasets (reader, recorder,
-player), and the live device classes of every board over a byte pipe you hand
-it. The codecs and decoders are pure computation over `&[u8]`, verified against
-the shared golden vectors and byte-for-byte identical to the other reference
-SDKs.
+player), and the live device classes of every board — over the USB serial
+port the crate opens with `serialport`, or any byte pipe you hand it (a
+socket, a `.depzrec` replay). The codecs and decoders are pure computation
+over `&[u8]`, verified against the shared golden vectors and byte-for-byte
+identical to the other reference SDKs.
 
 **Working with one specific sensor?** Each has its own introduction, guide
 and API reference:

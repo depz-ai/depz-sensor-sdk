@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using Depz.Sensor.Devices;
 using Depz.Sensor.Protocol;
 using Depz.Sensor.Transport;
@@ -106,6 +107,15 @@ public class DeviceCoreTests
     private static string IdentityKind(Identity id) => id.SensorType.ToString()!.ToLowerInvariant();
 
     [Fact]
+    public void ToHostTimeBeforeSyncIsTheInvalidStateError()
+    {
+        // Contract 07 §3 (ERRATA A14): a conversion needs a prior SyncTime — the SDK's own error.
+        using var dev = new DepzDevice(new FakeBoardLink(), Short);
+        Assert.Null(dev.LastTimeSync);
+        Assert.Contains("SyncTime", Assert.Throws<InvalidStateException>(() => dev.ToHostTimeUs(0)).Message);
+    }
+
+    [Fact]
     public void NoReplyTimesOutNamingTheOpcode()
     {
         var link = new FakeBoardLink();
@@ -136,7 +146,9 @@ public class DeviceCoreTests
         using var dev = new DepzDevice(link, TimeSpan.FromSeconds(1));
         // Closing the device fails the request still waiting.
         var first = Task.Run(() => Assert.Throws<LinkClosedException>(() => dev.GetSerialNumber()));
-        SpinWait.SpinUntil(() => { lock (link.Sent) return link.Sent.Count == 1; }, 1000);
+        // The first request must be in flight before the second is tried: a slow CI runner may
+        // start the task late, and then the two would swap roles.
+        Assert.True(SpinWait.SpinUntil(() => { lock (link.Sent) return link.Sent.Count == 1; }, 10_000));
         Assert.Throws<BusyException>(() => dev.Request((int)Cmd.GetSerial, null, DepzDevice.ExpectText((int)Cmd.GetSerial)));
         dev.Close();
         first.Wait();
@@ -163,7 +175,8 @@ public class DeviceCoreTests
             ? new[] { link.Reply((int)Rpt.Temperature, new byte[3]) }
             : new[] { link.Reply((int)Rpt.Text, Text(p.Cmd, "x")) };
         using var dev = new DepzDevice(link, Short);
-        var e = Assert.Throws<DepzException>(() => dev.ReadMcuTemperature());
+        var e = Assert.Throws<InvalidReplyException>(() => dev.ReadMcuTemperature());
+        Assert.Equal((int)Cmd.GetMcuTemperature, e.Cmd);
         Assert.Contains("does not decode", e.Message);
         Assert.Equal("x", dev.GetDeviceName());
     }
@@ -178,6 +191,7 @@ public class DeviceCoreTests
         Assert.Throws<ArgumentOutOfRangeException>(() => dev.SetEchoDecayUs(65536));
         Assert.Throws<ArgumentOutOfRangeException>(() => dev.GetSyncPin(0));
         Assert.Throws<ArgumentOutOfRangeException>(() => dev.SetReportPayloadCrc((CrcType)4));
+        Assert.Throws<ArgumentOutOfRangeException>(() => dev.SetReportPayloadCrc((CrcType)300)); // contract 02 §2 (ERRATA A2)
         Assert.Empty(link.Sent);
     }
 
@@ -187,7 +201,8 @@ public class DeviceCoreTests
         var link = new FakeBoardLink();
         using var dev = new DepzDevice(link);
         using var events = dev.Events();
-        link.Inject(FakeBoardLink.Status(0, Protocol.Status.ErrHardwareFault));
+        // in seq order: a gap would be an event of its own
+        link.Inject(link.Reply((int)Rpt.Status, new byte[] { 0, (byte)Protocol.Status.ErrHardwareFault }));
         link.Inject(link.Reply((int)Rpt.SequenceError, new byte[] { 7, 9 }));
         link.Inject(link.Reply(0xC5, new byte[] { 0xAB }));
         var a = Assert.IsType<UnsolicitedStatusEvent>(events.Take(TimeSpan.FromSeconds(1)));
@@ -195,6 +210,23 @@ public class DeviceCoreTests
         Assert.Equal(new SequenceErrorEvent(7, 9, true), events.Take(TimeSpan.FromSeconds(1)));
         Assert.Equal(new TextEvent(0xC5, "ab"), events.Take(TimeSpan.FromSeconds(1)));
         Assert.Equal(1, dev.Stats.DeviceSeqErrors);
+    }
+
+    /// <summary>Contract 01 §5 step 5 (ERRATA A1): a gap the host sees in the board's seq is a
+    /// SeqGapEvent of its own, ahead of the packet it was seen on; the first packet is no gap.</summary>
+    [Fact]
+    public void HostObservedSeqGapIsAnEvent()
+    {
+        var link = new FakeBoardLink();
+        using var dev = new DepzDevice(link);
+        using var events = dev.Events();
+        link.Inject(Framing.BuildPacket(0xC5, new byte[] { 5 }, 5));
+        link.Inject(Framing.BuildPacket(0xC5, new byte[] { 9 }, 9));
+        Assert.Equal(new TextEvent(0xC5, "05"), events.Take(TimeSpan.FromSeconds(1)));
+        Assert.Equal(new SeqGapEvent(6, 9, 3), events.Take(TimeSpan.FromSeconds(1)));
+        Assert.Equal(new TextEvent(0xC5, "09"), events.Take(TimeSpan.FromSeconds(1)));
+        Assert.Equal(1, dev.Stats.SeqGaps);
+        Assert.Equal(0, dev.Stats.DeviceSeqErrors);
     }
 
     [Fact]
@@ -215,6 +247,36 @@ public class DeviceCoreTests
         Assert.True(loop.IsClosed);
     }
 
+    /// <summary>Contract 07 §3: a callback that throws is counted and dropped — the other callback
+    /// and the queue still get the item, the reader goes on (a request completes, the next report is
+    /// read).</summary>
+    [Fact]
+    public void AThrowingCallbackNeverStopsTheReader()
+    {
+        var link = new FakeBoardLink();
+        link.OnPacket = p => new[] { link.Reply((int)Rpt.Text, Text(p.Cmd, "APP_usonic_SR04_v0.97")) };
+        using var dev = new Sr04Device(link);
+        using var events = dev.Events();
+        using var loop = dev.Measurements(capacity: 4);
+        var seen = new List<DeviceEvent>();
+        using var boom = dev.OnEvent(_ => throw new InvalidOperationException("consumer bug"));
+        using var keep = dev.OnEvent(e => { lock (seen) seen.Add(e); });
+        link.Inject(link.Reply(0xC5, new byte[] { 0xAB }));
+        Assert.Equal(new TextEvent(0xC5, "ab"), events.Take(TimeSpan.FromSeconds(1)));
+        lock (seen)
+            Assert.Equal(new DeviceEvent[] { new TextEvent(0xC5, "ab") }, seen);
+        Assert.Equal(1, dev.Stats.CallbackErrors);
+        Assert.Equal("APP_usonic_SR04_v0.97", dev.GetSoftwareName());
+
+        using var boomM = dev.OnMeasurement(_ => throw new InvalidOperationException("consumer bug"));
+        var payload = new byte[11];
+        payload[0] = (byte)Sr04Cmd.StartMeasurementLoop;
+        payload[9] = 7;
+        link.Inject(link.Reply((int)Sr04Rpt.Data, payload));
+        Assert.Equal(7, loop.Take(TimeSpan.FromSeconds(1)).EchoTimeUs);
+        Assert.Equal(2, dev.Stats.CallbackErrors);
+    }
+
     [Fact]
     public void QueuesDropTheOldestAndCount()
     {
@@ -230,7 +292,7 @@ public class DeviceCoreTests
             payload[9] = (byte)i;
             link.Inject(link.Reply((int)Sr04Rpt.Data, payload));
         }
-        SpinWait.SpinUntil(() => { lock (seen) return seen.Count == 5; }, 2000);
+        SpinWait.SpinUntil(() => { lock (seen) return seen.Count == 5; }, 10_000);
         Assert.Equal(3, q.DroppedCount);
         Assert.Equal(new long[] { 3 }, dev.StreamDroppedCounts);
         Assert.Equal(new[] { 4, 5 }, q.Drain().Select(m => m.EchoTimeUs));
@@ -256,6 +318,35 @@ public class DeviceCoreTests
             Assert.True(replay.RxExhausted);
             Assert.Equal(0, replay.TxRemaining);
             Assert.Throws<ReplayMismatchException>(() => dev.Send((int)Cmd.GetSerial));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // ERRATA A6: there is no `.depzrec.gz` — a capture is plain text, a gzip
+    // container is not inflated but refused like any damaged file. The gzipped
+    // bytes (mtime 0) are the same 70 in every SDK's test.
+    private static readonly byte[] GzippedCapture = Convert.FromHexString(
+        "1f8b0800000000000203ab562a4ece48cd4d54b252504a492da8d22b4a4dd63754aae5aa" +
+        "562a018a19e80085338b40b245154a204e6209586d6222500d007e3bc00b3d000000");
+
+    [Fact]
+    public void ReplayRefusesAGzippedCapture()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"depz-{Guid.NewGuid():N}.depzrec");
+        try
+        {
+            using (var plain = new MemoryStream())
+            {
+                using (var gz = new GZipStream(new MemoryStream(GzippedCapture), CompressionMode.Decompress))
+                    gz.CopyTo(plain);
+                File.WriteAllBytes(path, plain.ToArray());
+            }
+            Assert.Equal("depz.rec/1", new ReplayLink(path).Header["schema"]); // a valid capture
+            File.WriteAllBytes(path, GzippedCapture);
+            Assert.Throws<ArgumentException>(() => new ReplayLink(path));
         }
         finally
         {

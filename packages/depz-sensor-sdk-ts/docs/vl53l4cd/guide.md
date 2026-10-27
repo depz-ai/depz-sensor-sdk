@@ -150,7 +150,7 @@ The bridge drives the sensor's XSHUT (shutdown) pin:
 ```ts
 import { VL53L4_XSHUT_OFF, VL53L4_XSHUT_ON } from "@depz/sensor-sdk";
 
-await dev.resetSensor();            // power-cycle (~3 ms on the MCU)
+await dev.resetSensor();            // power-cycle (≤ 20 ms on the MCU, typ. ~2 ms)
 await dev.xshut(VL53L4_XSHUT_OFF);  // sensor off — stream stops, config lost
 await dev.xshut(VL53L4_XSHUT_ON);   // sensor back on, in its boot state
 ```
@@ -173,8 +173,9 @@ info.i2cErrors;     // bus errors, with lastI2cError naming the latest
 info.i2cKhz;        // the programmed bus-speed step
 ```
 
-Counters are free-running and wrap silently — watch increments, not absolute
-values.
+Counters wrap silently — watch increments, not absolute values.
+`i2cErrors` is cleared by every successful `resetSensor()`, so it counts bus
+errors since the last one, not since power-up.
 
 ## Gotchas
 

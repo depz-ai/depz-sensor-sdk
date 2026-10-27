@@ -10,7 +10,7 @@ editing the ports, keeps them diffable against the firmware repo.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from ..device import DeviceBase
 from ..errors import DepzError, DepzTimeoutError, StatusError
@@ -31,6 +31,8 @@ from ..protocol.vl53lx import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from . import Vl53lx
+
+T = TypeVar("T")
 
 __all__ = [
     "Vl53Error",
@@ -71,11 +73,11 @@ class BridgeLink:
     status or a missing answer surfaces as `ProtocolError`, exactly what the
     ports catch."""
 
-    def __init__(self, dev: "Vl53lx"):
+    def __init__(self, dev: Vl53lx) -> None:
         self._dev = dev
         self.last_timestamp_us = 0  # MCU timestamp of the latest register read
 
-    def _call(self, fn, *args, **kwargs):
+    def _call(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         try:
             return fn(*args, **kwargs)
         except (StatusError, DepzTimeoutError) as exc:
@@ -85,7 +87,7 @@ class BridgeLink:
         out = bytearray()
         while length > 0:
             n = min(length, XFER_MAX)
-            rep: RegData = self._call(
+            rep = self._call(
                 self._dev.request,
                 Vl53lxCmd.READ_REG,
                 pack_read_reg(addr, n),

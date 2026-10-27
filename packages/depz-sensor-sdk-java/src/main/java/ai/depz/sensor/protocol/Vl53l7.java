@@ -110,10 +110,9 @@ public final class Vl53l7 {
         return out;
     }
 
-    /** VL53_START_STREAM payload: {@code frame_size u16}. */
+    /** VL53_START_STREAM payload: {@code frame_size u16}, 1..8192 (the VL53L8 command, contract 04 §2). */
     public static byte[] packStartStream(int frameSize) {
-        Wire.checkUint("frameSize", frameSize, 16);
-        return new byte[] {(byte) frameSize, (byte) (frameSize >>> 8)};
+        return Vl53l8.packStartStream(frameSize);
     }
 
     /** VL53_PIN_CTRL payload: {@code action u8} (see {@link PinAction}). */

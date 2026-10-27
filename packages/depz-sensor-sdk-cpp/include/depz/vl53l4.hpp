@@ -70,11 +70,12 @@ inline constexpr std::uint8_t CONFIG_FMP_BYTE = 0x12;
 
 // ── command encoders ────────────────────────────────────────────────────────
 
-// VL53_READ_REG payload: addr u16, len u16 (both little-endian).
+// VL53_READ_REG payload: addr u16, len u16 (both little-endian); std::invalid_argument
+// unless len is 1..XFER_MAX and addr + len <= 0x10000 (contract 10 §1).
 bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 
 // VL53_WRITE_REG payload: addr u16 then the raw register data; std::invalid_argument
-// unless it is 1..XFER_MAX bytes.
+// unless it is 1..XFER_MAX bytes and addr + N <= 0x10000.
 bytes pack_write_reg(std::uint16_t addr, byte_span data);
 
 // VL53_XSHUT payload: action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET).
@@ -100,8 +101,9 @@ struct RegData {
 };
 
 // RPT_VL53_INFO — bridge diagnostics (21-byte little-endian payload).
-// Counters are free-running and wrap silently; watch increments, not absolute
-// values. Not a data path: safe to request while streaming.
+// Counters wrap silently; watch increments, not absolute values. i2c_errors
+// counts since the last successful XSHUT reset (the bridge clears it there),
+// not since power-up. Not a data path: safe to request while streaming.
 struct Vl53l4Info {
     std::uint32_t int_edges = 0;
     std::uint32_t slots_skipped = 0;
@@ -109,7 +111,7 @@ struct Vl53l4Info {
     std::uint8_t last_i2c_error = 0;  // 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR
     std::uint16_t model_id = 0;       // expected MODEL_ID (0xEBAA)
     std::uint8_t fw_status = 0;       // expected 0x03 (booted)
-    std::uint8_t initialized = 0;     // 1 = MODEL_ID matched on this read
+    std::uint8_t initialized = 0;     // 1 = MODEL_ID read back as 0xEBAA on this GET_INFO
     std::uint8_t xshut_level = 0;
     std::uint8_t int_level = 0;
     std::uint16_t i2c_khz = 0;
@@ -150,7 +152,8 @@ struct Vl53l4Result {
 // Decode the streamed RESULT_BLOCK_ADDR block exactly as VL53L4CD_GetResult()
 // decodes the same registers read one by one (big-endian words, x8 rates,
 // /4 sigma, per-SPAD rate x256/raw_spads with zero SPADs -> 0). Returns
-// nullopt when raw is shorter than 15 bytes.
+// nullopt when raw is shorter than RESULT_BLOCK_LEN (17) bytes; a longer
+// buffer is decoded and the tail ignored (contract 07 §3).
 std::optional<Vl53l4Result> parse_result_block(byte_span raw);
 
 // ── timing math (SetRangeTiming / GetRangeTiming) ───────────────────────────

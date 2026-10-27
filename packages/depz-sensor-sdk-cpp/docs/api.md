@@ -21,15 +21,15 @@ runs its commands and delivers its data — see the last section.
 - **USB identity**: [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`PID_VL53L8`](#pid_vl53l8), [`PID_VL53L4CD`](#pid_vl53l4cd), [`PID_TMF8829`](#pid_tmf8829), [`PID_BNO086`](#pid_bno086), [`DEV_USB_VID`](#dev_usb_vid), [`DEV_USB_PID`](#dev_usb_pid), [`DEPZ_PID_RANGE_LO`](#depz_pid_range_lo), [`DEPZ_PID_RANGE_HI`](#depz_pid_range_hi), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortInfo`](#portinfo), [`order_by_serial`](#order_by_serial)
 - **SR04**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
 - **VL53L4CD (ToF)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`MODEL_ID`](#model_id), [`CONFIG_ADDR`](#config_addr), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Result`](#vl53l4result), [`parse_result_block`](#parse_result_block), [`RangeTimingRegs`](#rangetimingregs), [`range_timing_registers`](#range_timing_registers), [`RangeTiming`](#rangetiming), [`decode_range_timing`](#decode_range_timing), [`offset_raw`](#offset_raw), [`decode_offset`](#decode_offset), [`xtalk_raw`](#xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold), [`default_configuration`](#default_configuration), [`config_block`](#config_block)
-- **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`CNH_DATA_IDX`](#cnh_data_idx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_MAX_AGGREGATES`](#cnh_max_aggregates), [`CNH_MAX_FEATURE_LENGTH`](#cnh_max_feature_length), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
+- **VL53L8 (ToF)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`pack_start_stream`](#pack_start_stream), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`FOOTER_ID_OFF_CH`](#footer_id_off_ch), [`CNH_DATA_IDX`](#cnh_data_idx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init), [`CNH_MAX_AGGREGATES`](#cnh_max_aggregates), [`CNH_MAX_FEATURE_LENGTH`](#cnh_max_feature_length), [`CNH_PER_HEADER_WORDS`](#cnh_per_header_words), [`CNH_PER_BUFFER_HEADER_WORDS`](#cnh_per_buffer_header_words), [`CNH_PER_HEADER_BUFFER_INFO_IDX`](#cnh_per_header_buffer_info_idx), [`CNH_PER_HEADER_FLAGS_IDX`](#cnh_per_header_flags_idx), [`CNH_BUFFER_INFO_WORDS_MASK`](#cnh_buffer_info_words_mask), [`CNH_MI_STATE_PING`](#cnh_mi_state_ping), [`CnhAggregate`](#cnhaggregate), [`CnhFrame`](#cnhframe), [`decode_cnh`](#decode_cnh)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`FOOTER_ID_OFF`](#footer_id_off), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`Model`](#model), [`to_string`](#to_string), [`resolve_model`](#resolve_model), [`infer_resolution`](#infer_resolution), [`decode_frame`](#decode_frame)
 - **VL53L 1D family (VL53L0X / L1CX / L1CB / L3CX / L4CX)**: [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`RegData`](#regdata), [`StreamData`](#streamdata), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`ClearStep`](#clearstep), [`pack_read_reg`](#pack_read_reg), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_addr_width`](#pack_set_addr_width), [`Vl53lxInfo`](#vl53lxinfo), [`DriverKind`](#driverkind), [`to_string`](#to_string), [`Product`](#product), [`products`](#products), [`find_product`](#find_product), [`product_from_board_name`](#product_from_board_name), [`SensorClass`](#sensorclass), [`resolve_class`](#resolve_class), [`DieVariant`](#dievariant), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw)
-- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
-- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
+- **BNO086 (IMU)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`MotionIntent`](#motionintent), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`sh2_build_interactive_calibration`](#sh2_build_interactive_calibration), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`sh2_build_force_flush`](#sh2_build_force_flush), [`SH2_COMMAND_RESPONSE`](#sh2_command_response), [`SH2_FRS_READ_RESPONSE`](#sh2_frs_read_response), [`SH2_FRS_WRITE_RESPONSE`](#sh2_frs_write_response), [`SH2_PRODUCT_ID_RESPONSE`](#sh2_product_id_response), [`SH2_GET_FEATURE_RESPONSE`](#sh2_get_feature_response), [`Feature`](#feature), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`TIMER_PERIOD_MIN_MS`](#timer_period_min_ms), [`TIMER_PERIOD_MAX_MS`](#timer_period_max_ms), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
 - **TMF8829 (dToF)**: [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_HV_CP_OVERLOAD`](#frame_hv_cp_overload), [`FRAME_VCDRV_OVERLOAD`](#frame_vcdrv_overload), [`FRAME_VCDRV_BURST_EXCEEDED`](#frame_vcdrv_burst_exceeded), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`MAX_PEAKS`](#max_peaks), [`FrameError`](#frameerror), [`fp_grid`](#fp_grid), [`frame_rows`](#frame_rows), [`fp_name`](#fp_name), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`parse_results`](#parse_results), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`flag_names`](#flag_names), [`subints`](#subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Measurement`](#measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`REG_APP_ID`](#reg_app_id), [`REG_CMD_STAT`](#reg_cmd_stat), [`REG_SERIAL`](#reg_serial), [`REG_CID_RID`](#reg_cid_rid), [`REG_CFG`](#reg_cfg), [`REG_INT_STATUS`](#reg_int_status), [`REG_INT_ENAB`](#reg_int_enab), [`REG_ID`](#reg_id), [`REG_REVID`](#reg_revid), [`REG_RESET`](#reg_reset), [`REG_ENABLE`](#reg_enable), [`REG_FIFOSTATUS`](#reg_fifostatus), [`REG_FIFO`](#reg_fifo), [`DEVICE_ID`](#device_id), [`CFG_SIZE`](#cfg_size), [`CMD_MEASURE`](#cmd_measure), [`CMD_WRITE_PAGE`](#cmd_write_page), [`CMD_LOAD_CONFIG_PAGE`](#cmd_load_config_page), [`CMD_STOP`](#cmd_stop), [`STAT_OK`](#stat_ok), [`STAT_ACCEPTED`](#stat_accepted), [`status_name`](#status_name), [`Preset`](#preset), [`PRESETS`](#presets), [`find_preset`](#find_preset), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`find_cfg_field`](#find_cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`firmware_image`](#firmware_image)
 - **Bootloader / firmware**: [`FWDEPZ_HEADER_SIZE`](#fwdepz_header_size), [`FWDEPZ_MAGIC`](#fwdepz_magic), [`BlCmd`](#blcmd), [`BlRpt`](#blrpt), [`BlStatus`](#blstatus), [`FlashInfo`](#flashinfo), [`pack_write_page`](#pack_write_page), [`pack_read_page`](#pack_read_page), [`FwDepzErrorKind`](#fwdepzerrorkind), [`FwDepzError`](#fwdepzerror), [`FwDepzImage`](#fwdepzimage)
-- **Datasets**: [`SCHEMA_PREFIX`](#schema_prefix), [`TimeSync`](#timesync), [`DeviceMeta`](#devicemeta), [`Record`](#record), [`Reader`](#reader)
-- **Live hardware (links, device, discovery)**: [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FEATURE_WAKEUP`](#feature_wakeup), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Config`](#tmf8829config), [`Tmf8829SensorId`](#tmf8829sensorid), [`Tmf8829StreamStats`](#tmf8829streamstats), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Progress`](#tmf8829progress), [`Tmf8829`](#tmf8829), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`attach_sensor_class`](#attach_sensor_class), [`open_on_link`](#open_on_link), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx), [`open_tmf8829`](#open_tmf8829)
+- **Datasets (record & replay)**: [`SCHEMA`](#schema), [`SCHEMA_PREFIX`](#schema_prefix), [`Value`](#value), [`is_gzip`](#is_gzip), [`gunzip`](#gunzip), [`TimeSync`](#timesync), [`DeviceMeta`](#devicemeta), [`Record`](#record), [`Reader`](#reader), [`Writer`](#writer), [`PlayerState`](#playerstate), [`to_string`](#to_string), [`PlayerOptions`](#playeroptions), [`DatasetPlayer`](#datasetplayer), [`sr04`](#sr04), [`vl53l4`](#vl53l4), [`vl53l8`](#vl53l8), [`vl53l8_cnh`](#vl53l8_cnh), [`vl53lx`](#vl53lx), [`bno055`](#bno055), [`tmf8829`](#tmf8829), [`bno086`](#bno086), [`temperature`](#temperature), [`round1`](#round1), [`base64`](#base64), [`RecorderOptions`](#recorderoptions), [`SessionRecorder`](#sessionrecorder)
+- **Live hardware (links, device, discovery)**: [`kErrArg`](#kerrarg), [`Error`](#error), [`ArgumentError`](#argumenterror), [`IoError`](#ioerror), [`DeviceLostError`](#devicelosterror), [`TimeoutError`](#timeouterror), [`ProtocolError`](#protocolerror), [`NoDeviceError`](#nodeviceerror), [`WrongTypeError`](#wrongtypeerror), [`ReplayMismatchError`](#replaymismatcherror), [`BootloaderModeError`](#bootloadermodeerror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`Link`](#link), [`Stream`](#stream), [`LinkStats`](#linkstats), [`TimeSync`](#timesync), [`DeviceEvent`](#deviceevent), [`host_now_us`](#host_now_us), [`Device`](#device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`CnhSetup`](#cnhsetup), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`Vl53lxCap`](#vl53lxcap), [`Vl53lxTarget`](#vl53lxtarget), [`Vl53lxBins`](#vl53lxbins), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lx`](#vl53lx), [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FEATURE_WAKEUP`](#feature_wakeup), [`FeatureRequest`](#featurerequest), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Config`](#tmf8829config), [`Tmf8829SensorId`](#tmf8829sensorid), [`Tmf8829StreamStats`](#tmf8829streamstats), [`Tmf8829Measurement`](#tmf8829measurement), [`Tmf8829Progress`](#tmf8829progress), [`Tmf8829`](#tmf8829), [`SerialPortInfo`](#serialportinfo), [`DeviceInfo`](#deviceinfo), [`list_serial_ports`](#list_serial_ports), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`OpenOptions`](#openoptions), [`open_device`](#open_device), [`attach_sensor_class`](#attach_sensor_class), [`open_on_link`](#open_on_link), [`open_sr04`](#open_sr04), [`open_vl53l4cd`](#open_vl53l4cd), [`open_vl53l8`](#open_vl53l8), [`open_bno055`](#open_bno055), [`open_bno086`](#open_bno086), [`open_vl53lx`](#open_vl53lx), [`open_tmf8829`](#open_tmf8829)
 
 ## Transport (framing & CRC)
 
@@ -393,6 +393,9 @@ bytes pack_sync_time(std::uint64_t pc_timestamp_us);
 ```cpp
 bytes pack_set_payload_crc_type(std::uint8_t crc_type);
 ```
+
+SET_PAYLOAD_CRC_TYPE payload: crc_type u8; std::out_of_range unless 0..3
+(contract 02 §2).
 
 ### sync_time_offset_rtt
 
@@ -846,7 +849,8 @@ Plus pad, set unconditionally and never cleared.
 bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
 ```
 
-VL53_READ_REG payload: addr u16, len u16 (both little-endian).
+VL53_READ_REG payload: addr u16, len u16 (both little-endian); std::invalid_argument
+unless len is 1..XFER_MAX and addr + len <= 0x10000 (contract 10 §1).
 
 ### pack_write_reg
 
@@ -855,7 +859,7 @@ bytes pack_write_reg(std::uint16_t addr, byte_span data);
 ```
 
 VL53_WRITE_REG payload: addr u16 then the raw register data; std::invalid_argument
-unless it is 1..XFER_MAX bytes.
+unless it is 1..XFER_MAX bytes and addr + N <= 0x10000.
 
 ### pack_xshut
 
@@ -912,7 +916,7 @@ struct Vl53l4Info {
     std::uint8_t last_i2c_error = 0;  // 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR
     std::uint16_t model_id = 0;  // expected MODEL_ID (0xEBAA)
     std::uint8_t fw_status = 0;  // expected 0x03 (booted)
-    std::uint8_t initialized = 0;  // 1 = MODEL_ID matched on this read
+    std::uint8_t initialized = 0;  // 1 = MODEL_ID read back as 0xEBAA on this GET_INFO
     std::uint8_t xshut_level = 0;
     std::uint8_t int_level = 0;
     std::uint16_t i2c_khz = 0;
@@ -920,8 +924,9 @@ struct Vl53l4Info {
 ```
 
 RPT_VL53_INFO — bridge diagnostics (21-byte little-endian payload).
-Counters are free-running and wrap silently; watch increments, not absolute
-values. Not a data path: safe to request while streaming.
+Counters wrap silently; watch increments, not absolute values. i2c_errors
+counts since the last successful XSHUT reset (the bridge clears it there),
+not since power-up. Not a data path: safe to request while streaming.
 
 #### Vl53l4Info.unpack
 
@@ -982,7 +987,8 @@ std::optional<Vl53l4Result> parse_result_block(byte_span raw);
 Decode the streamed RESULT_BLOCK_ADDR block exactly as VL53L4CD_GetResult()
 decodes the same registers read one by one (big-endian words, x8 rates,
 /4 sigma, per-SPAD rate x256/raw_spads with zero SPADs -> 0). Returns
-nullopt when raw is shorter than 15 bytes.
+nullopt when raw is shorter than RESULT_BLOCK_LEN (17) bytes; a longer
+buffer is decoded and the tail ignored (contract 07 §3).
 
 ### RangeTimingRegs
 
@@ -1141,6 +1147,25 @@ inline constexpr std::size_t STREAM_CHUNK_MAX = 1528;
 
 Max frame-data bytes carried in one RPT_VL53_FRAME chunk (contract 04).
 
+### STREAM_TOTAL_MAX
+
+```cpp
+inline constexpr std::size_t STREAM_TOTAL_MAX = 8192;
+```
+
+Largest frame_size VL53_START_STREAM accepts (contract 04 §2).
+
+### pack_start_stream
+
+```cpp
+bytes pack_start_stream(std::uint16_t frame_size);
+```
+
+VL53_START_STREAM (0x35) payload: frame_size u16 LE — the host ULD's
+data_read_size (contract 04 §2). Byte-exact with the reference
+pack_start_stream; frame_size outside 1..8192 throws std::invalid_argument
+(contract 04 §4 rule 4 — the firmware refuses it too).
+
 ### Variant
 
 ```cpp
@@ -1215,9 +1240,19 @@ class FrameReassembler {
 ```
 
 Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports. Rules
-(contract 04): reset on offset==0; chunks must be contiguous — a gap discards
-the frame in progress; a frame completes when the accumulated bytes equal
-full_size.
+(contract 04 §4): reset on offset==0; chunks must be contiguous — a gap
+discards the frame in progress; a frame completes when the accumulated bytes
+equal full_size. A chunk out of the rule-4 bounds (more than chunk_max bytes,
+full_size over STREAM_TOTAL_MAX, or running past full_size) is damaged:
+dropped and counted as a lost frame like the other damaged input, never
+thrown. chunk_max is the device's VL53_STREAM_FRAME_MAX
+(vl53l7::STREAM_CHUNK_MAX = 1536 on the I2C board, contract 11 §3).
+
+#### FrameReassembler.FrameReassembler
+
+```cpp
+explicit FrameReassembler(std::size_t chunk_max = STREAM_CHUNK_MAX);
+```
 
 #### FrameReassembler.feed
 
@@ -1273,19 +1308,28 @@ frame's block layout. Returns nullopt for a corrupted frame (header/footer id
 mismatch). `footer_id_off` is variant-specific (FOOTER_ID_OFF_CX /
 FOOTER_ID_OFF_CH, or footer_id_off(Variant)); it defaults to the CX offset.
 
+### XTALK_MARGIN_MAX_KCPS
+
+```cpp
+constexpr std::uint32_t XTALK_MARGIN_MAX_KCPS = 10000;
+```
+
+Largest xtalk margin set_xtalk_margin accepts, kcps/SPAD (as ST).
+
 ### xtalk_margin_raw
 
 ```cpp
-std::uint32_t xtalk_margin_raw(double margin_kcps);
+std::uint32_t xtalk_margin_raw(std::uint32_t margin_kcps);
 ```
 
-Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
-xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
+Xtalk margin, a whole number of kcps/SPAD (as ST) <-> DCI_XTALK_CFG raw word
+(raw = kcps*2048). xtalk_margin_raw: std::out_of_range above
+XTALK_MARGIN_MAX_KCPS. xtalk_margin_kcps: raw / 2048 (integer division).
 
 ### xtalk_margin_kcps
 
 ```cpp
-double xtalk_margin_kcps(std::uint32_t raw);
+std::uint32_t xtalk_margin_kcps(std::uint32_t raw);
 ```
 
 ### ThreshMeasurement
@@ -2352,6 +2396,171 @@ bytes sh2_build_frs_write_data(std::uint16_t offset_words, const std::vector<std
 
 FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
 
+### MotionIntent
+
+```cpp
+enum class MotionIntent : std::uint8_t {
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+};
+```
+
+P0 of the Interactive Calibration command (0x0E, SH-2 §6.4.12.1): what the
+host knows about the device's motion. Unknown is the hub's initial state.
+
+### CMD_INTERACTIVE_CALIBRATION
+
+```cpp
+inline constexpr std::uint8_t CMD_INTERACTIVE_CALIBRATION = 0x0E;
+```
+
+BNO086 only; no response
+
+### sh2_build_interactive_calibration
+
+```cpp
+bytes sh2_build_interactive_calibration(std::uint8_t seq, MotionIntent intent);
+```
+
+Interactive Calibration: a Command Request (0xF2) with command 0x0E and
+P0 = intent, 12 bytes. BNO086 only, no response; a BNO085 ignores it.
+
+### FORCE_SENSOR_FLUSH
+
+```cpp
+inline constexpr std::uint8_t FORCE_SENSOR_FLUSH = 0xF0;
+```
+
+Force Sensor Flush (0xF0) + sensor id, 2 bytes (SH-2 §6.5.6): the hub sends
+the sensor's batched reports now and answers with the header-less Flush
+Completed (FLUSH_COMPLETED) on the input channel.
+
+### sh2_build_force_flush
+
+```cpp
+bytes sh2_build_force_flush(std::uint8_t sensor_id);
+```
+
+### SH2_COMMAND_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_COMMAND_RESPONSE = 0xF1;
+```
+
+### SH2_FRS_READ_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_READ_RESPONSE = 0xF3;
+```
+
+### SH2_FRS_WRITE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_WRITE_RESPONSE = 0xF5;
+```
+
+### SH2_PRODUCT_ID_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_PRODUCT_ID_RESPONSE = 0xF8;
+```
+
+### SH2_GET_FEATURE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_GET_FEATURE_RESPONSE = 0xFC;
+```
+
+### Feature
+
+```cpp
+struct Feature {
+    std::uint8_t sensor_id = 0, flags = 0;
+    std::uint16_t sensitivity = 0;
+    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
+    std::uint32_t batch_us = 0;
+    std::uint32_t cfg_word = 0;
+};
+```
+
+Get Feature Response: the rates in effect.
+
+#### Feature.unpack
+
+```cpp
+static std::optional<Feature> unpack(byte_span payload);
+```
+
+### ProductId
+
+```cpp
+struct ProductId {
+    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
+    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
+    std::uint32_t sw_build_number = 0;
+    std::uint16_t sw_version_patch = 0;
+};
+```
+
+#### ProductId.unpack
+
+```cpp
+static std::optional<ProductId> unpack(byte_span payload);
+```
+
+### CommandResponse
+
+```cpp
+struct CommandResponse {
+    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
+    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
+};
+```
+
+#### CommandResponse.unpack
+
+```cpp
+static std::optional<CommandResponse> unpack(byte_span payload);
+```
+
+### FrsReadResponse
+
+```cpp
+struct FrsReadResponse {
+    std::uint8_t status = 0, data_length = 0;
+    std::uint16_t offset_words = 0;
+    std::uint32_t data0 = 0, data1 = 0;
+    std::uint16_t frs_type = 0;
+};
+```
+
+FRS Read Response: `status` the low nibble of byte 1, `data_length` (0..2
+words valid) its high nibble.
+
+#### FrsReadResponse.unpack
+
+```cpp
+static std::optional<FrsReadResponse> unpack(byte_span payload);
+```
+
+### FrsWriteResponse
+
+```cpp
+struct FrsWriteResponse {
+    std::uint8_t status = 0;
+    std::uint16_t offset_words = 0;
+};
+```
+
+#### FrsWriteResponse.unpack
+
+```cpp
+static std::optional<FrsWriteResponse> unpack(byte_span payload);
+```
+
 ### BASE_TIMESTAMP_REF
 
 ```cpp
@@ -2538,7 +2747,8 @@ inline constexpr std::uint8_t TRIGGER_INT = 1;
 bytes pack_read_reg(std::uint8_t addr, std::uint8_t len);
 ```
 
-BNO_READ_REG payload: addr u8, len u8.
+BNO_READ_REG payload: addr u8, len u8; std::invalid_argument unless len is
+1..XFER_MAX and addr + len <= 0x100 (contract 13 §1).
 
 ### pack_write_reg
 
@@ -2547,7 +2757,21 @@ bytes pack_write_reg(std::uint8_t addr, byte_span data);
 ```
 
 BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
-unless it is 1..XFER_MAX bytes.
+unless it is 1..XFER_MAX bytes and addr + N <= 0x100.
+
+### TIMER_PERIOD_MIN_MS
+
+```cpp
+inline constexpr std::uint16_t TIMER_PERIOD_MIN_MS = 1;
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+### TIMER_PERIOD_MAX_MS
+
+```cpp
+inline constexpr std::uint16_t TIMER_PERIOD_MAX_MS = 60000;
+```
 
 ### pack_start_stream
 
@@ -2555,7 +2779,9 @@ unless it is 1..XFER_MAX bytes.
 bytes pack_start_stream(std::uint8_t trigger, std::uint8_t addr, std::uint8_t len, std::uint16_t period_ms);
 ```
 
-BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE.
+BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE;
+std::invalid_argument when trigger is TIMER and period_ms is outside 1..60000
+(with INT the period is the missed-edge watchdog, 0 = none).
 
 ### RegData
 
@@ -2606,8 +2832,9 @@ struct Bno055Info {
 ```
 
 RPT_BNO_INFO (38 bytes, `<BBBBBHBBBIHHHIIIHBBH`) — sensor identity
-(registers 0x00..0x06) plus bridge diagnostics. Counters are free-running
-and wrap; read_*_us, slots_skipped and loop_max_us reset at START_STREAM. A
+(registers 0x00..0x06) plus bridge diagnostics. Counters wrap; read_*_us,
+slots_skipped and loop_max_us reset at START_STREAM, i2c_errors at every
+successful reset handshake (not free-running). A
 rising sensor_resets means the bridge pulsed nRESET: the sensor is back in
 CONFIG and the host must re-apply its configuration.
 
@@ -3157,11 +3384,12 @@ static AxisRemap unpack(std::uint8_t config, std::uint8_t sign);
 ### PLACEMENTS
 
 ```cpp
-inline constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 8> PLACEMENTS = {{ {0x21, 0x04}, {0x24, 0x00}, {0x24, 0x06}, {0x21, 0x02}, {0x24, 0x03}, {0x21, 0x01}, {0x21, 0x07}, {0x24, 0x05}, }};
+inline constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 8> PLACEMENTS = {{ {std::uint8_t{0x21}, std::uint8_t{0x04}}, {std::uint8_t{0x24}, std::uint8_t{0x00}}, {std::uint8_t{0x24}, std::uint8_t{0x06}}, {std::uint8_t{0x21}, std::uint8_t{0x02}}, {std::uint8_t{0x24}, std::uint8_t{0x03}}, {std::uint8_t{0x21}, std::uint8_t{0x01}}, {std::uint8_t{0x21}, std::uint8_t{0x07}}, {std::uint8_t{0x24}, std::uint8_t{0x05}}, }};
 ```
 
 Datasheet §3.4 mounting placements P0..P7 as (AXIS_MAP_CONFIG,
-AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default.
+AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default. Typed literals: as plain ints
+std::pair would narrow them inside its constructor (MSVC C4244).
 
 ### placement
 
@@ -4598,7 +4826,7 @@ bytes pack_read_page(std::uint32_t addr, std::uint16_t size);
 
 ```cpp
 enum class FwDepzErrorKind {
-    TooShort, Magic, HeaderCrc, Size
+    TooShort, Magic, HeaderCrc, Size, Section
 };
 ```
 
@@ -4638,15 +4866,16 @@ static FwDepzImage parse(byte_span blob);
 ```
 
 Validation order: length, magic, header CRC (CCITT-FALSE over [0..61]
-vs u16 LE at 62), then fw_size == payload length. Throws FwDepzError.
+vs u16 LE at 62), then fw_size == payload length, then section 0 of 1
+(sections are 0-based; multi-section files are refused). Throws FwDepzError.
 
 #### FwDepzImage.build
 
 ```cpp
-static bytes build(std::uint32_t load_addr, byte_span payload, std::uint8_t cur_sec = 1, std::uint8_t tot_sec = 1);
+static bytes build(std::uint32_t load_addr, byte_span payload, std::uint8_t cur_sec = 0, std::uint8_t tot_sec = 1);
 ```
 
-Assemble a container (test/tooling helper).
+Assemble a container (test/tooling helper). A shipped file is section 0 of 1.
 
 #### FwDepzImage.payload_crc_ok
 
@@ -4654,13 +4883,274 @@ Assemble a container (test/tooling helper).
 bool payload_crc_ok() const;
 ```
 
-## Datasets
+## Datasets (record & replay)
+
+### SCHEMA
+
+```cpp
+inline constexpr const char* SCHEMA = "depz.dataset/2";
+```
+
+The schema id this SDK writes.
 
 ### SCHEMA_PREFIX
 
 ```cpp
 inline constexpr const char* SCHEMA_PREFIX = "depz.dataset/";
 ```
+
+### Value
+
+```cpp
+class Value {
+    enum class Type { Null, Bool, Int, Double, String, Array, Object };
+};
+```
+
+A JSON value: what a record's `v` holds. Integers stay integers and reals
+stay reals in the file, as the Python reference writes them. Objects keep
+insertion order.
+
+#### Value.Value
+
+```cpp
+Value(bool b);
+```
+
+#### Value.Value
+
+```cpp
+Value(int i);
+```
+
+#### Value.Value
+
+```cpp
+Value(std::int64_t i);
+```
+
+#### Value.Value
+
+```cpp
+Value(std::uint32_t u);
+```
+
+#### Value.Value
+
+```cpp
+Value(std::uint64_t u);
+```
+
+#### Value.Value
+
+```cpp
+Value(double d);
+```
+
+#### Value.Value
+
+```cpp
+Value(const char* s);
+```
+
+#### Value.Value
+
+```cpp
+Value(std::string s);
+```
+
+#### Value.Value
+
+```cpp
+Value(Array a);
+```
+
+#### Value.Value
+
+```cpp
+Value(Object o);
+```
+
+#### Value.array
+
+```cpp
+static Value array();
+```
+
+#### Value.object
+
+```cpp
+static Value object();
+```
+
+#### Value.type
+
+```cpp
+Type type() const;
+```
+
+#### Value.is_null
+
+```cpp
+bool is_null() const;
+```
+
+#### Value.is_bool
+
+```cpp
+bool is_bool() const;
+```
+
+#### Value.is_int
+
+```cpp
+bool is_int() const;
+```
+
+#### Value.is_double
+
+```cpp
+bool is_double() const;
+```
+
+#### Value.is_number
+
+```cpp
+bool is_number() const;
+```
+
+#### Value.is_string
+
+```cpp
+bool is_string() const;
+```
+
+#### Value.is_array
+
+```cpp
+bool is_array() const;
+```
+
+#### Value.is_object
+
+```cpp
+bool is_object() const;
+```
+
+#### Value.as_bool
+
+```cpp
+bool as_bool() const;
+```
+
+Readers: a zero / empty default on a type mismatch; as_double also
+reads an integer, as_int truncates a real.
+
+#### Value.as_int
+
+```cpp
+std::int64_t as_int() const;
+```
+
+#### Value.as_double
+
+```cpp
+double as_double() const;
+```
+
+#### Value.as_string
+
+```cpp
+const std::string& as_string() const;
+```
+
+#### Value.items
+
+```cpp
+const Array& items() const;
+```
+
+#### Value.entries
+
+```cpp
+const Object& entries() const;
+```
+
+#### Value.size
+
+```cpp
+std::size_t size() const;
+```
+
+#### Value.find
+
+```cpp
+const Value* find(const std::string& key) const;
+```
+
+Members: by key (nullptr when absent / not an object), by index (throws
+std::out_of_range), and `at` (throws std::out_of_range when absent).
+
+#### Value.at
+
+```cpp
+const Value& at(const std::string& key) const;
+```
+
+#### Value.has
+
+```cpp
+bool has(const std::string& key) const;
+```
+
+#### Value.push
+
+```cpp
+Value& push(Value v);
+```
+
+Builders (this value must be an array / an object: std::logic_error
+otherwise). set() replaces an existing key.
+
+#### Value.set
+
+```cpp
+Value& set(const std::string& key, Value v);
+```
+
+#### Value.to_json
+
+```cpp
+std::string to_json() const;
+```
+
+Serialize compactly (no spaces, non-ASCII as \uXXXX, reals in the
+shortest form that reads back exactly; NaN / infinities as null).
+
+#### Value.parse
+
+```cpp
+static Value parse(const std::string& text);
+```
+
+Parse one JSON document. std::runtime_error when it does not parse.
+
+### is_gzip
+
+```cpp
+bool is_gzip(byte_span data);
+```
+
+True when `data` starts with the gzip magic.
+
+### gunzip
+
+```cpp
+bytes gunzip(byte_span data);
+```
+
+The content of a gzip file (members one after the other; stored, fixed or
+dynamic Huffman blocks). std::runtime_error on a corrupt stream.
 
 ### TimeSync
 
@@ -4678,9 +5168,15 @@ struct DeviceMeta {
     std::string serial;
     std::string sensor_type;
     std::string software_name;
+    std::string model;
     TimeSync time_sync;
+    Value raw;
 };
 ```
+
+A header device entry. `model` is the part when one sensor_type covers
+several ("BNO085" / "BNO086" under bno086), empty when absent; `raw` is
+the whole entry, for fields this view leaves out.
 
 ### Record
 
@@ -4689,14 +5185,12 @@ struct Record {
     std::string device_id;
     std::int64_t t_host_us = 0;
     std::string kind;
-    std::map<std::string, std::int64_t> ints;
-    std::map<std::string, std::string> strings;
-    std::map<std::string, std::vector<std::int64_t>> arrays;
+    Value value;
 };
 ```
 
-One record. The value object `v` is split by JSON type into typed maps
-(numbers, strings, integer arrays) — enough for the SR04 and VL53L8 kinds.
+One record: the device id, the host monotonic µs (device time − offset),
+the kind and the record's `v`.
 
 ### Reader
 
@@ -4705,8 +5199,9 @@ class Reader {
     std::string schema;
     std::string created_utc;
     std::string note;
-    std::map<std::string, DeviceMeta> devices;
-    std::vector<Record> records;  // stable-sorted by t_host_us
+    Value header;  // the parsed header line
+    std::map<std::string, DeviceMeta> devices;  // by device id
+    std::vector<Record> records;
 };
 ```
 
@@ -4716,8 +5211,22 @@ class Reader {
 explicit Reader(const std::string& content);
 ```
 
-Parse the whole `.depzdata` file content. Throws std::runtime_error on a
-malformed file or a non-depz.dataset schema.
+Parse a whole `.depzdata` document (UTF-8 JSON Lines: header + records)
+or the bytes of a `.depzdata.gz` (inflated first). A damaged file is
+refused whole with std::invalid_argument naming the line (contract 09,
+07 §3): an empty file, a header that is not a JSON object or whose
+`schema` is not a `depz.dataset/…` string, a record line that is not a
+JSON object, `d` / `k` not strings, `t` not an integer, `v` not an
+object. Nothing is skipped or coerced; blank lines are skipped, a record
+of an unknown `k` is kept. std::runtime_error on a corrupt gzip stream.
+
+#### Reader.open
+
+```cpp
+static Reader open(const std::string& path);
+```
+
+The same from a file path. std::runtime_error when it cannot be read.
 
 #### Reader.duration_us
 
@@ -4725,7 +5234,437 @@ malformed file or a non-depz.dataset schema.
 std::int64_t duration_us() const;
 ```
 
+Host-time span from the first record to the last; 0 with fewer than two.
+
+### Writer
+
+```cpp
+class Writer {
+    // (no public data members)
+};
+```
+
+Low-level thread-safe `.depzdata` record writer: the header line at open,
+one record line per write. A path ending in `.gz` is written as a gzip
+container of stored (uncompressed) blocks — every gzip reader opens it.
+Prefer the session recorder of depz/recorder.hpp for live devices.
+
+#### Writer.Writer
+
+```cpp
+Writer(const std::string& path, const Value::Object& devices, const std::string& note = "");
+```
+
+Create `path` (overwritten) and write the header: `devices` are the
+header device entries by device id (serial, sensor_type, software_name,
+time_sync, …), `note` free text. std::runtime_error when the file
+cannot be created.
+
+#### Writer.write
+
+```cpp
+void write(const std::string& device_id, std::int64_t t_host_us, const std::string& kind, const Value& value);
+```
+
+One record: device id, host µs, kind, value. ArgumentError (invalid_state,
+depz/errors.hpp) once closed, std::runtime_error on a write error.
+
+#### Writer.records_written
+
+```cpp
+std::uint64_t records_written() const;
+```
+
+#### Writer.close
+
+```cpp
+void close();
+```
+
+Flush, finish the gzip trailer and close the file. Idempotent.
+
+### PlayerState
+
+```cpp
+enum class PlayerState {
+    Idle,     // never played
+    Playing,  // delivering records paced by the clock
+    Paused,   // stopped mid-timeline; play() resumes
+    Done,     // past the last record; play() restarts from the top
+};
+```
+
+DatasetPlayer state (contract 09 §Player).
+
+### to_string
+
+```cpp
+const char* to_string(PlayerState s);
+```
+
+The name contract 09 uses ("idle", "playing", "paused", "done").
+
+### PlayerOptions
+
+```cpp
+struct PlayerOptions {
+    double speed = 1.0;  // ≥ 0; 0 = as fast as possible
+    bool threaded = true;  // false: drive with tick()
+};
+```
+
+DatasetPlayer construction options.
+
+#### PlayerOptions.double
+
+```cpp
+std::function<double()> clock;
+```
+
+monotonic seconds; empty = the system's
+
+### DatasetPlayer
+
+```cpp
+class DatasetPlayer {
+    // (no public data members)
+};
+```
+
+Timeline player over a dataset: paced delivery with play / pause / seek /
+speed — the engine behind a viewer's playback mode (contract 09 §Player).
+
+Timing: a media clock anchored at play / resume / seek to (now, `t` of the
+last delivered record — of the first record when none was). Record i is due
+at anchor_wall + (t_i − anchor_t) / speed: the first record goes out at
+once, each later one after its gap to the previous one, and a resumed or
+seeked player waits the next record's full gap. Pacing is against the
+clock, not cumulative: overdue records go out back to back. Speed 0
+delivers as fast as possible.
+
+Threads: by default records and the Done state are delivered on a player
+thread (started by the first play()); a state change a call makes is
+reported on the calling thread before it returns. Callbacks run outside the
+player's lock, so they may call its methods; once pause() returns no record
+callback is running or will start (unless pause was called from that
+callback). They must not block. With `threaded = false` no thread starts:
+the owner calls tick() from its own loop (a GUI timer, or a test with a
+fake clock). The destructor closes the player.
+
+#### DatasetPlayer.DatasetPlayer
+
+```cpp
+explicit DatasetPlayer(const Reader& reader, PlayerOptions options = PlayerOptions());
+```
+
+A player over the reader's records (copied). std::invalid_argument for
+a speed that is not finite and ≥ 0.
+
+#### DatasetPlayer.state
+
+```cpp
+PlayerState state() const;
+```
+
+#### DatasetPlayer.duration_us
+
+```cpp
+std::int64_t duration_us() const;
+```
+
+Span of the timeline: the last record's t minus the first's.
+
+#### DatasetPlayer.position_us
+
+```cpp
+std::int64_t position_us() const;
+```
+
+µs from the first record to the last delivered one (after a seek: to
+the record just before the target); 0 before anything was delivered.
+
+#### DatasetPlayer.speed
+
+```cpp
+double speed() const;
+```
+
+#### DatasetPlayer.set_speed
+
+```cpp
+void set_speed(double speed);
+```
+
+Change the speed (finite, ≥ 0, else std::invalid_argument). While
+playing it applies at once: the rest of the current wait is rescaled.
+
+#### DatasetPlayer.on_record
+
+```cpp
+Unsubscribe on_record(std::function<void(const Record&)> cb);
+```
+
+Subscribe to delivered records / state changes (called with the new
+state on every transition). The returned unsubscribe is idempotent.
+
+#### DatasetPlayer.on_state
+
+```cpp
+Unsubscribe on_state(std::function<void(PlayerState)> cb);
+```
+
+#### DatasetPlayer.on_delivery_error
+
+```cpp
+Unsubscribe on_delivery_error(std::function<void(const std::string&)> cb);
+```
+
+The message of a record callback that threw on the player thread:
+playback paused there (the record counts as delivered).
+
+#### DatasetPlayer.play
+
+```cpp
+void play();
+```
+
+Start, or resume after pause(); no-op while playing. From Done (or a
+position past the end) playback restarts at the first record. An empty
+dataset goes Playing -> Done at once. ArgumentError (invalid_state) once closed.
+
+#### DatasetPlayer.pause
+
+```cpp
+void pause();
+```
+
+Stop delivering; play() resumes from the next record, which then waits
+its full gap again. No-op unless playing.
+
+#### DatasetPlayer.seek_us
+
+```cpp
+void seek_us(double offset_us);
+```
+
+Move to `offset_us` µs from the first record: the next record delivered
+is the first with t >= first t + offset (negative: the start); records
+in between are skipped, never delivered. The state does not change,
+except that a seek past the end while playing ends playback (Done).
+NaN is std::invalid_argument, ArgumentError (invalid_state) once
+closed; on an empty dataset a seek is a no-op.
+
+#### DatasetPlayer.tick
+
+```cpp
+std::optional<double> tick();
+```
+
+Deliver every record due now, on the calling thread. Returns the
+seconds until the next one is due, nullopt when not playing. A record
+callback's exception pauses playback and propagates.
+
+#### DatasetPlayer.wait
+
+```cpp
+bool wait(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
+```
+
+Block until the player is not playing (done, or paused by someone
+else): true, or false on timeout (nullopt: no timeout). Needs the
+player thread, else ArgumentError (invalid_state).
+
+#### DatasetPlayer.close
+
+```cpp
+void close();
+```
+
+Stop playback and the player thread. Idempotent.
+
+### sr04
+
+```cpp
+Value sr04(const Sr04Measurement& m);
+```
+
+`sr04`: {echo_us, source: "once" | "loop"}.
+
+### vl53l4
+
+```cpp
+Value vl53l4(const Vl53l4cdMeasurement& m);
+```
+
+`vl53l4`: the result fields; distance_mm raw whatever range_status says.
+
+### vl53l8
+
+```cpp
+Value vl53l8(const Vl53l8LiveFrame& f, bool layers = false);
+```
+
+`vl53l8`: resolution, silicon_temp_degc and the per-zone arrays cut to the
+resolution; `layers` adds signal_per_spad, ambient_per_spad, range_sigma_mm
+and reflectance; `motion` when the frame carried the motion-indicator block.
+
+### vl53l8_cnh
+
+```cpp
+Value vl53l8_cnh(byte_span cnh_raw, const CnhSetup& setup);
+```
+
+`vl53l8_cnh`: the raw CNH block of a frame, base64, with the armed setup's
+decode parameters (nb_aggregates, feature_length, sum_span, start_bin).
+
+### vl53lx
+
+```cpp
+Value vl53lx(const Vl53lxMeasurement& m, const std::string& product, const std::string& driver);
+```
+
+`vl53lx`: product, driver, status, distance_mm, sigma_mm, signal_kcps,
+ambient_kcps, spads, and `targets` when the driver reported several.
+
+### bno055
+
+```cpp
+Value bno055(const Bno055Sample& s);
+```
+
+`bno055`: unit_sel and every channel the block covered, scaled.
+
+### tmf8829
+
+```cpp
+Value tmf8829(const Tmf8829Measurement& m);
+```
+
+`tmf8829`: one measurement — fp_mode, rows, cols, peaks, f_number, flags,
+temperature_c, distance_mm (mm, rounded to 0.1, flat [peak][row][col]),
+snr, and signal / noise / xtalk when the result format carried them.
+
+### bno086
+
+```cpp
+Value bno086(const Bno086Report& r);
+```
+
+`bno086`: the report in snake_case — type and sensor id, then only the
+fields the report carries (scaled: x/y/z, i/j/k/real, accuracy_rad, bias,
+angular_velocity, value), the detector outputs, the integer counts of the
+raw ADC streams (0x14..0x16), and the device timestamp.
+
+### temperature
+
+```cpp
+Value temperature(double celsius, const std::string& source);
+```
+
+`temperature`: {celsius, source} — source "mcu" or "sensor".
+
+### round1
+
+```cpp
+double round1(double x);
+```
+
+Python's round(x, 1): the nearest tenth of the exact binary value, ties to even.
+
+### base64
+
+```cpp
+std::string base64(byte_span data);
+```
+
+Standard base64 with padding.
+
+### RecorderOptions
+
+```cpp
+struct RecorderOptions {
+    std::string note;  // free text in the header
+    bool vl53l8_layers = false;  // VL53L8 records also carry signal / ambient / sigma / reflectance
+    std::optional<double> temperature_hz = 1;  // about this many `temperature` records per device and
+};
+```
+
+Record decoded data from several devices onto one host timeline. add()
+each open device (it runs Device::sync_time() and hooks the device's result
+stream), then start(): a record per result at device time − offset, written
+on the device's reader thread. The recorder never reconfigures a device —
+start and stop streaming yourself. stop() (or the destructor) closes the
+file. A plain Device records nothing.
+SessionRecorder construction options.
+
+### SessionRecorder
+
+```cpp
+class SessionRecorder {
+    // (no public data members)
+};
+```
+
+#### SessionRecorder.SessionRecorder
+
+```cpp
+explicit SessionRecorder(const std::string& path, RecorderOptions options = RecorderOptions());
+```
+
+A recorder writing `path` (`.depzdata`, or `.depzdata.gz`).
+
+#### SessionRecorder.add
+
+```cpp
+std::string add(Device& device, std::optional<std::string> device_id = std::nullopt, int sync_samples = 5);
+```
+
+Register a device before recording starts (after: ArgumentError, the class of
+DEPZ_E_ARG, which serves invalid_state — contract 07 §3):
+runs sync_time with `sync_samples` rounds so its timestamps land on the
+shared timeline, reads its serial and software name, hooks its stream.
+Returns the device id (`device_id`, or d0, d1, … in add order). The
+device must outlive the recorder.
+
+#### SessionRecorder.start
+
+```cpp
+void start();
+```
+
+Open the file and start writing. No-op while recording;
+std::runtime_error when the file cannot be created.
+
+#### SessionRecorder.stop
+
+```cpp
+void stop();
+```
+
+Stop writing, unhook the devices and close the file. Idempotent.
+
+#### SessionRecorder.recording
+
+```cpp
+bool recording() const;
+```
+
+#### SessionRecorder.records_written
+
+```cpp
+std::uint64_t records_written() const;
+```
+
 ## Live hardware (links, device, discovery)
+
+### kErrArg
+
+```cpp
+constexpr int kErrArg = -1;
+```
+
+DEPZ_E_ARG of depz_sensor_sdk.h: a bad argument, or a call not valid in the
+current state (static_assert'ed equal where the C header is included).
 
 ### Error
 
@@ -4735,7 +5674,7 @@ class Error : public std::runtime_error {
 };
 ```
 
-Base of every live-layer error; `code()` is the C SDK's depz_err value.
+Base of every SDK error; `code()` is the C SDK's depz_err value.
 
 #### Error.Error
 
@@ -4756,6 +5695,8 @@ class ArgumentError : public Error {
     // (no public data members)
 };
 ```
+
+invalid_argument and invalid_state (DEPZ_E_ARG).
 
 ### IoError
 
@@ -5014,6 +5955,7 @@ struct LinkStats {
     std::uint64_t tx_packets, rx_packets, tx_bytes, rx_bytes;
     std::uint64_t crc_errors, header_errors, trash_bytes;
     std::uint64_t seq_gaps, device_seq_errors;
+    std::uint64_t callback_errors;  // callbacks that threw on the reader (contract 07 §3)
 };
 ```
 
@@ -5031,10 +5973,11 @@ struct TimeSync {
 
 ```cpp
 struct DeviceEvent {
-    enum class Type { SequenceError, CrcError, Trash, UnsolicitedStatus, Text, Temperature, Disconnected };
+    enum class Type { SequenceError, SeqGap, CrcError, Trash, UnsolicitedStatus, Text, Temperature, Disconnected };
     Type type;
     std::uint8_t cmd = 0, seq = 0;
-    std::uint8_t expected_seq = 0, received_seq = 0;
+    std::uint8_t expected_seq = 0, received_seq = 0;  // SequenceError (RPT 0x84); SeqGap (host-observed)
+    std::uint8_t missed = 0;  // SeqGap: (received_seq - expected_seq) mod 256
     bool by_device = false;  // SequenceError reported by the device
     std::uint8_t status = 0;  // UnsolicitedStatus (ERR_HARDWARE_FAULT = a fault)
     std::uint64_t timestamp_us = 0;  // Temperature
@@ -5825,7 +6768,7 @@ void init(Vl53l8Progress progress = {});
 
 Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
 (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
-sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH.
+sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
 
 #### Vl53l8.initialized
 
@@ -5956,18 +6899,18 @@ no deep sleep on L5CX/L7CX; waking from it re-runs init()
 #### Vl53l8.xtalk_margin
 
 ```cpp
-double xtalk_margin();
+std::uint32_t xtalk_margin();
 ```
 
-kcps/SPAD
+whole kcps/SPAD (raw / 2048, as ST)
 
 #### Vl53l8.set_xtalk_margin
 
 ```cpp
-void set_xtalk_margin(double kcps_per_spad);
+void set_xtalk_margin(std::uint32_t kcps_per_spad);
 ```
 
-<= 10000
+whole kcps/SPAD 0..10000 (as ST); above is refused
 
 #### Vl53l8.calibrate_xtalk
 
@@ -6040,7 +6983,8 @@ void configure_motion_indicator(std::uint16_t min_mm = 400, std::uint16_t max_mm
 ```
 
 Motion indicator over [min_mm, max_mm] (400..4000, span <= 1500) for the
-current resolution; frames then carry `motion`.
+current resolution; frames then carry `motion`. It shares DCI 0xBFAC
+with CNH: this disarms CNH (cnh_setup() nullopt, no frame.cnh_raw).
 
 #### Vl53l8.configure_cnh
 
@@ -6049,7 +6993,16 @@ void configure_cnh(const CnhSetup& setup);
 ```
 
 L8CH / L7CH only (WrongTypeError otherwise): arm CNH for the next
-start_ranging(); frames then carry frame.cnh_raw. init() disarms it.
+start_ranging(); frames then carry frame.cnh_raw and no `motion` (the
+motion indicator is disarmed: one DCI block). init() disarms both.
+
+#### Vl53l8.cnh_setup
+
+```cpp
+std::optional<CnhSetup> cnh_setup() const;
+```
+
+The CNH setup configure_cnh() armed; nullopt when none is.
 
 #### Vl53l8.start_ranging
 
@@ -6779,8 +7732,12 @@ std::pair<int, int> range_timing();
 #### Vl53lx.set_mode
 
 ```cpp
-void set_mode(const std::string& mode);
+std::optional<int> set_mode(const std::string& mode);
 ```
+
+-> the budget in effect after the change, ms, where the change can move
+it (VL53L1: one the new mode does not tabulate goes to the nearest one
+it does, contract 12 §5), else nullopt.
 
 #### Vl53lx.mode
 
@@ -7010,20 +7967,6 @@ FEATURE_ALWAYS_ON: it keeps running while the hub sleeps. Together they kept
 a report at its full rate through Bno086::sleep() on a DEPZ BNO086
 (SH-2 3.12.6, 2026-10-16), while every other report stopped.
 
-### Feature
-
-```cpp
-struct Feature {
-    std::uint8_t sensor_id = 0, flags = 0;
-    std::uint16_t sensitivity = 0;
-    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
-    std::uint32_t batch_us = 0;
-    std::uint32_t cfg_word = 0;
-};
-```
-
-Get Feature Response: the rates in effect.
-
 ### FeatureRequest
 
 ```cpp
@@ -7037,17 +7980,6 @@ struct FeatureRequest {
 ```
 
 Everything Set Feature carries.
-
-### ProductId
-
-```cpp
-struct ProductId {
-    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
-    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
-    std::uint32_t sw_build_number = 0;
-    std::uint16_t sw_version_patch = 0;
-};
-```
 
 ### CalibrationConfig
 
@@ -7071,15 +8003,6 @@ struct ErrorRecord {
 struct Counts {
     std::uint8_t sensor_id;
     std::uint32_t offered, accepted, on, attempted;
-};
-```
-
-### CommandResponse
-
-```cpp
-struct CommandResponse {
-    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
-    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
 };
 ```
 
@@ -7361,6 +8284,39 @@ void save_dcd();
 ```cpp
 void configure_periodic_dcd(bool enable);
 ```
+
+#### Bno086.set_motion_intent
+
+```cpp
+void set_motion_intent(bno086::MotionIntent intent);
+```
+
+Interactive calibration (BNO086 only; a BNO085 ignores it): tell the hub
+how the device is about to move (command 0x0E), so it can refine the gyro
+zero-rate offset while the device is still. No SH-2 answer. The hub's own
+request — hold still, or go on — arrives as a MotionRequest report once
+SensorId::MotionRequest is enabled.
+
+#### Bno086.enable_motion_request
+
+```cpp
+void enable_motion_request(double hz = 1);
+```
+
+Enable MotionRequest (0x2B) reports. The hub sends one when its request
+changes, not at `hz`, and reads the rate back late: no read-back.
+
+#### Bno086.flush
+
+```cpp
+void flush(bno086::SensorId sensor);
+```
+
+Batching: Force Sensor Flush (0xF0) — the hub sends `sensor`'s batched
+reports now instead of when its batch interval runs out. Returns once the
+hub's Flush Completed (0xEF, ReportType::FlushCompleted) for `sensor`
+arrived — every report batched before the call has been emitted by then;
+TimeoutError after the device timeout (at least 1 s).
 
 #### Bno086.frs_read
 

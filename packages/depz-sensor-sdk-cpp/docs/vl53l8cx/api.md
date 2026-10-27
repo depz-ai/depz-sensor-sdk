@@ -21,7 +21,7 @@ the headers, not this file.
 
 ## Contents
 
-- **VL53L8 codecs (depz/vl53l8.hpp)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init)
+- **VL53L8 codecs (depz/vl53l8.hpp)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`pack_start_stream`](#pack_start_stream), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init)
 - **VL53L8 live class (depz/device.hpp)**: [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`open_vl53l8`](#open_vl53l8)
 
 ## VL53L8 codecs (depz/vl53l8.hpp)
@@ -45,6 +45,25 @@ inline constexpr std::size_t STREAM_CHUNK_MAX = 1528;
 ```
 
 Max frame-data bytes carried in one RPT_VL53_FRAME chunk (contract 04).
+
+### STREAM_TOTAL_MAX
+
+```cpp
+inline constexpr std::size_t STREAM_TOTAL_MAX = 8192;
+```
+
+Largest frame_size VL53_START_STREAM accepts (contract 04 §2).
+
+### pack_start_stream
+
+```cpp
+bytes pack_start_stream(std::uint16_t frame_size);
+```
+
+VL53_START_STREAM (0x35) payload: frame_size u16 LE — the host ULD's
+data_read_size (contract 04 §2). Byte-exact with the reference
+pack_start_stream; frame_size outside 1..8192 throws std::invalid_argument
+(contract 04 §4 rule 4 — the firmware refuses it too).
 
 ### Variant
 
@@ -106,9 +125,19 @@ class FrameReassembler {
 ```
 
 Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports. Rules
-(contract 04): reset on offset==0; chunks must be contiguous — a gap discards
-the frame in progress; a frame completes when the accumulated bytes equal
-full_size.
+(contract 04 §4): reset on offset==0; chunks must be contiguous — a gap
+discards the frame in progress; a frame completes when the accumulated bytes
+equal full_size. A chunk out of the rule-4 bounds (more than chunk_max bytes,
+full_size over STREAM_TOTAL_MAX, or running past full_size) is damaged:
+dropped and counted as a lost frame like the other damaged input, never
+thrown. chunk_max is the device's VL53_STREAM_FRAME_MAX
+(vl53l7::STREAM_CHUNK_MAX = 1536 on the I2C board, contract 11 §3).
+
+#### FrameReassembler.FrameReassembler
+
+```cpp
+explicit FrameReassembler(std::size_t chunk_max = STREAM_CHUNK_MAX);
+```
 
 #### FrameReassembler.feed
 
@@ -164,19 +193,28 @@ frame's block layout. Returns nullopt for a corrupted frame (header/footer id
 mismatch). `footer_id_off` is variant-specific (FOOTER_ID_OFF_CX /
 FOOTER_ID_OFF_CH, or footer_id_off(Variant)); it defaults to the CX offset.
 
+### XTALK_MARGIN_MAX_KCPS
+
+```cpp
+constexpr std::uint32_t XTALK_MARGIN_MAX_KCPS = 10000;
+```
+
+Largest xtalk margin set_xtalk_margin accepts, kcps/SPAD (as ST).
+
 ### xtalk_margin_raw
 
 ```cpp
-std::uint32_t xtalk_margin_raw(double margin_kcps);
+std::uint32_t xtalk_margin_raw(std::uint32_t margin_kcps);
 ```
 
-Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
-xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
+Xtalk margin, a whole number of kcps/SPAD (as ST) <-> DCI_XTALK_CFG raw word
+(raw = kcps*2048). xtalk_margin_raw: std::out_of_range above
+XTALK_MARGIN_MAX_KCPS. xtalk_margin_kcps: raw / 2048 (integer division).
 
 ### xtalk_margin_kcps
 
 ```cpp
-double xtalk_margin_kcps(std::uint32_t raw);
+std::uint32_t xtalk_margin_kcps(std::uint32_t raw);
 ```
 
 ### ThreshMeasurement
@@ -380,7 +418,7 @@ void init(Vl53l8Progress progress = {});
 
 Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
 (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
-sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH.
+sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
 
 #### Vl53l8.initialized
 
@@ -511,18 +549,18 @@ no deep sleep on L5CX/L7CX; waking from it re-runs init()
 #### Vl53l8.xtalk_margin
 
 ```cpp
-double xtalk_margin();
+std::uint32_t xtalk_margin();
 ```
 
-kcps/SPAD
+whole kcps/SPAD (raw / 2048, as ST)
 
 #### Vl53l8.set_xtalk_margin
 
 ```cpp
-void set_xtalk_margin(double kcps_per_spad);
+void set_xtalk_margin(std::uint32_t kcps_per_spad);
 ```
 
-<= 10000
+whole kcps/SPAD 0..10000 (as ST); above is refused
 
 #### Vl53l8.calibrate_xtalk
 
@@ -595,7 +633,8 @@ void configure_motion_indicator(std::uint16_t min_mm = 400, std::uint16_t max_mm
 ```
 
 Motion indicator over [min_mm, max_mm] (400..4000, span <= 1500) for the
-current resolution; frames then carry `motion`.
+current resolution; frames then carry `motion`. It shares DCI 0xBFAC
+with CNH: this disarms CNH (cnh_setup() nullopt, no frame.cnh_raw).
 
 #### Vl53l8.configure_cnh
 
@@ -604,7 +643,16 @@ void configure_cnh(const CnhSetup& setup);
 ```
 
 L8CH / L7CH only (WrongTypeError otherwise): arm CNH for the next
-start_ranging(); frames then carry frame.cnh_raw. init() disarms it.
+start_ranging(); frames then carry frame.cnh_raw and no `motion` (the
+motion indicator is disarmed: one DCI block). init() disarms both.
+
+#### Vl53l8.cnh_setup
+
+```cpp
+std::optional<CnhSetup> cnh_setup() const;
+```
+
+The CNH setup configure_cnh() armed; nullopt when none is.
 
 #### Vl53l8.start_ranging
 

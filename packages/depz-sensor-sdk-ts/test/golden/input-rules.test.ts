@@ -19,7 +19,10 @@ const FILES = [
   "vl53l4.json",
   "vl53l7.json",
   "vl53lx.json",
+  "vl53l8.json",
   "vl53l8_advanced.json",
+  "depzrec.json",
+  "depzdata.json",
 ];
 
 describe("input_rules (contract 07 §3)", () => {

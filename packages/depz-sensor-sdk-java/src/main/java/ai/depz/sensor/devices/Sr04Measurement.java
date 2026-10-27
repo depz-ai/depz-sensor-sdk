@@ -21,8 +21,19 @@ public record Sr04Measurement(long timestampUs, int echoTimeUs, String source) {
         return Sr04.distanceMmFromEcho(echoTimeUs, airTempC);
     }
 
+    /**
+     * Null for a source cmd contract 03 §2 does not define (0x36 / 0x37 only, ERRATA B11): not a
+     * measurement, it falls through to the hex text event.
+     */
     static Sr04Measurement from(Sr04.Sr04Data d) {
-        return new Sr04Measurement(d.timestampUs(), d.echoTimeUs(),
-                d.sourceCmd() == Sr04.Sr04Cmd.START_MEASUREMENT_LOOP.value ? "loop" : "once");
+        String source;
+        if (d.sourceCmd() == Sr04.Sr04Cmd.MEASURE_ONCE.value) {
+            source = "once";
+        } else if (d.sourceCmd() == Sr04.Sr04Cmd.START_MEASUREMENT_LOOP.value) {
+            source = "loop";
+        } else {
+            return null;
+        }
+        return new Sr04Measurement(d.timestampUs(), d.echoTimeUs(), source);
     }
 }

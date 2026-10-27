@@ -12,6 +12,8 @@ import ai.depz.sensor.devices.DepzException;
 import ai.depz.sensor.devices.DepzTimeoutException;
 import ai.depz.sensor.devices.DeviceEvent;
 import ai.depz.sensor.devices.DeviceLostException;
+import ai.depz.sensor.devices.InvalidReplyException;
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.LinkClosedException;
 import ai.depz.sensor.devices.NoDepzDeviceException;
 import ai.depz.sensor.devices.RecordingLink;
@@ -24,16 +26,22 @@ import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.protocol.Common;
 import ai.depz.sensor.protocol.Sr04;
 import ai.depz.sensor.transport.CrcType;
+import ai.depz.sensor.transport.Framing;
 import ai.depz.sensor.transport.Packet;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.zip.GZIPInputStream;
 
 /** The device core over a fake board: requests, errors, events, streams, record / replay. */
 public final class DeviceCoreTests {
@@ -55,6 +63,15 @@ public final class DeviceCoreTests {
             eq("APP_usonic_SR04_v0.97", dev.getSoftwareName());
             eq("sr04", dev.identify().sensorType().label);
             eq(2L, dev.stats().txPackets());
+        }
+    }
+
+    public static void toHostTimeBeforeSyncIsTheInvalidStateError() throws Exception {
+        // Contract 07 §3 (ERRATA A14): a conversion needs a prior syncTime — the SDK's own error.
+        try (DepzDevice dev = new DepzDevice(new FakeBoardLink(), SHORT)) {
+            check(dev.lastTimeSync() == null, "no sync yet");
+            InvalidStateException e = throwsType(InvalidStateException.class, () -> dev.toHostTimeUs(0));
+            check(e.getMessage().contains("syncTime"), e.getMessage());
         }
     }
 
@@ -111,7 +128,8 @@ public final class DeviceCoreTests {
                 ? List.of(link.reply(Common.Rpt.TEMPERATURE.value, new byte[3]))
                 : List.of(link.reply(Common.Rpt.TEXT.value, text(p.cmd(), "x")));
         try (DepzDevice dev = new DepzDevice(link, SHORT)) {
-            DepzException e = throwsType(DepzException.class, dev::readMcuTemperature);
+            InvalidReplyException e = throwsType(InvalidReplyException.class, dev::readMcuTemperature);
+            eq(Common.Cmd.GET_MCU_TEMPERATURE.value, e.cmd());
             check(e.getMessage().contains("does not decode"), e.getMessage());
             eq("x", dev.getDeviceName());
         }
@@ -124,6 +142,9 @@ public final class DeviceCoreTests {
             throwsType(IllegalArgumentException.class, () -> dev.setSamplePeriodUs(1L << 32));
             throwsType(IllegalArgumentException.class, () -> dev.setEchoDecayUs(65536));
             throwsType(IllegalArgumentException.class, () -> dev.getSyncPin(0));
+            // contract 02 §2 (ERRATA A2): the CrcType enum cannot hold 4; the codec refuses it for untyped callers
+            throwsType(IllegalArgumentException.class, () -> Common.packSetPayloadCrcType(4));
+            throwsType(IllegalArgumentException.class, () -> Common.packSetPayloadCrcType(300));
             eq(0, link.sentCount());
         }
     }
@@ -131,7 +152,8 @@ public final class DeviceCoreTests {
     public static void unsolicitedReportsBecomeEvents() throws Exception {
         FakeBoardLink link = new FakeBoardLink();
         try (DepzDevice dev = new DepzDevice(link); Subscription<DeviceEvent> events = dev.events()) {
-            link.inject(FakeBoardLink.status(0, Common.Status.ERR_HARDWARE_FAULT.value));
+            // in seq order: a gap would be an event of its own
+            link.inject(link.reply(Common.Rpt.STATUS.value, new byte[] {0, (byte) Common.Status.ERR_HARDWARE_FAULT.value}));
             link.inject(link.reply(Common.Rpt.SEQUENCE_ERROR.value, new byte[] {7, 9}));
             link.inject(link.reply(0xC5, new byte[] {(byte) 0xAB}));
             DeviceEvent a = events.take(Duration.ofSeconds(1));
@@ -139,6 +161,23 @@ public final class DeviceCoreTests {
             eq(new DeviceEvent.SequenceError(7, 9, true), events.take(Duration.ofSeconds(1)));
             eq(new DeviceEvent.Text(0xC5, "ab"), events.take(Duration.ofSeconds(1)));
             eq(1L, dev.stats().deviceSeqErrors());
+        }
+    }
+
+    /**
+     * Contract 01 §5 step 5 (ERRATA A1): a gap the host sees in the board's seq is a SeqGap event
+     * of its own, ahead of the packet it was seen on; the first packet is no gap.
+     */
+    public static void hostObservedSeqGapIsAnEvent() throws Exception {
+        FakeBoardLink link = new FakeBoardLink();
+        try (DepzDevice dev = new DepzDevice(link); Subscription<DeviceEvent> events = dev.events()) {
+            link.inject(Framing.buildPacket(0xC5, new byte[] {5}, 5, CrcType.NONE));
+            link.inject(Framing.buildPacket(0xC5, new byte[] {9}, 9, CrcType.NONE));
+            eq(new DeviceEvent.Text(0xC5, "05"), events.take(Duration.ofSeconds(1)));
+            eq(new DeviceEvent.SeqGap(6, 9, 3), events.take(Duration.ofSeconds(1)));
+            eq(new DeviceEvent.Text(0xC5, "09"), events.take(Duration.ofSeconds(1)));
+            eq(1L, dev.stats().seqGaps());
+            eq(0L, dev.stats().deviceSeqErrors());
         }
     }
 
@@ -161,6 +200,50 @@ public final class DeviceCoreTests {
             check(events.take(Duration.ofSeconds(1)) instanceof DeviceEvent.Disconnected, "disconnected event");
             throwsType(DeviceLostException.class, () -> loop.take(Duration.ofSeconds(1)));
             check(loop.isClosed(), "stream closed");
+        }
+    }
+
+    /**
+     * Contract 07 §3: a callback that throws is counted and dropped — the other callback and the
+     * queue still get the item, the reader goes on (a request completes, the next report is read).
+     */
+    public static void aThrowingCallbackNeverStopsTheReader() throws Exception {
+        FakeBoardLink link = new FakeBoardLink();
+        link.onPacket = p -> List.of(link.reply(Common.Rpt.TEXT.value, text(p.cmd(), "APP_usonic_SR04_v0.97")));
+        Logger log = Logger.getLogger("ai.depz.sensor");
+        Level was = log.getLevel();
+        log.setLevel(Level.OFF); // the deliberate failures below, not test noise
+        try (Sr04Device dev = new Sr04Device(link);
+                Subscription<DeviceEvent> events = dev.events();
+                Subscription<Sr04Measurement> loop = dev.measurements(4)) {
+            List<DeviceEvent> seen = new ArrayList<>();
+            dev.onEvent(e -> {
+                throw new IllegalStateException("consumer bug");
+            });
+            dev.onEvent(e -> {
+                synchronized (seen) {
+                    seen.add(e);
+                }
+            });
+            link.inject(link.reply(0xC5, new byte[] {(byte) 0xAB}));
+            eq(new DeviceEvent.Text(0xC5, "ab"), events.take(Duration.ofSeconds(1)));
+            synchronized (seen) {
+                eq(List.of(new DeviceEvent.Text(0xC5, "ab")), seen);
+            }
+            eq(1L, dev.stats().callbackErrors());
+            eq("APP_usonic_SR04_v0.97", dev.getSoftwareName());
+
+            dev.onMeasurement(m -> {
+                throw new AssertionError("consumer bug");
+            });
+            byte[] payload = new byte[11];
+            payload[0] = (byte) Sr04.Sr04Cmd.START_MEASUREMENT_LOOP.value;
+            payload[9] = 7;
+            link.inject(link.reply(Sr04.Sr04Rpt.DATA.value, payload));
+            eq(7, loop.take(Duration.ofSeconds(1)).echoTimeUs());
+            eq(2L, dev.stats().callbackErrors());
+        } finally {
+            log.setLevel(was);
         }
     }
 
@@ -211,6 +294,29 @@ public final class DeviceCoreTests {
                 eq(0L, replay.txRemaining());
                 throwsType(ReplayMismatchException.class, () -> dev.send(Common.Cmd.GET_SERIAL.value, null));
             }
+        } finally {
+            Files.deleteIfExists(path);
+        }
+    }
+
+    // ERRATA A6: there is no `.depzrec.gz` — a capture is plain text, a gzip
+    // container is not inflated but refused like any damaged file. The gzipped
+    // bytes (mtime 0) are the same 70 in every SDK's test.
+    private static final byte[] GZIPPED_CAPTURE = HexFormat.of().parseHex(
+            "1f8b0800000000000203ab562a4ece48cd4d54b252504a492da8d22b4a4dd63754aae5aa"
+                    + "562a018a19e80085338b40b245154a204e6209586d6222500d007e3bc00b3d000000");
+
+    public static void replayRefusesAGzippedCapture() throws Exception {
+        Path path = Files.createTempFile("depz-", ".depzrec");
+        try {
+            byte[] plain;
+            try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(GZIPPED_CAPTURE))) {
+                plain = in.readAllBytes();
+            }
+            Files.write(path, plain);
+            eq("depz.rec/1", new ReplayLink(path, false, false).header().get("schema")); // a valid capture
+            Files.write(path, GZIPPED_CAPTURE);
+            throwsType(IllegalArgumentException.class, () -> new ReplayLink(path, false, false));
         } finally {
             Files.deleteIfExists(path);
         }

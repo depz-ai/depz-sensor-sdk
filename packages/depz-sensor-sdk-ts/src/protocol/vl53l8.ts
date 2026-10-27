@@ -3,7 +3,7 @@
  * Mirrors the Python reference `depz_sensor_sdk.protocol.vl53l8`.
  */
 
-import { checkUint } from "./wire.js";
+import { checkUint, needBytes } from "./wire.js";
 
 export enum Vl53l8Cmd {
   ReadReg = 0x32,
@@ -50,6 +50,10 @@ export function packWriteReg(addr: number, data: Uint8Array): Uint8Array {
 export function packStartStream(frameSize: number): Uint8Array {
   const out = new Uint8Array(2);
   new DataView(out.buffer).setUint16(0, checkUint("frameSize", frameSize, 16), true);
+  // contract 04 §4 rule 4: the firmware refuses 0 and > 8192; so does the host
+  if (frameSize < 1 || frameSize > STREAM_TOTAL_MAX) {
+    throw new RangeError(`frameSize: ${frameSize} outside 1..${STREAM_TOTAL_MAX}`);
+  }
   return out;
 }
 
@@ -62,6 +66,7 @@ export interface RegData {
 }
 
 export function unpackRegData(payload: Uint8Array): RegData {
+  needBytes("RPT_REG_DATA", payload, 9);
   const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   return {
     cmd: dv.getUint8(0),
@@ -79,6 +84,7 @@ export interface FrameChunk {
 }
 
 export function unpackFrameChunk(payload: Uint8Array): FrameChunk {
+  needBytes("RPT_VL53_FRAME", payload, 12);
   const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   return {
     timestampUs: dv.getBigUint64(0, true),
@@ -91,9 +97,13 @@ export function unpackFrameChunk(payload: Uint8Array): FrameChunk {
 /**
  * Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
  *
- * Rules (contract 04): reset on offset==0; chunks must be contiguous —
+ * Rules (contract 04 §4): reset on offset==0; chunks must be contiguous —
  * a gap discards the frame in progress; a frame completes when the
- * accumulated bytes equal `fullSize`.
+ * accumulated bytes equal `fullSize`. A chunk out of the rule-4 bounds
+ * (more than `chunkMax` bytes, `fullSize` over STREAM_TOTAL_MAX, or running
+ * past `fullSize`) is damaged: dropped and counted as a lost frame like the
+ * other damaged input, never thrown. `chunkMax` is the device's
+ * VL53_STREAM_FRAME_MAX (contract 11 §3: 1536 on the I2C board).
  */
 export class FrameReassembler {
   completed = 0;
@@ -103,8 +113,24 @@ export class FrameReassembler {
   private fullSize = 0;
   private timestampUs = 0n;
 
+  constructor(private readonly chunkMax: number = STREAM_CHUNK_MAX) {}
+
   /** Returns `{ timestampUs, frame }` when a frame completes. */
   feed(chunk: FrameChunk): { timestampUs: bigint; frame: Uint8Array } | null {
+    if (
+      chunk.data.length > this.chunkMax ||
+      chunk.fullSize > STREAM_TOTAL_MAX ||
+      chunk.offset + chunk.data.length > chunk.fullSize
+    ) {
+      // rule 4: damaged — the frame in progress is lost (counted, rules 1–2)
+      // and so is the frame an offset-0 chunk starts (counted); a damaged
+      // orphan with nothing in progress is dropped like any orphan
+      if (this.buf.length > 0) this.discarded += 1;
+      if (chunk.offset === 0) this.discarded += 1;
+      this.buf = new Uint8Array(0);
+      this.fullSize = 0;
+      return null;
+    }
     if (chunk.offset === 0) {
       if (this.buf.length > 0 && this.buf.length !== this.fullSize) {
         this.discarded += 1;
@@ -133,11 +159,6 @@ export class FrameReassembler {
       this.fullSize = 0;
       this.completed += 1;
       return { timestampUs: this.timestampUs, frame };
-    }
-    if (this.buf.length > this.fullSize) {
-      this.discarded += 1;
-      this.buf = new Uint8Array(0);
-      this.fullSize = 0;
     }
     return null;
   }

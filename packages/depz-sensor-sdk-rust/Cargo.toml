@@ -1,8 +1,8 @@
 [package]
 name = "depz-sensor-sdk"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
-description = "Contract-first Rust SDK for the DEPZ USB sensor line (SR04, VL53L4CD ToF, VL53L8CX/CH ToF, TMF8829 dToF, BNO086 IMU) — transport, protocol codecs, and sensor decode."
+description = "Contract-first Rust SDK for the DEPZ USB sensor line (SR04, VL53L4CD ToF, VL53L8CX/CH ToF, TMF8829 dToF, BNO086 IMU) — live devices over the USB serial port, record / replay, protocol codecs, and sensor decode."
 license = "MIT"
 repository = "https://github.com/depz-ai/depz-sensor-sdk"
 homepage = "https://github.com/depz-ai/depz-sensor-sdk"
@@ -14,6 +14,9 @@ exclude = ["tests", "docs", "scripts"]
 [lib]
 name = "depz_sensor_sdk"
 path = "src/lib.rs"
+
+[dependencies]
+serialport = "4"
 
 [dev-dependencies]
 serde_json = "1"

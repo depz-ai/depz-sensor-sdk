@@ -130,21 +130,27 @@ export class Tmf8829MeasurementBuilder {
       return null;
     }
 
+    let res: Tmf8829PixelResults;
+    try {
+      res = parseTmf8829Results(raw, f);
+    } catch (e) {
+      // Contract 14 §5/§6: decoded first; a corrupt results frame never
+      // reaches the capture timer and is dropped with its pending frames
+      // and any half-measurement collected before it.
+      this.parseErrors += 1;
+      this.problems.push(`fN=${f.fNumber}: ${e instanceof Error ? e.message : String(e)}`);
+      this.pending = [];
+      this.hist = [];
+      this.refs = [];
+      this.half = null;
+      return null;
+    }
     const t = this.timer.results(f.fpMode, f.systick, f.t0Integration, f.t1Integration, timestampUs, edgeUs, flags);
     for (const [pf, praw] of this.pending) {
       if (pf.kind === TMF8829_FID_HISTOGRAMS) this.hist.push({ info: pf, raw: praw });
       else this.refs.push(praw);
     }
     this.pending = [];
-    let res: Tmf8829PixelResults;
-    try {
-      res = parseTmf8829Results(raw, f);
-    } catch (e) {
-      this.parseErrors += 1;
-      this.problems.push(`fN=${f.fNumber}: ${e instanceof Error ? e.message : String(e)}`);
-      this.half = null;
-      return null;
-    }
 
     let frames: Tmf8829FrameInfo[];
     let times: Tmf8829FrameTime[];

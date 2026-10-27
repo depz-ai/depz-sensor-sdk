@@ -18,6 +18,7 @@ from depz_sensor_sdk.dataset import (
     DatasetWriter,
     PlayerState,
 )
+from depz_sensor_sdk.errors import InvalidStateError
 
 REPO = Path(__file__).resolve().parents[3]
 DUAL_SR04 = REPO / "contracts/vectors/recordings/dataset_dual_sr04.depzdata"
@@ -355,13 +356,13 @@ def test_close_and_path_constructor(tmp_path: Path):
     with DatasetPlayer(path, clock=FakeClock(), threaded=False) as p:
         assert p.duration_us == 400_000
         p.play()
-        with pytest.raises(RuntimeError):
+        with pytest.raises(InvalidStateError):
             p.wait(0)  # no player thread
     assert p.state is PlayerState.PAUSED
     p.close()  # idempotent
-    with pytest.raises(RuntimeError):
+    with pytest.raises(InvalidStateError):
         p.play()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(InvalidStateError):
         p.seek_us(0)
 
 

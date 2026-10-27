@@ -119,6 +119,13 @@ static void stream_orientation(depz_device *dev)
   (`depz_bno086_feature_request`: interval, batch interval, change
   sensitivity, flags, sensor-specific word); pass `granted` NULL there to skip
   the read-back. `depz_bno086_get_feature()` asks the rate of any sensor.
+- **Batching**: with a non-zero `batch_us` the hub holds a sensor's reports
+  and sends them in bursts (every ~0.25 s on the lab BNO086), each with its
+  own timestamp. `depz_bno086_flush(dev, sensor)` asks for them now (Force
+  Sensor Flush) and returns once the hub's Flush Completed arrived — a
+  `DEPZ_BNO_FLUSH_COMPLETED_REPORT` with `flushed_sensor` set, which also
+  reaches your callbacks and streams, after every report batched before the
+  call.
 
 The example program `examples/bno086_minimal.c` turns the quaternion into
 heading / pitch / roll and prints the rate each output really arrived at.
@@ -248,6 +255,17 @@ heading). It lasts until reset unless you call `depz_bno086_persist_tare()`.
 rotation (a unit quaternion; all zeros clears it) — for a board mounted
 rotated in your device. None of these three has an SH-2 answer: they return
 once the bridge took the frame.
+
+**Interactive calibration** (BNO086 only; a BNO085 ignores it) lets the hub
+refine the gyroscope's zero-rate offset while the device is still: tell it
+how the device is about to move with `depz_bno086_set_motion_intent(dev,
+DEPZ_BNO_MOTION_INTENT_STATIONARY_NO_VIBRATION)` (also
+`..._STATIONARY_WITH_VIBRATION`, `..._IN_MOTION`, `..._IN_MOTION_ACCELERATING`;
+`..._UNKNOWN` is the hub's initial state). No SH-2 answer. The hub's own
+wish — hold still, or go on — arrives as a `DEPZ_BNO_MOTION_REQUEST` report
+(`intent`, `request`) once you call `depz_bno086_enable_motion_request(dev,
+1)`: the hub sends one when its request changes, not at the rate, so there
+is no read-back of the granted rate.
 
 ## Sleep and power on
 
@@ -496,5 +514,7 @@ static void on_event(const depz_event *ev, void *user)
 - **Never block in a callback** — answers arrive on the reader thread.
 - **Two outgoing messages at a time** — busy is normal under bursts; the
   class retries, your own transport must too.
-- **Tare, persist tare, reorientation and periodic DCD have no answer** from
-  the hub; success means the bridge took the frame.
+- **Tare, persist tare, reorientation, periodic DCD and the motion intent have
+  no answer** from the hub; success means the bridge took the frame.
+- **Flush Completed is an input report**, not a control answer: `depz_bno086_flush()`
+  waits for it on the report path, and your stream sees it too.

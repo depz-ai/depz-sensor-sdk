@@ -132,6 +132,21 @@ public final class MeasurementBuilder {
             return null;
         }
 
+        PixelResults res;
+        try {
+            res = Frames.parseResults(raw, f);
+        } catch (FrameError e) {
+            // Contract 14 §5/§6: decoded first; a corrupt results frame never
+            // reaches the capture timer and is dropped with its pending frames
+            // and any half-measurement collected before it.
+            parseErrors += 1;
+            problems.add("fN=" + f.fNumber() + ": " + e.getMessage());
+            pending = new ArrayList<>();
+            hist = new ArrayList<>();
+            refs = new ArrayList<>();
+            half = null;
+            return null;
+        }
         FrameTime t = timer.resultsFrame(f, timestampUs, edgeUs, flags);
         for (Pending p : pending) {
             if (p.info().kind() == Frames.FID_HISTOGRAMS) {
@@ -141,15 +156,6 @@ public final class MeasurementBuilder {
             }
         }
         pending = new ArrayList<>();
-        PixelResults res;
-        try {
-            res = Frames.parseResults(raw, f);
-        } catch (FrameError e) {
-            parseErrors += 1;
-            problems.add("fN=" + f.fNumber() + ": " + e.getMessage());
-            half = null;
-            return null;
-        }
 
         List<FrameInfo> frames;
         List<FrameTime> times;

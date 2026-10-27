@@ -1,7 +1,9 @@
 /* fake_vl53l4.h — in-process fake VL53L4CD bridge firmware over a loopback
  * link: a byte-addressed register map seeded like a booted sensor (the C
  * twin of the Python SDK's tests/fake_vl53l4.py), answering READ_REG /
- * WRITE_REG / SET_I2C_SPEED / XSHUT / START_STREAM / STOP_STREAM / GET_INFO.
+ * WRITE_REG / SET_I2C_SPEED / XSHUT / START_STREAM / STOP_STREAM / GET_INFO,
+ * and SET_ADDR_WIDTH / CLEAR_I2C_ERRORS, so the APP_VL53L0_4 family's L1X ULD
+ * (depz_vl53lx_*) runs on the same register file.
  * The default configuration block leaves the sensor "data ready", which is
  * what the ULD's VHV wait needs. */
 #ifndef DEPZ_TEST_FAKE_VL53L4_H

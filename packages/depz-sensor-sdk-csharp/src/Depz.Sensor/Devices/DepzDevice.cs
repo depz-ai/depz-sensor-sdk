@@ -9,9 +9,14 @@ namespace Depz.Sensor.Devices;
 /// <summary>Base of the unsolicited / diagnostic events a device emits.</summary>
 public abstract record DeviceEvent;
 
-/// <summary>A gap in packet sequence numbers; <c>ReportedByDevice</c>: the board saw a gap in
-/// host TX (RPT_SEQUENCE_ERROR), else the host saw one in the board's packets.</summary>
+/// <summary>The board saw a gap in host TX (RPT_SEQUENCE_ERROR); <c>ReportedByDevice</c> is
+/// always true.</summary>
 public sealed record SequenceErrorEvent(int ExpectedSeq, int ReceivedSeq, bool ReportedByDevice) : DeviceEvent;
+
+/// <summary>The host saw a gap in the board's packets (contract 01 §5 step 5): the packet still
+/// arrives, <c>Missed</c> = (received − expected) mod 256 did not. Counted in
+/// <c>LinkStats.SeqGaps</c>.</summary>
+public sealed record SeqGapEvent(int ExpectedSeq, int ReceivedSeq, int Missed) : DeviceEvent;
 
 /// <summary>A packet whose payload CRC did not check.</summary>
 public sealed record LinkCrcErrorEvent(int Cmd, int Seq) : DeviceEvent;
@@ -54,6 +59,9 @@ public sealed class LinkStats
 
     /// <summary>RPT_SEQUENCE_ERROR reports: gaps the device saw in host → device packets.</summary>
     public long DeviceSeqErrors { get; internal set; }
+
+    /// <summary>Callbacks that threw on the reader thread (contract 07 §3).</summary>
+    public long CallbackErrors { get; internal set; }
 }
 
 /// <summary>Claims a packet as the reply to a request: return true and set <paramref name="result"/>.</summary>
@@ -138,7 +146,11 @@ public class DepzDevice : IDisposable
         }
     }
 
-    public void Dispose() => Close();
+    public void Dispose()
+    {
+        Close();
+        GC.SuppressFinalize(this);
+    }
 
     // ── for sensor classes ───────────────────────────────────────────────────
 
@@ -253,7 +265,7 @@ public class DepzDevice : IDisposable
 
     /// <summary>Device µs → host monotonic µs (<see cref="HostNowUs"/>); needs a <see cref="SyncTime"/> first.</summary>
     public long ToHostTimeUs(long deviceTimestampUs) =>
-        deviceTimestampUs - (_core.TimeSync ?? throw new InvalidOperationException("call SyncTime() first")).OffsetUs;
+        deviceTimestampUs - (_core.TimeSync ?? throw new InvalidStateException("call SyncTime() first")).OffsetUs;
 
     /// <summary>The device → host payload CRC mode.</summary>
     public CrcType GetReportPayloadCrc() =>
@@ -266,9 +278,7 @@ public class DepzDevice : IDisposable
     /// <summary>Set the device → host payload CRC mode (host → device is per packet: <see cref="TxCrcType"/>).</summary>
     public void SetReportPayloadCrc(CrcType crcType)
     {
-        if (!Enum.IsDefined(typeof(CrcType), crcType))
-            throw new ArgumentOutOfRangeException(nameof(crcType), crcType, "not a CrcType (0..3)");
-        RequestOk((int)Cmd.SetPayloadCrcType, new[] { (byte)crcType });
+        RequestOk((int)Cmd.SetPayloadCrcType, Common.PackSetPayloadCrcType((int)crcType));
     }
 
     public SyncPinConfig GetSyncPin(int pin)
@@ -411,7 +421,7 @@ public class DepzDevice : IDisposable
                 p.Fail(e);
         }
 
-        private void Emit(DeviceEvent e) => Events.Emit(e);
+        private void Emit(DeviceEvent e) => Events.Emit(e, Stats);
 
         private void ReaderLoop()
         {
@@ -475,8 +485,16 @@ public class DepzDevice : IDisposable
 
         private void TrackSeq(int seq)
         {
-            if (_lastRxSeq >= 0 && seq != ((_lastRxSeq + 1) & 0xFF))
-                Stats.SeqGaps++;
+            // The first packet after open is no gap; a gap is surfaced ahead of its packet.
+            if (_lastRxSeq >= 0)
+            {
+                int expected = (_lastRxSeq + 1) & 0xFF;
+                if (seq != expected)
+                {
+                    Stats.SeqGaps++;
+                    Emit(new SeqGapEvent(expected, seq, (seq - expected) & 0xFF));
+                }
+            }
             _lastRxSeq = seq;
         }
 
@@ -548,13 +566,16 @@ public class DepzDevice : IDisposable
             if (claimed != null)
             {
                 if (bad != null)
-                    claimed.Fail(new DepzException($"reply to cmd 0x{claimed.Cmd:X2} does not decode: {bad.Message}", bad));
+                    claimed.Fail(new InvalidReplyException(claimed.Cmd, bad));
                 else
                     claimed.Complete(result);
                 return;
             }
 
-            if (pkt.Cmd == (int)Rpt.SequenceError && pkt.Payload.Length == 2)
+            // Contract 07 §3: a report longer than its fields is decoded and the tail
+            // ignored (a newer firmware may append fields); a shorter one is not a
+            // report of that kind and stays visible as hex text below.
+            if (pkt.Cmd == (int)Rpt.SequenceError && pkt.Payload.Length >= 2)
             {
                 var rep = SequenceErrorReport.Unpack(pkt.Payload);
                 Stats.DeviceSeqErrors++;
@@ -567,7 +588,7 @@ public class DepzDevice : IDisposable
                 Emit(new TextEvent(rep.Cmd, rep.Text));
                 return;
             }
-            if (pkt.Cmd == (int)Rpt.Temperature && pkt.Payload.Length == 10)
+            if (pkt.Cmd == (int)Rpt.Temperature && pkt.Payload.Length >= 10)
             {
                 var rep = TemperatureReport.Unpack(pkt.Payload);
                 Emit(new TemperatureEvent(rep.TimestampUs, rep.Celsius));
@@ -580,6 +601,10 @@ public class DepzDevice : IDisposable
         }
     }
 
+    // Done is set by the reader thread, possibly after the requester has given up and left:
+    // disposing it would race that Set. A ManualResetEventSlim that never allocated a wait
+    // handle holds nothing to free.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "Done outlives the request; see above")]
     private sealed class Pending
     {
         public readonly int Cmd;

@@ -836,8 +836,13 @@ int depz_vl53lx_get_range_timing(depz_device *dev, int *budget_ms, int *inter_ms
 ### depz_vl53lx_set_mode
 
 ```c
-int depz_vl53lx_set_mode(depz_device *dev, const char *mode);
+int depz_vl53lx_set_mode(depz_device *dev, const char *mode, int *budget_ms);
 ```
+
+`budget_ms` (NULL = don't want it) gets the timing budget in effect after
+the change on a driver whose mode change can move it — VL53L1: a budget the
+new mode does not tabulate moves to the nearest one it does (15 ms short ->
+20 ms long; contract 12 §5) — else 0.
 
 ### depz_vl53lx_get_mode
 

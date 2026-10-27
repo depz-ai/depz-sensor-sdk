@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Reflection;
+using Depz.Sensor.Devices;
 
 namespace Depz.Sensor.Vl53l8;
 
@@ -183,7 +185,7 @@ public sealed class Vl53l8Driver
         _defaultXtalk = Blob("cx", "default_xtalk"); // identical in every set
         _getNvmCmd = Blob("cx", "get_nvm_cmd");
         if (_firmware.Length != 0x15000)
-            throw new InvalidDataException($"firmware.bin ({set}) has the wrong size: {_firmware.Length}");
+            throw new InvalidStateException($"firmware.bin ({set}) has the wrong size: {_firmware.Length}");
     }
 
     public Vl53l8Firmware Firmware { get; }
@@ -224,7 +226,7 @@ public sealed class Vl53l8Driver
     {
         string res = $"Depz.Sensor.Vl53l8.{set}.{name}.bin";
         using var s = typeof(Vl53l8Driver).GetTypeInfo().Assembly.GetManifestResourceStream(res)
-            ?? throw new InvalidOperationException($"embedded resource {res} is missing");
+            ?? throw new InvalidStateException($"embedded resource {res} is missing");
         using var ms = new MemoryStream();
         s.CopyTo(ms);
         return ms.ToArray();
@@ -570,7 +572,7 @@ public sealed class Vl53l8Driver
         {
             // Readable once the sensor FW runs; tells L5 (MZ) from L7 (MZEVO): one blob, one board.
             ModuleType = DciReadData(DciFwFlags, 8)[1];
-            Note($"Sensor init done (module type {ModuleType switch { ModuleTypeMz => "MZ", ModuleTypeMzevo => "MZEVO", ModuleTypeMzplus => "MZPlus", _ => ModuleType.ToString() }})");
+            Note($"Sensor init done (module type {ModuleType switch { ModuleTypeMz => "MZ", ModuleTypeMzevo => "MZEVO", ModuleTypeMzplus => "MZPlus", _ => ModuleType?.ToString(CultureInfo.InvariantCulture) }})");
         }
         else
         {
@@ -965,12 +967,14 @@ public sealed class Vl53l8Driver
 
     // ── xtalk ────────────────────────────────────────────────────────────────
 
-    /// <summary>Xtalk margin, kcps/SPAD.</summary>
-    public double GetXtalkMargin() => BinaryPrimitives.ReadUInt32LittleEndian(DciReadData(DciXtalkCfg, 16)) / 2048.0;
+    /// <summary>Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).</summary>
+    public int GetXtalkMargin() =>
+        Vl53l8Advanced.XtalkMarginKcps(BinaryPrimitives.ReadUInt32LittleEndian(DciReadData(DciXtalkCfg, 16)));
 
-    public void SetXtalkMargin(double marginKcps)
+    /// <summary>Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.</summary>
+    public void SetXtalkMargin(int marginKcps)
     {
-        if (!(marginKcps >= 0 && marginKcps <= 10000))
+        if (marginKcps < 0 || marginKcps > Vl53l8Advanced.XtalkMarginMaxKcps)
             throw new Vl53l8Exception(Vl53l8Exception.StatusInvalidParam, "set_xtalk_margin");
         DciReplaceData(DciXtalkCfg, 16, U32(Vl53l8Advanced.XtalkMarginRaw(marginKcps)), 0x00);
     }
@@ -1064,6 +1068,10 @@ public sealed class Vl53l8Driver
         return cfg;
     }
 
+    /// <summary>Stop surfacing the motion block: frames parse with <c>Motion</c> null. Called when
+    /// the VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).</summary>
+    public void MotionIndicatorDisarm() => _motionPresent = false;
+
     public void MotionIndicatorSetResolution(MotionConfig cfg, int resolution)
     {
         if (resolution != Resolution4x4 && resolution != Resolution8x8)
@@ -1132,7 +1140,7 @@ public sealed class Vl53l8Driver
         int savedIntegration = GetIntegrationTimeMs();
         int savedSharpener = GetSharpenerPercent();
         int savedTargetOrder = GetTargetOrder();
-        double savedMargin = GetXtalkMargin();
+        int savedMargin = GetXtalkMargin();
         int savedMode = GetRangingMode();
 
         SetResolution(Resolution8x8);

@@ -323,6 +323,7 @@ impl<'a> Parser<'a> {
                         _ => return Err(self.err("unknown escape")),
                     }
                 }
+                0x00..=0x1F => return Err(self.err("control character in string")),
                 _ => {
                     // Copy the (possibly multi-byte UTF-8) character.
                     let start = self.pos - 1;
@@ -371,24 +372,43 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// RFC 8259 number: `-? (0 | [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?`.
     fn parse_number(&mut self) -> Result<Value, JsonError> {
         let start = self.pos;
         if self.peek() == Some(b'-') {
             self.pos += 1;
         }
-        while let Some(c) = self.peek() {
-            if c.is_ascii_digit() || c == b'.' || c == b'e' || c == b'E' || c == b'+' || c == b'-' {
-                self.pos += 1;
-            } else {
-                break;
+        match self.peek() {
+            Some(b'0') => self.pos += 1,
+            Some(b'1'..=b'9') => self.skip_digits(),
+            _ => return Err(self.err("bad number")),
+        }
+        if self.peek() == Some(b'.') {
+            self.pos += 1;
+            if !self.peek().is_some_and(|c| c.is_ascii_digit()) {
+                return Err(self.err("bad number"));
             }
+            self.skip_digits();
+        }
+        if matches!(self.peek(), Some(b'e' | b'E')) {
+            self.pos += 1;
+            if matches!(self.peek(), Some(b'+' | b'-')) {
+                self.pos += 1;
+            }
+            if !self.peek().is_some_and(|c| c.is_ascii_digit()) {
+                return Err(self.err("bad number"));
+            }
+            self.skip_digits();
         }
         let s = std::str::from_utf8(&self.bytes[start..self.pos])
             .map_err(|_| self.err("bad number"))?;
-        if s.is_empty() || s == "-" {
-            return Err(self.err("bad number"));
-        }
         Ok(Value::Number(s.to_string()))
+    }
+
+    fn skip_digits(&mut self) {
+        while self.peek().is_some_and(|c| c.is_ascii_digit()) {
+            self.pos += 1;
+        }
     }
 }
 
@@ -396,4 +416,10 @@ impl<'a> Parser<'a> {
 pub fn object_map(v: &Value) -> Option<BTreeMap<String, Value>> {
     v.entries()
         .map(|e| e.iter().cloned().collect::<BTreeMap<_, _>>())
+}
+
+/// Contract 08 «Line rules»: a `.depzrec` / `.depzdata` line of nothing but JSON whitespace
+/// (space, tab, CR) is blank — NUL, NBSP or another Unicode space is not.
+pub(crate) fn is_blank_line(line: &str) -> bool {
+    line.bytes().all(|b| matches!(b, b' ' | b'\t' | b'\r'))
 }

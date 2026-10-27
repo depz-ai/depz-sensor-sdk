@@ -29,8 +29,14 @@ pub struct DetectionThresholds {
 }
 
 impl From<uld::Vl53l4Error> for DepzError {
+    /// A refused argument is `InvalidArgument` (contract 07 §3); what the
+    /// sensor produced (a short block, an oscillator word of 0) is `Sensor`.
     fn from(e: uld::Vl53l4Error) -> Self {
-        DepzError::Sensor(e.to_string())
+        if e.is_argument() {
+            DepzError::InvalidArgument(e.to_string())
+        } else {
+            DepzError::Sensor(e.to_string())
+        }
     }
 }
 
@@ -101,7 +107,9 @@ impl Vl53l4cdDriver {
             }
             self.p.sleep_ms(1);
         }
-        Err(DepzError::Sensor("timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03".into()))
+        Err(DepzError::Sensor(
+            "timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03".into(),
+        ))
     }
 
     /// Initialise the sensor and leave the bus at `bus_khz`. The configuration block goes at 400 kHz,
@@ -132,7 +140,11 @@ impl Vl53l4cdDriver {
 
     pub fn start_ranging(&self) -> Result<()> {
         // INTERMEASUREMENT 0 = continuous, anything else = autonomous low power.
-        let mode = if self.read_dword(uld::INTERMEASUREMENT_MS)? == 0 { 0x21 } else { 0x40 };
+        let mode = if self.read_dword(uld::INTERMEASUREMENT_MS)? == 0 {
+            0x21
+        } else {
+            0x40
+        };
         self.write_byte(uld::SYSTEM_START, mode)
     }
 
@@ -141,7 +153,11 @@ impl Vl53l4cdDriver {
     }
 
     pub fn check_for_data_ready(&self) -> Result<bool> {
-        let int_pol = if (self.read_byte(uld::GPIO_HV_MUX__CTRL)? & 0x10) >> 4 == 1 { 0 } else { 1 };
+        let int_pol = if (self.read_byte(uld::GPIO_HV_MUX__CTRL)? & 0x10) >> 4 == 1 {
+            0
+        } else {
+            1
+        };
         Ok(self.read_byte(uld::GPIO__TIO_HV_STATUS)? & 1 == int_pol)
     }
 
@@ -158,15 +174,28 @@ impl Vl53l4cdDriver {
 
     /// One block read instead of the C driver's six register reads; the decoding is identical.
     pub fn get_result(&self) -> Result<Vl53l4Results> {
-        Ok(uld::parse_result_block(&self.p.read_multi(uld::RESULT_BLOCK_ADDR, uld::RESULT_BLOCK_LEN as usize)?)?)
+        Ok(uld::parse_result_block(&self.p.read_multi(
+            uld::RESULT_BLOCK_ADDR,
+            uld::RESULT_BLOCK_LEN as usize,
+        )?)?)
     }
 
     // ── timing ───────────────────────────────────────────────────────────────
 
     pub fn set_range_timing(&self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()> {
-        let clock_pll = if inter_measurement_ms > 0 { self.read_word(uld::RESULT__OSC_CALIBRATE_VAL)? } else { 0 };
-        let (a, b, im) =
-            uld::range_timing_registers(timing_budget_ms, inter_measurement_ms, self.read_word(uld::OSC_FREQUENCY)?, clock_pll)?;
+        // refused before any register traffic, not only before the writes
+        uld::check_range_timing(timing_budget_ms, inter_measurement_ms)?;
+        let clock_pll = if inter_measurement_ms > 0 {
+            self.read_word(uld::RESULT__OSC_CALIBRATE_VAL)?
+        } else {
+            0
+        };
+        let (a, b, im) = uld::range_timing_registers(
+            timing_budget_ms,
+            inter_measurement_ms,
+            self.read_word(uld::OSC_FREQUENCY)?,
+            clock_pll,
+        )?;
         self.write_dword(uld::INTERMEASUREMENT_MS, im)?;
         self.write_word(uld::RANGE_CONFIG_A, a)?;
         self.write_word(uld::RANGE_CONFIG_B, b)
@@ -202,13 +231,20 @@ impl Vl53l4cdDriver {
     }
 
     pub fn get_xtalk(&self) -> Result<u16> {
-        Ok(uld::decode_xtalk(self.read_word(uld::XTALK_PLANE_OFFSET_KCPS)?))
+        Ok(uld::decode_xtalk(
+            self.read_word(uld::XTALK_PLANE_OFFSET_KCPS)?,
+        ))
     }
 
     // ── thresholds ───────────────────────────────────────────────────────────
 
     /// The distance-window interrupt; `window` is one of [`uld::WINDOW_BELOW`] … [`uld::WINDOW_IN`].
-    pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()> {
+    pub fn set_detection_thresholds(
+        &self,
+        distance_low_mm: u16,
+        distance_high_mm: u16,
+        window: u8,
+    ) -> Result<()> {
         self.write_byte(uld::SYSTEM__INTERRUPT, window)?;
         self.write_word(uld::THRESH_HIGH, distance_high_mm)?;
         self.write_word(uld::THRESH_LOW, distance_low_mm)
@@ -225,19 +261,29 @@ impl Vl53l4cdDriver {
     }
 
     pub fn set_signal_threshold(&self, signal_kcps: u16) -> Result<()> {
-        self.write_word(uld::MIN_COUNT_RATE_RTN_LIMIT_MCPS, uld::signal_threshold_raw(signal_kcps))
+        self.write_word(
+            uld::MIN_COUNT_RATE_RTN_LIMIT_MCPS,
+            uld::signal_threshold_raw(signal_kcps),
+        )
     }
 
     pub fn get_signal_threshold(&self) -> Result<u16> {
-        Ok(uld::decode_signal_threshold(self.read_word(uld::MIN_COUNT_RATE_RTN_LIMIT_MCPS)?))
+        Ok(uld::decode_signal_threshold(
+            self.read_word(uld::MIN_COUNT_RATE_RTN_LIMIT_MCPS)?,
+        ))
     }
 
     pub fn set_sigma_threshold(&self, sigma_mm: u16) -> Result<()> {
-        self.write_word(uld::RANGE_CONFIG__SIGMA_THRESH, uld::sigma_threshold_raw(sigma_mm)?)
+        self.write_word(
+            uld::RANGE_CONFIG__SIGMA_THRESH,
+            uld::sigma_threshold_raw(sigma_mm)?,
+        )
     }
 
     pub fn get_sigma_threshold(&self) -> Result<u16> {
-        Ok(uld::decode_sigma_threshold(self.read_word(uld::RANGE_CONFIG__SIGMA_THRESH)?))
+        Ok(uld::decode_sigma_threshold(
+            self.read_word(uld::RANGE_CONFIG__SIGMA_THRESH)?,
+        ))
     }
 
     // ── temperature and calibration ──────────────────────────────────────────
@@ -255,7 +301,11 @@ impl Vl53l4cdDriver {
     }
 
     // The ranging loop both calibrations share: data ready, result, clear, n times.
-    fn collect(&self, nb_samples: u32, mut on_sample: impl FnMut(u32, &Vl53l4Results)) -> Result<()> {
+    fn collect(
+        &self,
+        nb_samples: u32,
+        mut on_sample: impl FnMut(u32, &Vl53l4Results),
+    ) -> Result<()> {
         self.start_ranging()?;
         for i in 0..nb_samples {
             self.wait_data_ready(5000)?;
@@ -270,7 +320,9 @@ impl Vl53l4cdDriver {
     /// programmed, mm.
     pub fn calibrate_offset(&self, target_dist_mm: i32, nb_samples: u32) -> Result<i32> {
         if !(5..=255).contains(&nb_samples) || !(10..=1000).contains(&target_dist_mm) {
-            return Err(DepzError::Sensor("nb_samples must be 5..255, target 10..1000 mm".into()));
+            return Err(DepzError::InvalidArgument(
+                "nb_samples must be 5..255, target 10..1000 mm".into(),
+            ));
         }
         self.write_word(uld::RANGE_OFFSET_MM, 0)?;
         self.write_word(uld::INNER_OFFSET_MM, 0)?;
@@ -287,7 +339,9 @@ impl Vl53l4cdDriver {
     /// programmed, kcps (C rounding).
     pub fn calibrate_xtalk(&self, target_dist_mm: i32, nb_samples: u32) -> Result<i32> {
         if !(5..=255).contains(&nb_samples) || !(10..=5000).contains(&target_dist_mm) {
-            return Err(DepzError::Sensor("nb_samples must be 5..255, target 10..5000 mm".into()));
+            return Err(DepzError::InvalidArgument(
+                "nb_samples must be 5..255, target 10..5000 mm".into(),
+            ));
         }
         self.write_word(uld::XTALK_PLANE_OFFSET_KCPS, 0)?; // compensation off
         self.collect(10, |_, _| {})?; // device heat loop
@@ -298,18 +352,29 @@ impl Vl53l4cdDriver {
             }
         })?;
         if samples.is_empty() {
-            return Err(DepzError::Sensor("xtalk calibration failed: no valid samples".into()));
+            return Err(DepzError::Sensor(
+                "xtalk calibration failed: no valid samples".into(),
+            ));
         }
         let n = samples.len() as f64;
         let avg_distance = samples.iter().map(|s| s.distance_mm as f64).sum::<f64>() / n;
         let avg_spad_nb = samples.iter().map(|s| s.number_of_spad as f64).sum::<f64>() / n;
-        let avg_signal = samples.iter().map(|s| s.signal_rate_kcps as f64).sum::<f64>() / n;
+        let avg_signal = samples
+            .iter()
+            .map(|s| s.signal_rate_kcps as f64)
+            .sum::<f64>()
+            / n;
         let tmp = (1.0 - avg_distance / target_dist_mm as f64) * (avg_signal / avg_spad_nb);
         if tmp > 127.0 {
             // 65536 / 512
-            return Err(DepzError::Sensor(format!("xtalk calibration failed: {tmp:.1} kcps > 127")));
+            return Err(DepzError::Sensor(format!(
+                "xtalk calibration failed: {tmp:.1} kcps > 127"
+            )));
         }
-        self.write_word(uld::XTALK_PLANE_OFFSET_KCPS, ((tmp * 512.0) as i64 & 0xFFFF) as u16)?;
+        self.write_word(
+            uld::XTALK_PLANE_OFFSET_KCPS,
+            ((tmp * 512.0) as i64 & 0xFFFF) as u16,
+        )?;
         Ok(round_half_away(tmp) as i32)
     }
 }

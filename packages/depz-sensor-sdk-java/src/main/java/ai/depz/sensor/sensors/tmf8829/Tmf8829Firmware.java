@@ -1,5 +1,6 @@
 package ai.depz.sensor.sensors.tmf8829;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -40,7 +41,7 @@ public final class Tmf8829Firmware {
     private static byte[] readResource(String name) {
         try (InputStream in = Tmf8829Firmware.class.getResourceAsStream(name)) {
             if (in == null) {
-                throw new IllegalStateException("resource " + name + " missing from the classpath");
+                throw new InvalidStateException("resource " + name + " missing from the classpath");
             }
             return in.readAllBytes();
         } catch (IOException e) {

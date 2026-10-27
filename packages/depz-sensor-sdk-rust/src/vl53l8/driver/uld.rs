@@ -6,10 +6,13 @@ use super::frame::{Vl53l8Frame, Vl53l8Motion};
 use super::tables;
 use super::Vl53l8Platform;
 use crate::vl53l8::advanced::{
-    thresh_scale, try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw,
-    DetectionThreshold, MotionConfig, NB_THRESHOLDS, POWER_MODE_DEEP_SLEEP, POWER_MODE_SLEEP, POWER_MODE_WAKEUP,
+    thresh_scale, try_default_motion_config, try_pack_detection_thresholds,
+    try_xtalk_margin_to_raw, xtalk_margin_from_raw, DetectionThreshold, MotionConfig,
+    NB_THRESHOLDS, POWER_MODE_DEEP_SLEEP, POWER_MODE_SLEEP, POWER_MODE_WAKEUP,
 };
-use crate::vl53l8::decode::{self, swap_buffer, Variant, NB_TARGET_PER_ZONE, RESOLUTION_4X4, RESOLUTION_8X8};
+use crate::vl53l8::decode::{
+    self, swap_buffer, Variant, NB_TARGET_PER_ZONE, RESOLUTION_4X4, RESOLUTION_8X8,
+};
 
 /// `set_ranging_mode`: continuous ranging (the integration time has no effect).
 pub const RANGING_MODE_CONTINUOUS: u8 = 1;
@@ -114,11 +117,23 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         };
         // Output enables word 3: 0 on the LMZ firmware; the frame tail and footer-id offset differ
         // between ULD 2.1.0 (cx) and the 2.0.x drivers.
-        let output_enable_w3 = if matches!(firmware, Vl53l8Firmware::Ch | Vl53l8Firmware::L7ch) { 0 } else { 0xC0000000 };
-        let frame_tail = if firmware == Vl53l8Firmware::Cx { 32 } else { 24 };
+        let output_enable_w3 = if matches!(firmware, Vl53l8Firmware::Ch | Vl53l8Firmware::L7ch) {
+            0
+        } else {
+            0xC0000000
+        };
+        let frame_tail = if firmware == Vl53l8Firmware::Cx {
+            32
+        } else {
+            24
+        };
         // Cx: footer id at size-12; Ch: size-4, no trim (the L5/L7 trim to the zones in use is
         // done here, to the resolution start_ranging programmed).
-        let variant = if firmware == Vl53l8Firmware::Cx { Variant::Cx } else { Variant::Ch };
+        let variant = if firmware == Vl53l8Firmware::Cx {
+            Variant::Cx
+        } else {
+            Variant::Ch
+        };
         Vl53l8Driver {
             p: platform,
             firmware,
@@ -205,10 +220,12 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     fn read(&self, addr: u16, size: usize) -> UldResult<Vec<u8>> {
         let buf = self.p.read_multi(addr, size)?;
         if buf.len() < size {
-            return Err(Vl53l8UldError::Platform(crate::devices::DepzError::Protocol(format!(
-                "VL53L8 read 0x{addr:04X}: {} of {size} bytes",
-                buf.len()
-            ))));
+            return Err(Vl53l8UldError::Platform(
+                crate::devices::DepzError::Protocol(format!(
+                    "VL53L8 read 0x{addr:04X}: {} of {size} bytes",
+                    buf.len()
+                )),
+            ));
         }
         Ok(buf)
     }
@@ -226,7 +243,15 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     }
 
     /// `_vl53l8cx_poll_for_answer`: until `buf[pos] & mask == expected`; 10 ms period, 2 s timeout.
-    fn poll_for_answer(&self, size: usize, pos: usize, address: u16, mask: u8, expected: u8, at: &str) -> UldResult<()> {
+    fn poll_for_answer(
+        &self,
+        size: usize,
+        pos: usize,
+        address: u16,
+        mask: u8,
+        expected: u8,
+        at: &str,
+    ) -> UldResult<()> {
         let mut timeout = 0;
         loop {
             let buf = self.read(address, size)?;
@@ -272,7 +297,14 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         cmd[9] = 0x02;
         cmd[11] = 0x08;
         self.write(UI_CMD_END - 11, &cmd)?;
-        self.poll_for_answer(4, 1, UI_CMD_STATUS, 0xFF, 0x03, &format!("dci read 0x{index:04X}"))?;
+        self.poll_for_answer(
+            4,
+            1,
+            UI_CMD_STATUS,
+            0xFF,
+            0x03,
+            &format!("dci read 0x{index:04X}"),
+        )?;
         let buf = swap_buffer(&self.read(UI_CMD_START, data_size + 12)?);
         Ok(buf[4..4 + data_size].to_vec())
     }
@@ -281,7 +313,9 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     pub fn dci_write_data(&self, index: u16, data: &[u8]) -> UldResult<()> {
         let n = data.len();
         if n + 12 > UI_CMD_END as usize + 1 {
-            return Err(Vl53l8UldError::InvalidArgument(format!("dci write 0x{index:04X}: {n} bytes do not fit")));
+            return Err(Vl53l8UldError::InvalidArgument(format!(
+                "dci write 0x{index:04X}: {n} bytes do not fit"
+            )));
         }
         let mut buf = vec![0u8; n + 12];
         buf[0] = (index >> 8) as u8;
@@ -289,15 +323,37 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         buf[2] = ((n & 0xFF0) >> 4) as u8;
         buf[3] = ((n & 0xF) << 4) as u8;
         buf[4..4 + n].copy_from_slice(&swap_buffer(data));
-        let tail = [0x00, 0x00, 0x00, 0x0F, 0x05, 0x01, ((n + 8) >> 8) as u8, (n + 8) as u8];
+        let tail = [
+            0x00,
+            0x00,
+            0x00,
+            0x0F,
+            0x05,
+            0x01,
+            ((n + 8) >> 8) as u8,
+            (n + 8) as u8,
+        ];
         buf[4 + n..].copy_from_slice(&tail);
         self.write(UI_CMD_END - (n as u16 + 12) + 1, &buf)?;
-        self.poll_for_answer(4, 1, UI_CMD_STATUS, 0xFF, 0x03, &format!("dci write 0x{index:04X}"))
+        self.poll_for_answer(
+            4,
+            1,
+            UI_CMD_STATUS,
+            0xFF,
+            0x03,
+            &format!("dci write 0x{index:04X}"),
+        )
     }
 
     /// `vl53l8cx_dci_replace_data`: read `data_size` bytes of DCI `index`, put `new_data` at
     /// `new_data_pos`, write it back.
-    pub fn dci_replace_data(&self, index: u16, data_size: usize, new_data: &[u8], new_data_pos: usize) -> UldResult<()> {
+    pub fn dci_replace_data(
+        &self,
+        index: u16,
+        data_size: usize,
+        new_data: &[u8],
+        new_data_pos: usize,
+    ) -> UldResult<()> {
         if new_data_pos + new_data.len() > data_size {
             return Err(Vl53l8UldError::InvalidArgument(format!(
                 "dci replace 0x{index:04X}: {} bytes at {new_data_pos} past {data_size}",
@@ -337,7 +393,8 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         // Drop the 8-byte NVM header and append the footer at 0x1E0.
         let mut output = vec![0u8; OFFSET_BUFFER_SIZE];
         output[..OFFSET_BUFFER_SIZE - 8].copy_from_slice(&buf[8..]);
-        output[OFFSET_BUFFER_SIZE - 8..].copy_from_slice(&[0x00, 0x00, 0x00, 0x0F, 0x03, 0x01, 0x01, 0xE4]);
+        output[OFFSET_BUFFER_SIZE - 8..]
+            .copy_from_slice(&[0x00, 0x00, 0x00, 0x0F, 0x03, 0x01, 0x01, 0xE4]);
         self.write(0x2E18, &output)?;
         self.poll_for_answer(4, 1, UI_CMD_STATUS, 0xFF, 0x03, "offset data")
     }
@@ -351,12 +408,12 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
             buf[0x20..0x28].copy_from_slice(&[0x00, 0x78, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08]);
             buf = swap_buffer(&buf);
             let mut signal = [0i64; 64];
-            for k in 0..64 {
-                signal[k] = u32le(&buf, 0x34 + 4 * k) as i64;
+            for (k, s) in signal.iter_mut().enumerate() {
+                *s = u32le(&buf, 0x34 + 4 * k) as i64;
             }
             average_4x4(&mut signal);
-            for k in 0..64 {
-                put_u32le(&mut buf, 0x34 + 4 * k, signal[k] as u32);
+            for (k, &s) in signal.iter().enumerate() {
+                put_u32le(&mut buf, 0x34 + 4 * k, s as u32);
             }
             buf = swap_buffer(&buf);
             buf[0x134..0x138].copy_from_slice(&[0xA0, 0xFC, 0x01, 0x00]);
@@ -525,7 +582,10 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
             if crc != expected {
                 return Err(Vl53l8UldError::status(
                     status::FW_CHECKSUM_FAIL,
-                    format!("crc=0x{crc:08X} (expected 0x{expected:08X} for {})", self.firmware.set_name()),
+                    format!(
+                        "crc=0x{crc:08X} (expected 0x{expected:08X} for {})",
+                        self.firmware.set_name()
+                    ),
                 ));
             }
             note("Sensor FW checksum OK");
@@ -577,7 +637,10 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// 16 (4×4) or 64 (8×8) zones; uploads the offsets and xtalk for it.
     pub fn set_resolution(&mut self, res: usize) -> UldResult<()> {
         if res != RESOLUTION_4X4 && res != RESOLUTION_8X8 {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_resolution"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_resolution",
+            ));
         }
         let four = res == RESOLUTION_4X4;
         let mut buf = self.dci_read_data(DCI_DSS_CONFIG, 16)?;
@@ -623,7 +686,10 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
             buf[0x03] = 0x2;
             0x01
         } else {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_ranging_mode"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_ranging_mode",
+            ));
         };
         self.dci_write_data(DCI_RANGING_MODE, &buf)?;
         self.dci_write_data(DCI_SINGLE_RANGE, &single_range.to_le_bytes())
@@ -646,9 +712,17 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// 2..1000 ms; no effect in continuous mode.
     pub fn set_integration_time_ms(&mut self, time_ms: i32) -> UldResult<()> {
         if !(2..=1000).contains(&time_ms) {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_integration_time_ms"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_integration_time_ms",
+            ));
         }
-        self.dci_replace_data(DCI_INT_TIME, 20, &(time_ms as u32 * 1000).to_le_bytes(), 0x00)
+        self.dci_replace_data(
+            DCI_INT_TIME,
+            20,
+            &(time_ms as u32 * 1000).to_le_bytes(),
+            0x00,
+        )
     }
 
     /// 0..99 %, rounded to nearest on the way back (ST truncates and loses a count for 95 of the
@@ -662,10 +736,15 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// [`Vl53l8UldError::InvalidArgument`].
     pub fn set_sharpener_percent(&mut self, pct: i32) -> UldResult<()> {
         if pct >= 100 {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_sharpener_percent"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_sharpener_percent",
+            ));
         }
         if pct < 0 {
-            return Err(Vl53l8UldError::InvalidArgument(format!("sharpener is 0..99 %, got {pct}")));
+            return Err(Vl53l8UldError::InvalidArgument(format!(
+                "sharpener is 0..99 %, got {pct}"
+            )));
         }
         self.dci_replace_data(DCI_SHARPENER, 16, &[(pct * 255 / 100) as u8], 0xD)
     }
@@ -678,7 +757,10 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// [`TARGET_ORDER_CLOSEST`] or [`TARGET_ORDER_STRONGEST`].
     pub fn set_target_order(&mut self, order: u8) -> UldResult<()> {
         if order != TARGET_ORDER_CLOSEST && order != TARGET_ORDER_STRONGEST {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_target_order"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_target_order",
+            ));
         }
         self.dci_replace_data(DCI_TARGET_ORDER, 4, &[order], 0x0)
     }
@@ -756,7 +838,10 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         self.resolution = Some(res);
 
         self.dci_write_data(DCI_OUTPUT_LIST, &u32s(&output))?;
-        self.dci_write_data(DCI_OUTPUT_CONFIG, &u32s(&[self.data_read_size as u32, output.len() as u32 + 1]))?;
+        self.dci_write_data(
+            DCI_OUTPUT_CONFIG,
+            &u32s(&[self.data_read_size as u32, output.len() as u32 + 1]),
+        )?;
         self.dci_write_data(DCI_OUTPUT_ENABLES, &u32s(&enable))?;
 
         // Start xshut bypass (interrupt mode)
@@ -823,7 +908,12 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     pub fn check_data_ready(&mut self) -> UldResult<bool> {
         let buf = self.read(0x0, 4)?;
         let b0 = buf[0] as i32;
-        if b0 != self.stream_count && b0 != 255 && buf[1] == 0x05 && buf[2] & 0x05 == 0x05 && buf[3] & 0x10 == 0x10 {
+        if b0 != self.stream_count
+            && b0 != 255
+            && buf[1] == 0x05
+            && buf[2] & 0x05 == 0x05
+            && buf[3] & 0x10 == 0x10
+        {
             self.stream_count = b0;
             return Ok(true);
         }
@@ -870,7 +960,11 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
                 r.reflectance.truncate(nt);
             }
         }
-        let motion = if self.motion_present { parse_motion(&swap_buffer(raw))? } else { None };
+        let motion = if self.motion_present {
+            parse_motion(&swap_buffer(raw))?
+        } else {
+            None
+        };
         Ok(Vl53l8Frame::from_results(timestamp_us, r, motion))
     }
 
@@ -941,21 +1035,27 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
             self.wr(0x000F, 0x43)?;
             self.wr(0x7FFF, 0x02)?;
         } else {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "set_power_mode"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "set_power_mode",
+            ));
         }
         Ok(())
     }
 
     // ── xtalk ────────────────────────────────────────────────────────────────
 
-    /// Xtalk margin, kcps/SPAD.
-    pub fn get_xtalk_margin(&self) -> UldResult<f64> {
-        Ok(u32le(&self.dci_read_data(DCI_XTALK_CFG, 16)?, 0) as f64 / 2048.0)
+    /// Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
+    pub fn get_xtalk_margin(&self) -> UldResult<u32> {
+        Ok(xtalk_margin_from_raw(u32le(
+            &self.dci_read_data(DCI_XTALK_CFG, 16)?,
+            0,
+        )))
     }
 
-    /// Xtalk margin, kcps/SPAD: 0..10000 (NaN and anything else is [`status::INVALID_PARAM`],
-    /// nothing written).
-    pub fn set_xtalk_margin(&mut self, margin_kcps: f64) -> UldResult<()> {
+    /// Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+    /// [`status::INVALID_PARAM`], nothing written.
+    pub fn set_xtalk_margin(&mut self, margin_kcps: u32) -> UldResult<()> {
         let raw = try_xtalk_margin_to_raw(margin_kcps)
             .map_err(|_| Vl53l8UldError::status(status::INVALID_PARAM, "set_xtalk_margin"))?;
         self.dci_replace_data(DCI_XTALK_CFG, 16, &raw.to_le_bytes(), 0x00)
@@ -967,7 +1067,8 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         let buf = self.read(UI_CMD_START, XTALK_BUFFER_SIZE + 4)?;
         let mut output = vec![0u8; XTALK_BUFFER_SIZE];
         output[..XTALK_BUFFER_SIZE - 8].copy_from_slice(&buf[8..XTALK_BUFFER_SIZE]);
-        output[XTALK_BUFFER_SIZE - 8..].copy_from_slice(&[0x00, 0x00, 0x00, 0x0F, 0x00, 0x01, 0x03, 0x04]);
+        output[XTALK_BUFFER_SIZE - 8..]
+            .copy_from_slice(&[0x00, 0x00, 0x00, 0x0F, 0x00, 0x01, 0x03, 0x04]);
         Ok(output)
     }
 
@@ -1006,7 +1107,12 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     pub fn set_detection_thresholds_enable(&mut self, enabled: bool) -> UldResult<()> {
         let grp = [0x01, if enabled { 0x01 } else { 0x00 }, 0x01, 0x00];
         self.dci_replace_data(DCI_DET_THRESH_GLOBAL_CONFIG, 8, &grp, 0x00)?;
-        self.dci_replace_data(DCI_DET_THRESH_CONFIG, 20, &[if enabled { 0x04 } else { 0x0C }], 0x11)
+        self.dci_replace_data(
+            DCI_DET_THRESH_CONFIG,
+            20,
+            &[if enabled { 0x04 } else { 0x0C }],
+            0x11,
+        )
     }
 
     /// The 64 thresholds, low / high rescaled to the units of their measurement (floor division).
@@ -1032,8 +1138,8 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// Program the 64 thresholds (missing entries are zeros). More than 64, or a low / high whose
     /// scaled value does not fit i32, is [`Vl53l8UldError::InvalidArgument`], nothing written.
     pub fn set_detection_thresholds(&mut self, thresholds: &[DetectionThreshold]) -> UldResult<()> {
-        let packed =
-            try_pack_detection_thresholds(thresholds).map_err(|e| Vl53l8UldError::InvalidArgument(e.to_string()))?;
+        let packed = try_pack_detection_thresholds(thresholds)
+            .map_err(|e| Vl53l8UldError::InvalidArgument(e.to_string()))?;
         self.dci_write_data(DCI_DET_THRESH_VALID_STATUS, &packed.valid)?;
         self.dci_write_data(DCI_DET_THRESH_START, &packed.start)
     }
@@ -1061,9 +1167,20 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         Ok(cfg)
     }
 
+    /// Stop surfacing the motion block: frames parse with `motion` `None`. Called when the VL53LMZ
+    /// CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+    pub fn motion_indicator_disarm(&mut self) {
+        self.motion_present = false;
+    }
+
     /// Set `cfg`'s zone map for `res` (16 or 64, else [`status::INVALID_PARAM`]) and write it.
-    pub fn motion_indicator_set_resolution(&mut self, cfg: &mut MotionConfig, res: usize) -> UldResult<()> {
-        cfg.try_set_resolution(res).map_err(|_| Vl53l8UldError::status(status::INVALID_PARAM, "motion set_resolution"))?;
+    pub fn motion_indicator_set_resolution(
+        &mut self,
+        cfg: &mut MotionConfig,
+        res: usize,
+    ) -> UldResult<()> {
+        cfg.try_set_resolution(res)
+            .map_err(|_| Vl53l8UldError::status(status::INVALID_PARAM, "motion set_resolution"))?;
         self.dci_write_data(DCI_MOTION_DETECTOR_CFG, &cfg.pack())
     }
 
@@ -1076,12 +1193,20 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
         distance_max_mm: i32,
     ) -> UldResult<()> {
         // wrapping_sub: the C / Java int subtraction, never a panic.
-        if distance_max_mm.wrapping_sub(distance_min_mm) > 1500 || distance_min_mm < 400 || distance_max_mm > 4000 {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "motion set_distance"));
+        if distance_max_mm.wrapping_sub(distance_min_mm) > 1500
+            || distance_min_mm < 400
+            || distance_max_mm > 4000
+        {
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "motion set_distance",
+            ));
         }
         cfg.ref_bin_offset = ((distance_min_mm as f64 / 37.5348 - 4.0) * 2048.5) as i32;
-        cfg.feature_length =
-            ((((distance_max_mm - distance_min_mm) as f64 / 10.0 + 30.02784) / 15.01392 + 0.5) as i32 & 0xFF) as u8;
+        cfg.feature_length = ((((distance_max_mm - distance_min_mm) as f64 / 10.0 + 30.02784)
+            / 15.01392
+            + 0.5) as i32
+            & 0xFF) as u8;
         self.dci_write_data(DCI_MOTION_DETECTOR_CFG, &cfg.pack())
     }
 
@@ -1100,7 +1225,11 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
             }
             let (kind, mut bh_size, idx) = bh_fields(output[i]);
             if (0x1..0x0D).contains(&kind) {
-                bh_size = if (0x54D0..0x54D0 + 960).contains(&idx) { res32 } else { res32 * NB_TARGET };
+                bh_size = if (0x54D0..0x54D0 + 960).contains(&idx) {
+                    res32
+                } else {
+                    res32 * NB_TARGET
+                };
                 output[i] = bh_set_size(output[i], bh_size);
                 size += kind * bh_size;
             } else {
@@ -1119,15 +1248,29 @@ impl<P: Vl53l8Platform> Vl53l8Driver<P> {
     /// outside is [`status::INVALID_PARAM`], nothing sent. Takes seconds; the configuration is
     /// saved and restored around it. Without cover glass the firmware answers "coverglass too
     /// good": [`Vl53l8Driver::xtalk_calibration_failed`], and the default buffer stays.
-    pub fn calibrate_xtalk(&mut self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> UldResult<()> {
+    pub fn calibrate_xtalk(
+        &mut self,
+        reflectance_percent: i32,
+        nb_samples: i32,
+        distance_mm: i32,
+    ) -> UldResult<()> {
         if !(1..=99).contains(&reflectance_percent) {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "reflectance 1..99"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "reflectance 1..99",
+            ));
         }
         if !(600..=3000).contains(&distance_mm) {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "distance 600..3000"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "distance 600..3000",
+            ));
         }
         if !(1..=16).contains(&nb_samples) {
-            return Err(Vl53l8UldError::status(status::INVALID_PARAM, "nb_samples 1..16"));
+            return Err(Vl53l8UldError::status(
+                status::INVALID_PARAM,
+                "nb_samples 1..16",
+            ));
         }
 
         let saved_resolution = self.get_resolution()?;
@@ -1194,13 +1337,20 @@ fn parse_motion(buf: &[u8]) -> UldResult<Option<Vl53l8Motion>> {
     let mut i = 16;
     while i + 4 <= drs {
         let (t, s, idx) = bh_fields(u32le(buf, i));
-        let msize = if t > 0x1 && t < 0xD { (t * s) as usize } else { s as usize };
+        let msize = if t > 0x1 && t < 0xD {
+            (t * s) as usize
+        } else {
+            s as usize
+        };
         if i + 4 + msize > drs {
             break;
         }
         if idx == MOTION_DETEC_IDX {
             if i + 16 + 4 * 32 > drs {
-                return Err(Vl53l8UldError::status(status::CORRUPTED_FRAME, "motion block past the frame end"));
+                return Err(Vl53l8UldError::status(
+                    status::CORRUPTED_FRAME,
+                    "motion block past the frame end",
+                ));
             }
             let motion = (0..32).map(|k| u32le(buf, i + 16 + 4 * k)).collect();
             return Ok(Some(Vl53l8Motion {
@@ -1230,7 +1380,9 @@ fn bh_set_size(bh: u32, size: u32) -> u32 {
 fn average_4x4(grid: &mut [i64; 64]) {
     for j in 0..4 {
         for i in 0..4 {
-            grid[i + 4 * j] = (grid[2 * i + 16 * j] + grid[2 * i + 16 * j + 1] + grid[2 * i + 16 * j + 8]
+            grid[i + 4 * j] = (grid[2 * i + 16 * j]
+                + grid[2 * i + 16 * j + 1]
+                + grid[2 * i + 16 * j + 8]
                 + grid[2 * i + 16 * j + 9])
                 .div_euclid(4);
         }

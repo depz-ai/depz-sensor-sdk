@@ -54,8 +54,9 @@ See `docs/guide.md` for the full guide and `docs/api.md` for the API reference.
 
 ## License
 
-MIT. Bundled VL53L8 sensor-firmware blobs are © STMicroelectronics
-(BSD-3-Clause); see `NOTICE`.
+MIT. Bundled VL53L5/L7/L8 sensor-firmware blobs are © STMicroelectronics
+(BSD-3-Clause); the bundled TMF8829 sensor firmware is © ams-OSRAM (MIT,
+`depz_sensor_sdk/tmf8829/data/LICENSES-MIT.TXT`); see `NOTICE`.
 
 Open source — source and issue tracker:
 <https://github.com/depz-ai/depz-sensor-sdk>.

@@ -22,6 +22,7 @@
 //!     - `FEAT_FRAC`  : `i8 [nb_agg * feat]` (padded up to a word boundary)
 //!     - `AMBIENT_INT`: `i32[nb_agg]`
 //!     - `AMBIENT_FRAC`: `i8[nb_agg]`
+//!
 //!   The real histogram value is `hist_raw / 2**hist_scaler`.
 
 // ---- persistent-data header layout (plugin_cnh.c) ----
@@ -70,15 +71,12 @@ pub struct CnhData {
 pub enum CnhError {
     /// `raw` is too short for the header or the computed block extends past it.
     Truncated,
-    /// `nb_of_aggregates` or `feature_length` is zero.
-    EmptyConfig,
 }
 
 impl std::fmt::Display for CnhError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CnhError::Truncated => write!(f, "VL53L8 CNH block truncated"),
-            CnhError::EmptyConfig => write!(f, "VL53L8 CNH empty config"),
         }
     }
 }
@@ -106,13 +104,11 @@ fn read_i8(raw: &[u8], off: usize) -> Result<i8, CnhError> {
 /// Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
 /// DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
 /// device reports a single buffer and the ping/pong selection resolves to the
-/// sole buffer.
+/// sole buffer. As the reference, an empty configuration (no aggregates or no
+/// bins) decodes to empty histograms rather than an error.
 pub fn decode_cnh(cfg: &CnhDecodeConfig, raw: &[u8]) -> Result<CnhData, CnhError> {
     let nb_agg = cfg.nb_of_aggregates;
     let feat = cfg.feature_length;
-    if nb_agg == 0 || feat == 0 {
-        return Err(CnhError::EmptyConfig);
-    }
 
     // ref_residual: u32 at word[2] (byte offset 8) — vl53lmz_cnh_get_ref_residual.
     let ref_residual_word = read_i32(raw, 2 * 4)? as u32;
@@ -174,8 +170,13 @@ fn decode_aggregate(
     for i in 0..feat {
         hist_scaler.push(read_i8(raw, feat_frac_off + i)?);
     }
-    // (AMBIENT_INT / AMBIENT_FRAC follow after ((3 + agg_x_feat) / 4) * 4 bytes;
-    // not decoded here — the DEPZ CNH surface returns histograms only.)
+    blk += agg_x_feat.div_ceil(4) * 4;
+    // AMBIENT_INT (int32 per aggregate) and AMBIENT_FRAC (int8 per aggregate):
+    // the DEPZ CNH surface returns histograms only, but a block that ends
+    // before them is truncated, exactly as the reference refuses it.
+    read_i32(raw, blk + agg_id * 4)?;
+    blk += nb_agg * 4;
+    read_i8(raw, blk + agg_id)?;
 
     Ok(CnhAggregate {
         hist_raw,

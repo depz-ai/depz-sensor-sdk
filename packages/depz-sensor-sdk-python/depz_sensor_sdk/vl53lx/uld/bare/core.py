@@ -22,8 +22,15 @@ INT streaming is a separate question (see the plan, E8.7).
 Reference C driver: ../../../temp/STSW-IMG033_L3/…/VL53L3CX_BareDriver/
 """
 
+from __future__ import annotations
+
+from typing import Callable, Sequence
+
+from depz_sensor_sdk.vl53lx.uld.base import BridgePlatform
 from depz_sensor_sdk.vl53lx.uld.bare.image import DeviceImage, RANGE_START_BLOCKS
-from depz_sensor_sdk.vl53lx.uld.bare.nvm import NvmReader
+from depz_sensor_sdk.vl53lx.uld.bare.nvm import (AdditionalOffsetCalData, CalPeakRateMap,
+                                                 NvmReader, OpticalCentre)
+from depz_sensor_sdk.vl53lx.uld.bare.regs import RegBlock
 from depz_sensor_sdk.vl53lx.uld.bare.tuning import TUNING, DEFAULTS
 
 # ── register map (vl53lx_register_map.h, vl53lx_hist_map.h) ──────────────────
@@ -105,14 +112,14 @@ def encode_row_col(row: int, col: int) -> int:
     return (((15 - col) << 3) + row) & 0xFF
 
 
-def decode_row_col(spad_number: int) -> tuple:
+def decode_row_col(spad_number: int) -> tuple[int, int]:
     """-> (row, col)"""
     if spad_number > 127:
         return 8 + ((255 - spad_number) & 0x07), (spad_number - 128) >> 3
     return spad_number & 0x07, (127 - spad_number) >> 3
 
 
-def decode_zone_size(encoded_xy_size: int) -> tuple:
+def decode_zone_size(encoded_xy_size: int) -> tuple[int, int]:
     """-> (width, height)"""
     return encoded_xy_size & 0x0F, encoded_xy_size >> 4
 
@@ -121,7 +128,8 @@ def encode_zone_size(width: int, height: int) -> int:
     return ((height << 4) + width) & 0xFF
 
 
-def decode_zone_limits(encoded_xy_centre: int, encoded_xy_size: int) -> tuple:
+def decode_zone_limits(encoded_xy_centre: int,
+                       encoded_xy_size: int) -> tuple[int, int, int, int]:
     """-> (x_ll, y_ll, x_ur, y_ur), clipped to the SPAD array."""
     y_centre, x_centre = decode_row_col(encoded_xy_centre)
     width, height = decode_zone_size(encoded_xy_size)
@@ -137,9 +145,10 @@ def is_aperture_location(row: int, col: int) -> bool:
     return (row % 4, col % 4) in ((0, 2), (2, 0))
 
 
-def calc_mm_effective_spads(encoded_mm_roi_centre, encoded_mm_roi_size,
-                            encoded_zone_centre, encoded_zone_size,
-                            good_spads, aperture_attenuation) -> tuple:
+def calc_mm_effective_spads(encoded_mm_roi_centre: int, encoded_mm_roi_size: int,
+                            encoded_zone_centre: int, encoded_zone_size: int,
+                            good_spads: bytes,
+                            aperture_attenuation: int) -> tuple[int, int]:
     """-> (mm inner, mm outer) effective SPADs, in 1/256 of a SPAD.
 
     Needed because our boards ship without the FMT offset calibration: with it
@@ -166,10 +175,11 @@ def calc_mm_effective_spads(encoded_mm_roi_centre, encoded_mm_roi_size,
     return inner, outer
 
 
-def combine_mm1_mm2_offsets(mm1_offset_mm, mm2_offset_mm,
-                            encoded_mm_roi_centre, encoded_mm_roi_size,
-                            encoded_zone_centre, encoded_zone_size,
-                            cal_data, good_spads, aperture_attenuation) -> int:
+def combine_mm1_mm2_offsets(mm1_offset_mm: int, mm2_offset_mm: int,
+                            encoded_mm_roi_centre: int, encoded_mm_roi_size: int,
+                            encoded_zone_centre: int, encoded_zone_size: int,
+                            cal_data: AdditionalOffsetCalData, good_spads: bytes,
+                            aperture_attenuation: int) -> int:
     """`VL53LX_hist_combine_mm1_mm2_offsets()` -> `range_offset_mm`, in quarter
     millimetres (`range_maths()` adds it before the /4 rounding step).
 
@@ -203,7 +213,7 @@ def combine_mm1_mm2_offsets(mm1_offset_mm, mm2_offset_mm,
     return -(-num // total) if num < 0 else num // total
 
 
-def rtn_good_spads(nvm_copy_data) -> bytes:
+def rtn_good_spads(nvm_copy_data: RegBlock) -> bytes:
     """The 32 `global_config__spad_enables_rtn_*` bytes as one bitmap."""
     return bytes(getattr(nvm_copy_data, f'global_config__spad_enables_rtn_{i}')
                  for i in range(32))
@@ -250,15 +260,16 @@ def calc_encoded_timeout(timeout_us: int, macro_period_us: int) -> int:
     return encode_timeout(calc_timeout_mclks(timeout_us, macro_period_us))
 
 
-def duration_maths(pll_period_us, vcsel_parm_pclks, window_vclks,
-                   elapsed_mclks) -> int:
+def duration_maths(pll_period_us: int, vcsel_parm_pclks: int, window_vclks: int,
+                   elapsed_mclks: int) -> int:
     duration = (window_vclks * pll_period_us) >> 12
     duration *= (elapsed_mclks * vcsel_parm_pclks) >> 4
     return min(duration >> 12, 0xFFFFFFFF)
 
 
-def calc_timeout_register_values(phasecal_us, mm_us, range_us,
-                                 fast_osc_frequency, gen_cfg, tim_cfg):
+def calc_timeout_register_values(phasecal_us: int, mm_us: int, range_us: int,
+                                 fast_osc_frequency: int, gen_cfg: RegBlock,
+                                 tim_cfg: RegBlock) -> None:
     """Fill the six timeout registers, for VCSEL period A and then B."""
     if fast_osc_frequency == 0:
         raise ZeroDivisionError('osc_measured__fast_osc__frequency is 0')
@@ -304,11 +315,35 @@ class HistConfig:
 
     __slots__ = HIST_CFG_FIELDS
 
-    def __init__(self):
+    low_amb_even_bin_0_1:  int
+    low_amb_even_bin_2_3:  int
+    low_amb_even_bin_4_5:  int
+    low_amb_odd_bin_0_1:   int
+    low_amb_odd_bin_2_3:   int
+    low_amb_odd_bin_4_5:   int
+    mid_amb_even_bin_0_1:  int
+    mid_amb_even_bin_2_3:  int
+    mid_amb_even_bin_4_5:  int
+    mid_amb_odd_bin_0_1:   int
+    mid_amb_odd_bin_2:     int
+    mid_amb_odd_bin_3_4:   int
+    mid_amb_odd_bin_5:     int
+    user_bin_offset:       int
+    high_amb_even_bin_0_1: int
+    high_amb_even_bin_2_3: int
+    high_amb_even_bin_4_5: int
+    high_amb_odd_bin_0_1:  int
+    high_amb_odd_bin_2_3:  int
+    high_amb_odd_bin_4_5:  int
+    amb_thresh_low:        int
+    amb_thresh_high:       int
+    spad_array_selection:  int
+
+    def __init__(self) -> None:
         for name in HIST_CFG_FIELDS:
             setattr(self, name, 0)
 
-    def set_bin_sequence(self, even, odd):
+    def set_bin_sequence(self, even: Sequence[int], odd: Sequence[int]) -> None:
         """VL53LX_init_histogram_config_structure(): six even and six odd bin
         codes, packed two to a byte, then repeated across the three ambient
         levels (the device picks a level, we give it the same sequence)."""
@@ -339,7 +374,8 @@ class HistConfig:
         self.amb_thresh_high      = 0xFFFF
         self.spad_array_selection = 0x00
 
-    def copy_to_static_cfg(self, static, timing, dynamic):
+    def copy_to_static_cfg(self, static: RegBlock, timing: RegBlock,
+                           dynamic: RegBlock) -> None:
         """VL53LX_copy_hist_cfg_to_static_cfg(). The field names on the left
         are lite-mode names; in histogram mode the firmware reads them as the
         bin sequence."""
@@ -376,7 +412,7 @@ class HistConfig:
         dynamic.system__thresh_low = self.amb_thresh_high
         dynamic.system__enable_xtalk_per_quadrant = self.spad_array_selection
 
-    def bin_sequence(self, stream_count: int, ambient_events_sum: int) -> list:
+    def bin_sequence(self, stream_count: int, ambient_events_sum: int) -> list[int]:
         """VL53LX_hist_get_bin_sequence_config(): which of the three sequences
         the device used for this frame, even or odd according to the stream
         count. Ours are all the same, but the driver asks anyway."""
@@ -386,6 +422,7 @@ class HistConfig:
         if ambient_events_sum < 1024 * self.amb_thresh_low:
             level = 'low'
 
+        packed: list[int]
         if stream_count & 0x01 == 0:
             packed = [getattr(self, f'{level}_amb_even_bin_0_1'),
                       getattr(self, f'{level}_amb_even_bin_2_3'),
@@ -403,7 +440,7 @@ class HistConfig:
                       getattr(self, f'{level}_amb_odd_bin_2_3'),
                       getattr(self, f'{level}_amb_odd_bin_4_5')]
 
-        seq = []
+        seq: list[int] = []
         for byte in packed:
             seq += [byte & 0x0F, byte >> 4]
         return seq
@@ -414,7 +451,7 @@ class HistPostProcessConfig:
     `VL53LX_init_hist_post_process_config_struct()` leaves it. E8.4 is what
     reads most of these; the preset modes set valid_phase_low/high here."""
 
-    def __init__(self, xtalk_compensation_enable=0):
+    def __init__(self, xtalk_compensation_enable: int = 0) -> None:
         d = DEFAULTS
         self.hist_algo_select       = d['TUNINGPARM_HIST_ALGO_SELECT_DEFAULT']
         self.hist_target_order      = d['TUNINGPARM_HIST_TARGET_ORDER_DEFAULT']
@@ -470,7 +507,7 @@ class HistogramBinData:
     post-processing needs to read them — the VCSEL period they were taken at,
     the phase of zero distance, the bin sequence and the ambient estimate."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.result__interrupt_status = 0
         self.result__range_status = 0
         self.result__report_status = 0
@@ -478,7 +515,7 @@ class HistogramBinData:
         self.result__dss_actual_effective_spads = 0
         self.phasecal_result__reference_phase = 0
         self.phasecal_result__vcsel_start = 0
-        self.bin_data = [0] * HISTOGRAM_BUFFER_SIZE
+        self.bin_data: list[int] = [0] * HISTOGRAM_BUFFER_SIZE
         self.zone_id = 0
         self.first_bin = 0                 # VL53LX_p_019
         self.number_of_bins = HISTOGRAM_BUFFER_SIZE     # VL53LX_p_020, buffer
@@ -487,8 +524,8 @@ class HistogramBinData:
         self.vcsel_width = 0
         self.fast_osc_frequency = 0        # VL53LX_p_015
         self.vcsel_period = 0              # VL53LX_p_005, the register value
-        self.bin_seq = [0] * 6
-        self.bin_rep = [0] * 6             # how often each code was sampled
+        self.bin_seq: list[int] = [0] * 6
+        self.bin_rep: list[int] = [0] * 6  # how often each code was sampled
         self.min_bin_value = 0
         self.max_bin_value = 0
         self.number_of_ambient_bins = 0
@@ -503,10 +540,10 @@ class HistogramBinData:
         self.roi_config__user_roi_requested_global_xy_size = 0
 
     @property
-    def range_status(self):
+    def range_status(self) -> int:
         return self.result__range_status & RANGE_STATUS__RANGE_STATUS_MASK
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f'<HistogramBinData stream {self.result__stream_count} '
                 f'status {self.range_status} spads '
                 f'{self.result__dss_actual_effective_spads} '
@@ -528,10 +565,10 @@ DEVICESTATE_RANGING_DSS_AUTO      = 'dss_auto'
 
 class LLState:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         self.cfg_device_state = DEVICESTATE_SW_STANDBY
         self.cfg_stream_count = 0
         self.cfg_gph_id = GROUPEDPARAMETERHOLD_ID_MASK
@@ -541,7 +578,7 @@ class LLState:
         self.rd_gph_id = GROUPEDPARAMETERHOLD_ID_MASK
         self.rd_timing_status = 0
 
-    def update_rd(self, mode_start, grouped_parameter_hold):
+    def update_rd(self, mode_start: int, grouped_parameter_hold: int) -> None:
         if mode_start & DEVICEMEASUREMENTMODE_MODE_MASK == 0:
             self.rd_device_state = DEVICESTATE_SW_STANDBY
             self.rd_stream_count = 0
@@ -568,7 +605,7 @@ class LLState:
         else:
             self.reset()
 
-    def update_cfg(self, mode_start):
+    def update_cfg(self, mode_start: int) -> None:
         if mode_start & DEVICEMEASUREMENTMODE_MODE_MASK == 0:
             self.cfg_device_state = DEVICESTATE_SW_STANDBY
             self.cfg_stream_count = 0
@@ -599,22 +636,22 @@ class BareDriver:
     post-process config and the timeouts.
     """
 
-    def __init__(self, platform):
+    def __init__(self, platform: BridgePlatform) -> None:
         self.p = platform
         self.img = DeviceImage(platform)
         self.nvm = NvmReader(platform, self.img)
-        self.tuning = dict(TUNING)
+        self.tuning: dict[str, int] = dict(TUNING)
 
         self.hist_cfg = HistConfig()
         self.hpp = HistPostProcessConfig()
 
         # Factory data with no register of its own (read_p2p_data).
         self.rtn_good_spads = bytes(32)
-        self.optical_centre = None
-        self.cal_peak_rate_map = None
-        self.add_off_cal_data = None
-        self.fmt_dmax_cal = None
-        self.mm_roi = None
+        self.optical_centre: OpticalCentre | None = None
+        self.cal_peak_rate_map: CalPeakRateMap | None = None
+        self.add_off_cal_data: AdditionalOffsetCalData | None = None
+        self.fmt_dmax_cal: dict[str, int] | None = None
+        self.mm_roi: dict[str, int] | None = None
         self.result__osc_calibrate_val = 0
 
         self.preset_mode = 'medium'
@@ -630,7 +667,7 @@ class BareDriver:
         self._ambient_events_sum = 0
 
     # ── VL53LX_read_p2p_data ──
-    def read_p2p_data(self):
+    def read_p2p_data(self) -> None:
         """Pull the factory data: three register blocks and four NVM regions.
 
         Costs about 0.1 s over USB, almost all of it in the NVM.
@@ -700,7 +737,7 @@ class BareDriver:
                 x_centre=x << 4, y_centre=y << 4)
 
     # ── VL53LX_data_init + VL53LX_DataInit ──
-    def data_init(self):
+    def data_init(self) -> None:
         """Everything the L3CX API does between boot and the first start: read
         the factory data, take the default preset mode and the default timing
         budget. Leaves the sensor untouched apart from the reads."""
@@ -711,8 +748,8 @@ class BareDriver:
         self.set_measurement_timing_budget_us(33333)
 
     # ── preset modes ──
-    def set_preset_mode(self, mode='medium', dss_target_mcps=None,
-                        inter_measurement_period_ms=None):
+    def set_preset_mode(self, mode: str = 'medium', dss_target_mcps: int | None = None,
+                        inter_measurement_period_ms: int | None = None) -> None:
         """VL53LX_set_preset_mode() for the three histogram ranging modes.
 
         `mode` is the distance mode the L3CX API speaks in — short, medium or
@@ -746,7 +783,7 @@ class BareDriver:
         self.set_inter_measurement_period_ms(inter_measurement_period_ms)
         self._update_range_offset()
 
-    def _update_range_offset(self):
+    def _update_range_offset(self) -> None:
         """`VL53LX_get_device_results()` recomputes `hpp.range_offset_mm` on
         every frame, under `VL53LX_OFFSETCORRECTIONMODE__MM1_MM2_OFFSETS` --
         the only mode this driver has. Its inputs are the factory data and the
@@ -774,14 +811,14 @@ class BareDriver:
         return (nvm.identification__module_type == 0xAA
                 and nvm.identification__model_id in (0xEB, 0xEC))
 
-    def distance_modes(self) -> tuple:
+    def distance_modes(self) -> tuple[str, ...]:
         return L4_DISTANCE_MODES if self.is_l4() else DISTANCE_MODES
 
     def fda_max_timing_budget_us(self) -> int:
         return (L4_FDA_MAX_TIMING_BUDGET_US if self.is_l4()
                 else FDA_MAX_TIMING_BUDGET_US)
 
-    def set_distance_mode(self, mode):
+    def set_distance_mode(self, mode: str) -> None:
         """VL53LX_SetDistanceMode(): the preset mode, with the timeouts put
         back afterwards. `set_preset_mode()` on its own resets them to the
         preset's own defaults, which would silently throw away the timing
@@ -798,7 +835,7 @@ class BareDriver:
         self.set_preset_mode(mode)
         self.set_timeouts_us(phasecal_us, mm_us, range_us)
 
-    def _preset_mode_standard_ranging(self):
+    def _preset_mode_standard_ranging(self) -> None:
         """VL53LX_preset_mode_standard_ranging(): the base every histogram
         mode is built on. Most of it survives into the histogram modes; the
         parts that do not are overwritten a few lines later."""
@@ -930,7 +967,7 @@ class BareDriver:
                                      | DEVICEREADOUTMODE_SINGLE_SD
                                      | DEVICEMEASUREMENTMODE_BACKTOBACK)
 
-    def _preset_mode_histogram_ranging(self):
+    def _preset_mode_histogram_ranging(self) -> None:
         """VL53LX_preset_mode_histogram_ranging(): standard ranging, then the
         histogram engine. The distance-mode tails below refine it."""
         self._preset_mode_standard_ranging()
@@ -966,9 +1003,11 @@ class BareDriver:
             DEVICESCHEDULERMODE_HISTOGRAM | DEVICEREADOUTMODE_DUAL_SD
             | DEVICEMEASUREMENTMODE_BACKTOBACK)
 
-    def _preset_tail(self, even, odd, vcsel_a, vcsel_b, mm_a, mm_b,
-                     range_a, range_b, cal_vcsel_start, valid_phase_high,
-                     phase_rtn, phase_ref, extra_sequence=0):
+    def _preset_tail(self, even: Sequence[int], odd: Sequence[int],
+                     vcsel_a: int, vcsel_b: int, mm_a: int, mm_b: int,
+                     range_a: int, range_b: int, cal_vcsel_start: int,
+                     valid_phase_high: int, phase_rtn: str, phase_ref: str,
+                     extra_sequence: int = 0) -> None:
         """The shape all three histogram distance modes share: a bin sequence,
         a VCSEL period pair and the timeouts that go with it."""
         static = self.img.static_config
@@ -1009,7 +1048,7 @@ class BareDriver:
             | DEVICEMEASUREMENTMODE_BACKTOBACK)
 
     # ── timeouts ──
-    def set_timeouts_us(self, phasecal_us, mm_us, range_us):
+    def set_timeouts_us(self, phasecal_us: int, mm_us: int, range_us: int) -> None:
         self.phasecal_config_timeout_us = phasecal_us
         self.mm_config_timeout_us = mm_us
         self.range_config_timeout_us = range_us
@@ -1018,14 +1057,14 @@ class BareDriver:
             self.img.static_nvm_managed.osc_measured__fast_osc__frequency,
             self.img.general_config, self.img.timing_config)
 
-    def set_inter_measurement_period_ms(self, period_ms):
+    def set_inter_measurement_period_ms(self, period_ms: int) -> None:
         if self.result__osc_calibrate_val == 0:
             raise ZeroDivisionError('result__osc_calibrate_val is 0')
         self.inter_measurement_period_ms = period_ms
         self.img.timing_config.system__intermeasurement_period = \
             period_ms * self.result__osc_calibrate_val
 
-    def set_measurement_timing_budget_us(self, budget_us):
+    def set_measurement_timing_budget_us(self, budget_us: int) -> None:
         """VL53LX_SetMeasurementTimingBudgetMicroSeconds(). The budget covers
         the whole measurement, of which the range timeout is one sixth after a
         fixed guard comes off."""
@@ -1038,7 +1077,7 @@ class BareDriver:
                              self.mm_config_timeout_us, range_us)
 
     # ── the firmware patch StartMeasurement loads ──
-    def load_patch(self):
+    def load_patch(self) -> None:
         """VL53LX_load_patch(): a six-instruction phasecal patch, written with
         the firmware stopped."""
         power = {0: 0x00, 1: 0x10, 2: 0x20, 3: 0x40}.get(
@@ -1054,21 +1093,21 @@ class BareDriver:
         self.p.wr_byte(PATCH__CTRL, 0x01)
         self.p.wr_byte(FIRMWARE__ENABLE, 0x01)
 
-    def unload_patch(self):
+    def unload_patch(self) -> None:
         self.p.wr_byte(FIRMWARE__ENABLE, 0x00)
         self._disable_powerforce()
         self.p.wr_byte(PATCH__CTRL, 0x00)
         self.p.wr_byte(FIRMWARE__ENABLE, 0x01)
 
-    def _enable_powerforce(self):
+    def _enable_powerforce(self) -> None:
         self.p.wr_byte(POWER_MANAGEMENT__GO1_POWER_FORCE, 0x01)
         self.p.sleep_ms(1)              # 250 us settling, rounded up
 
-    def _disable_powerforce(self):
+    def _disable_powerforce(self) -> None:
         self.p.wr_byte(POWER_MANAGEMENT__GO1_POWER_FORCE, 0x00)
 
     # ── VL53LX_init_and_start_range ──
-    def init_and_start_range(self, blocks=RANGE_START_BLOCKS):
+    def init_and_start_range(self, blocks: Sequence[str] = RANGE_START_BLOCKS) -> None:
         """Write the configuration and start. `blocks` is ST's config level:
         all of them to start, and general_config onwards to clear the
         interrupt and let the next frame run."""
@@ -1092,14 +1131,14 @@ class BareDriver:
                              dynamic.system__grouped_parameter_hold)
         self.state.update_cfg(system.system__mode_start)
 
-    def clear_interrupt_and_start_next_range(self):
+    def clear_interrupt_and_start_next_range(self) -> None:
         """VL53LX_clear_interrupt_and_enable_next_range(): in histogram mode
         the interrupt is cleared by rewriting general_config onwards, not by a
         write to system__interrupt_clear alone."""
         self.init_and_start_range(('general_config', 'timing_config',
                                    'dynamic_config', 'system_control'))
 
-    def stop_range(self):
+    def stop_range(self) -> None:
         system = self.img.system_control
         system.system__mode_start = (
             (system.system__mode_start & DEVICEMEASUREMENTMODE_STOP_MASK)
@@ -1109,7 +1148,7 @@ class BareDriver:
         self.state.reset()
 
     # ── VL53LX_get_histogram_bin_data ──
-    def get_histogram_bin_data(self, raw=None) -> HistogramBinData:
+    def get_histogram_bin_data(self, raw: bytes | None = None) -> HistogramBinData:
         """One frame: 83 bytes off the sensor, decoded into bins plus the
         metadata the post-processing needs. `raw` lets a caller hand in bytes
         that arrived some other way (a stream report)."""
@@ -1197,7 +1236,7 @@ class BareDriver:
 # ── the three distance-mode tails (vl53lx_api_preset_modes.c) ────────────────
 # Each is the block VL53LX_preset_mode_histogram_<mode>_range() applies on top
 # of histogram_ranging: bin sequence, VCSEL periods, timeouts, phases.
-def _tail_long(drv):
+def _tail_long(drv: BareDriver) -> None:
     drv._preset_tail(even=(7, 0, 1, 2, 3, 4), odd=(0, 1, 2, 3, 4, 5),
                      vcsel_a=0x09, vcsel_b=0x0B, mm_a=0x0021, mm_b=0x001B,
                      range_a=0x0029, range_b=0x0022, cal_vcsel_start=0x09,
@@ -1206,7 +1245,7 @@ def _tail_long(drv):
                      phase_ref='tp_init_phase_ref_hist_long')
 
 
-def _tail_medium(drv):
+def _tail_medium(drv: BareDriver) -> None:
     drv._preset_tail(even=(7, 0, 1, 1, 2, 2), odd=(0, 1, 2, 1, 2, 3),
                      vcsel_a=0x05, vcsel_b=0x07, mm_a=0x0036, mm_b=0x0028,
                      range_a=0x0044, range_b=0x0033, cal_vcsel_start=0x05,
@@ -1215,7 +1254,7 @@ def _tail_medium(drv):
                      phase_ref='tp_init_phase_ref_hist_med')
 
 
-def _tail_short(drv):
+def _tail_short(drv: BareDriver) -> None:
     drv._preset_tail(even=(7, 7, 0, 1, 1, 1), odd=(0, 1, 1, 1, 2, 2),
                      vcsel_a=0x03, vcsel_b=0x05, mm_a=0x0052, mm_b=0x0037,
                      range_a=0x0066, range_b=0x0044, cal_vcsel_start=0x03,
@@ -1225,5 +1264,5 @@ def _tail_short(drv):
                      extra_sequence=SEQUENCE_MM1_EN)
 
 
-_PRESET_TAIL = {'long': _tail_long, 'medium': _tail_medium,
-                'short': _tail_short}
+_PRESET_TAIL: dict[str, Callable[[BareDriver], None]] = {
+    'long': _tail_long, 'medium': _tail_medium, 'short': _tail_short}

@@ -13,12 +13,15 @@ use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
 use crate::framing::Packet;
 use crate::vl53lx::bare::HistogramBinData;
-use crate::vl53lx::driver::{BinData, ExtraValue, Thresholds, Vl53lxDriver, Vl53lxPlatform, Vl53lxRange, Vl53lxTarget};
+use crate::vl53lx::driver::{
+    BinData, ExtraValue, Thresholds, Vl53lxDriver, Vl53lxPlatform, Vl53lxRange, Vl53lxTarget,
+};
 use crate::vl53lx::products::{product as product_row, product_from_board_name, DriverKind};
 use crate::vl53lx::uld::{create_driver, driver_kinds};
 use crate::vl53lx::{
-    pack_read_reg, pack_set_addr_width, pack_set_i2c_speed, pack_start_stream, pack_write_reg, pack_xshut, RegData,
-    StreamData, Vl53lxCmd, Vl53lxInfo, Vl53lxRpt, XFER_MAX, XSHUT_RESET,
+    pack_set_addr_width, pack_set_i2c_speed, pack_start_stream, pack_xshut, try_pack_read_reg,
+    try_pack_write_reg, RegData, StreamData, Vl53lxCmd, Vl53lxInfo, Vl53lxRpt, XFER_MAX,
+    XSHUT_RESET,
 };
 
 const REG_TIMEOUT: Duration = Duration::from_secs(2);
@@ -61,7 +64,12 @@ impl Vl53lxMeasurement {
     /// The distances a chart draws: the plottable targets in driver order, or the single distance.
     pub fn plot_distances(&self) -> Vec<i32> {
         if !self.targets.is_empty() {
-            return self.targets.iter().filter(|t| PLOTTABLE_STATUSES.contains(&t.status)).map(|t| t.distance_mm).collect();
+            return self
+                .targets
+                .iter()
+                .filter(|t| PLOTTABLE_STATUSES.contains(&t.status))
+                .map(|t| t.distance_mm)
+                .collect();
         }
         if self.plottable() {
             vec![self.distance_mm]
@@ -72,7 +80,9 @@ impl Vl53lxMeasurement {
 
     /// The one target a single-number readout shows, or `None`.
     pub fn primary_target(&self) -> Option<&Vl53lxTarget> {
-        self.targets.iter().find(|t| PLOTTABLE_STATUSES.contains(&t.status))
+        self.targets
+            .iter()
+            .find(|t| PLOTTABLE_STATUSES.contains(&t.status))
     }
 
     fn from(timestamp_us: u64, r: Vl53lxRange, bins: Option<BinData>) -> Vl53lxMeasurement {
@@ -87,7 +97,9 @@ impl Vl53lxMeasurement {
             spads: r.spads,
             targets: r.targets,
             extra: r.extra,
-            bins: bins.and_then(|b| b.downcast::<HistogramBinData>().ok()).map(Arc::from),
+            bins: bins
+                .and_then(|b| b.downcast::<HistogramBinData>().ok())
+                .map(Arc::from),
         }
     }
 }
@@ -157,7 +169,10 @@ impl Streams {
     /// Give the driver back, decoding what streamed in meanwhile.
     fn release(&self, mut drv: MutexGuard<'_, DriverSlot>) {
         let mut backlog = self.backlog.lock().unwrap();
-        let out: Vec<Vl53lxMeasurement> = backlog.drain(..).filter_map(|p| self.decode(&mut drv, &p)).collect();
+        let out: Vec<Vl53lxMeasurement> = backlog
+            .drain(..)
+            .filter_map(|p| self.decode(&mut drv, &p))
+            .collect();
         drop(drv);
         for m in out {
             self.measurements.emit(m);
@@ -179,7 +194,10 @@ impl ReportHandler for Streams {
                 return true;
             }
         };
-        let mut out: Vec<Vl53lxMeasurement> = backlog.drain(..).filter_map(|p| self.decode(&mut drv, &p)).collect();
+        let mut out: Vec<Vl53lxMeasurement> = backlog
+            .drain(..)
+            .filter_map(|p| self.decode(&mut drv, &p))
+            .collect();
         out.extend(self.decode(&mut drv, &packet.payload));
         drop(drv);
         for m in out {
@@ -193,13 +211,21 @@ impl ReportHandler for Streams {
     }
 }
 
-fn decode_frame(drv: &mut dyn Vl53lxDriver, timestamp_us: u64, data: &[u8]) -> Result<Vl53lxMeasurement> {
+fn decode_frame(
+    drv: &mut dyn Vl53lxDriver,
+    timestamp_us: u64,
+    data: &[u8],
+) -> Result<Vl53lxMeasurement> {
     if drv.histogram() {
         let bins = drv.bin_data(Some(data))?;
         let r = drv.to_measurement(&bins)?;
         Ok(Vl53lxMeasurement::from(timestamp_us, r, Some(bins)))
     } else {
-        Ok(Vl53lxMeasurement::from(timestamp_us, drv.decode(data)?, None))
+        Ok(Vl53lxMeasurement::from(
+            timestamp_us,
+            drv.decode(data)?,
+            None,
+        ))
     }
 }
 
@@ -233,14 +259,19 @@ impl Vl53lxPlatform for BridgePlatform {
             let n = (size - out.len()).min(XFER_MAX);
             let rep: RegData = self.dev.request(
                 Vl53lxCmd::ReadReg as u8,
-                &pack_read_reg(addr, n as u16),
+                &try_pack_read_reg(addr, n as u16)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
                 expect_report(Vl53lxRpt::RegData as u8, RegData::unpack),
                 Some(REG_TIMEOUT),
             )?;
             if rep.data.len() != n {
-                return Err(DepzError::Protocol(format!("READ_REG 0x{addr:04X}: expected {n}, got {}", rep.data.len())));
+                return Err(DepzError::Protocol(format!(
+                    "READ_REG 0x{addr:04X}: expected {n}, got {}",
+                    rep.data.len()
+                )));
             }
-            self.last_timestamp_us.store(rep.timestamp_us, Ordering::Relaxed);
+            self.last_timestamp_us
+                .store(rep.timestamp_us, Ordering::Relaxed);
             out.extend_from_slice(&rep.data);
             addr = addr.wrapping_add(n as u16);
         }
@@ -250,22 +281,36 @@ impl Vl53lxPlatform for BridgePlatform {
     fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()> {
         let mut addr = addr;
         for chunk in data.chunks(XFER_MAX) {
-            self.dev.request_ok(Vl53lxCmd::WriteReg as u8, &pack_write_reg(addr, chunk), Some(REG_TIMEOUT))?;
+            self.dev.request_ok(
+                Vl53lxCmd::WriteReg as u8,
+                &try_pack_write_reg(addr, chunk)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
+                Some(REG_TIMEOUT),
+            )?;
             addr = addr.wrapping_add(chunk.len() as u16);
         }
         Ok(())
     }
 
     fn set_i2c_speed(&self, khz: u16) -> Result<()> {
-        self.dev.request_ok(Vl53lxCmd::SetI2cSpeed as u8, &pack_set_i2c_speed(khz), None)
+        self.dev
+            .request_ok(Vl53lxCmd::SetI2cSpeed as u8, &pack_set_i2c_speed(khz), None)
     }
 
     fn set_addr_width(&self, width: u8) -> Result<()> {
-        self.dev.request_ok(Vl53lxCmd::SetAddrWidth as u8, &pack_set_addr_width(width)?, None)
+        self.dev.request_ok(
+            Vl53lxCmd::SetAddrWidth as u8,
+            &pack_set_addr_width(width)?,
+            None,
+        )
     }
 
     fn xshut_reset(&self) -> Result<()> {
-        self.dev.request_ok(Vl53lxCmd::Xshut as u8, &pack_xshut(XSHUT_RESET), Some(XSHUT_TIMEOUT))
+        self.dev.request_ok(
+            Vl53lxCmd::Xshut as u8,
+            &pack_xshut(XSHUT_RESET),
+            Some(XSHUT_TIMEOUT),
+        )
     }
 }
 
@@ -315,11 +360,14 @@ impl Vl53lxDevice {
         let streams = Arc::new(Streams {
             driver: Mutex::new(None),
             backlog: Mutex::new(VecDeque::new()),
-            measurements: Fanout::new(),
+            measurements: Fanout::new(dev.callback_errors_counter()),
             parse_errors: AtomicU64::new(0),
         });
         dev.set_report_handler(streams.clone());
-        let platform = Arc::new(BridgePlatform { dev: dev.requester(), last_timestamp_us: AtomicU64::new(0) });
+        let platform = Arc::new(BridgePlatform {
+            dev: dev.requester(),
+            last_timestamp_us: AtomicU64::new(0),
+        });
         Vl53lxDevice {
             dev,
             fixed_product,
@@ -358,7 +406,9 @@ impl Vl53lxDevice {
 
     // (product, driver kind) as init binds them, read where the device is not at hand (a recorder's
     // measurement hook).
-    pub(crate) fn bound_pair(&self) -> impl Fn() -> Option<(&'static str, &'static str)> + Send + Sync + 'static {
+    pub(crate) fn bound_pair(
+        &self,
+    ) -> impl Fn() -> Option<(&'static str, &'static str)> + Send + Sync + 'static {
         let bound = self.bound.clone();
         move || bound.lock().unwrap().map(|b| (b.product, b.kind))
     }
@@ -371,7 +421,11 @@ impl Vl53lxDevice {
     /// not call this device's driver-backed methods from `f`: the driver is held).
     /// [`DepzError::InvalidState`] before [`Vl53lxDevice::init`].
     pub fn with_driver<R>(&self, f: impl FnOnce(&mut dyn Vl53lxDriver) -> Result<R>) -> Result<R> {
-        let mut g = self.streams.driver.lock().unwrap_or_else(|p| p.into_inner());
+        let mut g = self
+            .streams
+            .driver
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         let r = match g.as_deref_mut() {
             Some(d) => f(d),
             None => Err(DepzError::InvalidState("call init() first".into())),
@@ -381,7 +435,11 @@ impl Vl53lxDevice {
     }
 
     pub fn initialized(&self) -> bool {
-        self.streams.driver.lock().unwrap_or_else(|p| p.into_inner()).is_some()
+        self.streams
+            .driver
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .is_some()
     }
 
     pub fn ranging(&self) -> bool {
@@ -411,9 +469,9 @@ impl Vl53lxDevice {
         };
         let kind = match driver {
             Some(k) => k,
-            None => *driver_kinds(name)?
-                .first()
-                .ok_or_else(|| DepzError::Unsupported(format!("{name} has no driver this SDK runs yet")))?,
+            None => *driver_kinds(name)?.first().ok_or_else(|| {
+                DepzError::Unsupported(format!("{name} has no driver this SDK runs yet"))
+            })?,
         };
         let (mut drv, caveat) = create_driver(name, kind, self.platform.clone())?;
         // Sticky on the bridge and 2 after a reset: set before the first register access.
@@ -421,9 +479,17 @@ impl Vl53lxDevice {
         self.sensor_init(drv.as_mut())?;
         let product = product_row(name).map_or("", |p| p.name);
         let kind = DriverKind::from_name(kind).map_or("", |k| k.as_str());
-        let mut g = self.streams.driver.lock().unwrap_or_else(|p| p.into_inner());
+        let mut g = self
+            .streams
+            .driver
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         *g = Some(drv);
-        *self.bound.lock().unwrap() = Some(Bound { product, kind, caveat });
+        *self.bound.lock().unwrap() = Some(Bound {
+            product,
+            kind,
+            caveat,
+        });
         self.streams.release(g);
         Ok(())
     }
@@ -475,8 +541,12 @@ impl Vl53lxDevice {
         let (product, kind) = (b.product, b.kind);
         let mut out = Vec::new();
         match det {
-            None => out.push(format!("{product}: board name carries no product number, named by hand")),
-            Some(d) if d != product => out.push(format!("{product}: borrowing this driver - the board says it is a {d}")),
+            None => out.push(format!(
+                "{product}: board name carries no product number, named by hand"
+            )),
+            Some(d) if d != product => out.push(format!(
+                "{product}: borrowing this driver - the board says it is a {d}"
+            )),
             _ => {}
         }
         if let (Some(row), Some(reach)) = (product_row(det.unwrap_or(product)), reach) {
@@ -520,11 +590,21 @@ impl Vl53lxDevice {
     /// none of the configuration — [`Vl53lxDevice::init`] again.
     pub fn xshut(&self, action: u8) -> Result<()> {
         if action > XSHUT_RESET {
-            return Err(DepzError::InvalidArgument(format!("XSHUT action must be 0 (off), 1 (on) or 2 (reset), got {action}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "XSHUT action must be 0 (off), 1 (on) or 2 (reset), got {action}"
+            )));
         }
-        self.request_ok(Vl53lxCmd::Xshut as u8, &pack_xshut(action), Some(XSHUT_TIMEOUT))?;
+        self.request_ok(
+            Vl53lxCmd::Xshut as u8,
+            &pack_xshut(action),
+            Some(XSHUT_TIMEOUT),
+        )?;
         self.ranging.store(false, Ordering::SeqCst);
-        let mut g = self.streams.driver.lock().unwrap_or_else(|p| p.into_inner());
+        let mut g = self
+            .streams
+            .driver
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         *g = None;
         self.streams.release(g);
         Ok(())
@@ -532,7 +612,12 @@ impl Vl53lxDevice {
 
     /// RPT_VL53_INFO — the bridge's own counters and settings; safe while streaming.
     pub fn bridge_info(&self) -> Result<Vl53lxInfo> {
-        self.request(Vl53lxCmd::GetInfo as u8, &[], expect_report(Vl53lxRpt::Info as u8, Vl53lxInfo::unpack), None)
+        self.request(
+            Vl53lxCmd::GetInfo as u8,
+            &[],
+            expect_report(Vl53lxRpt::Info as u8, Vl53lxInfo::unpack),
+            None,
+        )
     }
 
     // ── configuration (init first; not while ranging) ────────────────────────
@@ -590,7 +675,13 @@ impl Vl53lxDevice {
 
     /// The mode in use, or `None` on a product without modes.
     pub fn get_mode(&self) -> Result<Option<String>> {
-        self.with_driver(|d| if d.supports().contains(&"mode") { d.get_mode().map(Some) } else { Ok(None) })
+        self.with_driver(|d| {
+            if d.supports().contains(&"mode") {
+                d.get_mode().map(Some)
+            } else {
+                Ok(None)
+            }
+        })
     }
 
     /// The only budgets accepted right now, or empty when any in [`Vl53lxDevice::budget_range`] will do.
@@ -605,7 +696,13 @@ impl Vl53lxDevice {
             if let Some(&first) = choices.first() {
                 let dist = |c: u32| (c as i64 - budget_ms as i64).abs();
                 // The first of equally near choices wins.
-                return Ok(choices.iter().copied().fold(first, |best, c| if dist(c) < dist(best) { c } else { best }));
+                return Ok(choices.iter().copied().fold(first, |best, c| {
+                    if dist(c) < dist(best) {
+                        c
+                    } else {
+                        best
+                    }
+                }));
             }
             let (lo, hi) = d.budget_ms();
             Ok(budget_ms.clamp(lo, hi))
@@ -634,13 +731,17 @@ impl Vl53lxDevice {
     /// `nb_samples` `None`: the driver's default.
     pub fn calibrate_offset(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
         self.require_not_ranging()?;
-        self.with_need("calib_offset", |d| d.calibrate_offset(target_dist_mm, nb_samples))
+        self.with_need("calib_offset", |d| {
+            d.calibrate_offset(target_dist_mm, nb_samples)
+        })
     }
 
     /// Crosstalk calibration; returns the xtalk programmed, kcps (store it on the host).
     pub fn calibrate_xtalk(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
         self.require_not_ranging()?;
-        self.with_need("calib_xtalk", |d| d.calibrate_xtalk(target_dist_mm, nb_samples))
+        self.with_need("calib_xtalk", |d| {
+            d.calibrate_xtalk(target_dist_mm, nb_samples)
+        })
     }
 
     pub fn get_detection_thresholds(&self) -> Result<Thresholds> {
@@ -648,9 +749,16 @@ impl Vl53lxDevice {
     }
 
     /// The distance-window interrupt; stays armed until the next init / configure.
-    pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()> {
+    pub fn set_detection_thresholds(
+        &self,
+        distance_low_mm: u16,
+        distance_high_mm: u16,
+        window: u8,
+    ) -> Result<()> {
         self.require_not_ranging()?;
-        self.with_need("thresholds", |d| d.set_detection_thresholds(distance_low_mm, distance_high_mm, window))
+        self.with_need("thresholds", |d| {
+            d.set_detection_thresholds(distance_low_mm, distance_high_mm, window)
+        })
     }
 
     pub fn get_signal_threshold_kcps(&self) -> Result<u32> {
@@ -714,7 +822,11 @@ impl Vl53lxDevice {
             let (addr, len) = d.stream_block();
             Ok((addr, len, d.clear_steps()))
         })?;
-        self.request_ok(Vl53lxCmd::StartStream as u8, &pack_start_stream(addr, len, &clear, 0)?, None)?;
+        self.request_ok(
+            Vl53lxCmd::StartStream as u8,
+            &pack_start_stream(addr, len, &clear, 0)?,
+            None,
+        )?;
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -753,12 +865,19 @@ impl Vl53lxDevice {
             stop?;
             Ok(got)
         })?;
-        Ok(Vl53lxMeasurement::from(self.platform.last_timestamp_us.load(Ordering::Relaxed), r, bins))
+        Ok(Vl53lxMeasurement::from(
+            self.platform.last_timestamp_us.load(Ordering::Relaxed),
+            r,
+            bins,
+        ))
     }
 
     /// Call `callback` for every streamed measurement (reader thread, or the thread of a call that
     /// held the driver while the frame came in).
-    pub fn on_measurement(&self, callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static) -> Hook {
+    pub fn on_measurement(
+        &self,
+        callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static,
+    ) -> Hook {
         self.streams.measurements.on_item(callback)
     }
 
@@ -769,7 +888,11 @@ impl Vl53lxDevice {
 
     /// The next streamed measurement (contract 07 §3); `timeout` `None`: 2 s.
     pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Vl53lxMeasurement> {
-        self.streams.measurements.next(timeout.unwrap_or(Duration::from_secs(2)), Vl53lxRpt::Stream as u8, self.is_closed())
+        self.streams.measurements.next(
+            timeout.unwrap_or(Duration::from_secs(2)),
+            Vl53lxRpt::Stream as u8,
+            self.is_closed(),
+        )
     }
 
     /// Stream reports dropped because the driver did not decode them.
@@ -791,7 +914,8 @@ impl Vl53lxDevice {
         if !self.initialized() {
             return Err(DepzError::InvalidState("call init() first".into()));
         }
-        self.bound().ok_or_else(|| DepzError::InvalidState("call init() first".into()))
+        self.bound()
+            .ok_or_else(|| DepzError::InvalidState("call init() first".into()))
     }
 
     // `product`, else this class's, else the board name's.
@@ -803,7 +927,11 @@ impl Vl53lxDevice {
         })
     }
 
-    fn with_need<R>(&self, group: &str, f: impl FnOnce(&mut dyn Vl53lxDriver) -> Result<R>) -> Result<R> {
+    fn with_need<R>(
+        &self,
+        group: &str,
+        f: impl FnOnce(&mut dyn Vl53lxDriver) -> Result<R>,
+    ) -> Result<R> {
         let b = self.bound_or_err()?;
         self.with_driver(|d| {
             need(d, b, group)?;
@@ -813,7 +941,9 @@ impl Vl53lxDevice {
 
     fn require_not_ranging(&self) -> Result<()> {
         if self.ranging() {
-            return Err(DepzError::InvalidState("stop_ranging() first — the stream owns the bus".into()));
+            return Err(DepzError::InvalidState(
+                "stop_ranging() first — the stream owns the bus".into(),
+            ));
         }
         Ok(())
     }
@@ -846,7 +976,13 @@ macro_rules! deref_to_family {
     };
 }
 
-deref_to_family!(Vl53l0xDevice, Vl53l1cxDevice, Vl53l1cbDevice, Vl53l3cxDevice, Vl53l4cxDevice);
+deref_to_family!(
+    Vl53l0xDevice,
+    Vl53l1cxDevice,
+    Vl53l1cbDevice,
+    Vl53l3cxDevice,
+    Vl53l4cxDevice
+);
 
 /// VL53L0X (2 m, 1-byte register addresses, 400 kHz): ULD API 1.0.4 with ranging profiles.
 pub struct Vl53l0xDevice(Vl53lxDevice);

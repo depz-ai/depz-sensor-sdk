@@ -3,18 +3,25 @@
 
 use std::time::Duration;
 
+use super::bno055::Bno055Device;
+use super::bno086::Bno086Device;
 use super::device::DepzDevice;
 use super::error::{DepzError, Result};
 use super::link::Link;
-use super::bno055::Bno055Device;
-use super::bno086::Bno086Device;
+use super::serial::{
+    by_serial, find_port, list_depz_ports, list_serial_ports, SerialPortInfo, SerialPortLink,
+};
 use super::sr04::Sr04Device;
 use super::tmf8829::Tmf8829Device;
 use super::vl53l4cd::Vl53l4cdDevice;
 use super::vl53l7::{Vl53l5cxDevice, Vl53l7chDevice, Vl53l7cxDevice};
 use super::vl53l8::{Vl53l8chDevice, Vl53l8cxDevice};
-use super::vl53lx::{Vl53l0xDevice, Vl53l1cbDevice, Vl53l1cxDevice, Vl53l3cxDevice, Vl53l4cxDevice, Vl53lxDevice};
+use super::vl53lx::{
+    Vl53l0xDevice, Vl53l1cbDevice, Vl53l1cxDevice, Vl53l3cxDevice, Vl53l4cxDevice, Vl53lxDevice,
+};
 use crate::discovery::resolve_sensor_class;
+use crate::protocol::identity::{parse_software_name, Mode, SensorType};
+use crate::usb_ids::usb_model_hint;
 
 /// The probe's answers: software name, device name, serial number.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +29,32 @@ pub struct ProbeResult {
     pub software_name: String,
     pub device_name: String,
     pub serial_number: String,
+}
+
+/// What the contract 02 §4.4 probe learned about one port ([`probe_port`], [`list_depz_devices`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceInfo {
+    pub port: String,
+    pub mode: Mode,
+    /// `None` in bootloader / unknown mode.
+    pub sensor_type: Option<SensorType>,
+    pub software_name: String,
+    pub fw_version: String,
+    pub device_name: String,
+    /// The device's protocol serial (GET_SERIAL).
+    pub serial_number: String,
+    /// The port's USB id, informative only — never filtered on.
+    pub usb_vid: Option<u16>,
+    pub usb_pid: Option<u16>,
+    /// The USB iSerial, the ordering / selection key (contract 02 §4.3).
+    pub usb_serial: Option<String>,
+}
+
+impl DeviceInfo {
+    /// The model the USB-id table gives the port (contract 02 §4.2), or `None`.
+    pub fn usb_model_hint(&self) -> Option<&'static str> {
+        usb_model_hint(self.usb_vid, self.usb_pid)
+    }
 }
 
 /// A device opened as its sensor class. `Plain` is a device this SDK has no class for (or
@@ -199,7 +232,11 @@ pub fn probe(dev: &DepzDevice) -> Result<ProbeResult> {
     let software_name = dev.get_software_name()?;
     let device_name = dev.get_device_name().unwrap_or_default();
     let serial_number = dev.get_serial_number().unwrap_or_default();
-    Ok(ProbeResult { software_name, device_name, serial_number })
+    Ok(ProbeResult {
+        software_name,
+        device_name,
+        serial_number,
+    })
 }
 
 /// Continue the open plain device `dev` as `class_name` (a name [`resolve_sensor_class`] returns)
@@ -207,7 +244,9 @@ pub fn probe(dev: &DepzDevice) -> Result<ProbeResult> {
 /// §4.4). `"device"`, and a class this SDK has no device layer for, give [`AnyDevice::Plain`].
 pub fn attach(dev: DepzDevice, class_name: &str) -> Result<AnyDevice> {
     if !crate::discovery::SENSOR_CLASS_NAMES.contains(&class_name) {
-        return Err(DepzError::InvalidArgument(format!("no sensor class '{class_name}'")));
+        return Err(DepzError::InvalidArgument(format!(
+            "no sensor class '{class_name}'"
+        )));
     }
     Ok(match class_name {
         "bootloader" => return Err(DepzError::BootloaderMode),
@@ -247,8 +286,189 @@ pub fn open_on_link(
         Ok(p) => p,
         Err(e) => {
             dev.close();
-            return Err(DepzError::NoDevice(format!("no DEPZ device answered on {name} ({e})")));
+            return Err(DepzError::NoDevice(format!(
+                "no DEPZ device answered on {name} ({e})"
+            )));
         }
     };
-    attach(dev, resolve_sensor_class(&p.software_name, &p.device_name, usb_vid, usb_pid))
+    attach(
+        dev,
+        resolve_sensor_class(&p.software_name, &p.device_name, usb_vid, usb_pid),
+    )
+}
+
+// ── serial ports (contract 02 §4.3) ──────────────────────────────────────────
+
+/// Probe one port: open it, run [`probe`], close. `None` when the port does not open or nothing
+/// DEPZ-shaped answers. Probing opens the port: leave ports other software owns alone.
+pub fn probe_port(port: &str, timeout: Option<Duration>) -> Option<DeviceInfo> {
+    let dev = DepzDevice::open(port, timeout).ok()?;
+    let p = probe(&dev);
+    dev.close();
+    let p = p.ok()?;
+    let ident = parse_software_name(&p.software_name);
+    Some(DeviceInfo {
+        port: port.to_string(),
+        mode: ident.mode,
+        sensor_type: ident.sensor_type,
+        software_name: ident.software_name,
+        fw_version: ident.version,
+        device_name: p.device_name,
+        serial_number: p.serial_number,
+        usb_vid: None,
+        usb_pid: None,
+        usb_serial: None,
+    })
+}
+
+/// Probe the candidate ports and return every DEPZ device found, ordered by USB serial. With
+/// `match_usb` only ports with a known DEPZ USB id are probed; `ports` (`None`: enumerate)
+/// replaces enumeration with an explicit list (still USB-annotated when the OS knows the port).
+/// [`DepzError::Io`] when the OS refuses to enumerate.
+pub fn list_depz_devices(
+    ports: Option<&[&str]>,
+    match_usb: bool,
+    timeout: Option<Duration>,
+) -> Result<Vec<DeviceInfo>> {
+    let enumerated = list_serial_ports()?;
+    let mut candidates: Vec<SerialPortInfo> = match ports {
+        None => enumerated,
+        Some(ports) => ports.iter().map(|p| port_id(&enumerated, p)).collect(),
+    };
+    if match_usb {
+        candidates.retain(SerialPortInfo::is_depz);
+    }
+    let mut found = Vec::new();
+    for pi in by_serial(candidates) {
+        if let Some(mut info) = probe_port(&pi.port, timeout) {
+            info.usb_vid = pi.vid;
+            info.usb_pid = pi.pid;
+            info.usb_serial = pi.usb_serial;
+            found.push(info);
+        }
+    }
+    Ok(found)
+}
+
+/// `port` with the USB identity of the enumerated port it names under any alias
+/// (`/dev/serial/by-id/…`, [`find_port`]); none when the OS does not list it. The port stays
+/// `port`: an explicit path is opened as given.
+fn port_id(enumerated: &[SerialPortInfo], port: &str) -> SerialPortInfo {
+    let found = find_port(enumerated, port);
+    SerialPortInfo {
+        port: port.to_string(),
+        vid: found.and_then(|p| p.vid),
+        pid: found.and_then(|p| p.pid),
+        usb_serial: found.and_then(|p| p.usb_serial.clone()),
+    }
+}
+
+/// Open exactly `port` as its sensor class (contract 02 §4.3, §4.4): the probe runs on a connection
+/// of its own, which is closed; the class the answers and the port's USB id resolve to then opens
+/// the port afresh (host sequence numbers restart at 0). The USB id is that of the enumerated port
+/// `port` names under any alias (`/dev/serial/by-id/…`, a symlink, another name of the same device
+/// node). A port whose USB id is not a DEPZ one — or that the OS does not list — is opened too,
+/// with a warning on stderr (an unprogrammed unit, a custom setup). `timeout` `None`: 200 ms.
+///
+/// [`DepzError::DeviceLost`]: the port does not open; [`DepzError::NoDevice`]: nothing DEPZ
+/// answered; [`DepzError::BootloaderMode`]: use the contract 06 client.
+pub fn open_device(port: &str, timeout: Option<Duration>) -> Result<AnyDevice> {
+    let pi = port_id(&list_serial_ports().unwrap_or_default(), port);
+    if !pi.is_depz() {
+        eprintln!(
+            "{port}: USB id {} is not a known DEPZ device — opening anyway (unprogrammed unit / custom setup?)",
+            fmt_vid_pid(pi.vid, pi.pid)
+        );
+    }
+    open_probed(port, pi.vid, pi.pid, timeout)
+}
+
+/// Open the DEPZ candidate with the alphabetically smallest USB serial as its sensor class
+/// (contract 02 §4.3): the first of [`list_depz_ports`]. [`DepzError::NoDevice`] when no serial
+/// port has a known DEPZ USB id — never "the first port the OS lists".
+pub fn open_first_device(timeout: Option<Duration>) -> Result<AnyDevice> {
+    open_device_at(0, timeout).map_err(|e| match e {
+        DepzError::NoDevice(_) => DepzError::NoDevice(
+            "no DEPZ device found (no serial port has a known DEPZ USB id). Pass a port path \
+             explicitly to open an unprogrammed unit."
+                .into(),
+        ),
+        other => other,
+    })
+}
+
+/// Open the DEPZ candidate whose USB serial is `serial` as its sensor class (contract 02 §4.3).
+/// [`DepzError::NoDevice`] when none has it.
+pub fn open_device_by_serial(serial: &str, timeout: Option<Duration>) -> Result<AnyDevice> {
+    let pi = list_depz_ports()?
+        .into_iter()
+        .find(|p| p.usb_serial.as_deref() == Some(serial))
+        .ok_or_else(|| DepzError::NoDevice(format!("no DEPZ device with USB serial '{serial}'")))?;
+    open_probed(&pi.port, pi.vid, pi.pid, timeout)
+}
+
+/// Open the `index`-th DEPZ candidate (0-based, candidates sorted by USB serial) as its sensor
+/// class (contract 02 §4.3). [`DepzError::NoDevice`] when out of range.
+pub fn open_device_at(index: usize, timeout: Option<Duration>) -> Result<AnyDevice> {
+    let candidates = list_depz_ports()?;
+    let pi = candidates.get(index).ok_or_else(|| {
+        DepzError::NoDevice(format!(
+            "no DEPZ candidate at index {index} ({} candidate(s) found)",
+            candidates.len()
+        ))
+    })?;
+    open_probed(&pi.port, pi.vid, pi.pid, timeout)
+}
+
+/// Open the port of a [`list_depz_devices`] result as the class its probe answers resolve to —
+/// no second probe.
+pub fn open_device_info(info: &DeviceInfo, timeout: Option<Duration>) -> Result<AnyDevice> {
+    open_resolved(
+        &info.port,
+        &info.software_name,
+        &info.device_name,
+        info.usb_vid,
+        info.usb_pid,
+        timeout,
+    )
+}
+
+fn fmt_vid_pid(vid: Option<u16>, pid: Option<u16>) -> String {
+    match (vid, pid) {
+        (Some(v), Some(p)) => format!("{v:04X}:{p:04X}"),
+        _ => "unknown".into(),
+    }
+}
+
+/// The probe on a connection of its own, closed before the class opens the port afresh.
+fn open_probed(
+    port: &str,
+    vid: Option<u16>,
+    pid: Option<u16>,
+    timeout: Option<Duration>,
+) -> Result<AnyDevice> {
+    let dev = DepzDevice::open(port, timeout)?;
+    let p = probe(&dev);
+    dev.close();
+    let p =
+        p.map_err(|e| DepzError::NoDevice(format!("no DEPZ device answered on {port} ({e})")))?;
+    open_resolved(port, &p.software_name, &p.device_name, vid, pid, timeout)
+}
+
+fn open_resolved(
+    port: &str,
+    software_name: &str,
+    device_name: &str,
+    vid: Option<u16>,
+    pid: Option<u16>,
+    timeout: Option<Duration>,
+) -> Result<AnyDevice> {
+    let class_name = resolve_sensor_class(software_name, device_name, vid, pid);
+    if class_name == "bootloader" {
+        return Err(DepzError::BootloaderMode);
+    }
+    attach(
+        DepzDevice::new(SerialPortLink::open(port)?, timeout),
+        class_name,
+    )
 }

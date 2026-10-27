@@ -1,5 +1,6 @@
 package ai.depz.sensor.sensors.vl53lx.bare;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxPlatform;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -80,7 +81,7 @@ public final class DeviceImage {
     public void push(String name) {
         RegBlock blk = get(name);
         if (!blk.def().writable()) {
-            throw new IllegalStateException(name + " is read-only");
+            throw new InvalidStateException(name + " is read-only");
         }
         p.writeMulti(blk.base(), blk.encode());
     }
@@ -115,7 +116,7 @@ public final class DeviceImage {
         for (String name : names) {
             RegBlock blk = get(name);
             if (!blk.def().writable()) {
-                throw new IllegalStateException(name + " is read-only");
+                throw new InvalidStateException(name + " is read-only");
             }
             byte[] enc = blk.encode();
             System.arraycopy(enc, 0, buf, blk.base() - s[0], enc.length);

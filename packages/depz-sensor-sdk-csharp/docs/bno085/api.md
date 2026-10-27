@@ -50,7 +50,7 @@ public Bno086Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Bno086Device.Bno086Device *(constructor)*
 
 ```csharp
-#if NET public Bno086Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Bno086Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Bno086Device.BusyRetries *(property)*
@@ -1493,6 +1493,14 @@ public const int StabilityDetectorConfig = 0xED85
 ```csharp
 public const int ActivityTrackerConfig = 0xED88
 ```
+
+#### FrsRecordId.GyroIntegratedRvConfig *(constant)*
+
+```csharp
+public const int GyroIntegratedRvConfig = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
 
 #### FrsRecordId.MetadataRecords *(field)*
 

@@ -4,7 +4,9 @@ A contract-first decode/encode SDK for the DEPZ sensor family. Every codec is a
 byte-exact port of the reference Python SDK, pinned to the shared golden vectors
 under `contracts/vectors` (`dotnet test`).
 
-Builds for .NET 8 and .NET Standard 2.1 — the latter runs in **Unity** 2021.2+
+Builds for .NET 8 and .NET Standard 2.1 — the latter is the shared library
+**Unity** reads; the Windows communication module for Unity (port discovery,
+serial link, `DepzDevicesUnity`) is the UPM package [`unity/`](unity/README.md)
 (see [Installation › Unity](docs/guide.md#unity)).
 
 ## Documentation
@@ -13,6 +15,9 @@ Full docs live under [`docs/`](docs/):
 
 - **[Common guide](docs/guide.md)** — what it is, install, discovery, the mental
   model, transport/CRC, datasets, firmware parse, testing, extension points.
+- **[Unity package](unity/README.md)** — `ai.depz.sensor`: the Windows
+  communication module and the sample `MonoBehaviour`; install by git URL or by
+  copying; limits.
 - **[API reference](docs/api.md)** — every public type, generated from the `///`
   summaries (per-sensor: [SR04](docs/sr04/api.md) ·
   [VL53L0X](docs/vl53l0x/api.md) · [VL53L1CX](docs/vl53l1cx/api.md) ·
@@ -88,7 +93,8 @@ record/replay and port discovery — with the **SR04**, **VL53L4CD** (the ST
 ULD 2.2.3 on the host), the **VL53L 1D family** (VL53L0X / L1CX / L1CB / L3CX / L4CX:
 the PAL, the ULDs, the ULP and the histogram BareDriver on the host), **VL53L8CX / VL53L8CH** and **VL53L5CX / VL53L7CX / VL53L7CH** (the ST ULD with the
 sensor firmware download, CNH) **BNO055**, **BNO085 / BNO086** and **TMF8829** (the sensor sequence with the firmware download) classes — every sensor of the line; the shared device scenarios (contract 15)
-run against them.
+run against them. In Unity on Windows the same classes open through the
+communication module `unity/` (`DepzDevicesUnity`, `WindowsSerialLink`).
 
 Verifiable, golden-vector-backed codecs are implemented for every sensor:
 
@@ -120,6 +126,30 @@ Plus the shared foundation: CRC KATs, DEPZ framing encode/decode, USB identity
 table + discovery ordering, common commands (time-sync, sync-pin), `.fwdepz`
 image parse, and `.depzdata` datasets: the multi-device recorder, the reader and
 the timeline player.
+
+## Tests and line coverage
+
+```bash
+export PATH="$HOME/.dotnet:$PATH"; export DOTNET_ROOT="$HOME/.dotnet"
+dotnet test                 # the xunit suite: golden vectors, scenarios, fakes
+scripts/coverage.sh         # the same suite under coverlet + a per-class summary
+scripts/coverage.sh --all   # every class; --min PCT moves the line-coverage floor (94)
+```
+
+`scripts/coverage.sh` runs `dotnet test --collect:"XPlat Code Coverage"`
+(the `coverlet.collector` package of the test project), writes the Cobertura
+XML to `tests/Depz.Sensor.Tests/TestResults/coverage/coverage.cobertura.xml`
+and prints the eight least-covered classes and the total, needing nothing
+beyond Python 3; it fails below 94 % lines in total. Every class has
+hardware-free tests (an in-memory `FakeBoardLink`, board and bridge fakes,
+golden vectors, `.depzrec` replays) except what a serial port needs —
+`SerialPortLink` and `SerialPorts` — which the summary skips. Raise the floor
+when the tests grow; never lower it to make a change pass.
+
+**On real boards:** `dotnet run --project examples/LiveCheck -- [seconds] [port ...]` opens every DEPZ board on the machine, streams 10 s and
+prints its rate and a plausibility value — the centre distance of a ToF sensor,
+|gravity| of a BNO055. The Python, Rust, Java and C# SDKs carry the same check;
+on 2026-10-26 all four agreed on ten boards.
 
 ## License
 

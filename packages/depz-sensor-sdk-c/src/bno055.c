@@ -27,6 +27,9 @@ static void put_u16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t
 /* ---- encoders --------------------------------------------------------------*/
 size_t depz_bno055_pack_read_reg(uint8_t addr, uint8_t len, uint8_t *out)
 {
+    /* contract 13 §1: len 1..128 and addr + len <= 0x100, like WRITE_REG */
+    if (len < 1 || len > DEPZ_BNO055_XFER_MAX || (unsigned)addr + len > 0x100u)
+        return 0;
     out[0] = addr;
     out[1] = len;
     return 2;
@@ -35,7 +38,7 @@ size_t depz_bno055_pack_read_reg(uint8_t addr, uint8_t len, uint8_t *out)
 size_t depz_bno055_pack_write_reg(uint8_t addr, const uint8_t *data,
                                   size_t data_len, uint8_t *out)
 {
-    if (data_len < 1 || data_len > DEPZ_BNO055_XFER_MAX)
+    if (data_len < 1 || data_len > DEPZ_BNO055_XFER_MAX || (size_t)addr + data_len > 0x100u)
         return 0;
     out[0] = addr;
     memcpy(out + 1, data, data_len);
@@ -45,6 +48,10 @@ size_t depz_bno055_pack_write_reg(uint8_t addr, const uint8_t *data,
 size_t depz_bno055_pack_start_stream(uint8_t trigger, uint8_t addr, uint8_t len,
                                      uint16_t period_ms, uint8_t *out)
 {
+    /* contract 13 §2: TIMER reads every period_ms, 1..60000; INT: a watchdog, 0 = none */
+    if (trigger == DEPZ_BNO055_TRIGGER_TIMER &&
+        (period_ms < DEPZ_BNO055_TIMER_PERIOD_MIN_MS || period_ms > DEPZ_BNO055_TIMER_PERIOD_MAX_MS))
+        return 0;
     out[0] = trigger;
     out[1] = addr;
     out[2] = len;

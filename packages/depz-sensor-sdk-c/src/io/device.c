@@ -266,7 +266,10 @@ static void dispatch(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t len
     depz_mutex_unlock(&dev->lock);
 
     memset(&ev, 0, sizeof ev);
-    if (cmd == DEPZ_RPT_SEQUENCE_ERROR && len == 2) {
+    /* Contract 07 §3: a report longer than its fields is decoded and the
+     * tail ignored (a newer firmware may append fields); a shorter one is
+     * not a report of that kind and stays visible as hex text below. */
+    if (cmd == DEPZ_RPT_SEQUENCE_ERROR && len >= 2) {
         depz_mutex_lock(&dev->lock);
         dev->stats.device_seq_errors++;
         depz_mutex_unlock(&dev->lock);
@@ -282,7 +285,7 @@ static void dispatch(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t len
         emit_simple(dev, DEPZ_DEV_EV_TEXT, &ev);
         return;
     }
-    if (cmd == DEPZ_RPT_TEMPERATURE && len == 10) {
+    if (cmd == DEPZ_RPT_TEMPERATURE && len >= 10) {
         depz_temperature_report t;
         depz_unpack_temperature(p, len, &t);
         ev.timestamp_us = t.timestamp_us;
@@ -307,15 +310,28 @@ static void on_parser_event(const depz_event *e, void *user)
     depz_device_event ev;
     memset(&ev, 0, sizeof ev);
     switch (e->type) {
-    case DEPZ_EV_PACKET:
+    case DEPZ_EV_PACKET: {
+        /* The first packet after open has nothing to be compared with; a gap
+         * is surfaced before its packet is dispatched (ERRATA A1). */
+        bool gap = false;
         depz_mutex_lock(&dev->lock);
         dev->stats.rx_packets++;
-        if (dev->last_rx_seq >= 0 && e->seq != ((dev->last_rx_seq + 1) & 0xFF))
-            dev->stats.seq_gaps++;
+        if (dev->last_rx_seq >= 0) {
+            uint8_t expected = (uint8_t)((dev->last_rx_seq + 1) & 0xFF);
+            if (e->seq != expected) {
+                dev->stats.seq_gaps++;
+                ev.expected_seq = expected;
+                ev.received_seq = e->seq;
+                ev.missed = (uint8_t)((e->seq - expected) & 0xFF);
+                gap = true;
+            }
+        }
         dev->last_rx_seq = e->seq;
         depz_mutex_unlock(&dev->lock);
+        if (gap) emit_simple(dev, DEPZ_DEV_EV_SEQ_GAP, &ev);
         dispatch(dev, e->cmd, e->payload, e->payload_len);
         break;
+    }
     case DEPZ_EV_CRC_ERROR:
         depz_mutex_lock(&dev->lock);
         dev->stats.crc_errors++;
@@ -378,11 +394,11 @@ static void reader_main(void *arg)
 
 int depz_device_send(depz_device *dev, uint8_t cmd, const uint8_t *payload, size_t len)
 {
-    uint8_t small[512], *frame = small;
+    uint8_t stack_buf[512], *frame = stack_buf;
     size_t cap = DEPZ_HEADER_SIZE + len + 4, n = 0;
     int rc;
     if (!dev) return depz_fail(DEPZ_E_ARG, "send: NULL device");
-    if (cap > sizeof small) {
+    if (cap > sizeof stack_buf) {
         frame = (uint8_t *)malloc(cap);
         if (!frame) return depz_fail(DEPZ_E_NOMEM, "send: out of memory");
     }
@@ -401,7 +417,7 @@ int depz_device_send(depz_device *dev, uint8_t cmd, const uint8_t *payload, size
         }
     }
     depz_mutex_unlock(&dev->tx_lock);
-    if (frame != small) free(frame);
+    if (frame != stack_buf) free(frame);
     return rc;
 }
 
@@ -554,9 +570,9 @@ int depz_device_get_payload_crc_type(depz_device *dev, depz_crc_type *out)
 
 int depz_device_set_payload_crc_type(depz_device *dev, depz_crc_type t)
 {
-    uint8_t b = (uint8_t)t;
-    if (t != DEPZ_CRC_NONE && t != DEPZ_CRC8 && t != DEPZ_CRC16 && t != DEPZ_CRC32)
-        return depz_fail(DEPZ_E_ARG, "set_payload_crc_type: %d is not a depz_crc_type", (int)t);
+    uint8_t b;
+    if ((int)t < 0 || (int)t > 0xFF || depz_pack_set_payload_crc_type((uint8_t)t, &b) == 0)
+        return depz_fail(DEPZ_E_ARG, "set_payload_crc_type: %d is not a depz_crc_type (0..3)", (int)t);
     return depz_device_request(dev, DEPZ_CMD_SET_PAYLOAD_CRC_TYPE, &b, 1, NULL, NULL, true, -1);
 }
 
@@ -607,7 +623,7 @@ uint64_t depz_host_now_us(void) { return depz_now_us(); }
 
 int depz_device_sync_time(depz_device *dev, int samples, depz_time_sync *out)
 {
-    depz_time_sync best;
+    depz_time_sync best = {0};
     bool have = false;
     int i;
     if (!dev) return depz_fail(DEPZ_E_ARG, "sync_time: NULL device");

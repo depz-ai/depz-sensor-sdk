@@ -112,7 +112,7 @@ public abstract class Vl53l1Die extends Vl53lxDriver {
     /** How far a target can be before the die fails it with status 4, mm. */
     public static long phaseWindowMm(long fastOscFrequency, long validPhaseHigh) {
         long pllPeriod = (1L << 30) / fastOscFrequency;
-        return validPhaseHigh * pllPeriod * (299704 >> 3) >> 25;
+        return (validPhaseHigh * pllPeriod * (299704 >> 3)) >> 25;
     }
 
     // ── result block ─────────────────────────────────────────────────────────
@@ -146,8 +146,8 @@ public abstract class Vl53l1Die extends Vl53lxDriver {
         return new Vl53lxRange(
                 u16be(raw, 13),                        // 0x0096
                 status, statusText(status), signalKcps, ambientKcps,
-                u16be(raw, 9) / 4,                     // 0x0092, 14.2
-                rawSpads / 256, List.of(), extra);
+                Math.floorDiv(u16be(raw, 9), 4),       // 0x0092, 14.2: whole mm, as the ULD
+                Math.floorDiv(rawSpads, 256), List.of(), extra);   // 8.8: whole SPADs
     }
 
     public static String statusText(int status) {

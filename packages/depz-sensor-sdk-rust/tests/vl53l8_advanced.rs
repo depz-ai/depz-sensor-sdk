@@ -7,7 +7,8 @@
 mod common;
 
 use depz_sensor_sdk::vl53l8::advanced::{
-    try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw, DetectionThreshold,
+    try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw,
+    xtalk_margin_from_raw, DetectionThreshold,
 };
 
 use common::{hex_encode, load, seen};
@@ -23,7 +24,12 @@ fn vl53l8_advanced_vectors() {
         let cfg = try_default_motion_config(resolution).unwrap();
         let packed = cfg.pack();
         assert_eq!(packed.len(), 156, "motion pack length {}", c["name"]);
-        assert_eq!(hex_encode(&packed), c["pack"].as_str().unwrap(), "motion {}", c["name"]);
+        assert_eq!(
+            hex_encode(&packed),
+            c["pack"].as_str().unwrap(),
+            "motion {}",
+            c["name"]
+        );
         seen(c);
         motion += 1;
     }
@@ -64,11 +70,18 @@ fn vl53l8_advanced_vectors() {
     // ── xtalk margin (kcps → raw) ────────────────────────────────────────────
     let mut xtalk = 0;
     for c in doc["xtalk_margin"].as_array().unwrap() {
-        let kcps = c["kcps"].as_f64().unwrap();
+        let kcps = c["kcps"].as_u64().unwrap() as u32;
+        let raw = try_xtalk_margin_to_raw(kcps).unwrap();
         assert_eq!(
-            try_xtalk_margin_to_raw(kcps).unwrap() as u64,
+            raw as u64,
             c["raw"].as_u64().unwrap(),
             "xtalk margin {}",
+            c["name"]
+        );
+        assert_eq!(
+            xtalk_margin_from_raw(raw),
+            kcps,
+            "xtalk margin from raw {}",
             c["name"]
         );
         seen(c);

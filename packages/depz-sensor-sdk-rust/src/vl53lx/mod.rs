@@ -25,8 +25,9 @@ pub mod products;
 pub mod uld;
 
 pub use crate::vl53l4::{
-    i2c_error_name, pack_read_reg, pack_set_i2c_speed, pack_write_reg, pack_xshut, try_pack_write_reg, RegData,
-    StreamData, I2C_KHZ_STEPS, SF_INT_ACT_HIGH, XFER_MAX, XSHUT_OFF, XSHUT_ON, XSHUT_RESET,
+    i2c_error_name, pack_read_reg, pack_set_i2c_speed, pack_write_reg, pack_xshut,
+    try_pack_read_reg, try_pack_write_reg, RegData, StreamData, I2C_KHZ_STEPS, SF_INT_ACT_HIGH,
+    XFER_MAX, XSHUT_OFF, XSHUT_ON, XSHUT_RESET,
 };
 pub use codecs::{
     pack_set_addr_width, pack_start_stream, Vl53lxCmd, Vl53lxInfo, Vl53lxRpt, CLEAR_STEPS_MAX,

@@ -22,9 +22,9 @@ pub mod codecs;
 pub use crate::vl53l8::codecs::{pack_start_stream, RegData};
 pub use crate::vl53l8::decode::Variant;
 pub use codecs::{
-    i2c_error_name, pack_pin_ctrl, pack_read_reg, pack_set_i2c_speed, pack_write_reg, Vl53l7Cmd, Vl53l7Info, Vl53l7Rpt,
-    I2C_SPEED_STEPS_KHZ, INFO_SIZE, PIN_I2C_RST, PIN_LPN_OFF, PIN_LPN_ON, PIN_SOFT_CYCLE,
-    READ_MAX_LEN, STREAM_CHUNK_MAX, WRITE_MAX_LEN,
+    i2c_error_name, pack_pin_ctrl, pack_read_reg, pack_set_i2c_speed, pack_write_reg, Vl53l7Cmd,
+    Vl53l7Info, Vl53l7Rpt, I2C_SPEED_STEPS_KHZ, INFO_SIZE, PIN_I2C_RST, PIN_LPN_OFF, PIN_LPN_ON,
+    PIN_SOFT_CYCLE, READ_MAX_LEN, STREAM_CHUNK_MAX, WRITE_MAX_LEN,
 };
 
 /// Unlike VL53L8 (≥ 2 Hz), L5/L7 range and stream at 1 Hz.

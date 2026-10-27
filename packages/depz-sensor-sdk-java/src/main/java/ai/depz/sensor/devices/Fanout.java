@@ -6,9 +6,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** The subscribers of one stream: callbacks and pull queues. */
 final class Fanout<T> {
+    private static final Logger LOG = Logger.getLogger("ai.depz.sensor");
+
     private final List<Consumer<T>> callbacks = new ArrayList<>();
     private final List<Subscription<T>> queues = new ArrayList<>();
 
@@ -51,13 +55,17 @@ final class Fanout<T> {
         }
     }
 
-    void emit(T item) {
+    /**
+     * Hand {@code item} to every callback, then to every queue (contract 07 §3); a callback that
+     * throws counts in {@code stats}.
+     */
+    void emit(T item, LinkStats stats) {
         List<Consumer<T>> cbs;
         synchronized (callbacks) {
             cbs = new ArrayList<>(callbacks);
         }
         for (Consumer<T> cb : cbs) {
-            cb.accept(item);
+            call(cb, item, stats);
         }
         List<Subscription<T>> qs;
         synchronized (queues) {
@@ -65,6 +73,23 @@ final class Fanout<T> {
         }
         for (Subscription<T> q : qs) {
             q.put(item);
+        }
+    }
+
+    /**
+     * Run a user callback on the reader thread: one that throws is counted in {@link
+     * LinkStats#callbackErrors()}, logged and dropped — it never stops the reader, the other
+     * callbacks or the queues (contract 07 §3).
+     */
+    static <T> void call(Consumer<T> cb, T item, LinkStats stats) {
+        try {
+            cb.accept(item);
+        } catch (RuntimeException | Error e) {
+            if (e instanceof VirtualMachineError vme) {
+                throw vme;
+            }
+            stats.callbackErrors.incrementAndGet();
+            LOG.log(Level.SEVERE, "a callback threw on the reader thread; dropped", e);
         }
     }
 

@@ -141,6 +141,24 @@ public sealed class Tmf8829MeasurementBuilder
             return null;
         }
 
+        Tmf8829PixelResults res;
+        try
+        {
+            res = Tmf8829Frames.ParseResults(raw, f);
+        }
+        catch (Tmf8829FrameException e)
+        {
+            // Contract 14 §5/§6: decoded first; a corrupt results frame never
+            // reaches the capture timer and is dropped with its pending frames
+            // and any half-measurement collected before it.
+            ParseErrors++;
+            _problems.Add($"fN={f.FNumber}: {e.Message}");
+            _pending.Clear();
+            _hist.Clear();
+            _refs.Clear();
+            _half = null;
+            return null;
+        }
         var t = Timer.ResultsFrame(f, timestampUs, edgeUs, flags);
         foreach (var (pf, praw) in _pending)
         {
@@ -150,19 +168,6 @@ public sealed class Tmf8829MeasurementBuilder
                 _refs.Add(praw);
         }
         _pending.Clear();
-
-        Tmf8829PixelResults res;
-        try
-        {
-            res = Tmf8829Frames.ParseResults(raw, f);
-        }
-        catch (Tmf8829FrameException e)
-        {
-            ParseErrors++;
-            _problems.Add($"fN={f.FNumber}: {e.Message}");
-            _half = null;
-            return null;
-        }
 
         Tmf8829FrameInfo[] frames;
         Tmf8829FrameTime[] times;

@@ -5,6 +5,7 @@ import pytest
 from depz_sensor_sdk import (
     BusyError,
     DepzTimeoutError,
+    InvalidStateError,
     Sr04,
     StatusError,
 )
@@ -157,3 +158,59 @@ def test_sync_time_all_aligns_devices():
             dev.close()
         for f in fakes:
             f.close()
+
+
+def test_payload_crc_type_roundtrip(rig):
+    """contract 02: GET → RPT_PAYLOAD_CRC_TYPE; SET takes 0..3, else
+    ERR_INVALID_PARAM — the device keeps its old setting."""
+    from depz_sensor_sdk.transport import CrcType
+
+    fake, dev = rig
+    assert dev.get_report_payload_crc() is CrcType.NONE
+    dev.set_report_payload_crc(CrcType.CRC16)
+    assert fake.payload_crc_type == 2
+    assert dev.get_report_payload_crc() is CrcType.CRC16
+    with pytest.raises(StatusError) as ei:
+        dev.request(0x09, b"\x07", ok_completes=True)
+    assert ei.value.status_name == "ERR_INVALID_PARAM"
+    assert dev.get_report_payload_crc() is CrcType.CRC16
+
+
+def test_payload_crc_type_out_of_range_is_refused_before_the_wire(rig):
+    """contract 07 §3 (ERRATA A2): 4..255 are not CrcTypes and 300 does not
+    fit the u8 field — both are a ValueError on the host, nothing is sent."""
+    fake, dev = rig
+    received = len(fake.received)
+    for bad in (4, 7, 255, 300, -1):
+        with pytest.raises(ValueError, match="crc_type"):
+            dev.set_report_payload_crc(bad)  # type: ignore[arg-type]
+    assert len(fake.received) == received
+    assert fake.payload_crc_type == 0
+
+
+def test_reset_acks_then_the_link_drops(rig):
+    from depz_sensor_sdk.device import DisconnectedEvent
+
+    fake, dev = rig
+    it = dev.events()
+    dev.reset()
+    assert fake.reset_count == 1
+    assert isinstance(next(it), DisconnectedEvent)
+    assert dev.closed
+
+
+def test_to_host_time_needs_a_sync(rig):
+    """Contract 07 §3: a conversion before `sync_time` is the SDK's
+    invalid-state error (ERRATA A14), not a bare RuntimeError."""
+    _, dev = rig
+    assert dev.time_sync is None
+    with pytest.raises(InvalidStateError, match="sync_time"):
+        dev.to_host_time_us(0)
+
+
+def test_device_is_a_context_manager():
+    fake = FakeSr04()
+    with Sr04(fake.link, timeout=1.0) as dev:
+        assert dev.get_serial_number() == FakeSr04.SERIAL
+    assert dev.closed
+    fake.close()

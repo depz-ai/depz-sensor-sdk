@@ -114,7 +114,7 @@ the L5/L7 boards and the VL53L 1D family each share one firmware:
 | **VL53L8CH** | VL53L8CX **+ CNH** compact-network-histograms | `0xED40`   | Everything VL53L8CX has (the same class, CH firmware blob) + CNH setup (`depz_vl53l8_configure_cnh`) + CNH histogram decode |
 | **TMF8829**  | Multizone dToF, 8×8 … 48×32 zones, up to 4 peaks, histograms (SPI register bridge) | `0xED4C` | Bridge codecs, chunk reassembly, frame / pixel decode + half-frame merge, sensor clock model and capture time (bit-exact), measurement assembly, presets / config-page fields, the embedded ams sensor firmware (MIT, `licenses/tmf8829/`) + live sensor class (`depz_tmf8829_*`: init with the firmware download, configure with read-back, raw registers, start / stop, measurements / raw frames / events via callbacks / streams, stream counters) |
 | **BNO055**   | 9-axis IMU, fusion on the chip (register bridge) | `0xEE0A` | Bridge codecs, units / calibration / axis-remap / page-1 config codecs, register-window decode + live sensor class (`depz_bno055_*`: configure through CONFIG with the boot and fusion-start waits, operating / power mode, units, axis remap and placements, calibration status / profile / soft-iron matrix, system status and self-test, page-1 configs / unique id / motion interrupts, scaled samples polled or streamed via callbacks / streams) |
-| **BNO085** / **BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | Bridge + SHTP framing, SH-2 encoders and answer parsers, input-report parsers and scaling + live sensor class (`depz_bno086_*`: reset / product id, enable with the granted-rate read-back, reports via callbacks / streams, calibration / DCD / tare / reorientation, FRS read / write and sensor metadata, error queue / counts, busy retry) |
+| **BNO085** / **BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | Bridge + SHTP framing, SH-2 encoders and answer parsers, input-report parsers and scaling + live sensor class (`depz_bno086_*`: reset / product id, enable with the granted-rate read-back, reports via callbacks / streams, calibration / DCD / tare / reorientation, interactive calibration and batch flush, FRS read / write and sensor metadata, error queue / counts, busy retry) |
 
 Every board in the table also opens live through `depz_sensor_io.h` —
 discovery, the common commands and time sync work on all of them; the SR04,
@@ -214,8 +214,9 @@ sensor-hub protocol on the host, request for request as the Python SDK:
 hardware reset and product id (BNO085 or BNO086), enabling any SH-2 output
 with the granted rate read back (re-asked while the hub still answers 0),
 reports scaled by helpers and delivered as callbacks or streams, ME
-calibration / DCD, tare and reorientation, FRS records and sensor metadata,
-the error queue and counts, and the bridge's busy back-off. The committed
+calibration / DCD, tare and reorientation, interactive calibration and the
+flush of batched reports, FRS records and sensor metadata, the error queue
+and counts, and the bridge's busy back-off. The committed
 BNO085 capture (Python SDK) replays strictly through the class; it is also
 **verified live** on a lab BNO085: rotation vector 100 Hz, game rotation
 vector 200 Hz, gravity |g| 9.85 m/s², no drops.
@@ -259,7 +260,8 @@ src/tmf8829_firmware.c      TMF8829 sensor firmware (generated)
 src/bno086_shtp.c           BNO086 SHTP framing + SH-2 control encoders
 src/bno086_reports.c        BNO086 SH-2 input-report parsers
 src/bno086_sh2.c            BNO086 SH-2 answer parsers, metadata, scaling
-src/dataset.c               .depzdata dataset reader
+src/dataset.c               .depzdata datasets: JSON values, reader (also .gz),
+                            writer, record values, the tick-driven player
 src/io/                     live layer: serial ports (POSIX / Win32), port
                             enumeration (Linux / macOS / Windows), links,
                             device core, discovery, SR04 class, VL53L4CD and
@@ -294,8 +296,9 @@ cmake --build build
 ctest --test-dir build
 ```
 
-The suite is 86 CTests, no hardware needed: one per consumed vector / replay
-target (the transport+protocol foundation plus the sensor-decode layer, 24),
+The suite is 105 CTests, no hardware needed: one per consumed vector / replay
+target (the transport+protocol foundation plus the sensor-decode layer,
+`vec_*`, 30),
 and the live layer against a fake SR04 and a fake VL53L4CD bridge (with a
 register map) over an in-memory loopback link, the VL53L8 state guards and CNH
 setup math, plus strict replays of a real SR04, a real VL53L4CD and three real
@@ -303,8 +306,22 @@ VL53L8 captures — VL53L8CX, VL53L8CH, VL53L8CH with CNH, each with the whole
 firmware download — four VL53L5CX / VL53L7CH captures through the same
 class, two real BNO055 captures through the BNO055 class, and a real BNO085
 capture plus a fake SH-2 hub through the BNO085 / BNO086 class, and the ten
-VL53L 1D-family captures through the 1D class (`io_*`, 59). CI
-builds and runs it on Linux, macOS and Windows.
+VL53L 1D-family captures through the 1D class (`io_*`, 46), and the
+cross-SDK scenarios of contract 15 (`scenario_*`, 29). CI builds and runs it
+on Linux, macOS and Windows, with warnings as errors (gcc, clang, MSVC `/W4`).
+
+```sh
+scripts/coverage.sh               # line coverage (gcc --coverage + gcovr) in build-coverage/
+../../scripts/sanitize.sh address c   # the suite under AddressSanitizer + LeakSanitizer
+```
+
+`scripts/coverage.sh` lists the least-covered files and fails below the floor
+in the script (`FLOOR`, the measured total rounded down — raise it when the
+tests grow, never lower it to make a change pass); the serial-port and
+port-enumeration files need a board and are listed apart. CI also runs the
+whole suite under UndefinedBehaviorSanitizer, AddressSanitizer with
+LeakSanitizer and ThreadSanitizer (`scripts/sanitize.sh
+undefined|address|thread c` at the repository root).
 
 The examples build next to the library (`build/depz_list`,
 `build/sr04_minimal [port] [seconds]`, `build/bno086_minimal [port] [seconds]`,
@@ -333,7 +350,7 @@ while the board was turned, tilted and shaken by hand.
 The library (`libdepz_sensor_sdk_c.a`, `depz_sensor_sdk_c.lib` with MSVC)
 exports a namespaced target **`depz::sensor_sdk_c`** and ships an
 installable CMake package (`find_package(depz-sensor-sdk-c CONFIG)`), a Conan 2
-recipe, and a vcpkg port. Version **0.7.0**, MIT.
+recipe, and a vcpkg port. Version **0.8.0**, MIT.
 
 ### CMake FetchContent
 
@@ -345,7 +362,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.7.0
+  GIT_TAG        v0.8.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -362,7 +379,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(depz-sensor-sdk-c 0.7.0 CONFIG REQUIRED)
+find_package(depz-sensor-sdk-c 0.8.0 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
@@ -381,7 +398,7 @@ uint8_t crc = depz_crc8_maxim(data, sizeof data);
 conan create packages/depz-sensor-sdk-c            # build & test-package locally
 ```
 
-In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.7.0`.
+In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.8.0`.
 The recipe sets the CMake target name to `depz::sensor_sdk_c` for CMakeDeps
 consumers. Submission to Conan Center is in review
 ([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
@@ -397,7 +414,7 @@ it merges, use the in-repo port (`vcpkg/`) as an overlay:
 vcpkg install depz-sensor-sdk-c --overlay-ports=packages/depz-sensor-sdk-c/vcpkg
 ```
 
-The port fetches the `v0.7.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
+The port fetches the `v0.8.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
 `0` placeholder to be filled at release (the first `vcpkg install` prints the
 correct hash).
 
@@ -408,6 +425,7 @@ correct hash).
 | `DEPZ_SENSOR_SDK_C_BUILD_IO` | `ON` | Build the live-hardware layer (`depz_sensor_io.h`, `src/io/`). `OFF` leaves the pure codec library with no OS dependencies. |
 | `DEPZ_SENSOR_SDK_C_BUILD_EXAMPLES` | `ON` standalone / `OFF` as a subproject | Build `depz_list` and `sr04_minimal` (needs `BUILD_IO`). |
 | `DEPZ_SENSOR_SDK_C_BUILD_TESTS` | `ON` standalone / `OFF` as a subproject | Build the golden-vector CTest suite and, with `BUILD_IO`, the live-layer tests (needs the golden-vector tree from the development checkout; auto-skipped when absent). |
+| `DEPZ_SENSOR_SDK_C_WERROR` | same as `BUILD_TESTS` | Warnings as errors (`-Werror`, MSVC `/WX`) on a standalone build; packagers build with tests off and keep warnings as warnings. |
 
 With `BUILD_IO` the target carries its OS link dependencies as `PUBLIC`, so
 `depz::sensor_sdk_c` consumers get them automatically: `Threads::Threads` on

@@ -14,7 +14,7 @@ the headers, not this file.
 
 ## Contents
 
-- **BNO055 codecs (depz/bno055.hpp)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
+- **BNO055 codecs (depz/bno055.hpp)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`INFO_SIZE`](#info_size), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`TIMER_PERIOD_MIN_MS`](#timer_period_min_ms), [`TIMER_PERIOD_MAX_MS`](#timer_period_max_ms), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`Bno055Info`](#bno055info), [`StreamData`](#streamdata), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`FULL_BLOCK_ADDR`](#full_block_addr), [`FULL_BLOCK_LEN`](#full_block_len), [`QUAT_BLOCK_ADDR`](#quat_block_addr), [`QUAT_BLOCK_LEN`](#quat_block_len), [`OprMode`](#oprmode), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`CalibrationProfile`](#calibrationprofile), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`placement`](#placement), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`Vec3`](#vec3), [`Quat`](#quat), [`RawBlock`](#rawblock), [`decode_block`](#decode_block)
 - **BNO055 live class (depz/device.hpp)**: [`Bno055Sample`](#bno055sample), [`Bno055Status`](#bno055status), [`Bno055`](#bno055), [`open_bno055`](#open_bno055)
 
 ## BNO055 codecs (depz/bno055.hpp)
@@ -82,7 +82,8 @@ inline constexpr std::uint8_t TRIGGER_INT = 1;
 bytes pack_read_reg(std::uint8_t addr, std::uint8_t len);
 ```
 
-BNO_READ_REG payload: addr u8, len u8.
+BNO_READ_REG payload: addr u8, len u8; std::invalid_argument unless len is
+1..XFER_MAX and addr + len <= 0x100 (contract 13 §1).
 
 ### pack_write_reg
 
@@ -91,7 +92,21 @@ bytes pack_write_reg(std::uint8_t addr, byte_span data);
 ```
 
 BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
-unless it is 1..XFER_MAX bytes.
+unless it is 1..XFER_MAX bytes and addr + N <= 0x100.
+
+### TIMER_PERIOD_MIN_MS
+
+```cpp
+inline constexpr std::uint16_t TIMER_PERIOD_MIN_MS = 1;
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+### TIMER_PERIOD_MAX_MS
+
+```cpp
+inline constexpr std::uint16_t TIMER_PERIOD_MAX_MS = 60000;
+```
 
 ### pack_start_stream
 
@@ -99,7 +114,9 @@ unless it is 1..XFER_MAX bytes.
 bytes pack_start_stream(std::uint8_t trigger, std::uint8_t addr, std::uint8_t len, std::uint16_t period_ms);
 ```
 
-BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE.
+BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE;
+std::invalid_argument when trigger is TIMER and period_ms is outside 1..60000
+(with INT the period is the missed-edge watchdog, 0 = none).
 
 ### RegData
 
@@ -150,8 +167,9 @@ struct Bno055Info {
 ```
 
 RPT_BNO_INFO (38 bytes, `<BBBBBHBBBIHHHIIIHBBH`) — sensor identity
-(registers 0x00..0x06) plus bridge diagnostics. Counters are free-running
-and wrap; read_*_us, slots_skipped and loop_max_us reset at START_STREAM. A
+(registers 0x00..0x06) plus bridge diagnostics. Counters wrap; read_*_us,
+slots_skipped and loop_max_us reset at START_STREAM, i2c_errors at every
+successful reset handshake (not free-running). A
 rising sensor_resets means the bridge pulsed nRESET: the sensor is back in
 CONFIG and the host must re-apply its configuration.
 
@@ -701,11 +719,12 @@ static AxisRemap unpack(std::uint8_t config, std::uint8_t sign);
 ### PLACEMENTS
 
 ```cpp
-inline constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 8> PLACEMENTS = {{ {0x21, 0x04}, {0x24, 0x00}, {0x24, 0x06}, {0x21, 0x02}, {0x24, 0x03}, {0x21, 0x01}, {0x21, 0x07}, {0x24, 0x05}, }};
+inline constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 8> PLACEMENTS = {{ {std::uint8_t{0x21}, std::uint8_t{0x04}}, {std::uint8_t{0x24}, std::uint8_t{0x00}}, {std::uint8_t{0x24}, std::uint8_t{0x06}}, {std::uint8_t{0x21}, std::uint8_t{0x02}}, {std::uint8_t{0x24}, std::uint8_t{0x03}}, {std::uint8_t{0x21}, std::uint8_t{0x01}}, {std::uint8_t{0x21}, std::uint8_t{0x07}}, {std::uint8_t{0x24}, std::uint8_t{0x05}}, }};
 ```
 
 Datasheet §3.4 mounting placements P0..P7 as (AXIS_MAP_CONFIG,
-AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default.
+AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default. Typed literals: as plain ints
+std::pair would narrow them inside its constructor (MSVC C4244).
 
 ### placement
 

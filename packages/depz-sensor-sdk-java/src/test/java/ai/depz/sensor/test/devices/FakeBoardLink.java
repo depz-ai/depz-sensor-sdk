@@ -68,11 +68,17 @@ public final class FakeBoardLink implements Link {
 
     @Override
     public synchronized byte[] read(Duration timeout) {
-        if (rx.isEmpty() && !closed && !unplugged) {
+        long deadline = System.nanoTime() + Math.max(1, timeout.toMillis()) * 1_000_000L;
+        while (rx.isEmpty() && !closed && !unplugged) {
+            long leftMs = (deadline - System.nanoTime()) / 1_000_000L;
+            if (leftMs <= 0) {
+                break;
+            }
             try {
-                wait(Math.max(1, timeout.toMillis()));
+                wait(leftMs);   // in a loop: a wakeup may be spurious
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                break;
             }
         }
         if (closed) {

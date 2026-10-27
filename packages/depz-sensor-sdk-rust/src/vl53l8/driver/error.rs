@@ -66,7 +66,10 @@ pub type UldResult<T> = std::result::Result<T, Vl53l8UldError>;
 impl Vl53l8UldError {
     /// A ULD status error.
     pub fn status(code: u8, context: impl Into<String>) -> Self {
-        Vl53l8UldError::Status { code, context: context.into() }
+        Vl53l8UldError::Status {
+            code,
+            context: context.into(),
+        }
     }
 
     /// The ULD status code, for a [`Vl53l8UldError::Status`].
@@ -82,7 +85,12 @@ impl fmt::Display for Vl53l8UldError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Vl53l8UldError::Status { code, context } => {
-                let text = format!("VL53L8CX {} (code {}) {}", status::name(*code), code, context);
+                let text = format!(
+                    "VL53L8CX {} (code {}) {}",
+                    status::name(*code),
+                    code,
+                    context
+                );
                 f.write_str(text.trim())
             }
             Vl53l8UldError::InvalidArgument(m) => write!(f, "invalid argument: {m}"),

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <typeinfo>
 
 #include <depz_sensor_io.h>
@@ -10,6 +11,8 @@
 namespace depz {
 
 // ── errors ──────────────────────────────────────────────────────────────────
+
+static_assert(kErrArg == DEPZ_E_ARG, "depz/errors.hpp kErrArg must be the C SDK's DEPZ_E_ARG");
 
 namespace {
 
@@ -172,6 +175,7 @@ DeviceEvent event_from_c(const depz_device_event& c)
     DeviceEvent e;
     switch (c.type) {
     case DEPZ_DEV_EV_SEQUENCE_ERROR: e.type = DeviceEvent::Type::SequenceError; break;
+    case DEPZ_DEV_EV_SEQ_GAP: e.type = DeviceEvent::Type::SeqGap; break;
     case DEPZ_DEV_EV_CRC_ERROR: e.type = DeviceEvent::Type::CrcError; break;
     case DEPZ_DEV_EV_TRASH: e.type = DeviceEvent::Type::Trash; break;
     case DEPZ_DEV_EV_UNSOLICITED_STATUS: e.type = DeviceEvent::Type::UnsolicitedStatus; break;
@@ -183,6 +187,7 @@ DeviceEvent event_from_c(const depz_device_event& c)
     e.seq = c.seq;
     e.expected_seq = c.expected_seq;
     e.received_seq = c.received_seq;
+    e.missed = c.missed;
     e.by_device = c.by_device;
     e.status = c.status;
     e.timestamp_us = c.timestamp_us;
@@ -204,12 +209,20 @@ struct FnHolder : detail::CallbackHolder {
     std::function<void(const T&)> fn;
 };
 
+// Contract 07 §3: a callback that threw is counted, reported and dropped — an
+// exception must not unwind through the C reader thread, and the reader goes on.
+void callback_threw(detail::CallbackHolder* h)
+{
+    if (h && h->errors) h->errors->fetch_add(1, std::memory_order_relaxed);
+    std::cerr << "depz-sensor-sdk: a callback threw on the reader thread; dropped\n";
+}
+
 void event_tramp(const depz_device_event* ev, void* user)
 {
     try {
         static_cast<FnHolder<DeviceEvent>*>(user)->fn(event_from_c(*ev));
     } catch (...) {
-        // An exception must not unwind through the C reader thread.
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -233,6 +246,7 @@ void l4_tramp(const depz_vl53l4cd_measurement* m, void* user)
     try {
         static_cast<FnHolder<Vl53l4cdMeasurement>*>(user)->fn(l4_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -274,6 +288,7 @@ void l8_tramp(const depz_vl53l8_live_frame* f, void* user)
     try {
         static_cast<FnHolder<Vl53l8LiveFrame>*>(user)->fn(l8_from_c(*f));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -368,6 +383,7 @@ void bno_tramp(const depz_bno055_sample* m, void* user)
     try {
         static_cast<FnHolder<Bno055Sample>*>(user)->fn(bno_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -472,6 +488,7 @@ void bno086_tramp(const depz_bno_report* m, void* user)
     try {
         static_cast<FnHolder<Bno086Report>*>(user)->fn(bno086_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -520,6 +537,7 @@ void vlx_tramp(const depz_vl53lx_measurement* m, void* user)
     try {
         static_cast<FnHolder<Vl53lxMeasurement>*>(user)->fn(vlx_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -561,6 +579,7 @@ void sr04_tramp(const depz_sr04_measurement* m, void* user)
     try {
         static_cast<FnHolder<Sr04Measurement>*>(user)->fn(measurement_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -619,6 +638,7 @@ std::unique_ptr<Device> Device::rewrap(std::unique_ptr<Device> dev)
     {
         std::lock_guard<std::mutex> g(dev->held_lock_);
         out->held_ = std::move(dev->held_);
+        out->callback_errors_ = dev->callback_errors_;
     }
     dev->d_ = nullptr;  // the new wrapper owns the handle now
     return out;
@@ -633,7 +653,8 @@ std::unique_ptr<Device> Device::promote(std::unique_ptr<Device> dev)
 std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name)
 {
     if (!dev) throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class: no device");
-    if (typeid(*dev) != typeid(Device))
+    const Device& plain = *dev;
+    if (typeid(plain) != typeid(Device))
         throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class needs a plain Device (it already has a class)");
     check(depz_attach_sensor_class(dev->handle(), class_name.c_str()));
     if (class_name == "device") return dev;
@@ -680,8 +701,9 @@ LinkStats Device::stats() const
 {
     depz_link_stats s{};
     depz_device_stats(handle(), &s);
-    return LinkStats{s.tx_packets, s.rx_packets,    s.tx_bytes, s.rx_bytes,         s.crc_errors,
-                     s.header_errors, s.trash_bytes, s.seq_gaps, s.device_seq_errors};
+    return LinkStats{s.tx_packets,  s.rx_packets,  s.tx_bytes, s.rx_bytes,
+                     s.crc_errors,  s.header_errors, s.trash_bytes, s.seq_gaps,
+                     s.device_seq_errors, callback_errors_->load(std::memory_order_relaxed)};
 }
 
 std::string Device::device_name()
@@ -809,7 +831,7 @@ Device::Unsubscribe Device::on_event(std::function<void(const DeviceEvent&)> cb)
     h->fn = std::move(cb);
     int token = 0;
     check(depz_device_on_event(handle(), event_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_device_off_event(d, token); };
 }
@@ -888,7 +910,7 @@ Device::Unsubscribe Sr04::on_measurement(std::function<void(const Sr04Measuremen
     h->fn = std::move(cb);
     int token = 0;
     check(depz_sr04_on_measurement(handle(), sr04_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_sr04_off_measurement(d, token); };
 }
@@ -1049,7 +1071,7 @@ Device::Unsubscribe Vl53l4cd::on_measurement(std::function<void(const Vl53l4cdMe
     h->fn = std::move(cb);
     int token = 0;
     check(depz_vl53l4cd_on_measurement(handle(), l4_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_vl53l4cd_off_measurement(d, token); };
 }
@@ -1201,14 +1223,14 @@ std::uint8_t Vl53l8::power_mode()
 
 void Vl53l8::set_power_mode(std::uint8_t mode) { check(depz_vl53l8_set_power_mode(handle(), mode)); }
 
-double Vl53l8::xtalk_margin()
+std::uint32_t Vl53l8::xtalk_margin()
 {
-    double v = 0;
+    std::uint32_t v = 0;
     check(depz_vl53l8_get_xtalk_margin(handle(), &v));
     return v;
 }
 
-void Vl53l8::set_xtalk_margin(double kcps) { check(depz_vl53l8_set_xtalk_margin(handle(), kcps)); }
+void Vl53l8::set_xtalk_margin(std::uint32_t kcps) { check(depz_vl53l8_set_xtalk_margin(handle(), kcps)); }
 
 bool Vl53l8::calibrate_xtalk(std::uint8_t reflectance_percent, std::uint8_t nb_samples, std::uint16_t distance_mm)
 {
@@ -1278,6 +1300,15 @@ void Vl53l8::configure_cnh(const CnhSetup& setup)
     check(depz_vl53l8_configure_cnh(handle(), &c));
 }
 
+std::optional<CnhSetup> Vl53l8::cnh_setup() const
+{
+    depz_vl53l8_cnh_setup c{};
+    if (!depz_vl53l8_cnh_armed(handle(), &c)) return std::nullopt;
+    CnhSetup s;
+    cnh_from_c(c, s);
+    return s;
+}
+
 void Vl53l8::start_ranging() { check(depz_vl53l8_start_ranging(handle())); }
 void Vl53l8::stop_ranging() { check(depz_vl53l8_stop_ranging(handle())); }
 
@@ -1287,7 +1318,7 @@ Device::Unsubscribe Vl53l8::on_frame(std::function<void(const Vl53l8LiveFrame&)>
     h->fn = std::move(cb);
     int token = 0;
     check(depz_vl53l8_on_frame(handle(), l8_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_vl53l8_off_frame(d, token); };
 }
@@ -1678,7 +1709,7 @@ Device::Unsubscribe Bno055::on_sample(std::function<void(const Bno055Sample&)> c
     h->fn = std::move(cb);
     int token = 0;
     check(depz_bno055_on_sample(handle(), bno_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_bno055_off_sample(d, token); };
 }
@@ -1866,7 +1897,7 @@ Device::Unsubscribe Bno086::on_report(std::function<void(const Bno086Report&)> c
     h->fn = std::move(cb);
     int token = 0;
     check(depz_bno086_on_report(handle(), bno086_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_bno086_off_report(d, token); };
 }
@@ -1914,6 +1945,18 @@ bno086::CalibrationConfig Bno086::calibration()
 void Bno086::save_dcd() { check(depz_bno086_save_dcd(handle())); }
 
 void Bno086::configure_periodic_dcd(bool enable) { check(depz_bno086_configure_periodic_dcd(handle(), enable)); }
+
+void Bno086::set_motion_intent(bno086::MotionIntent intent)
+{
+    check(depz_bno086_set_motion_intent(handle(), static_cast<std::uint8_t>(intent)));
+}
+
+void Bno086::enable_motion_request(double hz) { check(depz_bno086_enable_motion_request(handle(), hz)); }
+
+void Bno086::flush(bno086::SensorId sensor)
+{
+    check(depz_bno086_flush(handle(), static_cast<std::uint8_t>(sensor)));
+}
 
 std::vector<std::uint32_t> Bno086::frs_read(std::uint16_t record)
 {
@@ -2145,7 +2188,12 @@ std::pair<int, int> Vl53lx::range_timing()
     return {b, i};
 }
 
-void Vl53lx::set_mode(const std::string& mode) { check(depz_vl53lx_set_mode(handle(), mode.c_str())); }
+std::optional<int> Vl53lx::set_mode(const std::string& mode)
+{
+    int budget_ms = 0;
+    check(depz_vl53lx_set_mode(handle(), mode.c_str(), &budget_ms));
+    return budget_ms ? std::optional<int>(budget_ms) : std::nullopt;
+}
 
 std::optional<std::string> Vl53lx::mode()
 {
@@ -2261,7 +2309,7 @@ Device::Unsubscribe Vl53lx::on_measurement(std::function<void(const Vl53lxMeasur
     h->fn = std::move(cb);
     int token = 0;
     check(depz_vl53lx_on_measurement(handle(), vlx_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_vl53lx_off_measurement(d, token); };
 }
@@ -2416,6 +2464,7 @@ void tmf_measurement_tramp(const depz_tmf8829_measurement* m, void* user)
     try {
         static_cast<FnHolder<Tmf8829Measurement>*>(user)->fn(tmf_measurement_from_c(*m));
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -2430,6 +2479,7 @@ void tmf_frame_tramp(const depz_tmf8829_raw_frame* f, void* user)
         r.data.assign(d, d + f->len);
         static_cast<FnHolder<tmf8829::RawFrame>*>(user)->fn(r);
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -2444,6 +2494,7 @@ void tmf_event_tramp(const depz_tmf8829_event* e, void* user)
         ev.fifo_status = e->fifo_status;
         static_cast<FnHolder<tmf8829::Tmf8829Event>*>(user)->fn(ev);
     } catch (...) {
+        callback_threw(static_cast<detail::CallbackHolder*>(user));
     }
 }
 
@@ -2548,7 +2599,7 @@ Device::Unsubscribe Tmf8829::on_measurement(std::function<void(const Tmf8829Meas
     h->fn = std::move(cb);
     int token = 0;
     check(depz_tmf8829_on_measurement(handle(), tmf_measurement_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_tmf8829_off_measurement(d, token); };
 }
@@ -2559,7 +2610,7 @@ Device::Unsubscribe Tmf8829::on_frame(std::function<void(const tmf8829::RawFrame
     h->fn = std::move(cb);
     int token = 0;
     check(depz_tmf8829_on_frame(handle(), tmf_frame_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_tmf8829_off_frame(d, token); };
 }
@@ -2570,7 +2621,7 @@ Device::Unsubscribe Tmf8829::on_event(std::function<void(const tmf8829::Tmf8829E
     h->fn = std::move(cb);
     int token = 0;
     check(depz_tmf8829_on_event(handle(), tmf_event_tramp, h.get(), &token));
-    keep(std::move(h));
+    hold(std::move(h));
     depz_device* d = d_;
     return [d, token] { depz_tmf8829_off_event(d, token); };
 }

@@ -24,11 +24,14 @@ mode, so it is a port of its own.
 Reference C driver: ../../temp/STSW-IMG026/VL53L4CD_ULD_Driver/ (VL53L4CD_api.c)
 """
 
+from __future__ import annotations
+
 import math
 import time
+from typing import Callable
 
 from depz_sensor_sdk.vl53lx._link import I2C_KHZ_BOOT, ProtocolError, Vl53Error
-from depz_sensor_sdk.vl53lx.uld.base import Measurement, SensorDriver
+from depz_sensor_sdk.vl53lx.uld.base import BridgePlatform, Measurement, SensorDriver
 
 
 def round_half_away(x: float) -> int:
@@ -158,7 +161,17 @@ class ResultsData:
                  'signal_per_spad_kcps', 'number_of_spad', 'sigma_mm',
                  'stream_count')
 
-    def __init__(self, **kw):
+    range_status: int
+    distance_mm: int
+    ambient_rate_kcps: int
+    ambient_per_spad_kcps: int
+    signal_rate_kcps: int
+    signal_per_spad_kcps: int
+    number_of_spad: int
+    sigma_mm: int
+    stream_count: int
+
+    def __init__(self, **kw: int) -> None:
         for name in self.__slots__:
             setattr(self, name, kw.get(name, 0))
 
@@ -166,7 +179,7 @@ class ResultsData:
     def status_text(self) -> str:
         return RANGE_STATUS_NAMES.get(self.range_status, f'unknown ({self.range_status})')
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f'<ResultsData {self.distance_mm} mm  sigma {self.sigma_mm} mm  '
                 f'signal {self.signal_rate_kcps} kcps  ambient {self.ambient_rate_kcps} kcps  '
                 f'spads {self.number_of_spad}  status {self.range_status} ({self.status_text})>')
@@ -196,22 +209,25 @@ class VL53L1ResultBlock:
     constants below are that difference in full — everything else is shared.
     """
 
+    # The platform layer, which the SensorDriver this is mixed into provides.
+    p: BridgePlatform
+
     # Bridge-side facts of the die.
-    ADDR_WIDTH  = ADDR_WIDTH
-    CLEAR_STEPS = CLEAR_STEPS
-    MAX_KHZ     = 1000          # with Fast Mode Plus on the sensor pad
+    ADDR_WIDTH:  int = ADDR_WIDTH
+    CLEAR_STEPS: tuple[tuple[int, int], ...] = CLEAR_STEPS
+    MAX_KHZ:     int = 1000     # with Fast Mode Plus on the sensor pad
 
     # Where the signal rate comes from. The VL53L4CD ULD takes it from 0x008E
     # (offset 5), the VL53L1X ULD from 0x0098 (offset 15) — the
     # crosstalk-corrected peak signal.
-    SIGNAL_AT = 5
+    SIGNAL_AT: int = 5
     # per-spad rate = rate_kcps * K // spad_nb_raw, where spad_nb_raw is the
     # 8.8 word at 0x008C. The VL53L4CD ULD scales by 256, the VL53L1X ULD by
     # `200.0 * raw_rate / spad_nb_raw`, which is the same thing with K = 25
     # once the rate is in kcps. ST's own difference, kept.
-    PER_SPAD_K = 256
+    PER_SPAD_K: int = 256
 
-    def stream_block(self) -> tuple:
+    def stream_block(self) -> tuple[int, int]:
         return RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN
 
     def parse_result_block(self, raw: bytes) -> ResultsData:
@@ -273,15 +289,15 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
     """
 
     # The 91-byte blob written at CONFIG_ADDR, product-specific.
-    CONFIGURATION = b''
+    CONFIGURATION: bytes = b''
     # What StopRanging writes: the L4CD ULD 0x80, the L3CX ULP 0x00.
-    STOP_MODE = 0x80
+    STOP_MODE: int = 0x80
 
     # ── identity ──
     def model_id(self) -> int:
         return self.p.rd_word(IDENTIFICATION__MODEL_ID)
 
-    def set_i2c_address(self, new_address: int):
+    def set_i2c_address(self, new_address: int) -> None:
         """Note: the bridge always addresses 0x29, so this makes the sensor
         unreachable. Present for completeness with the C driver."""
         self.p.wr_byte(I2C_SLAVE__DEVICE_ADDRESS, new_address >> 1)
@@ -290,7 +306,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
     def boot_state(self) -> int:
         return self.p.rd_byte(FIRMWARE__SYSTEM_STATUS)
 
-    def wait_boot(self, timeout_s: float = 1.0):
+    def wait_boot(self, timeout_s: float = 1.0) -> None:
         deadline = time.monotonic() + timeout_s
         while True:
             if self.boot_state() == 0x03:
@@ -299,7 +315,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
                 raise Vl53Error('timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03')
             self.p.sleep_ms(1)
 
-    def reset_device(self, timeout_s: float = 1.0):
+    def reset_device(self, timeout_s: float = 1.0) -> None:
         """Pull the die through its soft reset (VL53L1_software_reset()).
 
         Neither ULD's SensorInit does this, and on a fresh power-up neither has
@@ -322,7 +338,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
             self.p.xshut_reset()
             self.wait_boot(timeout_s)
 
-    def sensor_init(self):
+    def sensor_init(self) -> None:
         """Initialise the sensor and leave the bus at this die's ceiling.
 
         The configuration block is written at I2C_KHZ_BOOT (400 kHz) because
@@ -358,34 +374,34 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
 
         self.set_range_timing(50, 0)
 
-    def init_boot(self):
+    def init_boot(self) -> None:
         """How a part gets to a booted die. The two VL53L4CD-lineage ULDs just
         wait; the VL53L1X one resets first — see reset_device()."""
         self.wait_boot()
 
-    def init_after_config(self):
+    def init_after_config(self) -> None:
         """Writes a part adds right after the configuration blob, before VHV.
         Only uld/l1.py has one: its blob boots the interrupt active-high."""
 
-    def init_extra(self):
+    def init_extra(self) -> None:
         """Writes a part adds at the end of init, before the timing is set."""
 
     # ── ranging ──
-    def clear_interrupt(self):
+    def clear_interrupt(self) -> None:
         self.p.wr_byte(SYSTEM__INTERRUPT_CLEAR, 0x01)
 
-    def start_ranging(self):
+    def start_ranging(self) -> None:
         # 0 = continuous, anything else = autonomous low power.
         mode = 0x21 if self.p.rd_dword(INTERMEASUREMENT_MS) == 0 else 0x40
         self.p.wr_byte(SYSTEM__MODE_START, mode)
 
-    def stop_ranging(self):
+    def stop_ranging(self) -> None:
         self.p.wr_byte(SYSTEM__MODE_START, self.STOP_MODE)
 
     def get_interrupt_polarity(self) -> int:
         return 0 if (self.p.rd_byte(GPIO_HV_MUX__CTRL) & 0x10) else 1
 
-    def set_interrupt_polarity(self, polarity: int):
+    def set_interrupt_polarity(self, polarity: int) -> None:
         temp = self.p.rd_byte(GPIO_HV_MUX__CTRL) & 0xEF
         self.p.wr_byte(GPIO_HV_MUX__CTRL, temp | ((not (polarity & 1)) << 4))
 
@@ -395,7 +411,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         return (self.p.rd_byte(GPIO__TIO_HV_STATUS) & 1) == int_pol
 
     # ── timing ──
-    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int):
+    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
         osc_frequency = self.p.rd_word(OSC_FREQUENCY)
         if osc_frequency == 0:
             raise Vl53Error('osc_frequency reads 0')
@@ -427,7 +443,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
                 ms_byte += 1
             self.p.wr_word(reg, ((ms_byte << 8) + (ls_byte & 0xFF)) & 0xFFFF)
 
-    def get_range_timing(self) -> tuple:
+    def get_range_timing(self) -> tuple[int, int]:
         """-> (timing_budget_ms, inter_measurement_ms)."""
         tmp = self.p.rd_dword(INTERMEASUREMENT_MS)
         clock_pll = self.p.rd_word(RESULT__OSC_CALIBRATE_VAL) & 0x3FF
@@ -452,7 +468,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         budget = budget + 2500 if tmp == 0 else budget * 2 + 4300
         return budget // 1000, inter_measurement_ms
 
-    def reach_mm(self):
+    def reach_mm(self) -> int:
         """Read off the loaded configuration, so it follows the blob and the
         mode: 1388 mm for the 0x38 window of the L4CD, L3CX and L1 short
         blobs, 4563 mm for the 0xB8 window L1 long writes."""
@@ -464,24 +480,24 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
 
     # ── thresholds ──
     def set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int,
-                                 window: int):
+                                 window: int) -> None:
         self.p.wr_byte(SYSTEM__INTERRUPT_CONFIG_GPIO, window)
         self.p.wr_word(THRESH_HIGH, distance_high_mm)
         self.p.wr_word(THRESH_LOW, distance_low_mm)
 
-    def get_detection_thresholds(self) -> tuple:
+    def get_detection_thresholds(self) -> tuple[int, int, int]:
         """-> (distance_low_mm, distance_high_mm, window)."""
         high = self.p.rd_word(THRESH_HIGH)
         low = self.p.rd_word(THRESH_LOW)
         return low, high, self.p.rd_byte(SYSTEM__INTERRUPT_CONFIG_GPIO) & 0x07
 
-    def set_signal_threshold(self, signal_kcps: int):
+    def set_signal_threshold(self, signal_kcps: int) -> None:
         self.p.wr_word(MIN_COUNT_RATE_RTN_LIMIT_MCPS, signal_kcps >> 3)
 
     def get_signal_threshold(self) -> int:
         return (self.p.rd_word(MIN_COUNT_RATE_RTN_LIMIT_MCPS) << 3) & 0xFFFF
 
-    def set_sigma_threshold(self, sigma_mm: int):
+    def set_sigma_threshold(self, sigma_mm: int) -> None:
         if sigma_mm > (0xFFFF >> 2):
             raise Vl53Error('sigma_mm must be <= 16383')
         self.p.wr_word(RANGE_CONFIG__SIGMA_THRESH, sigma_mm << 2)
@@ -490,7 +506,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         return self.p.rd_word(RANGE_CONFIG__SIGMA_THRESH) >> 2
 
     # ── offset ──
-    def set_offset(self, offset_mm: int):
+    def set_offset(self, offset_mm: int) -> None:
         self.p.wr_word(RANGE_OFFSET_MM, (offset_mm * 4) & 0xFFFF)
         self.p.wr_word(INNER_OFFSET_MM, 0)
         self.p.wr_word(OUTER_OFFSET_MM, 0)
@@ -501,7 +517,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
 
     # ── crosstalk (kcps on both ULDs; ST's L1X wrapper converts to cps, and
     # this port keeps the register's own unit so the tool speaks one) ──
-    def set_xtalk(self, xtalk_kcps: int):
+    def set_xtalk(self, xtalk_kcps: int) -> None:
         self.p.wr_word(XTALK_X_PLANE_GRADIENT_KCPS, 0x0000)
         self.p.wr_word(XTALK_Y_PLANE_GRADIENT_KCPS, 0x0000)
         self.p.wr_word(XTALK_PLANE_OFFSET_KCPS, (xtalk_kcps << 9) & 0xFFFF)
@@ -510,7 +526,7 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         return round_half_away(self.p.rd_word(XTALK_PLANE_OFFSET_KCPS) / 512.0)
 
     # ── ROI (VL53L1X_SetROI / VL53L3CX_ULP_SetROI, the same registers) ──
-    def set_roi(self, x: int, y: int):
+    def set_roi(self, x: int, y: int) -> None:
         """An X by Y window of SPADs, 4..16 each way."""
         optical_center = self.p.rd_byte(ROI_CONFIG__MODE_ROI_CENTRE_SPAD)
         x = min(x, 16)
@@ -520,19 +536,19 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         self.p.wr_byte(ROI_CONFIG__USER_ROI_CENTRE_SPAD, optical_center)
         self.p.wr_byte(ROI_CONFIG__USER_ROI_XY_SIZE, (y - 1) << 4 | (x - 1))
 
-    def get_roi(self) -> tuple:
+    def get_roi(self) -> tuple[int, int]:
         """-> (x, y)."""
         temp = self.p.rd_byte(ROI_CONFIG__USER_ROI_XY_SIZE)
         return (temp & 0x0F) + 1, ((temp & 0xF0) >> 4) + 1
 
-    def set_roi_center(self, center_spad: int):
+    def set_roi_center(self, center_spad: int) -> None:
         self.p.wr_byte(ROI_CONFIG__USER_ROI_CENTRE_SPAD, center_spad)
 
     def get_roi_center(self) -> int:
         return self.p.rd_byte(ROI_CONFIG__USER_ROI_CENTRE_SPAD)
 
     # ── temperature ──
-    def start_temperature_update(self):
+    def start_temperature_update(self) -> None:
         """Recommended after a >8 degC ambient change, see Example_3."""
         self.p.wr_byte(VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND, 0x81)  # full VHV
         self.p.wr_byte(0x000B, 0x92)
@@ -544,7 +560,8 @@ class VL53L1Die(VL53L1ResultBlock, SensorDriver):
         self.p.wr_byte(0x000B, 0x00)
 
     # ── calibration ──
-    def _collect(self, nb_samples: int, on_sample, timeout_s: float = 5.0):
+    def _collect(self, nb_samples: int, on_sample: Callable[[int, ResultsData], None],
+                 timeout_s: float = 5.0) -> None:
         """The ranging loop every calibration shares: data-ready, GetResult,
         ClearInterrupt, `nb_samples` times. What is done with the samples is
         each ULD's own arithmetic — see calibrate_offset/calibrate_xtalk in

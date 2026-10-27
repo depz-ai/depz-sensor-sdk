@@ -69,7 +69,7 @@ public Tmf8829Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Tmf8829Device.Tmf8829Device *(constructor)*
 
 ```csharp
-#if NET public Tmf8829Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Tmf8829Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Tmf8829Device.AppVersion *(property)*

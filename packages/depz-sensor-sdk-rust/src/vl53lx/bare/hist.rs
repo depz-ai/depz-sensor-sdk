@@ -265,7 +265,11 @@ pub fn rate_maths(events: i64, time_us: i64) -> i64 {
     } else {
         0
     };
-    let frac_bits = if events > SPAD_TOTAL_COUNT_RES_THRES { 3 } else { 7 };
+    let frac_bits = if events > SPAD_TOTAL_COUNT_RES_THRES {
+        3
+    } else {
+        7
+    };
     if time_us > 0 {
         tmp = ((tmp << frac_bits) + time_us / 2) / time_us;
     }
@@ -276,7 +280,12 @@ pub fn rate_maths(events: i64, time_us: i64) -> i64 {
 }
 
 /// `VL53LX_rate_per_spad_maths()`.
-pub fn rate_per_spad_maths(frac_bits: u32, peak_count_rate: i64, num_spads: i64, max_output_value: i64) -> i64 {
+pub fn rate_per_spad_maths(
+    frac_bits: u32,
+    peak_count_rate: i64,
+    num_spads: i64,
+    max_output_value: i64,
+) -> i64 {
     let tmp = if num_spads > 0 {
         let t = (peak_count_rate << 8) << frac_bits;
         (t + num_spads / 2) / num_spads
@@ -288,7 +297,11 @@ pub fn rate_per_spad_maths(frac_bits: u32, peak_count_rate: i64, num_spads: i64,
 
 /// `VL53LX_events_per_spad_maths()` → kcps per SPAD.
 pub fn events_per_spad_maths(events: i64, num_spads: i64, duration: i64) -> i64 {
-    let total = if num_spads != 0 { floor_div(events.wrapping_mul(1000 * 256), num_spads) } else { 0 };
+    let total = if num_spads != 0 {
+        floor_div(events.wrapping_mul(1000 * 256), num_spads)
+    } else {
+        0
+    };
     let per_spad = if duration > 0 {
         floor_div(total.wrapping_shl(11).wrapping_add(duration / 2), duration)
     } else {
@@ -320,7 +333,11 @@ pub fn range_maths(
 
     if fractional_bits == 0 {
         let range_mm10 = range_mm * 10 / (1 << 2);
-        range_mm = if (range_mm10 - range_mm10 / 10 * 10).abs() < 5 { range_mm10 / 10 } else { range_mm10 / 10 + 1 };
+        range_mm = if (range_mm10 - range_mm10 / 10 * 10).abs() < 5 {
+            range_mm10 / 10
+        } else {
+            range_mm10 / 10 + 1
+        };
     } else if fractional_bits == 1 {
         range_mm /= 1 << 1;
     }
@@ -357,7 +374,11 @@ pub fn average_repeated_bins(src: &HistogramBinData) -> HistogramBinData {
 
     for i in 0..MAX_BIN_SEQUENCE_LENGTH {
         let c = dst.bin_seq[i];
-        dst.bin_rep[i] = if c <= MAX_BIN_SEQUENCE_CODE { repeat_count[c as usize] } else { 0 };
+        dst.bin_rep[i] = if c <= MAX_BIN_SEQUENCE_CODE {
+            repeat_count[c as usize]
+        } else {
+            0
+        };
     }
     dst.bins_in_data = seq_length as i64 * 4;
 
@@ -373,21 +394,33 @@ pub fn average_repeated_bins(src: &HistogramBinData) -> HistogramBinData {
     }
 
     // Codes 7 and 15 are the ambient-only sequence entries.
-    dst.number_of_ambient_bins = if repeat_count[7] != 0 || repeat_count[15] != 0 { 4 } else { 0 };
+    dst.number_of_ambient_bins = if repeat_count[7] != 0 || repeat_count[15] != 0 {
+        4
+    } else {
+        0
+    };
     dst
 }
 
 /// `VL53LX_hist_calc_zero_distance_phase`.
 pub fn calc_zero_distance_phase(bins: &mut HistogramBinData) {
     let period = 2048 * math::decode_vcsel_period(bins.vcsel_period);
-    let phase = period + bins.phasecal_result_reference_phase + 2048 * bins.phasecal_result_vcsel_start
-        - 2048 * bins.cal_config_vcsel_start;
-    bins.zero_distance_phase = if period != 0 { py_mod(phase, period) } else { 0 };
+    let phase =
+        period + bins.phasecal_result_reference_phase + 2048 * bins.phasecal_result_vcsel_start
+            - 2048 * bins.cal_config_vcsel_start;
+    bins.zero_distance_phase = if period != 0 {
+        py_mod(phase, period)
+    } else {
+        0
+    };
 }
 
 /// `VL53LX_hist_estimate_ambient_from_thresholded_bins()`: the floor from every bin near the
 /// quietest.
-pub fn estimate_ambient_from_thresholded_bins(ambient_threshold_sigma: i64, bins: &mut HistogramBinData) {
+pub fn estimate_ambient_from_thresholded_bins(
+    ambient_threshold_sigma: i64,
+    bins: &mut HistogramBinData,
+) {
     let n = (bins.bins_in_data.max(0) as usize).min(bins.bin_data.len());
     let used = &bins.bin_data[..n];
     bins.min_bin_value = used.iter().copied().min().unwrap_or(0);
@@ -422,7 +455,8 @@ pub fn estimate_ambient_from_ambient_bins(bins: &mut HistogramBinData) {
     bins.number_of_ambient_samples = bins.number_of_ambient_bins;
     let n = (bins.number_of_ambient_bins as usize).min(bins.bin_data.len());
     bins.ambient_events_sum = bins.bin_data[..n].iter().sum();
-    bins.ambient_per_bin = (bins.ambient_events_sum + bins.number_of_ambient_bins / 2) / bins.number_of_ambient_bins;
+    bins.ambient_per_bin =
+        (bins.ambient_events_sum + bins.number_of_ambient_bins / 2) / bins.number_of_ambient_bins;
 }
 
 /// `VL53LX_hist_remove_ambient_bins`: drop the ambient-only bins off the front, so bin 0 is phase
@@ -461,7 +495,10 @@ fn woi_sums(bin_index: i64, filter_woi: i64, bins: &HistogramBinData) -> (i64, i
     let b = bins.bin_data[bin_index as usize];
     let mut c = 0;
     for w in 0..(filter_woi << 1) + 1 {
-        let j = py_mod(bin_index + w + bins.bins_in_data - filter_woi, bins.bins_in_data) as usize;
+        let j = py_mod(
+            bin_index + w + bins.bins_in_data - filter_woi,
+            bins.bins_in_data,
+        ) as usize;
         if w < filter_woi {
             a += bins.bin_data[j];
         } else if w > filter_woi {
@@ -490,10 +527,18 @@ fn calc_rates(
 
     let pll_period_us = math::calc_pll_period_us(fast_osc_frequency);
     let periods_elapsed = total_periods_elapsed.wrapping_add(1);
-    target.peak_duration_us =
-        math::duration_maths(pll_period_us, vcsel_width, RANGING_WINDOW_VCSEL_PERIODS, periods_elapsed);
-    target.woi_duration_us =
-        math::duration_maths(pll_period_us, target.window_bins << 4, RANGING_WINDOW_VCSEL_PERIODS, periods_elapsed);
+    target.peak_duration_us = math::duration_maths(
+        pll_period_us,
+        vcsel_width,
+        RANGING_WINDOW_VCSEL_PERIODS,
+        periods_elapsed,
+    );
+    target.woi_duration_us = math::duration_maths(
+        pll_period_us,
+        target.window_bins << 4,
+        RANGING_WINDOW_VCSEL_PERIODS,
+        periods_elapsed,
+    );
 
     target.peak_signal_count_rate_mcps = rate_maths(target.signal_events, target.peak_duration_us);
     target.avg_signal_count_rate_mcps = rate_maths(target.signal_events, target.woi_duration_us);
@@ -504,14 +549,28 @@ fn calc_rates(
         count_rate_total = floor_div(count_rate_total, merge_nb);
     }
     target.total_rate_per_spad_mcps = rate_per_spad_maths(0x06, count_rate_total, spads, 0xFFFF);
-    target.signal_events_per_spad_kcps = events_per_spad_maths(target.signal_events, spads, target.peak_duration_us);
+    target.signal_events_per_spad_kcps =
+        events_per_spad_maths(target.signal_events, spads, target.peak_duration_us);
     true
 }
 
 // VL53LX_f_019
 fn calc_ranges(gain_factor: i64, range_offset_mm: i64, target: &mut RangeData) {
-    let r = |phase| range_maths(target.fast_osc_frequency, phase, target.zero_distance_phase, 0, gain_factor, range_offset_mm);
-    let (min, median, max) = (r(target.phase_start), r(target.phase_mean), r(target.phase_end));
+    let r = |phase| {
+        range_maths(
+            target.fast_osc_frequency,
+            phase,
+            target.zero_distance_phase,
+            0,
+            gain_factor,
+            range_offset_mm,
+        )
+    };
+    let (min, median, max) = (
+        r(target.phase_start),
+        r(target.phase_mean),
+        r(target.phase_end),
+    );
     target.min_range_mm = min;
     target.median_range_mm = median;
     target.max_range_mm = max;
@@ -521,7 +580,7 @@ fn calc_ranges(gain_factor: i64, range_offset_mm: i64, target: &mut RangeData) {
 
 // VL53LX_f_023: the width of the pulse, 9.7 fixed point mm — how far the window sums lean to one side,
 // over how much signal there is above ambient. The ceilings are ST's.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // ST's VL53LX_f_023 parameter list, kept 1:1
 fn sigma_estimate(
     sigma_ref_mm: i64,
     a: i64,
@@ -548,7 +607,11 @@ fn sigma_estimate(
     let mut tmp0 = (b + bx + ambient_per_bin).min(D003);
 
     // (a - c)^2 << 8, capped at D004 — which it passes exactly when |a - c| >= 2^24.
-    let mut tmp1 = if a_minus_c >= 1 << 24 { D004 } else { ((a_minus_c * a_minus_c) << 8).min(D004) };
+    let mut tmp1 = if a_minus_c >= 1 << 24 {
+        D004
+    } else {
+        ((a_minus_c * a_minus_c) << 8).min(D004)
+    };
     tmp1 /= b_minus_amb;
     tmp1 /= b_minus_amb;
     tmp1 = tmp1.min(D005);
@@ -557,21 +620,21 @@ fn sigma_estimate(
 
     tmp1 = (c_zp + cx_zp + a_zp + ax_zp).min(D003) << 8;
 
-    tmp0 = (tmp1 + tmp0).min(D006);
+    // The reference caps tmp0 at D006 = i64::MAX here and after the two divisions below: a
+    // no-op for an i64, so the caps are left out (sat_mul still clamps the wide products).
+    tmp0 += tmp1;
 
     tmp0 = if tmp0 > D007 {
         sat_mul(tmp0 / b_minus_amb, pll_period_mm, D006)
     } else {
         tmp0 * pll_period_mm / b_minus_amb
     };
-    tmp0 = tmp0.min(D006);
 
     tmp0 = if tmp0 > D007 {
         sat_mul(tmp0 / b_minus_amb / 4, pll_period_mm, D006)
     } else {
         tmp0 * pll_period_mm / b_minus_amb / 4
     };
-    tmp0 = tmp0.min(D006);
 
     tmp0 = (tmp0 >> 2).min(D007);
 
@@ -595,7 +658,9 @@ fn pulse_sigma(
     let i = pulse.peak_bin % vcsel_period;
     let zp = woi_sums(i, pulse.filter_woi, pulse_zero);
     let amb = woi_sums(i, pulse.filter_woi, pulse_amb);
-    let x = pulse_xtalk.map(|x| woi_sums(i, pulse.filter_woi, x)).unwrap_or((0, 0, 0));
+    let x = pulse_xtalk
+        .map(|x| woi_sums(i, pulse.filter_woi, x))
+        .unwrap_or((0, 0, 0));
     sigma_estimate(
         sigma_ref_mm,
         amb.0,
@@ -692,7 +757,11 @@ fn assign_pulse_numbers(algo: &mut Gen3Algo) {
             algo.pulse_count += 1;
         }
         algo.pulse_count = algo.pulse_count.min(algo.max_pulses);
-        algo.pulse_no[i] = if algo.pulse_mask[i] > 0 { algo.pulse_count } else { 0 };
+        algo.pulse_no[i] = if algo.pulse_mask[i] > 0 {
+            algo.pulse_count
+        } else {
+            0
+        };
     }
 }
 
@@ -731,7 +800,12 @@ fn pulse_extents(algo: &mut Gen3Algo) {
 }
 
 // VL53LX_f_010: total and ambient events inside the pulse window.
-fn pulse_event_sums(pulse: &mut PulseData, bins: &HistogramBinData, vcsel_period: i64, ambient_per_bin: i64) {
+fn pulse_event_sums(
+    pulse: &mut PulseData,
+    bins: &HistogramBinData,
+    vcsel_period: i64,
+    ambient_per_bin: i64,
+) {
     pulse.total_events = 0;
     pulse.ambient_events = 0;
     for lb in pulse.start_bin..=pulse.end_bin {
@@ -763,14 +837,24 @@ fn isolate_pulse(
 }
 
 // VL53LX_f_020: the centre of mass of the bins in [start, end], in 1/2048ths of a bin.
-fn weighted_phase(start: i64, end: i64, vcsel_period: i64, clip_events: bool, bins: &HistogramBinData) -> i64 {
+fn weighted_phase(
+    start: i64,
+    end: i64,
+    vcsel_period: i64,
+    clip_events: bool,
+    bins: &HistogramBinData,
+) -> i64 {
     if vcsel_period == 0 {
         return MAX_ALLOWED_PHASE;
     }
     let mut event_sum = 0i64;
     let mut weighted_sum = 0i64;
     for lb in start..=end {
-        let i = if lb < 0 { lb + vcsel_period } else { lb % vcsel_period };
+        let i = if lb < 0 {
+            lb + vcsel_period
+        } else {
+            lb % vcsel_period
+        };
         if i >= 0 && (i as usize) < HISTOGRAM_BUFFER_SIZE {
             let mut value = bins.bin_data[i as usize] - bins.ambient_per_bin;
             if clip_events && value < 0 {
@@ -790,7 +874,12 @@ fn weighted_phase(start: i64, end: i64, vcsel_period: i64, clip_events: bool, bi
 
 // VL53LX_f_015: the near and far phase of the pulse — the centres of mass of its leading and trailing
 // bins.
-fn pulse_phase_limits(pulse: &mut PulseData, clip_events: bool, bins: &HistogramBinData, vcsel_period: i64) {
+fn pulse_phase_limits(
+    pulse: &mut PulseData,
+    clip_events: bool,
+    bins: &HistogramBinData,
+    vcsel_period: i64,
+) {
     if pulse.peak_bin == 0xFF {
         pulse.peak_bin = 1;
     }
@@ -799,7 +888,8 @@ fn pulse_phase_limits(pulse: &mut PulseData, clip_events: bool, bins: &Histogram
     let end = i + pulse.end_bin - pulse.peak_bin;
     let window_width = (end - start).min(3);
 
-    pulse.phase_start = weighted_phase(start, start + window_width, vcsel_period, clip_events, bins);
+    pulse.phase_start =
+        weighted_phase(start, start + window_width, vcsel_period, clip_events, bins);
     pulse.phase_end = weighted_phase(end - window_width, end, vcsel_period, clip_events, bins);
     if pulse.phase_start > pulse.phase_end {
         std::mem::swap(&mut pulse.phase_start, &mut pulse.phase_end);
@@ -816,9 +906,9 @@ fn sort_pulses(target_order: i64, algo: &mut Gen3Algo) {
     }
     let head = &mut algo.pulses[..algo.pulse_count as usize];
     if target_order == HIST_TARGET_ORDER_STRONGEST_FIRST {
-        head.sort_by(|a, b| b.signal_events.cmp(&a.signal_events));
+        head.sort_by_key(|p| std::cmp::Reverse(p.signal_events));
     } else {
-        head.sort_by(|a, b| a.phase_mean.cmp(&b.phase_mean));
+        head.sort_by_key(|p| p.phase_mean);
     }
 }
 
@@ -858,7 +948,11 @@ fn fill_target(
     }
 
     let mut lower = (valid_phase_low << 8) & 0xFFFF;
-    lower = if lower < target.zero_distance_phase { target.zero_distance_phase - lower } else { 0 };
+    lower = if lower < target.zero_distance_phase {
+        target.zero_distance_phase - lower
+    } else {
+        0
+    };
     let upper = ((valid_phase_high << 8) + bins.zero_distance_phase) & 0xFFFF;
     if target.phase_mean < lower || target.phase_mean > upper {
         target.range_status = DEVICE_ERROR_RANGE_PHASE_CHECK;
@@ -891,7 +985,14 @@ fn filter_pulse(
 
 // VL53LX_f_028: the sub-bin phase where (c - a) against (b - ambient) crosses zero; None when the pulse
 // has no height (the division by zero C turns into "not a peak after all").
-fn interpolate_phase(bin_index: i64, a: i64, b: i64, c: i64, ambient_per_bin: i64, vcsel_period: i64) -> Option<i64> {
+fn interpolate_phase(
+    bin_index: i64,
+    a: i64,
+    b: i64,
+    c: i64,
+    ambient_per_bin: i64,
+    vcsel_period: i64,
+) -> Option<i64> {
     let numerator = 4096 * (c - a);
     let half_b_minus_amb = 4096 * (b - ambient_per_bin);
     if half_b_minus_amb == 0 {
@@ -908,7 +1009,13 @@ fn interpolate_phase(bin_index: i64, a: i64, b: i64, c: i64, ambient_per_bin: i6
 
 // VL53LX_f_027: keep the last bin where the filter puts the centre of mass; that bin and its phase are
 // the target.
-fn find_peak_bin(pulse: &mut PulseData, filtered: &mut Filtered, vcsel_period: i64, bins_in_data: i64, ambient_per_bin: i64) {
+fn find_peak_bin(
+    pulse: &mut PulseData,
+    filtered: &mut Filtered,
+    vcsel_period: i64,
+    bins_in_data: i64,
+    ambient_per_bin: i64,
+) {
     for lb in pulse.start_bin..pulse.end_bin {
         let i = lb % vcsel_period;
         let j = (lb + 1) % vcsel_period;
@@ -919,7 +1026,10 @@ fn find_peak_bin(pulse: &mut PulseData, filtered: &mut Filtered, vcsel_period: i
         let is_peak = if filtered.left[ii] == 0 && filtered.right[ii] == 0 {
             0
         } else if (filtered.left[ii] >= 0 && filtered.right[ii] >= 0)
-            || (filtered.left[ii] < 0 && filtered.right[ii] >= 0 && filtered.left[jj] >= 0 && filtered.right[jj] < 0)
+            || (filtered.left[ii] < 0
+                && filtered.right[ii] >= 0
+                && filtered.left[jj] >= 0
+                && filtered.right[jj] < 0)
         {
             1
         } else {
@@ -930,7 +1040,14 @@ fn find_peak_bin(pulse: &mut PulseData, filtered: &mut Filtered, vcsel_period: i
             continue;
         }
         pulse.peak_bin = lb;
-        match interpolate_phase(lb, filtered.a[ii], filtered.b[ii], filtered.c[ii], ambient_per_bin, vcsel_period) {
+        match interpolate_phase(
+            lb,
+            filtered.a[ii],
+            filtered.b[ii],
+            filtered.c[ii],
+            ambient_per_bin,
+            vcsel_period,
+        ) {
             Some(phase) => pulse.phase_mean = phase,
             None => filtered.is_peak[ii] = 0,
         }
@@ -940,7 +1057,10 @@ fn find_peak_bin(pulse: &mut PulseData, filtered: &mut Filtered, vcsel_period: i
 // ── entry point ──────────────────────────────────────────────────────────
 
 /// `VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off, one merged frame.
-pub fn process_data(bins_input: &HistogramBinData, hpp: &HistPostProcessConfig) -> Result<RangeResults> {
+pub fn process_data(
+    bins_input: &HistogramBinData,
+    hpp: &HistPostProcessConfig,
+) -> Result<RangeResults> {
     process_data_merged(bins_input, hpp, 1)
 }
 
@@ -951,7 +1071,9 @@ pub fn process_data_merged(
     merge_nb: i64,
 ) -> Result<RangeResults> {
     if hpp.crosstalk_compensation_enable != 0 {
-        return Err(DepzError::Unsupported("crosstalk compensation is not ported".into()));
+        return Err(DepzError::Unsupported(
+            "crosstalk compensation is not ported".into(),
+        ));
     }
 
     let mut algo = Gen3Algo::new();
@@ -963,7 +1085,10 @@ pub fn process_data_merged(
         right: [0; N],
         is_peak: [0; N],
     };
-    let mut results = RangeResults { stream_count: bins_input.result_stream_count, ..RangeResults::default() };
+    let mut results = RangeResults {
+        stream_count: bins_input.result_stream_count,
+        ..RangeResults::default()
+    };
 
     // Compensation is off, so the crosstalk histogram (all zeros) is never read and not built.
     let mut bins = average_repeated_bins(bins_input);
@@ -987,7 +1112,12 @@ pub fn process_data_merged(
     assign_pulse_numbers(&mut algo);
     pulse_extents(&mut algo);
 
-    let (vp, frb, bid, apb) = (algo.vcsel_period, algo.first_rising_bin, algo.bins_in_data, algo.ambient_per_bin);
+    let (vp, frb, bid, apb) = (
+        algo.vcsel_period,
+        algo.first_rising_bin,
+        algo.bins_in_data,
+        algo.ambient_per_bin,
+    );
     for p in 0..algo.pulse_count as usize {
         let pulse = &mut algo.pulses[p];
         pulse_event_sums(pulse, &bins, vp, apb);
@@ -996,7 +1126,14 @@ pub fn process_data_merged(
 
         filter_pulse(pulse, &pulse_amb, vp, apb, &mut filtered);
         find_peak_bin(pulse, &mut filtered, vp, bid, apb);
-        pulse.sigma = pulse_sigma(pulse, hpp.sigma_estimator_sigma_ref_mm, vp, &pulse_zero, &pulse_amb, None);
+        pulse.sigma = pulse_sigma(
+            pulse,
+            hpp.sigma_estimator_sigma_ref_mm,
+            vp,
+            &pulse_zero,
+            &pulse_amb,
+            None,
+        );
         pulse_phase_limits(pulse, true, &bins, vp);
     }
 
@@ -1058,10 +1195,18 @@ pub fn events_consistency_check(
     }
     let events_scaler_sq = events_scaler.wrapping_mul(events_scaler).wrapping_add(2048) / 4096;
 
-    let c_signal_events =
-        (target.total_events - target.ambient_events).wrapping_mul(events_scaler).wrapping_add(2048) / 4096;
-    let c_sig_noise_sq = events_scaler_sq.wrapping_mul(target.total_events).wrapping_add(2048) / 4096;
-    let mut c_amb_noise_sq = events_scaler_sq.wrapping_mul(target.ambient_events).wrapping_add(2048) / 4096;
+    let c_signal_events = (target.total_events - target.ambient_events)
+        .wrapping_mul(events_scaler)
+        .wrapping_add(2048)
+        / 4096;
+    let c_sig_noise_sq = events_scaler_sq
+        .wrapping_mul(target.total_events)
+        .wrapping_add(2048)
+        / 4096;
+    let mut c_amb_noise_sq = events_scaler_sq
+        .wrapping_mul(target.ambient_events)
+        .wrapping_add(2048)
+        / 4096;
     // Ambient is subtracted from both frames, so only its noise survives, at a quarter weight.
     c_amb_noise_sq = c_amb_noise_sq.wrapping_add(2) / 4;
     let p_amb_noise_sq = (prev.ambient_events + 2) / 4;
@@ -1103,7 +1248,9 @@ pub fn convert_status(device_error: i64) -> i32 {
         DEVICE_ERROR_RANGE_PHASE_CHECK => RANGE_STATUS_OUT_OF_BOUNDS_FAIL,
         DEVICE_ERROR_SIGMA_THRESHOLD_CHECK => RANGE_STATUS_SIGMA_FAIL,
         DEVICE_ERROR_RANGE_COMPLETE_NO_WRAP_CHECK => RANGE_STATUS_RANGE_VALID_NO_WRAP_CHECK,
-        DEVICE_ERROR_PHASE_CONSISTENCY | DEVICE_ERROR_EVENT_CONSISTENCY => RANGE_STATUS_WRAP_TARGET_FAIL,
+        DEVICE_ERROR_PHASE_CONSISTENCY | DEVICE_ERROR_EVENT_CONSISTENCY => {
+            RANGE_STATUS_WRAP_TARGET_FAIL
+        }
         DEVICE_ERROR_PREV_RANGE_NO_TARGETS => RANGE_STATUS_TARGET_PRESENT_LACK_OF_SIGNAL,
         DEVICE_ERROR_RANGE_COMPLETE_MERGED_PULSE => RANGE_STATUS_RANGE_VALID_MERGED_PULSE,
         DEVICE_ERROR_RANGE_COMPLETE => RANGE_STATUS_RANGE_VALID,
@@ -1112,7 +1259,9 @@ pub fn convert_status(device_error: i64) -> i32 {
 }
 
 fn status_text(status: i32) -> String {
-    status_name(status).map(str::to_string).unwrap_or_else(|| format!("unknown ({status})"))
+    status_name(status)
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("unknown ({status})"))
 }
 
 fn to_target(d: &RangeData) -> Vl53lxTarget {
@@ -1135,9 +1284,15 @@ fn to_target(d: &RangeData) -> Vl53lxTarget {
 /// `max_range_mm`, `peak_bin`.
 pub fn to_range(results: &RangeResults, bins: &HistogramBinData) -> Vl53lxRange {
     let mut extra = BTreeMap::new();
-    extra.insert("stream_count".to_string(), ExtraValue::Int(results.stream_count));
+    extra.insert(
+        "stream_count".to_string(),
+        ExtraValue::Int(results.stream_count),
+    );
     let Some(first) = results.targets.first() else {
-        extra.insert("ambient_per_bin".to_string(), ExtraValue::Int(bins.ambient_per_bin));
+        extra.insert(
+            "ambient_per_bin".to_string(),
+            ExtraValue::Int(bins.ambient_per_bin),
+        );
         return Vl53lxRange {
             distance_mm: 8191,
             status: RANGE_STATUS_NONE,
@@ -1151,10 +1306,19 @@ pub fn to_range(results: &RangeResults, bins: &HistogramBinData) -> Vl53lxRange 
         };
     };
     let t0 = to_target(first);
-    extra.insert("min_range_mm".to_string(), ExtraValue::Int(first.min_range_mm));
-    extra.insert("max_range_mm".to_string(), ExtraValue::Int(first.max_range_mm));
+    extra.insert(
+        "min_range_mm".to_string(),
+        ExtraValue::Int(first.min_range_mm),
+    );
+    extra.insert(
+        "max_range_mm".to_string(),
+        ExtraValue::Int(first.max_range_mm),
+    );
     extra.insert("peak_bin".to_string(), ExtraValue::Int(first.peak_bin));
-    extra.insert("ambient_per_bin".to_string(), ExtraValue::Int(bins.ambient_per_bin));
+    extra.insert(
+        "ambient_per_bin".to_string(),
+        ExtraValue::Int(bins.ambient_per_bin),
+    );
     Vl53lxRange {
         distance_mm: t0.distance_mm,
         status: t0.status,

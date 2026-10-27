@@ -23,9 +23,9 @@ exact signatures see the [API reference](api.md).
 ```rust
 use std::time::Duration;
 use depz_sensor_sdk::bno055::regs::{OprMode, Units};
-use depz_sensor_sdk::devices::open_on_link;
+use depz_sensor_sdk::devices::open_first_device;
 
-let imu = open_on_link(link, None, None, None)?.into_bno055()?;
+let imu = open_first_device(None)?.into_bno055()?;
 imu.configure(OprMode::Ndof, Some(Units::default()), None, None)?; // returns once fusion runs
 let samples = imu.samples(256);
 imu.start_stream(10, None, false)?;          // the full 46-byte block at 100 Hz
@@ -313,7 +313,9 @@ println!(
 );
 ```
 
-The counters are free-running and wrap silently — watch increments. A rising
+The counters wrap silently — watch increments. `i2c_errors` is cleared by every
+successful reset handshake (the chip-ID poll after nRESET), so it counts failed
+transfers since the last one, not since power-up. A rising
 `sensor_resets` means the bridge recovered a stuck bus by pulsing nRESET: the
 stream keeps running, but the sensor is back in CONFIG with power-on settings
 (every output zero) and must be configured again.

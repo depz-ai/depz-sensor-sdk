@@ -35,17 +35,23 @@ public static class Vl53l8Advanced
 
     public const int NbThresholds = 64;
 
+    /// <summary>Largest xtalk margin <c>SetXtalkMargin</c> accepts, whole kcps/SPAD (as ST).</summary>
+    public const int XtalkMarginMaxKcps = 10000;
+
     /// <summary>
-    /// Xtalk margin raw DCI value: round(kcps × 2048). The margin is 0..10000
-    /// kcps (set_xtalk_margin's own limit); anything else, NaN included, is
-    /// refused — never wrapped (contract 07 §3).
+    /// Xtalk margin raw DCI value: kcps × 2048. As ST, the margin is a whole
+    /// number of kcps/SPAD, 0..<see cref="XtalkMarginMaxKcps"/>; a negative or a
+    /// bigger value is refused — never wrapped (contract 07 §3).
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">margin outside 0..10000.</exception>
-    public static uint XtalkMarginRaw(double marginKcps) =>
-        marginKcps >= 0 && marginKcps <= 10000
-            ? (uint)Math.Round(marginKcps * 2048.0, MidpointRounding.AwayFromZero)
+    public static uint XtalkMarginRaw(int marginKcps) =>
+        marginKcps >= 0 && marginKcps <= XtalkMarginMaxKcps
+            ? (uint)marginKcps * 2048u
             : throw new ArgumentOutOfRangeException(nameof(marginKcps), marginKcps,
-                "VL53L8CX INVALID_PARAM set_xtalk_margin: margin must be 0..10000");
+                "VL53L8CX INVALID_PARAM set_xtalk_margin: margin must be a whole 0..10000 kcps");
+
+    /// <summary>Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST).</summary>
+    public static int XtalkMarginKcps(uint raw) => (int)(raw / 2048u);
 
     /// <summary>One detection threshold (raw real-unit low/high, before scaling).</summary>
     public sealed record DetectionThreshold(

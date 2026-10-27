@@ -37,14 +37,17 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.7.0):
+Published on crates.io as `depz-sensor-sdk` (0.8.0):
 
 ```bash
 cargo add depz-sensor-sdk
 ```
 
 The crate name is `depz-sensor-sdk`; the library imports as `depz_sensor_sdk`.
-It targets stable Rust (edition 2021) with no runtime dependencies.
+It targets stable Rust (edition 2021). Its one runtime dependency is the
+[`serialport`](https://crates.io/crates/serialport) crate, which opens the
+board's USB serial port on Windows, macOS and Linux; on Linux it builds against
+libudev (`sudo apt-get install libudev-dev` on Debian / Ubuntu).
 
 ## Documentation
 
@@ -88,8 +91,11 @@ Full docs live under [`docs/`](docs/):
 
 ## Coverage today
 
-This crate is the **verifiable decode + protocol foundation** (transport-
-agnostic; no live serial I/O layer yet):
+The live layer (`devices`) opens the board's USB serial port itself —
+`open_device("/dev/ttyACM0", None)`, `open_first_device(None)`,
+`list_depz_devices(None, true, None)` — or runs on any `Link` you hand it (a
+`.depzrec` replay, a socket). Under it, the **verifiable decode + protocol
+foundation**:
 
 | Area | SR04 | VL53L8CX | VL53L8CH | BNO086 |
 |------|------|----------|----------|--------|
@@ -144,7 +150,20 @@ The register-bridge boards:
 
 ```bash
 cargo test
+cargo fmt --check && cargo clippy --all-targets -- -D warnings   # the CI lint gate
+scripts/coverage.sh       # line coverage with cargo-llvm-cov
 ```
+
+`scripts/coverage.sh` (needs `cargo install cargo-llvm-cov --locked`) lists the
+least-covered files of `src/` and fails below the floor in the script
+(`FLOOR`, the measured total rounded down — raise it when the tests grow,
+never lower it to make a change pass). The serial-port link
+(`src/devices/serial.rs`) needs a board and is listed apart.
+
+**On real boards:** `cargo run --example live_check -- [seconds] [port ...]` opens every DEPZ board on the machine, streams 10 s and
+prints its rate and a plausibility value — the centre distance of a ToF sensor,
+|gravity| of a BNO055. The Python, Rust, Java and C# SDKs carry the same check;
+on 2026-10-26 all four agreed on ten boards.
 
 ## License
 

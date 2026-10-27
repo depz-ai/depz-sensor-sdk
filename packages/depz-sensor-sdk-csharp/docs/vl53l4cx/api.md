@@ -466,7 +466,7 @@ public Vl53lxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Vl53lxDevice.Vl53lxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53lxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53lxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53lxDevice.BoardName *(property)*
@@ -834,7 +834,7 @@ public Vl53l0xDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Vl53l0xDevice.Vl53l0xDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l0xDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l0xDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l1cxDevice
@@ -854,7 +854,7 @@ public Vl53l1cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l1cxDevice.Vl53l1cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l1cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l1cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l1cbDevice
@@ -874,7 +874,7 @@ public Vl53l1cbDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l1cbDevice.Vl53l1cbDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l1cbDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l1cbDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l3cxDevice
@@ -894,7 +894,7 @@ public Vl53l3cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l3cxDevice.Vl53l3cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l3cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l3cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l4cxDevice
@@ -914,7 +914,7 @@ public Vl53l4cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l4cxDevice.Vl53l4cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l4cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l4cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### BareRegs
@@ -3303,6 +3303,34 @@ public long SignalRateMeasFixed400mm
 public long Part2PartOffsetAdjustmentNvmUm
 ```
 
+#### Vl53l0xUldDriver.TargetRefRate *(property)*
+
+```csharp
+public int TargetRefRate
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets; the SPAD management converges on it.
+
+#### Vl53l0xUldDriver.SigmaEstRefArray *(property)*
+
+```csharp
+public int SigmaEstRefArray
+```
+
+The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set (stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver.SigmaEstEffPulseWidth *(property)*
+
+```csharp
+public int SigmaEstEffPulseWidth
+```
+
+#### Vl53l0xUldDriver.SigmaEstEffAmbWidth *(property)*
+
+```csharp
+public int SigmaEstEffAmbWidth
+```
+
 #### Vl53l0xUldDriver.OscFrequencyMHz *(property)*
 
 ```csharp
@@ -3381,6 +3409,14 @@ public void GetInfoFromDevice(int option)
 
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product identification (2), the part UID and factory offset (4).
 
+#### Vl53l0xUldDriver.LoadTuningSettings
+
+```csharp
+public void LoadTuningSettings(byte[] buffer)
+```
+
+VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying a host-side parameter instead; a zero count ends the buffer.
+
 #### Vl53l0xUldDriver.ClearInterrupt
 
 ```csharp
@@ -3428,7 +3464,7 @@ VL53L0X_StopMeasurement().
 #### Vl53l0xUldDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
 Apply one of `Modes`: the sigma and signal limits, the budget and both VCSEL periods.
@@ -4126,10 +4162,10 @@ Timed mode only: this part has no free-running mode under the ULD configuration.
 #### Vl53l1UldDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
-"short" or "long"; the budget is re-applied (the VCSEL periods change what it means).
+"short" or "long"; the budget is re-applied (the VCSEL periods change what it means). Returns the budget in effect after the change, ms: one the new mode does not tabulate moves to the nearest one it does (contract 12 §5, the one exception to "refuse, don't round"), so the caller sees it.
 
 #### Vl53l1UldDriver.GetMode
 
@@ -4210,7 +4246,13 @@ The bridge refused a register command or did not answer it. The drivers catch it
 #### Vl53lxProtocolException.Vl53lxProtocolException *(constructor)*
 
 ```csharp
-public Vl53lxProtocolException(string message, Exception? inner = null) : base(message, inner ?? new Exception(message))
+public Vl53lxProtocolException(string message) : base(message)
+```
+
+#### Vl53lxProtocolException.Vl53lxProtocolException *(constructor)*
+
+```csharp
+public Vl53lxProtocolException(string message, Exception inner) : base(message, inner)
 ```
 
 ### Vl53lxPlatform
@@ -4484,8 +4526,10 @@ The only budgets accepted right now (ascending), or empty when any integer of `B
 #### Vl53lxDriver.SetMode
 
 ```csharp
-public virtual void SetMode(string name)
+public virtual int? SetMode(string name)
 ```
+
+Apply one of the modes. Returns the timing budget in effect after the change, ms, on a driver whose mode change can move it (VL53L1: contract 12 §5), else null.
 
 #### Vl53lxDriver.GetMode
 
@@ -4724,7 +4768,7 @@ Reset the part (whatever ran before left it ranging under another configuration)
 #### Vl53lxHistogramDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
 The device preset mode: the VCSEL period, which sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid phase window inside it (`ReachMm`). The bin is 199 mm wide in all three.

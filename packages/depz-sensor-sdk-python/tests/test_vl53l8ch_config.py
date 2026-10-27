@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from depz_sensor_sdk.errors import DepzError
+from depz_sensor_sdk.errors import DepzError, InvalidStateError
 from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.vl53l8 import (
     RESOLUTION_8X8,
@@ -80,9 +80,9 @@ def test_ch_inherits_config_while_ranging_guard():
     dev = _dev(Vl53l8ch)
     try:
         dev._ranging = True  # pretend the stream owns the register bank
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             dev.set_resolution(RESOLUTION_8X8)  # inherited guard
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             dev.configure_cnh(CnhConfig())  # CH-only method honours the guard too
     finally:
         dev.close()
@@ -91,7 +91,7 @@ def test_ch_inherits_config_while_ranging_guard():
 def test_ch_inherits_uld_before_init_guard():
     dev = _dev(Vl53l8ch)
     try:
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             _ = dev.uld  # inherited: init() not called
     finally:
         dev.close()

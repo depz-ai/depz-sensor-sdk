@@ -202,7 +202,7 @@ impl CaptureTimer {
 
     /// Capture time of a results frame. `flags` is what
     /// [`SensorClock::add`] returned for this frame's pair.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // the Python SDK's CaptureTimer.results() list, kept 1:1
     pub fn results(
         &mut self,
         clock: &SensorClock,

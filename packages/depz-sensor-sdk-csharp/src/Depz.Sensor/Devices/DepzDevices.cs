@@ -23,8 +23,9 @@ public sealed record DeviceInfo(
 /// <summary>
 /// Opening devices (contract 02 §4, contract 07 §2): the probe, class
 /// resolution and continuing a connection as its sensor class. Port discovery
-/// (<c>OpenDevice</c>, <c>ListDepzDevices</c>) needs .NET 8; in Unity open your
-/// own <see cref="ILink"/> and call <see cref="OpenOnLink"/>.
+/// (<c>OpenDevice</c>, <c>ListDepzDevices</c>) needs .NET 8; in Unity on Windows use
+/// <c>DepzDevicesUnity</c> (the <c>unity/</c> module), elsewhere open your own
+/// <see cref="ILink"/> and call <see cref="OpenOnLink"/>.
 /// </summary>
 public static class DepzDevices
 {
@@ -110,25 +111,17 @@ public static class DepzDevices
         return (software, deviceName, serial);
     }
 
-#if NET
-    /// <summary>Probe one port: open it, run <see cref="Probe"/>, close. Null when nothing DEPZ-shaped answers.</summary>
-    public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+    /// <summary>Probe the device on <paramref name="link"/> (the contract 02 §4.4 requests) and close
+    /// the link. Null when nothing DEPZ-shaped answers. <see cref="DeviceInfo.Port"/> is the link's
+    /// name; the USB ids stay null (a link knows none). For hosts that open their own ports.</summary>
+    public static DeviceInfo? ProbeLink(ILink link, TimeSpan? timeout = null)
     {
-        DepzDevice dev;
-        try
-        {
-            dev = new DepzDevice(port, timeout);
-        }
-        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is DepzException
-                                  || e is ArgumentException || e is InvalidOperationException)
-        {
-            return null;
-        }
+        var dev = new DepzDevice(link, timeout);
         try
         {
             var (software, deviceName, serial) = Probe(dev);
             var id = IdentityParser.ParseSoftwareName(software);
-            return new DeviceInfo(port, id.Mode, id.SensorType, id.SoftwareName, id.Version, deviceName, serial);
+            return new DeviceInfo(link.Name, id.Mode, id.SensorType, id.SoftwareName, id.Version, deviceName, serial);
         }
         catch (DepzException)
         {
@@ -140,16 +133,44 @@ public static class DepzDevices
         }
     }
 
+    /// <summary><paramref name="dev"/> as <typeparamref name="T"/>; any other class is closed and
+    /// throws <see cref="WrongTypeException"/> ("the device is not <paramref name="what"/>").</summary>
+    public static T Expect<T>(DepzDevice dev, string what) where T : DepzDevice
+    {
+        if (dev is T t)
+            return t;
+        string name = dev.GetType().Name;
+        dev.Close();
+        throw new WrongTypeException($"the device is not {what} ({name})");
+    }
+
+#if NET
+    /// <summary>Probe one port: open it, run the probe, close. Null when nothing DEPZ-shaped answers.</summary>
+    public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+    {
+        SerialPortLink link;
+        try
+        {
+            link = new SerialPortLink(port);
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is DepzException
+                                  || e is ArgumentException || e is InvalidOperationException)
+        {
+            return null;
+        }
+        return ProbeLink(link, timeout);
+    }
+
     /// <summary>Probe the candidate ports and return every DEPZ device found, ordered by USB serial.
     /// With <paramref name="matchUsb"/> (default) only ports with a known DEPZ USB id are probed;
     /// <paramref name="ports"/> replaces enumeration with an explicit list.</summary>
     public static IReadOnlyList<DeviceInfo> ListDepzDevices(
         IEnumerable<string>? ports = null, bool matchUsb = true, TimeSpan? timeout = null)
     {
-        var enumerated = SerialPorts.List().ToDictionary(p => p.Port);
+        var enumerated = SerialPorts.List();
         IEnumerable<SerialPortInfo> candidates = ports is null
-            ? enumerated.Values
-            : ports.Select(p => enumerated.TryGetValue(p, out var pi) ? pi : new SerialPortInfo(p, null, null, null));
+            ? enumerated
+            : ports.Select(p => PortId(enumerated, p));
         if (matchUsb)
             candidates = candidates.Where(p => UsbIds.IsKnownDepzUsb(p.Vid, p.Pid));
         var found = new List<DeviceInfo>();
@@ -191,7 +212,8 @@ public static class DepzDevices
     }
 
     /// <summary>Open exactly <paramref name="port"/> as its sensor class (also a port whose USB id
-    /// is not a DEPZ one: an unprogrammed unit).</summary>
+    /// is not a DEPZ one: an unprogrammed unit). The USB id is that of the enumerated port the path
+    /// names under any alias (<c>/dev/serial/by-id/…</c>; contract 02 §4.3).</summary>
     public static DepzDevice OpenPort(string port, TimeSpan? timeout = null) => OpenProbed(port, timeout);
 
     /// <summary>Open the port of a <see cref="ListDepzDevices"/> result as the class its probe answers resolve to.</summary>
@@ -203,56 +225,55 @@ public static class DepzDevices
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is an SR04.</summary>
     public static Sr04Device OpenSr04(string? serial = null, TimeSpan? timeout = null) =>
-        As<Sr04Device>(OpenDevice(serial, timeout), "an SR04");
+        Expect<Sr04Device>(OpenDevice(serial, timeout), "an SR04");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a VL53L4CD.</summary>
     public static Vl53l4cdDevice OpenVl53l4cd(string? serial = null, TimeSpan? timeout = null) =>
-        As<Vl53l4cdDevice>(OpenDevice(serial, timeout), "a VL53L4CD");
+        Expect<Vl53l4cdDevice>(OpenDevice(serial, timeout), "a VL53L4CD");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a
     /// VL53L8CX or VL53L8CH (<see cref="Vl53l8chDevice"/> derives from <see cref="Vl53l8cxDevice"/>).</summary>
     public static Vl53l8cxDevice OpenVl53l8(string? serial = null, TimeSpan? timeout = null) =>
-        As<Vl53l8cxDevice>(OpenDevice(serial, timeout), "a VL53L8CX / VL53L8CH");
+        Expect<Vl53l8cxDevice>(OpenDevice(serial, timeout), "a VL53L8CX / VL53L8CH");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a
     /// VL53L5CX, VL53L7CX or VL53L7CH (all derive from <see cref="Vl53l7cxDevice"/>).</summary>
     public static Vl53l7cxDevice OpenVl53l7(string? serial = null, TimeSpan? timeout = null) =>
-        As<Vl53l7cxDevice>(OpenDevice(serial, timeout), "a VL53L5CX / VL53L7CX / VL53L7CH");
+        Expect<Vl53l7cxDevice>(OpenDevice(serial, timeout), "a VL53L5CX / VL53L7CX / VL53L7CH");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a BNO055.</summary>
     public static Bno055Device OpenBno055(string? serial = null, TimeSpan? timeout = null) =>
-        As<Bno055Device>(OpenDevice(serial, timeout), "a BNO055");
+        Expect<Bno055Device>(OpenDevice(serial, timeout), "a BNO055");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a BNO085 / BNO086.</summary>
     public static Bno086Device OpenBno086(string? serial = null, TimeSpan? timeout = null) =>
-        As<Bno086Device>(OpenDevice(serial, timeout), "a BNO085 / BNO086");
+        Expect<Bno086Device>(OpenDevice(serial, timeout), "a BNO085 / BNO086");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a
     /// board of the VL53L 1D family (every class derives from <see cref="Vl53lxDevice"/>).</summary>
     public static Vl53lxDevice OpenVl53lx(string? serial = null, TimeSpan? timeout = null) =>
-        As<Vl53lxDevice>(OpenDevice(serial, timeout), "a VL53L 1D-family board");
+        Expect<Vl53lxDevice>(OpenDevice(serial, timeout), "a VL53L 1D-family board");
 
     /// <summary><see cref="OpenDevice(string?, TimeSpan?)"/>, and <see cref="WrongTypeException"/> unless it is a TMF8829.</summary>
     public static Tmf8829Device OpenTmf8829(string? serial = null, TimeSpan? timeout = null) =>
-        As<Tmf8829Device>(OpenDevice(serial, timeout), "a TMF8829");
-
-    private static T As<T>(DepzDevice dev, string what) where T : DepzDevice
-    {
-        if (dev is T t)
-            return t;
-        string name = dev.GetType().Name;
-        dev.Close();
-        throw new WrongTypeException($"the device is not {what} ({name})");
-    }
+        Expect<Tmf8829Device>(OpenDevice(serial, timeout), "a TMF8829");
 
     private static List<SerialPortInfo> DepzCandidates() =>
         SerialPorts.BySerial(SerialPorts.List().Where(p => UsbIds.IsKnownDepzUsb(p.Vid, p.Pid))).ToList();
 
+    // `port` with the USB identity of the enumerated port it names under any alias (SerialPorts.Find);
+    // none when the OS does not list it. The port stays `port`: an explicit path is opened as given.
+    private static SerialPortInfo PortId(IReadOnlyList<SerialPortInfo> enumerated, string port)
+    {
+        var found = SerialPorts.Find(enumerated, port);
+        return new SerialPortInfo(port, found?.Vid, found?.Pid, found?.UsbSerial);
+    }
+
     private static DepzDevice OpenProbed(string port, TimeSpan? timeout)
     {
-        var info = ProbePort(port, timeout) ?? throw new DeviceLostException($"no DEPZ device answered on {port}");
-        var pi = SerialPorts.List().FirstOrDefault(p => p.Port == port);
-        return OpenResolved(info, pi?.Vid, pi?.Pid, timeout);
+        var info = ProbePort(port, timeout) ?? throw new NoDepzDeviceException($"no DEPZ device answered on {port}");
+        var pi = PortId(SerialPorts.List(), port);
+        return OpenResolved(info, pi.Vid, pi.Pid, timeout);
     }
 
     // The probe ran on a connection of its own (closed); the class opens the port afresh.

@@ -58,6 +58,7 @@ FAMILY_VL53L7CX = "vl53l7cx"
 FAMILY_VL53L7CH = "vl53l7ch"
 FAMILY_BNO086 = "bno086"
 FAMILY_BNO055 = "bno055"
+FAMILY_TMF8829 = "tmf8829"
 #: The I2C L5/L7 board (APP_VL53L7): one firmware, three sensor classes.
 VL53L7_FAMILIES = (FAMILY_VL53L5CX, FAMILY_VL53L7CX, FAMILY_VL53L7CH)
 FAMILY_VL53L0X = "vl53l0x"
@@ -74,9 +75,41 @@ ALL_FAMILIES = (
     FAMILY_VL53L8CH,
     *VL53L7_FAMILIES,
     *VL53LX_FAMILIES,
+    FAMILY_TMF8829,
     FAMILY_BNO086,
     FAMILY_BNO055,
 )
+
+
+#: The lab bench this suite is run on (2026-10-27): one board per family below.
+#: VL53L8CX, VL53L7CX and the VL53L1CB / VL53L3CX / VL53L4CX products have no
+#: board here — they are covered by the fakes and the recorded scenarios only,
+#: and test_bench_families_present says so on every run. Another bench sets
+#: DEPZ_QA_BENCH to its own comma-separated family list.
+BENCH_FAMILIES = frozenset({
+    FAMILY_SR04,
+    FAMILY_VL53L4CD,
+    FAMILY_VL53L8CH,
+    FAMILY_VL53L5CX,
+    FAMILY_VL53L7CH,
+    FAMILY_VL53L0X,
+    FAMILY_VL53L1CX,
+    FAMILY_TMF8829,
+    FAMILY_BNO086,
+    FAMILY_BNO055,
+})
+
+
+def bench_families() -> frozenset[str]:
+    """The families this bench has boards for: DEPZ_QA_BENCH or BENCH_FAMILIES."""
+    env = os.environ.get("DEPZ_QA_BENCH", "").strip()
+    if not env:
+        return BENCH_FAMILIES
+    fams = frozenset(f.strip() for f in env.split(",") if f.strip())
+    unknown = fams - set(ALL_FAMILIES)
+    if unknown:
+        raise ValueError(f"DEPZ_QA_BENCH names unknown families {sorted(unknown)}")
+    return fams
 
 
 # ── device inventory ─────────────────────────────────────────────────────────
@@ -163,6 +196,7 @@ _HINT_TO_FAMILY = {
     "vl53l4cx": FAMILY_VL53L4CX,
     "bno086": FAMILY_BNO086,
     "bno055": FAMILY_BNO055,
+    "tmf8829": FAMILY_TMF8829,
 }
 
 
@@ -211,7 +245,7 @@ def open_family(dev: HwDevice, **kw):
     knows what the unit is, and re-probing on every open would double the
     open/close churn a reconnect test is trying to measure.
     """
-    from depz_sensor_sdk import Bno055, Bno086, Sr04, Vl53l4cd
+    from depz_sensor_sdk import Bno055, Bno086, Sr04, Tmf8829, Vl53l4cd
     from depz_sensor_sdk.vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx
     from depz_sensor_sdk.vl53lx import Vl53l0x, Vl53l1cb, Vl53l1cx, Vl53l3cx, Vl53l4cx
     from depz_sensor_sdk.vl53l8 import Vl53l8ch, Vl53l8cx
@@ -232,6 +266,7 @@ def open_family(dev: HwDevice, **kw):
         FAMILY_VL53L4CX: Vl53l4cx,
         FAMILY_BNO086: Bno086,
         FAMILY_BNO055: Bno055,
+        FAMILY_TMF8829: Tmf8829,
     }[dev.family]
     return cls(port, **kw)
 

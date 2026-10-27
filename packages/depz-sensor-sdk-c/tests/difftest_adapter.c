@@ -16,20 +16,20 @@
  * argument. Inside the type, the SDK's own checks decide.
  *
  * Declared gaps (`unsupported`):
- *   usb_serial_ordering — the serial ordering is internal to depz_find_devices
- *                         (a static comparator in src/io/discovery.c); there is
- *                         no public function to call.
- *   bno086_record       — no contract 09 dataset recorder: the C SDK only reads
- *                         datasets (depz_dataset_*), it never builds a record.
  *   vl53l8_cnh_decode   — only when built without the live-hardware layer
  *                         (the CNH setup helpers live in depz_sensor_io.h).
+ *
+ * usb_serial_ordering sorts with the codec layer's depz_port_order_cmp (the
+ * comparator depz_find_devices() orders with; explicit lengths, so a string
+ * holding a NUL compares whole); bno086_record is the contract 09 record value
+ * depz_dataset_bno086_record() builds, serialized by the SDK's own JSON.
  *
  * The vl53l8_* advanced ops: the C test tree has no fake VL53L8 DCI platform,
  * so they call the codecs the driver methods write with —
  * depz_vl53l8_motion_cfg_default_pack (motion_indicator_init: the resolution
  * check is in the codec), depz_vl53l8_pack_thresholds_checked (what
  * depz_vl53l8_set_detection_thresholds writes, with its checks) and
- * depz_vl53l8_xtalk_margin_to_raw_checked (the 0..10000 refusal
+ * depz_vl53l8_xtalk_margin_to_raw (the whole-kcps 0..10000 refusal
  * depz_vl53l8_set_xtalk_margin applies before the write).
  */
 #include "depz_sensor_sdk.h"
@@ -46,6 +46,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if DEPZ_DIFFTEST_HAS_IO && !defined(_WIN32)
+#include <unistd.h> /* close(): the temporary file of the depzrec_read op */
+#endif
 
 /* ── per-request arena + error exit ─────────────────────────────────────── */
 
@@ -74,7 +77,14 @@ static jmp_buf g_jb;
 static const char *g_err_kind;
 static char g_err_detail[300];
 
-static void fail(const char *kind, const char *fmt, ...)
+/* fail() leaves through longjmp: marked so, the compiler knows no caller
+ * reads a variable an INVALID() branch left unset */
+#if defined(_MSC_VER) && !defined(__clang__)
+#define NORETURN __declspec(noreturn)
+#else
+#define NORETURN _Noreturn
+#endif
+NORETURN static void fail(const char *kind, const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
@@ -239,15 +249,6 @@ static bool barg(const json_value *in, const char *k)
     const json_value *v = field(in, k);
     if (v->kind != JSON_BOOL) INVALID("%s: not a boolean", k);
     return v->b;
-}
-
-static double darg(const json_value *in, const char *k)
-{
-    const json_value *v = field(in, k);
-    if (v->kind == JSON_DOUBLE) return v->d;
-    if (v->kind != JSON_INT) INVALID("%s: not a number", k);
-    if (v->range == 1) return (double)v->u;
-    return (double)v->i; /* range 2 saturates: still far outside any API range */
 }
 
 static const char *sarg(const json_value *in, const char *k)
@@ -415,6 +416,31 @@ static void op_usb_identity(const json_value *in)
     o_end_obj();
 }
 
+/* A stable insertion sort over the JSON strings with their lengths: the
+ * reference sorts by (serial, port) with a stable sort. */
+static void op_usb_serial_ordering(const json_value *in)
+{
+    const json_value *ports = larg(in, "ports");
+    size_t n = json_arr_size(ports);
+    depz_port_key *keys = (depz_port_key *)amalloc((n ? n : 1) * sizeof *keys);
+    for (size_t i = 0; i < n; i++) {
+        const json_value *p = json_arr_get(ports, i);
+        if (!p || p->kind != JSON_OBJECT) INVALID("ports[%zu]: not an object", i);
+        keys[i].port = slarg(p, "port", &keys[i].port_len);
+        if (!keys[i].port) INVALID("ports[%zu].port: null", i);
+        keys[i].serial = slarg(p, "serial", &keys[i].serial_len);
+    }
+    for (size_t i = 1; i < n; i++) {
+        depz_port_key k = keys[i];
+        size_t j = i;
+        while (j > 0 && depz_port_order_cmp(&keys[j - 1], &k) > 0) { keys[j] = keys[j - 1]; j--; }
+        keys[j] = k;
+    }
+    o_obj(); o_key("order"); o_arr();
+    for (size_t i = 0; i < n; i++) o_strl(keys[i].port, keys[i].port_len);
+    o_end_arr(); o_end_obj();
+}
+
 static void op_probe_resolve(const json_value *in)
 {
     const json_value *vv = field(in, "usb_vid"), *pv = field(in, "usb_pid");
@@ -437,11 +463,7 @@ static void op_common_encode(const json_value *in)
     if (is(kind, "sync_time_request")) {
         n = depz_pack_sync_time(U64(in, "pc_timestamp_us"), out);
     } else if (is(kind, "set_payload_crc_type")) {
-        /* no codec check of its own: the enum is the argument's type */
-        int64_t ct = iarg(in, "crc_type", 0, 0xFF);
-        if (ct != DEPZ_CRC_NONE && ct != DEPZ_CRC8 && ct != DEPZ_CRC16 && ct != DEPZ_CRC32)
-            INVALID("crc_type %lld is not a depz_crc_type", (long long)ct);
-        n = depz_pack_set_payload_crc_type((uint8_t)ct, out);
+        n = depz_pack_set_payload_crc_type((uint8_t)iarg(in, "crc_type", 0, 0xFF), out);
     } else if (is(kind, "sync_pin_config")) {
         depz_sync_pin_config c = {U8(in, "pin"), U8(in, "mode"), U8(in, "polarity")};
         n = depz_pack_sync_pin_config(&c, out);
@@ -892,6 +914,45 @@ static void o_bno_fields(const depz_bno_report *r)
     o_end_obj();
 }
 
+/* A control-channel response (contract 05 §4 table) decoded: its fields, or
+ * invalid when shorter than them / another report id (contract 07 §3). */
+static void op_bno086_control_decode(const json_value *in)
+{
+    const char *kind = sarg(in, "kind");
+    size_t n; uint8_t *p = HEX(in, "payload", &n);
+    if (is(kind, "feature_response")) {
+        depz_bno_feature f;
+        if (depz_bno_unpack_feature_response(p, n, &f)) INVALID("Get Feature Response: short or another report id");
+        o_obj(); KU("sensor_id", f.sensor_id); KU("flags", f.flags); KU("sensitivity", f.sensitivity);
+        KU("interval_us", f.interval_us); KU("batch_us", f.batch_us); KU("cfg_word", f.cfg_word); o_end_obj();
+    } else if (is(kind, "product_id")) {
+        depz_bno_product_id r;
+        if (depz_bno_unpack_product_id(p, n, &r)) INVALID("Product ID Response: short or another report id");
+        o_obj(); KU("reset_cause", r.reset_cause); KU("sw_version_major", r.sw_version_major);
+        KU("sw_version_minor", r.sw_version_minor); KU("sw_part_number", r.sw_part_number);
+        KU("sw_build_number", r.sw_build_number); KU("sw_version_patch", r.sw_version_patch); o_end_obj();
+    } else if (is(kind, "command_response")) {
+        depz_bno_command_response r;
+        if (depz_bno_unpack_command_response(p, n, &r)) INVALID("Command Response: short or another report id");
+        o_obj(); KU("seq", r.seq); KU("command", r.command); KU("command_seq", r.command_seq);
+        KU("response_seq", r.response_seq);
+        o_key("r"); o_arr();
+        for (size_t k = 0; k < 11; k++) o_u64(r.r[k]);
+        o_end_arr(); o_end_obj();
+    } else if (is(kind, "frs_read_response")) {
+        depz_bno_frs_read_response r;
+        if (depz_bno_unpack_frs_read_response(p, n, &r)) INVALID("FRS Read Response: short or another report id");
+        o_obj(); KU("status", r.status); KU("data_length", r.data_length); KU("offset_words", r.offset_words);
+        KU("data0", r.data0); KU("data1", r.data1); KU("frs_type", r.frs_type); o_end_obj();
+    } else if (is(kind, "frs_write_response")) {
+        depz_bno_frs_write_response r;
+        if (depz_bno_unpack_frs_write_response(p, n, &r)) INVALID("FRS Write Response: short or another report id");
+        o_obj(); KU("status", r.status); KU("offset_words", r.offset_words); o_end_obj();
+    } else {
+        INVALID("kind %s", kind);
+    }
+}
+
 static void op_bno086_input_cargo(const json_value *in)
 {
     size_t n; uint8_t *c = HEX(in, "cargo", &n);
@@ -906,6 +967,45 @@ static void op_bno086_input_cargo(const json_value *in)
     o_end_arr(); o_end_obj();
 }
 
+/* A depz_json tree, as the SDK's serializer writes it (reals in their
+ * shortest round-trip form, so the text is re-parsed by the test JSON). */
+static void o_json(const depz_json *v)
+{
+    switch (depz_json_kind_of(v)) {
+    case DEPZ_JSON_NULL: o_null(); break;
+    case DEPZ_JSON_BOOL: o_bool(depz_json_bool_value(v)); break;
+    case DEPZ_JSON_INT: o_i64(depz_json_int_value(v)); break;
+    case DEPZ_JSON_DOUBLE: o_dbl(depz_json_double_value(v)); break;
+    case DEPZ_JSON_STRING: o_strl(depz_json_string_value(v), depz_json_string_len(v)); break;
+    case DEPZ_JSON_ARRAY:
+        o_arr();
+        for (size_t i = 0; i < depz_json_len(v); i++) o_json(depz_json_at(v, i));
+        o_end_arr();
+        break;
+    case DEPZ_JSON_OBJECT:
+        o_obj();
+        for (size_t i = 0; i < depz_json_len(v); i++) { o_key(depz_json_key_at(v, i)); o_json(depz_json_at(v, i)); }
+        o_end_obj();
+        break;
+    }
+}
+
+static void op_bno086_record(const json_value *in)
+{
+    size_t n; uint8_t *c = HEX(in, "cargo", &n);
+    uint64_t cap_ts = U64(in, "capture_timestamp_us");
+    depz_bno_report *reps = (depz_bno_report *)amalloc(sizeof(depz_bno_report) * (n + 2));
+    size_t got = depz_bno_parse_input_cargo(c, n, cap_ts, reps, n + 2);
+    o_obj(); o_key("records"); o_arr();
+    for (size_t i = 0; i < got; i++) {
+        depz_json *rec = depz_dataset_bno086_record(&reps[i]);
+        if (!rec) INVALID("out of memory");
+        o_json(rec);
+        depz_json_free(rec);
+    }
+    o_end_arr(); o_end_obj();
+}
+
 static void op_bno086_gyro_rv(const json_value *in)
 {
     size_t n; uint8_t *c = HEX(in, "cargo", &n);
@@ -914,6 +1014,93 @@ static void op_bno086_gyro_rv(const json_value *in)
     if (depz_bno_parse_gyro_rv(c, n, cap_ts, &r) != 0) { o_null(); return; } /* short cargo -> no report */
     o_obj(); KS("type", depz_bno_report_type_str(r.type)); o_key("fields"); o_bno_fields(&r); o_end_obj();
 }
+
+/* ── .depzrec / .depzdata readers (contracts 08, 09) ── */
+
+/* `text` as a dataset: its records in reader order as [d, t, k] — or invalid
+ * for a damaged file (the message names the line). */
+static void op_depzdata_read(const json_value *in)
+{
+    size_t n;
+    const char *text = slarg(in, "text", &n);
+    depz_dataset *ds;
+    if (!text) INVALID("text: null");
+    ds = depz_dataset_parse(text, n);
+    if (!ds) INVALID("%s", depz_last_error());
+    o_obj(); o_key("records"); o_arr();
+    for (size_t i = 0; i < depz_dataset_record_count(ds); i++) {
+        depz_dataset_record r;
+        depz_dataset_get_record(ds, i, &r);
+        o_arr(); o_str(r.device_id); o_i64(r.t_host_us); o_str(r.kind); o_end_arr();
+    }
+    o_end_arr(); o_end_obj();
+    depz_dataset_free(ds);
+}
+
+#if DEPZ_DIFFTEST_HAS_IO
+/* text[0..len) in a fresh temporary file (the replay link opens a path);
+ * its path in a static buffer — removed by the caller before the next call —
+ * or NULL. */
+static const char *write_temp_file(const char *text, size_t len)
+{
+    static char path[512];
+    FILE *f;
+#ifdef _WIN32
+    if (tmpnam_s(path, sizeof path) != 0) return NULL;
+    f = fopen(path, "wb");
+#else
+    const char *dir = getenv("TMPDIR");
+    int fd;
+    snprintf(path, sizeof path, "%s/depz_difftest_XXXXXX", dir && *dir ? dir : "/tmp");
+    fd = mkstemp(path);
+    if (fd < 0) return NULL;
+    f = fdopen(fd, "wb");
+    if (!f) { close(fd); return NULL; }
+#endif
+    if (!f) return NULL;
+    fwrite(text, 1, len, f);
+    fclose(f);
+    return path;
+}
+
+/* `text` as a capture: every rx chunk the loose replay serves once the host
+ * has written more tx bytes than any event waits for, concatenated — or
+ * invalid for a damaged file (the message names the line). */
+static void op_depzrec_read(const json_value *in)
+{
+    static uint8_t zeros[65536];
+    size_t n, got, rx_len = 0, rx_cap = 0;
+    const char *text = slarg(in, "text", &n);
+    const char *path;
+    uint8_t *rx = NULL, chunk[4096];
+    depz_link *l = NULL;
+    int rc;
+    if (!text) INVALID("text: null");
+    path = write_temp_file(text, n);
+    if (!path) INVALID("cannot create a temporary file");
+    rc = depz_link_open_replay(path, false, false, &l);
+    remove(path);
+    if (rc != DEPZ_OK) INVALID("%s", depz_last_error());
+    rc = depz_link_write(l, zeros, sizeof zeros);
+    if (rc != DEPZ_OK) { depz_link_free(l); INVALID("%s", depz_last_error()); }
+    while (!depz_link_replay_exhausted(l)) {
+        size_t before, after;
+        depz_link_replay_pending(l, NULL, &before);
+        if (depz_link_read(l, chunk, sizeof chunk, 0, &got) != DEPZ_OK) break;
+        depz_link_replay_pending(l, NULL, &after);
+        if (!got && after == before) break; /* an event gated beyond 64 KiB of tx */
+        if (rx_len + got > rx_cap) {
+            rx_cap = (rx_len + got) * 2 + 16;
+            rx = (uint8_t *)realloc(rx, rx_cap);
+        }
+        memcpy(rx + rx_len, chunk, got);
+        rx_len += got;
+    }
+    depz_link_free(l);
+    o_obj(); KH("rx", rx, rx_len); o_end_obj();
+    free(rx);
+}
+#endif
 
 /* ── TMF8829 ── */
 
@@ -1248,6 +1435,34 @@ static void op_vl53l4_tuning_decode(const json_value *in)
 
 /* ── VL53L5CX / L7 ── */
 
+/* ── VL53L8 register bridge (contract 04) ── */
+
+static void op_vl53l8_encode(const json_value *in)
+{
+    const char *kind = sarg(in, "kind");
+    uint8_t *out = scratch(0);
+    size_t n;
+    if (is(kind, "start_stream")) {
+        n = depz_vl53l8_pack_start_stream(U16(in, "frame_size"), out);
+        if (n == 0) INVALID("frame_size outside 1..%u", DEPZ_VL53L8_STREAM_TOTAL_MAX);
+    } else {
+        INVALID("kind %s", kind);
+    }
+    payload_out(out, n);
+}
+
+static void op_vl53l8_decode(const json_value *in)
+{
+    if (I64(in, "report") != DEPZ_VL53L8_RPT_FRAME) INVALID("report");
+    size_t n; uint8_t *p = HEX(in, "payload", &n);
+    depz_vl53l8_chunk c;
+    if (depz_vl53l8_unpack_chunk(p, n, &c) != 0) INVALID("vl53l8_unpack_chunk");
+    o_obj();
+    KU("timestamp_us", c.timestamp_us); KU("full_size", c.full_size); KU("offset", c.offset);
+    KH("data", c.data, c.data_len);
+    o_end_obj();
+}
+
 static void op_vl53l7_encode(const json_value *in)
 {
     const char *kind = sarg(in, "kind");
@@ -1428,14 +1643,115 @@ static void op_vl53l8_detection_thresholds(const json_value *in)
 
 static void op_vl53l8_xtalk_margin(const json_value *in)
 {
-    double kcps = darg(in, "kcps");
-    /* depz_vl53l8_set_xtalk_margin -> uld_set_xtalk_margin: `if (m > 10000) fail` before the write */
+    /* as ST: a whole number of kcps (the uint32_t parameter refuses a fraction
+     * or a negative), at most 10000 (depz_vl53l8_set_xtalk_margin fails before the write) */
+    uint32_t kcps = U32(in, "kcps");
     uint32_t raw;
-    if (depz_vl53l8_xtalk_margin_to_raw_checked(kcps, &raw) != 0) INVALID("xtalk margin %g refused", kcps);
+    if (depz_vl53l8_xtalk_margin_to_raw(kcps, &raw) != 0) INVALID("xtalk margin %u refused", kcps);
     o_obj(); KU("raw", raw); o_end_obj();
 }
 
 #if DEPZ_DIFFTEST_HAS_IO
+/* The event the device layer emits for an unsolicited common report —
+ * common_decode's twin through the dispatcher (contract 07 §2/§3): the packet
+ * goes in on a loopback pair with nothing pending, and the first event out is
+ * the answer. */
+static void op_common_event(const json_value *in)
+{
+    depz_link *host = NULL, *side = NULL;
+    depz_device *dev = NULL;
+    depz_stream *evs;
+    depz_device_event ev;
+    uint8_t *frame = (uint8_t *)amalloc(DEPZ_MAX_FRAME);
+    size_t n, frame_len;
+    uint8_t rpt = U8(in, "report");
+    const uint8_t *p = HEX(in, "payload", &n);
+    int rc;
+    if (depz_build_packet(rpt, p, n, 0, DEPZ_CRC_NONE, frame, DEPZ_MAX_FRAME, &frame_len) != 0)
+        INVALID("payload: does not fit a frame");
+    if (depz_link_loopback_pair(&host, &side) != DEPZ_OK) fail("error", "loopback pair");
+    if (depz_device_open_link(host, &dev) != DEPZ_OK) { depz_link_free(side); fail("error", "device open"); }
+    evs = depz_device_events(dev, 8);
+    depz_link_write(side, frame, frame_len);
+    rc = evs ? depz_stream_next(evs, &ev, 2000) : DEPZ_E_NOMEM;
+    depz_stream_close(evs);
+    depz_device_close(dev);
+    depz_link_free(side);
+    if (rc != DEPZ_OK) fail("error", "the device emitted no event (rc=%d)", rc);
+    o_obj();
+    switch (ev.type) {
+    case DEPZ_DEV_EV_UNSOLICITED_STATUS:
+        KS("event", "unsolicited_status"); KU("status", ev.status);
+        break;
+    case DEPZ_DEV_EV_SEQUENCE_ERROR:
+        KS("event", "sequence_error"); KU("expected_seq", ev.expected_seq); KU("received_seq", ev.received_seq);
+        KB("reported_by_device", ev.by_device);
+        break;
+    case DEPZ_DEV_EV_TEXT:
+        KS("event", "text"); KU("cmd", ev.cmd); KS("text", ev.text);
+        break;
+    case DEPZ_DEV_EV_TEMPERATURE:
+        KS("event", "temperature"); KU("timestamp_us", ev.timestamp_us); o_key("celsius"); o_dbl(ev.celsius);
+        break;
+    default:
+        fail("error", "event type %d", (int)ev.type);
+    }
+    o_end_obj();
+}
+
+/* The host-observed seq gaps (contract 01 §5 step 5, ERRATA A1): one packet
+ * per `seqs` entry (report 0x7F, payload 00 — each one a hex text event) on a
+ * loopback pair; once every packet's own event is out, the seq_gap events and
+ * stats.seq_gaps are the answer. A gap is emitted ahead of its packet, so
+ * none can still be on the way. */
+static void op_common_seq_gap(const json_value *in)
+{
+    static const uint8_t payload[1] = {0x00};
+    const json_value *seqs = field(in, "seqs");
+    depz_link *host = NULL, *side = NULL;
+    depz_device *dev = NULL;
+    depz_stream *evs;
+    depz_device_event ev;
+    depz_link_stats st;
+    uint8_t frame[16];
+    size_t k, n, frame_len, texts = 0;
+    int rc = DEPZ_OK;
+    if (seqs->kind != JSON_ARRAY) INVALID("seqs: an array");
+    n = json_arr_size(seqs);
+    for (k = 0; k < n; k++) ival(json_arr_get(seqs, k), "seqs", 0, 0xFF);
+    if (depz_link_loopback_pair(&host, &side) != DEPZ_OK) fail("error", "loopback pair");
+    if (depz_device_open_link(host, &dev) != DEPZ_OK) { depz_link_free(side); fail("error", "device open"); }
+    evs = depz_device_events(dev, 256);
+    if (!evs) rc = DEPZ_E_NOMEM;
+    for (k = 0; rc == DEPZ_OK && k < n; k++) {
+        uint8_t seq = (uint8_t)json_arr_get(seqs, k)->i;
+        rc = depz_build_packet(0x7F, payload, sizeof payload, seq, DEPZ_CRC_NONE, frame, sizeof frame, &frame_len);
+        if (rc == DEPZ_OK) rc = depz_link_write(side, frame, frame_len);
+    }
+    o_obj();
+    o_key("gaps");
+    o_arr();
+    while (rc == DEPZ_OK && texts < n) {
+        rc = depz_stream_next(evs, &ev, 2000);
+        if (rc != DEPZ_OK) break;
+        if (ev.type == DEPZ_DEV_EV_TEXT) {
+            texts++;
+        } else if (ev.type == DEPZ_DEV_EV_SEQ_GAP) {
+            o_obj();
+            KU("expected_seq", ev.expected_seq); KU("received_seq", ev.received_seq); KU("missed", ev.missed);
+            o_end_obj();
+        }
+    }
+    o_end_arr();
+    depz_device_stats(dev, &st);
+    depz_stream_close(evs);
+    depz_device_close(dev);
+    depz_link_free(side);
+    if (rc != DEPZ_OK) fail("error", "not every packet produced its event (rc=%d)", rc);
+    KU("seq_gaps", st.seq_gaps);
+    o_end_obj();
+}
+
 static void op_vl53l8_cnh_decode(const json_value *in)
 {
     const json_value *c = field(in, "config");
@@ -1474,7 +1790,8 @@ typedef struct { const char *name; void (*fn)(const json_value *); } op_entry;
 
 static const op_entry OPS[] = {
     {"crc", op_crc}, {"framing_encode", op_framing_encode}, {"framing_decode", op_framing_decode},
-    {"identity", op_identity}, {"usb_identity", op_usb_identity}, {"probe_resolve", op_probe_resolve},
+    {"identity", op_identity}, {"usb_identity", op_usb_identity},
+    {"usb_serial_ordering", op_usb_serial_ordering}, {"probe_resolve", op_probe_resolve},
     {"common_encode", op_common_encode}, {"common_decode", op_common_decode},
     {"sync_time_math", op_sync_time_math}, {"sr04_encode", op_sr04_encode}, {"sr04_decode", op_sr04_decode},
     {"fwdepz_parse", op_fwdepz_parse},
@@ -1486,7 +1803,9 @@ static const op_entry OPS[] = {
     {"bno086_shtp_header_unpack", op_bno086_shtp_header_unpack},
     {"bno086_shtp_tx_seq", op_bno086_shtp_tx_seq}, {"bno086_shtp_reassembly", op_bno086_shtp_reassembly},
     {"bno086_control_encode", op_bno086_control_encode}, {"bno086_input_cargo", op_bno086_input_cargo},
-    {"bno086_gyro_rv", op_bno086_gyro_rv},
+    {"bno086_record", op_bno086_record}, {"bno086_gyro_rv", op_bno086_gyro_rv},
+    {"bno086_control_decode", op_bno086_control_decode},
+    {"depzdata_read", op_depzdata_read},
     {"tmf8829_encode", op_tmf8829_encode}, {"tmf8829_decode", op_tmf8829_decode},
     {"tmf8829_reassembly", op_tmf8829_reassembly}, {"tmf8829_frame", op_tmf8829_frame},
     {"tmf8829_measurements", op_tmf8829_measurements}, {"tmf8829_config_get", op_tmf8829_config_get},
@@ -1495,6 +1814,7 @@ static const op_entry OPS[] = {
     {"vl53l4_result_block", op_vl53l4_result_block}, {"vl53l4_timing_encode", op_vl53l4_timing_encode},
     {"vl53l4_timing_decode", op_vl53l4_timing_decode}, {"vl53l4_tuning_encode", op_vl53l4_tuning_encode},
     {"vl53l4_tuning_decode", op_vl53l4_tuning_decode},
+    {"vl53l8_encode", op_vl53l8_encode}, {"vl53l8_decode", op_vl53l8_decode},
     {"vl53l7_encode", op_vl53l7_encode}, {"vl53l7_decode", op_vl53l7_decode}, {"vl53l7_model", op_vl53l7_model},
     {"vl53lx_encode", op_vl53lx_encode}, {"vl53lx_decode", op_vl53lx_decode}, {"vl53lx_model", op_vl53lx_model},
     {"vl53lx_die_block", op_vl53lx_die_block}, {"vl53lx_l0x_raw", op_vl53lx_l0x_raw},
@@ -1503,22 +1823,38 @@ static const op_entry OPS[] = {
     {"vl53l8_detection_thresholds", op_vl53l8_detection_thresholds},
     {"vl53l8_xtalk_margin", op_vl53l8_xtalk_margin},
 #if DEPZ_DIFFTEST_HAS_IO
+    {"common_event", op_common_event},
+    {"common_seq_gap", op_common_seq_gap},
     {"vl53l8_cnh_decode", op_vl53l8_cnh_decode},
+    {"depzrec_read", op_depzrec_read},
 #endif
 };
 
 /* Declared gaps: op -> reason (see the header comment). */
 static const char *const UNSUPPORTED[][2] = {
-    {"usb_serial_ordering", "no public serial-ordering function (static comparator inside depz_find_devices)"},
-    {"bno086_record", "no contract 09 dataset recorder in the C SDK (reader only)"},
 #if !DEPZ_DIFFTEST_HAS_IO
+    {"common_event", "built without the live-hardware layer (the device dispatcher is in depz_sensor_io.h)"},
+    {"common_seq_gap", "built without the live-hardware layer (the device dispatcher is in depz_sensor_io.h)"},
     {"vl53l8_cnh_decode", "built without the live-hardware layer (CNH setup helpers are in depz_sensor_io.h)"},
+    {"depzrec_read", "built without the live-hardware layer (the replay link is in depz_sensor_io.h)"},
 #endif
+    {NULL, NULL} /* the table is never empty */
 };
+
+/* Runs one op; false when it left through fail()'s longjmp. Kept apart from
+ * respond(): nothing here is read after the second return, so no local can be
+ * clobbered by the longjmp. */
+static bool run_op(const op_entry *e, const json_value *in)
+{
+    if (setjmp(g_jb) != 0) return false;
+    if (!in || in->kind != JSON_OBJECT) INVALID("`in` is not an object");
+    e->fn(in);
+    return true;
+}
 
 static void respond(const char *id_text, const char *op, const json_value *in)
 {
-    for (size_t i = 0; i < sizeof UNSUPPORTED / sizeof UNSUPPORTED[0]; i++) {
+    for (size_t i = 0; UNSUPPORTED[i][0]; i++) {
         if (is(op, UNSUPPORTED[i][0])) {
             o_reset();
             o_obj(); o_key("id"); o_sep(); o_puts(id_text); KS("error", "unsupported"); KS("detail", UNSUPPORTED[i][1]);
@@ -1539,9 +1875,7 @@ static void respond(const char *id_text, const char *op, const json_value *in)
     o_reset();
     o_puts(head);
     free(head);
-    if (setjmp(g_jb) == 0) {
-        if (!in || in->kind != JSON_OBJECT) INVALID("`in` is not an object");
-        e->fn(in);
+    if (run_op(e, in)) {
         o_puts("}");
     } else {
         o_reset();

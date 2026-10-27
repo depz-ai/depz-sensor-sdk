@@ -17,6 +17,7 @@ from depz_sensor_sdk.vl53l8.uld import (
     POWER_MODE_DEEP_SLEEP,
     POWER_MODE_SLEEP,
     POWER_MODE_WAKEUP,
+    Vl53l8cxError,
 )
 
 from fake_vl53l8 import make_driver as _driver
@@ -54,8 +55,15 @@ def test_set_power_mode_sleep_sequence():
 
 def test_xtalk_margin_roundtrip():
     drv, _ = _driver()
-    drv.set_xtalk_margin(50.0)
-    assert drv.get_xtalk_margin() == pytest.approx(50.0, abs=0.001)
+    drv.set_xtalk_margin(50)
+    assert drv.get_xtalk_margin() == 50
+
+
+def test_xtalk_margin_is_whole_kcps_as_st():
+    drv, _ = _driver()
+    for bad in (12.5, 50.0, -1, 10001, True):
+        with pytest.raises(Vl53l8cxError):
+            drv.set_xtalk_margin(bad)
 
 
 # ── detection thresholds ──────────────────────────────────────────────────────

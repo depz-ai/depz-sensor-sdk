@@ -41,7 +41,11 @@ impl Bno086Data {
         if p.len() < 9 {
             return Err(CodecError("RPT_DATA needs 9 bytes"));
         }
-        Ok(Bno086Data { cmd: p[0], timestamp_us: u64::from_le_bytes(p[1..9].try_into().unwrap()), shtp: p[9..].to_vec() })
+        Ok(Bno086Data {
+            cmd: p[0],
+            timestamp_us: u64::from_le_bytes(p[1..9].try_into().unwrap()),
+            shtp: p[9..].to_vec(),
+        })
     }
 }
 
@@ -126,13 +130,35 @@ pub const FRS_SIG_MOTION_DETECT_CONFIG: u16 = 0xC274;
 pub const FRS_SHAKE_DETECT_CONFIG: u16 = 0x7D7D;
 pub const FRS_STABILITY_DETECTOR_CONFIG: u16 = 0xED85;
 pub const FRS_ACTIVITY_TRACKER_CONFIG: u16 = 0xED88;
+/// Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+pub const FRS_GYRO_INTEGRATED_RV_CONFIG: u16 = 0xA1A2;
 
 /// Sensor id → its metadata FRS record.
 pub const METADATA_RECORDS: [(u8, u16); 24] = [
-    (0x14, 0xE301), (0x01, 0xE302), (0x04, 0xE303), (0x06, 0xE304), (0x15, 0xE305), (0x02, 0xE306),
-    (0x07, 0xE307), (0x16, 0xE308), (0x03, 0xE309), (0x0F, 0xE30A), (0x05, 0xE30B), (0x08, 0xE30C),
-    (0x09, 0xE30D), (0x10, 0xE313), (0x18, 0xE314), (0x11, 0xE315), (0x12, 0xE316), (0x13, 0xE317),
-    (0x19, 0xE318), (0x1E, 0xE31C), (0x28, 0xE322), (0x29, 0xE323), (0x2A, 0xE324), (0x2B, 0xE325),
+    (0x14, 0xE301),
+    (0x01, 0xE302),
+    (0x04, 0xE303),
+    (0x06, 0xE304),
+    (0x15, 0xE305),
+    (0x02, 0xE306),
+    (0x07, 0xE307),
+    (0x16, 0xE308),
+    (0x03, 0xE309),
+    (0x0F, 0xE30A),
+    (0x05, 0xE30B),
+    (0x08, 0xE30C),
+    (0x09, 0xE30D),
+    (0x10, 0xE313),
+    (0x18, 0xE314),
+    (0x11, 0xE315),
+    (0x12, 0xE316),
+    (0x13, 0xE317),
+    (0x19, 0xE318),
+    (0x1E, 0xE31C),
+    (0x28, 0xE322),
+    (0x29, 0xE323),
+    (0x2A, 0xE324),
+    (0x2B, 0xE325),
 ];
 
 // FRS Read Response status.
@@ -173,14 +199,20 @@ impl std::error::Error for Sh2HubError {}
 
 fn need(p: &[u8], n: usize, what: &str) -> Result<(), Sh2HubError> {
     if p.len() < n {
-        return Err(Sh2HubError(format!("{what}: need {n} bytes, got {}", p.len())));
+        return Err(Sh2HubError(format!(
+            "{what}: need {n} bytes, got {}",
+            p.len()
+        )));
     }
     Ok(())
 }
 
 fn expect_id(p: &[u8], id: u8, what: &str) -> Result<(), Sh2HubError> {
     if p[0] != id {
-        return Err(Sh2HubError(format!("not a {what} response: 0x{:02X}", p[0])));
+        return Err(Sh2HubError(format!(
+            "not a {what} response: 0x{:02X}",
+            p[0]
+        )));
     }
     Ok(())
 }
@@ -234,11 +266,14 @@ pub struct ProductId {
 impl ProductId {
     /// "major.minor.patch".
     pub fn version(&self) -> String {
-        format!("{}.{}.{}", self.sw_version_major, self.sw_version_minor, self.sw_version_patch)
+        format!(
+            "{}.{}.{}",
+            self.sw_version_major, self.sw_version_minor, self.sw_version_patch
+        )
     }
 
     pub fn unpack(p: &[u8]) -> Result<ProductId, Sh2HubError> {
-        need(p, 14, "Product ID Response")?;
+        need(p, 16, "Product ID Response")?;
         expect_id(p, sh2::REPORT_PRODUCT_ID_RESPONSE, "product-id")?;
         Ok(ProductId {
             reset_cause: p[1],
@@ -271,7 +306,13 @@ impl CommandResponse {
     pub fn unpack(p: &[u8]) -> Result<CommandResponse, Sh2HubError> {
         need(p, 16, "Command Response")?;
         expect_id(p, sh2::REPORT_COMMAND_RESPONSE, "command")?;
-        Ok(CommandResponse { seq: p[1], command: p[2], command_seq: p[3], response_seq: p[4], r: p[5..16].try_into().unwrap() })
+        Ok(CommandResponse {
+            seq: p[1],
+            command: p[2],
+            command_seq: p[3],
+            response_seq: p[4],
+            r: p[5..16].try_into().unwrap(),
+        })
     }
 }
 
@@ -312,7 +353,10 @@ impl FrsWriteResponse {
     pub fn unpack(p: &[u8]) -> Result<FrsWriteResponse, Sh2HubError> {
         need(p, 4, "FRS Write Response")?;
         expect_id(p, sh2::REPORT_FRS_WRITE_RESPONSE, "FRS write")?;
-        Ok(FrsWriteResponse { status: p[1], offset_words: u16le(p, 2) })
+        Ok(FrsWriteResponse {
+            status: p[1],
+            offset_words: u16le(p, 2),
+        })
     }
 }
 
@@ -329,7 +373,14 @@ pub struct ErrorRecord {
 
 impl ErrorRecord {
     pub fn from_response(r: &CommandResponse) -> ErrorRecord {
-        ErrorRecord { severity: r.r[0], seq: r.r[1], source: r.r[2], error: r.r[3], module: r.r[4], code: r.r[5] }
+        ErrorRecord {
+            severity: r.r[0],
+            seq: r.r[1],
+            source: r.r[2],
+            error: r.r[3],
+            module: r.r[4],
+            code: r.r[5],
+        }
     }
 }
 
@@ -394,7 +445,11 @@ impl SensorMetadata {
             batch_buffer_bytes: w(6) as u16,
             q_point_1: w(7) as u16,
             q_point_2: (w(7) >> 16) as u16,
-            q_point_3: if revision >= 3 { (w(8) >> 16) as u16 } else { 0 },
+            q_point_3: if revision >= 3 {
+                (w(8) >> 16) as u16
+            } else {
+                0
+            },
             raw_words: words.to_vec(),
         }
     }
@@ -410,7 +465,9 @@ pub const ME_CAL_GET: u8 = 0x01;
 // Fixed lengths of the sensor → host control reports; one cargo may hold several.
 fn control_response_length(id: u8) -> Option<usize> {
     match id {
-        sh2::REPORT_COMMAND_RESPONSE | sh2::REPORT_FRS_READ_RESPONSE | sh2::REPORT_PRODUCT_ID_RESPONSE => Some(16),
+        sh2::REPORT_COMMAND_RESPONSE
+        | sh2::REPORT_FRS_READ_RESPONSE
+        | sh2::REPORT_PRODUCT_ID_RESPONSE => Some(16),
         sh2::REPORT_FRS_WRITE_RESPONSE => Some(4),
         sh2::REPORT_GET_FEATURE_RESPONSE => Some(17),
         _ => None,
@@ -467,7 +524,9 @@ pub fn set_reorientation_params(x: f64, y: f64, z: f64, w: f64) -> Result<[u8; 9
     for (i, q) in [x, y, z, w].iter().enumerate() {
         let v = (q * (1 << 14) as f64).round_ties_even(); // Python round()
         if v.is_nan() || v < i16::MIN as f64 || v > i16::MAX as f64 {
-            return Err(Sh2HubError(format!("quaternion component {q} out of Q14 int16 range")));
+            return Err(Sh2HubError(format!(
+                "quaternion component {q} out of Q14 int16 range"
+            )));
         }
         p[1 + 2 * i..3 + 2 * i].copy_from_slice(&(v as i16).to_le_bytes());
     }
@@ -475,7 +534,13 @@ pub fn set_reorientation_params(x: f64, y: f64, z: f64, w: f64) -> Result<[u8; 9
 }
 
 /// ME Calibration (0x07): subcommand 0 configures, 1 ([`ME_CAL_GET`]) reads back.
-pub fn me_calibration_params(accel: bool, gyro: bool, mag: bool, planar: bool, subcommand: u8) -> [u8; 5] {
+pub fn me_calibration_params(
+    accel: bool,
+    gyro: bool,
+    mag: bool,
+    planar: bool,
+    subcommand: u8,
+) -> [u8; 5] {
     [accel as u8, gyro as u8, mag as u8, subcommand, planar as u8]
 }
 
@@ -507,7 +572,11 @@ pub struct FrsReadSession {
 
 impl FrsReadSession {
     pub fn new(frs_type: u16) -> FrsReadSession {
-        FrsReadSession { frs_type, words: Vec::new(), done: false }
+        FrsReadSession {
+            frs_type,
+            words: Vec::new(),
+            done: false,
+        }
     }
 
     pub fn request(&self) -> [u8; 8] {
@@ -518,8 +587,18 @@ impl FrsReadSession {
         if r.frs_type != self.frs_type {
             return Ok(self.done); // another record's traffic
         }
-        if matches!(r.status, FRS_UNRECOGNIZED_FRS_TYPE | FRS_BUSY | FRS_OFFSET_OUT_OF_RANGE | FRS_RECORD_EMPTY | FRS_DEVICE_ERROR) {
-            return Err(Sh2HubError(format!("FRS read 0x{:04X} failed: status {}", self.frs_type, r.status)));
+        if matches!(
+            r.status,
+            FRS_UNRECOGNIZED_FRS_TYPE
+                | FRS_BUSY
+                | FRS_OFFSET_OUT_OF_RANGE
+                | FRS_RECORD_EMPTY
+                | FRS_DEVICE_ERROR
+        ) {
+            return Err(Sh2HubError(format!(
+                "FRS read 0x{:04X} failed: status {}",
+                self.frs_type, r.status
+            )));
         }
         if r.data_length > 0 {
             self.words.push(r.data0);
@@ -547,7 +626,12 @@ pub struct FrsWriteSession {
 
 impl FrsWriteSession {
     pub fn new(frs_type: u16, words: &[u32]) -> FrsWriteSession {
-        FrsWriteSession { frs_type, words: words.to_vec(), done: false, offset: 0 }
+        FrsWriteSession {
+            frs_type,
+            words: words.to_vec(),
+            done: false,
+            offset: 0,
+        }
     }
 
     pub fn request(&self) -> [u8; 6] {
@@ -556,10 +640,15 @@ impl FrsWriteSession {
 
     pub fn feed(&mut self, r: &FrsWriteResponse) -> Result<Option<[u8; 12]>, Sh2HubError> {
         match r.status {
-            FRS_WRITE_UNRECOGNIZED_FRS_TYPE | FRS_WRITE_BUSY | FRS_WRITE_FAILED | FRS_WRITE_NOT_IN_WRITE_MODE
-            | FRS_WRITE_INVALID_LENGTH | FRS_WRITE_RECORD_INVALID => {
-                Err(Sh2HubError(format!("FRS write 0x{:04X} failed: status {}", self.frs_type, r.status)))
-            }
+            FRS_WRITE_UNRECOGNIZED_FRS_TYPE
+            | FRS_WRITE_BUSY
+            | FRS_WRITE_FAILED
+            | FRS_WRITE_NOT_IN_WRITE_MODE
+            | FRS_WRITE_INVALID_LENGTH
+            | FRS_WRITE_RECORD_INVALID => Err(Sh2HubError(format!(
+                "FRS write 0x{:04X} failed: status {}",
+                self.frs_type, r.status
+            ))),
             FRS_WRITE_COMPLETED => {
                 self.done = true;
                 Ok(None)
@@ -569,8 +658,9 @@ impl FrsWriteSession {
                     return Ok(None);
                 }
                 let end = (self.offset + 2).min(self.words.len());
-                let data = sh2::build_frs_write_data(self.offset as u16, &self.words[self.offset..end])
-                    .map_err(|e| Sh2HubError(e.to_string()))?;
+                let data =
+                    sh2::build_frs_write_data(self.offset as u16, &self.words[self.offset..end])
+                        .map_err(|e| Sh2HubError(e.to_string()))?;
                 self.offset = end;
                 Ok(Some(data))
             }

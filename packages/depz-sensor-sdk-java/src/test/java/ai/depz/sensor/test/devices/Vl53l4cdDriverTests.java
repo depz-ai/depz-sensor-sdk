@@ -4,6 +4,7 @@ import static ai.depz.sensor.test.devices.T.check;
 import static ai.depz.sensor.test.devices.T.eq;
 import static ai.depz.sensor.test.devices.T.throwsType;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.devices.Vl53l4Measurement;
 import ai.depz.sensor.devices.Vl53l4cdDevice;
@@ -160,9 +161,10 @@ public final class Vl53l4cdDriverTests {
 
     public static void rangeTimingBoundsAndSettingsRoundTrip() {
         Vl53l4cdDriver drv = new Vl53l4cdDriver(new FakePlatform());
-        throwsType(Vl53l4Uld.Vl53l4Error.class, () -> drv.setRangeTiming(9, 0));
-        throwsType(Vl53l4Uld.Vl53l4Error.class, () -> drv.setRangeTiming(201, 0));
-        throwsType(Vl53l4Uld.Vl53l4Error.class, () -> drv.setRangeTiming(50, 30)); // 0 < inter <= budget
+        // ERRATA A16: a refused argument is invalid_argument, not the driver's Vl53l4Error
+        throwsType(IllegalArgumentException.class, () -> drv.setRangeTiming(9, 0));
+        throwsType(IllegalArgumentException.class, () -> drv.setRangeTiming(201, 0));
+        throwsType(IllegalArgumentException.class, () -> drv.setRangeTiming(50, 30)); // 0 < inter <= budget
         for (int mm : new int[] {10, -10, 0, 255}) {
             drv.setOffset(mm);
             eq(mm, drv.getOffset());
@@ -175,7 +177,7 @@ public final class Vl53l4cdDriverTests {
         eq(1024, drv.getSignalThreshold());
         drv.setSigmaThreshold(15);
         eq(15, drv.getSigmaThreshold());
-        throwsType(RuntimeException.class, () -> drv.setSigmaThreshold(0x4000));
+        throwsType(IllegalArgumentException.class, () -> drv.setSigmaThreshold(0x4000));
     }
 
     public static void isAliveAndWaitsTimeOut() {
@@ -196,8 +198,8 @@ public final class Vl53l4cdDriverTests {
         p.seedResult(93, 200, 256 * 40);
         eq(7, drv.calibrateOffset(100, 5));
         eq(Vl53l4Uld.offsetRaw(7), word(p.last(Vl53l4Uld.RANGE_OFFSET_MM)));
-        throwsType(Vl53l4Uld.Vl53l4Error.class, () -> drv.calibrateOffset(5, 20));
-        throwsType(Vl53l4Uld.Vl53l4Error.class, () -> drv.calibrateOffset(100, 4));
+        throwsType(IllegalArgumentException.class, () -> drv.calibrateOffset(5, 20));
+        throwsType(IllegalArgumentException.class, () -> drv.calibrateOffset(100, 4));
     }
 
     public static void xtalkCalibrationFollowsTheStFormula() {
@@ -228,9 +230,9 @@ public final class Vl53l4cdDriverTests {
         try (Vl53l4cdDevice dev = new Vl53l4cdDevice(board, Duration.ofMillis(500))) {
             dev.startRanging();
             check(dev.ranging(), "ranging");
-            throwsType(IllegalStateException.class, () -> dev.setOffsetMm(3));
-            throwsType(IllegalStateException.class, () -> dev.init());
-            throwsType(IllegalStateException.class, () -> dev.measureOnce());
+            throwsType(InvalidStateException.class, () -> dev.setOffsetMm(3));
+            throwsType(InvalidStateException.class, () -> dev.init());
+            throwsType(InvalidStateException.class, () -> dev.measureOnce());
             dev.stopRanging();
             check(!dev.ranging(), "stopped");
             dev.stopRanging(); // a no-op once stopped

@@ -29,8 +29,9 @@ def test_bridge_identity_and_init(vl53l4):
     assert vl53l4.is_alive()
     vl53l4.init()
     assert vl53l4.initialized
-    timing = vl53l4.get_range_timing()
-    assert 10 <= timing.timing_budget_ms <= 200
+    budget_ms, inter_ms = vl53l4.get_range_timing()
+    assert 10 <= budget_ms <= 200
+    assert inter_ms == 0 or inter_ms > budget_ms
 
 
 def test_streams_sane_measurements(vl53l4):

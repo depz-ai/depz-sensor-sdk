@@ -569,17 +569,21 @@ int depz_tmf8829_builder_add(depz_tmf8829_builder *b, const uint8_t *raw, size_t
         return 0;
     }
 
+    if (depz_tmf8829_parse_results(raw, len, &f, &b->cur, err, sizeof err)) {
+        /* Contract 14 §5/§6: decoded first; a corrupt results frame never reaches the
+         * capture timer and is dropped with its pending frames and any half-measurement
+         * collected before it. */
+        b->parse_errors++;
+        log_problem(b, "fN=%lu: %s", (unsigned long)f.f_number, err);
+        b->pending_hist = b->pending_ref = b->hist = b->refs = 0;
+        b->has_half = false;
+        return 0;
+    }
     depz_tmf8829_timer_results(&b->timer, &b->clock, f.fp_mode, f.systick, f.t0_integration, f.t1_integration,
                                timestamp_us, edge_us, flags, &t);
     b->hist += b->pending_hist;
     b->refs += b->pending_ref;
     b->pending_hist = b->pending_ref = 0;
-    if (depz_tmf8829_parse_results(raw, len, &f, &b->cur, err, sizeof err)) {
-        b->parse_errors++;
-        log_problem(b, "fN=%lu: %s", (unsigned long)f.f_number, err);
-        b->has_half = false;
-        return 0;
-    }
 
     if (FP_GRID[f.fp_mode].rows == 32) {
         if (!b->has_half) {

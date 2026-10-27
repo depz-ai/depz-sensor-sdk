@@ -11,8 +11,10 @@ import pytest
 import serial
 
 from _support import (
+    ALL_FAMILIES,
     FAMILY_VL53L8CH,
     FAMILY_VL53L8CX,
+    bench_families,
     port_lease,
 )
 
@@ -72,6 +74,7 @@ def test_probe_reports_correct_sensor_type(hw_inventory):
         "vl53l4cx": SensorType.VL53LX,
         "bno086": SensorType.BNO086,
         "bno055": SensorType.BNO055,
+        "tmf8829": SensorType.TMF8829,
     }
     for dev in hw_inventory:
         with port_lease(dev.resolve_port()):
@@ -189,14 +192,17 @@ def test_busy_port_is_rejected_not_corrupted(any_info):
     with port_lease(port):
         holder = serial.Serial(port, 115200, timeout=0.05, exclusive=True)
         try:
-            with pytest.raises((serial.SerialException, DeviceLostError, OSError)):
+            # Since 0.8.0 open_device reports a port whose probe gets no answer
+            # (here: the open is refused) as NoDepzDeviceError (contract 07 §3);
+            # 0.7.0 raised DeviceLostError. Either way it fails, never shares.
+            with pytest.raises((serial.SerialException, DeviceLostError, NoDepzDeviceError, OSError)):
                 open_device(port, timeout=0.3)
         finally:
             holder.close()
 
 
-def test_all_four_families_present(hw_inventory):
-    """On a bench, all four sensor types must be attached.
+def test_bench_families_present(hw_inventory):
+    """On a bench, every family the bench is described with must be attached.
 
     The distinction that matters:
 
@@ -205,12 +211,19 @@ def test_all_four_families_present(hw_inventory):
     * **Some attached, not all** — you *are* on the bench and a family is
       missing or not answering. That FAILS: the run genuinely did not cover
       that sensor, and the report must say so rather than quietly claim
-      four-sensor coverage it never had.
+      coverage it never had.
+
+    The expected set is `BENCH_FAMILIES` (or `DEPZ_QA_BENCH`), not every family
+    the SDK knows: the families the bench has no board for are printed, so a
+    report never reads as covering them.
     """
     if not hw_inventory:
         pytest.skip("no DEPZ hardware attached — not a bench")
     families = {d.family for d in hw_inventory}
-    missing = {"sr04", "vl53l8cx", "vl53l8ch", "bno086"} - families
+    expected = bench_families()
+    absent = sorted(set(ALL_FAMILIES) - expected)
+    print(f"\n[depz-qa] bench {sorted(expected)}; no board for {absent} — not covered on hardware")
+    missing = expected - families
     if missing:
         pytest.fail(
             f"on a bench with {sorted(families)} attached, but "

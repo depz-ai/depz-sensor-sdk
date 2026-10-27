@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Unity communication module compiled outside Unity: the sources are the UPM package's
+       unity/Runtime (minus the MonoBehaviour, which needs UnityEngine), against netstandard2.1
+       and the NuGet System.IO.Ports / Microsoft.Win32.Registry; in Unity both come with the
+       .NET Framework API level. C# 9 and no implicit usings, as Unity compiles. Not packed:
+       Unity consumes the sources, .NET users have Depz.Sensor's own SerialPortLink. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>Depz.Sensor.Unity</RootNamespace>
+    <AssemblyName>Depz.Sensor.Unity</AssemblyName>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- the .NET code-quality analyzers at the recommended set, every finding fails the build;
+         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and CI's
+         newer one then fails a build that passes here -->
+    <AnalysisLevel>8.0-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Off, with the reason: CA1051 — the decoded results are plain field structs, as in the other
+         six SDKs; CA1707 / CA1720 — names follow the contracts (I2C_ERR_OK, Int, Signed);
+         CA1510 / CA1513 — ArgumentNullException.ThrowIfNull and ObjectDisposedException.ThrowIf
+         are not in netstandard2.1, which this builds for too; CA1859 — read-only interfaces
+         say the lookup tables are not to be changed, and they are a few entries each. -->
+    <NoWarn>$(NoWarn);CA1051;CA1707;CA1720;CA1510;CA1513;CA1859</NoWarn>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../unity/Runtime/**/*.cs" Exclude="../../unity/Runtime/DepzSensorBehaviour.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Depz.Sensor/Depz.Sensor.csproj" />
+  </ItemGroup>
+
+</Project>

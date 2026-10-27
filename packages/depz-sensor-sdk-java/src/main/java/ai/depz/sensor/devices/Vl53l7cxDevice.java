@@ -52,6 +52,11 @@ public class Vl53l7cxDevice extends Vl53l8cxDevice {
     }
 
     @Override
+    protected int streamChunk() {
+        return Vl53l7.STREAM_CHUNK_MAX;
+    }
+
+    @Override
     protected int minRangingHz() {
         return Vl53l7Uld.MIN_RANGING_FREQUENCY_HZ;
     }

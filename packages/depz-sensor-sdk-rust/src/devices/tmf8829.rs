@@ -10,10 +10,11 @@ use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
 use crate::framing::Packet;
 use crate::tmf8829::{
-    cfg_get, cfg_set, config_fields, fp_grid, pack_read_reg, pack_start_stream, pack_write_reg, preset_cmd,
-    preset_kilo_iterations, FrameChunk, FrameReassembler, MeasurementBuilder, RegData, Tmf8829Cmd, Tmf8829Event,
-    Tmf8829Info, Tmf8829Measurement, Tmf8829Rpt, CFG_SIZE, DEFAULT_PERIOD_MS, EV_BAD_HEADER, FIRMWARE_IMAGE,
-    FIRMWARE_LOAD_ADDR, INT_HISTOGRAMS, INT_RESULTS, PRESETS, READ_MAX, REG_CFG, SF_REF_FRAME, WRITE_MAX,
+    cfg_get, cfg_set, config_fields, fp_grid, pack_read_reg, pack_start_stream, pack_write_reg,
+    preset_cmd, preset_kilo_iterations, FrameChunk, FrameReassembler, MeasurementBuilder, RegData,
+    Tmf8829Cmd, Tmf8829Event, Tmf8829Info, Tmf8829Measurement, Tmf8829Rpt, CFG_SIZE,
+    DEFAULT_PERIOD_MS, EV_BAD_HEADER, FIRMWARE_IMAGE, FIRMWARE_LOAD_ADDR, INT_HISTOGRAMS,
+    INT_RESULTS, PRESETS, READ_MAX, REG_CFG, SF_REF_FRAME, WRITE_MAX,
 };
 
 // Host-interface registers (sensor bootloader and application).
@@ -52,7 +53,12 @@ const CMD_STOP: u8 = 0xFF;
 const STAT_OK: u8 = 0x00;
 const STAT_ACCEPTED: u8 = 0x01;
 
-const BL_STATUS_NAMES: &[(u8, &str)] = &[(0, "READY"), (1, "ERR_PARAM"), (2, "ERR_ADDR"), (4, "ERR_FIFO")];
+const BL_STATUS_NAMES: &[(u8, &str)] = &[
+    (0, "READY"),
+    (1, "ERR_PARAM"),
+    (2, "ERR_ADDR"),
+    (4, "ERR_FIFO"),
+];
 
 const STAT_NAMES: &[(u8, &str)] = &[
     (0x00, "OK"),
@@ -77,7 +83,10 @@ const REGISTER_TIMEOUT: Duration = Duration::from_secs(1);
 const APP_CMD_TIMEOUT: Duration = Duration::from_secs(1);
 
 fn status_name(table: &[(u8, &str)], st: u8) -> String {
-    table.iter().find(|(v, _)| *v == st).map_or_else(|| format!("0x{st:x}"), |(_, n)| n.to_string())
+    table
+        .iter()
+        .find(|(v, _)| *v == st)
+        .map_or_else(|| format!("0x{st:x}"), |(_, n)| n.to_string())
 }
 
 /// What [`Tmf8829Device::init`] reports: the RAM application version and the sensor's serial number.
@@ -102,12 +111,17 @@ pub struct Tmf8829AppliedConfig {
 impl Tmf8829AppliedConfig {
     /// A named field of the page.
     pub fn field(&self, name: &str) -> Option<u16> {
-        self.fields.iter().find(|(n, _)| *n == name).map(|(_, v)| *v)
+        self.fields
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| *v)
     }
 
     /// (rows, cols) of a measurement.
     pub fn grid(&self) -> (usize, usize) {
-        self.field("fp_mode").and_then(|m| fp_grid(m as u8)).unwrap_or((0, 0))
+        self.field("fp_mode")
+            .and_then(|m| fp_grid(m as u8))
+            .unwrap_or((0, 0))
     }
 }
 
@@ -163,9 +177,13 @@ impl ReportHandler for Streams {
     fn handle_report(&self, packet: &Packet) -> bool {
         if packet.cmd == Tmf8829Rpt::Frame as u8 {
             let m = {
-                let Ok(chunk) = FrameChunk::unpack(&packet.payload) else { return true };
+                let Ok(chunk) = FrameChunk::unpack(&packet.payload) else {
+                    return true;
+                };
                 let mut f = self.frames.lock().unwrap();
-                let Some(raw) = f.reassembler.feed(chunk) else { return true };
+                let Some(raw) = f.reassembler.feed(chunk) else {
+                    return true;
+                };
                 f.builder.add(&raw.data, raw.timestamp_us, raw.edge_us)
             };
             if let Some(m) = m {
@@ -174,7 +192,9 @@ impl ReportHandler for Streams {
             return true;
         }
         if packet.cmd == Tmf8829Rpt::Event as u8 {
-            let Ok(ev) = Tmf8829Event::unpack(&packet.payload) else { return true };
+            let Ok(ev) = Tmf8829Event::unpack(&packet.payload) else {
+                return true;
+            };
             if ev.code == EV_BAD_HEADER && self.stopping.load(Ordering::SeqCst) {
                 return true; // STOP mid histogram dump: expected (contract 14 §2)
             }
@@ -234,8 +254,11 @@ impl Tmf8829Device {
     /// Continue the open connection `dev` as a TMF8829.
     pub fn attach(dev: DepzDevice) -> Tmf8829Device {
         let streams = Arc::new(Streams {
-            frames: Mutex::new(Frames { reassembler: FrameReassembler::new(), builder: MeasurementBuilder::new() }),
-            measurements: Fanout::new(),
+            frames: Mutex::new(Frames {
+                reassembler: FrameReassembler::new(),
+                builder: MeasurementBuilder::new(),
+            }),
+            measurements: Fanout::new(dev.callback_errors_counter()),
             events: dev.core.events.clone(),
             stopping: AtomicBool::new(false),
         });
@@ -255,7 +278,9 @@ impl Tmf8829Device {
     /// event).
     pub fn interrupt_event(event: &DeviceEvent) -> Option<Tmf8829Event> {
         match event {
-            DeviceEvent::Sensor { kind, payload, .. } if *kind == Self::INTERRUPT_EVENT => Tmf8829Event::unpack(payload).ok(),
+            DeviceEvent::Sensor { kind, payload, .. } if *kind == Self::INTERRUPT_EVENT => {
+                Tmf8829Event::unpack(payload).ok()
+            }
             _ => None,
         }
     }
@@ -302,7 +327,10 @@ impl Tmf8829Device {
                 Some(REGISTER_TIMEOUT),
             )?;
             if rep.data.len() != n {
-                return Err(DepzError::Protocol(format!("READ_REG 0x{addr:02X}: expected {n}, got {}", rep.data.len())));
+                return Err(DepzError::Protocol(format!(
+                    "READ_REG 0x{addr:02X}: expected {n}, got {}",
+                    rep.data.len()
+                )));
             }
             out.extend_from_slice(&rep.data);
             addr = (addr + n).min(REG_FIFO as usize);
@@ -321,18 +349,30 @@ impl Tmf8829Device {
 
     /// Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF); `progress` gets
     /// (done, total) after each.
-    pub fn write_registers(&self, addr: u8, data: &[u8], progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<()> {
+    pub fn write_registers(
+        &self,
+        addr: u8,
+        data: &[u8],
+        progress: Option<&mut dyn FnMut(usize, usize)>,
+    ) -> Result<()> {
         let _g = self.reg.lock().unwrap();
         self.write_registers_raw(addr, data, progress)
     }
 
-    fn write_registers_raw(&self, addr: u8, data: &[u8], mut progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<()> {
+    fn write_registers_raw(
+        &self,
+        addr: u8,
+        data: &[u8],
+        mut progress: Option<&mut dyn FnMut(usize, usize)>,
+    ) -> Result<()> {
         let mut addr = addr as usize;
         let mut done = 0;
         while done < data.len() {
             let n = (data.len() - done).min(WRITE_MAX);
             if addr > REG_FIFO as usize {
-                return Err(DepzError::InvalidArgument(format!("TMF_WRITE_REG: addr 0x{addr:X} past 0xFF")));
+                return Err(DepzError::InvalidArgument(format!(
+                    "TMF_WRITE_REG: addr 0x{addr:X} past 0xFF"
+                )));
             }
             let payload = pack_write_reg(addr as u8, &data[done..done + n])?;
             self.request_ok(Tmf8829Cmd::WriteReg as u8, &payload, Some(REGISTER_TIMEOUT))?;
@@ -356,7 +396,13 @@ impl Tmf8829Device {
         self.write_registers_raw(addr, &[value], None)
     }
 
-    fn poll(&self, addr: u8, done: impl Fn(u8) -> bool, timeout: Duration, what: &str) -> Result<u8> {
+    fn poll(
+        &self,
+        addr: u8,
+        done: impl Fn(u8) -> bool,
+        timeout: Duration,
+        what: &str,
+    ) -> Result<u8> {
         let deadline = Instant::now() + timeout;
         loop {
             let v = self.read_register_raw(addr)?;
@@ -364,7 +410,9 @@ impl Tmf8829Device {
                 return Ok(v);
             }
             if Instant::now() > deadline {
-                return Err(DepzError::Sensor(format!("{what}: timeout, reg 0x{addr:02X} = 0x{v:02X}")));
+                return Err(DepzError::Sensor(format!(
+                    "{what}: timeout, reg 0x{addr:02X} = 0x{v:02X}"
+                )));
             }
         }
     }
@@ -382,14 +430,21 @@ impl Tmf8829Device {
             ("INT_ENAB", REG_INT_ENAB),
             ("FIFOSTATUS", REG_FIFO_STATUS),
         ];
-        regs.iter().map(|&(n, r)| Ok((n, self.read_register(r)?))).collect()
+        regs.iter()
+            .map(|&(n, r)| Ok((n, self.read_register(r)?)))
+            .collect()
     }
 
     // ── bridge ───────────────────────────────────────────────────────────────
 
     /// Bridge counters (never touches the sensor, safe mid-stream).
     pub fn get_bridge_info(&self) -> Result<Tmf8829Info> {
-        self.request(Tmf8829Cmd::GetInfo as u8, &[], expect_report(Tmf8829Rpt::Info as u8, Tmf8829Info::unpack), None)
+        self.request(
+            Tmf8829Cmd::GetInfo as u8,
+            &[],
+            expect_report(Tmf8829Rpt::Info as u8, Tmf8829Info::unpack),
+            None,
+        )
     }
 
     // ── init: sensor bootloader + firmware download ──────────────────────────
@@ -401,9 +456,17 @@ impl Tmf8829Device {
             payload.extend_from_slice(params);
         }
         self.write_registers_raw(REG_CMD_STAT, &payload, None)?;
-        let st = self.poll(REG_CMD_STAT, |v| v != cmd, FAST, &format!("bootloader cmd 0x{cmd:02X}"))?;
+        let st = self.poll(
+            REG_CMD_STAT,
+            |v| v != cmd,
+            FAST,
+            &format!("bootloader cmd 0x{cmd:02X}"),
+        )?;
         if st != 0 {
-            return Err(DepzError::Sensor(format!("bootloader cmd 0x{cmd:02X} -> {}", status_name(BL_STATUS_NAMES, st))));
+            return Err(DepzError::Sensor(format!(
+                "bootloader cmd 0x{cmd:02X} -> {}",
+                status_name(BL_STATUS_NAMES, st)
+            )));
         }
         Ok(())
     }
@@ -411,7 +474,10 @@ impl Tmf8829Device {
     /// Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware
     /// download, start. Stops a running stream first. `progress` (done, total) tracks the image
     /// download. A sensor that refuses or does not answer is [`DepzError::Sensor`].
-    pub fn init(&self, progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<Tmf8829InitResult> {
+    pub fn init(
+        &self,
+        progress: Option<&mut dyn FnMut(usize, usize)>,
+    ) -> Result<Tmf8829InitResult> {
         if self.streaming() {
             self.stop()?;
         }
@@ -460,9 +526,17 @@ impl Tmf8829Device {
     // An application command; its status must be one of `accept`.
     fn app_cmd(&self, cmd: u8, accept: &[u8], timeout: Duration) -> Result<u8> {
         self.write_register_raw(REG_CMD_STAT, cmd)?;
-        let st = self.poll(REG_CMD_STAT, |v| v < 0x10, timeout, &format!("sensor cmd 0x{cmd:02X}"))?;
+        let st = self.poll(
+            REG_CMD_STAT,
+            |v| v < 0x10,
+            timeout,
+            &format!("sensor cmd 0x{cmd:02X}"),
+        )?;
         if !accept.contains(&st) {
-            return Err(DepzError::Sensor(format!("sensor cmd 0x{cmd:02X} -> {}", status_name(STAT_NAMES, st))));
+            return Err(DepzError::Sensor(format!(
+                "sensor cmd 0x{cmd:02X} -> {}",
+                status_name(STAT_NAMES, st)
+            )));
         }
         Ok(st)
     }
@@ -477,7 +551,9 @@ impl Tmf8829Device {
         self.app_cmd(CMD_LOAD_CONFIG_PAGE, &[STAT_OK], APP_CMD_TIMEOUT)?;
         let cid = self.read_register_raw(REG_CID_RID)?;
         if cid != CMD_LOAD_CONFIG_PAGE {
-            return Err(DepzError::Sensor(format!("CID_RID 0x{cid:02X} after LOAD_CONFIG_PAGE")));
+            return Err(DepzError::Sensor(format!(
+                "CID_RID 0x{cid:02X} after LOAD_CONFIG_PAGE"
+            )));
         }
         self.read_registers_raw(REG_CFG, CFG_SIZE)
     }
@@ -491,16 +567,26 @@ impl Tmf8829Device {
     pub fn configure(&self, preset: &str, opts: &Tmf8829Options) -> Result<Tmf8829AppliedConfig> {
         let Some(preset_command) = preset_cmd(preset) else {
             let names: Vec<&str> = PRESETS.iter().map(|(n, _)| *n).collect();
-            return Err(DepzError::InvalidArgument(format!("unknown preset '{preset}'; one of {}", names.join(", "))));
+            return Err(DepzError::InvalidArgument(format!(
+                "unknown preset '{preset}'; one of {}",
+                names.join(", ")
+            )));
         };
         if self.streaming() {
-            return Err(DepzError::InvalidState("configure() while streaming: stop() first".into()));
+            return Err(DepzError::InvalidState(
+                "configure() while streaming: stop() first".into(),
+            ));
         }
         // The 3-bit field takes 0..7, the sensor reports at most 4.
         if !(1..=4).contains(&opts.nr_peaks) {
-            return Err(DepzError::InvalidArgument(format!("nr_peaks {}, must be 1..4", opts.nr_peaks)));
+            return Err(DepzError::InvalidArgument(format!(
+                "nr_peaks {}, must be 1..4",
+                opts.nr_peaks
+            )));
         }
-        let kilo = opts.kilo_iterations.unwrap_or_else(|| preset_kilo_iterations(preset).unwrap() as u32);
+        let kilo = opts
+            .kilo_iterations
+            .unwrap_or_else(|| preset_kilo_iterations(preset).unwrap() as u32);
         let mut want: Vec<(String, u32)> = vec![
             ("period_ms".into(), opts.period_ms),
             ("kilo_iterations".into(), kilo),
@@ -522,7 +608,8 @@ impl Tmf8829Device {
             self.app_cmd(preset_command, &[STAT_OK], APP_CMD_TIMEOUT)?;
             let mut page = self.config_page_raw()?;
             for (k, v) in &want {
-                cfg_set(&mut page, k, *v).map_err(|e| DepzError::InvalidArgument(format!("{k}: {v}: {}", e.0)))?;
+                cfg_set(&mut page, k, *v)
+                    .map_err(|e| DepzError::InvalidArgument(format!("{k}: {v}: {}", e.0)))?;
             }
             self.write_registers_raw(REG_CFG, &page, None)?;
             self.app_cmd(CMD_WRITE_PAGE, &[STAT_OK], APP_CMD_TIMEOUT)?;
@@ -536,7 +623,10 @@ impl Tmf8829Device {
             })
             .collect();
         if !stuck.is_empty() {
-            return Err(DepzError::Sensor(format!("config fields did not stick: {}", stuck.join(", "))));
+            return Err(DepzError::Sensor(format!(
+                "config fields did not stick: {}",
+                stuck.join(", ")
+            )));
         }
         let cfg = Tmf8829AppliedConfig {
             preset: preset.to_string(),
@@ -572,7 +662,11 @@ impl Tmf8829Device {
             f.builder.reset();
         }
         let flags = if cfg.ref_frame { SF_REF_FRAME } else { 0 };
-        self.request_ok(Tmf8829Cmd::StartStream as u8, &pack_start_stream(int_mask, flags)?, None)?;
+        self.request_ok(
+            Tmf8829Cmd::StartStream as u8,
+            &pack_start_stream(int_mask, flags)?,
+            None,
+        )?;
         self.streaming.store(true, Ordering::SeqCst);
         if let Err(e) = self.app_cmd(CMD_MEASURE, &[STAT_OK, STAT_ACCEPTED], APP_CMD_TIMEOUT) {
             self.streaming.store(false, Ordering::SeqCst);
@@ -614,7 +708,10 @@ impl Tmf8829Device {
     }
 
     /// Call `callback` for every measurement (reader thread; don't block).
-    pub fn on_measurement(&self, callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static) -> Hook {
+    pub fn on_measurement(
+        &self,
+        callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static,
+    ) -> Hook {
         self.streams.measurements.on_item(callback)
     }
 
@@ -625,7 +722,11 @@ impl Tmf8829Device {
 
     /// The next measurement (contract 07 §3); `timeout` `None`: 2 s.
     pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Tmf8829Measurement> {
-        self.streams.measurements.next(timeout.unwrap_or(Duration::from_secs(2)), Tmf8829Rpt::Frame as u8, self.is_closed())
+        self.streams.measurements.next(
+            timeout.unwrap_or(Duration::from_secs(2)),
+            Tmf8829Rpt::Frame as u8,
+            self.is_closed(),
+        )
     }
 
     pub fn stream_dropped_counts(&self) -> Vec<u64> {

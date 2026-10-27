@@ -134,7 +134,9 @@ public void configureCnh(Vl53l8CnhSetup setup)
 ```
 
 Arm CNH for the next `startRanging()`: every frame then carries
-`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`.
+`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`. CNH and the motion
+indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+`Vl53l8Frame#motion()`).
 
 ### Vl53l8CnhSetup
 

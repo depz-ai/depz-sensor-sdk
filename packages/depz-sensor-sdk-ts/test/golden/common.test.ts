@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  packSetPayloadCrcType,
   packSyncTime,
   packSyncPinConfig,
   syncTimeOffsetRtt,
@@ -18,7 +19,7 @@ describe("common command encode vectors", () => {
       if (c.kind === "sync_time_request") {
         expect(toHex(packSyncTime(BigInt(c.pc_timestamp_us)))).toBe(c.payload);
       } else if (c.kind === "set_payload_crc_type") {
-        expect(toHex(Uint8Array.of(c.crc_type))).toBe(c.payload);
+        expect(toHex(packSetPayloadCrcType(c.crc_type))).toBe(c.payload);
       } else if (c.kind === "sync_pin_config") {
         expect(
           toHex(packSyncPinConfig({ pin: c.pin, mode: c.mode, polarity: c.polarity })),

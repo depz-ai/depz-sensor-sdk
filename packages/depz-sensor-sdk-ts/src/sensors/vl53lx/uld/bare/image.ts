@@ -15,6 +15,7 @@
  * `pushRange()` does the same, for the same bytes on the wire.
  */
 
+import { InvalidStateError } from "../../../../errors.js";
 import type { BridgePlatform } from "../base.js";
 import { BLOCKS, BLOCK_NAMES, RegBlock, type BlockName } from "./regs.js";
 
@@ -66,7 +67,7 @@ export class DeviceImage {
   /** Write one block from the image to the sensor. */
   async push(name: BlockName): Promise<void> {
     const blk = this.blocks[name];
-    if (!BLOCKS[name].writable) throw new Error(`${name} is read-only`);
+    if (!BLOCKS[name].writable) throw new InvalidStateError(`${name} is read-only`);
     await this.p.wrMulti(blk.base, blk.encode());
   }
 
@@ -92,7 +93,7 @@ export class DeviceImage {
     const [base, size] = DeviceImage.span(names);
     const buf = new Uint8Array(size);
     for (const name of names) {
-      if (!BLOCKS[name].writable) throw new Error(`${name} is read-only`);
+      if (!BLOCKS[name].writable) throw new InvalidStateError(`${name} is read-only`);
       const blk = this.blocks[name];
       buf.set(blk.encode(), blk.base - base);
     }

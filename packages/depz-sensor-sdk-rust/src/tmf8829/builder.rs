@@ -113,7 +113,8 @@ impl MeasurementBuilder {
         }
         if f.kind() != FID_RESULTS && f.kind() != FID_HISTOGRAMS {
             self.parse_errors += 1;
-            self.problems.push(format!("frame id 0x{:02X}: unknown kind", f.id));
+            self.problems
+                .push(format!("frame id 0x{:02X}: unknown kind", f.id));
             return None;
         }
         let flags = self.clock.add(timestamp_us, f.systick);
@@ -133,25 +134,34 @@ impl MeasurementBuilder {
             return None;
         }
 
+        let res = match parse_results_info(raw, &f) {
+            Ok(r) => r,
+            Err(e) => {
+                // Contract 14 §5/§6: decoded first; a corrupt results frame never
+                // reaches the capture timer and is dropped with its pending frames
+                // and any half-measurement collected before it.
+                self.parse_errors += 1;
+                self.problems.push(format!("fN={}: {}", f.f_number, e));
+                self.pending.clear();
+                self.hist.clear();
+                self.refs.clear();
+                self.half = None;
+                return None;
+            }
+        };
         let t = self
             .timer
             .results_frame(&self.clock, &f, timestamp_us, edge_us, flags);
         for (pf, praw) in self.pending.drain(..) {
             if pf.kind() == FID_HISTOGRAMS {
-                self.hist.push(HistogramFrame { info: pf, raw: praw });
+                self.hist.push(HistogramFrame {
+                    info: pf,
+                    raw: praw,
+                });
             } else {
                 self.refs.push(praw);
             }
         }
-        let res = match parse_results_info(raw, &f) {
-            Ok(r) => r,
-            Err(e) => {
-                self.parse_errors += 1;
-                self.problems.push(format!("fN={}: {}", f.f_number, e));
-                self.half = None;
-                return None;
-            }
-        };
 
         let (res, frames, times) = if fp_grid(f.fp_mode()).map_or(0, |g| g.0) == 32 {
             let Some((f0, res0, t0)) = self.half.take() else {
@@ -191,7 +201,11 @@ impl MeasurementBuilder {
 
         let n = times.len() as i64;
         let m = Tmf8829Measurement {
-            timestamp_us: times.iter().map(|x| x.timestamp_us).sum::<i64>().div_euclid(n),
+            timestamp_us: times
+                .iter()
+                .map(|x| x.timestamp_us)
+                .sum::<i64>()
+                .div_euclid(n),
             flags: times.iter().fold(0, |a, x| a | x.flags),
             fp_mode: f.fp_mode(),
             f_number: f.f_number,

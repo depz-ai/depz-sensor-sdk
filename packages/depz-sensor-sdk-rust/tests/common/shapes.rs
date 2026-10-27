@@ -5,7 +5,10 @@
 //!
 //! Decoders return `Err(detail)` where the SDK refuses the input.
 
-use depz_sensor_sdk::bno055::{decode_block, Bno055Info, RawBlock, RegData as BnoRegData, StreamData as BnoStream};
+use depz_sensor_sdk::bno055::{
+    decode_block, Bno055Info, RawBlock, RegData as BnoRegData, StreamData as BnoStream,
+};
+use depz_sensor_sdk::bno086::hub;
 use depz_sensor_sdk::bno086::reports::{Report, Vector3Kind};
 use depz_sensor_sdk::bno086::shtp::ShtpCargo;
 use depz_sensor_sdk::framing::{Event, PacketParser};
@@ -13,9 +16,14 @@ use depz_sensor_sdk::tmf8829::{
     parse_frame, parse_results_info, FrameChunk, FrameReassembler, MeasurementBuilder,
     PixelResults, RegData as TmfRegData, Tmf8829Event, Tmf8829Info, FID_RESULTS,
 };
-use depz_sensor_sdk::vl53l4::{parse_result_block, RegData as L4RegData, StreamData as L4Stream, Vl53l4Info};
+use depz_sensor_sdk::vl53l4::{
+    parse_result_block, RegData as L4RegData, StreamData as L4Stream, Vl53l4Info,
+};
 use depz_sensor_sdk::vl53l7::Vl53l7Info;
-use depz_sensor_sdk::vl53lx::{decode_die_block, decode_histogram_raw, decode_l0x_raw, DieVariant, Vl53lxInfo};
+use depz_sensor_sdk::vl53l8::{unpack_frame_chunk, FrameReassembler as L8Reassembler};
+use depz_sensor_sdk::vl53lx::{
+    decode_die_block, decode_histogram_raw, decode_l0x_raw, DieVariant, Vl53lxInfo,
+};
 use serde_json::{json, Map, Value};
 
 use super::hex_encode;
@@ -30,7 +38,12 @@ fn i16s(v: &[i16]) -> Vec<i64> {
 
 /// `(name, value)` pairs → a JSON object.
 fn object<V: Into<Value>, const N: usize>(pairs: [(&str, V); N]) -> Value {
-    Value::Object(pairs.into_iter().map(|(k, v)| (k.to_string(), v.into())).collect())
+    Value::Object(
+        pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.into()))
+            .collect(),
+    )
 }
 
 // ---- framing (contract 01 §5) ------------------------------------------------
@@ -515,7 +528,6 @@ pub fn arrays(r: &PixelResults) -> Value {
     })
 }
 
-
 /// bno055.json `decode` shapes (0x91 REG_DATA, 0x92 INFO, 0x93 REG_STREAM).
 pub fn bno055_decode(report: u64, raw: &[u8]) -> Result<Value, String> {
     Ok(match report {
@@ -535,8 +547,10 @@ pub fn bno055_decode(report: u64, raw: &[u8]) -> Result<Value, String> {
 /// bno055.json `blocks` shape: every channel (null when outside the window).
 pub fn bno055_block(addr: u8, data: &[u8]) -> Value {
     let r = decode_block(addr, data);
-    let mut m: Map<String, Value> =
-        block_fields(&r).into_iter().map(|(k, v)| (k.to_string(), json!(v))).collect();
+    let mut m: Map<String, Value> = block_fields(&r)
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), json!(v)))
+        .collect();
     m.insert("temperature".into(), json!(r.temperature));
     m.insert("calib_stat".into(), json!(r.calib_stat));
     Value::Object(m)
@@ -551,6 +565,48 @@ pub fn bno086_cargo(c: &ShtpCargo) -> Value {
 pub fn bno086_typed(r: &Report) -> Value {
     let (ty, fields) = report_repr(r);
     json!({"type": ty, "fields": fields})
+}
+
+/// bno086_shtp.json `input_rules` op `bno086_control_decode`: a control-channel response
+/// (contract 05 §4 table) decoded to its fields — `Err` when shorter than them or of another
+/// report id (contract 07 §3).
+pub fn bno086_control_decode(kind: &str, payload: &[u8]) -> Result<Value, String> {
+    Ok(match kind {
+        "feature_response" => {
+            let r = hub::FeatureResponse::unpack(payload).map_err(err)?;
+            json!({
+                "sensor_id": r.sensor_id, "flags": r.flags, "sensitivity": r.sensitivity,
+                "interval_us": r.interval_us, "batch_us": r.batch_us, "cfg_word": r.cfg_word,
+            })
+        }
+        "product_id" => {
+            let r = hub::ProductId::unpack(payload).map_err(err)?;
+            json!({
+                "reset_cause": r.reset_cause, "sw_version_major": r.sw_version_major,
+                "sw_version_minor": r.sw_version_minor, "sw_part_number": r.sw_part_number,
+                "sw_build_number": r.sw_build_number, "sw_version_patch": r.sw_version_patch,
+            })
+        }
+        "command_response" => {
+            let r = hub::CommandResponse::unpack(payload).map_err(err)?;
+            json!({
+                "seq": r.seq, "command": r.command, "command_seq": r.command_seq,
+                "response_seq": r.response_seq, "r": r.r.to_vec(),
+            })
+        }
+        "frs_read_response" => {
+            let r = hub::FrsReadResponse::unpack(payload).map_err(err)?;
+            json!({
+                "status": r.status, "data_length": r.data_length, "offset_words": r.offset_words,
+                "data0": r.data0, "data1": r.data1, "frs_type": r.frs_type,
+            })
+        }
+        "frs_write_response" => {
+            let r = hub::FrsWriteResponse::unpack(payload).map_err(err)?;
+            json!({ "status": r.status, "offset_words": r.offset_words })
+        }
+        k => return Err(format!("bno086_control_decode kind {}", k)),
+    })
 }
 
 // ---- VL53L4CD / L7 / LX ------------------------------------------------------
@@ -614,7 +670,8 @@ pub fn vl53lx_info(raw: &[u8]) -> Result<Value, String> {
 
 /// vl53lx.json `die_block` shape; `variant` by name (`l4` / `l1`).
 pub fn vl53lx_die_block(raw: &[u8], variant: &str) -> Result<Value, String> {
-    let v = DieVariant::from_name(variant).ok_or_else(|| format!("unknown variant {:?}", variant))?;
+    let v =
+        DieVariant::from_name(variant).ok_or_else(|| format!("unknown variant {:?}", variant))?;
     let r = decode_die_block(raw, v).map_err(err)?;
     Ok(json!({
         "range_status": r.range_status, "distance_mm": r.distance_mm, "sigma_mm": r.sigma_mm,
@@ -685,6 +742,37 @@ pub fn tmf8829_decode(report: u64, raw: &[u8]) -> Result<Value, String> {
     })
 }
 
+/// vl53l8.json `decode` shape: one RPT_VL53_FRAME chunk (contract 04 §3).
+pub fn vl53l8_decode(report: u64, raw: &[u8]) -> Result<Value, String> {
+    match report {
+        0x93 => {
+            let c = unpack_frame_chunk(raw).ok_or("RPT_VL53_FRAME: short payload")?;
+            Ok(json!({
+                "timestamp_us": c.timestamp_us, "full_size": c.full_size, "offset": c.offset,
+                "data": hex_encode(&c.data),
+            }))
+        }
+        r => Err(format!("unknown VL53L8 report {:#x}", r)),
+    }
+}
+
+/// RPT_VL53_FRAME payloads through one reassembler; vl53l8.json `reassembly` shape (contract 04 §4).
+pub fn vl53l8_reassembly(chunks: &[Vec<u8>]) -> Result<Value, String> {
+    let mut r = L8Reassembler::new();
+    let mut done = Vec::new();
+    for ch in chunks {
+        let chunk = unpack_frame_chunk(ch).ok_or("RPT_VL53_FRAME: short payload")?;
+        if let Some(f) = r.feed(chunk) {
+            done.push(json!({
+                "timestamp_us": f.timestamp_us,
+                "size": f.frame.len(),
+                "sha256": sha256(&f.frame),
+            }));
+        }
+    }
+    Ok(json!({"frames": done, "completed": r.completed, "discarded": r.discarded}))
+}
+
 /// FRAME-chunk payloads through one reassembler; tmf8829.json `reassembly` shape.
 pub fn tmf8829_reassembly(chunks: &[Vec<u8>]) -> Result<Value, String> {
     let mut r = FrameReassembler::new();
@@ -700,7 +788,9 @@ pub fn tmf8829_reassembly(chunks: &[Vec<u8>]) -> Result<Value, String> {
             }));
         }
     }
-    Ok(json!({"frames": done, "completed": r.completed, "discarded": r.discarded, "seq_gaps": r.seq_gaps}))
+    Ok(
+        json!({"frames": done, "completed": r.completed, "discarded": r.discarded, "seq_gaps": r.seq_gaps}),
+    )
 }
 
 /// tmf8829.json `frames` shape: header, problems, then results or data_sha256.
@@ -721,7 +811,10 @@ pub fn tmf8829_frame(raw: &[u8]) -> Result<Value, String> {
     });
     let m = out.as_object_mut().unwrap();
     if f.kind() == FID_RESULTS {
-        m.insert("results".into(), arrays(&parse_results_info(raw, &f).map_err(err)?));
+        m.insert(
+            "results".into(),
+            arrays(&parse_results_info(raw, &f).map_err(err)?),
+        );
     } else {
         let body = raw.get(21..raw.len().saturating_sub(12)).unwrap_or(&[]);
         m.insert("data_sha256".into(), json!(sha256(body)));
@@ -735,7 +828,9 @@ pub fn tmf8829_measurements(frames: &[(Vec<u8>, u64, u64)]) -> Value {
     let mut b = MeasurementBuilder::new();
     let mut got = Vec::new();
     for (raw, ts, edge) in frames {
-        let Some(m) = b.add(raw, *ts, *edge) else { continue };
+        let Some(m) = b.add(raw, *ts, *edge) else {
+            continue;
+        };
         let mut item = json!({
             "timestamp_us": m.timestamp_us,
             "flags": m.flags,
@@ -749,7 +844,9 @@ pub fn tmf8829_measurements(frames: &[(Vec<u8>, u64, u64)]) -> Value {
             "n_problems": m.problems.len(),
             "distance_in_mm": m.frames.last().map(|f| f.distance_in_mm()),
         });
-        item.as_object_mut().unwrap().extend(arrays(&m.results).as_object().unwrap().clone());
+        item.as_object_mut()
+            .unwrap()
+            .extend(arrays(&m.results).as_object().unwrap().clone());
         got.push(item);
     }
     Value::from(got)

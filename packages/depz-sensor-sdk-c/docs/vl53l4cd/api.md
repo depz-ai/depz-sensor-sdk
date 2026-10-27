@@ -123,7 +123,8 @@ size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out);
 ```
 
 Encoders (return payload length written).
-/* 4 B */
+VL53_READ_REG payload: addr u16, len u16. Returns 4, or 0 when len is outside
+1..DEPZ_VL53L4_XFER_MAX or addr + len > 0x10000 (contract 10 §1).
 
 ### depz_vl53l4_pack_write_reg
 
@@ -132,7 +133,7 @@ size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data, size_t dat
 ```
 
 VL53_WRITE_REG payload: addr u16 + data. Returns 2 + data_len, or 0 when
-data_len is outside 1..DEPZ_VL53L4_XFER_MAX.
+data_len is outside 1..DEPZ_VL53L4_XFER_MAX or addr + data_len > 0x10000.
 
 ### depz_vl53l4_pack_xshut
 
@@ -189,15 +190,16 @@ typedef struct {
     uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
     uint16_t model_id;       /* expected DEPZ_VL53L4_MODEL_ID (0xEBAA) */
     uint8_t  fw_status;      /* expected 0x03 (booted) */
-    uint8_t  initialized;    /* 1 = MODEL_ID matched on this read */
+    uint8_t  initialized;    /* 1 = MODEL_ID read back as 0xEBAA on this GET_INFO */
     uint8_t  xshut_level;
     uint8_t  int_level;
     uint16_t i2c_khz;
 } depz_vl53l4_info;
 ```
 
-RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters are
-free-running and wrap silently; watch increments, not absolute values.
+RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters wrap
+silently; watch increments, not absolute values. i2c_errors counts since the
+last successful XSHUT reset (the bridge clears it there), not since power-up.
 
 ### depz_vl53l4_unpack_info
 
@@ -252,7 +254,8 @@ int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len, depz_vl53l4_r
 Decode the streamed 17-byte 0x0089..0x0099 block exactly as
 VL53L4CD_GetResult() decodes the same registers read one by one. Register
 contents are big-endian words (the bridge passes them through untouched).
-Returns 0 on success, -1 when len < 15.
+Returns 0 on success, -1 when len < DEPZ_VL53L4_RESULT_BLOCK_LEN (17); a
+longer buffer is decoded and the tail ignored (contract 07 §3).
 
 ### depz_vl53l4_range_timing_registers
 

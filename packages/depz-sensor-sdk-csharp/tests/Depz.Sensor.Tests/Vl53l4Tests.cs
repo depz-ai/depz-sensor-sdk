@@ -112,10 +112,37 @@ public class Vl53l4ResultBlockTests
         }
     }
 
-    [Fact]
-    public void ShortBlock_Throws()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(14)]
+    [InlineData(15)]
+    [InlineData(16)]
+    public void ShortBlock_Throws(int n)
     {
-        Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.ParseResultBlock(new byte[14]));
+        // contract 10 §5 (ERRATA A8): the block is 17 bytes; 15 and 16 are short too
+        Assert.Equal(17, Vl53l4Uld.ResultBlockLen);
+        var e = Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.ParseResultBlock(new byte[n]));
+        Assert.Contains("too short", e.Message);
+    }
+
+    [Fact]
+    public void SeventeenBytesDecode_TrailingBytesIgnored()
+    {
+        var block = new byte[17];
+        Assert.Equal(Vl53l4Uld.ParseResultBlock(block), Vl53l4Uld.ParseResultBlock(block.Concat(new byte[] { 0xFF, 0xFF }).ToArray()));
+    }
+
+    [Fact]
+    public void ReadReg_LimitsCheckedOnTheHost()
+    {
+        // contract 10 §1 (ERRATA A13): len 1..253 and addr+len <= 0x10000, like WRITE_REG
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Wire.PackReadReg(0x89, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Wire.PackReadReg(0, 254));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Wire.PackReadReg(0xFFFF, 2));
+        Assert.Equal(new byte[] { 0x03, 0xFF, 0xFD, 0x00 }, Vl53l4Wire.PackReadReg(0xFF03, 253));
+        Assert.Equal(new byte[] { 0xFF, 0xFF, 0x01, 0x00 }, Vl53l4Wire.PackReadReg(0xFFFF, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Wire.PackWriteReg(0xFFFF, new byte[] { 1, 2 }));
+        Assert.Equal(new byte[] { 0xFF, 0xFF, 1 }, Vl53l4Wire.PackWriteReg(0xFFFF, new byte[] { 1 }));
     }
 }
 
@@ -156,11 +183,11 @@ public class Vl53l4TimingTests
     public void InvalidInputs_Throw()
     {
         Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.RangeTimingRegisters(50, 0, 0));
-        Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.RangeTimingRegisters(9, 0, 14720));
-        Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.RangeTimingRegisters(201, 0, 14720));
-        Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.RangeTimingRegisters(50, 40, 14720)); // 0 < inter <= budget
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Uld.RangeTimingRegisters(9, 0, 14720));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Uld.RangeTimingRegisters(201, 0, 14720));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Uld.RangeTimingRegisters(50, 40, 14720)); // 0 < inter <= budget
         Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.DecodeRangeTiming(0, 0, 0, 403));
-        Assert.Throws<Vl53l4Exception>(() => Vl53l4Uld.SigmaThresholdRaw(16384));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4Uld.SigmaThresholdRaw(16384));
     }
 }
 

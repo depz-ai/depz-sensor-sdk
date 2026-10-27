@@ -122,8 +122,8 @@ These are the pure **codecs** for the ST ULD plugins — the payloads
 `motionIndicatorInit`), usable on their own for another transport.
 
 ```java
-// crosstalk margin (kcps/SPAD) → raw DCI value
-long raw = Vl53l8Uld.xtalkMarginToRaw(50.0);
+// crosstalk margin (a whole number of kcps/SPAD, 0..10000, as ST) → raw DCI value
+long raw = Vl53l8Uld.xtalkMarginToRaw(50);          // kcps * 2048; xtalkMarginFromRaw(raw) == 50
 
 // per-zone detection thresholds (interrupt-on-threshold)
 var thr = List.of(new Vl53l8Uld.DetectionThreshold(

@@ -126,7 +126,7 @@ dev.set_power_mode(POWER_MODE_SLEEP)
 dev.set_power_mode(POWER_MODE_WAKEUP)
 
 # crosstalk margin (kcps/SPAD) + on-device calibration against a flat target
-dev.set_xtalk_margin(50.0)
+dev.set_xtalk_margin(50)
 dev.calibrate_xtalk(reflectance_percent=16, nb_samples=4, distance_mm=600)
 
 # calibration-data save/restore (the 776-byte xtalk blob IS the L8CX caldata)

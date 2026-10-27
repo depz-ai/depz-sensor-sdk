@@ -175,6 +175,26 @@ public class Bno086DeviceTests
     }
 
     [Fact]
+    public void ShortControlResponseFailsThatRequestAsInvalidReply()
+    {
+        // A response shorter than its fields (contract 05 §4) fails the request with the
+        // invalid_reply kind (contract 07 §3): never a timeout, never a bare ArgumentException.
+        var (dev, hub) = Make();
+        using var _ = dev;
+        hub.OnCargo = (ch, c) => c[0] switch
+        {
+            (byte)ControlReport.ProductIdRequest => new[] { (Control, new byte[] { 0xF8, 4, 3, 12 }.Concat(new byte[11]).ToArray()) }, // 15 of 16
+            (byte)ControlReport.GetFeatureRequest => new[] { (Control, new byte[] { 0xFC, c[1], 0, 0, 0, 0x10, 0x27, 0, 0 }) }, // 9 of 17
+            _ => Array.Empty<(int, byte[])>(),
+        };
+        var pid = Assert.Throws<InvalidReplyException>(() => dev.ProductIds(settle: TimeSpan.FromMilliseconds(30)));
+        Assert.Equal((int)ControlReport.ProductIdResponse, pid.Cmd);
+        Assert.IsType<ArgumentException>(pid.InnerException);
+        var feat = Assert.Throws<InvalidReplyException>(() => dev.GetFeature((int)SensorId.Accelerometer, TimeSpan.FromMilliseconds(200)));
+        Assert.Equal((int)ControlReport.GetFeatureResponse, feat.Cmd);
+    }
+
+    [Fact]
     public void ErrorsAndCountsCollectTheirResponses()
     {
         var (dev, hub) = Make();

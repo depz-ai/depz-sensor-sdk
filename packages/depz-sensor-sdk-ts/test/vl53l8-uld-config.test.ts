@@ -323,7 +323,7 @@ describe("vl53l8 uld: xtalk calibration", () => {
     expect(await drv.getIntegrationTimeMs()).toBe(20);
     expect(await drv.getSharpenerPercent()).toBe(14);
     expect(await drv.getTargetOrder()).toBe(TARGET_ORDER_STRONGEST);
-    expect(await drv.getXtalkMargin()).toBeCloseTo(50, 3);
+    expect(await drv.getXtalkMargin()).toBe(50);
     expect(await drv.getRangingMode()).toBe(RANGING_MODE_CONTINUOUS);
   });
 
@@ -363,6 +363,21 @@ describe("vl53l8cx facade: configuration delegation", () => {
     (dev as unknown as { uldDriver: unknown }).uldDriver = drv;
     return { dev, drv, p };
   }
+
+  it("the frequency ceiling follows the resolution: 60 Hz at 4x4, 15 Hz at 8x8", async () => {
+    const { dev, p } = await facade();
+    await dev.setRangingFrequencyHz(60);
+    expect(await dev.getRangingFrequencyHz()).toBe(60);
+    const writes = p.writes.length;
+    await expect(dev.setRangingFrequencyHz(61)).rejects.toThrow(/<= 60 Hz/);
+    expect(p.writes.length).toBe(writes); // refused host-side, nothing on the bus
+    await dev.setResolution(RESOLUTION_8X8);
+    await dev.setRangingFrequencyHz(15);
+    await expect(dev.setRangingFrequencyHz(16)).rejects.toThrow(/<= 15 Hz/);
+    expect(await dev.getRangingFrequencyHz()).toBe(15);
+    await dev.setResolution(RESOLUTION_4X4);
+    await dev.setRangingFrequencyHz(16); // the ceiling moved back with the resolution
+  });
 
   it("standard settings round-trip through the facade", async () => {
     const { dev } = await facade();

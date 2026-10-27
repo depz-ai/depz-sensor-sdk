@@ -14,6 +14,7 @@ import {
   type PacketEvent,
   type ParserEvent,
 } from "../protocol/framing.js";
+import { InvalidStateError } from "../errors.js";
 import type { SerialTransport } from "../transport/types.js";
 
 /** Link statistics (contract 07 §2 `stats`). */
@@ -27,6 +28,16 @@ export interface LinkStats {
   trashBytes: number;
   /** Host-observed gaps in the device→host seq counter (mod 256). */
   seqGaps: number;
+  /** Callbacks that threw on the read pump (contract 07 §3). */
+  callbackErrors: number;
+}
+
+/** A host-observed gap in the device→host seq (contract 01 §5 step 5). */
+export interface SeqGap {
+  expectedSeq: number;
+  receivedSeq: number;
+  /** (received − expected) mod 256. */
+  missed: number;
 }
 
 export class DepzLink {
@@ -39,6 +50,7 @@ export class DepzLink {
     headerErrors: 0,
     trashBytes: 0,
     seqGaps: 0,
+    callbackErrors: 0,
   };
 
   private readonly transport: SerialTransport;
@@ -50,6 +62,7 @@ export class DepzLink {
   private closeFired = false;
   private packetCbs: Array<(pkt: PacketEvent) => void> = [];
   private parserCbs: Array<(ev: ParserEvent) => void> = [];
+  private seqGapCbs: Array<(gap: SeqGap) => void> = [];
   private closeCbs: Array<() => void> = [];
   private unsubDisconnect: (() => void) | null = null;
 
@@ -69,7 +82,7 @@ export class DepzLink {
   }
 
   start(): void {
-    if (this.started) throw new Error("DepzLink already started");
+    if (this.started) throw new InvalidStateError("DepzLink already started");
     this.started = true;
     this.unsubDisconnect = this.transport.onDisconnect(() => this.fireClose());
     void this.pump();
@@ -103,8 +116,15 @@ export class DepzLink {
   }
 
   private trackSeq(seq: number): void {
-    if (this.lastRxSeq !== null && seq !== ((this.lastRxSeq + 1) & 0xff)) {
-      this.stats.seqGaps += 1;
+    // The first packet after open has nothing to be compared with. The gap
+    // is reported before that packet goes to the parser/packet subscribers.
+    if (this.lastRxSeq !== null) {
+      const expectedSeq = (this.lastRxSeq + 1) & 0xff;
+      if (seq !== expectedSeq) {
+        this.stats.seqGaps += 1;
+        const gap: SeqGap = { expectedSeq, receivedSeq: seq, missed: (seq - expectedSeq) & 0xff };
+        for (const cb of [...this.seqGapCbs]) cb(gap);
+      }
     }
     this.lastRxSeq = seq;
   }
@@ -134,6 +154,14 @@ export class DepzLink {
     this.parserCbs.push(cb);
     return () => {
       this.parserCbs = this.parserCbs.filter((c) => c !== cb);
+    };
+  }
+
+  /** Subscribe to host-observed seq gaps. Returns an unsubscribe function. */
+  onSeqGap(cb: (gap: SeqGap) => void): () => void {
+    this.seqGapCbs.push(cb);
+    return () => {
+      this.seqGapCbs = this.seqGapCbs.filter((c) => c !== cb);
     };
   }
 

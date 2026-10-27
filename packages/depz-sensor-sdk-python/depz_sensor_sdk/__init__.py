@@ -11,6 +11,7 @@ from .device import (
     DisconnectedEvent,
     LinkCrcErrorEvent,
     LinkStats,
+    SeqGapEvent,
     SequenceErrorEvent,
     StreamQueue,
     TemperatureEvent,
@@ -60,8 +61,11 @@ from .errors import (
     DepzError,
     DepzTimeoutError,
     DeviceLostError,
+    InvalidReplyError,
+    InvalidStateError,
     LinkClosedError,
     NoDepzDeviceError,
+    ReplayMismatchError,
     StatusError,
 )
 from .usb_ids import (
@@ -118,6 +122,7 @@ __all__ = [
     "sync_time_all",
     # events
     "DeviceEvent",
+    "SeqGapEvent",
     "SequenceErrorEvent",
     "LinkCrcErrorEvent",
     "TrashEvent",
@@ -183,7 +188,10 @@ __all__ = [
     "StatusError",
     "BusyError",
     "DeviceLostError",
+    "InvalidReplyError",
+    "InvalidStateError",
     "LinkClosedError",
     "NoDepzDeviceError",
+    "ReplayMismatchError",
     "__version__",
 ]

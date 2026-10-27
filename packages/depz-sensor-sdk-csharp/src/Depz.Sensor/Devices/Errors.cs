@@ -22,6 +22,18 @@ public class DepzTimeoutException : DepzException
     public DepzTimeoutException(string message) : base(message) { }
 }
 
+/// <summary>The reply to a request does not decode (contract 07 §3): shorter than the fields its
+/// contract defines, or a value the decoder refuses. Only that request fails; the reader goes on
+/// and the device stays usable.</summary>
+public class InvalidReplyException : DepzException
+{
+    /// <summary>The request opcode whose reply was refused.</summary>
+    public int Cmd { get; }
+
+    public InvalidReplyException(int cmd, Exception cause)
+        : base($"reply to cmd 0x{cmd:X2} does not decode: {cause.Message}", cause) => Cmd = cmd;
+}
+
 /// <summary>The device answered a request with a non-OK RPT_STATUS (contract 02 §3).</summary>
 public class StatusException : DepzException
 {
@@ -77,7 +89,19 @@ public sealed class LinkClosedException : DeviceLostException
     public LinkClosedException(string message) : base(message) { }
 }
 
-/// <summary>Discovery found no DEPZ device to open.</summary>
+/// <summary>The call is not valid in the current state of the device or object
+/// (contract 07 §3): <c>ToHostTimeUs</c> before <c>SyncTime</c>, a sensor call before
+/// <c>Init()</c> / <c>Configure()</c> or while streaming, <c>Add()</c> after recording
+/// started, a closed dataset writer or player, <c>Wait()</c> without the player thread, a
+/// write to a read-only register block, a VL53Lx board name without a product number, a
+/// packaged firmware blob of the wrong size or missing from the assembly.</summary>
+public sealed class InvalidStateException : DepzException
+{
+    public InvalidStateException(string message) : base(message) { }
+}
+
+/// <summary>Discovery found no DEPZ device to open — no candidate port, no match for the
+/// serial / index asked for, or nothing DEPZ answering the probe on the port or link.</summary>
 public sealed class NoDepzDeviceException : DepzException
 {
     public NoDepzDeviceException(string message) : base(message) { }

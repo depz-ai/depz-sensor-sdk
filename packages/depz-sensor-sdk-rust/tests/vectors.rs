@@ -108,9 +108,7 @@ fn run_parser(stream: &[u8], chunks: &[&[u8]]) -> DecodeResult {
                     p.seq,
                     hex_encode(&p.payload)
                 )),
-                Event::CrcError { cmd, seq } => {
-                    events.push(format!("crc_error:{}:{}", cmd, seq))
-                }
+                Event::CrcError { cmd, seq } => events.push(format!("crc_error:{}:{}", cmd, seq)),
                 Event::Trash(data) => trash.extend_from_slice(&data),
             }
         }
@@ -205,12 +203,23 @@ fn usb_ids_vectors() {
     let doc = load("usb_ids.json");
 
     assert_eq!(doc["vid"].as_u64().unwrap() as u16, usb_ids::DEPZ_USB_VID);
-    assert_eq!(doc["dev_vid"].as_u64().unwrap() as u16, usb_ids::DEV_USB_VID);
-    assert_eq!(doc["dev_pid"].as_u64().unwrap() as u16, usb_ids::DEV_USB_PID);
+    assert_eq!(
+        doc["dev_vid"].as_u64().unwrap() as u16,
+        usb_ids::DEV_USB_VID
+    );
+    assert_eq!(
+        doc["dev_pid"].as_u64().unwrap() as u16,
+        usb_ids::DEV_USB_PID
+    );
     let range = doc["pid_range"].as_array().unwrap();
     assert_eq!(range[0].as_u64().unwrap() as u16, usb_ids::DEPZ_PID_RANGE.0);
     assert_eq!(range[1].as_u64().unwrap() as u16, usb_ids::DEPZ_PID_RANGE.1);
-    for id in ["usb_ids/vid", "usb_ids/dev_vid", "usb_ids/dev_pid", "usb_ids/pid_range"] {
+    for id in [
+        "usb_ids/vid",
+        "usb_ids/dev_vid",
+        "usb_ids/dev_pid",
+        "usb_ids/pid_range",
+    ] {
         seen(id);
     }
 
@@ -271,9 +280,9 @@ fn common_commands_vectors() {
     for c in doc["encode"].as_array().unwrap() {
         let want = c["payload"].as_str().unwrap();
         let got = match c["kind"].as_str().unwrap() {
-            "sync_time_request" => {
-                hex_encode(&proto::pack_sync_time(c["pc_timestamp_us"].as_u64().unwrap()))
-            }
+            "sync_time_request" => hex_encode(&proto::pack_sync_time(
+                c["pc_timestamp_us"].as_u64().unwrap(),
+            )),
             "set_payload_crc_type" => hex_encode(&proto::pack_set_payload_crc_type(
                 c["crc_type"].as_u64().unwrap() as u8,
             )),
@@ -318,8 +327,14 @@ fn common_commands_vectors() {
             }
             0x84 => {
                 let r = proto::SequenceErrorReport::unpack(&payload).unwrap();
-                assert_eq!(r.expected_seq as u64, expect["expected_seq"].as_u64().unwrap());
-                assert_eq!(r.received_seq as u64, expect["received_seq"].as_u64().unwrap());
+                assert_eq!(
+                    r.expected_seq as u64,
+                    expect["expected_seq"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    r.received_seq as u64,
+                    expect["received_seq"].as_u64().unwrap()
+                );
             }
             other => panic!("unhandled report 0x{:02x} in {}", other, c["name"]),
         }
@@ -335,7 +350,12 @@ fn common_commands_vectors() {
             c["t3"].as_i64().unwrap(),
             c["t4"].as_i64().unwrap(),
         );
-        assert_eq!(offset, c["offset_us"].as_i64().unwrap(), "offset {}", c["name"]);
+        assert_eq!(
+            offset,
+            c["offset_us"].as_i64().unwrap(),
+            "offset {}",
+            c["name"]
+        );
         assert_eq!(rtt, c["rtt_us"].as_i64().unwrap(), "rtt {}", c["name"]);
         seen(c);
         math += 1;
@@ -361,7 +381,12 @@ fn identity_vectors() {
         let id = identity::parse_software_name(&name);
         let expect = &c["expect"];
 
-        assert_eq!(id.mode.as_str(), expect["mode"].as_str().unwrap(), "mode {}", c["name"]);
+        assert_eq!(
+            id.mode.as_str(),
+            expect["mode"].as_str().unwrap(),
+            "mode {}",
+            c["name"]
+        );
         match expect["sensor_type"].as_str() {
             Some(s) => assert_eq!(
                 id.sensor_type.map(|t| t.as_str()),
@@ -377,7 +402,12 @@ fn identity_vectors() {
             "software_name {}",
             c["name"]
         );
-        assert_eq!(id.version, expect["version"].as_str().unwrap(), "version {}", c["name"]);
+        assert_eq!(
+            id.version,
+            expect["version"].as_str().unwrap(),
+            "version {}",
+            c["name"]
+        );
         seen(c);
         n += 1;
     }
@@ -395,12 +425,12 @@ fn sr04_vectors() {
     for c in doc["encode"].as_array().unwrap() {
         let want = c["payload"].as_str().unwrap();
         let got = match c["kind"].as_str().unwrap() {
-            "set_sample_period" => {
-                hex_encode(&sr04::pack_sample_period(c["period_us"].as_u64().unwrap() as u32))
-            }
-            "set_echo_decay" => {
-                hex_encode(&sr04::pack_echo_decay(c["decay_us"].as_u64().unwrap() as u16))
-            }
+            "set_sample_period" => hex_encode(&sr04::pack_sample_period(
+                c["period_us"].as_u64().unwrap() as u32,
+            )),
+            "set_echo_decay" => hex_encode(&sr04::pack_echo_decay(
+                c["decay_us"].as_u64().unwrap() as u16
+            )),
             other => panic!("unknown sr04 encode kind {}", other),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
@@ -418,7 +448,10 @@ fn sr04_vectors() {
                 let d = sr04::Sr04Data::unpack(&payload).unwrap();
                 assert_eq!(d.source_cmd as u64, expect["source_cmd"].as_u64().unwrap());
                 assert_eq!(d.timestamp_us, expect["timestamp_us"].as_u64().unwrap());
-                assert_eq!(d.echo_time_us as u64, expect["echo_time_us"].as_u64().unwrap());
+                assert_eq!(
+                    d.echo_time_us as u64,
+                    expect["echo_time_us"].as_u64().unwrap()
+                );
             }
             0x92 => {
                 let p = sr04::unpack_sample_period(&payload).unwrap();
@@ -452,6 +485,7 @@ fn fwdepz_vectors() {
                 fwdepz::FwdepzError::Magic => "magic",
                 fwdepz::FwdepzError::HeaderCrc => "header_crc",
                 fwdepz::FwdepzError::Size => "size",
+                fwdepz::FwdepzError::Section => "section",
             };
             assert_eq!(got_str, err, "error kind {}", c["name"]);
         } else {
@@ -462,7 +496,10 @@ fn fwdepz_vectors() {
             assert_eq!(h.fw_crc32 as u64, expect["fw_crc32"].as_u64().unwrap());
             assert_eq!(h.cur_sec as u64, expect["cur_sec"].as_u64().unwrap());
             assert_eq!(h.tot_sec as u64, expect["tot_sec"].as_u64().unwrap());
-            assert_eq!(h.payload_crc_ok, expect["payload_crc_ok"].as_bool().unwrap());
+            assert_eq!(
+                h.payload_crc_ok,
+                expect["payload_crc_ok"].as_bool().unwrap()
+            );
         }
         seen(c);
         n += 1;
@@ -480,7 +517,10 @@ fn sr04_session_recording() {
     let exp = load("recordings/sr04_session.expected.json");
     let pkts = recording_packets("sr04_session.depzrec");
     let sw = recorded_text(&pkts, proto::Cmd::GetNameActiveSoftware).expect("software name");
-    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(identity::SensorType::Sr04));
+    assert_eq!(
+        identity::parse_software_name(&sw).sensor_type,
+        Some(identity::SensorType::Sr04)
+    );
     assert_eq!(sw, exp["software_name"].as_str().unwrap());
     assert_eq!(
         recorded_text(&pkts, proto::Cmd::GetDeviceName).as_deref(),
@@ -513,7 +553,10 @@ fn sr04_session_recording() {
             .unwrap()
             .iter()
             .map(|w| {
-                let row = (w["timestamp_us"].as_u64().unwrap(), w["echo_time_us"].as_u64().unwrap());
+                let row = (
+                    w["timestamp_us"].as_u64().unwrap(),
+                    w["echo_time_us"].as_u64().unwrap(),
+                );
                 (row, w["source"].as_str().unwrap().to_string())
             })
             .collect()
@@ -524,7 +567,12 @@ fn sr04_session_recording() {
     assert_eq!(own(&once), rows("once"));
     // The loop may stream past the sidecar before the stop lands; match the first N.
     let want_loop = rows("loop");
-    assert!(looped.len() >= want_loop.len(), "loop: {} < {}", looped.len(), want_loop.len());
+    assert!(
+        looped.len() >= want_loop.len(),
+        "loop: {} < {}",
+        looped.len(),
+        want_loop.len()
+    );
     assert_eq!(own(&looped[..want_loop.len()]), want_loop);
     seen("recordings/sr04_session.depzrec");
 }

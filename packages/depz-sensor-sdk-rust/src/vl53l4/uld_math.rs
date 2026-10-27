@@ -140,7 +140,7 @@ pub fn range_status_name(status: u8) -> &'static str {
 /// VL53L4 codec/math failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Vl53l4Error {
-    /// Result block shorter than the 15 bytes the decode reads.
+    /// Result block shorter than `RESULT_BLOCK_LEN` (17) bytes (contract 10 §5).
     ShortResultBlock,
     /// `osc_frequency` register reads 0.
     OscFrequencyZero,
@@ -172,11 +172,17 @@ impl std::fmt::Display for Vl53l4Error {
                 write!(f, "VL53L4 timing_budget_ms must be 10..200")
             }
             Vl53l4Error::InterMeasurementInvalid => {
-                write!(f, "VL53L4 inter_measurement_ms must be 0 or > timing_budget_ms")
+                write!(
+                    f,
+                    "VL53L4 inter_measurement_ms must be 0 or > timing_budget_ms"
+                )
             }
             Vl53l4Error::SigmaTooLarge => write!(f, "VL53L4 sigma_mm must be <= 16383"),
             Vl53l4Error::InterMeasurementOverflow => {
-                write!(f, "VL53L4 inter_measurement_ms: INTERMEASUREMENT_MS overflows u32")
+                write!(
+                    f,
+                    "VL53L4 inter_measurement_ms: INTERMEASUREMENT_MS overflows u32"
+                )
             }
             Vl53l4Error::MacroPeriodZero => {
                 write!(f, "VL53L4 osc_frequency: macro period truncates to 0")
@@ -188,6 +194,22 @@ impl std::fmt::Display for Vl53l4Error {
 }
 
 impl std::error::Error for Vl53l4Error {}
+
+impl Vl53l4Error {
+    /// A refused argument (contract 07 §3 `invalid_argument`), not a value the
+    /// sensor produced: the budget, the period, the tuning values.
+    pub fn is_argument(&self) -> bool {
+        matches!(
+            self,
+            Vl53l4Error::TimingBudgetOutOfRange
+                | Vl53l4Error::InterMeasurementInvalid
+                | Vl53l4Error::InterMeasurementOverflow
+                | Vl53l4Error::SigmaTooLarge
+                | Vl53l4Error::OffsetOutOfRange
+                | Vl53l4Error::XtalkOutOfRange
+        )
+    }
+}
 
 /// `VL53L4CD_ResultsData_t` plus the sensor's own frame counter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -218,7 +240,8 @@ impl Vl53l4Results {
 /// decodes the same registers read one by one. Register contents are
 /// big-endian words (the bridge passes them through untouched).
 pub fn parse_result_block(raw: &[u8]) -> Result<Vl53l4Results, Vl53l4Error> {
-    if raw.len() < 15 {
+    // contract 10 §5: a 17-byte block; shorter is rejected, a tail ignored
+    if raw.len() < RESULT_BLOCK_LEN as usize {
         return Err(Vl53l4Error::ShortResultBlock);
     }
 
@@ -246,6 +269,24 @@ pub fn parse_result_block(raw: &[u8]) -> Result<Vl53l4Results, Vl53l4Error> {
     })
 }
 
+/// `SetRangeTiming`'s own argument checks (ST's `VL53L4CD_ERROR_INVALID_ARGUMENT`),
+/// which need no register: budget 10..=200 ms
+/// ([`Vl53l4Error::TimingBudgetOutOfRange`]), period 0 (continuous) or above
+/// the budget (autonomous; [`Vl53l4Error::InterMeasurementInvalid`]) —
+/// contract 10 §5.
+pub fn check_range_timing(
+    timing_budget_ms: u32,
+    inter_measurement_ms: u32,
+) -> Result<(), Vl53l4Error> {
+    if !(10..=200).contains(&timing_budget_ms) {
+        return Err(Vl53l4Error::TimingBudgetOutOfRange);
+    }
+    if inter_measurement_ms > 0 && inter_measurement_ms <= timing_budget_ms {
+        return Err(Vl53l4Error::InterMeasurementInvalid);
+    }
+    Ok(())
+}
+
 /// `SetRangeTiming` register math → `(RANGE_CONFIG_A, RANGE_CONFIG_B,
 /// INTERMEASUREMENT_MS raw dword)`.
 ///
@@ -254,7 +295,8 @@ pub fn parse_result_block(raw: &[u8]) -> Result<Vl53l4Results, Vl53l4Error> {
 /// `inter_measurement_ms > 0`). `inter_measurement_ms == 0` selects continuous
 /// mode; a value greater than the budget selects autonomous low power.
 ///
-/// Rejected (contract 07 §3, never wrapped): an `osc_frequency` of 0 or so
+/// Rejected (contract 07 §3, never wrapped): the arguments
+/// [`check_range_timing`] refuses, an `osc_frequency` of 0 or so
 /// small that the macro period truncates to 0
 /// ([`Vl53l4Error::MacroPeriodZero`]), and an autonomous period whose
 /// register value overflows u32 ([`Vl53l4Error::InterMeasurementOverflow`]).
@@ -264,11 +306,9 @@ pub fn range_timing_registers(
     osc_frequency: u16,
     clock_pll: u16,
 ) -> Result<(u16, u16, u32), Vl53l4Error> {
+    check_range_timing(timing_budget_ms, inter_measurement_ms)?;
     if osc_frequency == 0 {
         return Err(Vl53l4Error::OscFrequencyZero);
-    }
-    if !(10..=200).contains(&timing_budget_ms) {
-        return Err(Vl53l4Error::TimingBudgetOutOfRange);
     }
 
     let mut timing_budget_us = timing_budget_ms * 1000;
@@ -279,16 +319,15 @@ pub fn range_timing_registers(
         // Continuous mode.
         intermeasurement_raw = 0u32;
         timing_budget_us -= 2500;
-    } else if inter_measurement_ms > timing_budget_ms {
-        // Autonomous low-power mode (f64 product truncated toward zero).
+    } else {
+        // Autonomous low-power mode, above the budget (check_range_timing;
+        // f64 product truncated toward zero).
         let factor = (1.055 * inter_measurement_ms as f64 * (clock_pll & 0x3FF) as f64).floor();
         if factor > u32::MAX as f64 {
             return Err(Vl53l4Error::InterMeasurementOverflow);
         }
         intermeasurement_raw = factor as u32;
         timing_budget_us = (timing_budget_us - 4300) / 2;
-    } else {
-        return Err(Vl53l4Error::InterMeasurementInvalid);
     }
 
     timing_budget_us <<= 12;

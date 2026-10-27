@@ -96,7 +96,7 @@ const Product* find_product(const std::string& name) {
 namespace {
 std::string upper(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                   [](char c) { return static_cast<char>(std::toupper(static_cast<unsigned char>(c))); });
     return s;
 }
 }  // namespace

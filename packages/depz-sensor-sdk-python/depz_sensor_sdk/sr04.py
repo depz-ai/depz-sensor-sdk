@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from .device import DeviceBase, StreamIterator, StreamQueue
+from .device import DeviceBase, StreamIterator, StreamQueue, _NoMatch
 from .protocol.sr04 import (
     ECHO_DECAY_MAX_US,
     ECHO_DECAY_MIN_US,
@@ -46,9 +46,17 @@ class Sr04Measurement:
         return distance_mm_from_echo(self.echo_time_us, air_temp_c)
 
     @staticmethod
-    def _from_data(data: Sr04Data) -> "Sr04Measurement":
-        source = "loop" if data.source_cmd == Sr04Cmd.START_MEASUREMENT_LOOP else "once"
+    def _from_data(data: Sr04Data) -> "Sr04Measurement | None":
+        """None for a source cmd contract 03 §2 does not define: not a
+        measurement (it falls through to the hex text event)."""
+        source = _SOURCES.get(data.source_cmd)
+        if source is None:
+            return None
         return Sr04Measurement(data.timestamp_us, data.echo_time_us, source)
+
+
+#: RPT_DATA.cmd → measurement source (contract 03 §2, ERRATA E3/B11).
+_SOURCES: dict[int, str] = {Sr04Cmd.MEASURE_ONCE: "once", Sr04Cmd.START_MEASUREMENT_LOOP: "loop"}
 
 
 class Sr04(DeviceBase):
@@ -61,7 +69,7 @@ class Sr04(DeviceBase):
 
     def _init_subclass_state(self) -> None:
         self._measure_cbs: list[Callable[[Sr04Measurement], None]] = []
-        self._measure_queues: list[StreamQueue] = []
+        self._measure_queues: list[StreamQueue[Sr04Measurement]] = []
 
     # ── configuration ────────────────────────────────────────────────────────
 
@@ -84,7 +92,7 @@ class Sr04(DeviceBase):
         if not 0 <= period_us <= SAMPLE_PERIOD_WIRE_MAX_US:
             raise ValueError(
                 f"sample period must be 0..{SAMPLE_PERIOD_WIRE_MAX_US} µs "
-                f"(u32 wire field, contract 03 §2): got {period_us}"
+                f"(u32 wire field, contract 03 §1): got {period_us}"
             )
         self.request(Sr04Cmd.SET_SAMPLE_PERIOD, pack_sample_period(period_us), ok_completes=True)
 
@@ -121,13 +129,13 @@ class Sr04(DeviceBase):
         arrives only when the echo completes (or times out at ~65.5 ms), so
         the default timeout is generous."""
 
-        def match(pkt: Packet):
+        def match(pkt: Packet) -> Sr04Measurement | _NoMatch:
             if pkt.cmd != Sr04Rpt.DATA or len(pkt.payload) < 11:
                 return DeviceBase.NO_MATCH
             data = Sr04Data.unpack(pkt.payload)
             if data.source_cmd != Sr04Cmd.MEASURE_ONCE:
                 return DeviceBase.NO_MATCH
-            return Sr04Measurement._from_data(data)
+            return Sr04Measurement(data.timestamp_us, data.echo_time_us, "once")
 
         return self.request(Sr04Cmd.MEASURE_ONCE, matcher=match, timeout=timeout)
 
@@ -145,7 +153,7 @@ class Sr04(DeviceBase):
         self._measure_cbs.append(cb)
         return lambda: self._measure_cbs.remove(cb)
 
-    def stream(self, maxsize: int = 256) -> StreamIterator:
+    def stream(self, maxsize: int = 256) -> StreamIterator[Sr04Measurement]:
         """Blocking iterator over measurements (bounded, drop-oldest;
         `dropped_count` on the returned iterator). Subscribes immediately."""
         return StreamIterator(self._measure_queues, maxsize, lambda: self.closed)
@@ -159,9 +167,8 @@ class Sr04(DeviceBase):
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd == Sr04Rpt.DATA and len(pkt.payload) >= 11:
             m = Sr04Measurement._from_data(Sr04Data.unpack(pkt.payload))
-            for cb in list(self._measure_cbs):
-                cb(m)
-            for q in list(self._measure_queues):
-                q.put(m)
+            if m is None:
+                return False
+            self._deliver(self._measure_cbs, self._measure_queues, m)
             return True
         return False

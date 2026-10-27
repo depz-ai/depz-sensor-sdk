@@ -257,7 +257,10 @@ impl BareDriver {
     }
 
     fn tp(&self, name: &str) -> i64 {
-        *self.tuning.get(name).unwrap_or_else(|| panic!("no tuning parameter {name}"))
+        *self
+            .tuning
+            .get(name)
+            .unwrap_or_else(|| panic!("no tuning parameter {name}"))
     }
 
     /// `VL53LX_read_p2p_data()`: three register blocks and four NVM regions (~0.1 s over USB).
@@ -283,9 +286,13 @@ impl BareDriver {
 
         // Our boards have no FMT offset calibration. ST's fallback: nominal MM1/MM2 peak rates, and the
         // effective SPAD counts worked out here.
-        if cal.mm_inner_peak_signal_count_rtn_mcps == 0 && cal.mm_outer_peak_signal_count_rtn_mcps == 0 {
+        if cal.mm_inner_peak_signal_count_rtn_mcps == 0
+            && cal.mm_outer_peak_signal_count_rtn_mcps == 0
+        {
             let (inner, outer) = math::calc_mm_effective_spads(
-                self.img.nvm_copy_data().get("roi_config__mode_roi_centre_spad"),
+                self.img
+                    .nvm_copy_data()
+                    .get("roi_config__mode_roi_centre_spad"),
                 self.img.nvm_copy_data().get("roi_config__mode_roi_xy_size"),
                 0xC7,
                 0xFF,
@@ -303,12 +310,22 @@ impl BareDriver {
 
         let fmt = nvm::read_fmt_range_results(p, &mut self.img, nvm::FMT_RANGE_RESULTS_140MM_DARK)?;
         self.fmt_dmax_cal = vec![
-            ("ref__actual_effective_spads", fmt.actual_effective_rtn_spads),
-            ("ref__peak_signal_count_rate_mcps", fmt.peak_signal_count_rate_rtn_mcps),
+            (
+                "ref__actual_effective_spads",
+                fmt.actual_effective_rtn_spads,
+            ),
+            (
+                "ref__peak_signal_count_rate_mcps",
+                fmt.peak_signal_count_rate_rtn_mcps,
+            ),
             ("ref__distance_mm", fmt.measured_distance_mm),
             (
                 "ref_reflectance_pc",
-                if peak_map.cal_reflectance_pc != 0 { peak_map.cal_reflectance_pc } else { 0x0014 },
+                if peak_map.cal_reflectance_pc != 0 {
+                    peak_map.cal_reflectance_pc
+                } else {
+                    0x0014
+                },
             ),
             ("coverglass_transmission", 0x0100),
         ];
@@ -316,17 +333,36 @@ impl BareDriver {
 
         self.result_osc_calibrate_val = p.read_word(RESULT_OSC_CALIBRATE_VAL)? as i64;
 
-        if self.img.static_nvm().get("osc_measured__fast_osc__frequency") < 0x1000 {
-            self.img.static_nvm_mut().set("osc_measured__fast_osc__frequency", 0xBCCC);
+        if self
+            .img
+            .static_nvm()
+            .get("osc_measured__fast_osc__frequency")
+            < 0x1000
+        {
+            self.img
+                .static_nvm_mut()
+                .set("osc_measured__fast_osc__frequency", 0xBCCC);
         }
 
         // VL53LX_get_mode_mitigation_roi
-        let (y, x) = math::decode_row_col(self.img.nvm_copy_data().get("roi_config__mode_roi_centre_spad"));
+        let (y, x) = math::decode_row_col(
+            self.img
+                .nvm_copy_data()
+                .get("roi_config__mode_roi_centre_spad"),
+        );
         let xy_size = self.img.nvm_copy_data().get("roi_config__mode_roi_xy_size");
-        self.mm_roi = vec![("x_centre", x), ("y_centre", y), ("width", xy_size & 0x0F), ("height", xy_size >> 4)];
+        self.mm_roi = vec![
+            ("x_centre", x),
+            ("y_centre", y),
+            ("width", xy_size & 0x0F),
+            ("height", xy_size >> 4),
+        ];
 
         if optical_centre.x_centre == 0 && optical_centre.y_centre == 0 {
-            optical_centre = OpticalCentre { x_centre: x << 4, y_centre: y << 4 };
+            optical_centre = OpticalCentre {
+                x_centre: x << 4,
+                y_centre: y << 4,
+            };
         }
         self.optical_centre = Some(optical_centre);
         Ok(())
@@ -356,9 +392,15 @@ impl BareDriver {
         inter_measurement_period_ms: Option<i64>,
     ) -> Result<()> {
         let Some(t) = tail(mode) else {
-            return Err(DepzError::InvalidArgument(format!("unknown distance mode '{mode}'")));
+            return Err(DepzError::InvalidArgument(format!(
+                "unknown distance mode '{mode}'"
+            )));
         };
-        self.preset_mode = DISTANCE_MODES.iter().find(|m| **m == mode).copied().unwrap_or("medium");
+        self.preset_mode = DISTANCE_MODES
+            .iter()
+            .find(|m| **m == mode)
+            .copied()
+            .unwrap_or("medium");
         let dss = dss_target_mcps.unwrap_or_else(|| self.tp("tp_dss_target_histo_mcps"));
         let period = inter_measurement_period_ms.unwrap_or(self.inter_measurement_period_ms);
 
@@ -371,7 +413,9 @@ impl BareDriver {
         self.preset_mode_histogram_ranging();
         self.preset_tail(&t);
 
-        self.img.static_config_mut().set("dss_config__target_total_rate_mcps", dss);
+        self.img
+            .static_config_mut()
+            .set("dss_config__target_total_rate_mcps", dss);
         self.set_timeouts_us(phasecal_us, mm_us, range_us)?;
         self.set_inter_measurement_period_ms(period)?;
         self.update_range_offset();
@@ -381,7 +425,9 @@ impl BareDriver {
     // get_device_results() recomputes hpp.range_offset_mm every frame under MM1_MM2_OFFSETS; its inputs
     // are the factory data and the user ROI, so once per preset is the same answer.
     fn update_range_offset(&mut self) {
-        let Some(cal) = self.add_off_cal_data else { return };
+        let Some(cal) = self.add_off_cal_data else {
+            return;
+        };
         let customer = self.img.customer_nvm();
         let nvm_data = self.img.nvm_copy_data();
         let dynamic = self.img.dynamic_config();
@@ -394,7 +440,9 @@ impl BareDriver {
             dynamic.get("roi_config__user_roi_requested_global_xy_size"),
             &cal,
             &self.rtn_good_spads_map,
-            self.img.general_config().get("dss_config__aperture_attenuation"),
+            self.img
+                .general_config()
+                .get("dss_config__aperture_attenuation"),
         );
     }
 
@@ -428,7 +476,9 @@ impl BareDriver {
     /// side of the wrap).
     pub fn set_distance_mode(&mut self, mode: &str) -> Result<()> {
         if !self.distance_modes_for_die().contains(&mode) {
-            return Err(DepzError::InvalidArgument(format!("distance mode {mode} not available on this die")));
+            return Err(DepzError::InvalidArgument(format!(
+                "distance mode {mode} not available on this die"
+            )));
         }
         let phasecal_us = self.phasecal_config_timeout_us;
         let mm_us = self.mm_config_timeout_us;
@@ -448,7 +498,10 @@ impl BareDriver {
             tp("tp_consistency_lite_phase_tolerance"),
         );
         let (repeat, target) = (tp("tp_cal_repeat_rate"), tp("tp_phasecal_target"));
-        let (sigma_thresh, min_rate) = (tp("tp_lite_med_sigma_thresh_mm"), tp("tp_lite_med_min_count_rate_rtn_mcps"));
+        let (sigma_thresh, min_rate) = (
+            tp("tp_lite_med_sigma_thresh_mm"),
+            tp("tp_lite_med_min_count_rate_rtn_mcps"),
+        );
         let (seed, phase_rtn, phase_ref, first_order, quantifier) = (
             tp("tp_lite_seed_cfg"),
             tp("tp_init_phase_rtn_lite_med"),
@@ -471,7 +524,8 @@ impl BareDriver {
         stat.set("gpio_hv_pad__ctrl", 0x00);
         stat.set(
             "gpio_hv_mux__ctrl",
-            DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW | DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS,
+            DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW
+                | DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS,
         );
         stat.set("gpio__tio_hv_status", 0x02);
         stat.set("gpio__fio_hv_status", 0x00);
@@ -495,7 +549,10 @@ impl BareDriver {
         let general = self.img.general_config_mut();
         general.set("gph_config__stream_count_update_value", 0x00);
         general.set("global_config__stream_divider", 0x00);
-        general.set("system__interrupt_config_gpio", INTERRUPT_CONFIG_NEW_SAMPLE_READY);
+        general.set(
+            "system__interrupt_config_gpio",
+            INTERRUPT_CONFIG_NEW_SAMPLE_READY,
+        );
         general.set("cal_config__vcsel_start", 0x0B);
         general.set("cal_config__repeat_rate", repeat);
         general.set("global_config__vcsel_width", 0x02);
@@ -573,7 +630,12 @@ impl BareDriver {
         dynamic.set("roi_config__user_roi_requested_global_xy_size", 0xFF);
         dynamic.set(
             "system__sequence_config",
-            SEQUENCE_VHV_EN | SEQUENCE_PHASECAL_EN | SEQUENCE_DSS1_EN | SEQUENCE_DSS2_EN | SEQUENCE_MM2_EN | SEQUENCE_RANGE_EN,
+            SEQUENCE_VHV_EN
+                | SEQUENCE_PHASECAL_EN
+                | SEQUENCE_DSS1_EN
+                | SEQUENCE_DSS2_EN
+                | SEQUENCE_MM2_EN
+                | SEQUENCE_RANGE_EN,
         );
         dynamic.set("system__grouped_parameter_hold", 0x02);
 
@@ -583,7 +645,9 @@ impl BareDriver {
         system.set("system__interrupt_clear", CLEAR_RANGE_INT as i64);
         system.set(
             "system__mode_start",
-            DEVICE_SCHEDULER_MODE_STREAMING | DEVICE_READOUT_MODE_SINGLE_SD | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
+            DEVICE_SCHEDULER_MODE_STREAMING
+                | DEVICE_READOUT_MODE_SINGLE_SD
+                | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
         );
     }
 
@@ -591,8 +655,11 @@ impl BareDriver {
     fn preset_mode_histogram_ranging(&mut self) {
         self.preset_mode_standard_ranging();
 
-        self.img.static_config_mut().set("dss_config__target_total_rate_mcps", 0x1400);
-        self.hist_cfg.set_bin_sequence(&[7, 0, 1, 2, 3, 4], &[0, 1, 2, 3, 4, 5]);
+        self.img
+            .static_config_mut()
+            .set("dss_config__target_total_rate_mcps", 0x1400);
+        self.hist_cfg
+            .set_bin_sequence(&[7, 0, 1, 2, 3, 4], &[0, 1, 2, 3, 4, 5]);
 
         let timing = self.img.timing_config_mut();
         timing.set("range_config__vcsel_period_a", 0x09);
@@ -608,7 +675,9 @@ impl BareDriver {
         let dynamic = self.img.dynamic_config_mut();
         dynamic.set("sd_config__woi_sd0", 0x09);
         dynamic.set("sd_config__woi_sd1", 0x0B);
-        self.img.general_config_mut().set("phasecal_config__timeout_macrop", 0xF5);
+        self.img
+            .general_config_mut()
+            .set("phasecal_config__timeout_macrop", 0xF5);
 
         self.hpp.valid_phase_low = 0x08;
         self.hpp.valid_phase_high = 0x88;
@@ -616,11 +685,17 @@ impl BareDriver {
         self.hist_cfg.copy_to_static_cfg(&mut self.img);
         self.img.dynamic_config_mut().set(
             "system__sequence_config",
-            SEQUENCE_VHV_EN | SEQUENCE_PHASECAL_EN | SEQUENCE_DSS1_EN | SEQUENCE_DSS2_EN | SEQUENCE_RANGE_EN,
+            SEQUENCE_VHV_EN
+                | SEQUENCE_PHASECAL_EN
+                | SEQUENCE_DSS1_EN
+                | SEQUENCE_DSS2_EN
+                | SEQUENCE_RANGE_EN,
         );
         self.img.system_control_mut().set(
             "system__mode_start",
-            DEVICE_SCHEDULER_MODE_HISTOGRAM | DEVICE_READOUT_MODE_DUAL_SD | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
+            DEVICE_SCHEDULER_MODE_HISTOGRAM
+                | DEVICE_READOUT_MODE_DUAL_SD
+                | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
         );
     }
 
@@ -666,7 +741,9 @@ impl BareDriver {
 
         self.img.system_control_mut().set(
             "system__mode_start",
-            DEVICE_SCHEDULER_MODE_HISTOGRAM | DEVICE_READOUT_MODE_DUAL_SD | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
+            DEVICE_SCHEDULER_MODE_HISTOGRAM
+                | DEVICE_READOUT_MODE_DUAL_SD
+                | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK,
         );
     }
 
@@ -675,7 +752,10 @@ impl BareDriver {
         self.phasecal_config_timeout_us = phasecal_us;
         self.mm_config_timeout_us = mm_us;
         self.range_config_timeout_us = range_us;
-        let freq = self.img.static_nvm().get("osc_measured__fast_osc__frequency");
+        let freq = self
+            .img
+            .static_nvm()
+            .get("osc_measured__fast_osc__frequency");
         math::calc_timeout_register_values(phasecal_us, mm_us, range_us, freq, &mut self.img)
             .ok_or_else(|| DepzError::Sensor("osc_measured__fast_osc__frequency is 0".into()))
     }
@@ -687,7 +767,9 @@ impl BareDriver {
         }
         self.inter_measurement_period_ms = period_ms;
         let v = period_ms * self.result_osc_calibrate_val;
-        self.img.timing_config_mut().set("system__intermeasurement_period", v);
+        self.img
+            .timing_config_mut()
+            .set("system__intermeasurement_period", v);
         Ok(())
     }
 
@@ -695,13 +777,21 @@ impl BareDriver {
     /// after a fixed guard comes off.
     pub fn set_measurement_timing_budget_us(&mut self, budget_us: i64) -> Result<()> {
         if !(TIMING_GUARD_US < budget_us && budget_us <= 10_000_000) {
-            return Err(DepzError::InvalidArgument(format!("timing budget {budget_us} us out of range")));
+            return Err(DepzError::InvalidArgument(format!(
+                "timing budget {budget_us} us out of range"
+            )));
         }
         let range_us = (budget_us - TIMING_GUARD_US) / TIMING_DIVISOR;
         if range_us * TIMING_DIVISOR > self.fda_max_timing_budget_us() {
-            return Err(DepzError::InvalidArgument(format!("timing budget {budget_us} us out of range")));
+            return Err(DepzError::InvalidArgument(format!(
+                "timing budget {budget_us} us out of range"
+            )));
         }
-        self.set_timeouts_us(self.phasecal_config_timeout_us, self.mm_config_timeout_us, range_us)
+        self.set_timeouts_us(
+            self.phasecal_config_timeout_us,
+            self.mm_config_timeout_us,
+            range_us,
+        )
     }
 
     /// `VL53LX_load_patch()`: a six-instruction phasecal patch, written with the firmware stopped.
@@ -743,7 +833,8 @@ impl BareDriver {
     pub fn init_and_start_range_blocks(&mut self, blocks: &[&str]) -> Result<()> {
         self.measurement_mode = DEVICE_MEASUREMENT_MODE_BACK_TO_BACK;
         let system = self.img.system_control_mut();
-        let mode_start = (system.get("system__mode_start") & DEVICE_MEASUREMENT_MODE_STOP_MASK) | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK;
+        let mode_start = (system.get("system__mode_start") & DEVICE_MEASUREMENT_MODE_STOP_MASK)
+            | DEVICE_MEASUREMENT_MODE_BACK_TO_BACK;
         system.set("system__mode_start", mode_start);
         system.set("system__interrupt_clear", CLEAR_RANGE_INT as i64);
 
@@ -755,7 +846,10 @@ impl BareDriver {
 
         self.img.push_range(self.p.as_ref(), blocks)?;
 
-        let gph = self.img.dynamic_config().get("system__grouped_parameter_hold");
+        let gph = self
+            .img
+            .dynamic_config()
+            .get("system__grouped_parameter_hold");
         self.state.update_rd(mode_start, gph);
         self.state.update_cfg(mode_start);
         Ok(())
@@ -764,14 +858,22 @@ impl BareDriver {
     /// `VL53LX_clear_interrupt_and_enable_next_range()`: in histogram mode the interrupt is cleared by
     /// rewriting general_config onwards.
     pub fn clear_interrupt_and_start_next_range(&mut self) -> Result<()> {
-        self.init_and_start_range_blocks(&["general_config", "timing_config", "dynamic_config", "system_control"])
+        self.init_and_start_range_blocks(&[
+            "general_config",
+            "timing_config",
+            "dynamic_config",
+            "system_control",
+        ])
     }
 
     /// `VL53LX_stop_range()`.
     pub fn stop_range(&mut self) -> Result<()> {
         let system = self.img.system_control_mut();
         let v = system.get("system__mode_start");
-        system.set("system__mode_start", (v & DEVICE_MEASUREMENT_MODE_STOP_MASK) | DEVICE_MEASUREMENT_MODE_ABORT);
+        system.set(
+            "system__mode_start",
+            (v & DEVICE_MEASUREMENT_MODE_STOP_MASK) | DEVICE_MEASUREMENT_MODE_ABORT,
+        );
         self.img.push(self.p.as_ref(), "system_control")?;
         let system = self.img.system_control_mut();
         let v = system.get("system__mode_start");
@@ -816,11 +918,13 @@ impl BareDriver {
         };
 
         // Bin 23 does not fit in its three bytes: its low byte comes in a separate MSB/LSB pair.
-        buf[at(RESULT_HISTOGRAM_BIN_23_0)] =
-            ((buf[at(RESULT_HISTOGRAM_BIN_23_0_MSB)] << 2) + buf[at(RESULT_HISTOGRAM_BIN_23_0_LSB)]) & 0xFF;
+        buf[at(RESULT_HISTOGRAM_BIN_23_0)] = ((buf[at(RESULT_HISTOGRAM_BIN_23_0_MSB)] << 2)
+            + buf[at(RESULT_HISTOGRAM_BIN_23_0_LSB)])
+            & 0xFF;
         let b0 = at(RESULT_HISTOGRAM_BIN_0_2);
         for i in 0..HISTOGRAM_BUFFER_SIZE {
-            d.bin_data[i] = (buf[b0 + 3 * i] << 16) | (buf[b0 + 3 * i + 1] << 8) | buf[b0 + 3 * i + 2];
+            d.bin_data[i] =
+                (buf[b0 + 3 * i] << 16) | (buf[b0 + 3 * i + 1] << 8) | buf[b0 + 3 * i + 2];
         }
 
         let general = self.img.general_config();
@@ -829,24 +933,33 @@ impl BareDriver {
         let dynamic = self.img.dynamic_config();
 
         d.cal_config_vcsel_start = general.get("cal_config__vcsel_start");
-        d.vcsel_width =
-            (general.get("global_config__vcsel_width") << 4) + stat.get("ana_config__vcsel_pulse_width_offset");
-        d.fast_osc_frequency = self.img.static_nvm().get("osc_measured__fast_osc__frequency");
+        d.vcsel_width = (general.get("global_config__vcsel_width") << 4)
+            + stat.get("ana_config__vcsel_pulse_width_offset");
+        d.fast_osc_frequency = self
+            .img
+            .static_nvm()
+            .get("osc_measured__fast_osc__frequency");
         d.roi_config_user_roi_centre_spad = dynamic.get("roi_config__user_roi_centre_spad");
-        d.roi_config_user_roi_requested_global_xy_size = dynamic.get("roi_config__user_roi_requested_global_xy_size");
+        d.roi_config_user_roi_requested_global_xy_size =
+            dynamic.get("roi_config__user_roi_requested_global_xy_size");
 
         d.zone_id = 0;
-        d.bin_seq = self.hist_cfg.bin_sequence(self.state.rd_stream_count, self.ambient_events_sum);
+        d.bin_seq = self
+            .hist_cfg
+            .bin_sequence(self.state.rd_stream_count, self.ambient_events_sum);
 
         let encoded = if self.state.rd_timing_status == 0 {
             d.vcsel_period = timing.get("range_config__vcsel_period_a");
-            (timing.get("range_config__timeout_macrop_a_hi") << 8) + timing.get("range_config__timeout_macrop_a_lo")
+            (timing.get("range_config__timeout_macrop_a_hi") << 8)
+                + timing.get("range_config__timeout_macrop_a_lo")
         } else {
             d.vcsel_period = timing.get("range_config__vcsel_period_b");
-            (timing.get("range_config__timeout_macrop_b_hi") << 8) + timing.get("range_config__timeout_macrop_b_lo")
+            (timing.get("range_config__timeout_macrop_b_hi") << 8)
+                + timing.get("range_config__timeout_macrop_b_lo")
         };
 
-        d.number_of_ambient_bins = 4 * d.bin_seq.iter().filter(|&&s| s & 0x07 == 0x07).count() as i64;
+        d.number_of_ambient_bins =
+            4 * d.bin_seq.iter().filter(|&&s| s & 0x07 == 0x07).count() as i64;
         d.total_periods_elapsed = math::decode_timeout(encoded);
         d.peak_duration_us = math::duration_maths(
             math::calc_pll_period_us(d.fast_osc_frequency),
@@ -862,4 +975,3 @@ impl BareDriver {
         Ok(d)
     }
 }
-

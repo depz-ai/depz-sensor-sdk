@@ -94,7 +94,7 @@ public class Vl53lxDevice : DepzDevice
     public string? Caveat { get; private set; }
 
     /// <summary>The ULD port in use — escape hatch for product-specific calls.</summary>
-    public Vl53lxDriver Driver => _driver ?? throw new InvalidOperationException("call Init() first");
+    public Vl53lxDriver Driver => _driver ?? throw new InvalidStateException("call Init() first");
 
     public bool Initialized => _driver != null;
 
@@ -116,8 +116,9 @@ public class Vl53lxDevice : DepzDevice
     {
         RequireNotRanging();
         string name = product ?? FixedProduct ?? Detected
-            ?? throw new InvalidOperationException($"board '{BoardName}' carries no product number - pass product explicitly");
-        string kind = driver ?? Vl53lxProducts.DriverKinds(name).FirstOrDefault()
+            ?? throw new InvalidStateException($"board '{BoardName}' carries no product number - pass product explicitly");
+        IReadOnlyList<string> kinds = Vl53lxProducts.DriverKinds(name);
+        string kind = driver ?? (kinds.Count > 0 ? kinds[0] : null)
             ?? throw new NotSupportedException($"{name} has no driver this SDK runs yet");
         var (drv, caveat) = Vl53lxProducts.CreateDriver(name, kind, Platform);
         // Sticky on the bridge and 2 after a reset: set before the first register access.
@@ -427,7 +428,7 @@ public class Vl53lxDevice : DepzDevice
     private void RequireNotRanging()
     {
         if (_ranging)
-            throw new InvalidOperationException("StopRanging() first — the stream owns the bus");
+            throw new InvalidStateException("StopRanging() first — the stream owns the bus");
     }
 
     private protected override bool HandleReport(Packet packet)
@@ -457,7 +458,7 @@ public class Vl53lxDevice : DepzDevice
             Interlocked.Increment(ref _streamParseErrors); // a bad sample must not kill the reader
             return true;
         }
-        _measurements.Emit(m);
+        _measurements.Emit(m, Stats);
         return true;
     }
 

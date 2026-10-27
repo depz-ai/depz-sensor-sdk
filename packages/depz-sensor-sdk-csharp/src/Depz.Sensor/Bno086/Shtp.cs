@@ -91,6 +91,7 @@ public sealed class ShtpLayer
     private readonly int[] _txSeq = new int[NumChannels];
     private readonly ChannelRx[] _rx;
 
+    // Incomplete / orphan cargos and junk-channel (>= 6) frames thrown away.
     public int Discarded { get; private set; }
 
     public ShtpLayer()
@@ -174,13 +175,18 @@ public sealed class ShtpLayer
         if (frame.Length < ShtpHeader.Size)
             return null;
         ShtpHeader hdr = ShtpHeader.Unpack(frame);
-        if (hdr.Channel >= NumChannels || hdr.Length < ShtpHeader.Size)
-            return null; // empty/padding header ("no data" read) or junk
+        if (hdr.Length < ShtpHeader.Size)
+            return null; // empty/padding header ("no data" read)
+        if (hdr.Channel >= NumChannels)
+        {
+            Discarded++; // junk channel
+            return null;
+        }
         ReadOnlySpan<byte> chunk = frame.AsSpan(ShtpHeader.Size);
         ChannelRx rx = _rx[hdr.Channel];
         if (!hdr.Continuation)
         {
-            if (rx.Expected != 0 && rx.Buf.Count != 0)
+            if (rx.Expected != 0) // a partial, even one with no bytes yet
                 Discarded++;
             rx.Buf = new List<byte>(chunk.ToArray());
             rx.Expected = hdr.Length - ShtpHeader.Size;

@@ -16,8 +16,9 @@ from .protocol.bootloader import (
     FlashInfo,
     FwDepzImage,
     pack_write_page,
+    reply_report,
 )
-from .protocol.common import strip_device_string
+from .protocol.common import Cmd, strip_device_string
 from .transport import CrcType, Packet, PacketParser, build_packet, crc32_iso_hdlc
 from .transport.link import Link
 from .transport.serial_link import SerialLink
@@ -33,6 +34,24 @@ class BootloaderError(DepzError):
         self.status = status
         name = _STATUS_NAMES.get(status, f"0x{status:02X}")
         super().__init__(f"bootloader cmd 0x{cmd:02X} failed: {name}")
+
+
+class ApplicationNotBackError(DepzTimeoutError):
+    """After BOOT_APPLICATION the port never answered GET_SOFTWARE_NAME with
+    an application name before the deadline (contract 06 §3 step 6).
+    `last_seen` names the last thing the probe found: no port, a port that
+    did not answer, or the bootloader's name."""
+
+    def __init__(self, port: str, timeout: float, last_seen: str):
+        self.cmd = Cmd.GET_NAME_ACTIVE_SOFTWARE
+        self.timeout = timeout
+        self.port = port
+        self.last_seen = last_seen
+        DepzError.__init__(
+            self,
+            f"{port}: the application did not answer within {timeout:.1f}s "
+            f"after BOOT_APPLICATION (last seen: {last_seen})",
+        )
 
 
 class BootloaderDevice:
@@ -84,7 +103,9 @@ class BootloaderDevice:
         timeout: float | None = None,
         min_len: int = 2,
     ) -> Packet:
-        """Send and wait for the reply echoing `cmd` in payload[0]."""
+        """Send and wait for the reply to `cmd`: the report contract 06 §1
+        assigns to it (`reply_report`), echoing `cmd` in payload[0]."""
+        rpt = reply_report(cmd)
         self._send(cmd, payload, crc_type)
         deadline = time.monotonic() + (timeout if timeout is not None else self.timeout)
         while True:
@@ -94,9 +115,21 @@ class BootloaderDevice:
             pkt = self._recv(remaining)
             if pkt is None:
                 continue
-            if pkt.payload and pkt.payload[0] == cmd and len(pkt.payload) >= min_len:
-                if pkt.cmd == BlRpt.STATUS and pkt.payload[1] != BlStatus.ACK:
+            if not pkt.payload or pkt.payload[0] != cmd:
+                continue
+            if pkt.cmd == BlRpt.STATUS:
+                # A failed command is always nacked with the 2-byte RPT_STATUS,
+                # whatever report its success reply uses — check it before the
+                # typed reply's min_len or the nack would be ignored until
+                # timeout. An ACK in RPT_STATUS answers only a STATUS-reply
+                # command; for a typed-reply one it is not the reply.
+                if len(pkt.payload) >= 2 and pkt.payload[1] != BlStatus.ACK:
                     raise BootloaderError(cmd, pkt.payload[1])
+                if rpt != BlRpt.STATUS:
+                    continue
+            elif pkt.cmd != rpt:
+                continue
+            if len(pkt.payload) >= min_len:
                 return pkt
 
     # ── info ─────────────────────────────────────────────────────────────────
@@ -121,9 +154,7 @@ class BootloaderDevice:
     # ── flashing primitives ──────────────────────────────────────────────────
 
     def erase_app(self) -> None:
-        pkt = self.transact(BlCmd.ERASE_APP, timeout=15.0)
-        if pkt.payload[1] != BlStatus.ACK:
-            raise BootloaderError(BlCmd.ERASE_APP, pkt.payload[1])
+        self.transact(BlCmd.ERASE_APP, timeout=15.0)  # RPT_STATUS; a nack raises
 
     def write_page(self, addr: int, data: bytes) -> int:
         """Write one page (payload CRC16 framing); returns the device-computed
@@ -236,13 +267,47 @@ def find_bootloader_port(serial_number: str, *, timeout: float = 10.0) -> str:
     raise DepzTimeoutError(BlCmd.GET_FIRMWARE_NAME, timeout)
 
 
+def _wait_for_application(port: str, *, timeout: float = 10.0) -> str:
+    """Re-probe `port` until GET_SOFTWARE_NAME answers with an application
+    name; return it (contract 06 §3 step 6). The bootloader enumerates under
+    the same port name, so the port being back proves nothing: a BOOTDEPZ
+    answer keeps polling. Raises `ApplicationNotBackError` at the deadline."""
+    from .device import DeviceBase
+
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            dev = DeviceBase(port, timeout=0.5)
+        except DepzError:
+            last_seen = "no port"
+        else:
+            try:
+                name = dev.get_software_name()
+            except DepzError:
+                last_seen = "a port that did not answer"
+            else:
+                if name and not name.upper().startswith("BOOTDEPZ"):
+                    return name
+                last_seen = f"the bootloader ({name})" if name else "an empty name"
+            finally:
+                dev.close()
+        if time.monotonic() >= deadline:
+            raise ApplicationNotBackError(port, timeout, last_seen)
+        time.sleep(0.1)
+
+
 def update_firmware(
     port: str,
     fwdepz_path: str,
     *,
     progress: ProgressFn | None = None,
-) -> None:
-    """Full app-mode → bootloader → flash → boot-app flow (contract 06 §3)."""
+    app_timeout: float = 10.0,
+) -> str:
+    """Full app-mode → bootloader → flash → boot-app flow (contract 06 §3).
+
+    Returns the software name the application answers with on `port` after
+    the reboot (step 6); `ApplicationNotBackError` if it does not within
+    `app_timeout` seconds."""
     from .device import DeviceBase
 
     image = FwDepzImage.load(fwdepz_path)
@@ -269,3 +334,4 @@ def update_firmware(
         bl.boot_application()
     finally:
         bl.close()
+    return _wait_for_application(port, timeout=app_timeout)

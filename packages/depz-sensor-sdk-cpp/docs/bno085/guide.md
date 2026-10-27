@@ -101,6 +101,13 @@ void stream_orientation(depz::Bno086& imu)
   (interval, batch interval, change sensitivity, flags, sensor-specific
   word); with `verify` false it skips the read-back and returns nullopt.
   `feature(sensor)` asks the rate of any sensor.
+- **Batching**: with a non-zero `batch_us` the hub holds a sensor's reports
+  and sends them in bursts (every ~0.25 s on the lab BNO085), each with its
+  own timestamp. `flush(sensor)` asks for them now (Force Sensor Flush) and
+  returns once the hub's Flush Completed arrived — a
+  `ReportType::FlushCompleted` report with `flushed_sensor` set, which also
+  reaches your callbacks and streams, after every report batched before the
+  call.
 
 ## The report and its units
 
@@ -187,6 +194,15 @@ void calibrate(depz::Bno086& imu)
 - `tare_now(axes, basis)` makes the current orientation the zero until reset;
   `persist_tare()` keeps it. `set_reorientation(x, y, z, w)` sets a fixed
   mounting rotation (all zeros clears it). These three have no SH-2 answer.
+- **Interactive calibration** (BNO086 only; a BNO085 ignores it) lets the hub
+  refine the gyroscope's zero-rate offset while the device is still:
+  `set_motion_intent(bno086::MotionIntent::StationaryNoVibration)` (also
+  `StationaryWithVibration`, `InMotion`, `InMotionAccelerating`; `Unknown` is
+  the hub's initial state) tells it how the device is about to move, with no
+  SH-2 answer. The hub's own wish — hold still, or go on — arrives as a
+  `ReportType::MotionRequest` report (`intent`, `request`) once you call
+  `enable_motion_request()`: the hub sends one when its request changes, not
+  at the rate, so the granted rate is not read back.
 
 ## Sleep and power on
 
@@ -357,5 +373,7 @@ depz::bytes enable_rv(ShtpLayer& shtp)
 - **Rotation-vector heading needs a calibrated magnetometer** (the lab board
   started at ±180°); use the game rotation vector when north does not matter.
 - **Never block in a callback.**
-- **Tare, persist tare, reorientation and periodic DCD have no answer** from
-  the hub; success means the bridge took the frame.
+- **Tare, persist tare, reorientation, periodic DCD and the motion intent have
+  no answer** from the hub; success means the bridge took the frame.
+- **Flush Completed is an input report**, not a control answer: `flush()` waits
+  for it on the report path, and your stream sees it too.

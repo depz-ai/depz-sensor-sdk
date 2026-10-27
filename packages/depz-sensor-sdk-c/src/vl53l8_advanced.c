@@ -6,7 +6,6 @@
  * VL53L8CH. The live DCI read/write bridge is out of scope.
  */
 #include "depz_sensor_sdk.h"
-#include <math.h>
 #include <string.h>
 
 static void put_u32(uint8_t *p, uint32_t v)
@@ -16,24 +15,17 @@ static void put_u32(uint8_t *p, uint32_t v)
 }
 static void put_i32(uint8_t *p, int32_t v) { put_u32(p, (uint32_t)v); }
 
-uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps)
+int depz_vl53l8_xtalk_margin_to_raw(uint32_t margin_kcps, uint32_t *raw)
 {
-    double r = round(margin_kcps * 2048.0);
-    if (r < 0) r = 0;
-    return (uint32_t)r;
-}
-
-int depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw)
-{
-    if (!(margin_kcps >= 0.0 && margin_kcps <= 10000.0))
-        return -1; /* 0..10000 kcps: negative, NaN or too large is refused */
-    *raw = (uint32_t)round(margin_kcps * 2048.0);
+    if (margin_kcps > DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS)
+        return -1; /* as ST: at most 10000 kcps, nothing written */
+    *raw = margin_kcps * 2048u;
     return 0;
 }
 
-double depz_vl53l8_xtalk_margin_from_raw(uint32_t raw)
+uint32_t depz_vl53l8_xtalk_margin_from_raw(uint32_t raw)
 {
-    return (double)raw / 2048.0;
+    return raw / 2048u;
 }
 
 /* Detection-threshold measurement -> scale factor (get divides / set mult). */

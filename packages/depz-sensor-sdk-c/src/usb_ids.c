@@ -6,6 +6,8 @@
  */
 #include "depz_sensor_sdk.h"
 
+#include <string.h>
+
 /* PID -> sensor-model hint (informational). Full official DEPZ PID catalog
  * (VID 0x1BCF). One-edit-to-update: keep in sync with contracts/vectors/usb_ids.json. */
 static const struct { int pid; const char *model; } DEPZ_PID_MODEL[] = {
@@ -67,4 +69,23 @@ const char *depz_usb_model_hint(int vid, int pid)
                 return DEPZ_PID_MODEL[i].model;
     }
     return NULL;
+}
+
+int depz_port_order_cmp(const depz_port_key *a, const depz_port_key *b)
+{
+    const bool ea = !a->serial || a->serial_len == 0, eb = !b->serial || b->serial_len == 0;
+    if (ea != eb) return ea ? 1 : -1; /* a port without a serial sorts last */
+    if (!ea) {
+        const size_t n = a->serial_len < b->serial_len ? a->serial_len : b->serial_len;
+        const int c = memcmp(a->serial, b->serial, n);
+        if (c) return c;
+        if (a->serial_len != b->serial_len) return a->serial_len < b->serial_len ? -1 : 1;
+    }
+    {
+        const size_t n = a->port_len < b->port_len ? a->port_len : b->port_len;
+        const int c = (a->port && b->port) ? memcmp(a->port, b->port, n) : 0;
+        if (c) return c;
+        if (a->port_len != b->port_len) return a->port_len < b->port_len ? -1 : 1;
+    }
+    return 0;
 }

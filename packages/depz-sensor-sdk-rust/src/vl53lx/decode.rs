@@ -87,7 +87,10 @@ impl std::error::Error for ShortBlock {}
 
 fn need(raw: &[u8], n: usize) -> Result<(), ShortBlock> {
     if raw.len() < n {
-        Err(ShortBlock { need: n, got: raw.len() })
+        Err(ShortBlock {
+            need: n,
+            got: raw.len(),
+        })
     } else {
         Ok(())
     }
@@ -121,7 +124,7 @@ pub fn decode_die_block(raw: &[u8], variant: DieVariant) -> Result<DieResult, Sh
     let raw_spads = be16(raw, 3); // 8.8
     let signal = be16(raw, signal_at) * 8;
     let ambient = be16(raw, 7) * 8;
-    let per_spad = |rate: u32| if raw_spads != 0 { rate * k / raw_spads } else { 0 };
+    let per_spad = |rate: u32| (rate * k).checked_div(raw_spads).unwrap_or(0);
     Ok(DieResult {
         range_status,
         distance_mm: be16(raw, 13),

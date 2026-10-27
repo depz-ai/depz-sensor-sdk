@@ -120,7 +120,7 @@ if (r.RangeStatus == 0)                       // 0 = valid
 raw ≥ 24 passes through unmapped), `DistanceMm`, `SignalRateKcps` /
 `AmbientRateKcps` (×8), the per-SPAD rates, `NumberOfSpad`, `SigmaMm` and the
 sensor's own `StreamCount` frame counter (wraps at 255). `ParseResultBlock`
-throws `Vl53l4Exception` on a block shorter than 15 bytes.
+throws `Vl53l4Exception` on a block shorter than 17 bytes (`ResultBlockLen`).
 
 ## Range timing
 

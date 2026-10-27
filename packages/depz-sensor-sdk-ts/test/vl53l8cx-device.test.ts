@@ -9,7 +9,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DepzError,
+  InvalidStateError,
   LoopbackTransport,
+  MAX_RANGING_FREQUENCY_HZ,
   MIN_RANGING_FREQUENCY_HZ,
   RESOLUTION_4X4,
   RESOLUTION_8X8,
@@ -58,8 +60,15 @@ describe("vl53l8cx config guards", () => {
     await expect(cx().setRangingFrequencyHz(1)).rejects.toThrow(/2 Hz/);
   });
 
+  it("setRangingFrequencyHz enforces the 60 Hz ceiling of 4x4 (contract 11 §3, ERRATA A13)", async () => {
+    expect(MAX_RANGING_FREQUENCY_HZ[RESOLUTION_4X4]).toBe(60);
+    expect(MAX_RANGING_FREQUENCY_HZ[RESOLUTION_8X8]).toBe(15);
+    await expect(cx().setRangingFrequencyHz(61)).rejects.toThrow(/<= 60 Hz/);
+    await expect(cx().setRangingFrequencyHz(15.5)).rejects.toThrow(DepzError);
+  });
+
   it("uld getter throws before init()", () => {
-    expect(() => cx().uld).toThrow(/init/);
+    expect(() => cx().uld).toThrow(InvalidStateError);
   });
 
   it("variant getter throws before init()", () => {
@@ -75,7 +84,7 @@ describe("vl53l8cx config guards", () => {
   it("requireNotRanging blocks reconfiguration while the stream owns the bank", async () => {
     const dev = cx();
     (dev as unknown as { rangingFlag: boolean }).rangingFlag = true;
-    await expect(dev.setResolution(RESOLUTION_8X8)).rejects.toThrow(/stopRanging/);
+    await expect(dev.setResolution(RESOLUTION_8X8)).rejects.toThrow(InvalidStateError);
   });
 });
 
@@ -112,7 +121,7 @@ describe("vl53l8cx facade → ULD delegation", () => {
     const dev = cx();
     withFakeUld(dev);
     await dev.setXtalkMargin(50);
-    expect(await dev.getXtalkMargin()).toBeCloseTo(50, 3);
+    expect(await dev.getXtalkMargin()).toBe(50);
   });
 
   it("detection thresholds enable set/get delegates", async () => {
@@ -136,6 +145,6 @@ describe("vl53l8cx facade → ULD delegation", () => {
     const dev = cx();
     withFakeUld(dev);
     (dev as unknown as { rangingFlag: boolean }).rangingFlag = true;
-    await expect(dev.setXtalkMargin(10)).rejects.toThrow(/stopRanging/);
+    await expect(dev.setXtalkMargin(10)).rejects.toThrow(InvalidStateError);
   });
 });

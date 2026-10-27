@@ -122,7 +122,7 @@ public class Vl53l7ReplayTests
         Assert.NotEmpty(expectedFrames);
 
         var parser = new PacketParser();
-        var reassembler = new FrameReassembler();
+        var reassembler = new FrameReassembler(Vl53l7Wire.StreamChunkMax);
         var decoder = Vl53l7Frames.CreateDecoder();
         var frames = new List<Vl53l8Frame>();
 
@@ -189,7 +189,7 @@ public class Vl53l7ReplayTests
         // 64-entry per-target blocks — the trim is opt-in (L8 unchanged).
         string[] recLines = File.ReadAllLines(Vectors.RecordingPath("vl53l5cx_4x4_15hz.depzrec"));
         var parser = new PacketParser();
-        var reassembler = new FrameReassembler();
+        var reassembler = new FrameReassembler(Vl53l7Wire.StreamChunkMax);
         var l8 = Vl53l8FrameDecoder.ForVariant(Vl53l8Variant.Ch);
         var l7 = Vl53l7Frames.CreateDecoder();
         for (int i = 1; i < recLines.Length; i++)

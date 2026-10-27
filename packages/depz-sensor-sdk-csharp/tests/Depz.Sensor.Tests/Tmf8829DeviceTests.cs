@@ -277,6 +277,8 @@ public class Tmf8829DeviceTests
         .ToDictionary(c => c.GetProperty("name").GetString()!, c => Vectors.Hex(c.GetProperty("raw").GetString()!));
     private static readonly Dictionary<string, JsonElement> Meas = V.GetProperty("measurements").EnumerateArray()
         .ToDictionary(m => m.GetProperty("name").GetString()!, m => m);
+    private static readonly HashSet<string> Corrupt = V.GetProperty("frames").EnumerateArray()  // results frames whose pixel decode fails
+        .Where(c => c.TryGetProperty("error", out _)).Select(c => c.GetProperty("name").GetString()!).ToHashSet();
 
     private static (FakeTmf8829 Fake, Tmf8829Device Dev) Make()
     {
@@ -426,7 +428,7 @@ public class Tmf8829DeviceTests
         Assert.Equal(new[] { new[] { 0xFA, 0x30 }, new[] { 0xE1, 0xFF }, new[] { 0xE2, 0x01 } }, w.Skip(i).Take(3));
         Assert.Equal(new[] { new byte[] { 0x01, 0x00 } }, fake.Sent(0x35));
         Assert.Equal(new[] { 0x08, 0x10 }, w[^1]); // MEASURE after the stream is armed
-        Assert.Throws<InvalidOperationException>(() => dev.Configure());
+        Assert.Throws<InvalidStateException>(() => dev.Configure());
         dev.Start(); // no-op while streaming
         Assert.Single(fake.Sent(0x35));
 
@@ -513,7 +515,9 @@ public class Tmf8829DeviceTests
             fields["ratio_q16"] = got[k].Times[^1].RatioQ16;
             Tmf8829VectorTests.AssertFields($"{name}#{k}", want[k], fields);
         }
-        Assert.Equal((0, 0, 0), (dev.FramesDropped, dev.FramesDiscarded, dev.FrameParseErrors));
+        int nCorrupt = Meas[name].GetProperty("frames").EnumerateArray()
+            .Count(f => Corrupt.Contains(f.GetProperty("raw_case").GetString()!));
+        Assert.Equal((0, 0, nCorrupt), (dev.FramesDropped, dev.FramesDiscarded, dev.FrameParseErrors));
         Assert.Equal(want[^1].GetProperty("ratio_q16").GetUInt32(), dev.ClockRatioQ16);
     }
 

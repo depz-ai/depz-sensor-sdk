@@ -70,6 +70,10 @@ public final class Vl53l8 {
     /** VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE. */
     public static byte[] packStartStream(int frameSize) {
         Wire.checkUint("frameSize", frameSize, 16);
+        // contract 04 §4 rule 4: the firmware refuses 0 and > 8192; so does the host
+        if (frameSize < 1 || frameSize > STREAM_TOTAL_MAX) {
+            throw new IllegalArgumentException("frameSize: " + frameSize + " outside 1.." + STREAM_TOTAL_MAX);
+        }
         return new byte[] {(byte) frameSize, (byte) (frameSize >> 8)};
     }
 

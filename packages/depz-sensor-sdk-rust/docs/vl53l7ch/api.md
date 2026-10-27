@@ -134,7 +134,8 @@ The CNH setup armed by [`Vl53l7chDevice::configure_cnh`], or `None`.
 pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
 ```
 
-Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]).
+Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]); disarms the motion
+indicator (one DCI block).
 
 ### Vl53l7Cmd
 
@@ -380,10 +381,12 @@ pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8>
 ### pack_start_stream
 
 ```rust
-pub fn pack_start_stream(frame_size: u16) -> [u8; 2]
+pub fn pack_start_stream(frame_size: u16) -> Result<[u8; 2], CodecError>
 ```
 
-`VL53_START_STREAM` payload: `frame_size u16`.
+`VL53_START_STREAM` payload: `frame_size u16`, which must be
+1..=[`STREAM_TOTAL_MAX`] (contract 04 §4 rule 4 — the firmware refuses
+anything else too).
 
 ### RegData
 
@@ -421,6 +424,7 @@ shorter than the 12-byte header.
 pub struct FrameReassembler {
     pub completed: u64,
     pub discarded: u64,
+    chunk_max: usize,
     buf: Vec<u8>,
     full_size: usize,
     timestamp_us: u64,
@@ -434,6 +438,17 @@ Rebuilds full sensor frames from chunked `RPT_VL53_FRAME` reports.
 ```rust
 pub fn new() -> Self
 ```
+
+A reassembler for the VL53L8 board's [`STREAM_CHUNK_MAX`] chunks.
+
+#### FrameReassembler::with_chunk_max
+
+```rust
+pub fn with_chunk_max(chunk_max: usize) -> Self
+```
+
+A reassembler for a board whose `VL53_STREAM_FRAME_MAX` is `chunk_max`
+(`vl53l7::STREAM_CHUNK_MAX` = 1536 on the I2C board, contract 11 §3).
 
 #### FrameReassembler::feed
 
@@ -535,8 +550,6 @@ Result of [`decode_cnh`].
 pub enum CnhError {
     /// `raw` is too short for the header or the computed block extends past it.
     Truncated,
-    /// `nb_of_aggregates` or `feature_length` is zero.
-    EmptyConfig,
 }
 ```
 
@@ -555,7 +568,8 @@ into per-aggregate integer histograms plus the reference-residual word.
 Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
 DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
 device reports a single buffer and the ping/pong selection resolves to the
-sole buffer.
+sole buffer. As the reference, an empty configuration (no aggregates or no
+bins) decodes to empty histograms rather than an error.
 
 ### CNH_DATA_IDX
 

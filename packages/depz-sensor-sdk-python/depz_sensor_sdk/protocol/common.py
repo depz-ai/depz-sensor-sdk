@@ -124,6 +124,23 @@ class TemperatureReport:
         return self.raw_decidegrees / 10.0
 
 
+PAYLOAD_CRC_TYPE_MAX = 3  # SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2)
+
+
+def pack_set_payload_crc_type(crc_type: int) -> bytes:
+    """SET_PAYLOAD_CRC_TYPE payload `crc_type u8`, 0..3 (contract 02 §2), else
+    ValueError — checked before anything is written (contract 07 §3)."""
+    if check_uint("crc_type", crc_type, 8) > PAYLOAD_CRC_TYPE_MAX:
+        raise ValueError(f"crc_type: {crc_type} is not a CrcType 0..{PAYLOAD_CRC_TYPE_MAX}")
+    return bytes([crc_type])
+
+
+def unpack_payload_crc_type(payload: bytes) -> int:
+    """RPT_PAYLOAD_CRC_TYPE: the device→host payload CRC mode (one byte)."""
+    need_bytes("RPT_PAYLOAD_CRC_TYPE", payload, 1)
+    return payload[0]
+
+
 @dataclass(frozen=True)
 class SequenceErrorReport:
     expected_seq: int

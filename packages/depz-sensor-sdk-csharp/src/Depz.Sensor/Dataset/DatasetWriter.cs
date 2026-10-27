@@ -53,7 +53,7 @@ public sealed class DatasetWriter : IDisposable
         lock (_lock)
         {
             if (_closed)
-                throw new ObjectDisposedException(nameof(DatasetWriter));
+                throw new InvalidStateException("DatasetWriter is closed");
             _writer.WriteLine(line);
             RecordsWritten++;
         }
@@ -111,7 +111,7 @@ public sealed class SessionRecorder : IDisposable
     {
         if (device is null) throw new ArgumentNullException(nameof(device));
         if (_writer is not null)
-            throw new InvalidOperationException("Add() every device before recording starts");
+            throw new InvalidStateException("Add() every device before recording starts");
         string id = deviceId ?? $"d{_entries.Count}";
         var sync = device.SyncTime(syncSamples);
         var meta = new Dictionary<string, object?>

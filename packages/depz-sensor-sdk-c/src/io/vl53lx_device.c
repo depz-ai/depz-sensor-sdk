@@ -382,12 +382,12 @@ static int need_cap(depz_device *dev, unsigned cap, const char *group)
 
 #define LOCKED(body)                      \
     do {                                  \
-        int rc_;                          \
+        int locked_rc_;                   \
         VLX_TRY(need(dev));               \
         depz_mutex_lock(&st(dev)->seq);   \
-        rc_ = (body);                     \
+        locked_rc_ = (body);              \
         depz_mutex_unlock(&st(dev)->seq); \
-        return rc_;                       \
+        return locked_rc_;                \
     } while (0)
 
 /* ── identity ──────────────────────────────────────────────────────────── */
@@ -628,7 +628,10 @@ static int do_configure(depz_device *dev, int budget_ms, int inter_ms, const cha
     if (signal_kcps) VLX_TRY(need_cap(dev, DEPZ_VL53LX_CAP_SIGNAL_THRESH, "signal_thresh"));
     if (mode && !d->ops->set_mode) return depz_fail(DEPZ_E_ARG, "vl53lx: this driver has no modes");
     VLX_TRY(sensor_init(d));
-    if (mode) VLX_TRY(d->ops->set_mode(d, mode));
+    if (mode) {
+        int moved_ms = 0; /* the budget is set right below anyway */
+        VLX_TRY(d->ops->set_mode(d, mode, &moved_ms));
+    }
     VLX_TRY(d->ops->set_range_timing(d, budget_ms, inter_ms));
     if (offset_mm) VLX_TRY(d->ops->set_offset(d, *offset_mm));
     if (xtalk_kcps) VLX_TRY(d->ops->set_xtalk(d, *xtalk_kcps));
@@ -660,15 +663,21 @@ static int do_get_timing(depz_device *dev, int *budget_ms, int *inter_ms)
 
 int depz_vl53lx_get_range_timing(depz_device *dev, int *budget_ms, int *inter_ms) { LOCKED(do_get_timing(dev, budget_ms, inter_ms)); }
 
-static int do_set_mode(depz_device *dev, const char *mode)
+static int do_set_mode(depz_device *dev, const char *mode, int *budget_ms)
 {
+    int b = 0;
     VLX_TRY(need_not_ranging(dev));
     VLX_TRY(need_cap(dev, DEPZ_VL53LX_CAP_MODE, "mode"));
     if (!mode) return depz_fail(DEPZ_E_ARG, "vl53lx: NULL mode");
-    return st(dev)->drv->ops->set_mode(st(dev)->drv, mode);
+    VLX_TRY(st(dev)->drv->ops->set_mode(st(dev)->drv, mode, &b));
+    if (budget_ms) *budget_ms = b;
+    return DEPZ_OK;
 }
 
-int depz_vl53lx_set_mode(depz_device *dev, const char *mode) { LOCKED(do_set_mode(dev, mode)); }
+int depz_vl53lx_set_mode(depz_device *dev, const char *mode, int *budget_ms)
+{
+    LOCKED(do_set_mode(dev, mode, budget_ms));
+}
 
 static int do_get_mode(depz_device *dev, const char **mode)
 {

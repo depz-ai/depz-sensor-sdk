@@ -16,7 +16,7 @@ import java.util.function.Consumer;
  * VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs
  * here ({@link #uld()}). {@link #init()} first, then configure and {@link #startRanging()}: one
  * result block per INT edge streams to {@link #measurements}. Configuration while ranging throws
- * {@link IllegalStateException} — the stream owns the register bank.
+ * {@link InvalidStateException} — the stream owns the register bank.
  */
 public final class Vl53l4cdDevice extends DepzDevice {
     private static final Duration REG_TIMEOUT = Duration.ofSeconds(2);
@@ -94,12 +94,12 @@ public final class Vl53l4cdDevice extends DepzDevice {
         initialized = false;
     }
 
-    /** Hardware reset through XSHUT (~3 ms on the MCU); call {@link #init()} again. */
+    /** Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call {@link #init()} again. */
     public void resetSensor() {
         xshut(Vl53l4.XSHUT_RESET);
     }
 
-    /** RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming. */
+    /** RPT_VL53_INFO: sensor identity, pin levels and bridge counters ({@code i2cErrors} is cleared by a successful XSHUT reset). Safe while streaming. */
     public Vl53l4.Vl53l4Info bridgeInfo() {
         return request(Vl53l4.Vl53l4Cmd.GET_INFO.value, null, expectReport(Vl53l4.Vl53l4Rpt.INFO.value, Vl53l4.Vl53l4Info::unpack));
     }
@@ -277,7 +277,7 @@ public final class Vl53l4cdDevice extends DepzDevice {
 
     private void requireNotRanging() {
         if (ranging) {
-            throw new IllegalStateException("stopRanging() first — the stream owns the register bank");
+            throw new InvalidStateException("stopRanging() first — the stream owns the register bank");
         }
     }
 
@@ -295,7 +295,7 @@ public final class Vl53l4cdDevice extends DepzDevice {
             streamParseErrors.incrementAndGet();
             return true;
         }
-        measurements.emit(m);
+        measurements.emit(m, stats());
         return true;
     }
 

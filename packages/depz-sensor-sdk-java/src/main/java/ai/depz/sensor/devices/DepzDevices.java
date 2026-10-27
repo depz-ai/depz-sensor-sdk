@@ -5,9 +5,7 @@ import ai.depz.sensor.usb.Discovery;
 import ai.depz.sensor.usb.UsbIds;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Opening devices (contract 02 §4, contract 07 §2): the probe, class resolution and continuing a
@@ -133,16 +131,13 @@ public final class DepzDevices {
      * enumerate) replaces enumeration with an explicit list.
      */
     public static List<DeviceInfo> listDepzDevices(List<String> ports, boolean matchUsb, Duration timeout) {
-        Map<String, SerialPorts.SerialPortInfo> enumerated = new HashMap<>();
-        for (SerialPorts.SerialPortInfo p : SerialPorts.list()) {
-            enumerated.put(p.port(), p);
-        }
+        List<SerialPorts.SerialPortInfo> enumerated = SerialPorts.list();
         List<SerialPorts.SerialPortInfo> candidates = new ArrayList<>();
         if (ports == null) {
-            candidates.addAll(enumerated.values());
+            candidates.addAll(enumerated);
         } else {
             for (String p : ports) {
-                candidates.add(enumerated.getOrDefault(p, new SerialPorts.SerialPortInfo(p, null, null, null)));
+                candidates.add(portId(enumerated, p));
             }
         }
         if (matchUsb) {
@@ -199,7 +194,11 @@ public final class DepzDevices {
         return openProbed(candidates.get(index).port(), timeout);
     }
 
-    /** Open exactly {@code port} as its sensor class (also a port whose USB id is not a DEPZ one). */
+    /**
+     * Open exactly {@code port} as its sensor class (also a port whose USB id is not a DEPZ one). The
+     * USB id is that of the enumerated port the path names under any alias ({@code /dev/serial/by-id/…};
+     * contract 02 §4.3).
+     */
     public static DepzDevice openPort(String port, Duration timeout) {
         return openProbed(port, timeout);
     }
@@ -305,18 +304,25 @@ public final class DepzDevices {
         return SerialPorts.bySerial(all);
     }
 
+    /**
+     * {@code port} with the USB identity of the enumerated port it names under any alias
+     * ({@link SerialPorts#find}); none when the OS does not list it. The port stays {@code port}: an
+     * explicit path is opened as given.
+     */
+    private static SerialPorts.SerialPortInfo portId(List<SerialPorts.SerialPortInfo> enumerated, String port) {
+        SerialPorts.SerialPortInfo found = SerialPorts.find(enumerated, port);
+        return found == null
+                ? new SerialPorts.SerialPortInfo(port, null, null, null)
+                : new SerialPorts.SerialPortInfo(port, found.vid(), found.pid(), found.usbSerial());
+    }
+
     private static DepzDevice openProbed(String port, Duration timeout) {
         DeviceInfo info = probePort(port, timeout);
         if (info == null) {
-            throw new DeviceLostException("no DEPZ device answered on " + port);
+            throw new NoDepzDeviceException("no DEPZ device answered on " + port);
         }
-        SerialPorts.SerialPortInfo pi = null;
-        for (SerialPorts.SerialPortInfo p : SerialPorts.list()) {
-            if (p.port().equals(port)) {
-                pi = p;
-            }
-        }
-        return openResolved(info, pi == null ? null : pi.vid(), pi == null ? null : pi.pid(), timeout);
+        SerialPorts.SerialPortInfo pi = portId(SerialPorts.list(), port);
+        return openResolved(info, pi.vid(), pi.pid(), timeout);
     }
 
     // The probe ran on a connection of its own (closed); the class opens the port afresh.

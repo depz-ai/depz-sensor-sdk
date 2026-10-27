@@ -12,6 +12,7 @@
 mod common;
 
 use depz_sensor_sdk::framing::{Event, PacketParser};
+use depz_sensor_sdk::vl53l7::STREAM_CHUNK_MAX;
 use depz_sensor_sdk::vl53l8::{parse_frame, unpack_frame_chunk, FrameReassembler, Variant};
 use serde_json::Value;
 
@@ -31,7 +32,11 @@ struct DecodedFrame {
 }
 
 fn ints(v: &Value) -> Vec<i64> {
-    v.as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect()
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_i64().unwrap())
+        .collect()
 }
 
 fn replay(stem: &str, resolution: usize, with_cnh: bool) {
@@ -44,7 +49,7 @@ fn replay(stem: &str, resolution: usize, with_cnh: bool) {
     assert_eq!(expected["software_name"].as_str(), Some("APP_VL53L7_v0.53"));
 
     let mut parser = PacketParser::new();
-    let mut reasm = FrameReassembler::new();
+    let mut reasm = FrameReassembler::with_chunk_max(STREAM_CHUNK_MAX);
     let mut frames: Vec<DecodedFrame> = Vec::new();
 
     let mut lines = rec.lines();
@@ -110,13 +115,27 @@ fn replay(stem: &str, resolution: usize, with_cnh: bool) {
             target_status: ints(&want["target_status"]),
             nb_target_detected: ints(&want["nb_target_detected"]),
             cnh_raw: if with_cnh {
-                Some(want["cnh_raw"].as_str().expect("sidecar cnh_raw").to_string())
+                Some(
+                    want["cnh_raw"]
+                        .as_str()
+                        .expect("sidecar cnh_raw")
+                        .to_string(),
+                )
             } else {
-                assert!(want.get("cnh_raw").is_none(), "{} frame {}: unexpected cnh_raw", stem, idx);
+                assert!(
+                    want.get("cnh_raw").is_none(),
+                    "{} frame {}: unexpected cnh_raw",
+                    stem,
+                    idx
+                );
                 None
             },
         };
-        assert_eq!(want_frame.resolution, resolution, "{} frame {} resolution", stem, idx);
+        assert_eq!(
+            want_frame.resolution, resolution,
+            "{} frame {} resolution",
+            stem, idx
+        );
         assert_eq!(*got, want_frame, "{} frame {}", stem, idx);
     }
 

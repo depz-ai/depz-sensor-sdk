@@ -128,6 +128,12 @@ export function unpackTemperature(p: Uint8Array): TemperatureReport {
   return { timestampUs: v.getBigUint64(0, true), rawDecidegrees: v.getInt16(8, true) };
 }
 
+/** RPT_PAYLOAD_CRC_TYPE: the device→host payload CRC mode (one byte). */
+export function unpackPayloadCrcType(p: Uint8Array): number {
+  needBytes("RPT_PAYLOAD_CRC_TYPE", p, 1);
+  return p[0]!;
+}
+
 export function unpackSequenceError(p: Uint8Array): SequenceErrorReport {
   needBytes("RPT_SEQUENCE_ERROR", p, 2);
   return { expectedSeq: p[0]!, receivedSeq: p[1]! };
@@ -137,6 +143,20 @@ export function packSyncTime(pcTimestampUs: bigint): Uint8Array {
   const out = new Uint8Array(8);
   new DataView(out.buffer).setBigUint64(0, checkU64("pcTimestampUs", pcTimestampUs), true);
   return out;
+}
+
+/** SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2). */
+export const PAYLOAD_CRC_TYPE_MAX = 3;
+
+/**
+ * SET_PAYLOAD_CRC_TYPE payload `crc_type u8`, 0..3 (contract 02 §2), else
+ * RangeError — checked before anything is written (contract 07 §3).
+ */
+export function packSetPayloadCrcType(crcType: number): Uint8Array {
+  if (checkUint("crcType", crcType, 8) > PAYLOAD_CRC_TYPE_MAX) {
+    throw new RangeError(`crcType: ${crcType} is not a CrcType 0..${PAYLOAD_CRC_TYPE_MAX}`);
+  }
+  return Uint8Array.of(crcType);
 }
 
 /** Logical AUX sync pins (contract 02 §6). */

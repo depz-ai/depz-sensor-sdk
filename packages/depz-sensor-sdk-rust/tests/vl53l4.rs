@@ -8,9 +8,9 @@ mod common;
 use depz_sensor_sdk::protocol::identity::{self, SensorType};
 use depz_sensor_sdk::vl53l4::{
     config_block, decode_offset, decode_range_timing, decode_sigma_threshold,
-    decode_signal_threshold, decode_xtalk, try_offset_raw, pack_read_reg, pack_set_i2c_speed,
-    pack_start_stream, pack_write_reg, pack_xshut, parse_result_block, range_timing_registers,
-    sigma_threshold_raw, signal_threshold_raw, try_xtalk_raw, RegData, StreamData, Vl53l4Info,
+    decode_signal_threshold, decode_xtalk, pack_read_reg, pack_set_i2c_speed, pack_start_stream,
+    pack_write_reg, pack_xshut, parse_result_block, range_timing_registers, sigma_threshold_raw,
+    signal_threshold_raw, try_offset_raw, try_xtalk_raw, RegData, StreamData, Vl53l4Info,
     CONFIG_ADDR, DEFAULT_CONFIGURATION,
 };
 use serde_json::Value;
@@ -18,6 +18,29 @@ use serde_json::Value;
 use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, reg_reads, seen};
 
 // ---- vl53l4.json: "encode" -------------------------------------------------
+
+/// contract 10 §1 (ERRATA A13): READ_REG `len` 1..253 and `addr + len <= 0x10000`,
+/// like WRITE_REG — refused on the host, nothing is sent.
+#[test]
+fn vl53l4_read_reg_limits_are_checked_on_the_host() {
+    use depz_sensor_sdk::vl53l4::{try_pack_read_reg, try_pack_write_reg};
+    assert!(try_pack_read_reg(0x89, 0).is_err());
+    assert!(try_pack_read_reg(0, 254).is_err());
+    assert!(try_pack_read_reg(0xFFFF, 2).is_err());
+    assert_eq!(
+        try_pack_read_reg(0xFF03, 253).unwrap(),
+        [0x03, 0xFF, 0xFD, 0x00]
+    );
+    assert_eq!(
+        try_pack_read_reg(0xFFFF, 1).unwrap(),
+        [0xFF, 0xFF, 0x01, 0x00]
+    );
+    assert!(try_pack_write_reg(0xFFFF, &[1, 2]).is_err());
+    assert_eq!(
+        try_pack_write_reg(0xFFFF, &[1]).unwrap(),
+        vec![0xFF, 0xFF, 1]
+    );
+}
 
 #[test]
 fn vl53l4_encode_vectors() {
@@ -40,9 +63,7 @@ fn vl53l4_encode_vectors() {
                 c["len"].as_u64().unwrap() as u16,
                 c["flags"].as_u64().unwrap() as u8,
             )),
-            "set_i2c_speed" => {
-                hex_encode(&pack_set_i2c_speed(c["khz"].as_u64().unwrap() as u16))
-            }
+            "set_i2c_speed" => hex_encode(&pack_set_i2c_speed(c["khz"].as_u64().unwrap() as u16)),
             other => panic!("unknown vl53l4 encode kind {}", other),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
@@ -73,13 +94,25 @@ fn vl53l4_decode_vectors() {
             0x92 => {
                 let r = Vl53l4Info::unpack(&payload).unwrap();
                 assert_eq!(r.int_edges as u64, expect["int_edges"].as_u64().unwrap());
-                assert_eq!(r.slots_skipped as u64, expect["slots_skipped"].as_u64().unwrap());
+                assert_eq!(
+                    r.slots_skipped as u64,
+                    expect["slots_skipped"].as_u64().unwrap()
+                );
                 assert_eq!(r.i2c_errors as u64, expect["i2c_errors"].as_u64().unwrap());
-                assert_eq!(r.last_i2c_error as u64, expect["last_i2c_error"].as_u64().unwrap());
+                assert_eq!(
+                    r.last_i2c_error as u64,
+                    expect["last_i2c_error"].as_u64().unwrap()
+                );
                 assert_eq!(r.model_id as u64, expect["model_id"].as_u64().unwrap());
                 assert_eq!(r.fw_status as u64, expect["fw_status"].as_u64().unwrap());
-                assert_eq!(r.initialized as u64, expect["initialized"].as_u64().unwrap());
-                assert_eq!(r.xshut_level as u64, expect["xshut_level"].as_u64().unwrap());
+                assert_eq!(
+                    r.initialized as u64,
+                    expect["initialized"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    r.xshut_level as u64,
+                    expect["xshut_level"].as_u64().unwrap()
+                );
                 assert_eq!(r.int_level as u64, expect["int_level"].as_u64().unwrap());
                 assert_eq!(r.i2c_khz as u64, expect["i2c_khz"].as_u64().unwrap());
             }
@@ -109,8 +142,18 @@ fn vl53l4_result_block_vectors() {
         let raw = hex_decode(c["raw"].as_str().unwrap());
         let r = parse_result_block(&raw).unwrap();
         let expect = &c["expect"];
-        assert_eq!(r.range_status as u64, expect["range_status"].as_u64().unwrap(), "{}", c["name"]);
-        assert_eq!(r.distance_mm as u64, expect["distance_mm"].as_u64().unwrap(), "{}", c["name"]);
+        assert_eq!(
+            r.range_status as u64,
+            expect["range_status"].as_u64().unwrap(),
+            "{}",
+            c["name"]
+        );
+        assert_eq!(
+            r.distance_mm as u64,
+            expect["distance_mm"].as_u64().unwrap(),
+            "{}",
+            c["name"]
+        );
         assert_eq!(
             r.ambient_rate_kcps as u64,
             expect["ambient_rate_kcps"].as_u64().unwrap(),
@@ -141,13 +184,33 @@ fn vl53l4_result_block_vectors() {
             "{}",
             c["name"]
         );
-        assert_eq!(r.sigma_mm as u64, expect["sigma_mm"].as_u64().unwrap(), "{}", c["name"]);
-        assert_eq!(r.stream_count as u64, expect["stream_count"].as_u64().unwrap(), "{}", c["name"]);
+        assert_eq!(
+            r.sigma_mm as u64,
+            expect["sigma_mm"].as_u64().unwrap(),
+            "{}",
+            c["name"]
+        );
+        assert_eq!(
+            r.stream_count as u64,
+            expect["stream_count"].as_u64().unwrap(),
+            "{}",
+            c["name"]
+        );
         seen(c);
         n += 1;
     }
     assert!(n > 0);
-    assert!(parse_result_block(&[0u8; 14]).is_err(), "short block must error");
+    // contract 10 §5 (ERRATA A8): the block is 17 bytes — 15 and 16 are short, a tail is ignored
+    for short in [0usize, 14, 15, 16] {
+        assert!(
+            parse_result_block(&vec![0u8; short]).is_err(),
+            "{short}-byte block must error"
+        );
+    }
+    assert_eq!(
+        parse_result_block(&[0u8; 17]).unwrap(),
+        parse_result_block(&[0u8; 19]).unwrap()
+    );
     eprintln!("vl53l4.json: {} result_block cases", n);
 }
 
@@ -166,9 +229,24 @@ fn vl53l4_timing_vectors() {
             c["clock_pll"].as_u64().unwrap() as u16,
         )
         .unwrap();
-        assert_eq!(a as u64, c["range_config_a"].as_u64().unwrap(), "A {}", c["name"]);
-        assert_eq!(b as u64, c["range_config_b"].as_u64().unwrap(), "B {}", c["name"]);
-        assert_eq!(raw as u64, c["intermeasurement_raw"].as_u64().unwrap(), "raw {}", c["name"]);
+        assert_eq!(
+            a as u64,
+            c["range_config_a"].as_u64().unwrap(),
+            "A {}",
+            c["name"]
+        );
+        assert_eq!(
+            b as u64,
+            c["range_config_b"].as_u64().unwrap(),
+            "B {}",
+            c["name"]
+        );
+        assert_eq!(
+            raw as u64,
+            c["intermeasurement_raw"].as_u64().unwrap(),
+            "raw {}",
+            c["name"]
+        );
         enc += 1;
     }
 
@@ -181,7 +259,12 @@ fn vl53l4_timing_vectors() {
             c["range_config_a"].as_u64().unwrap() as u16,
         )
         .unwrap();
-        assert_eq!(budget_ms as u64, c["timing_budget_ms"].as_u64().unwrap(), "budget {}", c["name"]);
+        assert_eq!(
+            budget_ms as u64,
+            c["timing_budget_ms"].as_u64().unwrap(),
+            "budget {}",
+            c["name"]
+        );
         assert_eq!(
             inter_ms as u64,
             c["inter_measurement_ms"].as_u64().unwrap(),
@@ -213,15 +296,40 @@ fn vl53l4_tuning_vectors() {
         let raw = c["raw"].as_u64().unwrap() as u16;
         match c["kind"].as_str().unwrap() {
             "offset" => {
-                assert_eq!(try_offset_raw(value as i32).unwrap(), raw, "offset raw {}", c["name"]);
-                assert_eq!(decode_offset(raw) as i64, value, "offset decode {}", c["name"]);
+                assert_eq!(
+                    try_offset_raw(value as i32).unwrap(),
+                    raw,
+                    "offset raw {}",
+                    c["name"]
+                );
+                assert_eq!(
+                    decode_offset(raw) as i64,
+                    value,
+                    "offset decode {}",
+                    c["name"]
+                );
             }
             "xtalk" => {
-                assert_eq!(try_xtalk_raw(value as u16).unwrap(), raw, "xtalk raw {}", c["name"]);
-                assert_eq!(decode_xtalk(raw) as i64, value, "xtalk decode {}", c["name"]);
+                assert_eq!(
+                    try_xtalk_raw(value as u16).unwrap(),
+                    raw,
+                    "xtalk raw {}",
+                    c["name"]
+                );
+                assert_eq!(
+                    decode_xtalk(raw) as i64,
+                    value,
+                    "xtalk decode {}",
+                    c["name"]
+                );
             }
             "signal_threshold" => {
-                assert_eq!(signal_threshold_raw(value as u16), raw, "signal raw {}", c["name"]);
+                assert_eq!(
+                    signal_threshold_raw(value as u16),
+                    raw,
+                    "signal raw {}",
+                    c["name"]
+                );
                 assert_eq!(
                     decode_signal_threshold(raw) as i64,
                     value,
@@ -236,7 +344,12 @@ fn vl53l4_tuning_vectors() {
                     "sigma raw {}",
                     c["name"]
                 );
-                assert_eq!(decode_sigma_threshold(raw) as i64, value, "sigma decode {}", c["name"]);
+                assert_eq!(
+                    decode_sigma_threshold(raw) as i64,
+                    value,
+                    "sigma decode {}",
+                    c["name"]
+                );
             }
             other => panic!("unknown vl53l4 tuning kind {}", other),
         }
@@ -244,7 +357,10 @@ fn vl53l4_tuning_vectors() {
         n += 1;
     }
     assert!(n > 0);
-    assert!(sigma_threshold_raw(16384).is_err(), "sigma_mm > 16383 must error");
+    assert!(
+        sigma_threshold_raw(16384).is_err(),
+        "sigma_mm > 16383 must error"
+    );
     eprintln!("vl53l4.json: {} tuning cases (both directions)", n);
 }
 
@@ -258,7 +374,12 @@ fn vl53l4_xtalk_decode_vectors() {
     assert!(!cases.is_empty());
     for c in cases {
         let raw = c["raw"].as_u64().unwrap() as u16;
-        assert_eq!(decode_xtalk(raw) as u64, c["kcps"].as_u64().unwrap(), "xtalk decode {}", raw);
+        assert_eq!(
+            decode_xtalk(raw) as u64,
+            c["kcps"].as_u64().unwrap(),
+            "xtalk decode {}",
+            raw
+        );
         seen(c);
     }
 }
@@ -329,9 +450,15 @@ fn vl53l4cd_session_recording() {
     let exp = load("recordings/vl53l4cd_session.expected.json");
     let pkts = recording_packets("vl53l4cd_session.depzrec");
     let sw = recorded_text(&pkts, Cmd::GetNameActiveSoftware).expect("software name");
-    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(SensorType::Vl53l4));
+    assert_eq!(
+        identity::parse_software_name(&sw).sensor_type,
+        Some(SensorType::Vl53l4)
+    );
     assert_eq!(sw, exp["software_name"].as_str().unwrap());
-    assert_eq!(recorded_text(&pkts, Cmd::GetDeviceName).as_deref(), exp["device_name"].as_str());
+    assert_eq!(
+        recorded_text(&pkts, Cmd::GetDeviceName).as_deref(),
+        exp["device_name"].as_str()
+    );
 
     let mut info = None;
     let mut stream = Vec::new();
@@ -340,7 +467,11 @@ fn vl53l4cd_session_recording() {
             0x92 if info.is_none() => info = Some(Vl53l4Info::unpack(&p.payload).unwrap()),
             0x93 => {
                 let s = StreamData::unpack(&p.payload).unwrap();
-                assert_eq!((s.addr, s.len), (RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN), "stream block");
+                assert_eq!(
+                    (s.addr, s.len),
+                    (RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN),
+                    "stream block"
+                );
                 stream.push(s);
             }
             _ => {}
@@ -373,9 +504,17 @@ fn vl53l4cd_session_recording() {
         reg(RANGE_CONFIG_A) as u16,
     )
     .unwrap();
-    let timing: Vec<u64> = exp["timing"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    let timing: Vec<u64> = exp["timing"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_u64().unwrap())
+        .collect();
     assert_eq!(vec![budget as u64, inter as u64], timing, "timing");
-    assert_eq!(decode_offset(reg(RANGE_OFFSET_MM) as u16) as i64, exp["offset_mm"].as_i64().unwrap());
+    assert_eq!(
+        decode_offset(reg(RANGE_OFFSET_MM) as u16) as i64,
+        exp["offset_mm"].as_i64().unwrap()
+    );
     assert_eq!(
         decode_xtalk(reg(XTALK_PLANE_OFFSET_KCPS) as u16) as u64,
         exp["xtalk_kcps"].as_u64().unwrap()
@@ -388,7 +527,12 @@ fn vl53l4cd_session_recording() {
     }
     // The stream may run past the sidecar before the stop lands; match the first N.
     let want = exp["frames"].as_array().unwrap();
-    assert!(stream.len() >= want.len(), "{} < {} frames", stream.len(), want.len());
+    assert!(
+        stream.len() >= want.len(),
+        "{} < {} frames",
+        stream.len(),
+        want.len()
+    );
     for (idx, (s, w)) in stream.iter().zip(want).enumerate() {
         assert_measurement(&s.data, s.timestamp_us, w, &format!("frame {}", idx));
     }
@@ -403,7 +547,12 @@ fn vl53l4cd_session_recording() {
 fn vl53l4_math_rejects_instead_of_panicking() {
     use depz_sensor_sdk::vl53l4::Vl53l4Error;
     for osc in [1u16, 2, 4, 8] {
-        assert_eq!(range_timing_registers(50, 0, osc, 0), Err(Vl53l4Error::MacroPeriodZero), "osc {}", osc);
+        assert_eq!(
+            range_timing_registers(50, 0, osc, 0),
+            Err(Vl53l4Error::MacroPeriodZero),
+            "osc {}",
+            osc
+        );
     }
     assert_eq!(
         range_timing_registers(87, 2_147_483_647, 13927, 2559),

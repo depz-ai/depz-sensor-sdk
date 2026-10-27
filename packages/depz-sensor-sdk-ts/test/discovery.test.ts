@@ -226,6 +226,20 @@ describe("discovery engine", () => {
     }
   });
 
+  it("explicit port path the OS does not list warns too (ERRATA A5)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // /dev/ttyS0 answers (the IMU spec) but is not among the enumerated ports.
+    const dev = await openDeviceFrom(ports().filter((p) => p.path !== "/dev/ttyS0"), factory, "/dev/ttyS0");
+    try {
+      expect(dev).toBeInstanceOf(Bno086);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toContain("vid=?, pid=?");
+    } finally {
+      await dev.close();
+      warn.mockRestore();
+    }
+  });
+
   it("throws NoDepzDeviceError when nothing matches the serial", async () => {
     await expect(openDeviceFrom(ports(), factory, undefined, { serial: "SNXXX" })).rejects.toThrow(
       NoDepzDeviceError,

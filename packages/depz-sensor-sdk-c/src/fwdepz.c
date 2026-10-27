@@ -36,6 +36,9 @@ depz_fwdepz_result depz_fwdepz_parse(const uint8_t *blob, size_t len,
     size_t payload_len = len - DEPZ_FWDEPZ_HEADER_SIZE;
     if (fw_size != payload_len)
         return DEPZ_FWDEPZ_ERR_SIZE;
+    /* Sections are 0-based; every shipped file is section 0 of 1 (ERRATA B9). */
+    if (blob[20] != 0 || blob[21] != 1)
+        return DEPZ_FWDEPZ_ERR_SECTION;
 
     if (out) {
         out->load_addr = load_addr;

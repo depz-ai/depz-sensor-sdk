@@ -22,9 +22,9 @@ register math. For what the sensor is and its concepts, read the
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::{open_on_link, AnyDevice};
+use depz_sensor_sdk::devices::open_first_device;
 
-let tof = open_on_link(link, None, None, None)?.into_vl53l4cd()?;
+let tof = open_first_device(None)?.into_vl53l4cd()?;
 tof.init(None)?;                           // default config block + VHV, bus left at 1 MHz
 tof.set_range_timing(33, 0)?;              // 33 ms budget, continuous
 let (budget, inter) = tof.get_range_timing()?; // what the sensor holds: (32, 0)

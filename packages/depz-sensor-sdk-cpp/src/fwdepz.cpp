@@ -57,6 +57,11 @@ FwDepzImage FwDepzImage::parse(byte_span blob) {
     if (fw_size != payload.size()) {
         throw FwDepzError(FwDepzErrorKind::Size, "fw_size does not match payload length");
     }
+    // Sections are 0-based; every shipped file is section 0 of 1 (ERRATA B9).
+    if (cur_sec != 0 || tot_sec != 1) {
+        throw FwDepzError(FwDepzErrorKind::Section,
+                          "only section 0 of 1 is supported (multi-section files are not)");
+    }
     return FwDepzImage{load_addr, fw_size, fw_crc32, cur_sec, tot_sec, std::move(payload)};
 }
 

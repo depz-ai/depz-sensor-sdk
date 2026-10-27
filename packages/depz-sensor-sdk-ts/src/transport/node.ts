@@ -4,6 +4,8 @@
  * browser bundles stay serialport-free.
  */
 
+import { realpathSync, statSync } from "node:fs";
+
 import {
   listDepzDevicesFrom,
   openDeviceFrom,
@@ -162,18 +164,54 @@ export async function listDepzDevices(opts: ListOptions = {}): Promise<DeviceInf
   return listDepzDevicesFrom(ports, nodeFactory, opts);
 }
 
+/** `a` and `b` name the same port: the same resolved path (`/dev/serial/by-id/…`
+ * is a symlink to the node), or the same character device under two names (a
+ * zero device number is no node). POSIX only: a COM port is not a file, and
+ * resolving one (realpath, stat) opens it — a DTR pulse on every board of the
+ * bench — so on Windows a COM name is matched by string only. */
+function samePort(a: string, b: string): boolean {
+  if (process.platform === "win32") return false;
+  try {
+    if (realpathSync(a) === realpathSync(b)) return true;
+  } catch {
+    // not a path the OS resolves (a COM name, a port that is gone)
+  }
+  try {
+    const sa = statSync(a);
+    const sb = statSync(b);
+    return sa.isCharacterDevice() && sb.isCharacterDevice() && sa.rdev !== 0 && sa.rdev === sb.rdev;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The enumerated ports, plus `path` with the USB identity of the enumerated
+ * port it is an alias of (contract 02 §4.3, ERRATA A5) — so `openDeviceFrom`
+ * resolves the class of `/dev/serial/by-id/…` as it does of `/dev/ttyACM0`.
+ * A path listed verbatim, or an alias of nothing listed, leaves `ports` as is;
+ * on Windows a COM name is matched by string only.
+ */
+export function withAlias(ports: DepzPortInfo[], path: string): DepzPortInfo[] {
+  if (ports.some((p) => p.path === path)) return ports;
+  const port = ports.find((p) => samePort(path, p.path));
+  return port === undefined ? ports : [...ports, { ...port, path }];
+}
+
 /**
  * Open the right sensor class for `target` over `serialport` (Node only).
  *
- * `target` is a port path (string), a candidate index (number, sorted by USB
- * iSerial), a `DeviceInfo` from `listDepzDevices()`, or omitted for the
- * lowest-serial candidate. Throws `NoDepzDeviceError` when nothing matches —
- * it never grabs an arbitrary system port. See {@link openDeviceFrom}.
+ * `target` is a port path (string, under any alias of the enumerated port:
+ * `/dev/serial/by-id/…`), a candidate index (number, sorted by USB iSerial),
+ * a `DeviceInfo` from `listDepzDevices()`, or omitted for the lowest-serial
+ * candidate. Throws `NoDepzDeviceError` when nothing matches — it never
+ * grabs an arbitrary system port. See {@link openDeviceFrom}.
  */
 export async function openDevice(
   target?: OpenTarget,
   opts: OpenDeviceOptions = {},
 ): Promise<DepzDevice> {
-  const ports = (await listSerialPorts()).map(toPortInfo);
+  let ports = (await listSerialPorts()).map(toPortInfo);
+  if (typeof target === "string") ports = withAlias(ports, target);
   return openDeviceFrom(ports, nodeFactory, target, opts);
 }

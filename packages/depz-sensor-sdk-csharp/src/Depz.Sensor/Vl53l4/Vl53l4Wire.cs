@@ -63,21 +63,24 @@ public static class Vl53l4Wire
     /// </summary>
     public static ReadOnlySpan<int> I2cKhzSteps => new[] { 100, 200, 400, 500, 600, 700, 800, 900, 1000 };
 
-    /// <summary>VL53_READ_REG payload: addr u16 LE, len u16 LE.</summary>
+    /// <summary>VL53_READ_REG payload: addr u16 LE, len u16 LE, with the transfer limit of contract 10 §1 — len 1..<see cref="XferMax"/> and addr + len ≤ 0x10000.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">len outside 1..<see cref="XferMax"/> or the read runs past 0xFFFF.</exception>
     public static byte[] PackReadReg(ushort addr, ushort len)
     {
+        if (len < 1 || len > XferMax || addr + len > 0x10000)
+            throw new ArgumentOutOfRangeException(nameof(len), len, $"READ_REG len must be 1..{XferMax} and addr+len <= 0x10000");
         var buf = new byte[4];
         BinaryPrimitives.WriteUInt16LittleEndian(buf, addr);
         BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(2), len);
         return buf;
     }
 
-    /// <summary>VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..<see cref="XferMax"/> bytes).</summary>
-    /// <exception cref="ArgumentOutOfRangeException">data is empty or longer than <see cref="XferMax"/>.</exception>
+    /// <summary>VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..<see cref="XferMax"/> bytes, addr + N ≤ 0x10000).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">data is empty, longer than <see cref="XferMax"/>, or the write runs past 0xFFFF.</exception>
     public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
     {
-        if (data.Length < 1 || data.Length > XferMax)
-            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes");
+        if (data.Length < 1 || data.Length > XferMax || addr + data.Length > 0x10000)
+            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes and addr+N <= 0x10000");
         var buf = new byte[2 + data.Length];
         BinaryPrimitives.WriteUInt16LittleEndian(buf, addr);
         data.CopyTo(buf.AsSpan(2));
@@ -121,8 +124,11 @@ public sealed record Vl53l4RegData(byte Cmd, ulong TimestampUs, byte[] Data)
 }
 
 /// <summary>
-/// RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters are
-/// free-running and wrap silently; watch increments, not absolute values.
+/// RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters wrap
+/// silently; watch increments, not absolute values. <see cref="I2cErrors"/>
+/// counts since the last successful XSHUT reset (the bridge clears it there),
+/// not since power-up. <see cref="Initialized"/> = 1 when MODEL_ID read back as
+/// 0xEBAA on this GET_INFO.
 /// <see cref="ModelId"/> expected 0xEBAA, <see cref="FwStatus"/> expected 0x03
 /// (booted). <see cref="LastI2cError"/>: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 /// </summary>

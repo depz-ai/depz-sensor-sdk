@@ -12,6 +12,7 @@ struct fake_sr04 {
     depz_mutex  lock;
     depz_parser parser;
     bool        silent;
+    bool        short_temperature;
     uint8_t     tx_seq;
     uint32_t    sample_period_us;
     uint16_t    echo_decay_us;
@@ -19,6 +20,9 @@ struct fake_sr04 {
     bool        loop_running;
     uint64_t    mcu_time_us;
     int16_t     temperature_raw;
+    const char *software;      /* GET_NAME_ACTIVE_SOFTWARE; NULL = FAKE_SR04_SOFTWARE */
+    uint8_t     cmds[64];      /* the first host commands, in order */
+    size_t      n_cmds;
 };
 
 static void put_u16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
@@ -32,7 +36,7 @@ static void send_locked(fake_sr04 *f, uint8_t cmd, const uint8_t *payload, size_
     uint8_t frame[300];
     size_t n;
     if (depz_build_packet(cmd, payload, len, f->tx_seq, DEPZ_CRC_NONE, frame, sizeof frame, &n) == 0) {
-        if (depz_link_write(f->side, frame, n) == DEPZ_OK) f->tx_seq++;
+        if (depz_link_write(f->side, frame, n) == DEPZ_OK) f->tx_seq = (uint8_t)(f->tx_seq + 1); /* wraps mod 256 (contract 01 §5) */
     }
 }
 
@@ -67,9 +71,10 @@ static void measurement_locked(fake_sr04 *f, uint8_t source)
 static void handle(fake_sr04 *f, uint8_t cmd, const uint8_t *p, size_t len)
 {
     uint8_t out[24];
+    if (f->n_cmds < sizeof f->cmds) f->cmds[f->n_cmds++] = cmd;
     switch (cmd) {
     case 0x03: text(f, cmd, FAKE_SR04_NAME); break;
-    case 0x04: text(f, cmd, FAKE_SR04_SOFTWARE); break;
+    case 0x04: text(f, cmd, f->software ? f->software : FAKE_SR04_SOFTWARE); break;
     case 0x05: text(f, cmd, FAKE_SR04_SERIAL); break;
     case 0x06: { /* SYNC_TIME: zero device-processing gap, so rtt >= 0 */
         uint64_t t2 = f->mcu_time_us + 500;
@@ -83,7 +88,7 @@ static void handle(fake_sr04 *f, uint8_t cmd, const uint8_t *p, size_t len)
     case 0x07:
         put_u64(out, f->mcu_time_us);
         put_u16(out + 8, (uint16_t)f->temperature_raw);
-        send_locked(f, 0x83, out, 10);
+        send_locked(f, 0x83, out, f->short_temperature ? 3 : 10);
         break;
     case 0x31:
         if (len != 3 || p[0] < 1 || p[0] > 5 || p[1] > 4 || p[2] > 1) status(f, cmd, 0x04);
@@ -198,6 +203,30 @@ bool fake_sr04_loop_running(fake_sr04 *f)
     v = f->loop_running;
     depz_mutex_unlock(&f->lock);
     return v;
+}
+
+void fake_sr04_set_short_temperature(fake_sr04 *f, bool on)
+{
+    depz_mutex_lock(&f->lock);
+    f->short_temperature = on;
+    depz_mutex_unlock(&f->lock);
+}
+
+void fake_sr04_set_software(fake_sr04 *f, const char *name)
+{
+    depz_mutex_lock(&f->lock);
+    f->software = name;
+    depz_mutex_unlock(&f->lock);
+}
+
+size_t fake_sr04_commands(fake_sr04 *f, uint8_t *out, size_t cap)
+{
+    size_t n;
+    depz_mutex_lock(&f->lock);
+    n = f->n_cmds;
+    memcpy(out, f->cmds, n < cap ? n : cap);
+    depz_mutex_unlock(&f->lock);
+    return n;
 }
 
 void fake_sr04_send_measurement(fake_sr04 *f, uint8_t source_cmd)

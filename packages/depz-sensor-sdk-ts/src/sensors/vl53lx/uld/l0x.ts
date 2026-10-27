@@ -16,7 +16,7 @@
 
 import { I2C_KHZ_BOOT, ProtocolError, Vl53Error } from "./link.js";
 import { measurement, SensorDriver, type BridgePlatform, type Measurement } from "./base.js";
-import { floorDiv, pyRound, shl, shr, u32 } from "./arith.js";
+import { floorDiv, i16, pyRound, shl, shr, u32 } from "./arith.js";
 
 export const L0X_API_VERSION = [1, 0, 4] as const;
 
@@ -101,6 +101,19 @@ export const CHECK_NUMBER_OF_CHECKS = 6;
 export const DEFAULT_MAX_LOOP = 2000;
 /** 20 Mcps in 9.7 format, the ref-SPAD target. */
 export const TARGET_REF_RATE = 0x0a00;
+/** cMinTimingBudgetMicroSeconds: the C driver refuses anything under it. */
+export const MIN_TIMING_BUDGET_US = 20000;
+
+/**
+ * The host-side parameters a tuning buffer may carry in a {0xFF, select,
+ * msb, lsb} record, by select value (VL53L0X_load_tuning_settings()).
+ */
+const TUNING_PARAMS = [
+  "SigmaEstRefArray",
+  "SigmaEstEffPulseWidth",
+  "SigmaEstEffAmbWidth",
+  "TargetRefRate",
+] as const;
 export const SPEED_OF_LIGHT_IN_AIR = 2997;
 export const REF_SPAD_BUFFER_SIZE = 6;
 
@@ -334,6 +347,9 @@ export interface L0xDeviceData {
   PreRangeTimeoutMicroSecs: number;
   FinalRangeTimeoutMicroSecs: number;
   TargetRefRate: number;
+  SigmaEstRefArray: number;
+  SigmaEstEffPulseWidth: number;
+  SigmaEstEffAmbWidth: number;
   LimitChecksEnable: number[];
   LimitChecksValue: number[];
   Part2PartOffsetAdjustmentNVMMicroMeter: number;
@@ -402,6 +418,11 @@ export class VL53L0X extends SensorDriver {
     PreRangeTimeoutMicroSecs: 0,
     FinalRangeTimeoutMicroSecs: 0,
     TargetRefRate: TARGET_REF_RATE,
+    // Stored for the tuning loader; the 1.0.4 sigma estimate has these
+    // three as constants.
+    SigmaEstRefArray: 100,
+    SigmaEstEffPulseWidth: 900,
+    SigmaEstEffAmbWidth: 500,
     LimitChecksEnable: new Array<number>(CHECK_NUMBER_OF_CHECKS).fill(0),
     LimitChecksValue: new Array<number>(CHECK_NUMBER_OF_CHECKS).fill(0),
     Part2PartOffsetAdjustmentNVMMicroMeter: 0,
@@ -762,8 +783,13 @@ export class VL53L0X extends SensorDriver {
       d.SignalRateMeasFixed400mm = shl(signalRateMeas1104400mm, 9);
       let offsetUm = 0;
       if (distMeas1104400mm !== 0) {
+        // uint32 difference, uint32 product, then an int16_t: the C driver's
+        // types, kept because they are what makes the sign come out right. A
+        // target measured nearer than 400 mm wraps the uint32 difference, and
+        // only the int16 truncation turns that back into the positive offset
+        // it stands for.
         const offset1104Mm = u32(distMeas1104400mm - (400 << 4));
-        offsetUm = -shr(offset1104Mm * 1000, 4);
+        offsetUm = i16(-i16(shr(u32(offset1104Mm * 1000), 4)));
       }
       d.Part2PartOffsetAdjustmentNVMMicroMeter = offsetUm;
     }
@@ -821,7 +847,16 @@ export class VL53L0X extends SensorDriver {
       const numberOfWrites = buffer[index]!;
       index += 1;
       if (numberOfWrites === 0xff) {
-        // Host-side sigma parameters this port does not use.
+        // A host-side parameter: {0xFF, select, msb, lsb}. The three sigma
+        // parameters are constants in the 1.0.4 sigma estimate and only get
+        // stored; the fourth is the rate the reference SPAD management
+        // converges on.
+        const select = buffer[index]!;
+        const name = TUNING_PARAMS[select];
+        if (name === undefined) {
+          throw new Vl53Error(`bad tuning parameter ${select} at offset ${index - 1}`);
+        }
+        this.d[name] = (buffer[index + 1]! << 8) | buffer[index + 2]!;
         index += 3;
       } else if (numberOfWrites <= 4) {
         const address = buffer[index]!;
@@ -951,6 +986,11 @@ export class VL53L0X extends SensorDriver {
 
   // ── timing budget ──
   async setMeasurementTimingBudget(budgetUs: number): Promise<void> {
+    if (budgetUs < MIN_TIMING_BUDGET_US) {
+      throw new Vl53Error(
+        `timing budget ${budgetUs} us is below the ${MIN_TIMING_BUDGET_US} us minimum`,
+      );
+    }
     const steps = await this.getSequenceStepEnables();
     let finalBudgetUs = budgetUs - (START_OVERHEAD_US + END_OVERHEAD_US);
 
@@ -1369,7 +1409,7 @@ export class VL53L0X extends SensorDriver {
   }
 
   /** Apply one of MODES: limits, budget and both VCSEL periods. */
-  override async setMode(name: string): Promise<void> {
+  override async setMode(name: string): Promise<null> {
     const settings = L0X_MODE_SETTINGS.get(name);
     if (settings === undefined) {
       throw new Vl53Error(`no such mode: ${name} (have ${this.MODES.join(", ")})`);
@@ -1383,6 +1423,7 @@ export class VL53L0X extends SensorDriver {
     await this.setVcselPulsePeriod(VCSEL_PERIOD_PRE_RANGE, prePclks);
     await this.setVcselPulsePeriod(VCSEL_PERIOD_FINAL_RANGE, finalPclks);
     this.mode = name;
+    return null;
   }
 
   override async getMode(): Promise<string> {

@@ -99,7 +99,7 @@ std::string resolve_sensor_class(const std::string& software_name, const std::st
         case SensorType::Vl53lx: {
             std::string name = vl53lx::to_string(vl53lx::resolve_class(model, device_name));  // "Vl53l0x"
             std::transform(name.begin(), name.end(), name.begin(),
-                           [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                           [](char ch) { return static_cast<char>(std::tolower(static_cast<unsigned char>(ch))); });
             return name;
         }
         case SensorType::Vl53l4: return "vl53l4cd";

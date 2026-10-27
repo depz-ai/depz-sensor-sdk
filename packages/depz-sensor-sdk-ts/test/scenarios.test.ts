@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
 import { DepzDevice, type StreamQueue } from "../src/device/device.js";
 import { attachSensorClass, openOnTransport, resolveSensorClass } from "../src/discovery.js";
-import { DepzError, DepzTimeoutError, StatusError } from "../src/errors.js";
+import { DepzError, DepzTimeoutError, InvalidReplyError, StatusError } from "../src/errors.js";
 import { parseSoftwareName } from "../src/protocol/identity.js";
 import { DEPZ_USB_MODELS, DEPZ_VID } from "../src/protocol/usb-ids.js";
 import { Bno055 } from "../src/sensors/bno055/bno055.js";
@@ -163,6 +163,7 @@ const fail = (msg: string): never => {
 function errorKind(err: unknown): string | null {
   if (err instanceof DepzTimeoutError) return "timeout";
   if (err instanceof StatusError) return err.status === 0x07 ? "not_supported" : "device_error";
+  if (err instanceof InvalidReplyError) return "invalid_reply";
   if (err instanceof RangeError || err instanceof TypeError) return "invalid_argument";
   // The VL53Lx drivers refuse a mode they lack with Vl53Error, the same type
   // as a sensor that misbehaved; only the message tells them apart.

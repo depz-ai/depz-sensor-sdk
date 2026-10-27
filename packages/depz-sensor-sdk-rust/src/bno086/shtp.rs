@@ -116,7 +116,12 @@ pub fn try_pack_shtp_header(hdr: &ShtpHeader) -> Result<[u8; 4], ShtpError> {
     if hdr.length > LENGTH_MASK {
         return Err(ShtpError::LengthTooWide(hdr.length as usize));
     }
-    let word = hdr.length | if hdr.continuation { CONTINUATION_BIT } else { 0 };
+    let word = hdr.length
+        | if hdr.continuation {
+            CONTINUATION_BIT
+        } else {
+            0
+        };
     let w = word.to_le_bytes();
     Ok([w[0], w[1], hdr.channel, hdr.seq])
 }
@@ -155,7 +160,12 @@ pub fn try_build_frame(channel: u8, payload: &[u8], seq: u8) -> Result<Vec<u8>, 
     if total > LENGTH_MASK as usize {
         return Err(ShtpError::LengthTooWide(total));
     }
-    let hdr = try_pack_shtp_header(&ShtpHeader { length: total as u16, channel, seq, continuation: false })?;
+    let hdr = try_pack_shtp_header(&ShtpHeader {
+        length: total as u16,
+        channel,
+        seq,
+        continuation: false,
+    })?;
     let mut out = Vec::with_capacity(total);
     out.extend_from_slice(&hdr);
     out.extend_from_slice(payload);
@@ -175,7 +185,7 @@ struct ChannelRx {
 /// Per-channel TX sequence counters + RX cargo reassembly.
 #[derive(Debug, Clone)]
 pub struct ShtpLayer {
-    /// Incomplete cargos thrown away.
+    /// Incomplete cargos and junk-channel (≥ 6) frames thrown away.
     pub discarded: u64,
     tx_seqs: [u8; NUM_CHANNELS],
     rx: Vec<ChannelRx>,
@@ -250,8 +260,12 @@ impl ShtpLayer {
         let Ok(hdr) = try_unpack_shtp_header(frame) else {
             return None; // shorter than a header: junk
         };
-        if hdr.channel as usize >= NUM_CHANNELS || (hdr.length as usize) < SHTP_HEADER_SIZE {
-            return None; // padding/"no data" header or junk
+        if (hdr.length as usize) < SHTP_HEADER_SIZE {
+            return None; // padding/"no data" header
+        }
+        if hdr.channel as usize >= NUM_CHANNELS {
+            self.discarded += 1; // junk channel
+            return None;
         }
         let chunk = &frame[SHTP_HEADER_SIZE..];
         let ch = hdr.channel as usize;
@@ -259,8 +273,8 @@ impl ShtpLayer {
         if !hdr.continuation {
             {
                 let rx = &self.rx[ch];
-                if rx.expected != 0 && rx.received != 0 {
-                    self.discarded += 1;
+                if rx.expected != 0 {
+                    self.discarded += 1; // a partial, even one with no bytes yet
                 }
             }
             let rx = &mut self.rx[ch];

@@ -21,6 +21,10 @@
  *     clock model + capture time, measurement assembly, config page and the
  *     embedded sensor firmware (contract 14)
  *   - .fwdepz container parse/validate (contract 06 §2)
+ *   - .depzdata datasets: JSON values, reader (also .gz), writer, the
+ *     record value of each kind, the player (contract 09)
+ *   - the error codes (depz_err) and the per-thread failure detail the live
+ *     layer and the dataset reader report with (depz_last_error())
  *
  * Sensor host-logic (the ST drivers, the BNO086 SH-2 hub protocol) lives in
  * the live layer, depz_sensor_io.h; this header is pure codecs.
@@ -35,6 +39,37 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ======================================================================== */
+/* Errors. Codecs report a bad buffer by their return value; the live layer  */
+/* (depz_sensor_io.h) and the .depzdata reader also leave a message here.    */
+/* ======================================================================== */
+
+typedef enum {
+    DEPZ_OK                 = 0,
+    DEPZ_E_ARG              = -1,  /* bad argument, or not valid in this state */
+    DEPZ_E_NOMEM            = -2,
+    DEPZ_E_IO               = -3,  /* the OS refused: port cannot be opened... */
+    DEPZ_E_CLOSED           = -4,  /* link closed or device lost */
+    DEPZ_E_TIMEOUT          = -5,  /* no reply in time */
+    DEPZ_E_STATUS           = -6,  /* device answered a non-OK RPT_STATUS */
+    DEPZ_E_BUSY             = -7,  /* ERR_BUSY from the device, or the same
+                                      opcode is already in flight */
+    DEPZ_E_PROTOCOL         = -8,  /* a reply that does not parse */
+    DEPZ_E_NO_DEVICE        = -9,  /* discovery found no (matching) DEPZ device */
+    DEPZ_E_WRONG_TYPE       = -10, /* sensor call on a device of another type */
+    DEPZ_E_REPLAY_MISMATCH  = -11, /* strict replay: written bytes differ */
+    DEPZ_E_BOOTLOADER       = -12  /* the device is in bootloader mode */
+} depz_err;
+
+/* Short constant name of an error code ("DEPZ_E_TIMEOUT"). */
+const char *depz_err_str(int err);
+/* Human-readable detail of the last failure on the calling thread. */
+const char *depz_last_error(void);
+/* depz_status of the last DEPZ_E_STATUS / DEPZ_E_BUSY on the calling thread
+ * (and the opcode it answered), -1 when the last failure was something else. */
+int depz_last_status(void);
+int depz_last_status_cmd(void);
 
 /* ======================================================================== */
 /* CRC algorithms (contract 01 §3). All reflected table implementations      */
@@ -146,6 +181,22 @@ const char *depz_usb_model_hint(int vid, int pid);
  * invalid id, not an unknown one (contract 07 §3); else 0 with *known /
  * *model (either may be NULL) as the two functions above give them. */
 int depz_usb_identity(int vid, int pid, bool *known, const char **model);
+
+/* One serial port as the discovery order sees it (contract 02 §4): its path
+ * and its USB iSerial, each with an explicit length so a string holding an
+ * embedded NUL compares whole. `serial` NULL or empty = no serial. */
+typedef struct {
+    const char *port;
+    size_t      port_len;
+    const char *serial;
+    size_t      serial_len;
+} depz_port_key;
+
+/* The discovery order of two ports (contract 02 §4, the comparator
+ * depz_find_devices() sorts with): by USB serial ascending (bytewise), every
+ * port without a serial after every port with one, then by port path.
+ * Returns < 0, 0 or > 0 like strcmp. */
+int depz_port_order_cmp(const depz_port_key *a, const depz_port_key *b);
 
 /* ======================================================================== */
 /* Firmware-name identity (contract 02 §4.1)                                 */
@@ -300,7 +351,9 @@ typedef struct { uint8_t pin; uint8_t mode; uint8_t polarity; } depz_sync_pin_co
 
 /* Encoders (return payload length written). */
 size_t depz_pack_sync_time(uint64_t pc_timestamp_us, uint8_t *out); /* 8 B */
-size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out); /* 1 B */
+/* SET_PAYLOAD_CRC_TYPE payload: crc_type u8. Returns 1, or 0 when crc_type is
+ * not 0..3 (contract 02 §2). */
+size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out);
 /* 3 B, or 0 (nothing written) unless pin is 1..5, mode a depz_sync_pin_mode
  * (0..4) and polarity 0 (idle low) or 1 (idle high) — contract 02 §6. */
 size_t depz_pack_sync_pin_config(const depz_sync_pin_config *c, uint8_t *out);
@@ -381,7 +434,8 @@ typedef enum {
     DEPZ_FWDEPZ_ERR_TOO_SHORT,
     DEPZ_FWDEPZ_ERR_MAGIC,
     DEPZ_FWDEPZ_ERR_HEADER_CRC,
-    DEPZ_FWDEPZ_ERR_SIZE
+    DEPZ_FWDEPZ_ERR_SIZE,
+    DEPZ_FWDEPZ_ERR_SECTION /* not section 0 of 1: multi-section unsupported */
 } depz_fwdepz_result;
 
 typedef struct {
@@ -395,7 +449,8 @@ typedef struct {
     bool     payload_crc_ok;
 } depz_fwdepz_image;
 
-/* Parse & validate (magic -> header CRC-16/CCITT-FALSE -> fw_size==payload). */
+/* Parse & validate (magic -> header CRC-16/CCITT-FALSE -> fw_size==payload
+ * -> section 0 of 1; sections are 0-based). */
 depz_fwdepz_result depz_fwdepz_parse(const uint8_t *blob, size_t len,
                                      depz_fwdepz_image *out);
 
@@ -467,7 +522,9 @@ typedef enum {
 
 /* Encoders (return payload length written). */
 size_t depz_vl53l8_pack_read_reg(uint16_t addr, uint16_t length, uint8_t *out);  /* 4 B */
-size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out);         /* 2 B */
+/* 2 B; 0 (nothing written) when frame_size is outside 1..8192 (contract 04 §4
+ * rule 4 — the firmware refuses it too). */
+size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out);
 
 /* One RPT_VL53_FRAME chunk of a (possibly multi-chunk) sensor frame. */
 typedef struct {
@@ -493,12 +550,16 @@ int depz_vl53l8_unpack_reg_data(const uint8_t *payload, size_t len,
                                 depz_vl53l8_reg_data *out); /* needs >=9 B */
 
 /*
- * Frame reassembler (contract 04): reset on offset==0; chunks must be
+ * Frame reassembler (contract 04 §4): reset on offset==0; chunks must be
  * contiguous (offset == accumulated length) and agree on full_size; a gap
  * discards the frame in progress; completes when accumulated == full_size.
+ * A chunk out of the rule-4 bounds (more than chunk_max bytes, full_size over
+ * DEPZ_VL53L8_STREAM_TOTAL_MAX, or running past full_size) is damaged: dropped
+ * and counted as a lost frame like the other damaged input.
  */
 typedef struct {
     uint8_t  buf[DEPZ_VL53L8_STREAM_TOTAL_MAX];
+    size_t   chunk_max;
     size_t   len;
     uint16_t full_size;
     uint64_t timestamp_us;
@@ -506,7 +567,9 @@ typedef struct {
     uint64_t discarded;
 } depz_vl53l8_reassembler;
 
-void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r);
+/* chunk_max: the device's VL53_STREAM_FRAME_MAX — DEPZ_VL53L8_STREAM_CHUNK_MAX,
+ * or DEPZ_VL53L7_STREAM_CHUNK_MAX on the I2C board (contract 11 §3). */
+void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r, size_t chunk_max);
 /*
  * Feed one chunk. Returns 1 when a frame completes (sets *frame -> the
  * internal buffer, *frame_len, *ts), 0 otherwise. The frame pointer stays
@@ -632,13 +695,15 @@ int depz_vl53l8ch_decode_cnh(const depz_vl53l8ch_cnh_config *cfg,
 #define DEPZ_VL53L8_THRESH_START_SIZE     (DEPZ_VL53L8_NB_THRESHOLDS * 12) /* 768 */
 #define DEPZ_VL53L8_MOTION_CFG_SIZE       156
 
-/* Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048) (a negative
- * margin clamps to 0). The checked form refuses (-1, *raw untouched) a margin
- * outside 0..10000 kcps (or NaN), else 0. */
-uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps);
-int      depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw);
-/* Inverse: raw DCI -> kcps/SPAD (raw / 2048.0). */
-double   depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
+/* Largest xtalk margin depz_vl53l8_set_xtalk_margin accepts, kcps/SPAD (as ST). */
+#define DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS 10000u
+
+/* Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+ * (kcps * 2048). Refuses (-1, *raw untouched) a margin above
+ * DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS, else 0. */
+int      depz_vl53l8_xtalk_margin_to_raw(uint32_t margin_kcps, uint32_t *raw);
+/* Inverse: raw DCI -> whole kcps/SPAD (raw / 2048, integer division as ST). */
+uint32_t depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
 
 /* One detection-threshold entry in real units (mirror of DetectionThreshold). */
 typedef struct {
@@ -835,9 +900,11 @@ typedef enum {
 #define DEPZ_VL53L4_CONFIG_FMP_BYTE 0x12u
 
 /* Encoders (return payload length written). */
-size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out); /* 4 B */
+/* VL53_READ_REG payload: addr u16, len u16. Returns 4, or 0 when len is outside
+ * 1..DEPZ_VL53L4_XFER_MAX or addr + len > 0x10000 (contract 10 §1). */
+size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out);
 /* VL53_WRITE_REG payload: addr u16 + data. Returns 2 + data_len, or 0 when
- * data_len is outside 1..DEPZ_VL53L4_XFER_MAX. */
+ * data_len is outside 1..DEPZ_VL53L4_XFER_MAX or addr + data_len > 0x10000. */
 size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data,
                                   size_t data_len, uint8_t *out);
 size_t depz_vl53l4_pack_xshut(uint8_t action, uint8_t *out); /* 1 B */
@@ -855,8 +922,9 @@ typedef struct {
 int depz_vl53l4_unpack_reg_data(const uint8_t *payload, size_t len,
                                 depz_vl53l4_reg_data *out); /* needs >= 9 B */
 
-/* RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters are
- * free-running and wrap silently; watch increments, not absolute values. */
+/* RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters wrap
+ * silently; watch increments, not absolute values. i2c_errors counts since the
+ * last successful XSHUT reset (the bridge clears it there), not since power-up. */
 typedef struct {
     uint32_t int_edges;
     uint32_t slots_skipped;
@@ -864,7 +932,7 @@ typedef struct {
     uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
     uint16_t model_id;       /* expected DEPZ_VL53L4_MODEL_ID (0xEBAA) */
     uint8_t  fw_status;      /* expected 0x03 (booted) */
-    uint8_t  initialized;    /* 1 = MODEL_ID matched on this read */
+    uint8_t  initialized;    /* 1 = MODEL_ID read back as 0xEBAA on this GET_INFO */
     uint8_t  xshut_level;
     uint8_t  int_level;
     uint16_t i2c_khz;
@@ -900,7 +968,8 @@ typedef struct {
  * Decode the streamed 17-byte 0x0089..0x0099 block exactly as
  * VL53L4CD_GetResult() decodes the same registers read one by one. Register
  * contents are big-endian words (the bridge passes them through untouched).
- * Returns 0 on success, -1 when len < 15.
+ * Returns 0 on success, -1 when len < DEPZ_VL53L4_RESULT_BLOCK_LEN (17); a
+ * longer buffer is decoded and the tail ignored (contract 07 §3).
  */
 int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len,
                                    depz_vl53l4_result *out);
@@ -1181,12 +1250,19 @@ int depz_vl53lx_decode_histogram_raw(const uint8_t *raw, size_t len,
 
 /* Encoders (return payload length written). RESET / STOP_STREAM / GET_INFO
  * have an empty payload. */
-size_t depz_bno055_pack_read_reg(uint8_t addr, uint8_t len, uint8_t *out); /* 2 B */
+/* BNO_READ_REG payload: addr u8, len u8. Returns 2, or 0 when len is outside
+ * 1..DEPZ_BNO055_XFER_MAX or addr + len > 0x100 (contract 13 §1). */
+size_t depz_bno055_pack_read_reg(uint8_t addr, uint8_t len, uint8_t *out);
 /* BNO_WRITE_REG payload: addr u8 + data. Returns 1 + data_len, or 0 when
- * data_len is outside 1..DEPZ_BNO055_XFER_MAX. */
+ * data_len is outside 1..DEPZ_BNO055_XFER_MAX or addr + data_len > 0x100. */
 size_t depz_bno055_pack_write_reg(uint8_t addr, const uint8_t *data,
                                   size_t data_len, uint8_t *out);
-/* BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16. */
+/* BNO_START_STREAM TIMER period limits, ms (contract 13 §2). */
+#define DEPZ_BNO055_TIMER_PERIOD_MIN_MS 1u
+#define DEPZ_BNO055_TIMER_PERIOD_MAX_MS 60000u
+/* BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16.
+ * Returns 5, or 0 when trigger is TIMER and period_ms is outside 1..60000
+ * (with INT the period is the missed-edge watchdog, 0 = none). */
 size_t depz_bno055_pack_start_stream(uint8_t trigger, uint8_t addr, uint8_t len,
                                      uint16_t period_ms, uint8_t *out); /* 5 B */
 
@@ -1201,8 +1277,9 @@ int depz_bno055_unpack_reg_data(const uint8_t *payload, size_t len,
                                 depz_bno055_reg_data *out); /* needs >= 9 B */
 
 /* RPT_BNO_INFO (0x92, 38 B `<BBBBBHBBBIHHHIIIHBBH`): sensor identity
- * (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running
- * and wrap; read_*_us, slots_skipped, loop_max_us reset at START_STREAM. A
+ * (registers 0x00..0x06) plus bridge diagnostics. Counters wrap; read_*_us,
+ * slots_skipped, loop_max_us reset at START_STREAM, i2c_errors at every
+ * successful reset handshake (not free-running). A
  * rising sensor_resets means the sensor is back in CONFIG: re-configure. */
 typedef struct {
     uint8_t  i2c_addr;       /* 0x28 */
@@ -1963,7 +2040,7 @@ typedef struct {
 typedef struct {
     depz_shtp_rx_channel rx[DEPZ_SHTP_NUM_CHANNELS];
     uint8_t  tx_seq[DEPZ_SHTP_NUM_CHANNELS];
-    uint64_t discarded;   /* incomplete/orphan cargos thrown away */
+    uint64_t discarded;   /* incomplete/orphan cargos and channel >= 6 frames thrown away */
 } depz_shtp_layer;
 
 void depz_shtp_init(depz_shtp_layer *l);
@@ -2025,6 +2102,14 @@ size_t depz_bno_pack_frs_write_request(uint16_t frs_type, uint16_t length_words,
  * not 1 or 2 or out_cap < 12. */
 size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words,
                                     size_t nwords, uint8_t *out, size_t out_cap);
+/* Interactive Calibration: COMMAND_REQUEST 0xF2 with command 0x0E and P0 =
+ * `intent` (DEPZ_BNO_MOTION_INTENT_*), 12 B. BNO086 only, no response (SH-2
+ * §6.4.12); a BNO085 ignores it. */
+size_t depz_bno_pack_interactive_calibration(uint8_t seq, uint8_t intent, uint8_t out[12]);
+/* FORCE_SENSOR_FLUSH 0xF0 + sensor id, 2 B (SH-2 §6.5.6): the hub sends the
+ * sensor's batched reports now and answers with the header-less Flush
+ * Completed (DEPZ_BNO_FLUSH_COMPLETED) on the input channel. */
+size_t depz_bno_pack_force_flush(uint8_t sensor_id, uint8_t out[2]);
 
 /* --- SH-2 control message parsers (contract 05 §6) ------------------------ */
 
@@ -2076,6 +2161,7 @@ size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words
 #define DEPZ_SH2_GET_FEATURE_RESPONSE 0xFC
 #define DEPZ_SH2_SET_FEATURE_COMMAND  0xFD
 #define DEPZ_SH2_GET_FEATURE_REQUEST  0xFE
+#define DEPZ_SH2_FORCE_SENSOR_FLUSH   0xF0 /* host -> hub; answered by 0xEF on the input channel */
 
 /* Command Request `command` values. */
 #define DEPZ_SH2_CMD_ERRORS              0x01
@@ -2087,6 +2173,15 @@ size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words
 #define DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG 0x09
 #define DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE 0x0A
 #define DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET 0x0B
+#define DEPZ_SH2_CMD_INTERACTIVE_CALIBRATION 0x0E /* BNO086 only; no response */
+
+/* P0 of the Interactive Calibration command (SH-2 §6.4.12.1): what the host
+ * knows about the device's motion. UNKNOWN is the hub's initial state. */
+#define DEPZ_BNO_MOTION_INTENT_UNKNOWN                   0u
+#define DEPZ_BNO_MOTION_INTENT_STATIONARY_NO_VIBRATION   1u
+#define DEPZ_BNO_MOTION_INTENT_STATIONARY_WITH_VIBRATION 2u
+#define DEPZ_BNO_MOTION_INTENT_IN_MOTION                 3u
+#define DEPZ_BNO_MOTION_INTENT_IN_MOTION_ACCELERATING    4u
 
 /* Set Feature `flags` bits (SH-2 §6.5.4) for depz_bno086_feature_request.flags.
  * WAKEUP: the sensor reports on SHTP channel 4 (wake input); ALWAYS_ON: it
@@ -2129,6 +2224,7 @@ size_t depz_bno_pack_frs_write_data(uint16_t offset_words, const uint32_t *words
 #define DEPZ_BNO_FRS_SHAKE_DETECT_CONFIG    0x7D7Du
 #define DEPZ_BNO_FRS_STABILITY_DETECTOR_CONFIG 0xED85u
 #define DEPZ_BNO_FRS_ACTIVITY_TRACKER_CONFIG 0xED88u
+#define DEPZ_BNO_FRS_GYRO_INTEGRATED_RV_CONFIG 0xA1A2u /* reference, sync interval, max error, prediction */
 
 /* FRS read statuses (low nibble) and write statuses. */
 #define DEPZ_BNO_FRS_READ_NO_ERROR               0u
@@ -2201,7 +2297,7 @@ int depz_bno_unpack_frs_write_response(const uint8_t *p, size_t len, depz_bno_fr
  * id is not one: one control cargo may carry several back to back. */
 size_t depz_bno_control_report_len(uint8_t rid);
 
-/* Sensor metadata FRS record (0xE301..0xE324), sh2 reference layout:
+/* Sensor metadata FRS record (0xE301..0xE325), sh2 reference layout:
  * revision-gated fields read 0 when the record predates them. */
 typedef struct {
     uint8_t  me_version, mh_version, sh_version;
@@ -2342,44 +2438,252 @@ void depz_bno_report_angular_velocity(const depz_bno_report *r, double out[3]);
 double depz_bno_report_scalar(const depz_bno_report *r);
 
 /* ======================================================================== */
-/* .depzdata dataset reader (contract 09) — JSONL: header + records.          */
+/* JSON values (contract 09 dataset records)                                 */
 /* ======================================================================== */
+
+/* A JSON value: what a `.depzdata` record's `v` holds, built by the record
+ * functions below (depz_dataset_*_record) and handed to the writer, read back
+ * from a parsed dataset. Owned trees: free the root with depz_json_free();
+ * depz_json_push() / depz_json_set() take ownership of the child. */
+typedef struct depz_json depz_json;
+
+typedef enum {
+    DEPZ_JSON_NULL = 0,
+    DEPZ_JSON_BOOL,
+    DEPZ_JSON_INT,     /* a whole number (int64) */
+    DEPZ_JSON_DOUBLE,  /* a real number */
+    DEPZ_JSON_STRING,
+    DEPZ_JSON_ARRAY,
+    DEPZ_JSON_OBJECT
+} depz_json_kind;
+
+/* Constructors (NULL when out of memory). Integers stay integers and reals
+ * stay reals in the file, as the Python reference writes them. */
+depz_json *depz_json_null(void);
+depz_json *depz_json_bool(bool b);
+depz_json *depz_json_int(int64_t i);
+depz_json *depz_json_double(double d);
+depz_json *depz_json_string(const char *s);             /* copied, NUL-terminated */
+depz_json *depz_json_string_n(const char *s, size_t n); /* copied, may hold NULs */
+depz_json *depz_json_array(void);
+depz_json *depz_json_object(void);
+/* Append `item` to an array / set `key` of an object (replacing an existing
+ * key). Both take ownership of `item` — also on failure (-1: wrong kind, out
+ * of memory), so a chain of constructors never leaks. */
+int  depz_json_push(depz_json *array, depz_json *item);
+int  depz_json_set(depz_json *object, const char *key, depz_json *item);
+void depz_json_free(depz_json *v);
+
+/* Parse one JSON document out of text[0..len). NULL when it does not parse. */
+depz_json *depz_json_parse(const char *text, size_t len);
+/* Serialize compactly (no spaces, non-ASCII as \uXXXX, reals in the shortest
+ * form that reads back exactly; NaN / infinities as null). Returns the text's
+ * length, writing at most cap - 1 bytes plus a NUL into `out` (out may be
+ * NULL with cap 0 to size a buffer). */
+size_t depz_json_dump(const depz_json *v, char *out, size_t cap);
+/* The same into a malloc'd string the caller frees; NULL out of memory. */
+char *depz_json_dumps(const depz_json *v);
+
+/* Accessors. Readers return a zero / NULL default on a kind mismatch;
+ * depz_json_double_value also reads an integer. */
+depz_json_kind   depz_json_kind_of(const depz_json *v);     /* NULL -> DEPZ_JSON_NULL */
+bool             depz_json_bool_value(const depz_json *v);
+int64_t          depz_json_int_value(const depz_json *v);   /* a real is truncated */
+double           depz_json_double_value(const depz_json *v);
+const char      *depz_json_string_value(const depz_json *v);  /* NULL unless a string */
+size_t           depz_json_string_len(const depz_json *v);
+/* Arrays and objects: element count, the i-th element, the i-th key (objects),
+ * a member by key (NULL when absent). */
+size_t           depz_json_len(const depz_json *v);
+const depz_json *depz_json_at(const depz_json *v, size_t i);
+const char      *depz_json_key_at(const depz_json *v, size_t i);
+const depz_json *depz_json_get(const depz_json *v, const char *key);
+/* Structural equality (reals by value, so 2 == 2.0). */
+bool depz_json_equal(const depz_json *a, const depz_json *b);
+
+/* ======================================================================== */
+/* .depzdata datasets (contract 09): read, write, record values, playback    */
+/* ======================================================================== */
+
+/* The schema id this SDK writes. */
+#define DEPZ_DATASET_SCHEMA "depz.dataset/2"
 
 typedef struct depz_dataset depz_dataset;
 
+/* A header device entry. `model` is the part when one sensor_type covers
+ * several ("BNO085" / "BNO086" under bno086), "" when absent. */
 typedef struct {
     char    id[32];
     char    serial[64];
     char    sensor_type[32];
     char    software_name[64];
+    char    model[32];
     int64_t offset_us;   /* time_sync.offset_us */
     int64_t rtt_us;      /* time_sync.rtt_us    */
 } depz_dataset_device;
 
 typedef struct {
-    char        device_id[32];
-    int64_t     t_host_us;
-    char        kind[32];
-    const void *value;   /* opaque JSON node — read via depz_dataset_value_* */
+    char             device_id[32];
+    int64_t          t_host_us;  /* host monotonic µs (device time - offset) */
+    char             kind[32];
+    const depz_json *value;      /* the record's `v`, owned by the dataset */
 } depz_dataset_record;
 
-/* Parse a full .depzdata blob. Returns NULL on parse error / bad schema.
- * Records are exposed in stable merge order (by t_host_us, then file order). */
+/* Parse a whole `.depzdata` document (UTF-8 JSON Lines: header + records) or
+ * a `.depzdata.gz` (a gzip container: inflated first). A damaged file is
+ * refused whole, as a bad argument (contract 07 §3): NULL, with
+ * depz_last_error() naming the line — the header not a JSON object or its
+ * `schema` not a "depz.dataset/..." string, a record line not a JSON object,
+ * `d` / `k` not strings, `t` not an integer (a real, null or absent), `v`
+ * not an object, an empty file. Nothing is skipped or coerced; blank lines
+ * are skipped, an unknown `k` is kept (only players ignore it). Records come
+ * back as the reader orders them: each device's records stable-sorted by
+ * t_host_us, then merged by it (contract 09) — per-device order is only
+ * roughly monotonic in the file, so every reader sorts. */
 depz_dataset *depz_dataset_parse(const char *text, size_t len);
+/* The same from a file path (NULL + DEPZ_E_IO detail when unreadable). */
+depz_dataset *depz_dataset_read_file(const char *path);
 void          depz_dataset_free(depz_dataset *d);
 
 const char *depz_dataset_schema(const depz_dataset *d);
+const char *depz_dataset_created_utc(const depz_dataset *d);  /* "" when absent */
+const char *depz_dataset_note(const depz_dataset *d);         /* "" when absent */
+/* The parsed header line, for fields the struct view leaves out. */
+const depz_json *depz_dataset_header(const depz_dataset *d);
 size_t      depz_dataset_device_count(const depz_dataset *d);
 int         depz_dataset_get_device(const depz_dataset *d, size_t i,
                                     depz_dataset_device *out);
 size_t      depz_dataset_record_count(const depz_dataset *d);
 int         depz_dataset_get_record(const depz_dataset *d, size_t i,
                                     depz_dataset_record *out);
+/* Host-time span from the first record to the last; 0 with fewer than two. */
+int64_t     depz_dataset_duration_us(const depz_dataset *d);
 /* Read a scalar out of a record's `value` object. Return 0 on success. */
 int depz_dataset_value_int(const depz_dataset_record *r, const char *key,
                            int64_t *out);
 int depz_dataset_value_str(const depz_dataset_record *r, const char *key,
                            char *out, size_t cap);
+
+/* --- Record values (contract 09 `v`), from the decoded results ------------ */
+/* Key for key the reference Python SDK's values. The live layer
+ * (depz_sensor_io.h) adds the kinds whose results only exist there (sr04,
+ * vl53lx, bno055, the VL53L8 frame with its motion block, vl53l8_cnh) and
+ * the session recorder that writes them all. */
+
+/* `bno086`: the report in snake_case — type and sensor id, then only the
+ * fields the report carries (scaled: x/y/z, i/j/k/real, accuracy_rad, bias,
+ * angular_velocity, value), the detector outputs, the integer counts of the
+ * raw ADC streams (0x14..0x16), and the device timestamp. */
+depz_json *depz_dataset_bno086_record(const depz_bno_report *r);
+/* `vl53l8`: resolution, silicon_temp_degc and the per-zone arrays cut to the
+ * resolution; `layers` adds signal_per_spad, ambient_per_spad,
+ * range_sigma_mm and reflectance. */
+depz_json *depz_dataset_vl53l8_record(const depz_vl53l8_frame *f, bool layers);
+/* `vl53l4`: the result fields; distance_mm raw whatever range_status says. */
+depz_json *depz_dataset_vl53l4_record(const depz_vl53l4_result *r);
+/* `tmf8829`: one measurement — fp_mode, rows, cols, peaks, f_number, flags,
+ * temperature_c, distance_mm (mm, rounded to 0.1, flat [peak][row][col]),
+ * snr, and signal / noise / xtalk when the result format carried them. */
+depz_json *depz_dataset_tmf8829_record(const depz_tmf8829_measurement *m);
+/* `temperature`: {celsius, source} — source "mcu" or "sensor". */
+depz_json *depz_dataset_temperature_record(double celsius, const char *source);
+
+/* --- Writer ---------------------------------------------------------------- */
+
+/* Low-level `.depzdata` record writer: the header line at open, one record
+ * line per write. A path ending in `.gz` is written as a gzip container of
+ * stored (uncompressed) blocks — every gzip reader opens it; the SDK has no
+ * compression dependency. Not thread-safe: one writer, one thread at a time
+ * (the session recorder serializes its hooks). Prefer the session recorder
+ * of depz_sensor_io.h for live devices. */
+typedef struct depz_dataset_writer depz_dataset_writer;
+
+/* Create `path` (overwritten) and write the header. `devices` is the header's
+ * device object: {id: {serial, sensor_type, software_name, time_sync, …}}
+ * (read, not consumed); `note` may be NULL. NULL when the file cannot be
+ * created or `devices` is not an object. */
+depz_dataset_writer *depz_dataset_writer_open(const char *path, const depz_json *devices,
+                                              const char *note);
+/* One record: device id, host µs, kind, value. Takes ownership of `value`
+ * (also on failure). Returns 0, -1 after close / on a write error. */
+int depz_dataset_writer_write(depz_dataset_writer *w, const char *device_id, int64_t t_host_us,
+                              const char *kind, depz_json *value);
+uint64_t depz_dataset_writer_records_written(const depz_dataset_writer *w);
+/* Flush, finish the gzip trailer and close the file; then free the writer
+ * (NULL is a no-op). Returns 0, or -1 when the last flush failed. */
+int depz_dataset_writer_close(depz_dataset_writer *w);
+
+/* --- Player (contract 09 §Player) ----------------------------------------- */
+
+typedef enum {
+    DEPZ_PLAYER_IDLE = 0, /* never played */
+    DEPZ_PLAYER_PLAYING,  /* delivering records paced by the clock */
+    DEPZ_PLAYER_PAUSED,   /* stopped mid-timeline; play resumes */
+    DEPZ_PLAYER_DONE      /* past the last record; play restarts from the top */
+} depz_player_state;
+
+typedef struct depz_dataset_player depz_dataset_player;
+
+/* A monotonic clock in seconds (the player's media clock is anchored to it). */
+typedef double (*depz_player_clock_fn)(void *user);
+typedef void (*depz_player_record_cb)(const depz_dataset_record *r, void *user);
+typedef void (*depz_player_state_cb)(depz_player_state state, void *user);
+
+/* A player over `ds` (which must outlive it): paced delivery with play /
+ * pause / seek / speed — the engine behind a viewer's playback mode. Delivery
+ * is tick-driven: the owner calls depz_dataset_player_tick() from its own
+ * loop (a GUI timer, or a test with a fake clock) and the records due go out
+ * on that thread. `clock` NULL = the host monotonic clock. `speed` ≥ 0 (0 =
+ * as fast as possible); NULL for an invalid speed.
+ *
+ * Timing: a media clock anchored at play / resume / seek to (now, t of the
+ * last delivered record — of the first record when none was). Record i is
+ * due at anchor_wall + (t_i − anchor_t) / speed: the first record goes out at
+ * once, each later one after its gap to the previous one, and a resumed or
+ * seeked player waits the next record's full gap. Pacing is against the
+ * clock, not cumulative: overdue records go out back to back. */
+depz_dataset_player *depz_dataset_player_new(const depz_dataset *ds, double speed,
+                                             depz_player_clock_fn clock, void *clock_user);
+void depz_dataset_player_free(depz_dataset_player *p);
+
+depz_player_state depz_dataset_player_state(const depz_dataset_player *p);
+/* Span of the timeline: the last record's t minus the first's. */
+int64_t depz_dataset_player_duration_us(const depz_dataset_player *p);
+/* µs from the first record to the last delivered one (after a seek: to the
+ * record just before the target); 0 before anything was delivered. */
+int64_t depz_dataset_player_position_us(const depz_dataset_player *p);
+double  depz_dataset_player_speed(const depz_dataset_player *p);
+/* Change the speed (finite, ≥ 0; else -1, nothing changes). While playing it
+ * applies at once: the rest of the current wait is rescaled. */
+int     depz_dataset_player_set_speed(depz_dataset_player *p, double speed);
+
+/* Subscribe to delivered records / state changes (called with the new state
+ * on every transition). `token` identifies the subscription for the off_
+ * call, which is idempotent. */
+int  depz_dataset_player_on_record(depz_dataset_player *p, depz_player_record_cb cb, void *user,
+                                   int *token);
+void depz_dataset_player_off_record(depz_dataset_player *p, int token);
+int  depz_dataset_player_on_state(depz_dataset_player *p, depz_player_state_cb cb, void *user,
+                                  int *token);
+void depz_dataset_player_off_state(depz_dataset_player *p, int token);
+
+/* Start, or resume after pause; no-op while playing. From done (or a position
+ * past the end) playback restarts at the first record. An empty dataset goes
+ * playing -> done at once. */
+void depz_dataset_player_play(depz_dataset_player *p);
+/* Stop delivering; play resumes from the next record, which then waits its
+ * full gap again. No-op unless playing. */
+void depz_dataset_player_pause(depz_dataset_player *p);
+/* Move to `offset_us` µs from the first record: the next record delivered is
+ * the first with t >= first t + offset (negative: the start); records in
+ * between are skipped, never delivered. The state does not change, except
+ * that a seek past the end while playing ends playback (done). NaN is -1
+ * (nothing changes); on an empty dataset a seek is a no-op. */
+int  depz_dataset_player_seek_us(depz_dataset_player *p, double offset_us);
+/* Deliver every record due now, on the calling thread. Returns the seconds
+ * until the next one is due, or a negative value when not playing.
+ * Callbacks may call the player back (pause / seek / set_speed). */
+double depz_dataset_player_tick(depz_dataset_player *p);
 
 #ifdef __cplusplus
 }

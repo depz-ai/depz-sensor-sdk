@@ -10,10 +10,13 @@ use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
 use crate::framing::Packet;
 use crate::vl53l4::driver::{DetectionThresholds, Vl53l4Platform, Vl53l4cdDriver};
-use crate::vl53l4::uld_math::{range_status_name, Vl53l4Results, I2C_KHZ_DEFAULT, RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN};
+use crate::vl53l4::uld_math::{
+    range_status_name, Vl53l4Results, I2C_KHZ_DEFAULT, RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN,
+};
 use crate::vl53l4::{
-    pack_read_reg, pack_set_i2c_speed, pack_start_stream, pack_write_reg, pack_xshut, parse_result_block, RegData,
-    StreamData, Vl53l4Cmd, Vl53l4Info, Vl53l4Rpt, XFER_MAX, XSHUT_RESET,
+    pack_set_i2c_speed, pack_start_stream, pack_xshut, parse_result_block, try_pack_read_reg,
+    try_pack_write_reg, RegData, StreamData, Vl53l4Cmd, Vl53l4Info, Vl53l4Rpt, XFER_MAX,
+    XSHUT_RESET,
 };
 
 const REG_TIMEOUT: Duration = Duration::from_secs(2);
@@ -74,8 +77,13 @@ impl ReportHandler for Streams {
             return false;
         }
         // A stream re-armed on another block, or a corrupt read: count it, keep the reader.
-        match StreamData::unpack(&packet.payload).ok().and_then(|s| parse_result_block(&s.data).ok().map(|r| (s, r))) {
-            Some((s, r)) => self.measurements.emit(Vl53l4Measurement::from(s.timestamp_us, &r)),
+        match StreamData::unpack(&packet.payload)
+            .ok()
+            .and_then(|s| parse_result_block(&s.data).ok().map(|r| (s, r)))
+        {
+            Some((s, r)) => self
+                .measurements
+                .emit(Vl53l4Measurement::from(s.timestamp_us, &r)),
             None => {
                 self.parse_errors.fetch_add(1, Ordering::Relaxed);
             }
@@ -102,14 +110,19 @@ impl Vl53l4Platform for BridgePlatform {
             let n = (size - out.len()).min(XFER_MAX);
             let rep: RegData = self.dev.request(
                 Vl53l4Cmd::ReadReg as u8,
-                &pack_read_reg(addr, n as u16),
+                &try_pack_read_reg(addr, n as u16)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
                 expect_report(Vl53l4Rpt::RegData as u8, RegData::unpack),
                 Some(REG_TIMEOUT),
             )?;
             if rep.data.len() != n {
-                return Err(DepzError::Protocol(format!("READ_REG 0x{addr:04X}: expected {n}, got {}", rep.data.len())));
+                return Err(DepzError::Protocol(format!(
+                    "READ_REG 0x{addr:04X}: expected {n}, got {}",
+                    rep.data.len()
+                )));
             }
-            self.last_timestamp_us.store(rep.timestamp_us, Ordering::Relaxed);
+            self.last_timestamp_us
+                .store(rep.timestamp_us, Ordering::Relaxed);
             out.extend_from_slice(&rep.data);
             addr = addr.wrapping_add(n as u16);
         }
@@ -119,14 +132,20 @@ impl Vl53l4Platform for BridgePlatform {
     fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()> {
         let mut addr = addr;
         for chunk in data.chunks(XFER_MAX) {
-            self.dev.request_ok(Vl53l4Cmd::WriteReg as u8, &pack_write_reg(addr, chunk), Some(REG_TIMEOUT))?;
+            self.dev.request_ok(
+                Vl53l4Cmd::WriteReg as u8,
+                &try_pack_write_reg(addr, chunk)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
+                Some(REG_TIMEOUT),
+            )?;
             addr = addr.wrapping_add(chunk.len() as u16);
         }
         Ok(())
     }
 
     fn set_i2c_speed(&self, khz: u16) -> Result<()> {
-        self.dev.request_ok(Vl53l4Cmd::SetI2cSpeed as u8, &pack_set_i2c_speed(khz), None)
+        self.dev
+            .request_ok(Vl53l4Cmd::SetI2cSpeed as u8, &pack_set_i2c_speed(khz), None)
     }
 }
 
@@ -155,11 +174,24 @@ impl Deref for Vl53l4cdDevice {
 impl Vl53l4cdDevice {
     /// Continue the open connection `dev` as a VL53L4CD.
     pub fn attach(dev: DepzDevice) -> Vl53l4cdDevice {
-        let streams = Arc::new(Streams { measurements: Fanout::new(), parse_errors: AtomicU64::new(0) });
+        let streams = Arc::new(Streams {
+            measurements: Fanout::new(dev.callback_errors_counter()),
+            parse_errors: AtomicU64::new(0),
+        });
         dev.set_report_handler(streams.clone());
-        let platform = Arc::new(BridgePlatform { dev: dev.requester(), last_timestamp_us: AtomicU64::new(0) });
+        let platform = Arc::new(BridgePlatform {
+            dev: dev.requester(),
+            last_timestamp_us: AtomicU64::new(0),
+        });
         let uld = Vl53l4cdDriver::new(platform.clone());
-        Vl53l4cdDevice { dev, streams, platform, uld, ranging: AtomicBool::new(false), initialized: AtomicBool::new(false) }
+        Vl53l4cdDevice {
+            dev,
+            streams,
+            platform,
+            uld,
+            ranging: AtomicBool::new(false),
+            initialized: AtomicBool::new(false),
+        }
     }
 
     /// The ULD driver (escape hatch for raw register access).
@@ -195,22 +227,37 @@ impl Vl53l4cdDevice {
     /// Drive XSHUT: off (0) / on (1) / reset (2). Off and reset stop a stream; init again after.
     pub fn xshut(&self, action: u8) -> Result<()> {
         if action > XSHUT_RESET {
-            return Err(DepzError::InvalidArgument(format!("XSHUT action must be 0 (off), 1 (on) or 2 (reset), got {action}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "XSHUT action must be 0 (off), 1 (on) or 2 (reset), got {action}"
+            )));
         }
-        self.request_ok(Vl53l4Cmd::Xshut as u8, &pack_xshut(action), if action == XSHUT_RESET { Some(REG_TIMEOUT) } else { None })?;
+        self.request_ok(
+            Vl53l4Cmd::Xshut as u8,
+            &pack_xshut(action),
+            if action == XSHUT_RESET {
+                Some(REG_TIMEOUT)
+            } else {
+                None
+            },
+        )?;
         self.ranging.store(false, Ordering::SeqCst);
         self.initialized.store(false, Ordering::SeqCst);
         Ok(())
     }
 
-    /// Hardware reset through XSHUT (~3 ms on the MCU); init again.
+    /// Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); init again.
     pub fn reset_sensor(&self) -> Result<()> {
         self.xshut(XSHUT_RESET)
     }
 
-    /// RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+    /// RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2c_errors` is cleared by a successful XSHUT reset). Safe while streaming.
     pub fn bridge_info(&self) -> Result<Vl53l4Info> {
-        self.request(Vl53l4Cmd::GetInfo as u8, &[], expect_report(Vl53l4Rpt::Info as u8, Vl53l4Info::unpack), None)
+        self.request(
+            Vl53l4Cmd::GetInfo as u8,
+            &[],
+            expect_report(Vl53l4Rpt::Info as u8, Vl53l4Info::unpack),
+            None,
+        )
     }
 
     /// Re-time the bridge's I2C bus to the step nearest `khz`. Not while ranging.
@@ -230,7 +277,8 @@ impl Vl53l4cdDevice {
     /// low power.
     pub fn set_range_timing(&self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()> {
         self.require_not_ranging()?;
-        self.uld.set_range_timing(timing_budget_ms, inter_measurement_ms)
+        self.uld
+            .set_range_timing(timing_budget_ms, inter_measurement_ms)
     }
 
     pub fn get_offset_mm(&self) -> Result<i32> {
@@ -257,9 +305,15 @@ impl Vl53l4cdDevice {
     }
 
     /// The distance-window interrupt: INT only fires while the window holds.
-    pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()> {
+    pub fn set_detection_thresholds(
+        &self,
+        distance_low_mm: u16,
+        distance_high_mm: u16,
+        window: u8,
+    ) -> Result<()> {
         self.require_not_ranging()?;
-        self.uld.set_detection_thresholds(distance_low_mm, distance_high_mm, window)
+        self.uld
+            .set_detection_thresholds(distance_low_mm, distance_high_mm, window)
     }
 
     pub fn get_signal_threshold_kcps(&self) -> Result<u16> {
@@ -292,14 +346,16 @@ impl Vl53l4cdDevice {
     /// programmed. `nb_samples` `None`: 20.
     pub fn calibrate_offset(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
         self.require_not_ranging()?;
-        self.uld.calibrate_offset(target_dist_mm, nb_samples.unwrap_or(20))
+        self.uld
+            .calibrate_offset(target_dist_mm, nb_samples.unwrap_or(20))
     }
 
     /// Crosstalk calibration against a target at `target_dist_mm` (10–5000 mm); returns the xtalk now
     /// programmed, kcps. `nb_samples` `None`: 20.
     pub fn calibrate_xtalk(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
         self.require_not_ranging()?;
-        self.uld.calibrate_xtalk(target_dist_mm, nb_samples.unwrap_or(20))
+        self.uld
+            .calibrate_xtalk(target_dist_mm, nb_samples.unwrap_or(20))
     }
 
     // ── ranging ──────────────────────────────────────────────────────────────
@@ -308,7 +364,11 @@ impl Vl53l4cdDevice {
     pub fn start_ranging(&self) -> Result<()> {
         self.require_not_ranging()?;
         self.uld.start_ranging()?;
-        self.request_ok(Vl53l4Cmd::StartStream as u8, &pack_start_stream(RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN, 0), None)?;
+        self.request_ok(
+            Vl53l4Cmd::StartStream as u8,
+            &pack_start_stream(RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN, 0),
+            None,
+        )?;
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -340,11 +400,17 @@ impl Vl53l4cdDevice {
         let stop = self.uld.stop_ranging();
         let r = r?;
         stop?;
-        Ok(Vl53l4Measurement::from(self.platform.last_timestamp_us.load(Ordering::Relaxed), &r))
+        Ok(Vl53l4Measurement::from(
+            self.platform.last_timestamp_us.load(Ordering::Relaxed),
+            &r,
+        ))
     }
 
     /// Call `callback` for every streamed measurement (reader thread).
-    pub fn on_measurement(&self, callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static) -> Hook {
+    pub fn on_measurement(
+        &self,
+        callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static,
+    ) -> Hook {
         self.streams.measurements.on_item(callback)
     }
 
@@ -355,7 +421,11 @@ impl Vl53l4cdDevice {
 
     /// The next streamed measurement (contract 07 §3); `timeout` `None`: 2 s.
     pub fn get_measurement(&self, timeout: Option<Duration>) -> Result<Vl53l4Measurement> {
-        self.streams.measurements.next(timeout.unwrap_or(Duration::from_secs(2)), Vl53l4Rpt::Stream as u8, self.is_closed())
+        self.streams.measurements.next(
+            timeout.unwrap_or(Duration::from_secs(2)),
+            Vl53l4Rpt::Stream as u8,
+            self.is_closed(),
+        )
     }
 
     /// Stream reports dropped because their result block did not decode.
@@ -369,7 +439,9 @@ impl Vl53l4cdDevice {
 
     fn require_not_ranging(&self) -> Result<()> {
         if self.ranging() {
-            return Err(DepzError::InvalidState("stop_ranging() first — the stream owns the register bank".into()));
+            return Err(DepzError::InvalidState(
+                "stop_ranging() first — the stream owns the register bank".into(),
+            ));
         }
         Ok(())
     }

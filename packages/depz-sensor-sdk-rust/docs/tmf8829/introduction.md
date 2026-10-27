@@ -56,9 +56,11 @@ module is the verifiable **codec and decode layer**:
 - the embedded **sensor firmware image** ([`FIRMWARE_IMAGE`](api.md#firmware_image),
   14 444 B) with its MIT license text.
 
-The crate does not open a serial port itself: the device runs on any byte
-pipe you hand it (a port opened with the crate of your choice, a socket, a
-`.depzrec` replay).
+The live class opens the board's USB serial port through the
+[`serialport`](https://crates.io/crates/serialport) crate
+([`open_first_device`](../api.md#open_first_device) /
+[`open_device`](../api.md#open_device)), or runs on any byte pipe you hand it
+(a socket, a `.depzrec` replay).
 
 ## Key concepts
 

@@ -13,14 +13,16 @@ import struct
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ..device import DeviceBase, StreamIterator, StreamQueue
-from ..errors import DepzError, DepzTimeoutError, LinkClosedError, StatusError
+from ..errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError
 from ..protocol.vl53l8 import (
     CHUNK_SIZE,
+    STREAM_CHUNK_MAX,
     FrameChunk,
     FrameReassembler,
     RegData,
@@ -47,6 +49,10 @@ from .uld import (
     TARGET_ORDER_CLOSEST,
     TARGET_ORDER_STRONGEST,
     VL53L8CX,
+    DetectionThreshold,
+    FrameResults,
+    MotionConfig,
+    MotionIndicator,
     Vl53l8cxError,
     silicon_id_matches,
 )
@@ -76,6 +82,9 @@ __all__ = [
 ]
 
 MIN_RANGING_FREQUENCY_HZ = 2  # below this the sensor never streams (contract 04)
+#: Highest ranging frequency per resolution (contract 11 §3; the same silicon
+#: limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+MAX_RANGING_FREQUENCY_HZ = {RESOLUTION_4X4: 60, RESOLUTION_8X8: 15}
 
 
 @dataclass(frozen=True)
@@ -85,22 +94,23 @@ class Vl53l8Frame:
 
     timestamp_us: int
     resolution: int  # 16 | 64
-    distance_mm: np.ndarray  # int32 mm, shape (zones,); negative → 0, as ST
-    target_status: np.ndarray  # uint8: 5/9 = valid, 255 = no target
-    nb_target_detected: np.ndarray  # uint8
-    signal_per_spad: np.ndarray  # float64 kcps/SPAD
-    ambient_per_spad: np.ndarray  # float64 kcps/SPAD
-    nb_spads_enabled: np.ndarray  # int32
-    range_sigma_mm: np.ndarray  # float64 mm
-    reflectance: np.ndarray  # float64 %
+    distance_mm: NDArray[np.int32]  # mm, shape (zones,); negative → 0, as ST
+    target_status: NDArray[np.uint8]  # 5/9 = valid, 255 = no target
+    nb_target_detected: NDArray[np.uint8]
+    signal_per_spad: NDArray[np.float64]  # kcps/SPAD
+    ambient_per_spad: NDArray[np.float64]  # kcps/SPAD
+    nb_spads_enabled: NDArray[np.int32]
+    range_sigma_mm: NDArray[np.float64]  # mm
+    reflectance: NDArray[np.float64]  # %
     silicon_temp_degc: int
     cnh_raw: bytes | None = None  # CH variant: raw CNH block (decode via cnh)
-    motion: dict | None = None  # motion-indicator output when configured
+    motion: MotionIndicator | None = None  # motion-indicator output when configured
 
-    def grid(self, field: str = "distance_mm") -> np.ndarray:
+    def grid(self, field: str = "distance_mm") -> NDArray[Any]:
         """Zone array reshaped to (4,4) or (8,8)."""
         side = 4 if self.resolution == RESOLUTION_4X4 else 8
-        return getattr(self, field)[: self.resolution].reshape(side, side)
+        zones: NDArray[Any] = getattr(self, field)
+        return zones[: self.resolution].reshape(side, side)
 
 
 class _BridgePlatform:
@@ -162,15 +172,17 @@ class Vl53l8cx(DeviceBase):
     #: Register-bridge transfer limits (the I2C L5/L7 board reads less per call).
     _READ_CHUNK = CHUNK_SIZE
     _WRITE_CHUNK = CHUNK_SIZE
+    #: Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4).
+    _STREAM_CHUNK = STREAM_CHUNK_MAX
     #: Lowest ranging frequency that actually streams on this sensor.
     _MIN_RANGING_HZ = MIN_RANGING_FREQUENCY_HZ
 
     def _init_subclass_state(self) -> None:
         self._uld: VL53L8CX | None = None
         self._platform = _BridgePlatform(self)
-        self._reassembler = FrameReassembler()
+        self._reassembler = FrameReassembler()  # replaced, sized, by start_ranging()
         self._frame_cbs: list[Callable[[Vl53l8Frame], None]] = []
-        self._frame_queues: list[StreamQueue] = []
+        self._frame_queues: list[StreamQueue[Vl53l8Frame]] = []
         self._ranging = False
         self._cnh_config: CnhConfig | None = None
         self._write_progress: Callable[[int, int], None] | None = None
@@ -184,7 +196,7 @@ class Vl53l8cx(DeviceBase):
     def uld(self) -> VL53L8CX:
         """The underlying ULD driver (escape hatch for advanced DCI access)."""
         if self._uld is None:
-            raise DepzError("call init() first")
+            raise InvalidStateError("call init() first")
         return self._uld
 
     @property
@@ -228,6 +240,9 @@ class Vl53l8cx(DeviceBase):
                 driver = VL53L8CX(self._platform, variant=self._VARIANT)
                 driver.init(progress=progress)
                 self._uld = driver
+                # A fresh driver has no motion indicator armed; the CNH setup
+                # is gone from the sensor too (ERRATA B4).
+                self._cnh_config = None
             finally:
                 self._write_progress = None
 
@@ -252,14 +267,23 @@ class Vl53l8cx(DeviceBase):
         return self.uld.get_ranging_frequency_hz()
 
     def set_ranging_frequency_hz(self, hz: int) -> None:
-        """Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+        """Set the ranging frequency in Hz. Not while ranging.
 
-        Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-        enters its ranging loop and streams nothing (contract 04)."""
-        if hz < self._MIN_RANGING_HZ:
+        At least 2 Hz on the VL53L8 (below that the sensor never enters its
+        ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+        most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+        resolution last set or read through this class (4×4 after init).
+        Refused host-side, nothing reaches the bus."""
+        if not isinstance(hz, int) or hz < self._MIN_RANGING_HZ:
             raise ValueError(
                 f"ranging frequency must be >= {self._MIN_RANGING_HZ} Hz: below that "
                 "the sensor never enters its ranging loop and streams nothing (contract 04)"
+            )
+        max_hz = MAX_RANGING_FREQUENCY_HZ[self._resolution]
+        if hz > max_hz:
+            raise ValueError(
+                f"ranging frequency must be <= {max_hz} Hz at {self._resolution} zones "
+                f"(60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3), got {hz}"
             )
         self._require_not_ranging()
         self.uld.set_ranging_frequency_hz(hz)
@@ -315,10 +339,12 @@ class Vl53l8cx(DeviceBase):
         self._require_not_ranging()
         self.uld.set_power_mode(mode)
 
-    def get_xtalk_margin(self) -> float:
+    def get_xtalk_margin(self) -> int:
+        """Xtalk margin, whole kcps/SPAD (as ST)."""
         return self.uld.get_xtalk_margin()
 
-    def set_xtalk_margin(self, margin_kcps: float) -> None:
+    def set_xtalk_margin(self, margin_kcps: int) -> None:
+        """Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST)."""
         self._require_not_ranging()
         self.uld.set_xtalk_margin(margin_kcps)
 
@@ -349,10 +375,10 @@ class Vl53l8cx(DeviceBase):
         self._require_not_ranging()
         self.uld.set_detection_thresholds_enable(enabled)
 
-    def get_detection_thresholds(self) -> list[dict]:
+    def get_detection_thresholds(self) -> list[DetectionThreshold]:
         return self.uld.get_detection_thresholds()
 
-    def set_detection_thresholds(self, thresholds: list[dict]) -> None:
+    def set_detection_thresholds(self, thresholds: list[DetectionThreshold]) -> None:
         """Program the 64 detection thresholds (interrupt-on-threshold). Each
         entry is a dict: low_thresh, high_thresh, measurement, type, zone_num,
         operation (see uld THRESH_* constants)."""
@@ -365,13 +391,17 @@ class Vl53l8cx(DeviceBase):
 
     def configure_motion_indicator(
         self, distance_min_mm: int = 400, distance_max_mm: int = 1500
-    ):
+    ) -> MotionConfig:
         """Enable the motion indicator over [distance_min_mm, distance_max_mm]
         and surface motion output in each frame's `.motion`. Returns the
-        underlying uld MotionConfig for advanced tuning."""
+        underlying uld MotionConfig for advanced tuning.
+
+        On CH firmware the motion indicator and CNH share one DCI struct
+        (0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`)."""
         self._require_not_ranging()
         resolution = self.get_resolution()
         cfg = self.uld.motion_indicator_init(resolution)
+        self._cnh_config = None
         self.uld.motion_indicator_set_distance_motion(
             cfg, distance_min_mm, distance_max_mm
         )
@@ -386,7 +416,7 @@ class Vl53l8cx(DeviceBase):
         self.get_resolution()  # refresh the cache used for frame shaping
         self.uld.start_ranging(cnh_data_size=cnh_size)
         frame_size = self.uld.data_read_size
-        self._reassembler = FrameReassembler()
+        self._reassembler = FrameReassembler(self._STREAM_CHUNK)
         self.request(
             Vl53l8Cmd.START_STREAM, pack_start_stream(frame_size), ok_completes=True
         )
@@ -413,7 +443,7 @@ class Vl53l8cx(DeviceBase):
         self._frame_cbs.append(cb)
         return lambda: self._frame_cbs.remove(cb)
 
-    def frames(self, maxsize: int = 8) -> StreamIterator:
+    def frames(self, maxsize: int = 8) -> StreamIterator[Vl53l8Frame]:
         """Blocking iterator over parsed frames (bounded, drop-oldest).
         Subscribes immediately — call before or after start_ranging()."""
         return StreamIterator(self._frame_queues, maxsize, lambda: self.closed)
@@ -439,7 +469,7 @@ class Vl53l8cx(DeviceBase):
         """
         if self.closed:
             raise LinkClosedError("device is closed")
-        q = StreamQueue(1)
+        q: StreamQueue[Vl53l8Frame] = StreamQueue(1)
         self._frame_queues.append(q)
         try:
             deadline = time.monotonic() + timeout
@@ -463,7 +493,7 @@ class Vl53l8cx(DeviceBase):
 
     def _require_not_ranging(self) -> None:
         if self._ranging:
-            raise DepzError("stop_ranging() first — the stream owns the register bank")
+            raise InvalidStateError("stop_ranging() first — the stream owns the register bank")
 
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd != Vl53l8Rpt.VL53_FRAME or len(pkt.payload) < 12:
@@ -482,13 +512,10 @@ class Vl53l8cx(DeviceBase):
             self._frame_parse_errors += 1
             return True
         frame = self._to_frame(ts, parsed)
-        for cb in list(self._frame_cbs):
-            cb(frame)
-        for q in list(self._frame_queues):
-            q.put(frame)
+        self._deliver(self._frame_cbs, self._frame_queues, frame)
         return True
 
-    def _to_frame(self, timestamp_us: int, parsed: dict) -> Vl53l8Frame:
+    def _to_frame(self, timestamp_us: int, parsed: FrameResults) -> Vl53l8Frame:
         resolution = self._resolution
         return Vl53l8Frame(
             timestamp_us=timestamp_us,
@@ -512,11 +539,24 @@ class CnhMixin:
     class (VL53L8CH here, VL53L7CH in `vl53l7`). Mix in before the device
     base class."""
 
+    if TYPE_CHECKING:
+        # Provided by the Vl53l8cx host class the mixin is combined with.
+        _cnh_config: CnhConfig | None
+
+        @property
+        def uld(self) -> VL53L8CX: ...
+
+        def _require_not_ranging(self) -> None: ...
+
     def configure_cnh(self, config: CnhConfig) -> None:
         """Arm the CNH histogram block for the next start_ranging(). CH only —
-        this method does not exist on Vl53l8cx."""
+        this method does not exist on Vl53l8cx.
+
+        CNH and the motion indicator share one DCI struct (0xBFAC): this
+        disarms the motion indicator (frames carry no `.motion`)."""
         self._require_not_ranging()
         self.uld.dci_write_data(cnh_module.MI_CFG_DEV_IDX, config.pack())
+        self.uld.motion_indicator_disarm()
         self._cnh_config = config
 
     @property

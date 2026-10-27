@@ -10,7 +10,11 @@ pub fn crc8_maxim(data: &[u8]) -> u8 {
     for &b in data {
         crc ^= b;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0x8C } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0x8C
+            } else {
+                crc >> 1
+            };
         }
     }
     crc
@@ -22,7 +26,11 @@ pub fn crc16_modbus(data: &[u8]) -> u16 {
     for &b in data {
         crc ^= b as u16;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xA001 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xA001
+            } else {
+                crc >> 1
+            };
         }
     }
     crc

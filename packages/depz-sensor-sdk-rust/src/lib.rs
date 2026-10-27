@@ -29,6 +29,10 @@
 //! - [`dataset`] — `.depzdata` decoded multi-device dataset reader (contract 09).
 //! - [`discovery`] — class resolution from probe answers + USB id
 //!   (contract 02 §4.4): [`resolve_sensor_class`], [`SENSOR_CLASS_NAMES`].
+//! - [`devices`] — the live layer (contract 07): the board's USB serial port
+//!   opened through the `serialport` crate ([`devices::open_device`],
+//!   [`devices::list_depz_devices`]), or any [`devices::Link`] of the host's
+//!   (a `.depzrec` replay, a socket); one device class per sensor family.
 //!
 //! Everything here is byte-exact with the golden vectors in
 //! `contracts/vectors/` and the Python/Java/C/C++ reference SDKs.
@@ -47,12 +51,12 @@ pub mod tmf8829;
 pub mod usb_ids;
 pub mod vl53l4;
 pub mod vl53l7;
-pub mod vl53lx;
 pub mod vl53l8;
+pub mod vl53lx;
 
+pub use discovery::{resolve_sensor_class, SENSOR_CLASS_NAMES};
 pub use framing::{
     build_packet, CrcType, Event, FramingError, Packet, PacketParser, HEADER_SIZE, MAGIC,
     MAX_PAYLOAD,
 };
-pub use discovery::{resolve_sensor_class, SENSOR_CLASS_NAMES};
 pub use usb_ids::{is_known_depz_usb, usb_model_hint};

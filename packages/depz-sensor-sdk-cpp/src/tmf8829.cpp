@@ -578,21 +578,27 @@ std::optional<Measurement> MeasurementBuilder::add(byte_span raw, std::int64_t t
         return std::nullopt;
     }
 
+    PixelResults res;
+    try {
+        res = parse_results(raw, f);
+    } catch (const FrameError& e) {
+        // Contract 14 §5/§6: decoded first; a corrupt results frame never reaches the
+        // capture timer and is dropped with its pending frames and any half-measurement
+        // collected before it.
+        parse_errors++;
+        problems_.push_back("fN=" + std::to_string(f.f_number) + ": " + e.what());
+        pending_.clear();
+        hist_.clear();
+        refs_.clear();
+        half_.reset();
+        return std::nullopt;
+    }
     const FrameTime t = timer.results_frame(clock, f, timestamp_us, edge_us, flags);
     for (auto& p : pending_) {
         if (p.first.kind() == FID_HISTOGRAMS) hist_.push_back(HistogramFrame{p.first, std::move(p.second)});
         else refs_.push_back(std::move(p.second));
     }
     pending_.clear();
-    PixelResults res;
-    try {
-        res = parse_results(raw, f);
-    } catch (const FrameError& e) {
-        parse_errors++;
-        problems_.push_back("fN=" + std::to_string(f.f_number) + ": " + e.what());
-        half_.reset();
-        return std::nullopt;
-    }
 
     Measurement m;
     if (fp_grid(f.fp_mode())->first == 32) {

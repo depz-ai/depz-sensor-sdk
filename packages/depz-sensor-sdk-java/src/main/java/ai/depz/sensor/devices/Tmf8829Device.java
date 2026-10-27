@@ -347,7 +347,7 @@ public final class Tmf8829Device extends DepzDevice {
                     + String.join(", ", Tmf8829Config.PRESETS.keySet()));
         }
         if (streaming) {
-            throw new IllegalStateException("configure() while streaming: stop() first");
+            throw new InvalidStateException("configure() while streaming: stop() first");
         }
         // The 3-bit field takes 0..7, the sensor reports at most 4.
         if (nrPeaks < 1 || nrPeaks > 4) {
@@ -548,7 +548,7 @@ public final class Tmf8829Device extends DepzDevice {
                 }
             }
             if (m != null) {
-                measurements.emit(m);
+                measurements.emit(m, stats());
             }
             return true;
         }

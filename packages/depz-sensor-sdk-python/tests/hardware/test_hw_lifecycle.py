@@ -255,6 +255,16 @@ def test_consumer_exception_does_not_kill_the_reader(any_device_info):
             drv.start()
             first = drv.read_one()
             assert drv.sample_is_valid(first)
+            # Make sure an event reaches the callback on the reader thread:
+            # an opcode no firmware knows is answered with an RPT_STATUS
+            # nothing waits for (contract 02 §3) — an UnsolicitedStatusEvent.
+            # Without it the test only bit when a stray event happened to
+            # fire (a seq gap after a reopen), i.e. now and then.
+            drv.dev.send(0x7E)
+            deadline = time.monotonic() + 2.0
+            while not calls and time.monotonic() < deadline:
+                time.sleep(0.02)
+            assert calls, "no event reached the callback — the test did not exercise it"
 
             # The stream must survive whatever the callback did.
             time.sleep(0.3)

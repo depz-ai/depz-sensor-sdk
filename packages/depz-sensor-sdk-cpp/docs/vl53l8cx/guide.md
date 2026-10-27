@@ -315,7 +315,7 @@ back; the sensor subtracts a calibrated amount of it from every zone.
 #include "depz/device.hpp"
 
 void crosstalk(depz::Vl53l8& tof) {
-    tof.set_xtalk_margin(50.0);     // kcps/SPAD headroom for the xtalk flag, <= 10000
+    tof.set_xtalk_margin(50);       // whole kcps/SPAD headroom for the xtalk flag, 0..10000 (as ST)
     // A flat target of known reflectance at a known distance, behind the glass:
     // reflectance 1..99 %, samples 1..16, distance 600..3000 mm; blocks seconds.
     if (!tof.calibrate_xtalk(3, 4, 600))
@@ -568,8 +568,8 @@ and send them.
 
 ```cpp
 // crosstalk margin (kcps/SPAD) <-> DCI raw word
-std::uint32_t raw = depz::vl53l8::xtalk_margin_raw(50.0);
-double kcps       = depz::vl53l8::xtalk_margin_kcps(raw);
+std::uint32_t raw  = depz::vl53l8::xtalk_margin_raw(50);   // whole kcps 0..10000 (as ST), raw = kcps * 2048
+std::uint32_t kcps = depz::vl53l8::xtalk_margin_kcps(raw); // raw / 2048
 
 // per-zone detection thresholds (interrupt-on-threshold): 64-entry block
 std::vector<depz::vl53l8::DetectionThreshold> th(1);

@@ -104,7 +104,7 @@ public class Vl53lxDevice extends DepzDevice {
     public Vl53lxDriver driver() {
         Vl53lxDriver d = driver;
         if (d == null) {
-            throw new IllegalStateException("call init() first");
+            throw new InvalidStateException("call init() first");
         }
         return d;
     }
@@ -138,7 +138,7 @@ public class Vl53lxDevice extends DepzDevice {
         requireNotRanging();
         String name = product != null ? product : fixedProduct() != null ? fixedProduct() : detected();
         if (name == null) {
-            throw new IllegalStateException("board '" + boardName() + "' carries no product number - pass product explicitly");
+            throw new InvalidStateException("board '" + boardName() + "' carries no product number - pass product explicitly");
         }
         String kind = driver;
         if (kind == null) {
@@ -542,7 +542,7 @@ public class Vl53lxDevice extends DepzDevice {
 
     private void requireNotRanging() {
         if (ranging) {
-            throw new IllegalStateException("stopRanging() first — the stream owns the bus");
+            throw new InvalidStateException("stopRanging() first — the stream owns the bus");
         }
     }
 
@@ -569,7 +569,7 @@ public class Vl53lxDevice extends DepzDevice {
             streamParseErrors.incrementAndGet(); // a bad sample must not kill the reader
             return true;
         }
-        measurements.emit(m);
+        measurements.emit(m, stats());
         return true;
     }
 

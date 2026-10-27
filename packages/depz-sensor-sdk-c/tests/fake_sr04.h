@@ -24,6 +24,12 @@ void     fake_sr04_set_echo(fake_sr04 *f, uint16_t echo_us);
 bool     fake_sr04_loop_running(fake_sr04 *f);
 /* Emit one RPT_DATA as the firmware's ISR would (source 0x36 or 0x37). */
 void     fake_sr04_send_measurement(fake_sr04 *f, uint8_t source_cmd);
+/* Answer GET_MCU_TEMPERATURE with 3 of its 10 bytes (a short reply, contract 07 §3). */
+void     fake_sr04_set_short_temperature(fake_sr04 *f, bool on);
+/* Answer GET_NAME_ACTIVE_SOFTWARE with `name` (a string that outlives the fake). */
+void     fake_sr04_set_software(fake_sr04 *f, const char *name);
+/* The first host commands the fake received, in order: copies up to cap, returns how many. */
+size_t   fake_sr04_commands(fake_sr04 *f, uint8_t *out, size_t cap);
 /* Emit raw bytes (unsolicited reports, garbage). */
 void     fake_sr04_send_raw(fake_sr04 *f, uint8_t cmd, const uint8_t *payload, size_t len);
 

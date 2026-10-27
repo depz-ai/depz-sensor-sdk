@@ -28,6 +28,9 @@ size_t depz_pack_sync_time(uint64_t pc_timestamp_us, uint8_t *out)
 
 size_t depz_pack_set_payload_crc_type(uint8_t crc_type, uint8_t *out)
 {
+    /* contract 02 §2: 0..3 — refused before anything is written (07 §3) */
+    if (crc_type > (uint8_t)DEPZ_CRC32)
+        return 0;
     out[0] = crc_type;
     return 1;
 }

@@ -107,15 +107,19 @@ int depz_shtp_feed_ex(depz_shtp_layer *l, const uint8_t *frame, size_t frame_len
         return 0;
     depz_shtp_header hdr;
     depz_shtp_unpack_header(frame, &hdr);
-    if (hdr.channel >= DEPZ_SHTP_NUM_CHANNELS || hdr.length < DEPZ_SHTP_HEADER_SIZE)
-        return 0; /* empty/padding header or junk */
+    if (hdr.length < DEPZ_SHTP_HEADER_SIZE)
+        return 0; /* empty/padding header ("no data" read) */
+    if (hdr.channel >= DEPZ_SHTP_NUM_CHANNELS) {
+        l->discarded++; /* junk channel */
+        return 0;
+    }
 
     const uint8_t *chunk = frame + DEPZ_SHTP_HEADER_SIZE;
     size_t chunk_len = frame_len - DEPZ_SHTP_HEADER_SIZE;
     depz_shtp_rx_channel *rx = &l->rx[hdr.channel];
 
     if (!hdr.continuation) {
-        if (rx->expected != 0 && rx->received != 0)
+        if (rx->expected != 0) /* a partial, even one with no bytes yet */
             l->discarded++;
         if (rx_reserve(rx, chunk_len ? chunk_len : 1) != 0)
             return -1;
@@ -200,6 +204,18 @@ size_t depz_bno_pack_command_request(uint8_t seq, uint8_t command,
     if (nparams && params)
         memcpy(out + 3, params, nparams);
     return 12;
+}
+
+size_t depz_bno_pack_interactive_calibration(uint8_t seq, uint8_t intent, uint8_t out[12])
+{
+    return depz_bno_pack_command_request(seq, DEPZ_SH2_CMD_INTERACTIVE_CALIBRATION, &intent, 1, out);
+}
+
+size_t depz_bno_pack_force_flush(uint8_t sensor_id, uint8_t out[2])
+{
+    out[0] = DEPZ_SH2_FORCE_SENSOR_FLUSH;
+    out[1] = sensor_id;
+    return 2;
 }
 
 size_t depz_bno_pack_frs_read_request(uint16_t frs_type, uint16_t offset_words,

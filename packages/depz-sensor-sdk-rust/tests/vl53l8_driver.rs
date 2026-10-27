@@ -10,8 +10,9 @@ use depz_sensor_sdk::vl53l8::advanced::{
 };
 use depz_sensor_sdk::vl53l8::decode::swap_buffer;
 use depz_sensor_sdk::vl53l8::driver::{
-    status, tables, UldResult, Vl53l8CnhSetup, Vl53l8Driver, Vl53l8Firmware, Vl53l8Platform, Vl53l8UldError,
-    MODULE_TYPE_MZEVO, OFFSET_BUFFER_SIZE, RANGING_MODE_AUTONOMOUS, TARGET_ORDER_CLOSEST, XTALK_BUFFER_SIZE,
+    status, tables, UldResult, Vl53l8CnhSetup, Vl53l8Driver, Vl53l8Firmware, Vl53l8Platform,
+    Vl53l8UldError, MODULE_TYPE_MZEVO, OFFSET_BUFFER_SIZE, RANGING_MODE_AUTONOMOUS,
+    TARGET_ORDER_CLOSEST, XTALK_BUFFER_SIZE,
 };
 
 const DCI_ZONE_CONFIG: u16 = 0x5450;
@@ -57,7 +58,11 @@ struct Fake(Mutex<State>);
 
 impl Fake {
     fn new() -> Arc<Fake> {
-        Arc::new(Fake(Mutex::new(State { status: vec![0x02, 0x03, 0x00, 0x00], page: -1, ..State::default() })))
+        Arc::new(Fake(Mutex::new(State {
+            status: vec![0x02, 0x03, 0x00, 0x00],
+            page: -1,
+            ..State::default()
+        })))
     }
 
     fn s(&self) -> MutexGuard<'_, State> {
@@ -100,7 +105,11 @@ impl Fake {
     }
 
     fn count(&self, addr: u16, size: usize) -> usize {
-        self.s().reads.iter().filter(|r| **r == (addr, size)).count()
+        self.s()
+            .reads
+            .iter()
+            .filter(|r| **r == (addr, size))
+            .count()
     }
 
     fn writes(&self) -> Vec<W> {
@@ -112,7 +121,10 @@ impl Fake {
     }
 
     fn wrote(&self, addr: u16, first: u8) -> bool {
-        self.s().writes.iter().any(|w| w.0 == addr && w.1[0] == first)
+        self.s()
+            .writes
+            .iter()
+            .any(|w| w.0 == addr && w.1[0] == first)
     }
 
     fn banks(&self) -> Vec<(i32, usize)> {
@@ -142,8 +154,10 @@ impl Vl53l8Platform for Fake {
         let n = data.len();
         if addr == UI_CMD_END - 11 && n == 12 {
             s.xtalk_pending = false;
-            s.pending_read =
-                Some(((data[0] as u16) << 8 | data[1] as u16, (data[2] as usize) << 4 | (data[3] as usize) >> 4));
+            s.pending_read = Some((
+                (data[0] as u16) << 8 | data[1] as u16,
+                (data[2] as usize) << 4 | (data[3] as usize) >> 4,
+            ));
             return Ok(());
         }
         if n >= 12 && data[n - 5] == 0x0F && data[n - 4] == 0x05 && data[n - 3] == 0x01 {
@@ -180,7 +194,9 @@ impl Vl53l8Platform for Fake {
                 return Ok(swap_buffer(&raw));
             }
         }
-        Ok((0..size).map(|i| *s.reg.get(&(addr as u32 + i as u32)).unwrap_or(&0)).collect())
+        Ok((0..size)
+            .map(|i| *s.reg.get(&(addr as u32 + i as u32)).unwrap_or(&0))
+            .collect())
     }
 }
 
@@ -191,7 +207,11 @@ fn driver(p: &Arc<Fake>, fw: Vl53l8Firmware) -> Drv {
 }
 
 fn u32s(b: &[u8]) -> Vec<u32> {
-    b.chunks_exact(4).map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect()
+    b.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| u32::from_le_bytes(*c))
+        .collect()
 }
 
 fn put_u16(b: &mut [u8], off: usize, v: i32) {
@@ -227,14 +247,22 @@ fn ranging(resolution: usize) -> Arc<Fake> {
 }
 
 fn undo() -> Vec<W> {
-    vec![(0x7FFF, vec![0x00]), (0x14, vec![0x00]), (0x15, vec![0x00]), (0x09, vec![0x04]), (0x7FFF, vec![0x02])]
+    vec![
+        (0x7FFF, vec![0x00]),
+        (0x14, vec![0x00]),
+        (0x15, vec![0x00]),
+        (0x09, vec![0x04]),
+        (0x7FFF, vec![0x02]),
+    ]
 }
 
 /// The ULD status code of a failed call.
 #[track_caller]
 fn code<T: std::fmt::Debug>(r: UldResult<T>) -> u8 {
     match r {
-        Err(e) => e.status_code().unwrap_or_else(|| panic!("not a ULD status: {e:?}")),
+        Err(e) => e
+            .status_code()
+            .unwrap_or_else(|| panic!("not a ULD status: {e:?}")),
         Ok(v) => panic!("expected a ULD status, got Ok({v:?})"),
     }
 }
@@ -254,9 +282,19 @@ fn init_downloads_three_banks_and_uploads_the_configuration() {
     let p = booting(Vl53l8Firmware::Cx);
     let mut drv = driver(&p, Vl53l8Firmware::Cx);
     let mut notes: Vec<String> = Vec::new();
-    drv.init_with_progress(&mut |s| notes.push(s.to_string())).unwrap();
-    assert_eq!(vec![(0x09, 0x8000), (0x0A, 0x8000), (0x0B, 0x5000)], p.banks());
-    assert!(p.writes().iter().filter(|w| w.1.len() >= 0x5000).all(|w| w.0 == 0), "banks at 0");
+    drv.init_with_progress(&mut |s| notes.push(s.to_string()))
+        .unwrap();
+    assert_eq!(
+        vec![(0x09, 0x8000), (0x0A, 0x8000), (0x0B, 0x5000)],
+        p.banks()
+    );
+    assert!(
+        p.writes()
+            .iter()
+            .filter(|w| w.1.len() >= 0x5000)
+            .all(|w| w.0 == 0),
+        "banks at 0"
+    );
     let addrs = p.addrs();
     let at = |a: u16| addrs.iter().position(|&x| x == a).unwrap();
     assert!(at(0x2FD8) < at(0x2E18), "nvm before offset");
@@ -265,11 +303,20 @@ fn init_downloads_three_banks_and_uploads_the_configuration() {
     let writes = p.writes();
     let offset = &writes.iter().find(|w| w.0 == 0x2E18).unwrap().1;
     assert_eq!(OFFSET_BUFFER_SIZE, offset.len());
-    assert_eq!(&[0, 0, 0, 0x0F, 0x03, 0x01, 0x01, 0xE4], &offset[offset.len() - 8..]);
-    assert_eq!(XTALK_BUFFER_SIZE, writes.iter().find(|w| w.0 == 0x2CF8).unwrap().1.len());
+    assert_eq!(
+        &[0, 0, 0, 0x0F, 0x03, 0x01, 0x01, 0xE4],
+        &offset[offset.len() - 8..]
+    );
+    assert_eq!(
+        XTALK_BUFFER_SIZE,
+        writes.iter().find(|w| w.0 == 0x2CF8).unwrap().1.len()
+    );
     assert_eq!(Some(vec![1, 0, 1, 0]), p.dci(DCI_PIPE_CONTROL));
     assert_eq!(Some(vec![1, 0, 0, 0]), p.dci(DCI_SINGLE_RANGE));
-    assert!(notes.iter().any(|n| n == "Sensor FW checksum OK"), "checksum note");
+    assert!(
+        notes.iter().any(|n| n == "Sensor FW checksum OK"),
+        "checksum note"
+    );
     assert_eq!("Sensor init done", notes.last().unwrap());
     assert_eq!(None, drv.module_type());
     assert_eq!(XTALK_BUFFER_SIZE, drv.xtalk_data().len());
@@ -287,7 +334,10 @@ fn init_refuses_a_wrong_firmware_checksum() {
 fn init_times_out_when_the_sensor_never_boots() {
     let p = booting(Vl53l8Firmware::Cx);
     p.put(0x06, 0x00);
-    assert_eq!(status::TIMEOUT_ERROR, code(driver(&p, Vl53l8Firmware::Cx).init()));
+    assert_eq!(
+        status::TIMEOUT_ERROR,
+        code(driver(&p, Vl53l8Firmware::Cx).init())
+    );
     assert_eq!(201, p.count(0x06, 1), "2 s at 10 ms, then the timeout");
     assert!(p.banks().is_empty());
 }
@@ -296,7 +346,10 @@ fn init_times_out_when_the_sensor_never_boots() {
 fn init_stops_on_an_mcu_error_in_the_command_status() {
     let p = booting(Vl53l8Firmware::Cx);
     p.s().status = vec![0x02, 0x03, 0x7F, 0x00];
-    assert_eq!(status::MCU_ERROR, code(driver(&p, Vl53l8Firmware::Cx).init()));
+    assert_eq!(
+        status::MCU_ERROR,
+        code(driver(&p, Vl53l8Firmware::Cx).init())
+    );
 }
 
 #[test]
@@ -305,12 +358,22 @@ fn l7cx_init_checks_silicon_skips_the_checksum_and_reads_the_module_type() {
     p.dci_put(DCI_FW_FLAGS, &[0, MODULE_TYPE_MZEVO, 0, 0, 0, 0, 0, 0]);
     let mut drv = driver(&p, Vl53l8Firmware::L7cx);
     let mut notes: Vec<String> = Vec::new();
-    drv.init_with_progress(&mut |s| notes.push(s.to_string())).unwrap();
+    drv.init_with_progress(&mut |s| notes.push(s.to_string()))
+        .unwrap();
     assert_eq!(Some(MODULE_TYPE_MZEVO), drv.module_type());
-    assert_eq!("Sensor init done (module type MZEVO)", notes.last().unwrap());
-    assert!(!notes.iter().any(|n| n == "Sensor FW checksum OK"), "no checksum on L7CX");
+    assert_eq!(
+        "Sensor init done (module type MZEVO)",
+        notes.last().unwrap()
+    );
+    assert!(
+        !notes.iter().any(|n| n == "Sensor FW checksum OK"),
+        "no checksum on L7CX"
+    );
     assert_eq!(0, p.count(0x2FFC, 4));
-    assert!(p.wrote(0x20, 0x07) && p.wrote(0x20, 0x06), "L7 boot writes to 0x20");
+    assert!(
+        p.wrote(0x20, 0x07) && p.wrote(0x20, 0x06),
+        "L7 boot writes to 0x20"
+    );
 }
 
 #[test]
@@ -330,7 +393,11 @@ fn every_firmware_set_loads_and_boots() {
         let mut drv = driver(&p, fw);
         drv.init().unwrap();
         assert_eq!(3, p.banks().len(), "{fw:?}");
-        assert_eq!(matches!(fw, Vl53l8Firmware::L7cx | Vl53l8Firmware::L7ch), drv.is_i2c(), "{fw:?}");
+        assert_eq!(
+            matches!(fw, Vl53l8Firmware::L7cx | Vl53l8Firmware::L7ch),
+            drv.is_i2c(),
+            "{fw:?}"
+        );
     }
 }
 
@@ -341,7 +408,7 @@ fn start_ranging_sizes_the_frame_and_programs_the_outputs() {
     let cases = [
         (Vl53l8Firmware::Cx, 64, 1452),
         (Vl53l8Firmware::Cx, 16, 540),
-        (Vl53l8Firmware::Ch, 64, 1444),   // 24-byte tail on the 2.0.x firmware
+        (Vl53l8Firmware::Ch, 64, 1444), // 24-byte tail on the 2.0.x firmware
         (Vl53l8Firmware::L7cx, 16, 1060), // per-target blocks keep 64 entries
         (Vl53l8Firmware::L7cx, 64, 1444),
     ];
@@ -354,14 +421,33 @@ fn start_ranging_sizes_the_frame_and_programs_the_outputs() {
         assert_eq!(size, drv.data_read_size(), "{at}");
         assert_eq!(None, drv.frame_size_mismatch(), "{at}");
         assert_eq!(Some(resolution), drv.resolution(), "{at}");
-        assert_eq!(vec![size as u32, 13], u32s(&p.dci(DCI_OUTPUT_CONFIG).unwrap()), "{at}");
-        let w3 = if matches!(fw, Vl53l8Firmware::Ch | Vl53l8Firmware::L7ch) { 0 } else { 0xC0000000 };
-        assert_eq!(vec![0xFFF, 0, 0, w3], u32s(&p.dci(DCI_OUTPUT_ENABLES).unwrap()), "{at}");
+        assert_eq!(
+            vec![size as u32, 13],
+            u32s(&p.dci(DCI_OUTPUT_CONFIG).unwrap()),
+            "{at}"
+        );
+        let w3 = if matches!(fw, Vl53l8Firmware::Ch | Vl53l8Firmware::L7ch) {
+            0
+        } else {
+            0xC0000000
+        };
+        assert_eq!(
+            vec![0xFFF, 0, 0, w3],
+            u32s(&p.dci(DCI_OUTPUT_ENABLES).unwrap()),
+            "{at}"
+        );
         let output = u32s(&p.dci(DCI_OUTPUT_LIST).unwrap());
         assert_eq!(12, output.len(), "{at}");
-        let sizes: HashMap<u32, u32> = output.iter().map(|&bh| (bh >> 16, (bh >> 4) & 0xFFF)).collect();
+        let sizes: HashMap<u32, u32> = output
+            .iter()
+            .map(|&bh| (bh >> 16, (bh >> 4) & 0xFFF))
+            .collect();
         assert_eq!(resolution as u32, sizes[&0x54D0], "{at} ambient");
-        assert_eq!(if drv.is_i2c() { 64 } else { resolution as u32 }, sizes[&0xDF44], "{at} distance");
+        assert_eq!(
+            if drv.is_i2c() { 64 } else { resolution as u32 },
+            sizes[&0xDF44],
+            "{at} distance"
+        );
         assert_eq!(0x8C, sizes[&0xD858], "{at} motion: not zone-scaled");
     }
 }
@@ -395,7 +481,10 @@ fn start_ranging_trusts_the_firmware_frame_size() {
 fn start_ranging_without_a_resolution_is_refused_before_any_write() {
     let p = Fake::new();
     p.dci_put(DCI_ZONE_CONFIG, &[0; 8]);
-    assert_eq!(status::INVALID_PARAM, code(driver(&p, Vl53l8Firmware::Cx).start_ranging(None)));
+    assert_eq!(
+        status::INVALID_PARAM,
+        code(driver(&p, Vl53l8Firmware::Cx).start_ranging(None))
+    );
     assert!(p.dci(DCI_OUTPUT_LIST).is_none(), "no output list");
 }
 
@@ -404,7 +493,10 @@ fn start_ranging_reports_a_laser_safety_fault() {
     let p = ranging(64);
     p.fw_reports(1452);
     p.dci_put(DCI_FW_FLAGS, &[0, 0, 0, 0, 0, 0, 1, 0]);
-    assert_eq!(status::LASER_SAFETY, code(driver(&p, Vl53l8Firmware::Cx).start_ranging(None)));
+    assert_eq!(
+        status::LASER_SAFETY,
+        code(driver(&p, Vl53l8Firmware::Cx).start_ranging(None))
+    );
 }
 
 #[test]
@@ -416,7 +508,11 @@ fn stop_ranging_provokes_an_mcu_stop_then_undoes_it() {
     let mut want = vec![(0x7FFF, vec![0]), (0x15, vec![0x16]), (0x14, vec![0x01])];
     want.extend(undo());
     assert_eq!(want, p.writes());
-    assert_eq!((0x2FFC, 4), p.s().reads[0], "the auto-stop flag, not swapped");
+    assert_eq!(
+        (0x2FFC, 4),
+        p.s().reads[0],
+        "the auto-stop flag, not swapped"
+    );
 }
 
 #[test]
@@ -453,7 +549,12 @@ fn check_data_ready_fires_once_per_stream_count() {
     assert!(!drv.check_data_ready().unwrap(), "same stream count");
     go2(&p, [6, 0x05, 0x05, 0x10]);
     assert!(drv.check_data_ready().unwrap(), "next");
-    for g in [[255, 5, 5, 0x10], [7, 4, 5, 0x10], [7, 5, 4, 0x10], [7, 5, 5, 0]] {
+    for g in [
+        [255, 5, 5, 0x10],
+        [7, 4, 5, 0x10],
+        [7, 5, 4, 0x10],
+        [7, 5, 5, 0],
+    ] {
         go2(&p, g);
         assert!(!drv.check_data_ready().unwrap(), "{g:?}");
     }
@@ -462,7 +563,12 @@ fn check_data_ready_fires_once_per_stream_count() {
 }
 
 /// A raw frame (as read from register 0) for the programmed output list.
-fn frame(drv: &Drv, output: &[u32], fill: &dyn Fn(u32, usize) -> Vec<u8>, footer_off: usize) -> Vec<u8> {
+fn frame(
+    drv: &Drv,
+    output: &[u32],
+    fill: &dyn Fn(u32, usize) -> Vec<u8>,
+    footer_off: usize,
+) -> Vec<u8> {
     let mut buf = vec![0u8; drv.data_read_size()];
     buf[8] = 0x12;
     buf[9] = 0x34;
@@ -502,9 +608,8 @@ fn fill_4x4(idx: u32, msize: usize) -> Vec<u8> {
         }
         0xDB84 => {
             // nb target detected: zone 1 has none
-            for k in 0..16 {
-                b[k] = if k == 1 { 0 } else { 1 };
-            }
+            b[..16].fill(1);
+            b[1] = 0;
         }
         0xE084 => b[..16].fill(5),
         0x54B4 => b[8] = 0xF6, // metadata: −10 °C
@@ -541,10 +646,18 @@ fn a_frame_whose_footer_id_differs_is_corrupted() {
     let mut drv = driver(&p, Vl53l8Firmware::Cx);
     p.fw_reports(540);
     drv.start_ranging(None).unwrap();
-    let mut buf = swap_buffer(&frame(&drv, &u32s(&p.dci(DCI_OUTPUT_LIST).unwrap()), &fill_4x4, 12));
+    let mut buf = swap_buffer(&frame(
+        &drv,
+        &u32s(&p.dci(DCI_OUTPUT_LIST).unwrap()),
+        &fill_4x4,
+        12,
+    ));
     let n = buf.len();
     buf[n - 12] ^= 0xFF;
-    assert_eq!(status::CORRUPTED_FRAME, code(drv.parse_frame(0, &swap_buffer(&buf))));
+    assert_eq!(
+        status::CORRUPTED_FRAME,
+        code(drv.parse_frame(0, &swap_buffer(&buf)))
+    );
 }
 
 #[test]
@@ -570,10 +683,20 @@ fn the_motion_block_is_parsed_once_the_indicator_is_configured() {
         b
     };
     let raw = frame(&drv, &u32s(&p.dci(DCI_OUTPUT_LIST).unwrap()), &fill, 12);
-    let m = drv.parse_frame(0, &raw).unwrap().motion.expect("motion parsed");
+    let m = drv
+        .parse_frame(0, &raw)
+        .unwrap()
+        .motion
+        .expect("motion parsed");
     assert_eq!(
         (7, 9, 1, 2, 16),
-        (m.global_indicator_1, m.global_indicator_2, m.status, m.nb_of_detected_aggregates, m.nb_of_aggregates)
+        (
+            m.global_indicator_1,
+            m.global_indicator_2,
+            m.status,
+            m.nb_of_detected_aggregates,
+            m.nb_of_aggregates
+        )
     );
     assert_eq!((100..132).collect::<Vec<u32>>(), m.motion);
 }
@@ -596,7 +719,12 @@ fn l7_frames_are_trimmed_to_the_zones_in_use() {
         }
         b
     };
-    let f = drv.parse_frame(0, &frame(&drv, &u32s(&p.dci(DCI_OUTPUT_LIST).unwrap()), &fill, 4)).unwrap();
+    let f = drv
+        .parse_frame(
+            0,
+            &frame(&drv, &u32s(&p.dci(DCI_OUTPUT_LIST).unwrap()), &fill, 4),
+        )
+        .unwrap();
     assert_eq!(vec![10; 16], f.distance_mm);
     assert_eq!(16, f.target_status.len());
     assert_eq!(16, f.nb_spads_enabled.len());
@@ -611,7 +739,11 @@ fn power_modes() {
     let mut drv = driver(&p, Vl53l8Firmware::Cx);
     p.put(0x09, 0x07);
     assert_eq!(status::ERROR, code(drv.get_power_mode()));
-    assert_eq!((0x7FFF, vec![2]), *p.writes().last().unwrap(), "page restored");
+    assert_eq!(
+        (0x7FFF, vec![2]),
+        *p.writes().last().unwrap(),
+        "page restored"
+    );
 
     p.s().writes.clear();
     p.put(0x09, 0x04);
@@ -622,13 +754,21 @@ fn power_modes() {
     drv.set_power_mode(POWER_MODE_DEEP_SLEEP).unwrap();
     let w = p.writes();
     assert_eq!(
-        vec![(0x7FFF, vec![0]), (0x09, vec![2]), (0x0F, vec![0x43]), (0x7FFF, vec![2])],
+        vec![
+            (0x7FFF, vec![0]),
+            (0x09, vec![2]),
+            (0x0F, vec![0x43]),
+            (0x7FFF, vec![2])
+        ],
         w[w.len() - 4..].to_vec()
     );
 
     p.put(0x09, 0x04);
     p.put(0x06, 0x01); // never clears bit 0
-    assert_eq!(status::TIMEOUT_ERROR, code(drv.set_power_mode(POWER_MODE_SLEEP)));
+    assert_eq!(
+        status::TIMEOUT_ERROR,
+        code(drv.set_power_mode(POWER_MODE_SLEEP))
+    );
     assert_eq!(status::INVALID_PARAM, code(drv.set_power_mode(7)));
 }
 
@@ -640,19 +780,38 @@ fn l7cx_has_no_deep_sleep() {
     p.put(0x0F, 0x43);
     assert_eq!(POWER_MODE_SLEEP, drv.get_power_mode().unwrap());
     assert_eq!(0, p.count(0x0F, 1));
-    assert_eq!(status::INVALID_PARAM, code(drv.set_power_mode(POWER_MODE_DEEP_SLEEP)));
-    assert_eq!(status::INVALID_PARAM, code(drv.set_detection_thresholds_auto_stop(true)));
+    assert_eq!(
+        status::INVALID_PARAM,
+        code(drv.set_power_mode(POWER_MODE_DEEP_SLEEP))
+    );
+    assert_eq!(
+        status::INVALID_PARAM,
+        code(drv.set_detection_thresholds_auto_stop(true))
+    );
 }
 
 // ── xtalk, thresholds, motion ────────────────────────────────────────────────
 
 #[test]
 fn xtalk_margin_out_of_range_is_refused() {
-    for bad in [-0.5, 10000.5, f64::NAN] {
+    // as ST: whole kcps, at most 10000 (a fraction or a negative is not a u32)
+    for bad in [10001, u32::MAX] {
         let p = Fake::new();
-        assert_eq!(status::INVALID_PARAM, code(driver(&p, Vl53l8Firmware::Cx).set_xtalk_margin(bad)));
+        assert_eq!(
+            status::INVALID_PARAM,
+            code(driver(&p, Vl53l8Firmware::Cx).set_xtalk_margin(bad))
+        );
         assert!(p.dci(0xAD94).is_none(), "nothing written for {bad}");
     }
+}
+
+#[test]
+fn xtalk_margin_roundtrips_in_whole_kcps() {
+    let p = Fake::new();
+    let mut drv = driver(&p, Vl53l8Firmware::Cx);
+    drv.set_xtalk_margin(10000).unwrap();
+    assert_eq!(p.dci(0xAD94).unwrap()[..4], (10000u32 * 2048).to_le_bytes());
+    assert_eq!(drv.get_xtalk_margin().unwrap(), 10000);
 }
 
 fn xtalk_reply() -> Vec<u8> {
@@ -665,7 +824,12 @@ fn caldata_xtalk_reads_the_buffer_and_restores_the_resolution() {
     let mut drv = driver(&p, Vl53l8Firmware::Cx);
     p.s().xtalk_reply = Some(xtalk_reply());
     let blob = drv.get_caldata_xtalk().unwrap();
-    assert!(p.writes().iter().any(|w| w.0 == 0x2FB8 && w.1 == tables::get_xtalk_cmd()), "GET_XTALK sent");
+    assert!(
+        p.writes()
+            .iter()
+            .any(|w| w.0 == 0x2FB8 && w.1 == tables::get_xtalk_cmd()),
+        "GET_XTALK sent"
+    );
     let n = XTALK_BUFFER_SIZE;
     assert_eq!(n, blob.len());
     assert_eq!(&xtalk_reply()[8..n], &blob[..n - 8]);
@@ -679,9 +843,16 @@ fn caldata_xtalk_reads_the_buffer_and_restores_the_resolution() {
 fn detection_thresholds() {
     let p = Fake::new();
     let mut drv = driver(&p, Vl53l8Firmware::Cx);
-    let one = DetectionThreshold { measurement: 1, ..Default::default() };
+    let one = DetectionThreshold {
+        measurement: 1,
+        ..Default::default()
+    };
     invalid_argument(drv.set_detection_thresholds(&[one; 65]));
-    let overflow = DetectionThreshold { high_thresh: i32::MAX / 4 + 1, measurement: DIST_MM, ..Default::default() };
+    let overflow = DetectionThreshold {
+        high_thresh: i32::MAX / 4 + 1,
+        measurement: DIST_MM,
+        ..Default::default()
+    };
     invalid_argument(drv.set_detection_thresholds(&[overflow]));
     assert!(p.dci(DCI_THRESH_START).is_none(), "nothing written");
 
@@ -708,15 +879,31 @@ fn motion_indicator_window() {
     let mut cfg = drv.motion_indicator_init(16).unwrap();
     let map: Vec<i8> = (0..64).map(|i| if i < 16 { i as i8 } else { -1 }).collect();
     assert_eq!(map, cfg.map_id.to_vec());
-    assert_eq!(status::INVALID_PARAM, code(drv.motion_indicator_set_resolution(&mut cfg, 32)));
+    assert_eq!(
+        status::INVALID_PARAM,
+        code(drv.motion_indicator_set_resolution(&mut cfg, 32))
+    );
     for (lo, hi) in [(400, 1901), (300, 1000), (3000, 4001)] {
-        assert_eq!(status::INVALID_PARAM, code(drv.motion_indicator_set_distance_motion(&mut cfg, lo, hi)));
+        assert_eq!(
+            status::INVALID_PARAM,
+            code(drv.motion_indicator_set_distance_motion(&mut cfg, lo, hi))
+        );
     }
     // Java int arithmetic: the window width wraps, never panics.
-    assert_eq!(status::INVALID_PARAM, code(drv.motion_indicator_set_distance_motion(&mut cfg, i32::MIN, i32::MAX)));
-    drv.motion_indicator_set_distance_motion(&mut cfg, 1000, 2500).unwrap();
-    assert_eq!(((1000.0 / 37.5348 - 4.0) * 2048.5) as i32, cfg.ref_bin_offset);
-    assert_eq!(((150.0 + 30.02784) / 15.01392 + 0.5) as i32 as u8, cfg.feature_length);
+    assert_eq!(
+        status::INVALID_PARAM,
+        code(drv.motion_indicator_set_distance_motion(&mut cfg, i32::MIN, i32::MAX))
+    );
+    drv.motion_indicator_set_distance_motion(&mut cfg, 1000, 2500)
+        .unwrap();
+    assert_eq!(
+        ((1000.0 / 37.5348 - 4.0) * 2048.5) as i32,
+        cfg.ref_bin_offset
+    );
+    assert_eq!(
+        ((150.0 + 30.02784) / 15.01392 + 0.5) as i32 as u8,
+        cfg.feature_length
+    );
     assert_eq!(Some(cfg.pack()), p.dci(DCI_MOTION_CFG));
 }
 
@@ -724,9 +911,20 @@ fn motion_indicator_window() {
 
 #[test]
 fn calibration_arguments_are_checked_first() {
-    for (r, n, d) in [(0, 4, 600), (100, 4, 600), (16, 0, 600), (16, 17, 600), (16, 4, 599), (16, 4, 3001)] {
+    for (r, n, d) in [
+        (0, 4, 600),
+        (100, 4, 600),
+        (16, 0, 600),
+        (16, 17, 600),
+        (16, 4, 599),
+        (16, 4, 3001),
+    ] {
         let p = Fake::new();
-        assert_eq!(status::INVALID_PARAM, code(driver(&p, Vl53l8Firmware::Cx).calibrate_xtalk(r, n, d)), "{r} {n} {d}");
+        assert_eq!(
+            status::INVALID_PARAM,
+            code(driver(&p, Vl53l8Firmware::Cx).calibrate_xtalk(r, n, d)),
+            "{r} {n} {d}"
+        );
         assert!(p.writes().is_empty());
     }
 }
@@ -756,13 +954,23 @@ fn calibration_runs_the_firmware_table_and_restores_the_settings() {
         };
         let addrs = p.addrs();
         let at = |a: u16| addrs.iter().position(|&x| x == a).unwrap();
-        assert!(p.writes().iter().any(|w| w.0 == 0x2C28 && w.1 == table), "{fw:?} table");
+        assert!(
+            p.writes().iter().any(|w| w.0 == 0x2C28 && w.1 == table),
+            "{fw:?} table"
+        );
         assert!(at(0x2C28) < at(UI_CMD_END - 3), "{fw:?} table before start");
-        assert!(at(UI_CMD_END - 3) < at(0x2FB8), "{fw:?} start before readout");
+        assert!(
+            at(UI_CMD_END - 3) < at(0x2FB8),
+            "{fw:?} start before readout"
+        );
         let cal = p.dci(DCI_CAL_CFG).unwrap();
         assert_eq!(
             (2400, 256, 4),
-            (cal[0] as u32 | (cal[1] as u32) << 8, cal[2] as u32 | (cal[3] as u32) << 8, cal[4] as u32),
+            (
+                cal[0] as u32 | (cal[1] as u32) << 8,
+                cal[2] as u32 | (cal[3] as u32) << 8,
+                cal[4] as u32
+            ),
             "{fw:?}"
         );
         let got = u32s(&p.dci(DCI_OUTPUT_LIST).unwrap());
@@ -770,7 +978,11 @@ fn calibration_runs_the_firmware_table_and_restores_the_settings() {
         for (k, (&want, &got)) in tables::xtalk_cal_output().iter().zip(&got).enumerate() {
             assert_eq!(want & !0xFFF0, got & !0xFFF0, "{fw:?} output {k}");
         }
-        assert_eq!(vec![1204, 18], u32s(&p.dci(DCI_OUTPUT_CONFIG).unwrap()), "{fw:?}");
+        assert_eq!(
+            vec![1204, 18],
+            u32s(&p.dci(DCI_OUTPUT_CONFIG).unwrap()),
+            "{fw:?}"
+        );
         assert!(!drv.xtalk_calibration_failed(), "{fw:?} not failed");
         let n = XTALK_BUFFER_SIZE;
         assert_eq!(&xtalk_reply()[8..n], &drv.xtalk_data()[..n - 8], "{fw:?}");
@@ -778,8 +990,16 @@ fn calibration_runs_the_firmware_table_and_restores_the_settings() {
         assert_eq!(16, drv.get_resolution().unwrap(), "{fw:?}");
         assert_eq!(15, drv.get_ranging_frequency_hz().unwrap(), "{fw:?}");
         assert_eq!(20, drv.get_integration_time_ms().unwrap(), "{fw:?}");
-        assert_eq!(RANGING_MODE_AUTONOMOUS, drv.get_ranging_mode().unwrap(), "{fw:?}");
-        assert_eq!(TARGET_ORDER_CLOSEST, drv.get_target_order().unwrap(), "{fw:?}");
+        assert_eq!(
+            RANGING_MODE_AUTONOMOUS,
+            drv.get_ranging_mode().unwrap(),
+            "{fw:?}"
+        );
+        assert_eq!(
+            TARGET_ORDER_CLOSEST,
+            drv.get_target_order().unwrap(),
+            "{fw:?}"
+        );
     }
 }
 
@@ -796,7 +1016,9 @@ fn coverglass_too_good_is_flagged_not_thrown() {
 fn calibration_waits_then_times_out() {
     let p = calibration();
     p.put(0, status::ERROR); // still calibrating
-    let e = driver(&p, Vl53l8Firmware::Cx).calibrate_xtalk(16, 4, 600).unwrap_err();
+    let e = driver(&p, Vl53l8Firmware::Cx)
+        .calibrate_xtalk(16, 4, 600)
+        .unwrap_err();
     assert_eq!(Some(status::ERROR), e.status_code());
     assert!(e.to_string().contains("xtalk calibration"), "{e}");
     assert_eq!(401, p.count(0x0, 4), "400 waits of 50 ms, 401 reads");
@@ -827,7 +1049,10 @@ fn errors_convert_into_depz_error_with_the_status_in_the_text() {
     assert_eq!("VL53L8CX LASER_SAFETY (code 3)", e.to_string());
     let e: DepzError = Vl53l8UldError::status(0x41, "GO2 error status").into();
     assert_eq!("VL53L8CX 0x41 (code 65) GO2 error status", e.to_string());
-    assert!(matches!(DepzError::from(Vl53l8UldError::InvalidArgument("x".into())), DepzError::InvalidArgument(_)));
+    assert!(matches!(
+        DepzError::from(Vl53l8UldError::InvalidArgument("x".into())),
+        DepzError::InvalidArgument(_)
+    ));
     let lost: DepzError = Vl53l8UldError::from(DepzError::DeviceLost("gone".into())).into();
     assert!(matches!(lost, DepzError::DeviceLost(_)));
 }
@@ -844,7 +1069,10 @@ fn a_short_platform_read_is_an_error_not_a_panic() {
         }
     }
     let mut drv = Vl53l8Driver::new(Short, Vl53l8Firmware::Cx);
-    assert!(matches!(drv.check_data_ready(), Err(Vl53l8UldError::Platform(DepzError::Protocol(_)))));
+    assert!(matches!(
+        drv.check_data_ready(),
+        Err(Vl53l8UldError::Platform(DepzError::Protocol(_)))
+    ));
 }
 
 #[test]
@@ -857,16 +1085,37 @@ fn the_driver_is_send() {
 #[test]
 fn cnh_setup_builds_the_motion_configuration() {
     let mut cnh = Vl53l8CnhSetup::new();
-    assert!(matches!(cnh.required_memory(), Err(DepzError::InvalidArgument(_))));
-    assert!(matches!(cnh.init_config(0, 256, 1), Err(DepzError::InvalidArgument(_))));
-    assert!(matches!(cnh.init_config(1048576, 1, 1), Err(DepzError::InvalidArgument(_))));
+    assert!(matches!(
+        cnh.required_memory(),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        cnh.init_config(0, 256, 1),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        cnh.init_config(1048576, 1, 1),
+        Err(DepzError::InvalidArgument(_))
+    ));
     cnh.init_config(8, 24, 4).unwrap();
     assert_eq!(8 * 2048, cnh.ref_bin_offset());
     assert_eq!(0x3F, cnh.cnh_cfg());
-    assert!(matches!(cnh.create_agg_map(32, 0, 0, 1, 1, 4, 4), Err(DepzError::InvalidArgument(_))));
-    assert!(matches!(cnh.create_agg_map(16, 0, 0, 1, 1, 5, 4), Err(DepzError::InvalidArgument(_))));
-    assert!(matches!(cnh.create_agg_map(16, -1, 0, 1, 1, 4, 4), Err(DepzError::InvalidArgument(_))));
-    assert!(matches!(cnh.create_agg_map(64, 0, 0, i32::MAX, 1, 2, 1), Err(DepzError::InvalidArgument(_))));
+    assert!(matches!(
+        cnh.create_agg_map(32, 0, 0, 1, 1, 4, 4),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        cnh.create_agg_map(16, 0, 0, 1, 1, 5, 4),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        cnh.create_agg_map(16, -1, 0, 1, 1, 4, 4),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        cnh.create_agg_map(64, 0, 0, i32::MAX, 1, 2, 1),
+        Err(DepzError::InvalidArgument(_))
+    ));
     cnh.create_agg_map(64, 0, 0, 2, 2, 4, 4).unwrap();
     assert_eq!(16, cnh.nb_of_aggregates());
     let map = cnh.map_id();
@@ -876,11 +1125,17 @@ fn cnh_setup_builds_the_motion_configuration() {
     let packed = cnh.pack();
     assert_eq!(156, packed.len());
     assert_eq!(&(8 * 2048i32).to_le_bytes(), &packed[0..4]);
-    assert_eq!((4, 24, 16, 1, 0x3F, 1), (packed[18], packed[19], packed[20], packed[21], packed[25], packed[26]));
+    assert_eq!(
+        (4, 24, 16, 1, 0x3F, 1),
+        (packed[18], packed[19], packed[20], packed[21], packed[25], packed[26])
+    );
     assert_eq!(15, packed[28 + 63]);
     let d = cnh.decode_config();
     assert_eq!((16, 24), (d.nb_of_aggregates, d.feature_length));
     cnh.init_config(0, 255, 255).unwrap();
     cnh.create_agg_map(64, 0, 0, 1, 1, 8, 8).unwrap();
-    assert!(matches!(cnh.required_memory(), Err(DepzError::InvalidArgument(_))), "over CNH_MAX_DATA_BYTES");
+    assert!(
+        matches!(cnh.required_memory(), Err(DepzError::InvalidArgument(_))),
+        "over CNH_MAX_DATA_BYTES"
+    );
 }

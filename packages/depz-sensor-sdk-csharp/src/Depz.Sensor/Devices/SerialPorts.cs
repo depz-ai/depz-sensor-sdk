@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.IO.Ports;
 using Microsoft.Win32;
+#endif
 
 namespace Depz.Sensor.Devices;
 
@@ -11,10 +12,19 @@ public sealed record SerialPortInfo(string Port, int? Vid, int? Pid, string? Usb
 /// <summary>
 /// Serial port enumeration with USB ids: Linux (sysfs) and Windows (the
 /// registry). On macOS the ports are listed without USB ids, so discovery
-/// finds no DEPZ candidate there: open a port path explicitly.
+/// finds no DEPZ candidate there: open a port path explicitly. Enumeration
+/// needs .NET 8; the netstandard2.1 build keeps the ordering only, and the
+/// Unity module (<c>unity/</c>) enumerates Windows ports on its own.
 /// </summary>
 public static class SerialPorts
 {
+    /// <summary>Sorted by USB serial (none last), then by port path (contract 02 §4.3).</summary>
+    public static IEnumerable<SerialPortInfo> BySerial(IEnumerable<SerialPortInfo> ports) =>
+        ports.OrderBy(p => string.IsNullOrEmpty(p.UsbSerial) ? 1 : 0)
+            .ThenBy(p => p.UsbSerial ?? "", StringComparer.Ordinal)
+            .ThenBy(p => p.Port, StringComparer.Ordinal);
+
+#if NET
     /// <summary>Every serial port the OS lists.</summary>
     public static IReadOnlyList<SerialPortInfo> List()
     {
@@ -24,12 +34,6 @@ public static class SerialPorts
             return ListWindows();
         return SerialPort.GetPortNames().Select(p => new SerialPortInfo(p, null, null, null)).ToList();
     }
-
-    /// <summary>Sorted by USB serial (none last), then by port path (contract 02 §4.3).</summary>
-    public static IEnumerable<SerialPortInfo> BySerial(IEnumerable<SerialPortInfo> ports) =>
-        ports.OrderBy(p => string.IsNullOrEmpty(p.UsbSerial) ? 1 : 0)
-            .ThenBy(p => p.UsbSerial ?? "", StringComparer.Ordinal)
-            .ThenBy(p => p.Port, StringComparer.Ordinal);
 
     private static List<SerialPortInfo> ListLinux()
     {
@@ -62,6 +66,34 @@ public static class SerialPorts
         return result;
     }
 
+    /// <summary>The enumerated port <paramref name="port"/> names, under any alias (contract 02 §4.3,
+    /// ERRATA A5): the one whose path is the same string, else — on POSIX — the one whose resolved path
+    /// is the same (<c>/dev/serial/by-id/…</c> is a symlink to the node). On Windows a COM name is
+    /// matched by string only: a COM port is not a file, and resolving one opens it — a DTR pulse on
+    /// every board of the bench. Null when the OS does not list the port. (The reference SDK also
+    /// matches two names of one device node; .NET cannot read a device number.)</summary>
+    public static SerialPortInfo? Find(IEnumerable<SerialPortInfo> ports, string port)
+    {
+        var list = ports as IReadOnlyList<SerialPortInfo> ?? ports.ToList();
+        var exact = list.FirstOrDefault(p => p.Port == port);
+        if (exact != null || OperatingSystem.IsWindows())
+            return exact;
+        string? real = TryRealPath(port);
+        return real is null ? null : list.FirstOrDefault(p => TryRealPath(p.Port) == real);
+    }
+
+    private static string? TryRealPath(string path)
+    {
+        try
+        {
+            return RealPath(Path.GetFullPath(path), 0);
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? ResolveDir(string path)
     {
         try
@@ -77,12 +109,14 @@ public static class SerialPorts
 
     // realpath(3): sysfs links are relative to the directory that really holds them
     // (/sys/class/tty/ttyACM0/device → ../../../1-2:1.0), so resolve one component at a time.
+    private static readonly char[] PathSeparator = { '/' };
+
     private static string RealPath(string path, int depth)
     {
         if (depth > 40)
             throw new IOException($"too many levels of symbolic links: {path}");
         string cur = "/";
-        foreach (string part in path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+        foreach (string part in path.Split(PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
             string next = Path.Combine(cur, part);
             string? target = new FileInfo(next).LinkTarget;
@@ -109,7 +143,7 @@ public static class SerialPorts
                 foreach (string hw in usb.GetSubKeyNames())
                 {
                     int? vid = HwField(hw, "VID_"), pid = HwField(hw, "PID_");
-                    bool iface = hw.IndexOf("&MI_", StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool iface = hw.Contains("&MI_", StringComparison.OrdinalIgnoreCase);
                     using var hwKey = usb.OpenSubKey(hw);
                     if (hwKey is null)
                         continue;
@@ -148,14 +182,16 @@ public static class SerialPorts
         int i = hw.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
         return i >= 0 && hw.Length >= i + tag.Length + 4 ? ParseHex(hw.Substring(i + tag.Length, 4)) : null;
     }
+#endif
 }
 
+#if NET
 /// <summary>
 /// A serial port as an <see cref="ILink"/> (System.IO.Ports). DTR and RTS are
 /// raised on open, as the reference SDK's pyserial does: a CDC device may hold
 /// its output until the host asserts DTR.
 /// </summary>
-public sealed class SerialPortLink : ILink
+public sealed class SerialPortLink : ILink, IDisposable
 {
     private readonly SerialPort _port;
     private readonly byte[] _buf = new byte[16384];
@@ -219,6 +255,8 @@ public sealed class SerialPortLink : ILink
             throw new DeviceLostException($"{Name}: {e.Message}", e);
         }
     }
+
+    public void Dispose() => Close();
 
     public void Close()
     {

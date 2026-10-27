@@ -20,12 +20,20 @@ import java.util.function.Consumer;
  * ({@link #uld()}). {@link #init()} downloads the ~84 KB sensor firmware (about a second), then
  * configure and {@link #startRanging()}: the board pushes one frame per INT edge in chunks,
  * reassembled and parsed into {@link #frames}. Configuration needs {@link #init()} and throws
- * {@link IllegalStateException} while ranging — the stream owns the register bank. The VL53L8CH
+ * {@link InvalidStateException} while ranging — the stream owns the register bank. The VL53L8CH
  * superset is {@link Vl53l8chDevice}.
  */
 public class Vl53l8cxDevice extends DepzDevice {
     /** Below this the sensor never enters its ranging loop and streams nothing (contract 04). */
     public static final int MIN_RANGING_FREQUENCY_HZ = 2;
+
+    /**
+     * Highest ranging frequency at {@code resolution} zones (contract 11 §3; the same silicon
+     * limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+     */
+    public static int maxRangingFrequencyHz(int resolution) {
+        return resolution == Vl53l8Driver.RESOLUTION_8X8 ? 15 : 60;
+    }
 
     private static final Duration REG_TIMEOUT = Duration.ofSeconds(2);
     private static final int STREAM_MIN_BYTES = 12;
@@ -72,6 +80,11 @@ public class Vl53l8cxDevice extends DepzDevice {
         return Vl53l8.CHUNK_SIZE;
     }
 
+    /** Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4). */
+    protected int streamChunk() {
+        return Vl53l8.STREAM_CHUNK_MAX;
+    }
+
     /** The lowest ranging frequency that streams on this sensor. */
     protected int minRangingHz() {
         return MIN_RANGING_FREQUENCY_HZ;
@@ -84,11 +97,11 @@ public class Vl53l8cxDevice extends DepzDevice {
         return platform;
     }
 
-    /** The ULD driver (escape hatch for DCI access). @throws IllegalStateException before {@link #init()} */
+    /** The ULD driver (escape hatch for DCI access). @throws InvalidStateException before {@link #init()} */
     public Vl53l8Driver uld() {
         Vl53l8Driver d = uld;
         if (d == null) {
-            throw new IllegalStateException("call init() first");
+            throw new InvalidStateException("call init() first");
         }
         return d;
     }
@@ -130,6 +143,9 @@ public class Vl53l8cxDevice extends DepzDevice {
                 Vl53l8Driver driver = new Vl53l8Driver(platform(), firmwareSet());
                 driver.init(progress);
                 uld = driver;
+                // A fresh driver has no motion indicator armed; the CNH setup is gone from the
+                // sensor too (ERRATA B4).
+                armedCnh = null;
             } finally {
                 this.writeProgress = null;
             }
@@ -162,11 +178,20 @@ public class Vl53l8cxDevice extends DepzDevice {
         return uld().getRangingFrequencyHz();
     }
 
-    /** At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8. */
+    /**
+     * At least 2 Hz (1 Hz on L5/L7); at most {@link #maxRangingFrequencyHz} of the resolution last
+     * set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11
+     * §3). Refused host-side, nothing reaches the bus.
+     */
     public void setRangingFrequencyHz(int hz) {
         if (hz < minRangingHz()) {
             throw new IllegalArgumentException("ranging frequency must be >= " + minRangingHz()
                     + " Hz: below that the sensor never enters its ranging loop and streams nothing (contract 04), got " + hz);
+        }
+        int maxHz = maxRangingFrequencyHz(resolution);
+        if (hz > maxHz) {
+            throw new IllegalArgumentException("ranging frequency must be <= " + maxHz + " Hz at " + resolution
+                    + " zones (60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3), got " + hz);
         }
         requireNotRanging();
         uld().setRangingFrequencyHz(hz);
@@ -225,11 +250,13 @@ public class Vl53l8cxDevice extends DepzDevice {
         uld().setPowerMode(mode);
     }
 
-    public double getXtalkMargin() {
+    /** Xtalk margin, whole kcps/SPAD (as ST). */
+    public int getXtalkMargin() {
         return uld().getXtalkMargin();
     }
 
-    public void setXtalkMargin(double marginKcps) {
+    /** Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused. */
+    public void setXtalkMargin(int marginKcps) {
         requireNotRanging();
         uld().setXtalkMargin(marginKcps);
     }
@@ -278,10 +305,14 @@ public class Vl53l8cxDevice extends DepzDevice {
     /**
      * Enable the motion indicator over [min, max] mm; every frame then carries
      * {@link Vl53l8Frame#motion()}. Returns the configuration for further tuning.
+     *
+     * <p>On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms
+     * CNH ({@code cnhSetup()} null, no {@link Vl53l8Frame#cnhRaw()}).
      */
     public Vl53l8Uld.MotionConfig configureMotionIndicator(int distanceMinMm, int distanceMaxMm) {
         requireNotRanging();
         Vl53l8Uld.MotionConfig cfg = uld().motionIndicatorInit(getResolution());
+        armedCnh = null;
         uld().motionIndicatorSetDistanceMotion(cfg, distanceMinMm, distanceMaxMm);
         return cfg;
     }
@@ -310,6 +341,7 @@ public class Vl53l8cxDevice extends DepzDevice {
         requireNotRanging();
         setup.requiredMemory(); // a blank or oversized setup is refused before anything is sent
         uld().dciWriteData(Vl53l8CnhSetup.MI_CFG_DEV_IDX, setup.pack());
+        uld().motionIndicatorDisarm(); // one DCI block (ERRATA B4)
         armedCnh = setup;
     }
 
@@ -328,7 +360,7 @@ public class Vl53l8cxDevice extends DepzDevice {
         Integer cnhSize = cnh == null ? null : cnh.requiredMemory();
         getResolution(); // refresh the cache that shapes frames
         uld().startRanging(cnhSize);
-        reassembler = new FrameReassembler();
+        reassembler = new FrameReassembler(streamChunk());
         requestOk(Vl53l8.Vl53l8Cmd.START_STREAM.value, Vl53l8.packStartStream(uld().dataReadSize()));
         ranging = true;
     }
@@ -381,7 +413,7 @@ public class Vl53l8cxDevice extends DepzDevice {
 
     protected void requireNotRanging() {
         if (ranging) {
-            throw new IllegalStateException("stopRanging() first — the stream owns the register bank");
+            throw new InvalidStateException("stopRanging() first — the stream owns the register bank");
         }
     }
 
@@ -402,7 +434,7 @@ public class Vl53l8cxDevice extends DepzDevice {
             frameParseErrors.incrementAndGet();
             return true;
         }
-        frames.emit(frame);
+        frames.emit(frame, stats());
         return true;
     }
 

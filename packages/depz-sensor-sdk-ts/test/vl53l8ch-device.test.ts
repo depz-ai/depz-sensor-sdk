@@ -6,12 +6,14 @@
  * `vl53l8ch-cnh.test.ts`. Exercised via the fake DCI platform (no hardware).
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CnhConfig,
   DepzError,
   LoopbackTransport,
   MI_CFG_DEV_IDX,
+  RESOLUTION_8X8,
+  VL53L8CX,
   Vl53l8ch,
   Vl53l8cx,
 } from "../src/index.js";
@@ -69,5 +71,62 @@ describe("vl53l8ch configureCnh", () => {
     config.initConfig(0, 24, 4);
     config.createAggMap(64, 0, 0, 2, 2, 4, 4);
     await expect(dev.configureCnh(config)).rejects.toThrow(/stopRanging/);
+  });
+});
+
+// ── CNH ↔ motion indicator: one DCI block, mutually exclusive (ERRATA B4) ─────
+
+describe("vl53l8ch CNH and the motion indicator share DCI 0xBFAC", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function armed(): { dev: Vl53l8ch; drv: VL53L8CX; p: ReturnType<typeof makeDriver>["p"] } {
+    const dev = ch();
+    const { drv, p } = makeDriver();
+    (dev as unknown as { uldDriver: unknown }).uldDriver = drv;
+    return { dev, drv, p };
+  }
+
+  function cnh16x20(): CnhConfig {
+    const config = new CnhConfig();
+    config.initConfig(10, 20, 2);
+    config.createAggMap(64, 0, 0, 2, 2, 4, 4);
+    return config;
+  }
+
+  it("configureCnh disarms the motion indicator", async () => {
+    const { dev, drv, p } = armed();
+    await drv.setResolution(RESOLUTION_8X8);
+    await dev.configureMotionIndicator(400, 1500);
+    expect(drv.motionPresent).toBe(true);
+    const config = cnh16x20();
+    await dev.configureCnh(config);
+    expect(drv.motionPresent).toBe(false); // frames parse with motion null
+    expect(dev.activeCnhConfig).toBe(config);
+    expect(p.dci.get(MI_CFG_DEV_IDX)).toEqual(config.pack());
+  });
+
+  it("configureMotionIndicator disarms CNH", async () => {
+    const { dev, drv, p } = armed();
+    await drv.setResolution(RESOLUTION_8X8);
+    await dev.configureCnh(cnh16x20());
+    const cfg = await dev.configureMotionIndicator(400, 1500);
+    expect(dev.activeCnhConfig).toBeNull(); // startRanging adds no CNH block
+    expect(drv.motionPresent).toBe(true);
+    expect(p.dci.get(MI_CFG_DEV_IDX)).toEqual(cfg.pack());
+  });
+
+  it("init() disarms both", async () => {
+    vi.spyOn(VL53L8CX.prototype, "init").mockResolvedValue(undefined);
+    const { dev, drv } = armed();
+    await drv.setResolution(RESOLUTION_8X8);
+    await dev.configureMotionIndicator(400, 1500);
+    await dev.configureCnh(cnh16x20());
+    await dev.init();
+    expect(dev.activeCnhConfig).toBeNull();
+    const fresh = (dev as unknown as { uldDriver: VL53L8CX }).uldDriver;
+    expect(fresh).not.toBe(drv);
+    expect(fresh.motionPresent).toBe(false);
   });
 });

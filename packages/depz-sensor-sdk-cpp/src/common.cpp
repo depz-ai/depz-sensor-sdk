@@ -1,6 +1,7 @@
 #include "depz/common.hpp"
 
 #include "depz/detail/byteio.hpp"
+#include "depz/framing.hpp"
 
 #include <stdexcept>
 
@@ -63,6 +64,9 @@ bytes pack_sync_time(std::uint64_t pc_timestamp_us) {
 }
 
 bytes pack_set_payload_crc_type(std::uint8_t crc_type) {
+    // contract 02 §2: 0..3 — refused before anything is written (07 §3)
+    if (crc_type > static_cast<std::uint8_t>(CrcType::Crc32))
+        throw std::out_of_range("SET_PAYLOAD_CRC_TYPE: crc_type is not a CrcType 0..3");
     return bytes{std::byte{crc_type}};
 }
 

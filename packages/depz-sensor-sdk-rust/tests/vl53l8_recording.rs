@@ -15,7 +15,9 @@ use depz_sensor_sdk::framing::{Event, PacketParser};
 use depz_sensor_sdk::vl53l8::{parse_frame, unpack_frame_chunk, FrameReassembler, Variant};
 use serde_json::Value;
 
-use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, recordings_dir, seen};
+use common::{
+    hex_decode, hex_encode, load, recorded_text, recording_packets, recordings_dir, seen,
+};
 
 const RPT_VL53_FRAME: u8 = 0x93;
 
@@ -33,9 +35,10 @@ struct DecodedFrame {
 fn vl53l8_recording_replay() {
     let base = recordings_dir();
     let rec = std::fs::read_to_string(base.join("vl53l8_8x8_15hz_3s.depzrec")).unwrap();
-    let expected: Value =
-        serde_json::from_str(&std::fs::read_to_string(base.join("vl53l8_8x8_15hz_3s.expected.json")).unwrap())
-            .unwrap();
+    let expected: Value = serde_json::from_str(
+        &std::fs::read_to_string(base.join("vl53l8_8x8_15hz_3s.expected.json")).unwrap(),
+    )
+    .unwrap();
 
     // Replay all rx bytes through the transport parser, then the VL53L8 frame
     // reassembler + decoder. Feed one recorded chunk at a time (chunking is
@@ -153,8 +156,20 @@ fn vl53l8ch_replay(stem: &str, with_cnh: bool) {
     }
     let want = exp["frames"].as_array().unwrap();
     // The capture may stream past the sidecar; match the first N.
-    assert!(frames.len() >= want.len(), "{}: {} < {} frames", stem, frames.len(), want.len());
-    let ints = |v: &Value| -> Vec<i64> { v.as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect() };
+    assert!(
+        frames.len() >= want.len(),
+        "{}: {} < {} frames",
+        stem,
+        frames.len(),
+        want.len()
+    );
+    let ints = |v: &Value| -> Vec<i64> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_i64().unwrap())
+            .collect()
+    };
     for (idx, ((ts, r), w)) in frames.iter().zip(want).enumerate() {
         let got = DecodedFrame {
             timestamp_us: *ts as i64,
@@ -176,10 +191,21 @@ fn vl53l8ch_replay(stem: &str, with_cnh: bool) {
         let want_cnh = if with_cnh {
             Some(w["cnh_raw"].as_str().expect("sidecar cnh_raw"))
         } else {
-            assert!(w.get("cnh_raw").is_none(), "{} frame {}: unexpected cnh_raw", stem, idx);
+            assert!(
+                w.get("cnh_raw").is_none(),
+                "{} frame {}: unexpected cnh_raw",
+                stem,
+                idx
+            );
             None
         };
-        assert_eq!(r.cnh_raw.as_deref().map(hex_encode).as_deref(), want_cnh, "{} frame {} cnh", stem, idx);
+        assert_eq!(
+            r.cnh_raw.as_deref().map(hex_encode).as_deref(),
+            want_cnh,
+            "{} frame {} cnh",
+            stem,
+            idx
+        );
     }
     assert_eq!(reasm.discarded, 0, "{}: no frames discarded", stem);
     seen(&format!("recordings/{}.depzrec", stem));

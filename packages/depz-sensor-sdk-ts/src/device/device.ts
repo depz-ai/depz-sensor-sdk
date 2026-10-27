@@ -16,6 +16,8 @@ import {
   DepzError,
   DepzTimeoutError,
   DeviceLostError,
+  InvalidReplyError,
+  InvalidStateError,
   LinkClosedError,
   StatusError,
 } from "../errors.js";
@@ -26,8 +28,10 @@ import {
   UNSOLICITED,
   checkSyncPin,
   packSyncPinConfig,
+  packSetPayloadCrcType,
   packSyncTime,
   syncTimeOffsetRtt,
+  unpackPayloadCrcType,
   unpackSequenceError,
   unpackStatus,
   unpackSyncPinConfig,
@@ -53,6 +57,15 @@ export type DeviceEvent =
       receivedSeq: number;
       /** true: device saw a gap in host TX (RPT 0x84). */
       reportedByDevice: boolean;
+    }
+  | {
+      /** A gap the host saw in the device→host seq (contract 01 §5 step 5);
+       *  counted in `stats.seqGaps`. Not the device's RPT 0x84. */
+      type: "seqGap";
+      expectedSeq: number;
+      receivedSeq: number;
+      /** (received − expected) mod 256 packets that never arrived. */
+      missed: number;
     }
   | { type: "linkCrcError"; cmd: number; seq: number }
   | { type: "trash"; data: Uint8Array }
@@ -217,6 +230,7 @@ export class DepzDevice {
     this.link = opts?.[ADOPT_LINK] ?? new DepzLink(transport, { txCrcType: opts?.txCrcType ?? CrcType.None });
     this.unsubLink = [
       this.link.onParserEvent((ev) => this.handleParserEvent(ev)),
+      this.link.onSeqGap((gap) => this.emitEvent({ type: "seqGap", ...gap })),
       this.link.onClose(() => this.handleLinkClosed()),
     ];
   }
@@ -249,12 +263,12 @@ export class DepzDevice {
    * so no received byte goes to nobody.
    */
   [HAND_OVER](): HandedOverConnection {
-    if (this.handedOver) throw new DepzError("connection already handed over");
+    if (this.handedOver) throw new InvalidStateError("connection already handed over");
     if (!this.link.isStarted || this.torndown || this.closing) {
-      throw new DepzError("hand-over needs an open connection");
+      throw new InvalidStateError("hand-over needs an open connection");
     }
     if (this.pending.size > 0 || this.streams.length > 0) {
-      throw new DepzError("hand-over with a request in flight or a stream open");
+      throw new InvalidStateError("hand-over with a request in flight or a stream open");
     }
     for (const unsub of this.unsubLink) unsub();
     this.handedOver = true;
@@ -345,16 +359,31 @@ export class DepzDevice {
     // entry, so a late reply falls through to handleReport/`text` below and is
     // discarded harmlessly. A timeout should therefore be treated as "the link
     // may be desynced"; prefer reopening over transparent same-opcode retry.
+    //
+    // A matcher that throws has claimed the packet as its reply and failed to
+    // decode it (contract 07 §3: a reply shorter than its fields is rejected):
+    // that one request fails with InvalidReplyError and the pump goes on — an
+    // exception escaping here would end the read pump and fail every later
+    // request on this device.
     for (const p of [...this.pending.values()]) {
       if (p.matcher === null) continue;
-      const result = p.matcher(pkt);
+      let result: unknown;
+      try {
+        result = p.matcher(pkt);
+      } catch (err) {
+        this.settle(p, { error: new InvalidReplyError(p.cmd, err) });
+        return;
+      }
       if (result !== NO_MATCH) {
         this.settle(p, { value: result });
         return;
       }
     }
 
-    if (pkt.cmd === Rpt.SequenceError && pkt.payload.length === 2) {
+    // Contract 07 §3: a report longer than its fields is decoded and the tail
+    // ignored (a newer firmware may append fields); a shorter one is not a
+    // report of that kind and stays visible as hex text below.
+    if (pkt.cmd === Rpt.SequenceError && pkt.payload.length >= 2) {
       const rep = unpackSequenceError(pkt.payload);
       this.emitEvent({
         type: "sequenceError",
@@ -369,7 +398,7 @@ export class DepzDevice {
       this.emitEvent({ type: "text", cmd: rep.cmd, text: rep.text });
       return;
     }
-    if (pkt.cmd === Rpt.Temperature && pkt.payload.length === 10) {
+    if (pkt.cmd === Rpt.Temperature && pkt.payload.length >= 10) {
       const rep = unpackTemperature(pkt.payload);
       this.emitEvent({
         type: "temperature",
@@ -426,7 +455,21 @@ export class DepzDevice {
   }
 
   protected emitEvent(event: DeviceEvent): void {
-    for (const cb of [...this.eventCbs]) cb(event);
+    for (const cb of [...this.eventCbs]) this.callGuarded(cb, event);
+  }
+
+  /**
+   * Run a user callback on the read pump: one that throws is counted in
+   * `stats.callbackErrors`, logged and dropped — it never stops the pump, the
+   * other callbacks or the queues (contract 07 §3).
+   */
+  protected callGuarded<T>(cb: (item: T) => void, item: T): void {
+    try {
+      cb(item);
+    } catch (err) {
+      this.link.stats.callbackErrors += 1;
+      console.error("depz-sensor-sdk: a callback threw on the read pump", err);
+    }
   }
 
   // ── TX / requests ──────────────────────────────────────────────────────────
@@ -556,19 +599,19 @@ export class DepzDevice {
 
   /** Device µs → host monotonic µs (requires a prior `syncTime`). */
   toHostTimeUs(deviceTsUs: bigint): bigint {
-    if (this.timeSyncState === null) throw new DepzError("call syncTime() first");
+    if (this.timeSyncState === null) throw new InvalidStateError("call syncTime() first");
     return deviceTsUs - this.timeSyncState.offsetUs;
   }
 
   async getReportPayloadCrc(): Promise<CrcType> {
     return this.request(Cmd.GetPayloadCrcType, undefined, {
-      matcher: DepzDevice.expectReport(Rpt.PayloadCrcType, (p) => p[0]! as CrcType),
+      matcher: DepzDevice.expectReport(Rpt.PayloadCrcType, (p) => unpackPayloadCrcType(p) as CrcType),
     });
   }
 
   /** Set the device→host payload CRC mode (host→device is per-packet). */
   async setReportPayloadCrc(crcType: CrcType): Promise<void> {
-    await this.request(Cmd.SetPayloadCrcType, Uint8Array.of(crcType), { okCompletes: true });
+    await this.request(Cmd.SetPayloadCrcType, packSetPayloadCrcType(crcType), { okCompletes: true });
   }
 
   async getSyncPin(pin: number): Promise<SyncPinConfig> {

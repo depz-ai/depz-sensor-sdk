@@ -77,7 +77,9 @@ FILE_DOMAIN = [
     ("bno055.hpp", "bno055"),
     ("tmf8829.hpp", "tmf8829"),
     ("dataset.hpp", "dataset"),
+    ("errors.hpp", "device"),
     ("device.hpp", "device"),
+    ("recorder.hpp", "dataset"),
 ]
 
 DOMAIN_ORDER = [
@@ -99,7 +101,7 @@ DOMAIN_TITLE = {
     "bno055": "BNO055 (IMU)",
     "tmf8829": "TMF8829 (dToF)",
     "bootloader": "Bootloader / firmware",
-    "dataset": "Datasets",
+    "dataset": "Datasets (record & replay)",
     "device": "Live hardware (links, device, discovery)",
 }
 

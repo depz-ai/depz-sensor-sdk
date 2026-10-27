@@ -135,7 +135,7 @@ class ShtpLayer:
     def __init__(self) -> None:
         self._tx_seq = [0] * NUM_CHANNELS
         self._rx = [_ChannelRx() for _ in range(NUM_CHANNELS)]
-        self.discarded = 0  # incomplete cargos thrown away
+        self.discarded = 0  # incomplete cargos and junk-channel (>= 6) frames thrown away
 
     # ── TX ───────────────────────────────────────────────────────────────────
 
@@ -172,12 +172,15 @@ class ShtpLayer:
         if len(frame) < SHTP_HEADER_SIZE:
             return None
         hdr = ShtpHeader.unpack(frame)
-        if hdr.channel >= NUM_CHANNELS or hdr.length < SHTP_HEADER_SIZE:
-            return None  # empty/padding header ("no data" read) or junk
+        if hdr.length < SHTP_HEADER_SIZE:
+            return None  # empty/padding header ("no data" read)
+        if hdr.channel >= NUM_CHANNELS:
+            self.discarded += 1  # junk channel
+            return None
         chunk = frame[SHTP_HEADER_SIZE:]
         rx = self._rx[hdr.channel]
         if not hdr.continuation:
-            if rx.expected and rx.buf:
+            if rx.expected:  # a partial, even one with no bytes yet
                 self.discarded += 1
             rx.buf = bytearray(chunk)
             rx.expected = hdr.length - SHTP_HEADER_SIZE

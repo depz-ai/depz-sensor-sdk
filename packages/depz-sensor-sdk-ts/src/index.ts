@@ -61,7 +61,7 @@ export type {
   TransportFactory,
 } from "./discovery.js";
 export { DepzLink } from "./device/link.js";
-export type { LinkStats } from "./device/link.js";
+export type { LinkStats, SeqGap } from "./device/link.js";
 export {
   DEFAULT_TIMEOUT_MS,
   DepzDevice,
@@ -82,6 +82,7 @@ export type { Sr04Measurement } from "./sensors/sr04.js";
 export * from "./sensors/vl53l4/uld.js";
 export * from "./sensors/vl53l4/vl53l4.js";
 export {
+  MAX_RANGING_FREQUENCY_HZ,
   MIN_RANGING_FREQUENCY_HZ,
   Vl53l8,
   Vl53l8ch,
@@ -196,6 +197,8 @@ export {
   motionConfigSetResolution,
   packDetectionThresholds,
   swapBuffer,
+  XTALK_MARGIN_MAX_KCPS,
+  xtalkMarginFromRaw,
   xtalkMarginToRaw,
 } from "./sensors/vl53l8/uld.js";
 export type {

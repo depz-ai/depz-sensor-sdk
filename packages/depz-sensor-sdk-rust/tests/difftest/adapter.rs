@@ -23,24 +23,31 @@ mod common;
 use std::io::{BufRead, Write};
 use std::panic::{self, AssertUnwindSafe};
 
-use common::shapes;
-use depz_sensor_sdk::bno055::{self as b055, AccelConfig, AxisRemap, CalibStatus, CalibrationProfile, GyroConfig, MagConfig, Units};
+use common::{fake_board, shapes};
+use depz_sensor_sdk::bno055::{
+    self as b055, AccelConfig, AxisRemap, CalibStatus, CalibrationProfile, GyroConfig, MagConfig,
+    Units,
+};
 use depz_sensor_sdk::bno086::reports::{try_parse_gyro_rv_cargo, try_parse_input_cargo};
 use depz_sensor_sdk::bno086::sh2;
-use depz_sensor_sdk::bno086::shtp::{try_pack_shtp_header, try_unpack_shtp_header, ShtpHeader, ShtpLayer};
+use depz_sensor_sdk::bno086::shtp::{
+    try_pack_shtp_header, try_unpack_shtp_header, ShtpHeader, ShtpLayer,
+};
 use depz_sensor_sdk::crc::{crc16_ccitt_false, crc16_modbus, crc32_iso_hdlc, crc8_maxim};
 use depz_sensor_sdk::framing::{build_packet, CrcType, PacketParser};
 use depz_sensor_sdk::fwdepz;
 use depz_sensor_sdk::protocol::{common as proto, identity, sr04};
+use depz_sensor_sdk::resolve_sensor_class;
 use depz_sensor_sdk::tmf8829::{self as tmf, CaptureTimer, SensorClock};
 use depz_sensor_sdk::usb_ids::{self, PortEntry};
 use depz_sensor_sdk::vl53l4 as l4;
 use depz_sensor_sdk::vl53l7 as l7;
+use depz_sensor_sdk::vl53l8 as l8;
 use depz_sensor_sdk::vl53l8::advanced::{
-    try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw, DetectionThreshold,
+    try_default_motion_config, try_pack_detection_thresholds, try_xtalk_margin_to_raw,
+    DetectionThreshold,
 };
 use depz_sensor_sdk::vl53lx as lx;
-use depz_sensor_sdk::resolve_sensor_class;
 use serde_json::{json, Value};
 
 /// Ops this SDK declares it cannot do, with the reason (never a silent gap).
@@ -61,9 +68,19 @@ fn int<T: TryFrom<i128>>(v: &Value, what: &str) -> Result<T, String> {
     } else if let Some(x) = v.as_i64() {
         x as i128
     } else {
-        return Err(format!("{}: not an integer of 64 bits or less: {}", what, v));
+        return Err(format!(
+            "{}: not an integer of 64 bits or less: {}",
+            what, v
+        ));
     };
-    T::try_from(wide).map_err(|_| format!("{}: {} does not fit the API type {}", what, wide, std::any::type_name::<T>()))
+    T::try_from(wide).map_err(|_| {
+        format!(
+            "{}: {} does not fit the API type {}",
+            what,
+            wide,
+            std::any::type_name::<T>()
+        )
+    })
 }
 
 fn n<T: TryFrom<i128>>(i: &Value, k: &str) -> Result<T, String> {
@@ -81,11 +98,15 @@ fn opt_n<T: TryFrom<i128>>(i: &Value, k: &str) -> Result<Option<T>, String> {
 }
 
 fn boolean(i: &Value, k: &str) -> Result<bool, String> {
-    field(i, k)?.as_bool().ok_or_else(|| format!("{}: not a bool", k))
+    field(i, k)?
+        .as_bool()
+        .ok_or_else(|| format!("{}: not a bool", k))
 }
 
 fn string<'a>(i: &'a Value, k: &str) -> Result<&'a str, String> {
-    field(i, k)?.as_str().ok_or_else(|| format!("{}: not a string", k))
+    field(i, k)?
+        .as_str()
+        .ok_or_else(|| format!("{}: not a string", k))
 }
 
 fn opt_string<'a>(i: &'a Value, k: &str) -> Result<Option<&'a str>, String> {
@@ -93,20 +114,31 @@ fn opt_string<'a>(i: &'a Value, k: &str) -> Result<Option<&'a str>, String> {
     if v.is_null() {
         Ok(None)
     } else {
-        v.as_str().map(Some).ok_or_else(|| format!("{}: not a string", k))
+        v.as_str()
+            .map(Some)
+            .ok_or_else(|| format!("{}: not a string", k))
     }
 }
 
 fn arr<'a>(i: &'a Value, k: &str) -> Result<&'a Vec<Value>, String> {
-    field(i, k)?.as_array().ok_or_else(|| format!("{}: not a list", k))
+    field(i, k)?
+        .as_array()
+        .ok_or_else(|| format!("{}: not a list", k))
 }
 
 fn hex_of(v: &Value) -> Result<Vec<u8>, String> {
     let s = v.as_str().ok_or("not a hex string")?;
-    if s.len() % 2 != 0 || !s.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)) {
+    if s.len() % 2 != 0
+        || !s
+            .bytes()
+            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+    {
         return Err("not a hex string".into());
     }
-    Ok((0..s.len()).step_by(2).map(|k| u8::from_str_radix(&s[k..k + 2], 16).unwrap()).collect())
+    Ok((0..s.len())
+        .step_by(2)
+        .map(|k| u8::from_str_radix(&s[k..k + 2], 16).unwrap())
+        .collect())
 }
 
 fn hex(i: &Value, k: &str) -> Result<Vec<u8>, String> {
@@ -143,13 +175,22 @@ fn op_crc(i: &Value) -> R {
 }
 
 fn op_framing_encode(i: &Value) -> R {
-    let frame = build_packet(n(i, "cmd")?, &hex(i, "payload")?, n(i, "seq")?, crc_type(n(i, "crc_type")?)?)
-        .map_err(dbg)?;
+    let frame = build_packet(
+        n(i, "cmd")?,
+        &hex(i, "payload")?,
+        n(i, "seq")?,
+        crc_type(n(i, "crc_type")?)?,
+    )
+    .map_err(dbg)?;
     Ok(json!({ "frame": common::hex_encode(&frame) }))
 }
 
 fn op_framing_decode(i: &Value) -> R {
-    let chunks = if i.get("chunks").is_some() { hexes(i, "chunks")? } else { vec![hex(i, "stream")?] };
+    let chunks = if i.get("chunks").is_some() {
+        hexes(i, "chunks")?
+    } else {
+        vec![hex(i, "stream")?]
+    };
     Ok(shapes::framing_collect(&mut PacketParser::new(), &chunks))
 }
 
@@ -165,15 +206,25 @@ fn op_identity(i: &Value) -> R {
 
 fn op_usb_identity(i: &Value) -> R {
     let (vid, pid) = (Some(n::<u16>(i, "vid")?), Some(n::<u16>(i, "pid")?));
-    Ok(json!({ "known": usb_ids::is_known_depz_usb(vid, pid), "model": usb_ids::usb_model_hint(vid, pid) }))
+    Ok(
+        json!({ "known": usb_ids::is_known_depz_usb(vid, pid), "model": usb_ids::usb_model_hint(vid, pid) }),
+    )
 }
 
 fn op_usb_serial_ordering(i: &Value) -> R {
     let ports = arr(i, "ports")?
         .iter()
-        .map(|p| Ok(PortEntry { port: string(p, "port")?.to_string(), serial: opt_string(p, "serial")?.map(str::to_string) }))
+        .map(|p| {
+            Ok(PortEntry {
+                port: string(p, "port")?.to_string(),
+                serial: opt_string(p, "serial")?.map(str::to_string),
+            })
+        })
         .collect::<Result<Vec<_>, String>>()?;
-    let order: Vec<String> = usb_ids::order_ports(ports).into_iter().map(|p| p.port).collect();
+    let order: Vec<String> = usb_ids::order_ports(ports)
+        .into_iter()
+        .map(|p| p.port)
+        .collect();
     Ok(json!({ "order": order }))
 }
 
@@ -191,14 +242,16 @@ fn op_common_encode(i: &Value) -> R {
     match string(i, "kind")? {
         "sync_time_request" => payload(&proto::pack_sync_time(n(i, "pc_timestamp_us")?)),
         "set_payload_crc_type" => {
-            // No codec takes a CrcType here: check the enum like the device layer's type does.
-            let t = crc_type(n(i, "crc_type")?)?;
-            payload(&proto::pack_set_payload_crc_type(t as u8))
+            payload(&proto::try_pack_set_payload_crc_type(n(i, "crc_type")?).map_err(dbg)?)
         }
         "sync_pin_config" => payload(
-            &proto::SyncPinConfig { pin: n(i, "pin")?, mode: n(i, "mode")?, polarity: n(i, "polarity")? }
-                .try_pack()
-                .map_err(dbg)?,
+            &proto::SyncPinConfig {
+                pin: n(i, "pin")?,
+                mode: n(i, "mode")?,
+                polarity: n(i, "polarity")?,
+            }
+            .try_pack()
+            .map_err(dbg)?,
         ),
         k => Err(format!("unknown kind {}", k)),
     }
@@ -227,8 +280,23 @@ fn op_common_decode(i: &Value) -> R {
     }
 }
 
+fn op_common_event(i: &Value) -> R {
+    fake_board::common_event(n::<u8>(i, "report")?, &hex(i, "payload")?)
+}
+
+fn op_common_seq_gap(i: &Value) -> R {
+    let seqs = field(i, "seqs")?
+        .as_array()
+        .ok_or("seqs is not a list")?
+        .iter()
+        .map(|v| int(v, "seqs"))
+        .collect::<Result<Vec<u8>, String>>()?;
+    fake_board::common_seq_gap(&seqs)
+}
+
 fn op_sync_time_math(i: &Value) -> R {
-    let (off, rtt) = proto::sync_time_offset_rtt(n(i, "t1")?, n(i, "t2")?, n(i, "t3")?, n(i, "t4")?);
+    let (off, rtt) =
+        proto::sync_time_offset_rtt(n(i, "t1")?, n(i, "t2")?, n(i, "t3")?, n(i, "t4")?);
     Ok(json!({ "offset_us": off, "rtt_us": rtt }))
 }
 
@@ -245,7 +313,9 @@ fn op_sr04_decode(i: &Value) -> R {
     match n::<u64>(i, "report")? {
         0x91 => {
             let d = sr04::Sr04Data::unpack(&p).map_err(dbg)?;
-            Ok(json!({ "source_cmd": d.source_cmd, "timestamp_us": d.timestamp_us, "echo_time_us": d.echo_time_us }))
+            Ok(
+                json!({ "source_cmd": d.source_cmd, "timestamp_us": d.timestamp_us, "echo_time_us": d.echo_time_us }),
+            )
         }
         0x92 => Ok(json!({ "period_us": sr04::unpack_sample_period(&p).map_err(dbg)? })),
         0x93 => Ok(json!({ "decay_us": sr04::unpack_echo_decay(&p).map_err(dbg)? })),
@@ -265,9 +335,19 @@ fn op_fwdepz_parse(i: &Value) -> R {
 
 fn op_bno055_encode(i: &Value) -> R {
     match string(i, "kind")? {
-        "read_reg" => payload(&b055::pack_read_reg(n(i, "addr")?, n(i, "len")?)),
-        "write_reg" => payload(&b055::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?),
-        "start_stream" => payload(&b055::pack_start_stream(n(i, "trigger")?, n(i, "addr")?, n(i, "len")?, n(i, "period_ms")?)),
+        "read_reg" => payload(&b055::try_pack_read_reg(n(i, "addr")?, n(i, "len")?).map_err(dbg)?),
+        "write_reg" => {
+            payload(&b055::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?)
+        }
+        "start_stream" => payload(
+            &b055::try_pack_start_stream(
+                n(i, "trigger")?,
+                n(i, "addr")?,
+                n(i, "len")?,
+                n(i, "period_ms")?,
+            )
+            .map_err(dbg)?,
+        ),
         "reset" => payload(&b055::pack_reset()),
         "stop_stream" => payload(&b055::pack_stop_stream()),
         "get_info" => payload(&b055::pack_get_info()),
@@ -334,7 +414,9 @@ fn op_bno055_sensor_config(i: &Value) -> R {
     match string(i, "sensor")? {
         "accel" => {
             let a = AccelConfig::unpack(n(i, "value")?);
-            Ok(json!({ "range": a.range, "bandwidth": a.bandwidth, "power": a.power, "repack": a.pack() }))
+            Ok(
+                json!({ "range": a.range, "bandwidth": a.bandwidth, "power": a.power, "repack": a.pack() }),
+            )
         }
         "gyro" => {
             let g = GyroConfig::unpack(&hex(i, "bytes")?).map_err(dbg)?;
@@ -369,14 +451,20 @@ fn op_bno086_shtp_header_pack(i: &Value) -> R {
 
 fn op_bno086_shtp_header_unpack(i: &Value) -> R {
     let h = try_unpack_shtp_header(&hex(i, "bytes")?).map_err(dbg)?;
-    Ok(json!({ "length": h.length, "channel": h.channel, "seq": h.seq, "continuation": h.continuation }))
+    Ok(
+        json!({ "length": h.length, "channel": h.channel, "seq": h.seq, "continuation": h.continuation }),
+    )
 }
 
 fn op_bno086_shtp_tx_seq(i: &Value) -> R {
     let mut layer = ShtpLayer::new();
     let mut frames = Vec::new();
     for p in arr(i, "packets")? {
-        frames.push(common::hex_encode(&layer.try_next_frame(n(p, "channel")?, &hex(p, "payload")?).map_err(dbg)?));
+        frames.push(common::hex_encode(
+            &layer
+                .try_next_frame(n(p, "channel")?, &hex(p, "payload")?)
+                .map_err(dbg)?,
+        ));
     }
     Ok(json!({ "frames": frames }))
 }
@@ -409,40 +497,72 @@ fn op_bno086_control_encode(i: &Value) -> R {
         )),
         "get_feature_request" => payload(&sh2::build_get_feature_request(n(i, "sensor_id")?)),
         "product_id_request" => payload(&sh2::build_product_id_request()),
-        "command_request" => {
-            payload(&sh2::build_command_request(n(i, "seq")?, n(i, "command")?, &hex(i, "params")?).map_err(dbg)?)
-        }
-        "frs_read_request" => {
-            payload(&sh2::build_frs_read_request(n(i, "frs_type")?, n(i, "offset_words")?, n(i, "block_words")?))
-        }
-        "frs_write_request" => payload(&sh2::build_frs_write_request(n(i, "frs_type")?, n(i, "length_words")?)),
+        "command_request" => payload(
+            &sh2::build_command_request(n(i, "seq")?, n(i, "command")?, &hex(i, "params")?)
+                .map_err(dbg)?,
+        ),
+        "frs_read_request" => payload(&sh2::build_frs_read_request(
+            n(i, "frs_type")?,
+            n(i, "offset_words")?,
+            n(i, "block_words")?,
+        )),
+        "frs_write_request" => payload(&sh2::build_frs_write_request(
+            n(i, "frs_type")?,
+            n(i, "length_words")?,
+        )),
         "frs_write_data" => {
-            let words = arr(i, "words")?.iter().map(|w| int::<u32>(w, "words")).collect::<Result<Vec<_>, _>>()?;
+            let words = arr(i, "words")?
+                .iter()
+                .map(|w| int::<u32>(w, "words"))
+                .collect::<Result<Vec<_>, _>>()?;
             payload(&sh2::build_frs_write_data(n(i, "offset_words")?, &words).map_err(dbg)?)
         }
         k => Err(format!("unknown kind {}", k)),
     }
 }
 
+fn op_bno086_control_decode(i: &Value) -> R {
+    shapes::bno086_control_decode(string(i, "kind")?, &hex(i, "payload")?)
+}
+
 fn op_bno086_input_cargo(i: &Value) -> R {
-    let reps = try_parse_input_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?).map_err(dbg)?;
+    let reps =
+        try_parse_input_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?).map_err(dbg)?;
     Ok(json!({ "reports": reps.iter().map(shapes::bno086_typed).collect::<Vec<_>>() }))
 }
 
 fn op_bno086_record(i: &Value) -> R {
-    let reps = try_parse_input_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?).map_err(dbg)?;
+    let reps =
+        try_parse_input_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?).map_err(dbg)?;
     let recs = reps
         .iter()
-        .map(|r| serde_json::from_str(&depz_sensor_sdk::dataset::records::bno086(r).to_json()).map_err(dbg))
+        .map(|r| {
+            serde_json::from_str(&depz_sensor_sdk::dataset::records::bno086(r).to_json())
+                .map_err(dbg)
+        })
         .collect::<Result<Vec<Value>, String>>()?;
     Ok(json!({ "records": recs }))
 }
 
 fn op_bno086_gyro_rv(i: &Value) -> R {
-    Ok(match try_parse_gyro_rv_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?).map_err(dbg)? {
-        Some(r) => shapes::bno086_typed(&r),
-        None => Value::Null,
-    })
+    Ok(
+        match try_parse_gyro_rv_cargo(&hex(i, "cargo")?, n(i, "capture_timestamp_us")?)
+            .map_err(dbg)?
+        {
+            Some(r) => shapes::bno086_typed(&r),
+            None => Value::Null,
+        },
+    )
+}
+
+// ── .depzrec / .depzdata readers (contracts 08, 09) ──
+
+fn op_depzrec_read(i: &Value) -> R {
+    common::depzrec_read(string(i, "text")?)
+}
+
+fn op_depzdata_read(i: &Value) -> R {
+    common::depzdata_read(string(i, "text")?)
 }
 
 // ── TMF8829 ──
@@ -502,7 +622,16 @@ fn op_tmf8829_frame_time(i: &Value) -> R {
             timer.histograms();
             continue;
         }
-        let t = timer.results(&clock, id & 0x0F, tick, n(r, "t0")?, n(r, "t1")?, ts, n(r, "edge_us")?, flags);
+        let t = timer.results(
+            &clock,
+            id & 0x0F,
+            tick,
+            n(r, "t0")?,
+            n(r, "t1")?,
+            ts,
+            n(r, "edge_us")?,
+            flags,
+        );
         times.push(json!({
             "timestamp_us": t.timestamp_us, "t1_len_us": t.t1_len_us, "flags": t.flags,
             "ratio_q16": clock.ratio_q16,
@@ -515,10 +644,16 @@ fn op_tmf8829_frame_time(i: &Value) -> R {
 
 fn op_vl53l4_encode(i: &Value) -> R {
     match string(i, "kind")? {
-        "read_reg" => payload(&l4::pack_read_reg(n(i, "addr")?, n(i, "len")?)),
-        "write_reg" => payload(&l4::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?),
+        "read_reg" => payload(&l4::try_pack_read_reg(n(i, "addr")?, n(i, "len")?).map_err(dbg)?),
+        "write_reg" => {
+            payload(&l4::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?)
+        }
         "xshut" => payload(&l4::pack_xshut(n(i, "action")?)),
-        "start_stream" => payload(&l4::pack_start_stream(n(i, "addr")?, n(i, "len")?, n(i, "flags")?)),
+        "start_stream" => payload(&l4::pack_start_stream(
+            n(i, "addr")?,
+            n(i, "len")?,
+            n(i, "flags")?,
+        )),
         "set_i2c_speed" => payload(&l4::pack_set_i2c_speed(n(i, "khz")?)),
         k => Err(format!("unknown kind {}", k)),
     }
@@ -597,7 +732,22 @@ fn op_vl53l7_decode(i: &Value) -> R {
 }
 
 fn op_vl53l7_model(i: &Value) -> R {
-    Ok(json!({ "class": l7::resolve_model(opt_string(i, "usb_model")?, string(i, "device_name")?).as_str() }))
+    Ok(
+        json!({ "class": l7::resolve_model(opt_string(i, "usb_model")?, string(i, "device_name")?).as_str() }),
+    )
+}
+
+// ── VL53L8 register bridge (contract 04) ──
+
+fn op_vl53l8_encode(i: &Value) -> R {
+    match string(i, "kind")? {
+        "start_stream" => payload(&l8::pack_start_stream(n(i, "frame_size")?).map_err(dbg)?),
+        k => Err(format!("unknown kind {}", k)),
+    }
+}
+
+fn op_vl53l8_decode(i: &Value) -> R {
+    shapes::vl53l8_decode(n::<u64>(i, "report")?, &hex(i, "payload")?)
 }
 
 // ── VL53L 1D family ──
@@ -605,19 +755,26 @@ fn op_vl53l7_model(i: &Value) -> R {
 fn op_vl53lx_encode(i: &Value) -> R {
     match string(i, "kind")? {
         "set_addr_width" => payload(&lx::pack_set_addr_width(n(i, "width")?).map_err(dbg)?),
-        "read_reg" => payload(&lx::pack_read_reg(n(i, "addr")?, n(i, "len")?)),
-        "write_reg" => payload(&lx::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?),
+        "read_reg" => payload(&lx::try_pack_read_reg(n(i, "addr")?, n(i, "len")?).map_err(dbg)?),
+        "write_reg" => {
+            payload(&lx::try_pack_write_reg(n(i, "addr")?, &hex(i, "data")?).map_err(dbg)?)
+        }
         "xshut" => payload(&lx::pack_xshut(n(i, "action")?)),
         "set_i2c_speed" => payload(&lx::pack_set_i2c_speed(n(i, "khz")?)),
         "start_stream" => {
             let clear = arr(i, "clear")?
                 .iter()
                 .map(|s| match s.as_array().map(Vec::as_slice) {
-                    Some([a, v]) => Ok((int::<u16>(a, "clear addr")?, int::<u8>(v, "clear value")?)),
+                    Some([a, v]) => {
+                        Ok((int::<u16>(a, "clear addr")?, int::<u8>(v, "clear value")?))
+                    }
                     _ => Err("clear: not an [addr, value] pair".to_string()),
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-            payload(&lx::pack_start_stream(n(i, "addr")?, n(i, "len")?, &clear, n(i, "flags")?).map_err(dbg)?)
+            payload(
+                &lx::pack_start_stream(n(i, "addr")?, n(i, "len")?, &clear, n(i, "flags")?)
+                    .map_err(dbg)?,
+            )
         }
         k => Err(format!("unknown kind {}", k)),
     }
@@ -656,7 +813,9 @@ fn op_vl53lx_histogram_raw(i: &Value) -> R {
 // driver methods' parameter checks (resolution, xtalk margin ≤ 10000).
 
 fn op_vl53l8_motion_config(i: &Value) -> R {
-    Ok(json!({ "pack": common::hex_encode(&try_default_motion_config(n(i, "resolution")?).map_err(dbg)?.pack()) }))
+    Ok(
+        json!({ "pack": common::hex_encode(&try_default_motion_config(n(i, "resolution")?).map_err(dbg)?.pack()) }),
+    )
 }
 
 fn op_vl53l8_detection_thresholds(i: &Value) -> R {
@@ -674,27 +833,48 @@ fn op_vl53l8_detection_thresholds(i: &Value) -> R {
         })
         .collect::<Result<Vec<_>, String>>()?;
     let b = try_pack_detection_thresholds(&t).map_err(dbg)?;
-    Ok(json!({ "start_block": common::hex_encode(&b.start), "valid_status": common::hex_encode(&b.valid) }))
+    Ok(
+        json!({ "start_block": common::hex_encode(&b.start), "valid_status": common::hex_encode(&b.valid) }),
+    )
 }
 
 fn op_vl53l8_cnh_decode(i: &Value) -> R {
     let c = field(i, "config")?;
     let mut setup = depz_sensor_sdk::vl53l8::driver::Vl53l8CnhSetup::new();
-    setup.init_config(n(c, "start_bin")?, n(c, "num_bins")?, n(c, "sub_sample")?).map_err(dbg)?;
-    let m = field(c, "agg_map")?.as_array().ok_or("agg_map: not an array")?;
+    setup
+        .init_config(n(c, "start_bin")?, n(c, "num_bins")?, n(c, "sub_sample")?)
+        .map_err(dbg)?;
+    let m = field(c, "agg_map")?
+        .as_array()
+        .ok_or("agg_map: not an array")?;
     if m.len() != 6 {
         return Err("agg_map: start_x, start_y, merge_x, merge_y, cols, rows".into());
     }
     let a = |k: usize| int::<i32>(&m[k], "agg_map");
-    setup.create_agg_map(n(c, "resolution")?, a(0)?, a(1)?, a(2)?, a(3)?, a(4)?, a(5)?).map_err(dbg)?;
-    let r = depz_sensor_sdk::vl53l8::decode_cnh(&setup.decode_config(), &hex(i, "cnh_raw")?).map_err(dbg)?;
-    let aggs: Vec<Value> = r.aggregates.iter().map(|a| json!({ "hist_raw": a.hist_raw, "hist_scaler": a.hist_scaler })).collect();
+    setup
+        .create_agg_map(
+            n(c, "resolution")?,
+            a(0)?,
+            a(1)?,
+            a(2)?,
+            a(3)?,
+            a(4)?,
+            a(5)?,
+        )
+        .map_err(dbg)?;
+    let r = depz_sensor_sdk::vl53l8::decode_cnh(&setup.decode_config(), &hex(i, "cnh_raw")?)
+        .map_err(dbg)?;
+    let aggs: Vec<Value> = r
+        .aggregates
+        .iter()
+        .map(|a| json!({ "hist_raw": a.hist_raw, "hist_scaler": a.hist_scaler }))
+        .collect();
     Ok(json!({ "aggregates": aggs }))
 }
 
 fn op_vl53l8_xtalk_margin(i: &Value) -> R {
-    let kcps = field(i, "kcps")?.as_f64().ok_or("kcps: not a number")?;
-    Ok(json!({ "raw": try_xtalk_margin_to_raw(kcps).map_err(dbg)? }))
+    // as ST: a whole number of kcps (a fraction or a negative is not a u32), at most 10000
+    Ok(json!({ "raw": try_xtalk_margin_to_raw(n::<u32>(i, "kcps")?).map_err(dbg)? }))
 }
 
 type Op = fn(&Value) -> R;
@@ -709,6 +889,8 @@ const OPS: &[(&str, Op)] = &[
     ("probe_resolve", op_probe_resolve),
     ("common_encode", op_common_encode),
     ("common_decode", op_common_decode),
+    ("common_event", op_common_event),
+    ("common_seq_gap", op_common_seq_gap),
     ("sync_time_math", op_sync_time_math),
     ("sr04_encode", op_sr04_encode),
     ("sr04_decode", op_sr04_decode),
@@ -727,9 +909,12 @@ const OPS: &[(&str, Op)] = &[
     ("bno086_shtp_tx_seq", op_bno086_shtp_tx_seq),
     ("bno086_shtp_reassembly", op_bno086_shtp_reassembly),
     ("bno086_control_encode", op_bno086_control_encode),
+    ("bno086_control_decode", op_bno086_control_decode),
     ("bno086_input_cargo", op_bno086_input_cargo),
     ("bno086_record", op_bno086_record),
     ("bno086_gyro_rv", op_bno086_gyro_rv),
+    ("depzrec_read", op_depzrec_read),
+    ("depzdata_read", op_depzdata_read),
     ("tmf8829_encode", op_tmf8829_encode),
     ("tmf8829_decode", op_tmf8829_decode),
     ("tmf8829_reassembly", op_tmf8829_reassembly),
@@ -754,8 +939,13 @@ const OPS: &[(&str, Op)] = &[
     ("vl53lx_die_block", op_vl53lx_die_block),
     ("vl53lx_l0x_raw", op_vl53lx_l0x_raw),
     ("vl53lx_histogram_raw", op_vl53lx_histogram_raw),
+    ("vl53l8_encode", op_vl53l8_encode),
+    ("vl53l8_decode", op_vl53l8_decode),
     ("vl53l8_motion_config", op_vl53l8_motion_config),
-    ("vl53l8_detection_thresholds", op_vl53l8_detection_thresholds),
+    (
+        "vl53l8_detection_thresholds",
+        op_vl53l8_detection_thresholds,
+    ),
     ("vl53l8_xtalk_margin", op_vl53l8_xtalk_margin),
     ("vl53l8_cnh_decode", op_vl53l8_cnh_decode),
 ];
@@ -781,10 +971,14 @@ fn handle(req: &Value) -> Value {
     let input = req.get("in").cloned().unwrap_or(Value::Null);
     match panic::catch_unwind(AssertUnwindSafe(|| f(&input))) {
         Ok(Ok(out)) => json!({ "id": id, "out": out }),
-        Ok(Err(e)) => json!({ "id": id, "error": "invalid", "detail": e.chars().take(300).collect::<String>() }),
+        Ok(Err(e)) => {
+            json!({ "id": id, "error": "invalid", "detail": e.chars().take(300).collect::<String>() })
+        }
         // A panic is not a crash of the process (one bad input must not stop
         // the run) but it is a finding: an SDK should return an error.
-        Err(p) => json!({ "id": id, "error": "invalid", "detail": format!("PANIC: {}", panic_text(&*p)) }),
+        Err(p) => {
+            json!({ "id": id, "error": "invalid", "detail": format!("PANIC: {}", panic_text(&*p)) })
+        }
     }
 }
 
@@ -801,7 +995,9 @@ fn main() {
         }
         let resp = match serde_json::from_str::<Value>(&line) {
             Ok(req) => handle(&req),
-            Err(e) => json!({ "id": null, "error": "invalid", "detail": format!("bad request line: {}", e) }),
+            Err(e) => {
+                json!({ "id": null, "error": "invalid", "detail": format!("bad request line: {}", e) })
+            }
         };
         let _ = writeln!(out, "{}", resp);
         let _ = out.flush();

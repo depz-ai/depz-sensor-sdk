@@ -321,7 +321,7 @@ public Vl53l7cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l7cxDevice.Vl53l7cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l7cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l7cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l7cxDevice.ModuleType *(property)*
@@ -389,7 +389,7 @@ public Vl53l5cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l5cxDevice.Vl53l5cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l5cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l5cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l7chDevice
@@ -409,7 +409,7 @@ public Vl53l7chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l7chDevice.Vl53l7chDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l7chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l7chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l7chDevice.CnhSetup *(property)*
@@ -426,7 +426,7 @@ The CNH setup armed by `ConfigureCnh`, or null.
 public void ConfigureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next start (as `ConfigureCnh`).
+Arm CNH for the next start (as `ConfigureCnh`); disarms the motion indicator.
 
 ## Shared with VL53L8 (frame decode)
 
@@ -452,7 +452,7 @@ public sealed class FrameReassembler
 
 Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
 
-Rules (contract 04): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. Byte-exact with the reference Python `FrameReassembler`.
+Rules (contract 04 §4): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. A chunk out of the rule-4 bounds (more than `chunkMax` bytes, `FullSize` over `StreamTotalMax`, or running past `FullSize`) is damaged: dropped and counted as a lost frame like the other damaged input, never thrown. Byte-exact with the reference Python `FrameReassembler`.
 
 #### FrameReassembler.Completed *(property)*
 
@@ -464,6 +464,12 @@ public int Completed
 
 ```csharp
 public int Discarded
+```
+
+#### FrameReassembler.FrameReassembler *(constructor)*
+
+```csharp
+public FrameReassembler(int chunkMax = Vl53l8Wire.StreamChunkMax)
 ```
 
 #### FrameReassembler.public

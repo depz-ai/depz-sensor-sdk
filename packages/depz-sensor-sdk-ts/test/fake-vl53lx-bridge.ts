@@ -14,6 +14,10 @@
  *
  * The result block (0x0089, 17 B) and the data-ready bit (0x0031 bit 0) are
  * plain registers; the INT polarity bit of 0x0030 is set by the blob.
+ *
+ * A `die` model (fake-vl53l0x-die.ts) can take over the register file: the
+ * bridge hands it every READ_REG / WRITE_REG, and a `DieNack` it throws goes
+ * back as ERR_HARDWARE_FAULT, the status a NACKing sensor produces.
  */
 
 import {
@@ -38,6 +42,17 @@ export interface FakeVl53lxBridgeOptions {
   noClearI2cErrors?: boolean;
 }
 
+/** Thrown by a die model: the sensor did not ACK the register access. */
+export class DieNack extends Error {}
+
+/** Register behaviour behind the bridge, in place of the flat register file. */
+export interface DieModel {
+  read(addr: number, n: number): Uint8Array;
+  write(addr: number, data: Uint8Array): void;
+}
+
+const ERR_HARDWARE_FAULT = 0x09;
+
 export const DIE_MODEL_ID = 0xebaa;
 export const DIE_OSC = 0xbccc;
 export const DIE_PLL = 0x0123;
@@ -47,6 +62,8 @@ export class FakeVl53lxBridge {
   readonly side: LoopbackTransport;
   readonly regs = new Uint8Array(0x10000);
   readonly rx: RxPacket[] = [];
+  /** Bytes to drop from the next READ_REG answer (a short reply). */
+  truncateNextRead = 0;
   readonly firmware: "vlx" | "l4";
   deviceName: string;
   mcuTimeUs = 5_000_000n;
@@ -54,6 +71,8 @@ export class FakeVl53lxBridge {
   info: Uint8Array;
   /** Called on every register write, after it lands. */
   onWrite: ((addr: number, data: Uint8Array) => void) | null = null;
+  /** Optional register-behaviour model (read / write) replacing `regs`. */
+  die: DieModel | null = null;
 
   private readonly failures = new Map<number, Array<number | "silent">>();
   private readonly noClear: boolean;
@@ -181,7 +200,17 @@ export class FakeVl53lxBridge {
         // READ_REG → RPT_VL53_REG_DATA: echoed opcode, ts u64, data
         const addr = dv.getUint16(0, true);
         const len = dv.getUint16(2, true);
-        const data = this.regs.slice(addr, addr + len); // short past 0xFFFF
+        let data: Uint8Array;
+        try {
+          data = this.die !== null ? this.die.read(addr, len) : this.regs.slice(addr, addr + len);
+        } catch (err) {
+          if (err instanceof DieNack) return this.status(cmd, ERR_HARDWARE_FAULT);
+          throw err;
+        }
+        if (this.truncateNextRead) {
+          data = data.slice(0, data.length - this.truncateNextRead);
+          this.truncateNextRead = 0;
+        }
         const out = new Uint8Array(9 + data.length);
         out[0] = cmd;
         new DataView(out.buffer).setBigUint64(1, this.mcuTimeUs, true);
@@ -192,7 +221,16 @@ export class FakeVl53lxBridge {
       case 0x33: {
         const addr = dv.getUint16(0, true);
         const data = payload.slice(2);
-        this.regs.set(data, addr);
+        if (this.die !== null) {
+          try {
+            this.die.write(addr, data);
+          } catch (err) {
+            if (err instanceof DieNack) return this.status(cmd, ERR_HARDWARE_FAULT);
+            throw err;
+          }
+        } else {
+          this.regs.set(data, addr);
+        }
         this.onWrite?.(addr, data);
         return this.status(cmd, 0);
       }

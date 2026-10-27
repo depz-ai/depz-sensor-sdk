@@ -15,7 +15,8 @@ import java.util.Map;
  * integers → {@code Long} ({@code BigInteger} beyond the long range), reals →
  * {@code Double}, {@code true/false} → {@code Boolean}, {@code null} → {@code null}.
  * {@link #serialize} writes those back, plus any {@code Number}, primitive arrays and
- * {@code byte[]} (as a lowercase hex string).
+ * {@code byte[]} (as a lowercase hex string). Malformed or truncated text is refused with
+ * {@link IllegalArgumentException} naming the index — never an index error of the runtime.
  */
 public final class JsonText {
     private final String s;
@@ -47,14 +48,28 @@ public final class JsonText {
         }
     }
 
+    /** The character at the cursor; truncated text is a malformed-JSON error, not an index error. */
+    private char peek() {
+        if (i >= s.length()) {
+            throw new IllegalArgumentException("unexpected end of JSON at index " + i);
+        }
+        return s.charAt(i);
+    }
+
+    private char take() {
+        char c = peek();
+        i++;
+        return c;
+    }
+
     private Object value() {
-        char c = s.charAt(i);
+        char c = peek();
         switch (c) {
             case '{': return object();
             case '[': return array();
             case '"': return string();
-            case 't': expect("true"); return Boolean.TRUE;
-            case 'f': expect("false"); return Boolean.FALSE;
+            case 't': expect("true"); return true;
+            case 'f': expect("false"); return false;
             case 'n': expect("null"); return null;
             default: return number();
         }
@@ -71,17 +86,17 @@ public final class JsonText {
         Map<String, Object> m = new LinkedHashMap<>();
         i++; // {
         ws();
-        if (s.charAt(i) == '}') { i++; return m; }
+        if (peek() == '}') { i++; return m; }
         while (true) {
             ws();
             String key = string();
             ws();
-            if (s.charAt(i) != ':') throw new IllegalArgumentException("expected ':' at " + i);
+            if (peek() != ':') throw new IllegalArgumentException("expected ':' at " + i);
             i++;
             ws();
             m.put(key, value());
             ws();
-            char c = s.charAt(i++);
+            char c = take();
             if (c == '}') break;
             if (c != ',') throw new IllegalArgumentException("expected ',' or '}' at " + (i - 1));
         }
@@ -92,12 +107,12 @@ public final class JsonText {
         List<Object> a = new ArrayList<>();
         i++; // [
         ws();
-        if (s.charAt(i) == ']') { i++; return a; }
+        if (peek() == ']') { i++; return a; }
         while (true) {
             ws();
             a.add(value());
             ws();
-            char c = s.charAt(i++);
+            char c = take();
             if (c == ']') break;
             if (c != ',') throw new IllegalArgumentException("expected ',' or ']' at " + (i - 1));
         }
@@ -105,14 +120,14 @@ public final class JsonText {
     }
 
     private String string() {
-        if (s.charAt(i) != '"') throw new IllegalArgumentException("expected string at " + i);
+        if (peek() != '"') throw new IllegalArgumentException("expected string at " + i);
         i++;
         StringBuilder sb = new StringBuilder();
         while (true) {
-            char c = s.charAt(i++);
+            char c = take();
             if (c == '"') break;
             if (c == '\\') {
-                char e = s.charAt(i++);
+                char e = take();
                 switch (e) {
                     case '"': sb.append('"'); break;
                     case '\\': sb.append('\\'); break;
@@ -122,12 +137,20 @@ public final class JsonText {
                     case 'n': sb.append('\n'); break;
                     case 'r': sb.append('\r'); break;
                     case 't': sb.append('\t'); break;
-                    case 'u':
-                        sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
-                        i += 4;
+                    case 'u': {
+                        int code = 0;
+                        for (int k = 0; k < 4; k++) {
+                            int d = hexDigit(take());
+                            if (d < 0) throw new IllegalArgumentException("bad \\u escape at " + (i - 1));
+                            code = (code << 4) | d;
+                        }
+                        sb.append((char) code);
                         break;
+                    }
                     default: throw new IllegalArgumentException("bad escape \\" + e);
                 }
+            } else if (c < 0x20) {
+                throw new IllegalArgumentException("control character in string at index " + (i - 1));
             } else {
                 sb.append(c);
             }
@@ -135,19 +158,29 @@ public final class JsonText {
         return sb.toString();
     }
 
+    /** RFC 8259 number: {@code -? (0 | [1-9][0-9]*) (. [0-9]+)? ([eE] [+-]? [0-9]+)?}. */
     private Object number() {
         int start = i;
         boolean real = false;
-        while (i < s.length()) {
-            char c = s.charAt(i);
-            if (c == '-' || c == '+' || (c >= '0' && c <= '9')) {
-                i++;
-            } else if (c == '.' || c == 'e' || c == 'E') {
-                real = true;
-                i++;
-            } else {
-                break;
+        if (at('-')) i++;
+        if (at('0')) {
+            i++;
+        } else if (!digits()) {
+            if (i == start) {
+                throw new IllegalArgumentException("unexpected character '" + s.charAt(i) + "' at index " + i);
             }
+            throw new IllegalArgumentException("bad number at index " + start);
+        }
+        if (at('.')) {
+            i++;
+            real = true;
+            if (!digits()) throw new IllegalArgumentException("bad number at index " + start);
+        }
+        if (at('e') || at('E')) {
+            i++;
+            real = true;
+            if (at('+') || at('-')) i++;
+            if (!digits()) throw new IllegalArgumentException("bad number at index " + start);
         }
         String tok = s.substring(start, i);
         if (real) {
@@ -159,6 +192,34 @@ public final class JsonText {
             // beyond the long range (u64 >= 2^63): exact, as BigInteger
             return new BigInteger(tok);
         }
+    }
+
+    private boolean at(char c) {
+        return i < s.length() && s.charAt(i) == c;
+    }
+
+    /** Skips ASCII digits; false when there was none. */
+    private boolean digits() {
+        int from = i;
+        while (i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '9') i++;
+        return i > from;
+    }
+
+    /** An ASCII hex digit's value, else -1 ({@link Character#digit} also takes other scripts' digits). */
+    private static int hexDigit(char c) {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    }
+
+    /** Contract 08 «Line rules»: a line of nothing but JSON whitespace (space, tab, CR) is blank. */
+    public static boolean isBlankLine(String line) {
+        for (int k = 0; k < line.length(); k++) {
+            char c = line.charAt(k);
+            if (c != ' ' && c != '\t' && c != '\r') return false;
+        }
+        return true;
     }
 
     // ── writing ──────────────────────────────────────────────────────────────
@@ -258,11 +319,19 @@ public final class JsonText {
         return sb.toString();
     }
 
-    /** Bytes of a hex string (even length). */
+    /** Bytes of a hex string: even length, hex digits only, else {@link IllegalArgumentException}. */
     public static byte[] unhex(String s) {
+        if ((s.length() & 1) != 0) {
+            throw new IllegalArgumentException("hex string of odd length " + s.length());
+        }
         byte[] out = new byte[s.length() / 2];
         for (int k = 0; k < out.length; k++) {
-            out[k] = (byte) Integer.parseInt(s.substring(2 * k, 2 * k + 2), 16);
+            int hi = hexDigit(s.charAt(2 * k));
+            int lo = hexDigit(s.charAt(2 * k + 1));
+            if (hi < 0 || lo < 0) {
+                throw new IllegalArgumentException("not a hex string at index " + 2 * k);
+            }
+            out[k] = (byte) ((hi << 4) | lo);
         }
         return out;
     }

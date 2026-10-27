@@ -12,6 +12,7 @@ import struct
 
 import pytest
 
+from depz_sensor_sdk.errors import InvalidStateError
 from depz_sensor_sdk.vl53l8 import uld
 from depz_sensor_sdk.vl53l8.uld import (
     POWER_MODE_DEEP_SLEEP,
@@ -131,6 +132,14 @@ def test_every_variant_loads_its_blobs(variant):
     assert len(drv.firmware) == 0x15000
     assert len(drv.default_xtalk) == uld.XTALK_BUFFER_SIZE
     assert drv.i2c == (variant in uld.I2C_VARIANTS)
+
+
+def test_a_firmware_blob_of_the_wrong_size_is_invalid_state(tmp_path):
+    for blob in uld.VL53L8CX_DATA_DIR.iterdir():
+        (tmp_path / blob.name).write_bytes(blob.read_bytes())
+    (tmp_path / 'firmware.bin').write_bytes(bytes(0x15000 - 1))
+    with pytest.raises(InvalidStateError):
+        VL53L8CX(ScriptedPlatform(), variant='cx', data_dir=tmp_path)
 
 
 def test_is_alive_reads_ids_on_page_0_and_restores_page_2():

@@ -29,9 +29,9 @@ the rules the sensor imposes listed where they matter.
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::{open_on_link, Tmf8829Options};
+use depz_sensor_sdk::devices::{open_first_device, Tmf8829Options};
 
-let tof = open_on_link(link, None, None, None)?.into_tmf8829()?;
+let tof = open_first_device(None)?.into_tmf8829()?;
 let init = tof.init(None)?;                             // firmware download, ~0.15 s
 println!("app {} serial {:08X}", init.app_version, init.sensor_serial);
 let cfg = tof.configure("16x16", &Tmf8829Options { nr_peaks: 2, ..Default::default() })?;

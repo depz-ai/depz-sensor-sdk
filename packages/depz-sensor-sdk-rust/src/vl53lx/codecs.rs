@@ -103,7 +103,9 @@ pub struct Vl53lxInfo {
 impl Vl53lxInfo {
     pub fn unpack(payload: &[u8]) -> Result<Vl53lxInfo, CodecError> {
         if payload.len() < INFO_SIZE {
-            return Err(CodecError("RPT_VL53_INFO (v2.00) must be at least 23 bytes"));
+            return Err(CodecError(
+                "RPT_VL53_INFO (v2.00) must be at least 23 bytes",
+            ));
         }
         let u32_at = |i: usize| u32::from_le_bytes(payload[i..i + 4].try_into().unwrap());
         Ok(Vl53lxInfo {

@@ -20,14 +20,17 @@ the plan), and the status is `6 (no wrap-around check done)` rather than
 BareDriver does not keep.
 """
 
+from __future__ import annotations
+
 import time
 
-from depz_sensor_sdk.vl53lx.uld.base import Measurement, SensorDriver, Vl53Error
+from depz_sensor_sdk.vl53lx.uld.base import BridgePlatform, Measurement, SensorDriver, Vl53Error
 from depz_sensor_sdk.vl53lx.uld.vl53l1_die import phase_window_mm
 from depz_sensor_sdk.vl53lx.uld.bare import hist
 from depz_sensor_sdk.vl53lx.uld.bare.core import (BareDriver, CLEAR_RANGE_INT, DISTANCE_MODES,
                              HISTOGRAM_BIN_DATA_I2C_INDEX,
                              HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES,
+                             HistogramBinData,
                              TIMING_DIVISOR, TIMING_GUARD_US)
 from depz_sensor_sdk.vl53lx._link import I2C_KHZ_BOOT
 
@@ -63,14 +66,14 @@ class VL53LX(SensorDriver):
     # This product's ranging modes are device preset modes: they pick how far
     # the 24 bins reach before the phase wraps. Applied like the timing
     # budget, before ranging starts.
-    MODES = DISTANCE_MODES
+    MODES: tuple[str, ...] = DISTANCE_MODES
     # TIMING_GUARD_US comes off the budget before it is divided, and the range
     # timeout is capped at FDA_MAX_TIMING_BUDGET_US: 2..551 ms. Rounded inwards.
     # Both MODES and BUDGET_MS are narrowed per die in sensor_init().
     BUDGET_MS = (2, 550)
     HISTOGRAM = True
 
-    def __init__(self, platform, product: str):
+    def __init__(self, platform: BridgePlatform, product: str) -> None:
         super().__init__(platform, product)
         self.bare = BareDriver(platform)
         self._mode = DEFAULT_MODE
@@ -85,7 +88,7 @@ class VL53LX(SensorDriver):
         # a call count: `cmd_stream` decodes the same sample twice, once to
         # print and once to count the valid ones, and that must not step the
         # state twice.
-        self._last_stream_count = None
+        self._last_stream_count: int | None = None
         # The phase and event consistency checks read the frame before this
         # one; the BareDriver keeps no history, so it lives here.
         self._history = hist.FrameHistory()
@@ -95,7 +98,7 @@ class VL53LX(SensorDriver):
         return self.p.rd_word(0x010F)
 
     # ── lifecycle ──
-    def wait_boot(self, timeout_s: float = 1.0):
+    def wait_boot(self, timeout_s: float = 1.0) -> None:
         deadline = time.monotonic() + timeout_s
         while True:
             if self.p.rd_byte(FIRMWARE__SYSTEM_STATUS) == 0x03:
@@ -104,7 +107,7 @@ class VL53LX(SensorDriver):
                 raise Vl53Error('timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03')
             self.p.sleep_ms(1)
 
-    def sensor_init(self):
+    def sensor_init(self) -> None:
         """Reset the part, configure it for histogram ranging and leave the
         bus at this die's ceiling.
 
@@ -131,7 +134,7 @@ class VL53LX(SensorDriver):
         if self.MAX_KHZ != I2C_KHZ_BOOT:
             self.p.set_i2c_speed(self.MAX_KHZ)
 
-    def set_mode(self, name: str):
+    def set_mode(self, name: str) -> None:
         """short / medium / long — the device preset mode: the VCSEL period,
         which sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid
         phase window inside it (`reach_mm()`). The bin itself is 199 mm wide in
@@ -152,9 +155,9 @@ class VL53LX(SensorDriver):
     def get_mode(self) -> str:
         return self._mode
 
-    def reach_mm(self):
+    def reach_mm(self) -> int:
         """The valid phase window of the preset mode, which the
-        post-processing applies (`hist._fill_target`): 992 / 1785 / 3373 mm
+        post-processing applies (`hist._fill_target`): 992 / 1788 / 3373 mm
         for short / medium / long at the usual oscillator. Past it the target
         is status 4, although the bins only wrap further out."""
         return phase_window_mm(
@@ -162,7 +165,7 @@ class VL53LX(SensorDriver):
             self.bare.hpp.valid_phase_high)
 
     # ── driver-specific readout ──
-    def driver_info(self) -> dict:
+    def driver_info(self) -> dict[str, float]:
         """The two numbers this driver has that the contract has no field
         for: how long one range actually runs, and the MM1/MM2 offset the
         histogram post-processing applies."""
@@ -171,7 +174,7 @@ class VL53LX(SensorDriver):
             'MM1/MM2 offset mm': self.bare.hpp.range_offset_mm / 4,
         }
 
-    def start_ranging(self):
+    def start_ranging(self) -> None:
         self._last_stream_count = None
         self._history.reset()
         self.bare.load_patch()
@@ -182,21 +185,21 @@ class VL53LX(SensorDriver):
         # ClearInterruptAndStartMeasurement is for.
         self.bare.clear_interrupt_and_start_next_range()
 
-    def stop_ranging(self):
+    def stop_ranging(self) -> None:
         self.bare.stop_range()
         self.bare.unload_patch()
 
     # ── data ──
-    def stream_block(self) -> tuple:
+    def stream_block(self) -> tuple[int, int]:
         return HISTOGRAM_BIN_DATA_I2C_INDEX, HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES
 
     def decode(self, raw: bytes) -> Measurement:
         return self.to_measurement(self.bin_data(raw))
 
     def read_measurement(self) -> Measurement:
-        return self.decode(None)
+        return self.to_measurement(self.bin_data())
 
-    def bin_data(self, raw=None):
+    def bin_data(self, raw: bytes | None = None) -> HistogramBinData:
         """The raw frame, for callers that want the bins themselves — the
         `--bins` printout and the GUI's histogram panel. `raw` is the streamed
         block when the bridge read it; None reads it here."""
@@ -215,7 +218,7 @@ class VL53LX(SensorDriver):
             self._last_stream_count = stream_count
         return self.bare.get_histogram_bin_data(raw)
 
-    def to_measurement(self, bins) -> Measurement:
+    def to_measurement(self, bins: HistogramBinData) -> Measurement:
         results = hist.process_data(bins, self.bare.hpp)
         # Once per frame, and only here: the history is a state machine, and
         # decoding the same frame twice would step it twice.
@@ -228,11 +231,11 @@ class VL53LX(SensorDriver):
         int_pol = 0 if ((self.p.rd_byte(GPIO_HV_MUX__CTRL) & 0x10) >> 4) == 1 else 1
         return (self.p.rd_byte(GPIO__TIO_HV_STATUS) & 1) == int_pol
 
-    def clear_interrupt(self):
+    def clear_interrupt(self) -> None:
         self.p.wr_byte(SYSTEM__INTERRUPT_CLEAR, CLEAR_RANGE_INT)
 
     # ── timing ──
-    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int):
+    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
         """The family-wide timing call. The budget covers the whole
         measurement, of which the range timeout is one sixth after a fixed
         guard comes off — ST's own arithmetic, in `BareDriver`."""
@@ -246,7 +249,7 @@ class VL53LX(SensorDriver):
         # wants a period, and back-to-back is a period of zero.
         self.bare.set_inter_measurement_period_ms(inter_measurement_ms)
 
-    def get_range_timing(self) -> tuple:
+    def get_range_timing(self) -> tuple[int, int]:
         """-> (timing budget ms, inter-measurement ms)."""
         budget_us = (self.bare.range_config_timeout_us * TIMING_DIVISOR
                      + TIMING_GUARD_US)

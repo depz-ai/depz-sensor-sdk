@@ -122,7 +122,12 @@ public final class Vl53l4Uld {
         255, 255, 11, 12,
     };
 
-    /** ULD error. */
+    /**
+     * What the sensor did, not what the caller asked: a boot or data-ready
+     * timeout, a short result block, an oscillator word of 0, a failed xtalk
+     * calibration. A refused argument is an {@link IllegalArgumentException}
+     * (contract 07 §3).
+     */
     public static final class Vl53l4Error extends RuntimeException {
         public Vl53l4Error(String message) {
             super(message);
@@ -150,10 +155,12 @@ public final class Vl53l4Uld {
      * Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
      * decodes the same registers read one by one. Register contents are
      * big-endian words (the bridge passes them through untouched). Throws
-     * {@link Vl53l4Error} when {@code raw} is shorter than 15 bytes.
+     * {@link Vl53l4Error} when {@code raw} is shorter than {@link #RESULT_BLOCK_LEN} (17) bytes
+     * (contract 10 §5); a longer buffer is decoded and the tail ignored.
      */
     public static Results parseResultBlock(byte[] raw) {
-        if (raw.length < 15) {
+        // contract 10 §5: the block is 17 bytes; shorter is rejected, a tail is ignored
+        if (raw.length < RESULT_BLOCK_LEN) {
             throw new Vl53l4Error("result block too short: " + raw.length + " bytes");
         }
 
@@ -181,6 +188,20 @@ public final class Vl53l4Uld {
     // ── timing math (SetRangeTiming / GetRangeTiming) ────────────────────────
 
     /**
+     * SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+     * which need no register: budget 10..200 ms, period 0 (continuous) or above
+     * the budget (autonomous) and a u32 — {@link IllegalArgumentException}
+     * otherwise (contract 10 §5).
+     */
+    public static void checkRangeTiming(int timingBudgetMs, long interMeasurementMs) {
+        inRange("timingBudgetMs", timingBudgetMs, 10, 200);
+        inRange("interMeasurementMs", interMeasurementMs, 0, 0xFFFFFFFFL);
+        if (interMeasurementMs > 0 && interMeasurementMs <= timingBudgetMs) {
+            throw new IllegalArgumentException("inter_measurement_ms must be 0 or > timing_budget_ms");
+        }
+    }
+
+    /**
      * SetRangeTiming register math → {@code {RANGE_CONFIG_A, RANGE_CONFIG_B,
      * INTERMEASUREMENT_MS raw dword}}.
      *
@@ -188,24 +209,23 @@ public final class Vl53l4Uld {
      * is the word read from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
      * mode, i.e. when {@code interMeasurementMs > 0}). Budget 10..200 ms;
      * {@code interMeasurementMs} 0 (continuous) or greater than the budget
-     * (autonomous low power) — anything else throws {@link Vl53l4Error}.
+     * (autonomous low power) — anything else throws
+     * {@link IllegalArgumentException} ({@link #checkRangeTiming}).
      * Register words are refused out of range, never wrapped: {@code oscFrequency}
-     * 1..65535, {@code clockPll} 0..65535, {@code interMeasurementMs} a u32, and
-     * an INTERMEASUREMENT_MS dword that would overflow u32 throws too.
+     * 1..65535 (0 reads as {@link Vl53l4Error}), {@code clockPll} 0..65535, and
+     * an INTERMEASUREMENT_MS dword that would overflow u32 throws
+     * {@link IllegalArgumentException} too.
      * The third element (the dword) is a u32 in Java's {@code int} convention
      * ({@link Integer#toUnsignedLong}).
      */
     public static int[] rangeTimingRegisters(
             int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll) {
+        checkRangeTiming(timingBudgetMs, interMeasurementMs);
         if (oscFrequency == 0) {
             throw new Vl53l4Error("osc_frequency reads 0");
         }
-        if (timingBudgetMs < 10 || timingBudgetMs > 200) {
-            throw new Vl53l4Error("timing_budget_ms must be 10..200");
-        }
         inRange("oscFrequency", oscFrequency, 1, 0xFFFF);
         inRange("clockPll", clockPll, 0, 0xFFFF);
-        inRange("interMeasurementMs", interMeasurementMs, 0, 0xFFFFFFFFL);
 
         long timingBudgetUs = timingBudgetMs * 1000L;
         long macroPeriodUs = ((2304L * (0x40000000L / oscFrequency)) & 0xFFFFFFFFL) >> 6;
@@ -214,16 +234,14 @@ public final class Vl53l4Uld {
         if (interMeasurementMs == 0) { // continuous
             intermeasurementRaw = 0;
             timingBudgetUs -= 2500;
-        } else if (interMeasurementMs > timingBudgetMs) { // autonomous low power
+        } else { // autonomous low power, above the budget (checkRangeTiming)
             double factor = Math.floor(1.055 * interMeasurementMs * (clockPll & 0x3FF));
             if (factor > 0xFFFFFFFFL) {
-                throw new Vl53l4Error("interMeasurementMs " + interMeasurementMs
+                throw new IllegalArgumentException("interMeasurementMs " + interMeasurementMs
                     + ": INTERMEASUREMENT_MS overflows u32");
             }
             intermeasurementRaw = (long) factor;
             timingBudgetUs = (timingBudgetUs - 4300) / 2;
-        } else {
-            throw new Vl53l4Error("inter_measurement_ms must be 0 or > timing_budget_ms");
         }
 
         timingBudgetUs = (timingBudgetUs << 12) & 0xFFFFFFFFL;
@@ -248,8 +266,8 @@ public final class Vl53l4Uld {
      *
      * <p>Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
      * RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
-     * word. A value wider than its register (dword u32, words u16) throws
-     * {@link Vl53l4Error}.
+     * word. An oscillator word of 0 throws {@link Vl53l4Error}; a value wider
+     * than its register (dword u32, words u16) {@link IllegalArgumentException}.
      */
     public static int[] decodeRangeTiming(
             long intermeasurementRaw, int clockPll, int oscFrequency, int rangeConfigA) {
@@ -265,7 +283,7 @@ public final class Vl53l4Uld {
         long interMeasurementMs = pll != 0 ? (intermeasurementRaw / pll) & 0xFFFF : 0;
 
         long macroPeriodUs = ((2304L * (0x40000000L / oscFrequency)) & 0xFFFFFFFFL) >> 6;
-        long lsByte = (rangeConfigA & 0x00FF) << 4;
+        long lsByte = (long) (rangeConfigA & 0x00FF) << 4;
         long msByte = (rangeConfigA & 0xFF00) >> 8;
         msByte = (0x04 - (msByte - 1) - 1) & 0xFFFFFFFFL; // wraps: only shift when < 12
         macroPeriodUs = (macroPeriodUs * 16) & 0xFFFFFFFFL;
@@ -335,9 +353,6 @@ public final class Vl53l4Uld {
 
     /** RANGE_CONFIG__SIGMA_THRESH word for SetSigmaThreshold (mm ≤ 16383). */
     public static int sigmaThresholdRaw(int sigmaMm) {
-        if (sigmaMm > (0xFFFF >> 2)) {
-            throw new Vl53l4Error("sigma_mm must be <= 16383");
-        }
         inRange("sigmaMm", sigmaMm, 0, 0xFFFF >> 2);
         return sigmaMm << 2;
     }
@@ -349,10 +364,10 @@ public final class Vl53l4Uld {
     }
 
 
-    /** A register-derived argument outside {@code lo..hi} → {@link Vl53l4Error} (never wrapped). */
+    /** An argument outside {@code lo..hi} → {@link IllegalArgumentException} (invalid_argument, never wrapped). */
     private static void inRange(String name, long v, long lo, long hi) {
         if (v < lo || v > hi) {
-            throw new Vl53l4Error(name + " " + v + " out of range " + lo + ".." + hi);
+            throw new IllegalArgumentException(name + " " + v + " out of range " + lo + ".." + hi);
         }
     }
 

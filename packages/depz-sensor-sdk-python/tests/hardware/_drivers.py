@@ -23,6 +23,8 @@ from _support import (
     FAMILY_BNO055,
     FAMILY_BNO086,
     FAMILY_SR04,
+    FAMILY_TMF8829,
+    FAMILY_VL53L4CD,
     FAMILY_VL53L5CX,
     FAMILY_VL53L7CH,
     FAMILY_VL53L7CX,
@@ -245,6 +247,69 @@ class Vl53lxDriver(SensorDriver):
         return isinstance(sample.distance_mm, int) and isinstance(sample.status, int)
 
 
+class Vl53l4cdDriver(SensorDriver):
+    """VL53L4CD (APP_VL53L4CD): init() is the ULD sensor_init, then a 50 ms
+    budget in continuous mode — 20 Hz, the rate test_hw_vl53l4 streams at."""
+
+    first_sample_timeout = 2.0
+    nominal_hz = 20.0
+
+    def prepare(self) -> None:
+        self.dev.init()
+        self.dev.set_range_timing(50, 0)
+
+    def start(self) -> None:
+        self.dev.start_ranging()
+
+    def stop(self) -> None:
+        self.dev.stop_ranging()
+
+    def read_one(self, timeout: float | None = None) -> Any:
+        return self.dev.get_measurement(
+            timeout=self.first_sample_timeout if timeout is None else timeout
+        )
+
+    def pending_read(self) -> Any:
+        return self.dev.get_measurement(timeout=30.0)
+
+    def sample_timestamp_us(self, sample) -> int:
+        return sample.timestamp_us
+
+    def sample_is_valid(self, sample) -> bool:
+        return 0 <= sample.distance_mm <= 8190 and 0 <= sample.stream_count <= 255
+
+
+class Tmf8829Driver(SensorDriver):
+    """TMF8829 (APP_TMF8829): init() downloads the RAM application, start()
+    measures the default 8x8 preset."""
+
+    first_sample_timeout = 3.0
+    nominal_hz = 10.0
+
+    def prepare(self) -> None:
+        self.dev.init()
+
+    def start(self) -> None:
+        self.dev.start()
+
+    def stop(self) -> None:
+        self.dev.stop()
+
+    def read_one(self, timeout: float | None = None) -> Any:
+        return self.dev.get_measurement(
+            timeout=self.first_sample_timeout if timeout is None else timeout
+        )
+
+    def pending_read(self) -> Any:
+        return self.dev.get_measurement(timeout=30.0)
+
+    def sample_timestamp_us(self, sample) -> int:
+        return sample.timestamp_us
+
+    def sample_is_valid(self, sample) -> bool:
+        return sample.distance_mm is not None and sample.distance_mm.size > 0
+
+
 class Bno086Driver(SensorDriver):
     first_sample_timeout = 2.0
     nominal_hz = 50.0
@@ -363,6 +428,8 @@ class Bno055Driver(SensorDriver):
 
 DRIVERS: dict[str, type[SensorDriver]] = {
     FAMILY_SR04: Sr04Driver,
+    FAMILY_VL53L4CD: Vl53l4cdDriver,
+    FAMILY_TMF8829: Tmf8829Driver,
     FAMILY_VL53L8CX: Vl53l8Driver,
     FAMILY_VL53L8CH: Vl53l8Driver,
     # The L5/L7 classes subclass Vl53l8cx: same lifecycle, same frame type.

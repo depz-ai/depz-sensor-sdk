@@ -12,7 +12,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   BNO055_RESET_TIMEOUT_MS,
@@ -394,7 +394,7 @@ export class Bno055 extends DepzDevice {
    */
   async restoreConfiguration(): Promise<void> {
     if (this.configured === null) {
-      return Promise.reject(new DepzError("configure() has not been called"));
+      return Promise.reject(new InvalidStateError("configure() has not been called"));
     }
     return this.configure(this.configured);
   }
@@ -562,13 +562,19 @@ export class Bno055 extends DepzDevice {
     if (length < 1 || length > BNO055_XFER_MAX || addr + length > 0x100) {
       return Promise.reject(new RangeError(`block 0x${addr.toString(16)}+${length} outside 1..128 / page`));
     }
+    // Encoded (and so range-checked: TIMER period 1..60000) before the units
+    // read below — a refused argument puts nothing on the wire.
+    let payload: Uint8Array;
+    try {
+      payload = packBno055StartStream(trigger, addr, length, periodMs);
+    } catch (e) {
+      return Promise.reject(e);
+    }
     return this.locked(async () => {
       // Units first: the read pump may decode the first sample before the
       // command's own reply is processed.
       this.streamUnits = await this.currentUnits();
-      await this.request(Bno055Cmd.StartStream, packBno055StartStream(trigger, addr, length, periodMs), {
-        okCompletes: true,
-      });
+      await this.request(Bno055Cmd.StartStream, payload, { okCompletes: true });
       this.streamingFlag = true;
     });
   }
@@ -760,7 +766,7 @@ export class Bno055 extends DepzDevice {
   }
 
   private requireNotStreaming(): void {
-    if (this.streamingFlag) throw new DepzError("stopStream() first — the stream reads page 0");
+    if (this.streamingFlag) throw new InvalidStateError("stopStream() first — the stream reads page 0");
   }
 
   protected override handleReport(pkt: PacketEvent): boolean {
@@ -779,7 +785,7 @@ export class Bno055 extends DepzDevice {
       return true;
     }
     const sample = decodeBno055Sample(s.timestampUs, s.addr, s.data, this.streamUnits);
-    for (const cb of [...this.sampleCbs]) cb(sample);
+    for (const cb of [...this.sampleCbs]) this.callGuarded(cb, sample);
     for (const q of [...this.sampleQueues]) q.push(sample);
     return true;
   }

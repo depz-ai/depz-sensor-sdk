@@ -21,6 +21,7 @@ import { DepzError } from "../../errors.js";
 import {
   PinAction,
   VL53L7_READ_MAX_LEN,
+  VL53L7_STREAM_CHUNK_MAX,
   VL53L7_WRITE_MAX_LEN,
   Vl53l7Cmd,
   Vl53l7Rpt,
@@ -52,6 +53,7 @@ export class Vl53l7cx extends Vl53l8cx {
   protected override readonly variantId: Vl53l8Variant = "l7cx";
   protected override readonly readChunk: number = VL53L7_READ_MAX_LEN;
   protected override readonly writeChunk: number = VL53L7_WRITE_MAX_LEN;
+  protected override readonly streamChunk: number = VL53L7_STREAM_CHUNK_MAX;
   protected override readonly minRangingHz: number = VL53L7_MIN_RANGING_FREQUENCY_HZ;
   /** module_type this class expects after init() (L5 and L7 share a blob). */
   protected readonly expectedModuleType: number = MODULE_TYPE_MZEVO;
@@ -157,10 +159,14 @@ export class Vl53l7ch extends Vl53l7cx {
   /**
    * Arm the CNH histogram block for the next startRanging(). CH only — this
    * method does not exist on Vl53l7cx / Vl53l5cx.
+   *
+   * CNH and the motion indicator share one DCI struct (0xBFAC): this disarms
+   * the motion indicator (frames carry `motion` null).
    */
   async configureCnh(config: CnhConfig): Promise<void> {
     this.requireNotRanging();
     await this.uld.dciWriteData(MI_CFG_DEV_IDX, config.pack());
+    this.uld.motionIndicatorDisarm();
     this.cnhConfig = config;
   }
 }

@@ -63,15 +63,25 @@ public static class Bno055Wire
     public const byte ExpectedMagId = 0x32;
     public const byte ExpectedGyrId = 0x0F;
 
-    /// <summary>BNO_READ_REG payload: addr u8, len u8.</summary>
-    public static byte[] PackReadReg(byte addr, byte len) => new[] { addr, len };
+    /// <summary>BNO_READ_REG payload: addr u8, len u8, with the transfer limit of contract 13 §1 — len 1..<see cref="XferMax"/> and addr + len ≤ 0x100.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">len outside 1..<see cref="XferMax"/> or the read runs past the page.</exception>
+    public static byte[] PackReadReg(byte addr, byte len)
+    {
+        if (len < 1 || len > XferMax || addr + len > 0x100)
+            throw new ArgumentOutOfRangeException(nameof(len), len, $"READ_REG len must be 1..{XferMax} and addr+len <= 0x100");
+        return new[] { addr, len };
+    }
 
-    /// <summary>BNO_WRITE_REG payload: addr u8, then data[1..<see cref="XferMax"/>].</summary>
-    /// <exception cref="ArgumentOutOfRangeException">data is empty or longer than <see cref="XferMax"/>.</exception>
+    /// <summary>BNO_START_STREAM TIMER period limits, ms (contract 13 §2).</summary>
+    public const int TimerPeriodMinMs = 1;
+    public const int TimerPeriodMaxMs = 60000;
+
+    /// <summary>BNO_WRITE_REG payload: addr u8, then data[1..<see cref="XferMax"/>] with addr + N ≤ 0x100.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">data is empty, longer than <see cref="XferMax"/>, or the write runs past the page.</exception>
     public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
     {
-        if (data.Length < 1 || data.Length > XferMax)
-            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes");
+        if (data.Length < 1 || data.Length > XferMax || addr + data.Length > 0x100)
+            throw new ArgumentOutOfRangeException(nameof(data), data.Length, $"WRITE_REG data must be 1..{XferMax} bytes and addr+N <= 0x100");
         var buf = new byte[1 + data.Length];
         buf[0] = addr;
         data.CopyTo(buf.AsSpan(1));
@@ -84,6 +94,9 @@ public static class Bno055Wire
     /// </summary>
     public static byte[] PackStartStream(Bno055Trigger trigger, byte addr, byte len, ushort periodMs)
     {
+        // contract 13 §2: TIMER reads every period_ms, 1..60000; INT: the missed-edge watchdog, 0 = none
+        if (trigger == Bno055Trigger.Timer && (periodMs < TimerPeriodMinMs || periodMs > TimerPeriodMaxMs))
+            throw new ArgumentOutOfRangeException(nameof(periodMs), periodMs, $"TIMER period must be {TimerPeriodMinMs}..{TimerPeriodMaxMs} ms");
         var buf = new byte[5];
         buf[0] = (byte)trigger;
         buf[1] = addr;
@@ -127,9 +140,10 @@ public sealed record Bno055StreamData(ulong TimestampUs, byte Addr, byte Length,
 
 /// <summary>
 /// RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge
-/// diagnostics. Counters are free-running and wrap silently: watch increments.
-/// Read*Us, <see cref="SlotsSkipped"/> and <see cref="LoopMaxUs"/> reset at
-/// START_STREAM. A rising <see cref="SensorResets"/> means the bridge pulsed
+/// diagnostics. Counters wrap silently: watch increments. Read*Us,
+/// <see cref="SlotsSkipped"/> and <see cref="LoopMaxUs"/> reset at
+/// START_STREAM, <see cref="I2cErrors"/> at every successful reset handshake.
+/// A rising <see cref="SensorResets"/> means the bridge pulsed
 /// nRESET to recover the bus: the sensor is back in CONFIG and the host must
 /// restore its configuration. <see cref="SwRev"/> is BCD (0x0311 = 03.11).
 /// <see cref="LastI2cError"/>: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.

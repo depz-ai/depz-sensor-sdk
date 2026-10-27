@@ -34,7 +34,9 @@ impl std::fmt::Display for Sh2Error {
             Sh2Error::TooManyParams(n) => {
                 write!(f, "command request carries at most 9 params, got {}", n)
             }
-            Sh2Error::BadWriteWordCount(n) => write!(f, "FRS write data carries 1 or 2 words, got {}", n),
+            Sh2Error::BadWriteWordCount(n) => {
+                write!(f, "FRS write data carries 1 or 2 words, got {}", n)
+            }
         }
     }
 }

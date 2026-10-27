@@ -16,6 +16,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import Sequence
 
 from ._wire import checked_pack
 from .vl53l4 import (  # noqa: F401  (re-exported: identical on the wire)
@@ -32,6 +33,29 @@ from .vl53l4 import (  # noqa: F401  (re-exported: identical on the wire)
     pack_write_reg,
     pack_xshut,
 )
+
+
+__all__ = [
+    "CLEAR_STEPS_MAX",
+    "I2C_KHZ_STEPS",
+    "INFO_SIZE",
+    "SF_INT_ACT_HIGH",
+    "XFER_MAX",
+    "XSHUT_OFF",
+    "XSHUT_ON",
+    "XSHUT_RESET",
+    "RegData",
+    "StreamData",
+    "Vl53lxCmd",
+    "Vl53lxInfo",
+    "Vl53lxRpt",
+    "pack_read_reg",
+    "pack_set_addr_width",
+    "pack_set_i2c_speed",
+    "pack_start_stream",
+    "pack_write_reg",
+    "pack_xshut",
+]
 
 
 class Vl53lxCmd(IntEnum):
@@ -58,7 +82,7 @@ INFO_SIZE = 23
 
 
 def pack_start_stream(
-    addr: int, length: int, clear: tuple = (), flags: int = 0
+    addr: int, length: int, clear: Sequence[tuple[int, int]] = (), flags: int = 0
 ) -> bytes:
     """vl53_start_stream_t: block, flags, then `clear` = ((addr, value), ...)
     played by the bridge after every block read (0..4 steps)."""
@@ -78,7 +102,7 @@ def pack_set_addr_width(width: int) -> bytes:
 
 @dataclass(frozen=True)
 class Vl53lxInfo:
-    """RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads
+    """RPT_VL53_INFO (v2.00 and v2.01, 23 bytes) — bridge state only; the bridge reads
     no sensor register. Counters are free-running (wrap silently): watch
     increments. `slots_skipped` = a slot that never got the bus, `i2c_errors`
     = a bus that answered badly (since power-up, the last XSHUT reset or

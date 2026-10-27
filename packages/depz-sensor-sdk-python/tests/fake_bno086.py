@@ -33,6 +33,8 @@ class FakeBno086:
     ADVERTISEMENT = bytes.fromhex("000101020a")  # opaque channel-0 blob
     FRS_RECORDS: dict[int, list[int]] = {
         0x2D3E: [0x10000000, 0, 0, 0x40000000],  # system orientation (Q30)
+        0x1F1F: [0x00010003, 0x3F800000, 0x0000A5C3, 0xFFFF1234, 0x00000007],  # saved calibration (DCD)
+        0x4B4B: [0x00086A5C],  # serial number
         0xE302: [0x00040404, 0x00500000, 0x4000, (4 << 16) | 0x0800,
                  2500, 0x01190032, 0x00001000, (0x0011 << 16) | 8,
                  0, 100000],  # accelerometer metadata rev 4
@@ -48,9 +50,11 @@ class FakeBno086:
         self.last_set_feature: bytes | None = None
         self.tare_requests: list[bytes] = []
         self.motion_intents: list[int] = []  # Interactive Calibration P0
+        self.me_cal_requests: list[bytes] = []  # ME Calibration P0..P8 (configure)
         self.flush_requests: list[int] = []  # Force Sensor Flush sensor IDs
         self.executable_frames: list[bytes] = []  # host SHTP frames on channel 1
-        self.frs_writes: dict[int, list[int]] = {}
+        self.frs_writes: dict[int, list[int]] = {}  # written records, read back
+        self.frs_erased: set[int] = set()  # erased by a 0-word write request
         self._frs_wr_type: int | None = None
         self._frs_wr_len = 0
         self._frs_wr_words: dict[int, int] = {}
@@ -126,6 +130,11 @@ class FakeBno086:
             self._text(cmd, self.SOFTWARE_NAME)
         elif cmd == 0x05:
             self._text(cmd, self.SERIAL)
+        elif cmd == 0x06:  # SYNC_TIME: zero device-processing gap (t3 == t2),
+            # like FakeSr04, so the round trip is never negative in-process
+            (t1,) = struct.unpack("<Q", payload)
+            t2 = self.mcu_time_us + 500
+            self._send(0x82, struct.pack("<QQQ", t1, t2, t2))
         elif cmd == 0x32:  # SENSOR_RESET: ack, then reset advertisement flow
             self._status(cmd, 0x00)
             self._shtp_tx_seq = [0] * NUM_CHANNELS
@@ -194,6 +203,11 @@ class FakeBno086:
             self._frs_read(ftype)
         elif rid == 0xF7:  # FRS write request
             _, _, length, ftype = struct.unpack_from("<BBHH", payload)
+            if length == 0:  # SH-2 §6.3.3: a 0-word write erases the record
+                self.frs_writes.pop(ftype, None)
+                self.frs_erased.add(ftype)
+                self._frs_write_response(3, 0)  # write completed
+                return
             self._frs_wr_type = ftype
             self._frs_wr_len = length
             self._frs_wr_words = {}
@@ -209,6 +223,7 @@ class FakeBno086:
             if len(self._frs_wr_words) >= self._frs_wr_len:
                 words = [self._frs_wr_words[i] for i in range(self._frs_wr_len)]
                 self.frs_writes[self._frs_wr_type] = words
+                self.frs_erased.discard(self._frs_wr_type)
                 self._frs_write_response(3, offset)  # write completed
                 self._frs_wr_type = None
             else:
@@ -237,6 +252,7 @@ class FakeBno086:
             if params[3] == 0x01:  # get
                 self._command_response(seq, command, [0, 1, 1, 0, 0])
             else:
+                self.me_cal_requests.append(bytes(params))
                 self._command_response(seq, command, [0])
             return
         if command == 0x0A:  # get oscillator type — r[0] IS the type
@@ -280,7 +296,8 @@ class FakeBno086:
         )
 
     def _frs_read(self, ftype: int) -> None:
-        words = self.FRS_RECORDS.get(ftype)
+        # A written record reads back; an erased one is gone, like flash.
+        words = None if ftype in self.frs_erased else self.frs_writes.get(ftype, self.FRS_RECORDS.get(ftype))
         if words is None:
             self._frs_read_response(1, 0, 0, [0, 0], ftype)  # unrecognized
             return

@@ -134,6 +134,8 @@ public sealed class Vl53l4cdDriver
 
     public void SetRangeTiming(int timingBudgetMs, long interMeasurementMs)
     {
+        // refused before any register traffic, not only before the writes
+        Vl53l4Uld.CheckRangeTiming(timingBudgetMs, interMeasurementMs);
         int clockPll = interMeasurementMs > 0 ? ReadWord(Vl53l4Uld.ResultOscCalibrateVal) : 0;
         var (a, b, interRaw) = Vl53l4Uld.RangeTimingRegisters(
             timingBudgetMs, interMeasurementMs, ReadWord(Vl53l4Uld.OscFrequency), clockPll);
@@ -233,7 +235,7 @@ public sealed class Vl53l4cdDriver
     public int CalibrateOffset(int targetDistMm, int nbSamples = 20)
     {
         if (nbSamples < 5 || nbSamples > 255 || targetDistMm < 10 || targetDistMm > 1000)
-            throw new Vl53l4Exception("nb_samples must be 5..255, target 10..1000 mm");
+            throw new ArgumentException("nb_samples must be 5..255, target 10..1000 mm");
         WriteWord(Vl53l4Uld.RangeOffsetMm, 0);
         WriteWord(Vl53l4Uld.InnerOffsetMm, 0);
         WriteWord(Vl53l4Uld.OuterOffsetMm, 0);
@@ -253,7 +255,7 @@ public sealed class Vl53l4cdDriver
     public int CalibrateXtalk(int targetDistMm, int nbSamples = 20)
     {
         if (nbSamples < 5 || nbSamples > 255 || targetDistMm < 10 || targetDistMm > 5000)
-            throw new Vl53l4Exception("nb_samples must be 5..255, target 10..5000 mm");
+            throw new ArgumentException("nb_samples must be 5..255, target 10..5000 mm");
         WriteWord(Vl53l4Uld.XtalkPlaneOffsetKcps, 0); // compensation off
 
         Collect(10, (_, _) => { }); // device heat loop

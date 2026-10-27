@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any, Iterable
 
 import numpy as np
 
@@ -122,6 +123,17 @@ class MeasurementBuilder:
             self._pending.append((f, raw))
             return None
 
+        try:
+            res = parse_results(raw, f)
+        except FrameError as e:
+            # Contract 14 §5/§6: decoded first; a corrupt results frame never
+            # reaches the capture timer and is dropped with its pending frames
+            # and any half-measurement collected before it.
+            self.parse_errors += 1
+            self._problems.append(f"fN={f.f_number}: {e}")
+            self._pending, self._hist, self._refs = [], [], []
+            self._half = None
+            return None
         t = self.timer.results_frame(f, timestamp_us, edge_us, flags)
         for pf, praw in self._pending:
             if pf.kind == FID_HISTOGRAMS:
@@ -129,13 +141,6 @@ class MeasurementBuilder:
             else:
                 self._refs.append(praw)
         self._pending = []
-        try:
-            res = parse_results(raw, f)
-        except FrameError as e:
-            self.parse_errors += 1
-            self._problems.append(f"fN={f.f_number}: {e}")
-            self._half = None
-            return None
 
         if FP_GRID.get(f.fp_mode, (0, 0))[0] == 32:
             if self._half is None:
@@ -182,18 +187,18 @@ class MeasurementBuilder:
         return m
 
 
-def _or(values) -> int:
+def _or(values: Iterable[int]) -> int:
     out = 0
     for v in values:
         out |= v
     return out
 
 
-def record_value(m: Tmf8829Measurement) -> dict:
+def record_value(m: Tmf8829Measurement) -> dict[str, Any]:
     """Contract 09 `tmf8829` record value of a measurement."""
     r = m.results
     rows, cols = m.shape
-    v: dict = {
+    v: dict[str, Any] = {
         "fp_mode": m.fp_mode,
         "rows": rows,
         "cols": cols,

@@ -88,11 +88,15 @@ bytes ShtpLayer::next_frame(int channel, byte_span payload) {
 std::optional<ShtpCargo> ShtpLayer::feed(byte_span frame, std::uint64_t capture_us) {
     if (frame.size() < SHTP_HEADER_SIZE) return std::nullopt;
     ShtpHeader hdr = ShtpHeader::unpack(frame);
-    if (hdr.channel >= NUM_CHANNELS || hdr.length < SHTP_HEADER_SIZE) return std::nullopt;
+    if (hdr.length < SHTP_HEADER_SIZE) return std::nullopt;  // empty/padding header ("no data" read)
+    if (hdr.channel >= NUM_CHANNELS) {
+        ++discarded;  // junk channel
+        return std::nullopt;
+    }
     byte_span chunk = frame.subspan(SHTP_HEADER_SIZE);
     ChannelRx& rx = rx_[hdr.channel];
     if (!hdr.continuation) {
-        if (rx.expected && !rx.buf.empty()) ++discarded;
+        if (rx.expected) ++discarded;  // a partial, even one with no bytes yet
         rx.buf.assign(chunk.begin(), chunk.end());
         rx.expected = hdr.length - SHTP_HEADER_SIZE;
         rx.seq = hdr.seq;
@@ -162,6 +166,15 @@ bytes sh2_build_command_request(std::uint8_t seq, std::uint8_t command, byte_spa
     return out;
 }
 
+bytes sh2_build_interactive_calibration(std::uint8_t seq, MotionIntent intent) {
+    const std::byte p0{static_cast<std::uint8_t>(intent)};
+    return sh2_build_command_request(seq, CMD_INTERACTIVE_CALIBRATION, byte_span(&p0, 1));
+}
+
+bytes sh2_build_force_flush(std::uint8_t sensor_id) {
+    return bytes{std::byte{FORCE_SENSOR_FLUSH}, std::byte{sensor_id}};
+}
+
 bytes sh2_build_frs_read_request(std::uint16_t frs_type, std::uint16_t offset_words,
                                  std::uint16_t block_words) {
     bytes out;
@@ -195,6 +208,63 @@ bytes sh2_build_frs_write_data(std::uint16_t offset_words,
     detail::wr_le(out, w0, 4);
     detail::wr_le(out, w1, 4);
     return out;
+}
+
+// ── SH-2 control-channel responses (§4 table) ───────────────────────────────
+
+std::optional<Feature> Feature::unpack(byte_span p) {
+    if (p.size() < 17 || u8(p[0]) != SH2_GET_FEATURE_RESPONSE) return std::nullopt;
+    Feature f;
+    f.sensor_id = u8(p[1]);
+    f.flags = u8(p[2]);
+    f.sensitivity = rd_u16(p, 3);
+    f.interval_us = rd_u32(p, 5);
+    f.batch_us = rd_u32(p, 9);
+    f.cfg_word = rd_u32(p, 13);
+    return f;
+}
+
+std::optional<ProductId> ProductId::unpack(byte_span p) {
+    if (p.size() < 16 || u8(p[0]) != SH2_PRODUCT_ID_RESPONSE) return std::nullopt;
+    ProductId r;
+    r.reset_cause = u8(p[1]);
+    r.sw_version_major = u8(p[2]);
+    r.sw_version_minor = u8(p[3]);
+    r.sw_part_number = rd_u32(p, 4);
+    r.sw_build_number = rd_u32(p, 8);
+    r.sw_version_patch = rd_u16(p, 12);
+    return r;
+}
+
+std::optional<CommandResponse> CommandResponse::unpack(byte_span p) {
+    if (p.size() < 16 || u8(p[0]) != SH2_COMMAND_RESPONSE) return std::nullopt;
+    CommandResponse r;
+    r.seq = u8(p[1]);
+    r.command = u8(p[2]);
+    r.command_seq = u8(p[3]);
+    r.response_seq = u8(p[4]);
+    for (std::size_t k = 0; k < r.r.size(); ++k) r.r[k] = u8(p[5 + k]);
+    return r;
+}
+
+std::optional<FrsReadResponse> FrsReadResponse::unpack(byte_span p) {
+    if (p.size() < 16 || u8(p[0]) != SH2_FRS_READ_RESPONSE) return std::nullopt;
+    FrsReadResponse r;
+    r.status = static_cast<std::uint8_t>(u8(p[1]) & 0x0F);
+    r.data_length = static_cast<std::uint8_t>(u8(p[1]) >> 4);
+    r.offset_words = rd_u16(p, 2);
+    r.data0 = rd_u32(p, 4);
+    r.data1 = rd_u32(p, 8);
+    r.frs_type = rd_u16(p, 12);
+    return r;
+}
+
+std::optional<FrsWriteResponse> FrsWriteResponse::unpack(byte_span p) {
+    if (p.size() < 4 || u8(p[0]) != SH2_FRS_WRITE_RESPONSE) return std::nullopt;
+    FrsWriteResponse r;
+    r.status = u8(p[1]);
+    r.offset_words = rd_u16(p, 2);
+    return r;
 }
 
 // ── SH-2 input reports ──────────────────────────────────────────────────────

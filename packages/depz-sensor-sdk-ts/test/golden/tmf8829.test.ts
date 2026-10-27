@@ -68,6 +68,12 @@ describe("tmf8829.json", () => {
 
   it("parses frames and pixels", () => {
     for (const c of V.frames) {
+      if ("error" in c) {
+        // a results frame whose pixel decode must fail
+        expect(() => tmf8829Frame(fromHex(c.raw)), c.name).toThrow();
+        seen(c);
+        continue;
+      }
       const want: Any = { header: c.header, problems: c.problems };
       if ("results" in c) want.results = c.results;
       else want.data_sha256 = c.data_sha256;

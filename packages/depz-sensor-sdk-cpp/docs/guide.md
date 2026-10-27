@@ -170,7 +170,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.7.0
+    GIT_TAG        v0.8.0
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -307,7 +307,7 @@ detail):
 
 | Exception | When |
 |---|---|
-| `ArgumentError` | a bad argument, or a call not valid in this state (a VL53L4CD / VL53L8 setting while ranging) |
+| `ArgumentError` | a bad argument, or a call not valid in this state (a VL53L4CD / VL53L8 setting while ranging, a closed dataset writer or player); also thrown by the dataset layer, from `depz/errors.hpp` |
 | `IoError` | the OS refused — the port does not exist, is busy or not permitted |
 | `DeviceLostError` | the device is closed or was unplugged |
 | `TimeoutError` | no reply in time |
@@ -392,15 +392,17 @@ void watch(depz::Device& dev) {
             std::printf("lost: %s\n", ev->text.c_str());
             break;
         default:
-            break;   // SequenceError, CrcError, Trash, UnsolicitedStatus, Text
+            break;   // SequenceError, SeqGap, CrcError, Trash, UnsolicitedStatus, Text
         }
     }
     if (events.closed()) std::puts("device closed");
 }
 ```
 
-`DeviceEvent::Type` is one of `SequenceError` (a gap in the packet sequence;
-`by_device` when the device reported it), `CrcError`, `Trash` (bytes skipped
+`DeviceEvent::Type` is one of `SequenceError` (the device saw a gap in what
+the host sent, RPT 0x84; `by_device`), `SeqGap` (the host saw a gap in what the
+device sent: `expected_seq`, `received_seq`, `missed` — also counted in
+`stats().seq_gaps`), `CrcError`, `Trash` (bytes skipped
 while hunting for a frame), `UnsolicitedStatus` (`is_hardware_fault()` for
 `ERR_HARDWARE_FAULT`), `Text` (a text report — or, as hex, a report no
 sensor class routes), `Temperature` and `Disconnected`.
@@ -651,26 +653,77 @@ supplies the codecs it is built from.
 
 ## Datasets: record & replay
 
-`depz::dataset::Reader` reads a decoded, multi-device, time-synced
-`.depzdata` file (JSON-lines: a header line + one record per line). Records come
-back **merged by host time** across every device, including two of the same
-model:
+A `.depzdata` dataset (contract 09) is UTF-8 JSON Lines: a header line
+describing the devices on one shared host timeline, then one decoded record
+per line (`.depzdata.gz`: the same, gzipped). `depz/dataset.hpp` reads, writes
+and plays them with no dependency — a small JSON value (`dataset::Value`) and
+its own inflate.
+
+`depz::dataset::Reader` returns the header (`devices`, `note`, the raw
+`header`) and every record **merged by host time** across every device,
+including two of the same model:
 
 ```cpp
 #include "depz/dataset.hpp"
 
-depz::dataset::Reader ds(file_contents);
+auto ds = depz::dataset::Reader::open("session.depzdata.gz");  // or Reader(content)
 for (const auto& rec : ds.records) {         // stable-sorted by t_host_us
-    // rec.device_id, rec.t_host_us, rec.kind
-    // rec.ints / rec.strings / rec.arrays   (value split by JSON type)
+    if (rec.kind == "vl53l8")                // rec.value: a dataset::Value tree
+        std::cout << rec.device_id << " @ " << rec.t_host_us << " zone0 "
+                  << rec.value.at("distance_mm")[0].as_int() << " mm\n";
 }
 // ds.schema, ds.devices (per-device DeviceMeta incl. TimeSync), ds.duration_us()
 ```
 
-Writing datasets is a host-side concern; the SDK provides the reader used for
-replay and regression. The raw-byte layer below it — the `.depzrec` capture
-of everything that crossed the wire — is `Link::recording` / `Link::replay`
-(see [record and replay](#record-and-replay)).
+Recording live devices is `depz::dataset::SessionRecorder` (`depz/recorder.hpp`,
+the live layer): `add()` takes an open device of any class, runs `sync_time()`
+on it (so every record's `t` is the device time mapped onto the host clock),
+reads the serial and software name for the header and hooks the class's
+result stream; `start()` opens the file and writes a record per result on the
+device's reader thread. It never reconfigures a device — start and stop
+streaming yourself. About `temperature_hz` times a second it adds
+`temperature` records (the MCU thermometer, and the sensor die where frames
+carry one). A `.gz` path is written as a gzip container of stored
+(uncompressed) blocks: every gzip reader opens it.
+
+```cpp
+#include "depz/recorder.hpp"
+
+depz::dataset::RecorderOptions o;
+o.note = "bench run";
+depz::dataset::SessionRecorder rec("session.depzdata.gz", o);
+rec.add(*tof);        // "d0"; 5 time-sync rounds
+rec.add(*imu);        // "d1"
+rec.start();
+// … stream …
+rec.stop();           // the destructor stops too
+```
+
+`depz::dataset::Writer` writes records of your own; `dataset::records::*`
+(`sr04`, `vl53l4`, `vl53l8`, `vl53l8_cnh`, `vl53lx`, `bno055`, `tmf8829`,
+`bno086`, `temperature`) builds each kind's value key for key as the Python
+reference writes it.
+
+Playback is `depz::dataset::DatasetPlayer`: the records paced by their times,
+with play / pause / seek / speed (contract 09 §Player) — on a player thread
+(`wait()` until done), or from your own timer through `tick()` with
+`threaded = false` and an injectable clock. The media clock is anchored at
+play / resume / seek, so the first record goes out at once, every later one
+after its gap to the previous one, and a slow consumer gets overdue records
+back to back without drift; speed 0 plays as fast as possible.
+
+```cpp
+depz::dataset::PlayerOptions po;
+po.speed = 2.0;
+depz::dataset::DatasetPlayer player(ds, po);
+auto unsub = player.on_record([](const depz::dataset::Record& r) { /* plot it */ });
+player.play();
+player.wait();        // done (or paused by someone else)
+```
+
+The raw-byte layer below datasets — the `.depzrec` capture of everything
+that crossed the wire — is `Link::recording` / `Link::replay` (see
+[record and replay](#record-and-replay)).
 
 ## What is not here
 
@@ -714,8 +767,18 @@ histogram driver now refuses the short preset on an L4 die), and
 `device_tmf8829_fake_session` runs `depz::Tmf8829` against the C SDK's fake
 TMF8829 bridge with frames captured on a board (`init()` with the firmware
 download, `configure()` with read-back, 32×32 with ref frames, a dropped
-frame, the swallowed stop event). `ctest` runs 33
-tests in all: `vectors`, 19 `device_*` tests and 13 per-suite vector
-tests.
+frame, the swallowed stop event); `device_dataset_recorder_*` run the session
+recorder over two fake SR04 boards on one host timeline, the temperature
+sampler into a `.gz`, and a fake BNO086 cargo recorded at measurement time.
+`dataset` covers the JSON value, the writer (plain and gzip, round trips, a
+corrupt trailer, compressed members) and the committed dual-SR04 fixture;
+`dataset_player` the contract 09 §Player timing model on a fake clock and the
+threaded driver. `ctest` runs 58
+tests in all: `vectors`, 14 `device_*` tests, 28 `scenario_*` replays and 15
+per-suite vector tests.
+CI runs the same suite on Linux, macOS and Windows, and again on Linux under
+clang's UndefinedBehaviorSanitizer, AddressSanitizer with LeakSanitizer and
+ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread cpp` at the
+repository root runs one locally).
 Your own tests can do the same: record a session once with `Link::recording`, then
 replay it with `Link::replay(path, true)` in CI.

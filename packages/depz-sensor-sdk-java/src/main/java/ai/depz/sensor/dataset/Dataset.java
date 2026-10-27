@@ -30,6 +30,8 @@ public final class Dataset {
     public static final String DATASET_SCHEMA_PREFIX = "depz.dataset/";
 
     /** One merged record. */
+    // Contract 09's name; nested, so always written Dataset.Record and never mistaken for java.lang.Record.
+    @SuppressWarnings("AvoidCommonTypeNames")
     public record Record(String deviceId, long tHostUs, String kind, Map<String, Object> value) {}
 
     private final Map<String, Object> header;
@@ -61,30 +63,22 @@ public final class Dataset {
      * {@code Map<String,Object>} (objects → Map, arrays → List, ints → Long).
      */
     public static Dataset parse(String content, java.util.function.Function<String, Object> jsonLine) {
-        List<String> lines = new ArrayList<>();
-        for (String l : content.split("\n")) {
-            if (!l.trim().isEmpty()) {
-                lines.add(l);
-            }
+        String[] lines = content.split("\n", -1);
+        if (content.isEmpty()) {
+            throw new IllegalArgumentException("empty, not a .depzdata file (no header line)");
         }
-        if (lines.isEmpty()) {
-            throw new IllegalArgumentException("empty dataset");
-        }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> header = (Map<String, Object>) jsonLine.apply(lines.get(0));
+        Map<String, Object> header = jsonObject(jsonLine, 1, lines[0]);
         Object schema = header.get("schema");
         if (!(schema instanceof String s) || !s.startsWith(DATASET_SCHEMA_PREFIX)) {
-            throw new IllegalArgumentException("not a depz.dataset file");
+            throw new IllegalArgumentException("not a depz.dataset file: schema " + schema);
         }
         // Preserve file order for the stable sort tiebreak.
         List<Record> raw = new ArrayList<>();
-        for (int i = 1; i < lines.size(); i++) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> ev = (Map<String, Object>) jsonLine.apply(lines.get(i));
-            @SuppressWarnings("unchecked")
-            Map<String, Object> v = ev.get("v") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-            raw.add(new Record(
-                    (String) ev.get("d"), ((Number) ev.get("t")).longValue(), (String) ev.get("k"), v));
+        for (int i = 1; i < lines.length; i++) {
+            if (JsonText.isBlankLine(lines[i])) {
+                continue;
+            }
+            raw.add(record(jsonLine, i + 1, lines[i]));
         }
         // Per-device order is monotonic; a stable sort by tHostUs merges exactly.
         List<Integer> idx = new ArrayList<>();
@@ -100,6 +94,49 @@ public final class Dataset {
             sorted.add(raw.get(i));
         }
         return new Dataset(header, sorted);
+    }
+
+    /**
+     * {@code line} as the JSON object a dataset line must be (contract 09), else
+     * {@link IllegalArgumentException} naming the line — a damaged file is the caller's
+     * bad argument, never a crash.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> jsonObject(java.util.function.Function<String, Object> jsonLine,
+            int lineno, String line) {
+        Object obj;
+        try {
+            obj = jsonLine.apply(line);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("line " + lineno + ": not JSON: " + e.getMessage());
+        }
+        if (!(obj instanceof Map)) {
+            throw new IllegalArgumentException("line " + lineno + ": not a JSON object");
+        }
+        return (Map<String, Object>) obj;
+    }
+
+    /** One record line: {@code d} and {@code k} strings, {@code t} an integer, {@code v} an object. */
+    @SuppressWarnings("unchecked")
+    private static Record record(java.util.function.Function<String, Object> jsonLine, int lineno, String line) {
+        Map<String, Object> ev = jsonObject(jsonLine, lineno, line);
+        Object d = ev.get("d");
+        if (!(d instanceof String deviceId)) {
+            throw new IllegalArgumentException("line " + lineno + ": 'd' must be a device id string, got " + d);
+        }
+        Object t = ev.get("t");
+        if (!(t instanceof Long tHostUs)) {
+            throw new IllegalArgumentException("line " + lineno + ": 't' must be an integer (host us), got " + t);
+        }
+        Object k = ev.get("k");
+        if (!(k instanceof String kind)) {
+            throw new IllegalArgumentException("line " + lineno + ": 'k' must be a record kind string, got " + k);
+        }
+        Object v = ev.get("v");
+        if (!(v instanceof Map)) {
+            throw new IllegalArgumentException("line " + lineno + ": 'v' must be an object, got " + v);
+        }
+        return new Record(deviceId, tHostUs, kind, (Map<String, Object>) v);
     }
 
     public Map<String, Object> header() {

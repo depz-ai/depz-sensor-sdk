@@ -18,6 +18,9 @@ using detail::wr_le;
 // ── command encoders ────────────────────────────────────────────────────────
 
 bytes pack_read_reg(std::uint8_t addr, std::uint8_t len) {
+    // contract 13 §1: len 1..128 and addr + len <= 0x100, like WRITE_REG (refused, never sent)
+    if (len < 1 || len > XFER_MAX || static_cast<unsigned>(addr) + len > 0x100u)
+        throw std::invalid_argument("BNO_READ_REG: len must be 1..128 and addr+len <= 0x100");
     bytes out;
     wr_le(out, addr, 1);
     wr_le(out, len, 1);
@@ -25,9 +28,9 @@ bytes pack_read_reg(std::uint8_t addr, std::uint8_t len) {
 }
 
 bytes pack_write_reg(std::uint8_t addr, byte_span data) {
-    // contract 13 §2: data 1..128 bytes (refused, never sent)
-    if (data.empty() || data.size() > XFER_MAX)
-        throw std::invalid_argument("BNO_WRITE_REG: data must be 1..128 bytes");
+    // contract 13 §2: data 1..128 bytes and addr + N <= 0x100 (refused, never sent)
+    if (data.empty() || data.size() > XFER_MAX || static_cast<std::size_t>(addr) + data.size() > 0x100u)
+        throw std::invalid_argument("BNO_WRITE_REG: data must be 1..128 bytes and addr+N <= 0x100");
     bytes out;
     out.reserve(1 + data.size());
     wr_le(out, addr, 1);
@@ -37,6 +40,9 @@ bytes pack_write_reg(std::uint8_t addr, byte_span data) {
 
 bytes pack_start_stream(std::uint8_t trigger, std::uint8_t addr, std::uint8_t len,
                         std::uint16_t period_ms) {
+    // contract 13 §2: TIMER reads every period_ms, 1..60000; INT: a watchdog, 0 = none
+    if (trigger == TRIGGER_TIMER && (period_ms < TIMER_PERIOD_MIN_MS || period_ms > TIMER_PERIOD_MAX_MS))
+        throw std::invalid_argument("BNO_START_STREAM: TIMER period_ms must be 1..60000");
     bytes out;
     out.reserve(5);
     wr_le(out, trigger, 1);

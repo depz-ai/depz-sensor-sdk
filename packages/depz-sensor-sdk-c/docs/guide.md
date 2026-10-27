@@ -186,7 +186,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.7.0
+  GIT_TAG        v0.8.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -371,7 +371,10 @@ static int read_period(depz_device *dev, uint32_t *period_us)
 ### Events and link stats
 
 Everything the device says that is not a reply or a sensor measurement becomes
-a `depz_device_event`: `SEQUENCE_ERROR`, `CRC_ERROR`, `TRASH` (bytes that were
+a `depz_device_event`: `SEQUENCE_ERROR` (the device saw a gap in what the host
+sent, RPT 0x84), `SEQ_GAP` (the host saw a gap in what the device sent:
+`expected_seq`, `received_seq`, `missed`; also counted in `seq_gaps`),
+`CRC_ERROR`, `TRASH` (bytes that were
 not a packet), `UNSOLICITED_STATUS` (`ERR_HARDWARE_FAULT` is a fault), `TEXT`
 (`RPT_TEXT`, and unrouted reports as hex text), `TEMPERATURE`, and
 `DISCONNECTED` (`text` = the reason). Take them as a callback or as a stream:
@@ -644,8 +647,9 @@ the per-sensor guide:
   decoders.
 - **[BNO086](bno086/guide.md)** — the live sensor class (`depz_bno086_*`:
   reset and product id, enable with the granted-rate read-back, reports via
-  callbacks / streams, calibration / DCD / tare / reorientation, FRS records
-  and sensor metadata, error queue and counts) and, underneath, the bridge
+  callbacks / streams, calibration / DCD / tare / reorientation, interactive
+  calibration and batch flush, FRS records and sensor metadata, error queue
+  and counts) and, underneath, the bridge
   codecs (`depz_bno086_unpack_data`), SHTP framing (`depz_shtp_*`), SH-2
   encoders and answer parsers (`depz_bno_pack_*` / `depz_bno_unpack_*`), the
   input-report parsers and the scaling helpers (`depz_bno_report_*`).
@@ -670,25 +674,111 @@ write pages, verify) is left to the transport you own.
 
 ## Datasets
 
-`depz_dataset_parse()` reads a `.depzdata` recording (JSONL: a header plus
-time-merged records, contract 09) into an in-memory model you walk with
-`depz_dataset_get_device()` / `depz_dataset_get_record()` and read scalars from
-with `depz_dataset_value_int` / `depz_dataset_value_str`. Records are exposed in
-stable merge order (by `t_host_us`, then file order).
+A `.depzdata` dataset (contract 09) is UTF-8 JSON Lines: a header line
+describing the devices on one shared host timeline, then one decoded record
+per line (`.depzdata.gz`: the same, gzipped). The SDK reads, writes and plays
+them with no dependency — a small JSON tree (`depz_json`) and its own inflate
+live in `src/dataset.c`.
+
+**Reading.** `depz_dataset_read_file()` (or `depz_dataset_parse()` on the
+bytes; a gzip container is inflated first) returns the header
+(`depz_dataset_get_device()`, `depz_dataset_note()`, the raw
+`depz_dataset_header()`) and every record merged by host time with a stable
+sort (`depz_dataset_get_record()`, `depz_dataset_duration_us()`). A record's
+value is a `depz_json` tree: scalars through `depz_dataset_value_int` /
+`depz_dataset_value_str`, anything else (the VL53L8 zone arrays, the BNO086
+quaternion, a `motion` block) through `depz_json_get()`, `depz_json_at()`,
+`depz_json_double_value()`, …
+
+```c
+depz_dataset *ds = depz_dataset_read_file("session.depzdata.gz");
+for (size_t i = 0; i < depz_dataset_record_count(ds); i++) {
+    depz_dataset_record r;
+    depz_dataset_get_record(ds, i, &r);              /* sorted by t_host_us */
+    if (strcmp(r.kind, "vl53l8") == 0) {
+        const depz_json *d = depz_json_get(r.value, "distance_mm");
+        printf("%s @ %lld zone0 %lld mm\n", r.device_id, (long long)r.t_host_us,
+               (long long)depz_json_int_value(depz_json_at(d, 0)));
+    }
+}
+depz_dataset_free(ds);
+```
+
+**Recording live devices.** `depz_session_recorder_new()` takes open devices
+of any class: `depz_session_recorder_add()` runs `depz_device_sync_time()` on
+each (so every record's `t` is the device time mapped onto the host clock —
+the same math a multi-device recording is aligned by), reads the serial and
+software name for the header and hooks the class's result stream; `start()`
+opens the file and writes a record per result on the device's reader thread.
+The recorder never reconfigures a device — start and stop streaming yourself.
+About `temperature_hz` times a second it adds `temperature` records (the MCU
+thermometer, and the sensor die where frames carry one). A `.gz` path is
+written as a gzip container of stored (uncompressed) blocks: every gzip reader
+opens it.
+
+```c
+depz_session_recorder_options opt = DEPZ_SESSION_RECORDER_OPTIONS_INIT;
+opt.note = "bench run";
+depz_session_recorder *rec = depz_session_recorder_new("session.depzdata.gz", &opt);
+depz_session_recorder_add(rec, tof, NULL, 5, NULL, 0);   /* "d0", 5 sync rounds */
+depz_session_recorder_add(rec, imu, NULL, 5, NULL, 0);   /* "d1" */
+depz_session_recorder_start(rec);
+/* … stream … */
+depz_session_recorder_free(rec);                          /* stops, closes the file */
+```
+
+**Writing records of your own.** `depz_dataset_writer_open()` writes the
+header, `depz_dataset_writer_write()` one record (it takes ownership of the
+value). The value of each kind is built key for key as the Python reference
+writes it by `depz_dataset_bno086_record()`, `depz_dataset_vl53l8_record()`,
+`depz_dataset_vl53l4_record()`, `depz_dataset_tmf8829_record()` (codec layer)
+and `depz_dataset_sr04_record()`, `depz_dataset_vl53l8_live_record()`,
+`depz_dataset_vl53l8_cnh_record()`, `depz_dataset_vl53lx_record()`,
+`depz_dataset_bno055_record()` (live layer).
+
+**Playback.** `depz_dataset_player_new()` delivers the records paced by their
+times, with play / pause / seek / speed (contract 09 §Player). Delivery is
+tick-driven: call `depz_dataset_player_tick()` from your own loop (a GUI
+timer, or a test with a fake clock) and it returns the seconds until the next
+record is due. The media clock is anchored at play / resume / seek, so the
+first record goes out at once, every later one after its gap to the previous
+one, and a slow consumer gets overdue records back to back without drift;
+speed 0 plays as fast as possible.
+
+```c
+static void on_rec(const depz_dataset_record *r, void *user) { /* plot it */ }
+
+depz_dataset_player *p = depz_dataset_player_new(ds, 2.0, NULL, NULL); /* 2x, host clock */
+int token;
+depz_dataset_player_on_record(p, on_rec, NULL, &token);
+depz_dataset_player_play(p);
+for (;;) {
+    double wait = depz_dataset_player_tick(p);         /* < 0: not playing */
+    if (wait < 0) break;
+    sleep_seconds(wait);
+}
+depz_dataset_player_free(p);
+```
 
 ## Testing
 
-The suite is 86 CTests, no hardware required:
+The suite is 98 CTests, no hardware required:
 
-- **Vectors (26)** — one CTest per consumed vector / replay target: the
+- **Vectors (27)** — one CTest per consumed vector / replay target: the
   transport+protocol foundation plus the sensor-decode layer. A real VL53L8CX
   capture is replayed end-to-end through the shared decode path
   (`vec_vl53l8_replay`), and live L5CX / L7CH / L8CH captures through the L5/L7
   decode (`vec_vl53l7_replay_*`, including CNH frames). The TMF8829 decode
   layer runs its two vectors: real frames captured on a board
   (`vec_tmf8829`) and the capture times of 970 results frames from 27
-  recorded streams (`vec_tmf8829_frame_time`).
-- **Live layer (60, `io_*`)** — the device core and the SR04 class against a
+  recorded streams (`vec_tmf8829_frame_time`). `vec_dataset` reads the
+  committed dual-SR04 dataset and covers the JSON values, the writer (plain
+  and gzip, round trips, a corrupt trailer, compressed members), and the
+  player's timing model on a fake clock (contract 09 §Player: pacing, pause /
+  resume, seek, speed changes, a slow consumer).
+- **Live layer (43 `io_*` + 28 `scenario_*`)** — the session recorder over two fake SR04 boards
+  on one host timeline, the temperature sampler into a `.gz`, and a fake BNO086
+  cargo recorded at measurement time (`io_dataset_recorder_*`); the device core and the SR04 class against a
   fake SR04 on the far end of a loopback link (identity, time sync, status
   errors, timeouts, the echo-decay clamp, single shot vs loop, `ERR_BUSY`
   during the loop, drop-oldest streams, disconnect, record → strict replay);
@@ -732,8 +822,10 @@ The suite is 86 CTests, no hardware required:
 ctest --test-dir build            # 86/86
 ```
 
-CI runs the suite on Linux, macOS and Windows, and the live layer again under
-AddressSanitizer and ThreadSanitizer. The live layer was also checked by hand on
+CI runs the suite on Linux, macOS and Windows, and the whole suite again on
+Linux under clang's UndefinedBehaviorSanitizer, AddressSanitizer with
+LeakSanitizer and ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread c`
+at the repository root runs one locally). The live layer was also checked by hand on
 a real SR04 (firmware `APP_usonic_SR04_v0.97`), a real VL53L4CD
 (`APP_VL53L4_v0.83`), a real VL53L8CH (`APP_VL53L8_v0.92`), a real
 VL53L7CH (`APP_VL53L7_v0.53`), a real VL53L4CX (`APP_VL53L0_4_v0.24`), a real

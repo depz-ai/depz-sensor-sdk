@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+
 namespace Depz.Sensor.Devices;
 
 /// <summary>
@@ -143,18 +146,38 @@ internal sealed class Fanout<T>
         get { lock (_queues) return _queues.Select(q => q.DroppedCount).ToList(); }
     }
 
-    public void Emit(T item)
+    /// <summary>Hand <paramref name="item"/> to every callback, then to every queue (contract 07 §3);
+    /// a callback that throws counts in <paramref name="stats"/>.</summary>
+    public void Emit(T item, LinkStats stats)
     {
         Action<T>[] cbs;
         lock (_callbacks)
             cbs = _callbacks.ToArray();
         foreach (var cb in cbs)
-            cb(item);
+            Call(cb, item, stats);
         Subscription<T>[] qs;
         lock (_queues)
             qs = _queues.ToArray();
         foreach (var q in qs)
             q.Put(item);
+    }
+
+    /// <summary>Run a user callback on the reader thread: one that throws is counted in
+    /// <see cref="LinkStats.CallbackErrors"/>, traced and dropped — it never stops the reader, the
+    /// other callbacks or the queues (contract 07 §3).</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+        Justification = "contract 07 §3: whatever a user callback throws must not stop the reader")]
+    internal static void Call(Action<T> cb, T item, LinkStats stats)
+    {
+        try
+        {
+            cb(item);
+        }
+        catch (Exception e)
+        {
+            stats.CallbackErrors++;
+            Trace.TraceError($"depz-sensor-sdk: a callback threw on the reader thread; dropped: {e}");
+        }
     }
 
     /// <summary>The next item on a one-slot queue of its own (contract 07 §3 <c>get_measurement</c>):

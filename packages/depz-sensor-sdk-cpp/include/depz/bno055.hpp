@@ -55,14 +55,21 @@ inline constexpr std::uint8_t TRIGGER_INT = 1;
 // ── command encoders ────────────────────────────────────────────────────────
 // BNO_RESET, BNO_STOP_STREAM and BNO_GET_INFO carry an empty payload.
 
-// BNO_READ_REG payload: addr u8, len u8.
+// BNO_READ_REG payload: addr u8, len u8; std::invalid_argument unless len is
+// 1..XFER_MAX and addr + len <= 0x100 (contract 13 §1).
 bytes pack_read_reg(std::uint8_t addr, std::uint8_t len);
 
 // BNO_WRITE_REG payload: addr u8 then the raw register data; std::invalid_argument
-// unless it is 1..XFER_MAX bytes.
+// unless it is 1..XFER_MAX bytes and addr + N <= 0x100.
 bytes pack_write_reg(std::uint8_t addr, byte_span data);
 
-// BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE.
+// BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+inline constexpr std::uint16_t TIMER_PERIOD_MIN_MS = 1;
+inline constexpr std::uint16_t TIMER_PERIOD_MAX_MS = 60000;
+
+// BNO_START_STREAM payload: trigger u8, addr u8, len u8, period_ms u16 LE;
+// std::invalid_argument when trigger is TIMER and period_ms is outside 1..60000
+// (with INT the period is the missed-edge watchdog, 0 = none).
 bytes pack_start_stream(std::uint8_t trigger, std::uint8_t addr, std::uint8_t len,
                         std::uint16_t period_ms);
 
@@ -80,8 +87,9 @@ struct RegData {
 };
 
 // RPT_BNO_INFO (38 bytes, `<BBBBBHBBBIHHHIIIHBBH`) — sensor identity
-// (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running
-// and wrap; read_*_us, slots_skipped and loop_max_us reset at START_STREAM. A
+// (registers 0x00..0x06) plus bridge diagnostics. Counters wrap; read_*_us,
+// slots_skipped and loop_max_us reset at START_STREAM, i2c_errors at every
+// successful reset handshake (not free-running). A
 // rising sensor_resets means the bridge pulsed nRESET: the sensor is back in
 // CONFIG and the host must re-apply its configuration.
 struct Bno055Info {
@@ -286,16 +294,17 @@ struct AxisRemap {
 };
 
 // Datasheet §3.4 mounting placements P0..P7 as (AXIS_MAP_CONFIG,
-// AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default.
+// AXIS_MAP_SIGN); P1 (0x24/0x00) is the power-on default. Typed literals: as plain ints
+// std::pair would narrow them inside its constructor (MSVC C4244).
 inline constexpr std::array<std::pair<std::uint8_t, std::uint8_t>, 8> PLACEMENTS = {{
-    {0x21, 0x04},  // P0
-    {0x24, 0x00},  // P1 (default)
-    {0x24, 0x06},  // P2
-    {0x21, 0x02},  // P3
-    {0x24, 0x03},  // P4
-    {0x21, 0x01},  // P5
-    {0x21, 0x07},  // P6
-    {0x24, 0x05},  // P7
+    {std::uint8_t{0x21}, std::uint8_t{0x04}},  // P0
+    {std::uint8_t{0x24}, std::uint8_t{0x00}},  // P1 (default)
+    {std::uint8_t{0x24}, std::uint8_t{0x06}},  // P2
+    {std::uint8_t{0x21}, std::uint8_t{0x02}},  // P3
+    {std::uint8_t{0x24}, std::uint8_t{0x03}},  // P4
+    {std::uint8_t{0x21}, std::uint8_t{0x01}},  // P5
+    {std::uint8_t{0x21}, std::uint8_t{0x07}},  // P6
+    {std::uint8_t{0x24}, std::uint8_t{0x05}},  // P7
 }};
 
 // "P0".."P7" (case-insensitive); nullopt for any other name.

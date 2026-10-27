@@ -360,7 +360,7 @@ static const l1_budget *l1_find(bool is_short, int ms)
 
 static int l1_set_range_timing(vlx_driver *d, int budget_ms, int inter_ms)
 {
-    bool is_short;
+    bool is_short = false;
     const l1_budget *b;
     uint16_t pll;
     VLX_TRY(l1_mode_code(d, &is_short));
@@ -422,10 +422,13 @@ static size_t l1_budget_choices(vlx_driver *d, int *out, size_t cap)
     return n;
 }
 
-static int l1_set_mode(vlx_driver *d, const char *name)
+/* A budget the new mode does not tabulate moves to the nearest one it does —
+ * contract 12 §5, the one exception to "refuse, don't round" — and `*out_ms`
+ * gets the budget in effect, so the caller sees the move. */
+static int l1_set_mode(vlx_driver *d, const char *name, int *out_ms)
 {
     int budget_ms, inter_ms;
-    bool is_short;
+    bool is_short = false;
     const l1_budget *t;
     size_t n, i;
     if (strcmp(name, "short") && strcmp(name, "long"))
@@ -460,12 +463,14 @@ static int l1_set_mode(vlx_driver *d, const char *name)
             budget_ms = best;
         }
     }
-    return l1_set_range_timing(d, budget_ms, inter_ms);
+    VLX_TRY(l1_set_range_timing(d, budget_ms, inter_ms));
+    *out_ms = budget_ms;
+    return DEPZ_OK;
 }
 
 static int l1_get_mode(vlx_driver *d, const char **name)
 {
-    bool is_short;
+    bool is_short = false;
     VLX_TRY(l1_mode_code(d, &is_short));
     *name = is_short ? L1_MODES[1] : L1_MODES[0];
     return DEPZ_OK;

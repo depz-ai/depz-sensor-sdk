@@ -1,3 +1,5 @@
+using Depz.Sensor.Devices;
+
 namespace Depz.Sensor.Tmf8829;
 
 /// <summary>
@@ -37,7 +39,7 @@ public static class Tmf8829Firmware
 
     private static Stream Open(string name) =>
         typeof(Tmf8829Firmware).Assembly.GetManifestResourceStream(name)
-        ?? throw new InvalidOperationException($"embedded resource {name} missing");
+        ?? throw new InvalidStateException($"embedded resource {name} missing");
 
     private static byte[] ReadResource(string name)
     {

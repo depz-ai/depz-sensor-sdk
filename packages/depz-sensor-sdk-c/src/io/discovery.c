@@ -15,14 +15,19 @@ int depz_list_serial_ports(depz_port_info **out, size_t *count)
 void depz_free_port_list(depz_port_info *list) { free(list); }
 void depz_free_device_list(depz_device_info *list) { free(list); }
 
-/* USB serial ascending, unknown serials last, then port path. */
+/* USB serial ascending, unknown serials last, then port path (contract 02 §4,
+ * the codec layer's depz_port_order_cmp). */
 static int by_serial(const void *a, const void *b)
 {
     const depz_port_info *x = (const depz_port_info *)a, *y = (const depz_port_info *)b;
-    int ex = !x->usb_serial[0], ey = !y->usb_serial[0], c;
-    if (ex != ey) return ex - ey;
-    c = strcmp(x->usb_serial, y->usb_serial);
-    return c ? c : strcmp(x->port, y->port);
+    const depz_port_key kx = { x->port, strlen(x->port), x->usb_serial, strlen(x->usb_serial) };
+    const depz_port_key ky = { y->port, strlen(y->port), y->usb_serial, strlen(y->usb_serial) };
+    return depz_port_order_cmp(&kx, &ky);
+}
+
+void depz_sort_ports_by_serial(depz_port_info *ports, size_t count)
+{
+    if (ports && count > 1) qsort(ports, count, sizeof *ports, by_serial);
 }
 
 /* The ports with a known DEPZ USB id, sorted. */
@@ -34,7 +39,7 @@ static int depz_candidates(depz_port_info **out, size_t *count)
     if (rc) return rc;
     for (i = 0; i < total; i++)
         if (depz_is_known_depz_usb(all[i].vid, all[i].pid)) all[n++] = all[i];
-    qsort(all, n, sizeof *all, by_serial);
+    if (n > 1) qsort(all, n, sizeof *all, by_serial);
     *out = all;
     *count = n;
     return DEPZ_OK;
@@ -99,7 +104,7 @@ int depz_list_depz_devices(bool match_usb, int timeout_ms, depz_device_info **ou
             if (depz_is_known_depz_usb(ports[i].vid, ports[i].pid)) ports[k++] = ports[i];
         total = k;
     }
-    qsort(ports, total, sizeof *ports, by_serial);
+    if (total > 1) qsort(ports, total, sizeof *ports, by_serial);
     found = (depz_device_info *)calloc(total ? total : 1, sizeof *found);
     if (!found) { free(ports); return depz_fail(DEPZ_E_NOMEM, "list_depz_devices: out of memory"); }
     for (i = 0; i < total; i++) {
@@ -237,18 +242,23 @@ int depz_open_on_link(depz_link *link, int usb_vid, int usb_pid, int timeout_ms,
     return DEPZ_OK;
 }
 
-/* The USB VID / PID of `port`, -1 when the OS does not know them. */
+/* The USB VID / PID of the enumerated port `port` names under any alias
+ * (contract 02 §4.3, ERRATA A5): the same string, else the same resolved
+ * path or device node (depz_same_port). -1 when the OS does not list it. */
 static void port_ids(const char *port, int *vid, int *pid)
 {
     depz_port_info *all;
-    size_t n, i;
+    size_t n, i, hit = (size_t)-1;
     *vid = *pid = -1;
     if (depz_enumerate_ports(&all, &n) != DEPZ_OK) return;
-    for (i = 0; i < n; i++)
-        if (strcmp(all[i].port, port) == 0) {
-            *vid = all[i].vid;
-            *pid = all[i].pid;
-        }
+    for (i = 0; i < n && hit == (size_t)-1; i++)
+        if (strcmp(all[i].port, port) == 0) hit = i;
+    for (i = 0; i < n && hit == (size_t)-1; i++)
+        if (depz_same_port(port, all[i].port)) hit = i;
+    if (hit != (size_t)-1) {
+        *vid = all[hit].vid;
+        *pid = all[hit].pid;
+    }
     free(all);
 }
 

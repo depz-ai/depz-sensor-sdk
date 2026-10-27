@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
@@ -28,7 +29,11 @@ import ai.depz.sensor.usb.Discovery;
 import ai.depz.sensor.usb.UsbIds;
 import ai.depz.sensor.sensors.vl53l4.Vl53l4Uld;
 import ai.depz.sensor.sensors.vl53l7.Vl53l7Uld;
+import ai.depz.sensor.sensors.vl53lx.Vl53l0xUldDriver;
+import ai.depz.sensor.sensors.vl53lx.Vl53l1UldDriver;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxDecode;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxException;
+import ai.depz.sensor.sensors.vl53lx.Vl53lxPlatform;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxProducts;
 import ai.depz.sensor.sensors.vl53l8.FrameReassembler;
 import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld;
@@ -79,9 +84,12 @@ public final class RunVectors {
         vl53l8AdvancedVectors();
         vl53l8CnhVectors();
         vl53l8ReplayVector();
+        vl53l8WireVectors();
         vl53l7Vectors();
         vl53l7ReplayVectors();
         vl53lxVectors();
+        vl53lxL0xUldVectors();
+        vl53lxL1UldVectors();
         bno086ShtpVectors();
         bno086ReportsVectors();
         bno055Vectors();
@@ -209,6 +217,9 @@ public final class RunVectors {
         try (java.util.stream.Stream<Path> s = Files.list(vectorsDir)) {
             s.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".json")).sorted().forEach(files::add);
         }
+        // the reader vectors (contracts 08, 09) are input_rules-only files: they must be among the loaded
+        check("depzrec.json loaded", files.contains("depzrec.json"));
+        check("depzdata.json loaded", files.contains("depzdata.json"));
         int found = 0;
         for (String file : files) {
             Object root = Json.parse(Files.readString(vectorsDir.resolve(file)));
@@ -243,6 +254,19 @@ public final class RunVectors {
             }
         }
         check("input_rules groups found (" + found + ")", found >= 10);
+    }
+
+    /**
+     * A {@link Shapes} value against a vector's {@code expect}: both through the
+     * adapter's canonical JSON and the same parser, so a {@code BigInteger} u64 or
+     * an {@code Integer} field compares by value, not by Java type.
+     */
+    private static boolean shapeEq(Object got, Object expect) {
+        StringBuilder sb = new StringBuilder();
+        DifftestAdapter.canon(got, sb);
+        StringBuilder want = new StringBuilder();
+        DifftestAdapter.canon(expect, want);
+        return Objects.equals(Json.parse(sb.toString()), Json.parse(want.toString()));
     }
 
     /** True when {@code r} throws IllegalArgumentException (or a subclass / an SDK error). */
@@ -515,7 +539,7 @@ public final class RunVectors {
                     got = Common.packSyncTime(lng(c.get("pc_timestamp_us")));
                     break;
                 case "set_payload_crc_type":
-                    got = new byte[] {(byte) intOf(c.get("crc_type"))};
+                    got = Common.packSetPayloadCrcType(intOf(c.get("crc_type")));
                     break;
                 case "sync_pin_config":
                     got = new Common.SyncPinConfig(
@@ -761,6 +785,26 @@ public final class RunVectors {
             check("vl53l4.result_block:" + name, ok);
             seen(c, mk);
         }
+        // contract 10 §5 (ERRATA A8): the block is 17 bytes — 15 and 16 are short, a tail is ignored
+        for (int n : new int[] {0, 14, 15, 16}) {
+            boolean refused = false;
+            try {
+                Vl53l4Uld.parseResultBlock(new byte[n]);
+            } catch (Vl53l4Uld.Vl53l4Error e) {
+                refused = refused || e.getMessage().contains("too short");
+            }
+            check("vl53l4.result_block:" + n + "_bytes_too_short", refused);
+        }
+        check("vl53l4.result_block:tail_ignored",
+            Vl53l4Uld.parseResultBlock(new byte[17]).equals(Vl53l4Uld.parseResultBlock(new byte[19])));
+        // contract 10 §1 (ERRATA A13): READ_REG len 1..253 and addr+len <= 0x10000, like WRITE_REG
+        check("vl53l4.encode:read_reg_refusals",
+            throwsIae(() -> Vl53l4.packReadReg(0x89, 0)) && throwsIae(() -> Vl53l4.packReadReg(0, 254))
+                && throwsIae(() -> Vl53l4.packReadReg(0xFFFF, 2))
+                && throwsIae(() -> Vl53l4.packWriteReg(0xFFFF, new byte[] {1, 2})));
+        check("vl53l4.encode:read_reg_limits_accepted",
+            hex(Vl53l4.packReadReg(0xFF03, 253)).equals("03fffd00") && hex(Vl53l4.packReadReg(0xFFFF, 1)).equals("ffff0100")
+                && hex(Vl53l4.packWriteReg(0xFFFF, new byte[] {1})).equals("ffff01"));
     }
 
     private static void vl53l4TimingVectors() throws Exception {
@@ -883,8 +927,10 @@ public final class RunVectors {
             Map<String, Object> c = obj(xo);
             int mk = mark();
             String name = (String) c.get("name");
-            long raw = Vl53l8Uld.xtalkMarginToRaw(((Number) c.get("kcps")).doubleValue());
+            int kcps = (int) lng(c.get("kcps"));
+            long raw = Vl53l8Uld.xtalkMarginToRaw(kcps);
             check("vl53l8.xtalk:" + name, raw == lng(c.get("raw")));
+            check("vl53l8.xtalk.from_raw:" + name, Vl53l8Uld.xtalkMarginFromRaw(raw) == kcps);
             seen(c, mk);
         }
     }
@@ -962,7 +1008,7 @@ public final class RunVectors {
         List<Vl53l8Uld.Results> decoded = new ArrayList<>();
         List<Long> timestamps = new ArrayList<>();
 
-        for (String line : rec.split("\n")) {
+        for (String line : rec.split("\n", -1)) {
             if (line.isBlank()) {
                 continue;
             }
@@ -1008,6 +1054,45 @@ public final class RunVectors {
             check("vl53l8.replay.frame[" + i + "]", ok);
         }
         seen("recordings/vl53l8_8x8_15hz_3s.depzrec", mk);
+    }
+
+    // ── vl53l8.json (VL53L8 SPI bridge, the streaming side, contract 04 §2–§4) ──
+
+    private static void vl53l8WireVectors() throws Exception {
+        System.out.println("[vl53l8.json]");
+        Map<String, Object> root = load("vl53l8.json");
+        for (Object eo : arr(root.get("encode"))) {
+            Map<String, Object> c = obj(eo);
+            int mk = mark();
+            String name = (String) c.get("name");
+            byte[] got = ai.depz.sensor.protocol.Vl53l8.packStartStream(intOf(c.get("frame_size")));
+            check("vl53l8.encode:" + name, "start_stream".equals(c.get("kind")) && hex(got).equals(c.get("payload")));
+            seen(c, mk);
+        }
+        for (Object dobj : arr(root.get("decode"))) {
+            Map<String, Object> c = obj(dobj);
+            int mk = mark();
+            String name = (String) c.get("name");
+            int report = intOf(c.get("report"));
+            Map<String, Object> got = Shapes.vl53l8Decode(report, hex((String) c.get("payload")));
+            check("vl53l8.decode:" + name, report == ai.depz.sensor.protocol.Vl53l8.Vl53l8Rpt.VL53_FRAME.value
+                && shapeEq(got, c.get("expect")));
+            seen(c, mk);
+        }
+        check("vl53l8.decode:frame_chunk_rejects_short_payload",
+            rejects(() -> FrameReassembler.unpackFrameChunk(new byte[11]))
+                && FrameReassembler.unpackFrameChunk(new byte[12]).data().length == 0);
+        for (Object ro : arr(root.get("reassembly"))) {
+            Map<String, Object> c = obj(ro);
+            int mk = mark();
+            String name = (String) c.get("name");
+            List<byte[]> chunks = new ArrayList<>();
+            for (Object ch : arr(c.get("chunks"))) {
+                chunks.add(hex((String) ch));
+            }
+            check("vl53l8.reassembly:" + name, shapeEq(Shapes.vl53l8Reassembly(chunks), c.get("expect")));
+            seen(c, mk);
+        }
     }
 
     // ── vl53l7.json (VL53L5CX/L7CX/L7CH I2C bridge, contract 11) ─────────────
@@ -1323,7 +1408,7 @@ public final class RunVectors {
 
         String rec = Files.readString(vectorsDir.resolve("recordings/" + stem + ".depzrec"));
         PacketParser parser = new PacketParser();
-        FrameReassembler reasm = new FrameReassembler();
+        FrameReassembler reasm = new FrameReassembler(Vl53l7.STREAM_CHUNK_MAX);
         List<Vl53l8Uld.Results> decoded = new ArrayList<>();
         List<Vl53l8Uld.Results> inferred = new ArrayList<>();
         List<Long> timestamps = new ArrayList<>();
@@ -1331,7 +1416,7 @@ public final class RunVectors {
         String deviceName = null;
         int parseErrors = 0;
 
-        for (String line : rec.split("\n")) {
+        for (String line : rec.split("\n", -1)) {
             if (line.isBlank()) {
                 continue;
             }
@@ -1383,7 +1468,7 @@ public final class RunVectors {
         // (APP_VL53L7_*) cannot tell L5CX / L7CX / L7CH apart.
         check(p + ".model", deviceName != null
             && Vl53l7Uld.resolveModel(null, deviceName).label
-                .equals(((String) expected.get("class")).toLowerCase()));
+                .equals(((String) expected.get("class")).toLowerCase(Locale.ROOT)));
         check(p + ".parse_errors", parseErrors == 0);
         // The capture may stream frames past the sidecar; match the first N.
         check(p + ".count", decoded.size() >= wantFrames.size());
@@ -1727,7 +1812,7 @@ public final class RunVectors {
         PacketParser txParser = new PacketParser();
         PacketParser rxParser = new PacketParser();
         List<RecPacket> out = new ArrayList<>();
-        for (String line : Files.readString(vectorsDir.resolve("recordings/" + file)).split("\n")) {
+        for (String line : Files.readString(vectorsDir.resolve("recordings/" + file)).split("\n", -1)) {
             if (line.isBlank()) {
                 continue;
             }
@@ -2112,6 +2197,173 @@ public final class RunVectors {
     // decodes to the sidecar's distance and status. Histogram and L0X captures
     // need driver state (histogram algorithm, PAL status) the Java SDK lacks.
 
+    /** The scripted platform of the vl53lx.json l0x_uld cases: every register op the driver
+     *  issues must be the next one of the trace, a read answered with its recorded bytes. */
+    private static final class TracePlatform extends Vl53lxPlatform {
+        final List<Object> ops;
+        int next;
+
+        TracePlatform(List<Object> ops) {
+            this.ops = ops;
+        }
+
+        private byte[] take(String op, int addr) {
+            if (next >= ops.size()) {
+                throw new AssertionError("op #" + next + " beyond the trace: " + op + " 0x" + Integer.toHexString(addr));
+            }
+            Map<String, Object> want = obj(ops.get(next++));
+            if (!op.equals(want.get("op")) || intOf(want.get("addr")) != addr) {
+                throw new AssertionError("op #" + (next - 1) + ": expected " + want.get("op") + " 0x"
+                    + Integer.toHexString(intOf(want.get("addr"))) + ", got " + op + " 0x" + Integer.toHexString(addr));
+            }
+            return hex((String) want.get("data"));
+        }
+
+        @Override
+        public byte[] readMulti(int addr, int size) {
+            byte[] data = take("r", addr);
+            if (data.length != size) {
+                throw new AssertionError("read 0x" + Integer.toHexString(addr) + ": " + size + " B asked, " + data.length + " recorded");
+            }
+            return data;
+        }
+
+        @Override
+        public void writeMulti(int addr, byte[] data) {
+            if (!java.util.Arrays.equals(take("w", addr), data)) {
+                throw new AssertionError("write 0x" + Integer.toHexString(addr) + ": " + hex(data));
+            }
+        }
+
+        @Override
+        public void setI2cSpeed(int khz) {
+            throw new AssertionError("SET_I2C_SPEED is not in the trace");
+        }
+
+        @Override
+        public void setAddrWidth(int width) {
+            throw new AssertionError("SET_ADDR_WIDTH is not in the trace");
+        }
+
+        @Override
+        public void xshutReset() {
+            throw new AssertionError("XSHUT is not in the trace");
+        }
+
+        @Override
+        public void sleepMs(int ms) {
+        }
+    }
+
+    /** The VL53L0X ULD calls over the recorded register traces (the three ST divergences of
+     *  2fa4be5), on a fresh driver: the ops must come out in the recorded order, the trace must
+     *  be used up, the host state / error match. */
+    private static void vl53lxL0xUldVectors() throws Exception {
+        System.out.println("[vl53lx.json l0x_uld]");
+        Map<String, Object> root = load("vl53lx.json");
+        int n = 0;
+        for (Object co : arr(root.get("l0x_uld"))) {
+            Map<String, Object> c = obj(co);
+            int mk = mark();
+            String name = (String) c.get("name");
+            String kind = (String) c.get("kind");
+            String p = "vl53lx.l0x_uld:" + name;
+            List<Object> ops = arr(c.get("trace"));
+            TracePlatform trace = new TracePlatform(ops);
+            Vl53l0xUldDriver drv = new Vl53l0xUldDriver(trace, "VL53L0X");
+            String error = (String) c.get("error");
+            RuntimeException failed = null;
+            try {
+                switch (kind) {
+                    case "nvm_offset":
+                        drv.getInfoFromDevice(intOf(c.get("option")));
+                        break;
+                    case "timing_budget":
+                        drv.setRangeTiming(intOf(c.get("timing_budget_ms")), intOf(c.get("inter_measurement_ms")));
+                        break;
+                    case "tuning": {
+                        byte[] bytes = hex((String) c.get("buffer"));
+                        int[] buffer = new int[bytes.length];
+                        for (int i = 0; i < bytes.length; i++) {
+                            buffer[i] = bytes[i] & 0xFF;
+                        }
+                        drv.loadTuningSettings(buffer);
+                        break;
+                    }
+                    default:
+                        throw new RuntimeException("unknown vl53lx l0x_uld kind " + kind);
+                }
+            } catch (Vl53lxException e) {
+                failed = e;
+            } catch (AssertionError e) {
+                check(p + ".trace: " + e.getMessage(), false);
+                continue;
+            }
+            if (error != null) {
+                check(p + ".error", failed != null && failed.getMessage().contains(error));
+            } else {
+                check(p + ".ok" + (failed == null ? "" : ": " + failed.getMessage()), failed == null);
+                Map<String, Object> expect = obj(c.get("expect"));
+                if (kind.equals("nvm_offset")) {
+                    check(p + ".offset", failed == null
+                        && drv.part2PartOffsetAdjustmentNvmUm() == intOf(expect.get("part2part_offset_adjustment_nvm_um")));
+                } else if (kind.equals("tuning")) {
+                    check(p + ".params", failed == null
+                        && drv.sigmaEstRefArray() == intOf(expect.get("sigma_est_ref_array"))
+                        && drv.sigmaEstEffPulseWidth() == intOf(expect.get("sigma_est_eff_pulse_width"))
+                        && drv.sigmaEstEffAmbWidth() == intOf(expect.get("sigma_est_eff_amb_width"))
+                        && drv.targetRefRate() == intOf(expect.get("target_ref_rate")));
+                }
+            }
+            check(p + ".trace_used_up: " + trace.next + " of " + ops.size() + " ops", trace.next == ops.size());
+            seen(c, mk);
+            n++;
+        }
+        check("vl53lx.l0x_uld: at least 8 cases", n >= 8);
+    }
+
+    /** VL53L1X setMode over the recorded register traces, on a fresh driver (ERRATA A9): the ops
+     *  come out in the recorded order and use the trace up, and the call returns the budget in
+     *  effect — one the new mode does not tabulate moved to the nearest one — or fails as the
+     *  case says. */
+    private static void vl53lxL1UldVectors() throws Exception {
+        System.out.println("[vl53lx.json l1_uld]");
+        Map<String, Object> root = load("vl53lx.json");
+        int n = 0;
+        for (Object co : arr(root.get("l1_uld"))) {
+            Map<String, Object> c = obj(co);
+            int mk = mark();
+            String name = (String) c.get("name");
+            String p = "vl53lx.l1_uld:" + name;
+            check(p + ".kind", "set_mode".equals(c.get("kind")));
+            List<Object> ops = arr(c.get("trace"));
+            TracePlatform trace = new TracePlatform(ops);
+            Vl53l1UldDriver drv = new Vl53l1UldDriver(trace, "VL53L1CX");
+            String error = (String) c.get("error");
+            RuntimeException failed = null;
+            Integer budget = null;
+            try {
+                budget = drv.setMode((String) c.get("mode"));
+            } catch (IllegalArgumentException | Vl53lxException e) {
+                failed = e;
+            } catch (AssertionError e) {
+                check(p + ".trace: " + e.getMessage(), false);
+                continue;
+            }
+            if (error != null) {
+                check(p + ".error", failed != null && failed.getMessage().contains(error));
+            } else {
+                check(p + ".ok" + (failed == null ? "" : ": " + failed.getMessage()), failed == null);
+                int want = intOf(obj(c.get("expect")).get("timing_budget_ms"));
+                check(p + ".budget: " + budget + ", want " + want, budget != null && budget == want);
+            }
+            check(p + ".trace_used_up: " + trace.next + " of " + ops.size() + " ops", trace.next == ops.size());
+            seen(c, mk);
+            n++;
+        }
+        check("vl53lx.l1_uld: at least 3 cases", n >= 3);
+    }
+
     private static void vl53lxDieReplayVectors() throws Exception {
         vl53lxDieReplayVector("vl53l1cb_uld_short_50ms", "l1");
         vl53lxDieReplayVector("vl53l1cx_uld_long_33ms", "l1");
@@ -2283,7 +2535,7 @@ public final class RunVectors {
         int streams = 0;
         int checked = 0;
         int lineNo = 0;
-        for (String line : Files.readString(vectorsDir.resolve("recordings/tmf8829_frame_time.jsonl")).split("\n")) {
+        for (String line : Files.readString(vectorsDir.resolve("recordings/tmf8829_frame_time.jsonl")).split("\n", -1)) {
             lineNo++;
             if (line.isBlank()) {
                 continue;
@@ -2530,7 +2782,16 @@ public final class RunVectors {
                 && info.size() == intOf(h.get("size"));
             check("tmf8829.frame.header:" + name, hdr);
             check("tmf8829.frame.problems:" + name, info.problems().equals(arr(c.get("problems"))));
-            if (info.kind() == Frames.FID_RESULTS) {
+            if (c.containsKey("error")) {
+                // a results frame whose pixel decode must fail
+                boolean refused = false;
+                try {
+                    Frames.parseResults(raw, info);
+                } catch (Frames.FrameError e) {
+                    refused = true;
+                }
+                check("tmf8829.frame.error:" + name, refused);
+            } else if (info.kind() == Frames.FID_RESULTS) {
                 check("tmf8829.frame.results:" + name,
                     pixelResultsEq(Frames.parseResults(raw, info), obj(c.get("results"))));
             } else {
@@ -2765,6 +3026,19 @@ public final class RunVectors {
             check("bno055.encode:" + name, hex(got).equals(c.get("payload")));
             seen(c, mk);
         }
+        // contract 13 §1 (ERRATA A13): READ_REG len 1..128 and addr+len <= 0x100, like WRITE_REG
+        check("bno055.encode:read_reg_refusals",
+            throwsIae(() -> Bno055.packReadReg(0x00, 0)) && throwsIae(() -> Bno055.packReadReg(0x00, 129))
+                && throwsIae(() -> Bno055.packReadReg(0xFF, 2)) && throwsIae(() -> Bno055.packWriteReg(0xFF, new byte[] {1, 2})));
+        check("bno055.encode:read_reg_limits_accepted",
+            hex(Bno055.packReadReg(0x80, 128)).equals("8080") && hex(Bno055.packReadReg(0xFF, 1)).equals("ff01"));
+        // contract 13 §2: the TIMER period is 1..60000 ms; for INT it is the watchdog and 0 disables it
+        check("bno055.encode:timer_period_refusals",
+            Bno055.TIMER_PERIOD_MIN_MS == 1 && Bno055.TIMER_PERIOD_MAX_MS == 60000
+                && throwsIae(() -> Bno055.packStartStream(Bno055.TRIGGER_TIMER, 0x08, 46, 0))
+                && throwsIae(() -> Bno055.packStartStream(Bno055.TRIGGER_TIMER, 0x08, 46, 60001))
+                && hex(Bno055.packStartStream(Bno055.TRIGGER_TIMER, 0x08, 46, 60000)).equals("00082e60ea")
+                && hex(Bno055.packStartStream(Bno055.TRIGGER_INT, 0x35, 1, 0)).equals("0135010000"));
         check("bno055.cmd_ids",
             Bno055.Bno055Cmd.READ_REG.value == 0x32 && Bno055.Bno055Cmd.WRITE_REG.value == 0x33
                 && Bno055.Bno055Cmd.RESET.value == 0x34 && Bno055.Bno055Cmd.START_STREAM.value == 0x35

@@ -22,9 +22,9 @@ everything below.
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::open_on_link;
+use depz_sensor_sdk::devices::open_first_device;
 
-let tof = open_on_link(link, None, None, None)?.into_vl53l8cx()?;
+let tof = open_first_device(None)?.into_vl53l8cx()?;
 tof.init()?;                        // downloads the ~84 KB sensor firmware (about a second)
 tof.set_resolution(64)?;            // 8×8
 tof.set_ranging_frequency_hz(15)?;  // 2 Hz at least; 15 Hz at most at 8×8
@@ -164,8 +164,8 @@ use depz_sensor_sdk::vl53l8::advanced::{
 let cfg = try_default_motion_config(64)?;
 let bytes = cfg.pack();
 
-// Crosstalk margin (kcps/SPAD, 0..=10000) → raw DCI value:
-let raw = try_xtalk_margin_to_raw(50.0)?;  // round(kcps * 2048)
+// Crosstalk margin (a whole number of kcps/SPAD, 0..=10000, as ST) → raw DCI value:
+let raw = try_xtalk_margin_to_raw(50)?;  // kcps * 2048; xtalk_margin_from_raw(raw) == 50
 
 // Up to 64 detection thresholds → their two DCI blocks (low/high scaled per
 // measurement; a scaled value that overflows i32 is an error, never wrapped):
@@ -177,9 +177,7 @@ let blocks = try_pack_detection_thresholds(&[DetectionThreshold {
 ```
 
 The `try_` forms carry the driver's parameter checks (contract 07 §3: an
-argument out of range is refused before anything is written). The older
-`default_motion_config` / `xtalk_margin_to_raw` / `pack_detection_thresholds`
-cannot report an error and are deprecated.
+argument out of range is refused before anything is written).
 
 Measurement selectors ([`DIST_MM`](api.md), [`SIGNAL_PER_SPAD_KCPS`](api.md), …)
 and power-mode constants ([`POWER_MODE_SLEEP`](api.md) …) live in the same

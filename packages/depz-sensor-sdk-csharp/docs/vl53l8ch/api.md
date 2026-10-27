@@ -36,7 +36,7 @@ public Vl53l8chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l8chDevice.Vl53l8chDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l8chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l8chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l8chDevice.CnhSetup *(property)*
@@ -53,7 +53,7 @@ The CNH setup armed by `ConfigureCnh`, or null; recorders keep it next to the ra
 public void ConfigureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next `StartRanging`: every frame then carries `CnhRaw`, decoded with `DecodeHistogram` and `ToDecodeConfig`.
+Arm CNH for the next `StartRanging`: every frame then carries `CnhRaw`, decoded with `DecodeHistogram` and `ToDecodeConfig`. CNH and the motion indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no `Motion`).
 
 ### Vl53l8CnhConfig
 

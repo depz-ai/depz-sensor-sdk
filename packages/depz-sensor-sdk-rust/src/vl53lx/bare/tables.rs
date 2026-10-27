@@ -5,13 +5,26 @@
 
 use super::image::{RegBlockDef, RegField};
 
-const fn f(name: &'static str, off: usize, width: usize, signed: bool, mask: Option<i64>) -> RegField {
-    RegField { name, off, width, signed, mask }
+const fn f(
+    name: &'static str,
+    off: usize,
+    width: usize,
+    signed: bool,
+    mask: Option<i64>,
+) -> RegField {
+    RegField {
+        name,
+        off,
+        width,
+        signed,
+        mask,
+    }
 }
 
 /// The register blocks of the device image (one `VL53LX_*_t` struct of the C driver each), in
 /// address order: base, size, writable and the fields with offset, width, signedness and the mask
 /// the C codec applies (`None`: none).
+#[rustfmt::skip] // generated table: one field per line
 pub static BLOCKS: &[RegBlockDef] = &[
     RegBlockDef {
         name: "static_nvm_managed",
@@ -405,6 +418,7 @@ pub static BLOCKS: &[RegBlockDef] = &[
 ];
 
 /// `VL53LX_tuning_parm_storage_t` after initialisation, keyed by the C field name.
+#[rustfmt::skip] // generated table: one parameter per line
 pub static TUNING: &[(&str, i64)] = &[
     ("tp_tuning_parm_version", 30),
     ("tp_tuning_parm_key_table_version", 14),
@@ -509,6 +523,7 @@ pub static TUNING: &[(&str, i64)] = &[
 ];
 
 /// The raw tuning header, for the parameters the post-processing reads without a `tp_` field.
+#[rustfmt::skip] // generated table: one parameter per line
 pub static DEFAULTS: &[(&str, i64)] = &[
     ("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_DEFAULT", 0),
     ("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_MIN_SPAD_LIMIT_DEFAULT", 2048),

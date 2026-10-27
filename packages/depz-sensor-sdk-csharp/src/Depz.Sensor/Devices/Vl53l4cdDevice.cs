@@ -34,7 +34,7 @@ public sealed record Vl53l4Measurement(
 /// ST ULD 2.2.3 runs here (<see cref="Uld"/>). <see cref="Init"/> first, then
 /// configure and <see cref="StartRanging"/>: one result block per INT edge
 /// streams to <see cref="Measurements"/>. Configuration while ranging throws
-/// <see cref="InvalidOperationException"/> — the stream owns the register bank.
+/// <see cref="InvalidStateException"/> — the stream owns the register bank.
 /// </summary>
 public sealed class Vl53l4cdDevice : DepzDevice
 {
@@ -110,10 +110,10 @@ public sealed class Vl53l4cdDevice : DepzDevice
         Initialized = false;
     }
 
-    /// <summary>Hardware reset through XSHUT (~3 ms on the MCU); call <see cref="Init"/> again.</summary>
+    /// <summary>Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call <see cref="Init"/> again.</summary>
     public void ResetSensor() => Xshut(Vl53l4Xshut.Reset);
 
-    /// <summary>RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters.
+    /// <summary>RPT_VL53_INFO: sensor identity, pin levels and bridge counters (I2cErrors is cleared by a successful XSHUT reset).
     /// Safe while streaming.</summary>
     public Vl53l4Info BridgeInfo() =>
         Request((int)Vl53l4Cmd.GetInfo, null, ExpectReport((int)Vl53l4Rpt.Info, p => Vl53l4Info.Unpack(p)));
@@ -273,7 +273,7 @@ public sealed class Vl53l4cdDevice : DepzDevice
     private void RequireNotRanging()
     {
         if (_ranging)
-            throw new InvalidOperationException("StopRanging() first — the stream owns the register bank");
+            throw new InvalidStateException("StopRanging() first — the stream owns the register bank");
     }
 
     private protected override bool HandleReport(Packet packet)
@@ -292,7 +292,7 @@ public sealed class Vl53l4cdDevice : DepzDevice
             Interlocked.Increment(ref _streamParseErrors);
             return true;
         }
-        _measurements.Emit(m);
+        _measurements.Emit(m, Stats);
         return true;
     }
 

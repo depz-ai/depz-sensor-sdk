@@ -85,6 +85,10 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
 
     private static final int DEFAULT_MAX_LOOP = 2000;
     private static final int TARGET_REF_RATE_DEFAULT = 0x0A00;
+    private static final long MIN_TIMING_BUDGET_US = 20000; // cMinTimingBudgetMicroSeconds
+    // The host-side parameters a tuning buffer may carry in a {0xFF, select, msb, lsb}
+    // record, by select value (VL53L0X_load_tuning_settings()).
+    private static final int TUNING_PARAM_COUNT = 4;
     private static final long SPEED_OF_LIGHT_IN_AIR = 2997;
     private static final int REF_SPAD_BUFFER_SIZE = 6;
 
@@ -158,12 +162,15 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
     private int referenceSpadCount;
     private int referenceSpadType;
     private int[] refGoodSpadMap = new int[REF_SPAD_BUFFER_SIZE];
-    private int[] refSpadEnables = new int[REF_SPAD_BUFFER_SIZE];
     private int preRangeVcselPulsePeriod;
     private int finalRangeVcselPulsePeriod;
     private long preRangeTimeoutUs;
     private long finalRangeTimeoutUs;
-    private final int targetRefRate = TARGET_REF_RATE_DEFAULT;
+    private int targetRefRate = TARGET_REF_RATE_DEFAULT;
+    // Stored for the tuning loader; the 1.0.4 sigma estimate has these three as constants.
+    private int sigmaEstRefArray = 100;
+    private int sigmaEstEffPulseWidth = 900;
+    private int sigmaEstEffAmbWidth = 500;
     private final int[] limitChecksEnable = new int[CHECK_NUMBER_OF_CHECKS];
     private final long[] limitChecksValue = new long[CHECK_NUMBER_OF_CHECKS];
     private String mode = "default";
@@ -255,11 +262,37 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
         return part2PartOffsetAdjustmentNvmUm;
     }
 
+    /** The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets;
+     *  the SPAD management converges on it. */
+    public int targetRefRate() {
+        return targetRefRate;
+    }
+
+    /** The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set
+     *  (stored only: the 1.0.4 sigma estimate has them as constants). */
+    public int sigmaEstRefArray() {
+        return sigmaEstRefArray;
+    }
+
+    public int sigmaEstEffPulseWidth() {
+        return sigmaEstEffPulseWidth;
+    }
+
+    public int sigmaEstEffAmbWidth() {
+        return sigmaEstEffAmbWidth;
+    }
+
     public long oscFrequencyMHz() {
         return oscFrequencyMHz;
     }
 
     // ── helpers of the C driver ──────────────────────────────────────────────
+
+    /** C int16 truncation (an assignment to an int16_t). */
+    private static long i16(long v) {
+        long r = v & 0xFFFF;
+        return (r & 0x8000) != 0 ? r - 0x10000 : r;
+    }
 
     private static long u32(long v) {
         return v & 0xFFFFFFFFL;
@@ -674,8 +707,12 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
             signalRateMeasFixed400mm = signalRate400 << 9;
             long offsetUm = 0;
             if (dist400 != 0) {
+                // uint32 difference, uint32 product, then an int16_t: the C driver's types,
+                // kept because they are what makes the sign come out right. A target measured
+                // nearer than 400 mm wraps the uint32 difference, and only the int16
+                // truncation turns that back into the positive offset it stands for.
                 long offset1104Mm = u32(dist400 - (400 << 4));
-                offsetUm = -((offset1104Mm * 1000) >> 4);
+                offsetUm = i16(-i16(u32(offset1104Mm * 1000) >> 4));
             }
             part2PartOffsetAdjustmentNvmUm = offsetUm;
         }
@@ -717,19 +754,34 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
         if (!Arrays.equals(bytes, p.readMulti(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, REF_SPAD_BUFFER_SIZE))) {
             throw new Vl53lxException("reference SPAD map did not read back");
         }
-        refSpadEnables = spadArray;
         referenceSpadCount = count;
         referenceSpadType = isApertureSpads;
     }
 
     // ── tuning settings ──────────────────────────────────────────────────────
 
-    private void loadTuningSettings(int[] buffer) {
+    /** VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying a
+     *  host-side parameter instead; a zero count ends the buffer. */
+    public void loadTuningSettings(int[] buffer) {
         int index = 0;
         while (buffer[index] != 0) {
             int writes = buffer[index++];
             if (writes == 0xFF) {
-                index += 3; // host-side sigma parameters, constants in the 1.0.4 sigma estimate
+                // A host-side parameter: {0xFF, select, msb, lsb}. The three sigma parameters
+                // are constants in the 1.0.4 sigma estimate and only get stored; the fourth is
+                // the rate the reference SPAD management converges on.
+                int select = buffer[index];
+                if (select >= TUNING_PARAM_COUNT) {
+                    throw new Vl53lxException("bad tuning parameter " + select + " at offset " + (index - 1));
+                }
+                int value = (buffer[index + 1] << 8) | buffer[index + 2];
+                switch (select) {
+                    case 0 -> sigmaEstRefArray = value;
+                    case 1 -> sigmaEstEffPulseWidth = value;
+                    case 2 -> sigmaEstEffAmbWidth = value;
+                    default -> targetRefRate = value;
+                }
+                index += 3;
             } else if (writes <= 4) {
                 int address = buffer[index++];
                 p.writeMulti(address, toBytes(Arrays.copyOfRange(buffer, index, index + writes)));
@@ -861,6 +913,9 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
     private static final int DSS_OVERHEAD_US = 690, PRE_RANGE_OVERHEAD_US = 660, FINAL_RANGE_OVERHEAD_US = 550;
 
     private void setMeasurementTimingBudget(long budgetUs) {
+        if (budgetUs < MIN_TIMING_BUDGET_US) {
+            throw new Vl53lxException("timing budget " + budgetUs + " us is below the " + MIN_TIMING_BUDGET_US + " us minimum");
+        }
         boolean[] steps = getSequenceStepEnables();
         long[] finalBudgetUs = {budgetUs - (START_OVERHEAD_US + END_OVERHEAD_US)};
         if (steps[SEQ_TCC] || steps[SEQ_MSRC] || steps[SEQ_DSS]) {
@@ -1024,7 +1079,6 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
     private static final class RangingData {
         int rangeStatus;
         int distanceMm;
-        int rangeFractionalPart;
         long signalRateMcps;
         long ambientRateMcps;
         long effectiveSpadRtnCount;
@@ -1045,11 +1099,10 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
         RangingData data = new RangingData();
         data.signalRateMcps = (long) (((raw[6] & 0xFF) << 8) + (raw[7] & 0xFF)) << 9;   // 9.7 → 16.16
         data.ambientRateMcps = (long) (((raw[8] & 0xFF) << 8) + (raw[9] & 0xFF)) << 9;
-        data.effectiveSpadRtnCount = ((raw[2] & 0xFF) << 8) + (raw[3] & 0xFF);          // 8.8
+        data.effectiveSpadRtnCount = ((long) (raw[2] & 0xFF) << 8) + (raw[3] & 0xFF);          // 8.8
         data.deviceRangeStatus = raw[0] & 0xFF;
         if (rangeFractionalEnable != 0) {
             data.distanceMm = distance >> 2;
-            data.rangeFractionalPart = (distance & 0x03) << 6;
         } else {
             data.distanceMm = distance;
         }
@@ -1297,7 +1350,7 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
 
     /** Apply one of {@link #modes()}: the sigma and signal limits, the budget and both VCSEL periods. */
     @Override
-    public void setMode(String name) {
+    public Integer setMode(String name) {
         ModeSetting settings = null;
         for (ModeSetting m : MODE_SETTINGS) {
             if (m.name().equals(name)) {
@@ -1316,6 +1369,7 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
         setVcselPulsePeriod(VCSEL_PRE_RANGE, settings.pre());
         setVcselPulsePeriod(VCSEL_FINAL_RANGE, settings.fin());
         mode = name;
+        return null;
     }
 
     @Override
@@ -1579,7 +1633,7 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
             current = enableRefSpads(needApt, spadArray, startSelect, current, minimumSpadCount);
             peak = performRefSignalMeasurement();
             if (peak > targetRefRate) {
-                storeRefSpads(minimumSpadCount, 1, spadArray);
+                storeRefSpads(minimumSpadCount, 1);
                 return new RefSpads(minimumSpadCount, 1);
             }
         }
@@ -1615,12 +1669,11 @@ public final class Vl53l0xUldDriver extends Vl53lxDriver {
             lastDiff = diff;
             lastSpadArray = spadArray.clone();
         }
-        storeRefSpads(refSpadCount, needApt, spadArray);
+        storeRefSpads(refSpadCount, needApt);
         return new RefSpads(refSpadCount, needApt);
     }
 
-    private void storeRefSpads(int count, int isApertureSpads, int[] spadArray) {
-        refSpadEnables = spadArray.clone();
+    private void storeRefSpads(int count, int isApertureSpads) {
         referenceSpadCount = count;
         referenceSpadType = isApertureSpads;
     }

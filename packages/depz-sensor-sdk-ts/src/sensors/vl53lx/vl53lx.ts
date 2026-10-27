@@ -15,7 +15,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError, StatusError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, StatusError } from "../../errors.js";
 import { Status } from "../../protocol/common.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
@@ -364,7 +364,7 @@ export class Vl53lx extends DepzDevice {
 
   /** The ULD port in use — escape hatch for product-specific calls. */
   get driver(): SensorDriver {
-    if (this.driverInst === null) throw new DepzError("call init() first");
+    if (this.driverInst === null) throw new InvalidStateError("call init() first");
     return this.driverInst;
   }
 
@@ -392,7 +392,7 @@ export class Vl53lx extends DepzDevice {
     this.requireNotRanging();
     const name = opts.product || this.classProduct || (await this.detected());
     if (!name) {
-      throw new DepzError(
+      throw new InvalidStateError(
         `board '${await this.boardName()}' carries no product number — pass product explicitly`,
       );
     }
@@ -780,11 +780,11 @@ export class Vl53lx extends DepzDevice {
   }
 
   protected requireNotRanging(): void {
-    if (this.rangingFlag) throw new DepzError("stopRanging() first — the stream owns the bus");
+    if (this.rangingFlag) throw new InvalidStateError("stopRanging() first — the stream owns the bus");
   }
 
   private emit(out: Vl53lxMeasurement): void {
-    for (const cb of [...this.measureCbs]) cb(out);
+    for (const cb of [...this.measureCbs]) this.callGuarded(cb, out);
     for (const q of [...this.measureQueues]) q.push(out);
   }
 

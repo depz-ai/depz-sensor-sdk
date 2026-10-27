@@ -107,7 +107,6 @@ public final class Vl53l8Uld {
     // Example_12_cnh_data.c (DISABLE_PING_PONG | DISABLE_VARIANCE | ambient | xtalk
     // | zero-invalid | store-ref-residual). Do not "simplify" the offset math.
 
-    /** persistent-data header layout (plugin_cnh.c). */
     /** decodeCnh() bounds — the same limits as the other SDKs. */
     public static final int CNH_MAX_AGGREGATES = 64;
     public static final int CNH_MAX_FEATURE_LENGTH = 255;
@@ -116,7 +115,6 @@ public final class Vl53l8Uld {
     private static final int CNH_PER_HEADER_BUFFER_INFO_IDX = 1;
     private static final int CNH_PER_HEADER_FLAGS_IDX = 3;
     private static final int BUFFER_INFO_WORDS_MASK = 0xFFFF;
-    private static final int BUFFER_INFO_FLAGS_SHIFT = 24;
     private static final int MI_STATE_PING = 0;
 
     /** One decoded CNH aggregate: raw histogram ints + per-bin int8 scalers. */
@@ -169,7 +167,7 @@ public final class Vl53l8Uld {
             long aggXFeat = (long) nbOfAggregates * featureLength;
             int ppSize = (int) (u32le(raw, CNH_PER_HEADER_BUFFER_INFO_IDX * 4) & BUFFER_INFO_WORDS_MASK);
             int localPp = i32le(raw, 0) == MI_STATE_PING ? 0 : 1;
-            long base = CNH_PER_HEADER_WORDS + (localPp == 1 ? ppSize : 0);
+            long base = (long) CNH_PER_HEADER_WORDS + (localPp == 1 ? ppSize : 0);
             long end = (base + CNH_PER_BUFFER_HEADER_WORDS) * 4 + aggXFeat * 4
                     + ((3 + aggXFeat) / 4) * 4 + (long) nbOfAggregates * 5;
             if (end > raw.length) {
@@ -419,17 +417,25 @@ public final class Vl53l8Uld {
 
     // ── advanced-feature DCI codecs (pure) ───────────────────────────────────
 
+    /** Largest xtalk margin {@code setXtalkMargin} accepts, whole kcps/SPAD (as ST). */
+    public static final int XTALK_MARGIN_MAX_KCPS = 10000;
+
     /**
-     * Xtalk margin (kcps/spad) -> raw DCI value (round(kcps * 2048)). The margin
-     * is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN
-     * included, throws {@link Vl53l8Error} (INVALID_PARAM) — never wrapped
-     * (contract 07 §3).
+     * Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+     * (kcps * 2048). The margin is 0..{@link #XTALK_MARGIN_MAX_KCPS}; a negative
+     * or a bigger value throws {@link Vl53l8Error} (INVALID_PARAM) — never
+     * wrapped (contract 07 §3).
      */
-    public static long xtalkMarginToRaw(double marginKcps) {
-        if (!(marginKcps >= 0 && marginKcps <= 10000)) {
+    public static long xtalkMarginToRaw(int marginKcps) {
+        if (marginKcps < 0 || marginKcps > XTALK_MARGIN_MAX_KCPS) {
             throw new Vl53l8Error(STATUS_INVALID_PARAM, "set_xtalk_margin");
         }
-        return Math.round(marginKcps * 2048);
+        return marginKcps * 2048L;
+    }
+
+    /** Inverse: raw DCI value -> whole kcps/SPAD (raw / 2048, integer division as ST). */
+    public static int xtalkMarginFromRaw(long raw) {
+        return (int) (raw / 2048);
     }
 
     /** One detection-threshold entry (real units). */
@@ -568,7 +574,6 @@ public final class Vl53l8Uld {
         return cfg;
     }
 
-    /** ULD status error. */
     /** A VL53L8 / L5 / L7 ULD status (vl53l8cx_api.h codes) with where it happened. */
     public static final class Vl53l8Error extends RuntimeException {
         public static final int STATUS_TIMEOUT_ERROR = 1;

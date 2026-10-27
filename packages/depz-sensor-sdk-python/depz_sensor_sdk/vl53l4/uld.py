@@ -123,15 +123,27 @@ RANGE_STATUS_NAMES = {
 
 
 class Vl53l4cdError(RuntimeError):
-    pass
+    """What the sensor did, not what the caller asked: a boot or data-ready
+    timeout, a short result block, an oscillator word of 0, a failed xtalk
+    calibration. A refused argument is a ValueError (contract 07 §3)."""
 
 
 def _in_range(name: str, v: int, lo: int, hi: int) -> int:
-    """`v` when it is an integer in lo..hi, else Vl53l4cdError (contract 07 §3:
-    never wrap)."""
+    """`v` when it is an integer in lo..hi, else ValueError (contract 07 §3:
+    invalid_argument, never wrap)."""
     if not isinstance(v, int) or not lo <= v <= hi:
-        raise Vl53l4cdError(f"{name} {v} out of range {lo}..{hi}")
+        raise ValueError(f"{name} {v} out of range {lo}..{hi}")
     return v
+
+
+def check_range_timing(timing_budget_ms: int, inter_measurement_ms: int) -> None:
+    """SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+    which need no register: budget 10..200 ms, period 0 (continuous) or above
+    the budget (autonomous) and a u32. ValueError otherwise (contract 10 §5)."""
+    _in_range("timing_budget_ms", timing_budget_ms, 10, 200)
+    _in_range("inter_measurement_ms", inter_measurement_ms, 0, 0xFFFFFFFF)
+    if 0 < inter_measurement_ms <= timing_budget_ms:
+        raise ValueError("inter_measurement_ms must be 0 or > timing_budget_ms")
 
 
 class Vl53l4Platform(Protocol):
@@ -172,7 +184,8 @@ def parse_result_block(raw: bytes) -> ResultsData:
     """Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
     decodes the same registers read one by one. Register contents are
     big-endian words (the bridge passes them through untouched)."""
-    if len(raw) < 15:
+    # contract 10 §5: the block is 17 bytes; shorter is rejected, a tail is ignored
+    if len(raw) < RESULT_BLOCK_LEN:
         raise Vl53l4cdError(f"result block too short: {len(raw)} bytes")
 
     status = raw[0] & 0x1F
@@ -214,15 +227,12 @@ def range_timing_registers(
     `osc_frequency` is the word read from 0x0006; `clock_pll` is the word read
     from RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
     `inter_measurement_ms > 0`)."""
+    check_range_timing(timing_budget_ms, inter_measurement_ms)
     if osc_frequency == 0:
         raise Vl53l4cdError("osc_frequency reads 0")
-    if not 10 <= timing_budget_ms <= 200:
-        raise Vl53l4cdError("timing_budget_ms must be 10..200")
-    # Register words (u16) and the u32 period: out of range is refused, never wrapped.
+    # Register words (u16): out of range is refused, never wrapped.
     _in_range("osc_frequency", osc_frequency, 1, 0xFFFF)
     _in_range("clock_pll", clock_pll, 0, 0xFFFF)
-    _in_range("timing_budget_ms", timing_budget_ms, 10, 200)
-    _in_range("inter_measurement_ms", inter_measurement_ms, 0, 0xFFFFFFFF)
 
     timing_budget_us = timing_budget_ms * 1000
     macro_period_us = ((2304 * (0x40000000 // osc_frequency)) & 0xFFFFFFFF) >> 6
@@ -230,16 +240,14 @@ def range_timing_registers(
     if inter_measurement_ms == 0:  # continuous
         intermeasurement_raw = 0
         timing_budget_us -= 2500
-    elif inter_measurement_ms > timing_budget_ms:  # autonomous low power
+    else:  # autonomous low power (check_range_timing: above the budget)
         factor = 1.055 * inter_measurement_ms * (clock_pll & 0x3FF)
         intermeasurement_raw = int(factor)
         if intermeasurement_raw > 0xFFFFFFFF:
-            raise Vl53l4cdError(
+            raise ValueError(
                 f"inter_measurement_ms {inter_measurement_ms}: INTERMEASUREMENT_MS overflows u32"
             )
         timing_budget_us = (timing_budget_us - 4300) // 2
-    else:
-        raise Vl53l4cdError("inter_measurement_ms must be 0 or > timing_budget_ms")
 
     timing_budget_us = (timing_budget_us << 12) & 0xFFFFFFFF
     words = []
@@ -341,8 +349,6 @@ def decode_signal_threshold(raw_word: int) -> int:
 
 
 def sigma_threshold_raw(sigma_mm: int) -> int:
-    if sigma_mm > (0xFFFF >> 2):
-        raise Vl53l4cdError("sigma_mm must be <= 16383")
     _in_range("sigma_mm", sigma_mm, 0, 0xFFFF >> 2)
     return sigma_mm << 2
 
@@ -453,6 +459,8 @@ class VL53L4CD:
     # ── timing ───────────────────────────────────────────────────────────────
 
     def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
+        # refused before any register traffic, not only before the writes
+        check_range_timing(timing_budget_ms, inter_measurement_ms)
         clock_pll = (
             self.rd_word(RESULT__OSC_CALIBRATE_VAL)
             if inter_measurement_ms > 0
@@ -557,7 +565,7 @@ class VL53L4CD:
 
     def calibrate_offset(self, target_dist_mm: int, nb_samples: int = 20) -> int:
         if not 5 <= nb_samples <= 255 or not 10 <= target_dist_mm <= 1000:
-            raise Vl53l4cdError("nb_samples must be 5..255, target 10..1000 mm")
+            raise ValueError("nb_samples must be 5..255, target 10..1000 mm")
 
         self.wr_word(RANGE_OFFSET_MM, 0)
         self.wr_word(INNER_OFFSET_MM, 0)
@@ -574,7 +582,7 @@ class VL53L4CD:
 
     def calibrate_xtalk(self, target_dist_mm: int, nb_samples: int = 20) -> int:
         if not 5 <= nb_samples <= 255 or not 10 <= target_dist_mm <= 5000:
-            raise Vl53l4cdError("nb_samples must be 5..255, target 10..5000 mm")
+            raise ValueError("nb_samples must be 5..255, target 10..5000 mm")
 
         self.wr_word(XTALK_PLANE_OFFSET_KCPS, 0)  # disable compensation
 

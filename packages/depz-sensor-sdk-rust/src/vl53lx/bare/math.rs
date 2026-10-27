@@ -69,8 +69,11 @@ pub fn calc_mm_effective_spads(
             if good_spads[(spad >> 3) as usize] & (1 << (spad & 0x07)) == 0 {
                 continue;
             }
-            let attenuation =
-                if is_aperture_location(y, x) { aperture_attenuation } else { regs::RTN_SPAD_UNITY_TRANSMISSION };
+            let attenuation = if is_aperture_location(y, x) {
+                aperture_attenuation
+            } else {
+                regs::RTN_SPAD_UNITY_TRANSMISSION
+            };
             if mm.0 <= x && x <= mm.2 && mm.1 <= y && y <= mm.3 {
                 inner += attenuation;
             } else {
@@ -83,7 +86,7 @@ pub fn calc_mm_effective_spads(
 
 /// `VL53LX_hist_combine_mm1_mm2_offsets()` → `range_offset_mm`, in quarter millimetres: the MM1
 /// (inner) and MM2 (outer) offsets weighted by the share of each region the ROI covers.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // ST's parameter list, kept 1:1
 pub fn combine_mm1_mm2_offsets(
     mm1_offset_mm: i64,
     mm2_offset_mm: i64,
@@ -190,7 +193,12 @@ pub fn calc_encoded_timeout(timeout_us: i64, macro_period_us: i64) -> i64 {
 }
 
 /// `VL53LX_duration_maths()`: a window duration, µs.
-pub fn duration_maths(pll_period_us: i64, vcsel_parm_pclks: i64, window_vclks: i64, elapsed_mclks: i64) -> i64 {
+pub fn duration_maths(
+    pll_period_us: i64,
+    vcsel_parm_pclks: i64,
+    window_vclks: i64,
+    elapsed_mclks: i64,
+) -> i64 {
     let mut duration = window_vclks.wrapping_mul(pll_period_us) >> 12;
     duration = duration.wrapping_mul(elapsed_mclks.wrapping_mul(vcsel_parm_pclks) >> 4);
     (duration >> 12).min(0xFFFF_FFFF)
@@ -208,9 +216,14 @@ pub fn calc_timeout_register_values(
     if fast_osc_frequency == 0 {
         return None;
     }
-    let mut macro_us = calc_macro_period_us(fast_osc_frequency, img.timing_config().get("range_config__vcsel_period_a"));
-    img.general_config_mut()
-        .set("phasecal_config__timeout_macrop", 0xFF.min(calc_timeout_mclks(phasecal_us, macro_us)));
+    let mut macro_us = calc_macro_period_us(
+        fast_osc_frequency,
+        img.timing_config().get("range_config__vcsel_period_a"),
+    );
+    img.general_config_mut().set(
+        "phasecal_config__timeout_macrop",
+        0xFF.min(calc_timeout_mclks(phasecal_us, macro_us)),
+    );
     let tim = img.timing_config_mut();
     let encoded = calc_encoded_timeout(mm_us, macro_us);
     tim.set("mm_config__timeout_macrop_a_hi", encoded >> 8);

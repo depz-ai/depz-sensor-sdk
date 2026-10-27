@@ -52,17 +52,46 @@ class BusyError(StatusError):
         super().__init__(cmd, 0x06)
 
 
+class InvalidReplyError(DepzError):
+    """The reply to a request does not decode (contract 07 §3): shorter than
+    the fields its contract defines, or a value the decoder refuses. Only that
+    request fails; the reader goes on and the device stays usable."""
+
+    def __init__(self, cmd: int, cause: BaseException):
+        self.cmd = cmd
+        super().__init__(f"reply to cmd 0x{cmd:02X} does not decode: {cause}")
+        self.__cause__ = cause
+
+
 class DeviceLostError(DepzError):
     """The serial link dropped (unplug, reboot) while in use."""
 
 
 class NoDepzDeviceError(DepzError):
-    """Discovery found no DEPZ device matching the request.
+    """Discovery found nothing to open (contract 07 §3).
 
-    Raised by `open_device()`/discovery when no candidate serial port has a
-    known DEPZ USB identity (or none matches a requested serial/index).
+    Raised by `open_device()` / `open_on_link()` when no candidate serial
+    port has a known DEPZ USB identity, none matches a requested
+    serial/index, or nothing DEPZ answers the probe on the port path or link
+    given.
     """
 
 
 class LinkClosedError(DepzError):
     """Operation attempted on a closed link/device."""
+
+
+class InvalidStateError(DepzError):
+    """The call is not valid in the current state of the device or object
+    (contract 07 §3): `to_host_time_us` before `sync_time`, a sensor call
+    before `init()` / `configure()` or while streaming, `add()` after
+    recording started, a closed `DatasetWriter` or `DatasetPlayer`,
+    `wait()` without the player thread, a write to a read-only register
+    block, a VL53Lx board name without a product number, a packaged
+    firmware blob of the wrong size."""
+
+
+class ReplayMismatchError(DepzError):
+    """A strict `ReplayLink` saw the host write bytes the capture does not
+    hold (contract 08): the SDK under test diverged from the recorded
+    protocol."""

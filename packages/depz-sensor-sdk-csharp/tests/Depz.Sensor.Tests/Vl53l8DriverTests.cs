@@ -552,14 +552,25 @@ public class Vl53l8DriverTests
     // ── xtalk, thresholds, motion ────────────────────────────────────────────
 
     [Theory]
-    [InlineData(-0.5)]
-    [InlineData(10000.5)]
-    [InlineData(double.NaN)]
-    public void XtalkMarginOutOfRangeIsRefused(double bad)
+    [InlineData(-1)]
+    [InlineData(10001)]
+    [InlineData(int.MaxValue)]
+    public void XtalkMarginOutOfRangeIsRefused(int bad)
     {
+        // as ST: whole kcps 0..10000 (a fraction is not an int)
         var p = new FakeVl53l8Platform();
         Assert.Throws<Vl53l8Exception>(() => new Vl53l8Driver(p).SetXtalkMargin(bad));
         Assert.False(p.Dci.ContainsKey(0xAD94));
+    }
+
+    [Fact]
+    public void XtalkMarginRoundtripsInWholeKcps()
+    {
+        var p = new FakeVl53l8Platform();
+        var drv = new Vl53l8Driver(p);
+        drv.SetXtalkMargin(10000);
+        Assert.Equal(10000u * 2048u, BinaryPrimitives.ReadUInt32LittleEndian(p.Dci[0xAD94]));
+        Assert.Equal(10000, drv.GetXtalkMargin());
     }
 
     private static byte[] XtalkReply() => Enumerable.Range(0, 1024).Select(i => (byte)i).ToArray();

@@ -373,8 +373,9 @@ void diagnostics(depz::Vl53l4cd& tof) {
 }
 ```
 
-The counters are free-running and wrap silently — watch increments, not
-absolute values. `int_edges` grows while ranging; `slots_skipped` counts INT
+The counters wrap silently — watch increments, not absolute values;
+`i2c_errors` is cleared by every successful `reset_sensor()`, so it counts bus
+errors since the last one, not since power-up. `int_edges` grows while ranging; `slots_skipped` counts INT
 edges the MCU could not serve (the host sees a gap in `stream_count`);
 `last_i2c_error` names the latest bus error (1 NACK, 2 timeout, 3 bus error).
 A raw `write_reg()` goes around the class: the ULD state the SDK tracks
@@ -518,7 +519,7 @@ after starting the sensor.)
 ### Decode a result block
 
 ```cpp
-auto r = v4::parse_result_block(raw17);        // nullopt when < 15 bytes
+auto r = v4::parse_result_block(raw17);        // nullopt when < 17 bytes
 if (r && r->range_status == 0) {               // 0 = valid
     std::printf("%d mm, sigma %d mm\n", r->distance_mm, r->sigma_mm);
 }

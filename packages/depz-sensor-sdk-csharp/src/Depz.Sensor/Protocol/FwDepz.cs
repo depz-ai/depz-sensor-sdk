@@ -25,7 +25,8 @@ public static class FwDepz
         /// <summary>
         /// Parse and validate. Validation order (contract 06 §2): length, magic,
         /// then CRC-16/CCITT-FALSE over bytes [0..61] vs the u16 LE at offset 62,
-        /// then fw_size == payload length.
+        /// then fw_size == payload length, then section 0 of 1 (sections are
+        /// 0-based; multi-section files are refused).
         /// </summary>
         public static FwDepzImage Parse(byte[] blob)
         {
@@ -50,6 +51,11 @@ public static class FwDepz
 
             if (fwSize != payload.Length)
                 throw new FwDepzException("size", $"fw_size={fwSize} but payload is {payload.Length} bytes");
+
+            // Sections are 0-based; every shipped file is section 0 of 1 (ERRATA B9).
+            if (curSec != 0 || totSec != 1)
+                throw new FwDepzException("section",
+                    $"section {curSec} of {totSec}: only section 0 of 1 is supported (multi-section files are not)");
 
             return new FwDepzImage(loadAddr, fwSize, fwCrc32, curSec, totSec, payload);
         }

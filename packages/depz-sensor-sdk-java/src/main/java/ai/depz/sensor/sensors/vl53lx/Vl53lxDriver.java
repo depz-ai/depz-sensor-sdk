@@ -111,7 +111,11 @@ public abstract class Vl53lxDriver {
         return List.of();
     }
 
-    public void setMode(String name) {
+    /**
+     * Apply one of {@link #modes()}. Returns the timing budget in effect after the change, ms, on a driver whose
+     * mode change can move it (VL53L1: contract 12 §5), else null.
+     */
+    public Integer setMode(String name) {
         throw unsupported("mode");
     }
 

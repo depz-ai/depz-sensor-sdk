@@ -235,12 +235,12 @@ static void set_flag(depz_device *dev, bool *flag, bool v)
 /* Public entry: serialise the whole sequence. */
 #define LOCKED(body)                          \
     do {                                      \
-        int rc_;                              \
+        int locked_rc_;                       \
         TRY(need(dev));                       \
         depz_mutex_lock(&st(dev)->seq);       \
-        rc_ = (body);                         \
+        locked_rc_ = (body);                  \
         depz_mutex_unlock(&st(dev)->seq);     \
-        return rc_;                           \
+        return locked_rc_;                    \
     } while (0)
 
 /* ── register access (callers hold `seq`) ─────────────────────────────── */
@@ -375,9 +375,9 @@ static int do_init(depz_device *dev, depz_tmf8829_progress_cb progress, void *us
     /* ENABLE reads 0 over SPI until the sensor's I2C is off. */
     TRY(poll_reg(dev, DEPZ_TMF8829_REG_ENABLE, UNTIL_BITS, ENABLE_CPU_READY, BL_TIMEOUT_MS, "cpu_ready", NULL));
     /* The image is a multiple of 4 already (contract 14 §4): no padding. */
-    params[0] = (uint8_t)DEPZ_TMF8829_FIRMWARE_LOAD_ADDR;
-    params[1] = (uint8_t)(DEPZ_TMF8829_FIRMWARE_LOAD_ADDR >> 8);
-    params[2] = (uint8_t)(DEPZ_TMF8829_FIRMWARE_LOAD_ADDR >> 16);
+    params[0] = (uint8_t)(DEPZ_TMF8829_FIRMWARE_LOAD_ADDR & 0xFF);
+    params[1] = (uint8_t)((DEPZ_TMF8829_FIRMWARE_LOAD_ADDR >> 8) & 0xFF);
+    params[2] = (uint8_t)((DEPZ_TMF8829_FIRMWARE_LOAD_ADDR >> 16) & 0xFF);
     params[3] = (uint8_t)(DEPZ_TMF8829_FIRMWARE_LOAD_ADDR >> 24);
     params[4] = (uint8_t)(depz_tmf8829_firmware_len / 4);
     params[5] = (uint8_t)((depz_tmf8829_firmware_len / 4) >> 8);

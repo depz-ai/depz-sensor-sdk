@@ -629,8 +629,8 @@ public final class BareDriver {
         d.resultRangeStatus = buf[1];
         d.resultReportStatus = buf[2];
         d.resultStreamCount = buf[3];
-        d.resultDssActualEffectiveSpads = (buf[4] << 8) | buf[5];
-        d.phasecalResultReferencePhase = (buf[BareRegs.PHASECAL_RESULT_REFERENCE_PHASE - off] << 8)
+        d.resultDssActualEffectiveSpads = ((long) buf[4] << 8) | buf[5];
+        d.phasecalResultReferencePhase = ((long) buf[BareRegs.PHASECAL_RESULT_REFERENCE_PHASE - off] << 8)
                 | buf[BareRegs.PHASECAL_RESULT_REFERENCE_PHASE - off + 1];
         d.phasecalResultVcselStart = buf[BareRegs.PHASECAL_RESULT_VCSEL_START - off];
 
@@ -639,7 +639,7 @@ public final class BareDriver {
                 + buf[BareRegs.RESULT_HISTOGRAM_BIN_23_0_LSB - off]) & 0xFF;
         int b0 = BareRegs.RESULT_HISTOGRAM_BIN_0_2 - off;
         for (int i = 0; i < BareRegs.HISTOGRAM_BUFFER_SIZE; i++) {
-            d.binData[i] = (buf[b0 + 3 * i] << 16) | (buf[b0 + 3 * i + 1] << 8) | buf[b0 + 3 * i + 2];
+            d.binData[i] = ((long) buf[b0 + 3 * i] << 16) | (buf[b0 + 3 * i + 1] << 8) | buf[b0 + 3 * i + 2];
         }
 
         RegBlock general = img.generalConfig();

@@ -43,9 +43,9 @@ size_t depz_strip_device_string(const uint8_t *data, size_t len,
         } else {
             if (n + 3 > out_cap - 1)
                 break;
-            out[n++] = (char)0xEF;
-            out[n++] = (char)0xBF;
-            out[n++] = (char)0xBD;
+            out[n++] = '\xEF';   /* U+FFFD in UTF-8 */
+            out[n++] = '\xBF';
+            out[n++] = '\xBD';
         }
     }
     memset(out + n, 0, out_cap - n);

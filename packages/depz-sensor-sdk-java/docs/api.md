@@ -19,7 +19,7 @@ Each sensor also has a focused reference with just its own symbols:
 - **Transport**: [`Crc`](#crc), [`CrcError`](#crcerror), [`CrcType`](#crctype), [`Event`](#event), [`Framing`](#framing), [`Packet`](#packet), [`PacketParser`](#packetparser), [`Trash`](#trash)
 - **USB identity**: [`Discovery`](#discovery), [`UsbIds`](#usbids), [`UsbIds.PortRef`](#usbidsportref)
 - **Protocol codecs (common)**: [`Common`](#common), [`Common.Cmd`](#commoncmd), [`Common.Rpt`](#commonrpt), [`Common.Status`](#commonstatus), [`Common.SyncPinMode`](#commonsyncpinmode), [`Common.SyncPinPolarity`](#commonsyncpinpolarity), [`Common.StatusReport`](#commonstatusreport), [`Common.TextReport`](#commontextreport), [`Common.SyncTimeReport`](#commonsynctimereport), [`Common.TemperatureReport`](#commontemperaturereport), [`Common.SequenceErrorReport`](#commonsequenceerrorreport), [`Common.SyncPinConfig`](#commonsyncpinconfig), [`Identity`](#identity), [`Identity.SensorType`](#identitysensortype), [`Wire`](#wire)
-- **Live devices**: [`BootloaderModeException`](#bootloadermodeexception), [`BusyException`](#busyexception), [`DepzDevice`](#depzdevice), [`DepzDevices`](#depzdevices), [`DepzDevices.ProbeResult`](#depzdevicesproberesult), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`DeviceEvent`](#deviceevent), [`DeviceInfo`](#deviceinfo), [`DeviceLostException`](#devicelostexception), [`Link`](#link), [`LinkClosedException`](#linkclosedexception), [`LinkStats`](#linkstats), [`NoDepzDeviceException`](#nodepzdeviceexception), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`ReplayMismatchException`](#replaymismatchexception), [`SerialPortLink`](#serialportlink), [`SerialPorts`](#serialports), [`SerialPorts.SerialPortInfo`](#serialportsserialportinfo), [`StatusException`](#statusexception), [`Subscription`](#subscription), [`TimeSyncResult`](#timesyncresult), [`WrongTypeException`](#wrongtypeexception)
+- **Live devices**: [`BootloaderModeException`](#bootloadermodeexception), [`BusyException`](#busyexception), [`DepzDevice`](#depzdevice), [`DepzDevices`](#depzdevices), [`DepzDevices.ProbeResult`](#depzdevicesproberesult), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`DeviceEvent`](#deviceevent), [`DeviceInfo`](#deviceinfo), [`DeviceLostException`](#devicelostexception), [`InvalidReplyException`](#invalidreplyexception), [`InvalidStateException`](#invalidstateexception), [`Link`](#link), [`LinkClosedException`](#linkclosedexception), [`LinkStats`](#linkstats), [`NoDepzDeviceException`](#nodepzdeviceexception), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`ReplayMismatchException`](#replaymismatchexception), [`SerialPortLink`](#serialportlink), [`SerialPorts`](#serialports), [`SerialPorts.SerialPortInfo`](#serialportsserialportinfo), [`StatusException`](#statusexception), [`Subscription`](#subscription), [`TimeSyncResult`](#timesyncresult), [`WrongTypeException`](#wrongtypeexception)
 - **SR04**: [`Sr04Device`](#sr04device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Sr04.Sr04Cmd`](#sr04sr04cmd), [`Sr04.Sr04Rpt`](#sr04sr04rpt), [`Sr04.Sr04Data`](#sr04sr04data)
 - **Firmware container**: [`FwDepz`](#fwdepz), [`FwDepz.FwDepzError`](#fwdepzfwdepzerror), [`FwDepz.FwDepzImage`](#fwdepzfwdepzimage)
 - **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4`](#vl53l4), [`Vl53l4.Vl53l4Cmd`](#vl53l4vl53l4cmd), [`Vl53l4.Vl53l4Rpt`](#vl53l4vl53l4rpt), [`Vl53l4.RegData`](#vl53l4regdata), [`Vl53l4.Vl53l4Info`](#vl53l4vl53l4info), [`Vl53l4.StreamData`](#vl53l4streamdata), [`DetectionThresholds`](#detectionthresholds), [`RangeTiming`](#rangetiming), [`Vl53l4Platform`](#vl53l4platform), [`Vl53l4Uld`](#vl53l4uld), [`Vl53l4Uld.Vl53l4Error`](#vl53l4uldvl53l4error), [`Vl53l4Uld.Results`](#vl53l4uldresults), [`Vl53l4cdDriver`](#vl53l4cddriver)
@@ -29,7 +29,7 @@ Each sensor also has a focused reference with just its own symbols:
 - **TMF8829 (dToF)**: [`Tmf8829AppliedConfig`](#tmf8829appliedconfig), [`Tmf8829Device`](#tmf8829device), [`Tmf8829Device.InitResult`](#tmf8829deviceinitresult), [`Tmf8829Exception`](#tmf8829exception), [`Tmf8829InterruptEvent`](#tmf8829interruptevent), [`Tmf8829`](#tmf8829), [`Tmf8829.Tmf8829Cmd`](#tmf8829tmf8829cmd), [`Tmf8829.Tmf8829Rpt`](#tmf8829tmf8829rpt), [`Tmf8829.EventCode`](#tmf8829eventcode), [`Tmf8829.RegData`](#tmf8829regdata), [`Tmf8829.Tmf8829Info`](#tmf8829tmf8829info), [`Tmf8829.FrameChunk`](#tmf8829framechunk), [`Tmf8829.Tmf8829Event`](#tmf8829tmf8829event), [`Tmf8829.RawFrame`](#tmf8829rawframe), [`Tmf8829.FrameReassembler`](#tmf8829framereassembler), [`CaptureTimer`](#capturetimer), [`CaptureTimer.FrameTime`](#capturetimerframetime), [`Frames`](#frames), [`Frames.FrameError`](#framesframeerror), [`Frames.FrameInfo`](#framesframeinfo), [`Frames.PixelResults`](#framespixelresults), [`Frames.HistogramFrame`](#frameshistogramframe), [`MeasurementBuilder`](#measurementbuilder), [`MeasurementBuilder.Measurement`](#measurementbuildermeasurement), [`SensorClock`](#sensorclock), [`Tmf8829Config`](#tmf8829config), [`Tmf8829Config.CfgField`](#tmf8829configcfgfield), [`Tmf8829Firmware`](#tmf8829firmware)
 - **BNO086 (IMU)**: [`Bno086Device`](#bno086device), [`Bno086`](#bno086), [`Bno086.Bno086Cmd`](#bno086bno086cmd), [`Bno086.Bno086Rpt`](#bno086bno086rpt), [`Bno086.Data`](#bno086data), [`Reports`](#reports), [`Reports.Report`](#reportsreport), [`Sh2`](#sh2), [`Sh2Hub`](#sh2hub), [`Sh2Hub.TareBasis`](#sh2hubtarebasis), [`Sh2Hub.MotionIntent`](#sh2hubmotionintent), [`Sh2Hub.Sh2Exception`](#sh2hubsh2exception), [`Sh2Hub.FeatureResponse`](#sh2hubfeatureresponse), [`Sh2Hub.ProductId`](#sh2hubproductid), [`Sh2Hub.CommandResponse`](#sh2hubcommandresponse), [`Sh2Hub.FrsReadResponse`](#sh2hubfrsreadresponse), [`Sh2Hub.FrsWriteResponse`](#sh2hubfrswriteresponse), [`Sh2Hub.ErrorRecord`](#sh2huberrorrecord), [`Sh2Hub.Counts`](#sh2hubcounts), [`Sh2Hub.CalibrationConfig`](#sh2hubcalibrationconfig), [`Sh2Hub.SensorMetadata`](#sh2hubsensormetadata), [`Sh2Hub.FrsReadSession`](#sh2hubfrsreadsession), [`Sh2Hub.FrsWriteSession`](#sh2hubfrswritesession), [`Shtp`](#shtp), [`Shtp.ShtpHeader`](#shtpshtpheader), [`Shtp.ShtpCargo`](#shtpshtpcargo), [`Shtp.ShtpLayer`](#shtpshtplayer)
 - **BNO055 (IMU)**: [`Bno055Device`](#bno055device), [`Bno055Sample`](#bno055sample), [`Bno055`](#bno055), [`Bno055.Bno055Cmd`](#bno055bno055cmd), [`Bno055.Bno055Rpt`](#bno055bno055rpt), [`Bno055.RegData`](#bno055regdata), [`Bno055.StreamData`](#bno055streamdata), [`Bno055.Bno055Info`](#bno055bno055info), [`Bno055Regs`](#bno055regs), [`Bno055Regs.SystemStatus`](#bno055regssystemstatus), [`Bno055Regs.OprMode`](#bno055regsoprmode), [`Bno055Regs.PwrMode`](#bno055regspwrmode), [`Bno055Regs.TempSource`](#bno055regstempsource), [`Bno055Regs.Units`](#bno055regsunits), [`Bno055Regs.CalibStatus`](#bno055regscalibstatus), [`Bno055Regs.CalibrationProfile`](#bno055regscalibrationprofile), [`Bno055Regs.AxisRemap`](#bno055regsaxisremap), [`Bno055Regs.AccelConfig`](#bno055regsaccelconfig), [`Bno055Regs.GyroConfig`](#bno055regsgyroconfig), [`Bno055Regs.MagConfig`](#bno055regsmagconfig), [`Bno055Regs.RawBlock`](#bno055regsrawblock)
-- **Datasets (record & replay)**: [`Dataset`](#dataset), [`Dataset.Record`](#datasetrecord), [`DatasetPlayer`](#datasetplayer), [`DatasetRecords`](#datasetrecords), [`DatasetWriter`](#datasetwriter), [`PlayerState`](#playerstate), [`SessionRecorder`](#sessionrecorder)
+- **Datasets (record & replay)**: [`Dataset`](#dataset), [`DatasetPlayer`](#datasetplayer), [`DatasetRecords`](#datasetrecords), [`DatasetWriter`](#datasetwriter), [`PlayerState`](#playerstate), [`SessionRecorder`](#sessionrecorder)
 - **JSON**: [`JsonText`](#jsontext)
 
 ## Transport
@@ -464,6 +464,23 @@ public static byte[] packSyncTime(long pcTimestampUs)
 
 `pcTimestampUs` is a u64 in Java's two's-complement convention: every
 `long` is a valid bit pattern (a value ≥ 2^63 arrives negative).
+
+#### Common.PAYLOAD_CRC_TYPE_MAX *(field)*
+
+```java
+public static final int PAYLOAD_CRC_TYPE_MAX = 3
+```
+
+SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2).
+
+#### Common.packSetPayloadCrcType
+
+```java
+public static byte[] packSetPayloadCrcType(int crcType)
+```
+
+SET_PAYLOAD_CRC_TYPE payload `crc_type u8`, 0..3 (contract 02 §2), else
+IllegalArgumentException — checked before anything is written (contract 07 §3).
 
 #### Common.syncTimeOffsetRtt
 
@@ -1191,7 +1208,9 @@ Open the `index`-th DEPZ candidate, candidates sorted by USB serial.
 public static DepzDevice openPort(String port, Duration timeout)
 ```
 
-Open exactly `port` as its sensor class (also a port whose USB id is not a DEPZ one).
+Open exactly `port` as its sensor class (also a port whose USB id is not a DEPZ one). The
+USB id is that of the enumerated port the path names under any alias (`/dev/serial/by-id/…`;
+contract 02 §4.3).
 
 #### DepzDevices.openDevice
 
@@ -1382,6 +1401,37 @@ public class DeviceLostException extends DepzException
 
 The connection went away: unplugged, closed, or the OS refused I/O.
 
+### InvalidReplyException
+
+```java
+public class InvalidReplyException extends DepzException
+```
+
+The reply to a request does not decode (contract 07 §3): shorter than the fields its contract
+defines, or a value the decoder refuses. Only that request fails; the reader goes on and the
+device stays usable.
+
+#### InvalidReplyException.cmd
+
+```java
+public int cmd()
+```
+
+The request opcode whose reply was refused.
+
+### InvalidStateException
+
+```java
+public final class InvalidStateException extends DepzException
+```
+
+The call is not valid in the current state of the device or object (contract 07 §3):
+`toHostTimeUs` before `syncTime`, a sensor call before `init()` /
+`configure()` or while streaming, `add()` after recording started, a closed
+dataset writer or player, `await` without the player thread, a write to a read-only
+register block, a VL53Lx board name without a product number, a packaged firmware blob of
+the wrong size or missing from the classpath.
+
 ### Link
 
 ```java
@@ -1406,7 +1456,7 @@ I/O on a link that is already closed.
 public final class LinkStats
 ```
 
-Link counters (contract 07 §2 `stats`); updated by the reader thread.
+Link counters (contract 07 §2 `stats`); updated by the reader thread and the sender.
 
 #### LinkStats.txPackets
 
@@ -1465,6 +1515,14 @@ public long deviceSeqErrors()
 ```
 
 RPT_SEQUENCE_ERROR reports: gaps the device saw in host → device packets.
+
+#### LinkStats.callbackErrors
+
+```java
+public long callbackErrors()
+```
+
+Callbacks that threw on the reader thread (contract 07 §3).
 
 ### NoDepzDeviceException
 
@@ -1565,6 +1623,19 @@ public static List<SerialPortInfo> list()
 ```
 
 Every serial port the OS lists.
+
+#### SerialPorts.find
+
+```java
+public static SerialPortInfo find(List<SerialPortInfo> ports, String port)
+```
+
+The enumerated port `port` names, under any alias (contract 02 §4.3, ERRATA A5): the one
+whose path is the same string, else — on POSIX — the one whose resolved path is the same
+(`/dev/serial/by-id/…` is a symlink to the node), else the one that is the same character
+device under another name. On Windows a COM name is matched by string only: a COM port is not
+a file, and resolving one (toRealPath, readAttributes) opens it — a DTR pulse on every board of
+the bench. Null when the OS does not list the port.
 
 #### SerialPorts.bySerial
 
@@ -2016,7 +2087,8 @@ public static FwDepzImage parse(byte[] blob)
 
 Parse and validate. Validation order (contract 06 §2): length, magic,
 then CRC-16/CCITT-FALSE over bytes [0..61] vs the u16 LE at offset 62,
-then `fw_size == payload length`.
+then `fw_size == payload length`, then section 0 of 1 (sections
+are 0-based; multi-section files are refused).
 
 ## VL53L4CD (ToF)
 
@@ -2052,7 +2124,7 @@ public final class Vl53l4cdDevice extends DepzDevice
 VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs
 here (`uld()`). `init()` first, then configure and `startRanging()`: one
 result block per INT edge streams to `measurements`. Configuration while ranging throws
-`IllegalStateException` — the stream owns the register bank.
+`InvalidStateException` — the stream owns the register bank.
 
 #### Vl53l4cdDevice.uld
 
@@ -2113,7 +2185,7 @@ Off and Reset stop a stream; `init()` again after.
 public void resetSensor()
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); call `init()` again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call `init()` again.
 
 #### Vl53l4cdDevice.bridgeInfo
 
@@ -2121,7 +2193,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); call `init()` again.
 public Vl53l4.Vl53l4Info bridgeInfo()
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2cErrors` is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice.setI2cSpeedKhz
 
@@ -2369,7 +2441,7 @@ VL53_XSHUT action: drive XSHUT high, no boot handshake.
 public static final int XSHUT_RESET = 2
 ```
 
-VL53_XSHUT action: pulse low then wait for the boot handshake (~3 ms).
+VL53_XSHUT action: pulse low then wait for the boot handshake (≤ 20 ms, typ. ~2 ms).
 
 #### Vl53l4.SF_INT_ACT_HIGH *(field)*
 
@@ -2386,7 +2458,8 @@ GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
 public static byte[] packReadReg(int addr, int len)
 ```
 
-VL53_READ_REG payload: `addr u16, len u16` little-endian.
+VL53_READ_REG payload `addr u16, len u16` with the transfer limit of contract 10 §1:
+`len` 1..253 and `addr + len <= 0x10000`, else IllegalArgumentException.
 
 #### Vl53l4.packWriteReg
 
@@ -2394,7 +2467,7 @@ VL53_READ_REG payload: `addr u16, len u16` little-endian.
 public static byte[] packWriteReg(int addr, byte[] data)
 ```
 
-VL53_WRITE_REG payload: `addr u16, data[1..253]`, else IllegalArgumentException.
+VL53_WRITE_REG payload: `addr u16, data[1..253]` with `addr + N <= 0x10000`, else IllegalArgumentException.
 
 #### Vl53l4.packXshut
 
@@ -2473,8 +2546,11 @@ public static RegData unpack(byte[] p)
 public record Vl53l4Info(long intEdges, long slotsSkipped, long i2cErrors, int lastI2cError, int modelId, int fwStatus, int initialized, int xshutLevel, int intLevel, int i2cKhz)
 ```
 
-RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters are
-free-running and wrap silently; watch increments, not absolute values.
+RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters wrap
+silently; watch increments, not absolute values. `i2cErrors` counts
+since the last successful XSHUT reset (the bridge clears it there), not
+since power-up; `initialized` = 1 when MODEL_ID read back as 0xEBAA
+on this GET_INFO.
 `modelId` expected 0xEBAA, `fwStatus` expected 0x03 (booted);
 `lastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
@@ -2863,7 +2939,19 @@ public static Results parseResultBlock(byte[] raw)
 Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
 decodes the same registers read one by one. Register contents are
 big-endian words (the bridge passes them through untouched). Throws
-`Vl53l4Error` when `raw` is shorter than 15 bytes.
+`Vl53l4Error` when `raw` is shorter than `RESULT_BLOCK_LEN` (17) bytes
+(contract 10 §5); a longer buffer is decoded and the tail ignored.
+
+#### Vl53l4Uld.checkRangeTiming
+
+```java
+public static void checkRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+which need no register: budget 10..200 ms, period 0 (continuous) or above
+the budget (autonomous) and a u32 — `IllegalArgumentException`
+otherwise (contract 10 §5).
 
 #### Vl53l4Uld.rangeTimingRegisters
 
@@ -2878,10 +2966,12 @@ INTERMEASUREMENT_MS raw dword}`.
 is the word read from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
 mode, i.e. when `interMeasurementMs > 0`). Budget 10..200 ms;
 `interMeasurementMs` 0 (continuous) or greater than the budget
-(autonomous low power) — anything else throws `Vl53l4Error`.
+(autonomous low power) — anything else throws
+`IllegalArgumentException` (`checkRangeTiming`).
 Register words are refused out of range, never wrapped: `oscFrequency`
-1..65535, `clockPll` 0..65535, `interMeasurementMs` a u32, and
-an INTERMEASUREMENT_MS dword that would overflow u32 throws too.
+1..65535 (0 reads as `Vl53l4Error`), `clockPll` 0..65535, and
+an INTERMEASUREMENT_MS dword that would overflow u32 throws
+`IllegalArgumentException` too.
 The third element (the dword) is a u32 in Java's `int` convention
 (`Integer#toUnsignedLong`).
 
@@ -2896,8 +2986,8 @@ inter_measurement_ms}`.
 
 Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
 RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
-word. A value wider than its register (dword u32, words u16) throws
-`Vl53l4Error`.
+word. An oscillator word of 0 throws `Vl53l4Error`; a value wider
+than its register (dword u32, words u16) `IllegalArgumentException`.
 
 #### Vl53l4Uld.offsetRaw
 
@@ -2978,7 +3068,10 @@ GetSigmaThreshold: word → mm.
 public static final class Vl53l4Error extends RuntimeException
 ```
 
-ULD error.
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is an `IllegalArgumentException`
+(contract 07 §3).
 
 ### Vl53l4Uld.Results
 
@@ -3053,6 +3146,8 @@ public boolean isAlive()
 public void waitBoot(int timeoutMs)
 ```
 
+Polls FIRMWARE__SYSTEM_STATUS until the sensor has booted, once per millisecond.
+
 #### Vl53l4cdDriver.sensorInit
 
 ```java
@@ -3097,6 +3192,8 @@ public boolean checkForDataReady()
 ```java
 public void waitDataReady(int timeoutMs)
 ```
+
+Polls the data-ready flag, once per millisecond.
 
 #### Vl53l4cdDriver.getResult
 
@@ -3233,7 +3330,9 @@ public void configureCnh(Vl53l8CnhSetup setup)
 ```
 
 Arm CNH for the next `startRanging()`: every frame then carries
-`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`.
+`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`. CNH and the motion
+indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+`Vl53l8Frame#motion()`).
 
 ### Vl53l8cxDevice
 
@@ -3245,7 +3344,7 @@ VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD
 (`uld()`). `init()` downloads the ~84 KB sensor firmware (about a second), then
 configure and `startRanging()`: the board pushes one frame per INT edge in chunks,
 reassembled and parsed into `frames`. Configuration needs `init()` and throws
-`IllegalStateException` while ranging — the stream owns the register bank. The VL53L8CH
+`InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH
 superset is `Vl53l8chDevice`.
 
 #### Vl53l8cxDevice.MIN_RANGING_FREQUENCY_HZ *(field)*
@@ -3255,6 +3354,15 @@ public static final int MIN_RANGING_FREQUENCY_HZ = 2
 ```
 
 Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.maxRangingFrequencyHz
+
+```java
+public static int maxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon
+limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
 
 #### Vl53l8cxDevice.firmwareSet
 
@@ -3280,6 +3388,14 @@ protected int writeChunk()
 
 Register bytes per WRITE_REG.
 
+#### Vl53l8cxDevice.streamChunk
+
+```java
+protected int streamChunk()
+```
+
+Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4).
+
 #### Vl53l8cxDevice.minRangingHz
 
 ```java
@@ -3294,7 +3410,7 @@ The lowest ranging frequency that streams on this sensor.
 public Vl53l8Driver uld()
 ```
 
-The ULD driver (escape hatch for DCI access). @throws IllegalStateException before `init()`
+The ULD driver (escape hatch for DCI access). @throws InvalidStateException before `init()`
 
 #### Vl53l8cxDevice.uldOrNull
 
@@ -3369,7 +3485,9 @@ public int getRangingFrequencyHz()
 public void setRangingFrequencyHz(int hz)
 ```
 
-At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8.
+At least 2 Hz (1 Hz on L5/L7); at most `maxRangingFrequencyHz` of the resolution last
+set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11
+§3). Refused host-side, nothing reaches the bus.
 
 #### Vl53l8cxDevice.getRangingMode
 
@@ -3446,14 +3564,18 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice.getXtalkMargin
 
 ```java
-public double getXtalkMargin()
+public int getXtalkMargin()
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice.setXtalkMargin
 
 ```java
-public void setXtalkMargin(double marginKcps)
+public void setXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
 
 #### Vl53l8cxDevice.calibrateXtalk
 
@@ -3517,6 +3639,9 @@ public Vl53l8Uld.MotionConfig configureMotionIndicator(int distanceMinMm, int di
 
 Enable the motion indicator over [min, max] mm; every frame then carries
 `Vl53l8Frame#motion()`. Returns the configuration for further tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms
+CNH (`cnhSetup()` null, no `Vl53l8Frame#cnhRaw()`).
 
 #### Vl53l8cxDevice.configureMotionIndicator
 
@@ -3742,7 +3867,11 @@ chunk transport is identical across the two parts.
 
 Rules: reset on `offset == 0`; chunks must be contiguous — a gap
 discards the frame in progress; a frame completes when the accumulated bytes
-equal `fullSize`. Mirror of the TS/Python `FrameReassembler`.
+equal `fullSize`. A chunk out of the rule-4 bounds (more than
+`chunkMax` bytes, `fullSize` over `STREAM_TOTAL_MAX`, or
+running past `fullSize`) is damaged: dropped and counted as a lost
+frame like the other damaged input, never thrown. Mirror of the TS/Python
+`FrameReassembler`.
 
 #### FrameReassembler.STREAM_CHUNK_MAX *(field)*
 
@@ -3751,6 +3880,14 @@ public static final int STREAM_CHUNK_MAX = 1528
 ```
 
 Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### FrameReassembler.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Largest frame_size START_STREAM accepts (contract 04 §4 rule 4).
 
 #### FrameReassembler.completed *(field)*
 
@@ -4285,16 +4422,18 @@ the sensor firmware is lost.
 #### Vl53l8Driver.getXtalkMargin
 
 ```java
-public double getXtalkMargin()
+public int getXtalkMargin()
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver.setXtalkMargin
 
 ```java
-public void setXtalkMargin(double marginKcps)
+public void setXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
 
 #### Vl53l8Driver.getCaldataXtalk
 
@@ -4353,6 +4492,15 @@ public Vl53l8Uld.MotionConfig motionIndicatorInit(int res)
 ```
 
 A default motion-indicator configuration for `res`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.motionIndicatorDisarm
+
+```java
+public void motionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `motion` null. Called when the
+VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
 
 #### Vl53l8Driver.motionIndicatorSetResolution
 
@@ -4738,16 +4886,32 @@ keep their declared 64-entry size even in 4x4, the sensor fills the first
 `0` = no trim (VL53L8 behaviour), `16`/`64` = explicit,
 `RESOLUTION_FROM_FRAME` = the size of the zone-scaled ambient block.
 
+#### Vl53l8Uld.XTALK_MARGIN_MAX_KCPS *(field)*
+
+```java
+public static final int XTALK_MARGIN_MAX_KCPS = 10000
+```
+
+Largest xtalk margin `setXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
 #### Vl53l8Uld.xtalkMarginToRaw
 
 ```java
-public static long xtalkMarginToRaw(double marginKcps)
+public static long xtalkMarginToRaw(int marginKcps)
 ```
 
-Xtalk margin (kcps/spad) -> raw DCI value (round(kcps * 2048)). The margin
-is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN
-included, throws `Vl53l8Error` (INVALID_PARAM) — never wrapped
-(contract 07 §3).
+Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+(kcps * 2048). The margin is 0..`XTALK_MARGIN_MAX_KCPS`; a negative
+or a bigger value throws `Vl53l8Error` (INVALID_PARAM) — never
+wrapped (contract 07 §3).
+
+#### Vl53l8Uld.xtalkMarginFromRaw
+
+```java
+public static int xtalkMarginFromRaw(long raw)
+```
+
+Inverse: raw DCI value -> whole kcps/SPAD (raw / 2048, integer division as ST).
 
 #### Vl53l8Uld.packDetectionThresholds
 
@@ -5178,7 +5342,7 @@ The CNH setup armed by `configureCnh`, or null.
 public void configureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next start (as `Vl53l8chDevice#configureCnh`).
+Arm CNH for the next start (as `Vl53l8chDevice#configureCnh`); disarms the motion indicator.
 
 ### Vl53l7cxDevice
 
@@ -5352,7 +5516,7 @@ VL53_WRITE_REG payload: `addr u16, data[1..2048]` with
 public static byte[] packStartStream(int frameSize)
 ```
 
-VL53_START_STREAM payload: `frame_size u16`.
+VL53_START_STREAM payload: `frame_size u16`, 1..8192 (the VL53L8 command, contract 04 §2).
 
 #### Vl53l7.packPinCtrl
 
@@ -6351,6 +6515,36 @@ public long signalRateMeasFixed400mm()
 public long part2PartOffsetAdjustmentNvmUm()
 ```
 
+#### Vl53l0xUldDriver.targetRefRate
+
+```java
+public int targetRefRate()
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets;
+the SPAD management converges on it.
+
+#### Vl53l0xUldDriver.sigmaEstRefArray
+
+```java
+public int sigmaEstRefArray()
+```
+
+The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set
+(stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver.sigmaEstEffPulseWidth
+
+```java
+public int sigmaEstEffPulseWidth()
+```
+
+#### Vl53l0xUldDriver.sigmaEstEffAmbWidth
+
+```java
+public int sigmaEstEffAmbWidth()
+```
+
 #### Vl53l0xUldDriver.oscFrequencyMHz
 
 ```java
@@ -6413,6 +6607,15 @@ public void getInfoFromDevice(int option)
 
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product
 identification (2), the part UID and factory offset (4).
+
+#### Vl53l0xUldDriver.loadTuningSettings
+
+```java
+public void loadTuningSettings(int[] buffer)
+```
+
+VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying a
+host-side parameter instead; a zero count ends the buffer.
 
 #### Vl53l0xUldDriver.setOffsetUm
 
@@ -7224,8 +7427,11 @@ The only budgets accepted right now (ascending), or empty when any integer of `b
 #### Vl53lxDriver.setMode
 
 ```java
-public void setMode(String name)
+public Integer setMode(String name)
 ```
+
+Apply one of `modes()`. Returns the timing budget in effect after the change, ms, on a driver whose
+mode change can move it (VL53L1: contract 12 §5), else null.
 
 #### Vl53lxDriver.getMode
 
@@ -12744,6 +12950,14 @@ public static final int FRS_STABILITY_DETECTOR_CONFIG = 0xED85
 public static final int FRS_ACTIVITY_TRACKER_CONFIG = 0xED88
 ```
 
+#### Sh2Hub.FRS_GYRO_INTEGRATED_RV_CONFIG *(field)*
+
+```java
+public static final int FRS_GYRO_INTEGRATED_RV_CONFIG = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 #### Sh2Hub.METADATA_RECORDS *(field)*
 
 ```java
@@ -13372,7 +13586,7 @@ Per-channel TX sequence counters + RX cargo reassembly.
 public int discarded = 0
 ```
 
-Incomplete cargos thrown away.
+Incomplete cargos and junk-channel (≥ 6) frames thrown away.
 
 #### Shtp.ShtpLayer.nextFrame
 
@@ -13995,13 +14209,28 @@ public static final String[] I2C_ERROR_NAMES
 
 `last_i2c_error` values in RPT_BNO_INFO, indexed by code.
 
+#### Bno055.TIMER_PERIOD_MIN_MS *(field)*
+
+```java
+public static final int TIMER_PERIOD_MIN_MS = 1
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+#### Bno055.TIMER_PERIOD_MAX_MS *(field)*
+
+```java
+public static final int TIMER_PERIOD_MAX_MS = 60000
+```
+
 #### Bno055.packReadReg
 
 ```java
 public static byte[] packReadReg(int addr, int len)
 ```
 
-BNO_READ_REG payload: `addr u8, len u8`.
+BNO_READ_REG payload `addr u8, len u8` with the transfer limit of contract 13 §1:
+`len` 1..128 and `addr + len <= 0x100`, else IllegalArgumentException.
 
 #### Bno055.packWriteReg
 
@@ -14009,7 +14238,7 @@ BNO_READ_REG payload: `addr u8, len u8`.
 public static byte[] packWriteReg(int addr, byte[] data)
 ```
 
-BNO_WRITE_REG payload: `addr u8, data[1..128]`, else IllegalArgumentException.
+BNO_WRITE_REG payload: `addr u8, data[1..128]` with `addr + N <= 0x100`, else IllegalArgumentException.
 
 #### Bno055.packStartStream
 
@@ -14017,8 +14246,9 @@ BNO_WRITE_REG payload: `addr u8, data[1..128]`, else IllegalArgumentException.
 public static byte[] packStartStream(int trigger, int addr, int len, int periodMs)
 ```
 
-BNO_START_STREAM payload, 5 bytes: `trigger u8, addr u8, len u8,
-period_ms u16 LE`. Replaces any running stream.
+BNO_START_STREAM payload `trigger u8, addr u8, len u8, period_ms u16`. With the TIMER
+trigger the period is 1..60000 ms (contract 13 §2), else IllegalArgumentException; with INT it
+is the missed-edge watchdog and 0 disables it. Replaces any running stream.
 
 ### Bno055.Bno055Cmd
 
@@ -14091,11 +14321,12 @@ public record Bno055Info(int i2cAddr, int chipId, int accId, int magId, int gyrI
 ```
 
 RPT_BNO_INFO (38-byte LE payload `<BBBBBHBBBIHHHIIIHBBH`) — sensor
-identity (registers 0x00..0x06) plus bridge diagnostics. Counters are
-free-running and wrap silently; watch increments. `read*Us`,
-`slotsSkipped` and `loopMaxUs` reset at START_STREAM. A rising
-`sensorResets` means the bridge pulsed nRESET to recover the bus: the
-sensor is back in CONFIG and the host must restore its configuration.
+identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap
+silently; watch increments. `read*Us`, `slotsSkipped` and
+`loopMaxUs` reset at START_STREAM, `i2cErrors` at every
+successful reset handshake. A rising `sensorResets` means the bridge
+pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host
+must restore its configuration.
 `swRev` is BCD (`0x0311` = 03.11).
 
 #### Bno055.Bno055Info.unpack
@@ -15197,14 +15428,6 @@ public void play(Consumer<Record> callback)
 
 `play(Consumer, double, Long, BooleanSupplier)` in real time from the first record.
 
-### Dataset.Record
-
-```java
-public record Record(String deviceId, long tHostUs, String kind, Map<String, Object> value)
-```
-
-One merged record.
-
 ### DatasetPlayer
 
 ```java
@@ -15350,7 +15573,7 @@ public boolean await(Duration timeout)
 ```
 
 Block until the player is not playing (done, or paused by someone else): true, or false on timeout
-(null: no timeout). Needs the player thread, else `IllegalStateException`. (Python's
+(null: no timeout). Needs the player thread, else `InvalidStateException`. (Python's
 `wait`; `wait` is taken by `Object` in Java.)
 
 #### DatasetPlayer.await
@@ -15557,13 +15780,22 @@ datasets (no external dependency). `parse`: objects → `Map<String,Object>`
 integers → `Long` (`BigInteger` beyond the long range), reals →
 `Double`, `true/false` → `Boolean`, `null` → `null`.
 `serialize` writes those back, plus any `Number`, primitive arrays and
-`byte[]` (as a lowercase hex string).
+`byte[]` (as a lowercase hex string). Malformed or truncated text is refused with
+`IllegalArgumentException` naming the index — never an index error of the runtime.
 
 #### JsonText.parse
 
 ```java
 public static Object parse(String text)
 ```
+
+#### JsonText.isBlankLine
+
+```java
+public static boolean isBlankLine(String line)
+```
+
+Contract 08 «Line rules»: a line of nothing but JSON whitespace (space, tab, CR) is blank.
 
 #### JsonText.serialize
 
@@ -15587,7 +15819,7 @@ Lowercase hex of `b`.
 public static byte[] unhex(String s)
 ```
 
-Bytes of a hex string (even length).
+Bytes of a hex string: even length, hex digits only, else `IllegalArgumentException`.
 
 #### JsonText.base64
 

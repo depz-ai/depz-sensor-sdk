@@ -6,6 +6,7 @@ import static ai.depz.sensor.test.devices.T.throwsType;
 
 import ai.depz.sensor.devices.Bno055Device;
 import ai.depz.sensor.devices.Bno055Sample;
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.protocol.Bno055;
 import ai.depz.sensor.protocol.Common;
@@ -132,6 +133,13 @@ public final class Bno055DeviceTests {
         }
     }
 
+    public static void restoreConfigurationBeforeConfigureIsInvalidState() {
+        FakeBoard b = board();
+        try (Bno055Device dev = open(b)) {
+            throwsType(InvalidStateException.class, dev::restoreConfiguration);
+        }
+    }
+
     public static void configureWritesUnitsRemapAndProfileInConfig() {
         FakeBoard b = board();
         try (Bno055Device dev = open(b)) {
@@ -167,8 +175,8 @@ public final class Bno055DeviceTests {
             eq(cfg.pack(), b.pages[1][Bno055Regs.REG1_ACC_CONFIG] & 0xFF);
             eq(cfg, dev.getAccelConfig());
             dev.startStream();
-            throwsType(IllegalStateException.class, dev::uniqueId);
-            throwsType(IllegalStateException.class, () -> dev.setInterruptEnable(1));
+            throwsType(InvalidStateException.class, dev::uniqueId);
+            throwsType(InvalidStateException.class, () -> dev.setInterruptEnable(1));
             dev.stopStream();
             eq(16, dev.uniqueId().length);
         }
@@ -195,6 +203,9 @@ public final class Bno055DeviceTests {
             throwsType(IllegalArgumentException.class, () -> dev.setInterruptMask(256));
             throwsType(IllegalArgumentException.class, () -> dev.startStream(10, new int[] {0xF0, 0x20}));
             throwsType(IllegalArgumentException.class, () -> dev.startStream(-1));
+            // contract 13 §2 (ERRATA A13): a TIMER period outside 1..60000 ms is refused before any traffic
+            throwsType(IllegalArgumentException.class, () -> dev.startStream(0));
+            throwsType(IllegalArgumentException.class, () -> dev.startStream(60001));
             throwsType(IllegalArgumentException.class, () -> dev.startStream(10, null, 2));
             throwsType(IllegalArgumentException.class, () -> dev.readRegisters(0, 1, 2));
             eq(0, b.link.sentCount());

@@ -3,7 +3,9 @@
  * WAKE, SEND_SHTP_PACKET (with scripted ERR_BUSY), and on the control channel
  * Product ID, Set / Get Feature (Set answers unsolicited, as the real hub
  * does), the ME calibration / DCD / oscillator / errors / counts / tare
- * commands and FRS read / write over an in-memory record store. */
+ * commands, Force Sensor Flush (answered by `ef <sensor>` on the input
+ * channel) and FRS read / write over an in-memory record store; the common
+ * GET_SERIAL ("SN0086") and SYNC_TIME a session recorder needs. */
 #ifndef DEPZ_TEST_FAKE_BNO086_H
 #define DEPZ_TEST_FAKE_BNO086_H
 

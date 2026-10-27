@@ -114,6 +114,8 @@ struct SyncPinConfig {
 };
 
 bytes pack_sync_time(std::uint64_t pc_timestamp_us);
+// SET_PAYLOAD_CRC_TYPE payload: crc_type u8; std::out_of_range unless 0..3
+// (contract 02 §2).
 bytes pack_set_payload_crc_type(std::uint8_t crc_type);
 
 // NTP-style clock math, all us (contract 02 §5). Returns {offset_us, rtt_us}

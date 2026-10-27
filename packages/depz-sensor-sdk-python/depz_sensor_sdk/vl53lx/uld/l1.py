@@ -20,8 +20,15 @@ polarity, a start code with no free-running mode, and its own two calibrations.
 **Crosstalk is in kcps here, not in cps.** ST's L1X wrapper converts the 7.9
 kcps register at 0x0016 to counts per second in its own API; the L4CD wrapper
 does not. The tool speaks one unit for the whole family, so the shared
-set_xtalk/get_xtalk keep the register's own kcps — the only place where this
-port deliberately parts with the C driver.
+set_xtalk/get_xtalk keep the register's own kcps.
+
+**The threshold byte is rewritten, not accumulated.** VL53L1X_SetDistanceThreshold()
+masks SYSTEM__INTERRUPT_CONFIG_GPIO with `& 0x47` before OR-ing the new window
+in, so the previous window bits and the no-target flag survive: a window set
+after another one cannot be narrower, and the flag can never be cleared again.
+set_detection_thresholds() below clears both (`& ~0x6F`) so that the window
+written is the one asked for. These two are the only places where this port
+deliberately parts with the C driver.
 
 Reference C driver: ../../temp/STSW-IMG009_L1/STSW-IMG009_v3.5.5/API/core/
 """
@@ -39,8 +46,8 @@ from depz_sensor_sdk.vl53lx.uld.vl53l1_die import (CONFIG_END, CONFIG_ADDR,
                             SD_CONFIG__INITIAL_PHASE_SD0, SD_CONFIG__WOI_SD0,
                             SYSTEM__INTERRUPT_CONFIG_GPIO,
                             SYSTEM__MODE_START, THRESH_HIGH, THRESH_LOW,
-                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die,
-                            round_half_away)
+                            XTALK_PLANE_OFFSET_KCPS, ResultsData,
+                            VL53L1Die, round_half_away)
 
 ULD_VERSION = (3, 5, 5)
 
@@ -130,13 +137,13 @@ class VL53L1(VL53L1Die):
     PER_SPAD_K = 25
 
     # ── init (VL53L1X_SensorInit(), on the die's sequence) ──
-    def init_boot(self):
+    def init_boot(self) -> None:
         """No plain wait_boot() here: a sensor left hung by a previous session
         answers reads with zeros and never reaches 0x03 on its own.
         reset_device() ends with the boot wait anyway."""
         self.reset_device()
 
-    def init_after_config(self):
+    def init_after_config(self) -> None:
         """ST ships this part's configuration with an active-HIGH interrupt
         (register 0x30 = 0x01), where the L4CD blob has 0x11 — active low.
         The bridge watches the falling edge, so an active-high sensor gives it
@@ -144,14 +151,14 @@ class VL53L1(VL53L1Die):
         delivered exactly one report while polling ran at the full 20 Hz."""
         self.set_interrupt_polarity(0)
 
-    def init_extra(self):
+    def init_extra(self) -> None:
         """The L4CD ULD's ALGO__RANGE_IGNORE_THRESHOLD_MCPS write is not in
         this driver's init, so nothing is written here; what is left to do is
         record the mode the blob boots in, for budget_choices()."""
         self._applied_mode = self.MODES[0]
 
     # ── ranging ──
-    def start_ranging(self):
+    def start_ranging(self) -> None:
         """VL53L1X_StartRanging(): timed mode, and only timed mode.
 
         Unlike the L4CD, this part has no free-running mode under the ULD
@@ -164,10 +171,14 @@ class VL53L1(VL53L1Die):
         self.p.wr_byte(SYSTEM__MODE_START, 0x40)
 
     # ── ranging mode (VL53L1X_SetDistanceMode) ──
-    def set_mode(self, name: str):
+    def set_mode(self, name: str) -> int:
         """'short' or 'long'. The two differ in VCSEL period and phase
         window, so the budget is re-applied afterwards — those periods
-        change what the MACROP timeouts mean."""
+        change what the MACROP timeouts mean.
+
+        -> the budget in effect after the change, ms. A budget the new mode
+        does not tabulate moves to the nearest one it does (contract 12 §5,
+        the one exception to "refuse, don't round"), so the caller sees it."""
         try:
             mode = MODE_CODES[name]
         except KeyError:
@@ -197,6 +208,7 @@ class VL53L1(VL53L1Die):
             budget_ms = min(TIMING_BUDGETS[mode],
                             key=lambda ms: abs(ms - budget_ms))
         self.set_range_timing(budget_ms, inter_ms)
+        return budget_ms
 
     def get_mode(self) -> str:
         """-> 'short' or 'long'. VL53L1X_GetDistanceMode()."""
@@ -212,7 +224,7 @@ class VL53L1(VL53L1Die):
                         f'which is neither distance mode')
 
     # ── timing ──
-    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int):
+    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
         """set_range_timing(budget, inter) of the family contract, on top of
         VL53L1X_SetTimingBudgetInMs() + VL53L1X_SetInterMeasurementInMs().
 
@@ -243,12 +255,12 @@ class VL53L1(VL53L1Die):
         self.p.wr_dword(INTERMEASUREMENT_MS,
                         int(clock_pll * inter_measurement_ms * 1.075))
 
-    def budget_choices(self) -> tuple:
+    def budget_choices(self) -> tuple[int, ...]:
         """The tabulated budgets of the mode in use. 15 ms exists in short
         mode only, so the answer moves with the mode."""
         return tuple(sorted(TIMING_BUDGETS[MODE_CODES[self._applied_mode]]))
 
-    def get_range_timing(self) -> tuple:
+    def get_range_timing(self) -> tuple[int, int]:
         """-> (timing_budget_ms, inter_measurement_ms)."""
         macrop_a = self.p.rd_word(RANGE_CONFIG__TIMEOUT_MACROP_A_HI)
         budget_ms = _BUDGET_BY_MACROP_A.get(macrop_a, 0)
@@ -260,10 +272,11 @@ class VL53L1(VL53L1Die):
 
     # ── thresholds ──
     def set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int,
-                                 window: int, int_on_no_target: int = 0):
+                                 window: int, int_on_no_target: int = 0) -> None:
         """VL53L1X_SetDistanceThreshold(): a read-modify-write that keeps the
         bits outside 0x6F, and an "interrupt when no target" flag the L4CD ULD
-        does not have."""
+        does not have. The C driver keeps the old window bits too (`& 0x47`),
+        see the module docstring for why this one does not."""
         temp = self.p.rd_byte(SYSTEM__INTERRUPT_CONFIG_GPIO) & ~0x6F & 0xFF
         temp |= window
         if int_on_no_target:
@@ -283,7 +296,7 @@ class VL53L1(VL53L1Die):
         self.p.wr_word(INNER_OFFSET_MM, 0)
         self.p.wr_word(OUTER_OFFSET_MM, 0)
 
-        distances = []
+        distances: list[int] = []
         self._collect(nb_samples, lambda i, r: distances.append(r.distance_mm))
 
         offset_mm = target_dist_mm - sum(distances) // nb_samples
@@ -297,7 +310,7 @@ class VL53L1(VL53L1Die):
 
         self.p.wr_word(XTALK_PLANE_OFFSET_KCPS, 0)      # disable compensation
 
-        samples = []
+        samples: list[ResultsData] = []
         self._collect(nb_samples, lambda i, r: samples.append(r))
 
         n = float(len(samples))

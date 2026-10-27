@@ -28,6 +28,9 @@ pub enum FwdepzError {
     HeaderCrc,
     /// `fw_size` != payload length.
     Size,
+    /// The header is not section 0 of 1 (sections are 0-based; multi-section
+    /// files are not supported).
+    Section,
 }
 
 impl std::fmt::Display for FwdepzError {
@@ -36,6 +39,7 @@ impl std::fmt::Display for FwdepzError {
             FwdepzError::Magic => "magic",
             FwdepzError::HeaderCrc => "header_crc",
             FwdepzError::Size => "size",
+            FwdepzError::Section => "section",
         };
         write!(f, "fwdepz error: {}", s)
     }
@@ -44,7 +48,7 @@ impl std::fmt::Display for FwdepzError {
 impl std::error::Error for FwdepzError {}
 
 /// Parse and validate a `.fwdepz` blob. Validation order: magic → header CRC →
-/// `fw_size == len(payload)` (contract 06 §2).
+/// `fw_size == len(payload)` → section 0 of 1 (contract 06 §2).
 pub fn parse(file: &[u8]) -> Result<FwdepzHeader, FwdepzError> {
     if file.len() < HEADER_SIZE || &file[0..8] != MAGIC {
         return Err(FwdepzError::Magic);
@@ -62,6 +66,10 @@ pub fn parse(file: &[u8]) -> Result<FwdepzHeader, FwdepzError> {
     let payload = &file[HEADER_SIZE..];
     if fw_size as usize != payload.len() {
         return Err(FwdepzError::Size);
+    }
+    // Sections are 0-based; every shipped file is section 0 of 1 (ERRATA B9).
+    if cur_sec != 0 || tot_sec != 1 {
+        return Err(FwdepzError::Section);
     }
     let payload_crc_ok = crc32_iso_hdlc(payload) == fw_crc32;
 

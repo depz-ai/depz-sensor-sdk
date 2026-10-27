@@ -79,7 +79,10 @@ fn capture(file: &str) -> Capture {
                 _ => None,
             };
             current = op.map(|op| {
-                steps.push(Step { op, reply: Reply::NoAnswer(p.cmd) });
+                steps.push(Step {
+                    op,
+                    reply: Reply::NoAnswer(p.cmd),
+                });
                 (steps.len() - 1, p.cmd)
             });
             continue;
@@ -119,7 +122,13 @@ struct ReplayState {
 
 impl Replay {
     fn new(steps: Vec<Step>) -> Replay {
-        Replay { state: Mutex::new(ReplayState { script: steps.into(), done: 0, mismatch: None }) }
+        Replay {
+            state: Mutex::new(ReplayState {
+                script: steps.into(),
+                done: 0,
+                mismatch: None,
+            }),
+        }
     }
 
     fn next(&self, op: Op) -> Result<Reply> {
@@ -134,7 +143,9 @@ impl Replay {
                 match step.reply {
                     Reply::Ok | Reply::Data(_) => Ok(step.reply),
                     Reply::Refused(cmd, status) => Err(DepzError::Status { cmd, status }),
-                    Reply::NoAnswer(cmd) => Err(DepzError::timeout(cmd, Duration::from_millis(100))),
+                    Reply::NoAnswer(cmd) => {
+                        Err(DepzError::timeout(cmd, Duration::from_millis(100)))
+                    }
                 }
             }
             other => {
@@ -166,7 +177,13 @@ impl Replay {
     }
 
     fn left(&self) -> Vec<String> {
-        self.state.lock().unwrap().script.iter().map(|s| format!("{:?}", s.op)).collect()
+        self.state
+            .lock()
+            .unwrap()
+            .script
+            .iter()
+            .map(|s| format!("{:?}", s.op))
+            .collect()
     }
 }
 
@@ -198,12 +215,20 @@ impl Vl53lxPlatform for Replay {
 }
 
 fn scenario(id: &str) -> Value {
-    let p = vectors_dir().join("..").join("scenarios").join(format!("{id}.json"));
+    let p = vectors_dir()
+        .join("..")
+        .join("scenarios")
+        .join(format!("{id}.json"));
     serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap()
 }
 
 fn call<'a>(sc: &'a Value, name: &str) -> &'a Value {
-    sc["steps"].as_array().unwrap().iter().find(|s| s["call"] == name).unwrap_or_else(|| panic!("no '{name}' step"))
+    sc["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["call"] == name)
+        .unwrap_or_else(|| panic!("no '{name}' step"))
 }
 
 struct Outcome {
@@ -217,19 +242,35 @@ struct Outcome {
 fn replay(id: &str, product_by_class: &str) -> Outcome {
     let sc = scenario(id);
     let expected: Value = serde_json::from_str(
-        &std::fs::read_to_string(vectors_dir().join("recordings").join(format!("{id}.expected.json"))).unwrap(),
+        &std::fs::read_to_string(
+            vectors_dir()
+                .join("recordings")
+                .join(format!("{id}.expected.json")),
+        )
+        .unwrap(),
     )
     .unwrap();
     let cap = capture(sc["recording"].as_str().unwrap());
-    let timeouts = cap.steps.iter().filter(|s| matches!(s.reply, Reply::NoAnswer(_))).count();
-    let refusals = cap.steps.iter().filter(|s| matches!(s.reply, Reply::Refused(..))).count();
+    let timeouts = cap
+        .steps
+        .iter()
+        .filter(|s| matches!(s.reply, Reply::NoAnswer(_)))
+        .count();
+    let refusals = cap
+        .steps
+        .iter()
+        .filter(|s| matches!(s.reply, Reply::Refused(..)))
+        .count();
     let n_steps = cap.steps.len();
     let platform = Arc::new(Replay::new(cap.steps));
     let shared: Arc<dyn Vl53lxPlatform> = platform.clone();
 
     let init = call(&sc, "init")["args"].as_array().unwrap();
     let kind = init[0].as_str().unwrap();
-    let product = init.get(1).and_then(|v| v.as_str()).unwrap_or(product_by_class);
+    let product = init
+        .get(1)
+        .and_then(|v| v.as_str())
+        .unwrap_or(product_by_class);
     assert_eq!(expected["product"], product, "{id}");
     let (mut drv, _caveat) = create_driver(product, kind, shared).unwrap();
 
@@ -258,11 +299,22 @@ fn replay(id: &str, product_by_class: &str) -> Outcome {
         panic!("{id}: {m}");
     }
     let timing = result.unwrap_or_else(|e| panic!("{id}: {e}"));
-    assert!(platform.left().is_empty(), "{id}: the capture has more: {:?}", platform.left());
+    assert!(
+        platform.left().is_empty(),
+        "{id}: the capture has more: {:?}",
+        platform.left()
+    );
     assert_eq!(platform.done(), n_steps);
 
     let want = call(&sc, "get_range_timing")["expect"].as_array().unwrap();
-    assert_eq!(timing, (want[0].as_u64().unwrap() as u32, want[1].as_u64().unwrap() as u32), "{id} timing");
+    assert_eq!(
+        timing,
+        (
+            want[0].as_u64().unwrap() as u32,
+            want[1].as_u64().unwrap() as u32
+        ),
+        "{id} timing"
+    );
 
     let frames = expected["frames"].as_array().unwrap();
     assert!(!frames.is_empty());
@@ -270,13 +322,26 @@ fn replay(id: &str, product_by_class: &str) -> Outcome {
         let raw = hex_decode(f["raw"].as_str().unwrap());
         assert_eq!(cap.blocks[i], raw, "{id} frame {i}: the streamed block");
         let r = drv.decode(&raw).unwrap();
-        assert_eq!(r.distance_mm as i64, f["distance_mm"].as_i64().unwrap(), "{id} frame {i} distance");
-        assert_eq!(r.status as i64, f["status"].as_i64().unwrap(), "{id} frame {i} status");
+        assert_eq!(
+            r.distance_mm as i64,
+            f["distance_mm"].as_i64().unwrap(),
+            "{id} frame {i} distance"
+        );
+        assert_eq!(
+            r.status as i64,
+            f["status"].as_i64().unwrap(),
+            "{id} frame {i} status"
+        );
         assert!(r.targets.is_empty());
         assert_eq!(r.valid(), r.status == 0);
         assert!(!r.status_text.is_empty());
     }
-    Outcome { ops: n_steps, timeouts, refusals, frames: frames.len() }
+    Outcome {
+        ops: n_steps,
+        timeouts,
+        refusals,
+        frames: frames.len(),
+    }
 }
 
 fn report(id: &str, o: &Outcome) {
@@ -340,10 +405,18 @@ fn registry_kinds_and_refusals() {
 
     let p: Arc<dyn Vl53lxPlatform> = Arc::new(Replay::new(Vec::new()));
     let e = create_driver("VL53L3CX", "uld", p.clone()).err().unwrap();
-    assert_eq!(unsupported(e), "VL53L3CX has no 'uld' driver - it has ulp, histogram");
+    assert_eq!(
+        unsupported(e),
+        "VL53L3CX has no 'uld' driver - it has ulp, histogram"
+    );
 
     let cases: [(&str, &str, &str, Option<&str>); 5] = [
-        ("VL53L0X", "uld", "Vl53l0xUldDriver", Some("no detection thresholds; there is no ROI on this die at all")),
+        (
+            "VL53L0X",
+            "uld",
+            "Vl53l0xUldDriver",
+            Some("no detection thresholds; there is no ROI on this die at all"),
+        ),
         ("VL53L1CX", "uld", "Vl53l1UldDriver", None),
         ("VL53L1CB", "uld", "Vl53l1UldDriver", None),
         (
@@ -379,7 +452,10 @@ fn driver_properties() {
     assert_eq!(l0x.max_khz(), 400);
     assert_eq!(l0x.clear_steps(), [(0x0B, 0x01), (0x0B, 0x00)]);
     assert_eq!(l0x.stream_block(), (0x14, 12));
-    assert_eq!(l0x.modes(), ["default", "long-range", "high-speed", "high-accuracy"]);
+    assert_eq!(
+        l0x.modes(),
+        ["default", "long-range", "high-speed", "high-accuracy"]
+    );
     assert_eq!(l0x.budget_ms(), (20, 200));
 
     let (l1, _) = create_driver("VL53L1CX", "uld", p.clone()).unwrap();
@@ -396,13 +472,22 @@ fn driver_properties() {
     assert!(l4.budget_choices().is_empty());
     assert!(!l4.supports().contains(&"roi"));
     let e = l4.set_mode("short").unwrap_err();
-    assert_eq!(unsupported(e), "VL53L4CD/Vl53l4UldDriver does not support 'mode'");
+    assert_eq!(
+        unsupported(e),
+        "VL53L4CD/Vl53l4UldDriver does not support 'mode'"
+    );
     let e = l4.perform_ref_spad_management().unwrap_err();
-    assert_eq!(unsupported(e), "VL53L4CD/Vl53l4UldDriver does not support 'refspad'");
+    assert_eq!(
+        unsupported(e),
+        "VL53L4CD/Vl53l4UldDriver does not support 'refspad'"
+    );
 
     let (mut l3, _) = create_driver("VL53L3CX", "ulp", p).unwrap();
     let e = l3.calibrate_offset(100, None).unwrap_err();
-    assert_eq!(unsupported(e), "VL53L3CX/Vl53l3UlpDriver does not support 'calib_offset'");
+    assert_eq!(
+        unsupported(e),
+        "VL53L3CX/Vl53l3UlpDriver does not support 'calib_offset'"
+    );
 }
 
 #[test]
@@ -412,13 +497,19 @@ fn die_decode_and_status_text() {
     // raw status 13 maps to 13, which the ULD table does not name
     let mut raw = hex_decode("090900d3200296008600092bb902700296");
     let r = l4.decode(&raw).unwrap();
-    assert_eq!((r.distance_mm, r.status, r.status_text.as_str()), (624, 0, "valid"));
+    assert_eq!(
+        (r.distance_mm, r.status, r.status_text.as_str()),
+        (624, 0, "valid")
+    );
     assert_eq!(r.signal_kcps, (0x0296 * 8) as f64);
     assert_eq!(r.ambient_kcps, (0x0086 * 8) as f64);
     assert_eq!(r.sigma_mm, (0x0009 / 4) as f64);
     assert_eq!(r.spads, (0xD320 / 256) as f64);
     assert_eq!(r.extra["stream_count"], ExtraValue::Int(0));
-    assert_eq!(r.extra["signal_per_spad_kcps"], ExtraValue::Int(0x0296 * 8 * 256 / 0xD320));
+    assert_eq!(
+        r.extra["signal_per_spad_kcps"],
+        ExtraValue::Int(0x0296 * 8 * 256 / 0xD320)
+    );
     raw[0] = 13;
     let r = l4.decode(&raw).unwrap();
     assert_eq!((r.status, r.status_text.as_str()), (13, "unknown (13)"));
@@ -434,7 +525,10 @@ fn die_decode_and_status_text() {
     let raw = hex_decode("090901439008060136000d222702420806");
     let r = l1.decode(&raw).unwrap();
     assert_eq!(r.signal_kcps, (0x0806 * 8) as f64);
-    assert_eq!(r.extra["signal_per_spad_kcps"], ExtraValue::Int(0x0806 * 8 * 25 / 0x4390));
+    assert_eq!(
+        r.extra["signal_per_spad_kcps"],
+        ExtraValue::Int(0x0806 * 8 * 25 / 0x4390)
+    );
 
     assert_eq!(uld::die::status_text(255), "other error");
     assert_eq!(uld::die::status_text(-1), "unknown (-1)");

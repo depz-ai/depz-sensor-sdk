@@ -21,6 +21,7 @@ import {
 } from "../../src/protocol/tmf8829.js";
 import { unpackInfo, unpackRegData, unpackStream } from "../../src/protocol/vl53l4.js";
 import { unpackVl53l7Info } from "../../src/protocol/vl53l7.js";
+import { FrameReassembler, Vl53l8Rpt, unpackFrameChunk } from "../../src/protocol/vl53l8.js";
 import { unpackVl53lxInfo } from "../../src/protocol/vl53lx.js";
 import { decodeBno055Block } from "../../src/sensors/bno055/regs.js";
 import { Tmf8829MeasurementBuilder } from "../../src/sensors/tmf8829/builder.js";
@@ -269,6 +270,26 @@ export function tmf8829Decode(report: number, p: Uint8Array): Any {
     };
   }
   throw new Error(`unknown TMF8829 report ${report}`);
+}
+
+/** vl53l8.json decode shape: one RPT_VL53_FRAME chunk (contract 04 §3). */
+export function vl53l8Decode(report: number, payload: Uint8Array): Any {
+  if (report === Vl53l8Rpt.Vl53Frame) {
+    const c = unpackFrameChunk(payload);
+    return { timestamp_us: c.timestampUs, full_size: c.fullSize, offset: c.offset, data: toHex(c.data) };
+  }
+  throw new Error(`unknown VL53L8 report ${report}`);
+}
+
+/** RPT_VL53_FRAME payloads through one reassembler; vl53l8.json reassembly shape (contract 04 §4). */
+export function vl53l8Reassembly(chunks: Uint8Array[]): Any {
+  const r = new FrameReassembler();
+  const frames: Any[] = [];
+  for (const ch of chunks) {
+    const f = r.feed(unpackFrameChunk(ch));
+    if (f !== null) frames.push({ timestamp_us: f.timestampUs, size: f.frame.length, sha256: sha256(f.frame) });
+  }
+  return { frames, completed: r.completed, discarded: r.discarded };
 }
 
 /** Feed FRAME-chunk payloads to one reassembler; the reassembly shape. */

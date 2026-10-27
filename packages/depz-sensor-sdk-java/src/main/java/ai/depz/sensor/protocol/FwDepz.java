@@ -30,7 +30,8 @@ public final class FwDepz {
         /**
          * Parse and validate. Validation order (contract 06 §2): length, magic,
          * then CRC-16/CCITT-FALSE over bytes [0..61] vs the u16 LE at offset 62,
-         * then {@code fw_size == payload length}.
+         * then {@code fw_size == payload length}, then section 0 of 1 (sections
+         * are 0-based; multi-section files are refused).
          */
         public static FwDepzImage parse(byte[] blob) {
             if (blob.length < FWDEPZ_HEADER_SIZE) {
@@ -53,6 +54,11 @@ public final class FwDepz {
             byte[] payload = Arrays.copyOfRange(blob, FWDEPZ_HEADER_SIZE, blob.length);
             if (fwSize != payload.length) {
                 throw new FwDepzError("size", "fw_size=" + fwSize + " but payload is " + payload.length + " bytes");
+            }
+            // Sections are 0-based; every shipped file is section 0 of 1 (ERRATA B9).
+            if (curSec != 0 || totSec != 1) {
+                throw new FwDepzError("section", "section " + curSec + " of " + totSec
+                    + ": only section 0 of 1 is supported (multi-section files are not)");
             }
             return new FwDepzImage(loadAddr, fwSize, fwCrc32, curSec, totSec, payload);
         }

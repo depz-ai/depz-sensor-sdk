@@ -6,10 +6,15 @@ package ai.depz.sensor.devices;
  */
 public interface DeviceEvent {
     /**
-     * A gap in packet sequence numbers; {@code reportedByDevice}: the board saw a gap in host TX
-     * (RPT_SEQUENCE_ERROR), else the host saw one in the board's packets.
+     * The board saw a gap in host TX (RPT_SEQUENCE_ERROR); {@code reportedByDevice} is always true.
      */
     record SequenceError(int expectedSeq, int receivedSeq, boolean reportedByDevice) implements DeviceEvent {}
+
+    /**
+     * The host saw a gap in the board's packets (contract 01 §5 step 5): the packet still arrives,
+     * {@code missed} = (received − expected) mod 256 did not. Counted in {@code seqGaps}.
+     */
+    record SeqGap(int expectedSeq, int receivedSeq, int missed) implements DeviceEvent {}
 
     /** A packet whose payload CRC did not check. */
     record LinkCrcError(int cmd, int seq) implements DeviceEvent {}

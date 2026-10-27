@@ -10,7 +10,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **BNO085 (IMU)**: [`Bno086Cmd`](#bno086cmd), [`RPT_DATA`](#rpt_data), [`BUSY_BACKOFF_MS`](#busy_backoff_ms), [`Bno086Data`](#bno086data), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`EXECUTABLE_RESET_COMPLETE`](#executable_reset_complete), [`CMD_ERRORS`](#cmd_errors), [`CMD_COUNTER`](#cmd_counter), [`CMD_TARE`](#cmd_tare), [`CMD_INITIALIZE`](#cmd_initialize), [`CMD_SAVE_DCD`](#cmd_save_dcd), [`CMD_ME_CALIBRATE`](#cmd_me_calibrate), [`CMD_PERIODIC_DCD_CONFIG`](#cmd_periodic_dcd_config), [`CMD_GET_OSCILLATOR_TYPE`](#cmd_get_oscillator_type), [`CMD_CLEAR_DCD_AND_RESET`](#cmd_clear_dcd_and_reset), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`OSC_INTERNAL`](#osc_internal), [`OSC_EXT_CRYSTAL`](#osc_ext_crystal), [`OSC_EXT_CLOCK`](#osc_ext_clock), [`ERROR_SOURCE_NO_MORE_ERRORS`](#error_source_no_more_errors), [`TARE_X`](#tare_x), [`TARE_Y`](#tare_y), [`TARE_Z`](#tare_z), [`TARE_ALL`](#tare_all), [`TareBasis`](#tarebasis), [`MotionIntent`](#motionintent), [`FRS_STATIC_CALIBRATION_AGM`](#frs_static_calibration_agm), [`FRS_NOMINAL_CALIBRATION`](#frs_nominal_calibration), [`FRS_DYNAMIC_CALIBRATION`](#frs_dynamic_calibration), [`FRS_ME_POWER_MGMT`](#frs_me_power_mgmt), [`FRS_SYSTEM_ORIENTATION`](#frs_system_orientation), [`FRS_ACCEL_ORIENTATION`](#frs_accel_orientation), [`FRS_GYROSCOPE_ORIENTATION`](#frs_gyroscope_orientation), [`FRS_MAGNETOMETER_ORIENTATION`](#frs_magnetometer_orientation), [`FRS_ARVR_STABILIZATION_RV`](#frs_arvr_stabilization_rv), [`FRS_ARVR_STABILIZATION_GRV`](#frs_arvr_stabilization_grv), [`FRS_SERIAL_NUMBER`](#frs_serial_number), [`FRS_USER_RECORD`](#frs_user_record), [`FRS_SIG_MOTION_DETECT_CONFIG`](#frs_sig_motion_detect_config), [`FRS_SHAKE_DETECT_CONFIG`](#frs_shake_detect_config), [`FRS_STABILITY_DETECTOR_CONFIG`](#frs_stability_detector_config), [`FRS_ACTIVITY_TRACKER_CONFIG`](#frs_activity_tracker_config), [`METADATA_RECORDS`](#metadata_records), [`FRS_NO_ERROR`](#frs_no_error), [`FRS_UNRECOGNIZED_FRS_TYPE`](#frs_unrecognized_frs_type), [`FRS_BUSY`](#frs_busy), [`FRS_READ_COMPLETED`](#frs_read_completed), [`FRS_OFFSET_OUT_OF_RANGE`](#frs_offset_out_of_range), [`FRS_RECORD_EMPTY`](#frs_record_empty), [`FRS_BLOCK_COMPLETED`](#frs_block_completed), [`FRS_BLOCK_AND_READ_COMPLETED`](#frs_block_and_read_completed), [`FRS_DEVICE_ERROR`](#frs_device_error), [`FRS_WRITE_WORDS_RECEIVED`](#frs_write_words_received), [`FRS_WRITE_UNRECOGNIZED_FRS_TYPE`](#frs_write_unrecognized_frs_type), [`FRS_WRITE_BUSY`](#frs_write_busy), [`FRS_WRITE_COMPLETED`](#frs_write_completed), [`FRS_WRITE_MODE_READY`](#frs_write_mode_ready), [`FRS_WRITE_FAILED`](#frs_write_failed), [`FRS_WRITE_NOT_IN_WRITE_MODE`](#frs_write_not_in_write_mode), [`FRS_WRITE_INVALID_LENGTH`](#frs_write_invalid_length), [`FRS_WRITE_RECORD_VALID`](#frs_write_record_valid), [`FRS_WRITE_RECORD_INVALID`](#frs_write_record_invalid), [`Sh2HubError`](#sh2huberror), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`COUNTS_GET`](#counts_get), [`COUNTS_CLEAR`](#counts_clear), [`ME_CAL_GET`](#me_cal_get), [`split_control_cargo`](#split_control_cargo), [`counts_get_params`](#counts_get_params), [`counts_clear_params`](#counts_clear_params), [`errors_params`](#errors_params), [`tare_now_params`](#tare_now_params), [`persist_tare_params`](#persist_tare_params), [`set_reorientation_params`](#set_reorientation_params), [`me_calibration_params`](#me_calibration_params), [`interactive_calibration_params`](#interactive_calibration_params), [`force_flush`](#force_flush), [`periodic_dcd_params`](#periodic_dcd_params), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`try_parse_input_cargo`](#try_parse_input_cargo), [`try_parse_gyro_rv_cargo`](#try_parse_gyro_rv_cargo), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`ShtpError`](#shtperror), [`try_pack_shtp_header`](#try_pack_shtp_header), [`try_unpack_shtp_header`](#try_unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`try_build_frame`](#try_build_frame), [`ShtpLayer`](#shtplayer), [`RATE_LOW_FACTOR`](#rate_low_factor), [`RATE_HIGH_FACTOR`](#rate_high_factor), [`Bno086Device`](#bno086device)
+- **BNO085 (IMU)**: [`Bno086Cmd`](#bno086cmd), [`RPT_DATA`](#rpt_data), [`BUSY_BACKOFF_MS`](#busy_backoff_ms), [`Bno086Data`](#bno086data), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`EXECUTABLE_RESET_COMPLETE`](#executable_reset_complete), [`CMD_ERRORS`](#cmd_errors), [`CMD_COUNTER`](#cmd_counter), [`CMD_TARE`](#cmd_tare), [`CMD_INITIALIZE`](#cmd_initialize), [`CMD_SAVE_DCD`](#cmd_save_dcd), [`CMD_ME_CALIBRATE`](#cmd_me_calibrate), [`CMD_PERIODIC_DCD_CONFIG`](#cmd_periodic_dcd_config), [`CMD_GET_OSCILLATOR_TYPE`](#cmd_get_oscillator_type), [`CMD_CLEAR_DCD_AND_RESET`](#cmd_clear_dcd_and_reset), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`OSC_INTERNAL`](#osc_internal), [`OSC_EXT_CRYSTAL`](#osc_ext_crystal), [`OSC_EXT_CLOCK`](#osc_ext_clock), [`ERROR_SOURCE_NO_MORE_ERRORS`](#error_source_no_more_errors), [`TARE_X`](#tare_x), [`TARE_Y`](#tare_y), [`TARE_Z`](#tare_z), [`TARE_ALL`](#tare_all), [`TareBasis`](#tarebasis), [`MotionIntent`](#motionintent), [`FRS_STATIC_CALIBRATION_AGM`](#frs_static_calibration_agm), [`FRS_NOMINAL_CALIBRATION`](#frs_nominal_calibration), [`FRS_DYNAMIC_CALIBRATION`](#frs_dynamic_calibration), [`FRS_ME_POWER_MGMT`](#frs_me_power_mgmt), [`FRS_SYSTEM_ORIENTATION`](#frs_system_orientation), [`FRS_ACCEL_ORIENTATION`](#frs_accel_orientation), [`FRS_GYROSCOPE_ORIENTATION`](#frs_gyroscope_orientation), [`FRS_MAGNETOMETER_ORIENTATION`](#frs_magnetometer_orientation), [`FRS_ARVR_STABILIZATION_RV`](#frs_arvr_stabilization_rv), [`FRS_ARVR_STABILIZATION_GRV`](#frs_arvr_stabilization_grv), [`FRS_SERIAL_NUMBER`](#frs_serial_number), [`FRS_USER_RECORD`](#frs_user_record), [`FRS_SIG_MOTION_DETECT_CONFIG`](#frs_sig_motion_detect_config), [`FRS_SHAKE_DETECT_CONFIG`](#frs_shake_detect_config), [`FRS_STABILITY_DETECTOR_CONFIG`](#frs_stability_detector_config), [`FRS_ACTIVITY_TRACKER_CONFIG`](#frs_activity_tracker_config), [`FRS_GYRO_INTEGRATED_RV_CONFIG`](#frs_gyro_integrated_rv_config), [`METADATA_RECORDS`](#metadata_records), [`FRS_NO_ERROR`](#frs_no_error), [`FRS_UNRECOGNIZED_FRS_TYPE`](#frs_unrecognized_frs_type), [`FRS_BUSY`](#frs_busy), [`FRS_READ_COMPLETED`](#frs_read_completed), [`FRS_OFFSET_OUT_OF_RANGE`](#frs_offset_out_of_range), [`FRS_RECORD_EMPTY`](#frs_record_empty), [`FRS_BLOCK_COMPLETED`](#frs_block_completed), [`FRS_BLOCK_AND_READ_COMPLETED`](#frs_block_and_read_completed), [`FRS_DEVICE_ERROR`](#frs_device_error), [`FRS_WRITE_WORDS_RECEIVED`](#frs_write_words_received), [`FRS_WRITE_UNRECOGNIZED_FRS_TYPE`](#frs_write_unrecognized_frs_type), [`FRS_WRITE_BUSY`](#frs_write_busy), [`FRS_WRITE_COMPLETED`](#frs_write_completed), [`FRS_WRITE_MODE_READY`](#frs_write_mode_ready), [`FRS_WRITE_FAILED`](#frs_write_failed), [`FRS_WRITE_NOT_IN_WRITE_MODE`](#frs_write_not_in_write_mode), [`FRS_WRITE_INVALID_LENGTH`](#frs_write_invalid_length), [`FRS_WRITE_RECORD_VALID`](#frs_write_record_valid), [`FRS_WRITE_RECORD_INVALID`](#frs_write_record_invalid), [`Sh2HubError`](#sh2huberror), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`COUNTS_GET`](#counts_get), [`COUNTS_CLEAR`](#counts_clear), [`ME_CAL_GET`](#me_cal_get), [`split_control_cargo`](#split_control_cargo), [`counts_get_params`](#counts_get_params), [`counts_clear_params`](#counts_clear_params), [`errors_params`](#errors_params), [`tare_now_params`](#tare_now_params), [`persist_tare_params`](#persist_tare_params), [`set_reorientation_params`](#set_reorientation_params), [`me_calibration_params`](#me_calibration_params), [`interactive_calibration_params`](#interactive_calibration_params), [`force_flush`](#force_flush), [`periodic_dcd_params`](#periodic_dcd_params), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`try_parse_input_cargo`](#try_parse_input_cargo), [`try_parse_gyro_rv_cargo`](#try_parse_gyro_rv_cargo), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`ShtpError`](#shtperror), [`try_pack_shtp_header`](#try_pack_shtp_header), [`try_unpack_shtp_header`](#try_unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`try_build_frame`](#try_build_frame), [`ShtpLayer`](#shtplayer), [`RATE_LOW_FACTOR`](#rate_low_factor), [`RATE_HIGH_FACTOR`](#rate_high_factor), [`Bno086Device`](#bno086device)
 
 ## BNO085 (IMU)
 
@@ -332,14 +332,42 @@ pub const FRS_STABILITY_DETECTOR_CONFIG: u16 = 0xED85;
 pub const FRS_ACTIVITY_TRACKER_CONFIG: u16 = 0xED88;
 ```
 
+### FRS_GYRO_INTEGRATED_RV_CONFIG
+
+```rust
+pub const FRS_GYRO_INTEGRATED_RV_CONFIG: u16 = 0xA1A2;
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 ### METADATA_RECORDS
 
 ```rust
 pub const METADATA_RECORDS: [(u8, u16); 24] = [
-    (0x14, 0xE301), (0x01, 0xE302), (0x04, 0xE303), (0x06, 0xE304), (0x15, 0xE305), (0x02, 0xE306),
-    (0x07, 0xE307), (0x16, 0xE308), (0x03, 0xE309), (0x0F, 0xE30A), (0x05, 0xE30B), (0x08, 0xE30C),
-    (0x09, 0xE30D), (0x10, 0xE313), (0x18, 0xE314), (0x11, 0xE315), (0x12, 0xE316), (0x13, 0xE317),
-    (0x19, 0xE318), (0x1E, 0xE31C), (0x28, 0xE322), (0x29, 0xE323), (0x2A, 0xE324), (0x2B, 0xE325),
+    (0x14, 0xE301),
+    (0x01, 0xE302),
+    (0x04, 0xE303),
+    (0x06, 0xE304),
+    (0x15, 0xE305),
+    (0x02, 0xE306),
+    (0x07, 0xE307),
+    (0x16, 0xE308),
+    (0x03, 0xE309),
+    (0x0F, 0xE30A),
+    (0x05, 0xE30B),
+    (0x08, 0xE30C),
+    (0x09, 0xE30D),
+    (0x10, 0xE313),
+    (0x18, 0xE314),
+    (0x11, 0xE315),
+    (0x12, 0xE316),
+    (0x13, 0xE317),
+    (0x19, 0xE318),
+    (0x1E, 0xE31C),
+    (0x28, 0xE322),
+    (0x29, 0xE323),
+    (0x2A, 0xE324),
+    (0x2B, 0xE325),
 ];
 ```
 
@@ -740,7 +768,13 @@ out of the Q14 int16 range is refused.
 ### me_calibration_params
 
 ```rust
-pub fn me_calibration_params(accel: bool, gyro: bool, mag: bool, planar: bool, subcommand: u8) -> [u8; 5]
+pub fn me_calibration_params(
+    accel: bool,
+    gyro: bool,
+    mag: bool,
+    planar: bool,
+    subcommand: u8,
+) -> [u8; 5]
 ```
 
 ME Calibration (0x07): subcommand 0 configures, 1 ([`ME_CAL_GET`]) reads back.
@@ -1107,7 +1141,10 @@ Which of the plain 3-vector reports.
 ### try_parse_input_cargo
 
 ```rust
-pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Vec<Report>, CodecError>
+pub fn try_parse_input_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Vec<Report>, CodecError>
 ```
 
 [`parse_input_cargo`] that refuses a negative `capture_timestamp_us`: the
@@ -1116,7 +1153,10 @@ capture time is the MCU uptime, a u64 (contract 07 §3).
 ### try_parse_gyro_rv_cargo
 
 ```rust
-pub fn try_parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Option<Report>, CodecError>
+pub fn try_parse_gyro_rv_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Option<Report>, CodecError>
 ```
 
 [`parse_gyro_rv_cargo`] that refuses a negative `capture_timestamp_us`
@@ -1488,7 +1528,7 @@ Single-fragment frame: length = header + payload. A frame longer than the
 
 ```rust
 pub struct ShtpLayer {
-    /// Incomplete cargos thrown away.
+    /// Incomplete cargos and junk-channel (≥ 6) frames thrown away.
     pub discarded: u64,
     tx_seqs: [u8; NUM_CHANNELS],
     rx: Vec<ChannelRx>,
@@ -1674,7 +1714,11 @@ The SH-2 application's Product ID — the first of [`Bno086Device::product_ids`]
 #### Bno086Device::product_ids
 
 ```rust
-pub fn product_ids(&self, timeout: Option<Duration>, settle: Option<Duration>) -> Result<Vec<ProductId>>
+pub fn product_ids(
+    &self,
+    timeout: Option<Duration>,
+    settle: Option<Duration>,
+) -> Result<Vec<ProductId>>
 ```
 
 Every component's Product ID Response, the SH-2 application first. Collects until no response
@@ -1852,7 +1896,12 @@ Read a whole FRS record: its 32-bit words.
 #### Bno086Device::frs_write
 
 ```rust
-pub fn frs_write(&self, record_id: u16, words: &[u32], timeout: Option<Duration>) -> Result<()>
+pub fn frs_write(
+    &self,
+    record_id: u16,
+    words: &[u32],
+    timeout: Option<Duration>,
+) -> Result<()>
 ```
 
 Write a whole FRS record.

@@ -32,7 +32,7 @@ static void send_locked(fake_vl53l4 *f, uint8_t cmd, const uint8_t *payload, siz
     size_t n;
     if (depz_build_packet(cmd, payload, len, f->tx_seq, DEPZ_CRC_NONE, frame, sizeof frame, &n) == 0 &&
         depz_link_write(f->side, frame, n) == DEPZ_OK)
-        f->tx_seq++;
+        f->tx_seq = (uint8_t)(f->tx_seq + 1); /* wraps mod 256 (contract 01 §5) */
 }
 
 static void status(fake_vl53l4 *f, uint8_t cmd, uint8_t st)
@@ -117,6 +117,8 @@ static void handle(fake_vl53l4 *f, uint8_t cmd, const uint8_t *p, size_t len)
         if (len == 2 && f->n_speeds < 64) f->speeds[f->n_speeds++] = (uint16_t)(p[0] | p[1] << 8);
         status(f, cmd, 0x00);
         break;
+    case 0x39: /* SET_ADDR_WIDTH, CLEAR_I2C_ERRORS: the APP_VL53L0_4 bridge's two */
+    case 0x3A: status(f, cmd, 0x00); break;
     default: status(f, cmd, 0x02);
     }
 }

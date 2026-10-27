@@ -9,7 +9,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`MODE_SWITCH_FROM_CONFIG`](#mode_switch_from_config), [`MODE_SWITCH_TO_CONFIG`](#mode_switch_to_config), [`SELF_TEST_TIME`](#self_test_time), [`BOOT_SETTLE_TIMEOUT`](#boot_settle_timeout), [`STUCK_SELF_TEST_POLLS`](#stuck_self_test_polls), [`FUSION_START_TIMEOUT`](#fusion_start_timeout), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`TIMER_PERIOD_MIN_MS`](#timer_period_min_ms), [`TIMER_PERIOD_MAX_MS`](#timer_period_max_ms), [`try_pack_read_reg`](#try_pack_read_reg), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`try_pack_start_stream`](#try_pack_start_stream), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`MODE_SWITCH_FROM_CONFIG`](#mode_switch_from_config), [`MODE_SWITCH_TO_CONFIG`](#mode_switch_to_config), [`SELF_TEST_TIME`](#self_test_time), [`BOOT_SETTLE_TIMEOUT`](#boot_settle_timeout), [`STUCK_SELF_TEST_POLLS`](#stuck_self_test_polls), [`FUSION_START_TIMEOUT`](#fusion_start_timeout), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
 - **Shared (re-exported from `vl53l4`)**: [`i2c_error_name`](#i2c_error_name)
 
 ## BNO055 (IMU)
@@ -111,13 +111,38 @@ pub const EXPECTED_MAG_ID: u8 = 0x32;
 pub const EXPECTED_GYR_ID: u8 = 0x0F;
 ```
 
+### TIMER_PERIOD_MIN_MS
+
+```rust
+pub const TIMER_PERIOD_MIN_MS: u16 = 1;
+```
+
+`BNO_START_STREAM` TIMER period limits, ms (contract 13 §2).
+
+### TIMER_PERIOD_MAX_MS
+
+```rust
+pub const TIMER_PERIOD_MAX_MS: u16 = 60000;
+```
+
+### try_pack_read_reg
+
+```rust
+pub fn try_pack_read_reg(addr: u8, len: u8) -> Result<[u8; 2], CodecError>
+```
+
+`BNO_READ_REG` payload: `addr u8, len u8` with the transfer limit of
+contract 13 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x100` —
+refused before anything is written (contract 07 §3).
+
 ### pack_read_reg
 
 ```rust
 pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2]
 ```
 
-`BNO_READ_REG` payload: `addr u8, len u8`.
+`BNO_READ_REG` payload: `addr u8, len u8`, unchecked — prefer
+[`try_pack_read_reg`].
 
 ### try_pack_write_reg
 
@@ -125,8 +150,8 @@ pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2]
 pub fn try_pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError>
 ```
 
-`BNO_WRITE_REG` payload: `addr u8, data[1..128]`; a data length outside
-1..=[`XFER_MAX`] is refused (contract 07 §3), never sent.
+`BNO_WRITE_REG` payload: `addr u8, data[1..128]` with `addr + N <= 0x100`;
+anything else is refused (contract 07 §3), never sent.
 
 ### pack_write_reg
 
@@ -161,6 +186,21 @@ pub fn pack_get_info() -> [u8; 0]
 
 `BNO_GET_INFO` payload (empty).
 
+### try_pack_start_stream
+
+```rust
+pub fn try_pack_start_stream(
+    trigger: u8,
+    addr: u8,
+    len: u8,
+    period_ms: u16,
+) -> Result<[u8; 5], CodecError>
+```
+
+`BNO_START_STREAM` payload with the TIMER rule of contract 13 §2: with
+[`TRIGGER_TIMER`] the period is 1..=60000 ms, else refused before anything
+is written; with [`TRIGGER_INT`] it is the missed-edge watchdog (0 = none).
+
 ### pack_start_stream
 
 ```rust
@@ -168,7 +208,8 @@ pub fn pack_start_stream(trigger: u8, addr: u8, len: u8, period_ms: u16) -> [u8;
 ```
 
 `BNO_START_STREAM` payload: `trigger u8, addr u8, len u8, period_ms u16 LE`
-— 5 bytes. Replaces any running stream.
+— 5 bytes, unchecked — prefer [`try_pack_start_stream`]. Replaces any
+running stream.
 
 ### RegData
 
@@ -239,6 +280,7 @@ pub struct Bno055Info {
     pub read_avg_us: u16,
     /// Packets refused by a full USB TX ring.
     pub tx_dropped: u32,
+    /// Failed transfers since the last successful reset handshake.
     pub i2c_errors: u32,
     /// Stream slots dropped because the bus was still busy (since START_STREAM).
     pub slots_skipped: u32,
@@ -254,8 +296,9 @@ pub struct Bno055Info {
 ```
 
 A decoded `RPT_BNO_INFO` report (38 bytes) — sensor identity (registers
-0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap
-silently: watch increments. A rising `sensor_resets` means the bridge
+0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch
+increments. `i2c_errors` is cleared by every successful reset handshake.
+A rising `sensor_resets` means the bridge
 pulsed nRESET to recover the bus — the sensor is back in CONFIG and the
 host must re-apply its configuration.
 
@@ -1040,8 +1083,14 @@ Accelerometer bandwidth per `AccelConfig::bandwidth` code, Hz.
 ### ACC_POWER_NAMES
 
 ```rust
-pub const ACC_POWER_NAMES: [&str; 6] =
-    ["normal", "suspend", "low power 1", "standby", "low power 2", "deep suspend"];
+pub const ACC_POWER_NAMES: [&str; 6] = [
+    "normal",
+    "suspend",
+    "low power 1",
+    "standby",
+    "low power 2",
+    "deep suspend",
+];
 ```
 
 Accelerometer power mode per `AccelConfig::power` code.
@@ -1065,8 +1114,13 @@ Gyroscope bandwidth per `GyroConfig::bandwidth` code, Hz.
 ### GYR_POWER_NAMES
 
 ```rust
-pub const GYR_POWER_NAMES: [&str; 5] =
-    ["normal", "fast power up", "deep suspend", "suspend", "advanced powersave"];
+pub const GYR_POWER_NAMES: [&str; 5] = [
+    "normal",
+    "fast power up",
+    "deep suspend",
+    "suspend",
+    "advanced powersave",
+];
 ```
 
 Gyroscope power mode per `GyroConfig::power` code.
@@ -1678,7 +1732,12 @@ pub fn read_quaternion(&self) -> Result<[f64; 4]>
 #### Bno055Device::start_stream
 
 ```rust
-pub fn start_stream(&self, period_ms: u16, block: Option<(u8, u8)>, int_trigger: bool) -> Result<()>
+pub fn start_stream(
+    &self,
+    period_ms: u16,
+    block: Option<(u8, u8)>,
+    int_trigger: bool,
+) -> Result<()>
 ```
 
 Arm the bridge to read `block` (`None`: the full block) every `period_ms` and push it. Fusion

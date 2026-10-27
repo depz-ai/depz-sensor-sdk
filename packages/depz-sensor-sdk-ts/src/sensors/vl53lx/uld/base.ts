@@ -222,7 +222,12 @@ export abstract class SensorDriver {
   }
 
   // ── ranging mode (only when 'mode' in SUPPORTS) ──
-  async setMode(_name: string): Promise<void> {
+  /**
+   * Apply one of MODES. → the timing budget in effect after the change, ms,
+   * on a driver whose mode change can move it (VL53L1: contract 12 §5), else
+   * null.
+   */
+  async setMode(_name: string): Promise<number | null> {
     throw new Vl53Error(`${this.product}: no ranging modes`);
   }
   async getMode(): Promise<string> {

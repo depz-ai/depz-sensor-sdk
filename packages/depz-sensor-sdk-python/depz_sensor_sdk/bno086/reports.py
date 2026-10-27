@@ -529,7 +529,7 @@ class UnknownReport(Report):
 
 
 def _i16(payload: bytes, off: int) -> int:
-    return struct.unpack_from("<h", payload, off)[0]
+    return int(struct.unpack_from("<h", payload, off)[0])
 
 
 def parse_input_cargo(payload: bytes, capture_timestamp_us: int) -> list[Report]:

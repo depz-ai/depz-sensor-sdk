@@ -173,7 +173,10 @@ public class Tmf8829VectorTests
                 Assert.True(Tmf8829Frames.FrameSize(raw) == raw.Length, $"{name}: full_size from the header");
             var problems = c.GetProperty("problems").EnumerateArray().Select(x => x.GetString()!).ToArray();
             Assert.True(problems.SequenceEqual(info.Problems()), $"{name}: problems");
-            if (info.Kind == Tmf8829Frames.FidResults)
+            if (c.TryGetProperty("error", out _))
+                // a results frame whose pixel decode must fail
+                Assert.Throws<Tmf8829FrameException>(() => Tmf8829Frames.ParseResults(raw, info));
+            else if (info.Kind == Tmf8829Frames.FidResults)
                 AssertFields(name + ".results", c.GetProperty("results"), Arrays(Tmf8829Frames.ParseResults(raw, info)));
             else
                 Assert.True(c.GetProperty("data_sha256").GetString() == Sha256(raw.AsSpan(21, raw.Length - 33)),
@@ -181,7 +184,7 @@ public class Tmf8829VectorTests
             n++;
             Vectors.Seen(c);
         }
-        Assert.Equal(18, n);
+        Assert.Equal(20, n);
     }
 
     [Fact]
@@ -211,7 +214,7 @@ public class Tmf8829VectorTests
             n++;
             Vectors.Seen(s);
         }
-        Assert.Equal(9, n);
+        Assert.Equal(11, n);
     }
 
     [Fact]

@@ -164,8 +164,9 @@ var thresholds = new[]
 byte[] status = Vl53l8Advanced.ThresholdValidStatus();          // 8-byte valid-status
 byte[] block  = Vl53l8Advanced.PackDetectionThresholds(thresholds);
 
-// Xtalk margin: kcps → raw DCI value.
-uint xtalk = Vl53l8Advanced.XtalkMarginRaw(50.0);
+// Xtalk margin: a whole number of kcps (0..10000, as ST) → raw DCI value (kcps * 2048).
+uint xtalk = Vl53l8Advanced.XtalkMarginRaw(50);
+int kcps   = Vl53l8Advanced.XtalkMarginKcps(xtalk);   // raw / 2048
 ```
 
 Measurement selectors (`DistMm`, `SignalPerSpadKcps`, `RangeSigmaMm`,

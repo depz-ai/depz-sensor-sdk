@@ -5,6 +5,7 @@
  */
 
 import { type DepzDevice } from "./device/device.js";
+import { InvalidStateError } from "./errors.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
 import { tmf8829RecordValue } from "./sensors/tmf8829/builder.js";
 import { Tmf8829 } from "./sensors/tmf8829/tmf8829.js";
@@ -170,7 +171,7 @@ export class DatasetRecorder {
   constructor(private opts: { note?: string; vl53l8Layers?: boolean } = {}) {}
 
   async add(device: DepzDevice, deviceId?: string, syncSamples = 5): Promise<string> {
-    if (this.writer) throw new Error("add() all devices before start()");
+    if (this.writer) throw new InvalidStateError("add() all devices before start()");
     const id = deviceId ?? `d${this.entries.length}`;
     const sync = await device.syncTime(syncSamples);
     const meta: DatasetDeviceMeta = {
@@ -318,27 +319,78 @@ export class DatasetRecorder {
   }
 
   dump(): string {
-    if (!this.writer) throw new Error("recorder never started");
+    if (!this.writer) throw new InvalidStateError("recorder never started");
     return this.writer.dump();
   }
 }
 
-/** Parse a `.depzdata` file; records come back merged by host time. */
+/** Contract 08 «Line rules»: lines end at LF only; a blank line is JSON whitespace only (not NBSP, NUL …). */
+const BLANK_LINE = /^[ \t\r]*$/;
+
+/**
+ * `line` as the JSON object a dataset line must be, else a TypeError naming
+ * the line (a damaged file is the caller's bad argument, contract 07 §3 —
+ * never a crash in the reader).
+ */
+function jsonObjectLine(lineno: number, line: string): Record<string, unknown> {
+  let obj: unknown;
+  try {
+    obj = JSON.parse(line);
+  } catch (bad) {
+    throw new TypeError(`.depzdata line ${lineno}: not JSON: ${(bad as Error).message}`);
+  }
+  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
+    throw new TypeError(`.depzdata line ${lineno}: not a JSON object`);
+  }
+  return obj as Record<string, unknown>;
+}
+
+/**
+ * One record line (contract 09): `d` and `k` strings, `t` an integer (host
+ * µs), `v` an object. An unknown `k` is kept — only players ignore kinds.
+ */
+function recordLine(lineno: number, line: string): DatasetRecord {
+  const ev = jsonObjectLine(lineno, line);
+  const { d, t, k, v } = ev;
+  if (typeof d !== "string") {
+    throw new TypeError(`.depzdata line ${lineno}: 'd' must be a device id string, got ${JSON.stringify(d)}`);
+  }
+  if (typeof t !== "number" || !Number.isInteger(t)) {
+    throw new RangeError(`.depzdata line ${lineno}: 't' must be an integer (host µs), got ${JSON.stringify(t)}`);
+  }
+  if (typeof k !== "string") {
+    throw new TypeError(`.depzdata line ${lineno}: 'k' must be a record kind string, got ${JSON.stringify(k)}`);
+  }
+  if (typeof v !== "object" || v === null || Array.isArray(v)) {
+    throw new TypeError(`.depzdata line ${lineno}: 'v' must be an object, got ${JSON.stringify(v)}`);
+  }
+  return { deviceId: d, tHostUs: t, kind: k, value: v as Record<string, unknown> };
+}
+
+/**
+ * Parse a `.depzdata` file; records come back merged by host time. A
+ * damaged file (header not an object / not a depz.dataset schema, a record
+ * line with a missing or mistyped field) is refused by line number
+ * (TypeError / RangeError, contract 07 §3), never skipped or coerced.
+ */
 export class DatasetReader {
   readonly header: DatasetHeader;
   readonly records: DatasetRecord[];
 
   constructor(content: string) {
-    const lines = content.split("\n").filter((l) => l.trim().length > 0);
-    if (lines.length === 0) throw new Error("empty dataset");
-    this.header = JSON.parse(lines[0]!) as DatasetHeader;
-    if (!String(this.header.schema ?? "").startsWith("depz.dataset/")) {
-      throw new Error("not a depz.dataset file");
+    if (content.length === 0) throw new TypeError(".depzdata: empty, not a dataset (no header line)");
+    const lines = content.split("\n");
+    const header = jsonObjectLine(1, lines[0]!);
+    if (typeof header.schema !== "string" || !header.schema.startsWith("depz.dataset/")) {
+      throw new TypeError(".depzdata: not a depz.dataset file");
     }
-    const raw: DatasetRecord[] = lines.slice(1).map((l) => {
-      const ev = JSON.parse(l) as { d: string; t: number; k: string; v: Record<string, unknown> };
-      return { deviceId: ev.d, tHostUs: ev.t, kind: ev.k, value: ev.v };
-    });
+    this.header = header as DatasetHeader;
+    const raw: DatasetRecord[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]!;
+      if (BLANK_LINE.test(line)) continue;
+      raw.push(recordLine(i + 1, line));
+    }
     // Per-device order is only roughly monotonic (contract 09); a stable sort
     // gives the one timeline.
     this.records = raw

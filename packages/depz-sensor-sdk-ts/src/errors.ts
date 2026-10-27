@@ -62,11 +62,42 @@ export class BusyError extends StatusError {
   }
 }
 
+/**
+ * The reply to a request does not decode (contract 07 §3): shorter than the
+ * fields its contract defines, or a value the decoder refuses. Only that
+ * request fails; the read pump goes on and the device stays usable.
+ */
+export class InvalidReplyError extends DepzError {
+  readonly cmd: number;
+
+  constructor(cmd: number, cause: unknown) {
+    super(`reply to cmd 0x${hex2(cmd)} does not decode: ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.cmd = cmd;
+    this.cause = cause;
+  }
+}
+
 /** The serial link dropped (unplug, reboot) while in use. */
 export class DeviceLostError extends DepzError {}
 
 /** Operation attempted on a closed link/device. */
 export class LinkClosedError extends DepzError {}
+
+/**
+ * The call is not valid in the current state of the device or object
+ * (contract 07 §3): `toHostTimeUs` before `syncTime`, a sensor call before
+ * `init()` / `configure()` or while streaming, `add()` after recording
+ * started, a closed dataset writer or player, `wait()` without the player
+ * thread, a write to a read-only register block, a VL53Lx board name without
+ * a product number, a packaged firmware blob of the wrong size.
+ */
+export class InvalidStateError extends DepzError {}
+
+/**
+ * A strict `ReplayTransport` saw the host write bytes the capture does not
+ * hold (contract 08): the SDK under test diverged from the recorded protocol.
+ */
+export class ReplayMismatchError extends DepzError {}
 
 /**
  * Discovery found no DEPZ device matching the request (no candidate port by

@@ -16,7 +16,7 @@ the source, not this file.
 ### Tmf8829
 
 ```python
-class Tmf8829(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Tmf8829(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone,
@@ -147,7 +147,7 @@ Subscribe to measurements (reader-thread context; don't block).
 #### Tmf8829.measurements
 
 ```python
-measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -193,7 +193,7 @@ do not block). Returns an unsubscribe function.
 #### Tmf8829.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -210,7 +210,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Tmf8829.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -220,12 +220,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Tmf8829.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -233,7 +235,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Tmf8829.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.

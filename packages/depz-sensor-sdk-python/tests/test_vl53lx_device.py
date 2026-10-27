@@ -16,7 +16,7 @@ import time
 
 import pytest
 
-from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, LinkClosedError, StatusError
+from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError
 from depz_sensor_sdk.vl53lx import (
     PLOTTABLE_STATUSES,
     XSHUT_OFF,
@@ -135,11 +135,11 @@ def test_before_init_no_driver_no_product(connect):
     dev, _ = connect()
     assert dev.initialized is False
     assert (dev.product, dev.driver_kind) == (None, None)
-    with pytest.raises(DepzError, match=r"call init\(\) first"):
+    with pytest.raises(InvalidStateError):
         dev.driver
-    with pytest.raises(DepzError):
+    with pytest.raises(InvalidStateError):
         dev.supports("offset")
-    with pytest.raises(DepzError, match="init"):
+    with pytest.raises(InvalidStateError):
         dev.get_offset_mm()
 
 
@@ -230,7 +230,7 @@ def test_an_unstamped_board_needs_the_product_named(connect):
     dev, fake = connect(UNSTAMPED)
     assert dev.detected is None
     assert dev.driver_kinds() == ()
-    with pytest.raises(DepzError, match="carries no product number"):
+    with pytest.raises(InvalidStateError):
         dev.init()
     assert fake.sent(SET_ADDR_WIDTH) == []
     dev.init(product="VL53L4CD")
@@ -319,10 +319,19 @@ def test_an_error_status_on_a_register_access_is_a_protocol_error(connect):
 
 
 def test_a_short_register_read_is_a_protocol_error(connect):
-    dev, _ = connect()
-    # the register file ends at 0xFFFF: the fake answers one byte of two
+    dev, fake = connect()
+    fake.truncate_next_read = 1  # the bridge answers one byte of two
     with pytest.raises(ProtocolError, match="expected 2, got 1"):
+        dev._bridge.read_reg(0x0089, 2)
+
+
+def test_a_read_past_0xffff_is_refused_before_the_wire(connect):
+    """contract 12 §2 / 10 §1: addr + len <= 0x10000 is the host's check (ERRATA A13)."""
+    dev, fake = connect()
+    reads = len(fake.sent(READ_REG))
+    with pytest.raises(ValueError):
         dev._bridge.read_reg(0xFFFF, 2)
+    assert len(fake.sent(READ_REG)) == reads
 
 
 def test_no_answer_is_a_protocol_error_too(connect):
@@ -709,7 +718,7 @@ def test_configuration_is_refused_while_the_stream_owns_the_bus(ready):
         dev.start_ranging,
         dev.measure_once,
     ):
-        with pytest.raises(DepzError, match=r"stop_ranging\(\) first"):
+        with pytest.raises(InvalidStateError):
             call()
     assert fake.rx == []
     dev.bridge_info()  # touches no sensor register: allowed while streaming

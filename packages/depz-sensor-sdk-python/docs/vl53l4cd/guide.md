@@ -146,7 +146,7 @@ The bridge drives the sensor's XSHUT (shutdown) pin:
 
 ```python
 from depz_sensor_sdk.vl53l4 import XSHUT_OFF, XSHUT_ON
-dev.reset_sensor()      # power-cycle (~3 ms on the MCU)
+dev.reset_sensor()      # power-cycle (≤ 20 ms on the MCU, typ. ~2 ms)
 dev.xshut(XSHUT_OFF)    # sensor off — stream stops, config lost
 dev.xshut(XSHUT_ON)     # sensor back on, in its boot state
 ```
@@ -169,8 +169,9 @@ info.i2c_errors    # bus errors, with last_i2c_error naming the latest
 info.i2c_khz       # the programmed bus-speed step
 ```
 
-Counters are free-running and wrap silently — watch increments, not absolute
-values.
+Counters wrap silently — watch increments, not absolute values.
+`i2c_errors` is cleared by every successful `reset_sensor()`, so it counts bus
+errors since the last one, not since power-up.
 
 ## Gotchas
 

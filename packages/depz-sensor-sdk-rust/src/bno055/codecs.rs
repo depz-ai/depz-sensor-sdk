@@ -52,16 +52,37 @@ pub const EXPECTED_ACC_ID: u8 = 0xFB;
 pub const EXPECTED_MAG_ID: u8 = 0x32;
 pub const EXPECTED_GYR_ID: u8 = 0x0F;
 
-/// `BNO_READ_REG` payload: `addr u8, len u8`.
+const REG_SPACE: usize = 0x100; // 8-bit register addresses: a transfer never runs past 0xFF
+
+/// `BNO_START_STREAM` TIMER period limits, ms (contract 13 §2).
+pub const TIMER_PERIOD_MIN_MS: u16 = 1;
+pub const TIMER_PERIOD_MAX_MS: u16 = 60000;
+
+/// `BNO_READ_REG` payload: `addr u8, len u8` with the transfer limit of
+/// contract 13 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x100` —
+/// refused before anything is written (contract 07 §3).
+pub fn try_pack_read_reg(addr: u8, len: u8) -> Result<[u8; 2], CodecError> {
+    if len < 1 || len as usize > XFER_MAX || addr as usize + len as usize > REG_SPACE {
+        return Err(CodecError(
+            "BNO_READ_REG: len must be 1..128 and addr+len <= 0x100",
+        ));
+    }
+    Ok(pack_read_reg(addr, len))
+}
+
+/// `BNO_READ_REG` payload: `addr u8, len u8`, unchecked — prefer
+/// [`try_pack_read_reg`].
 pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2] {
     [addr, len]
 }
 
-/// `BNO_WRITE_REG` payload: `addr u8, data[1..128]`; a data length outside
-/// 1..=[`XFER_MAX`] is refused (contract 07 §3), never sent.
+/// `BNO_WRITE_REG` payload: `addr u8, data[1..128]` with `addr + N <= 0x100`;
+/// anything else is refused (contract 07 §3), never sent.
 pub fn try_pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError> {
-    if data.is_empty() || data.len() > XFER_MAX {
-        return Err(CodecError("BNO_WRITE_REG: data must be 1..128 bytes"));
+    if data.is_empty() || data.len() > XFER_MAX || addr as usize + data.len() > REG_SPACE {
+        return Err(CodecError(
+            "BNO_WRITE_REG: data must be 1..128 bytes and addr+N <= 0x100",
+        ));
     }
     Ok(pack_write_reg(addr, data))
 }
@@ -90,8 +111,27 @@ pub fn pack_get_info() -> [u8; 0] {
     []
 }
 
+/// `BNO_START_STREAM` payload with the TIMER rule of contract 13 §2: with
+/// [`TRIGGER_TIMER`] the period is 1..=60000 ms, else refused before anything
+/// is written; with [`TRIGGER_INT`] it is the missed-edge watchdog (0 = none).
+pub fn try_pack_start_stream(
+    trigger: u8,
+    addr: u8,
+    len: u8,
+    period_ms: u16,
+) -> Result<[u8; 5], CodecError> {
+    if trigger == TRIGGER_TIMER && !(TIMER_PERIOD_MIN_MS..=TIMER_PERIOD_MAX_MS).contains(&period_ms)
+    {
+        return Err(CodecError(
+            "BNO_START_STREAM: TIMER period_ms must be 1..60000",
+        ));
+    }
+    Ok(pack_start_stream(trigger, addr, len, period_ms))
+}
+
 /// `BNO_START_STREAM` payload: `trigger u8, addr u8, len u8, period_ms u16 LE`
-/// — 5 bytes. Replaces any running stream.
+/// — 5 bytes, unchecked — prefer [`try_pack_start_stream`]. Replaces any
+/// running stream.
 pub fn pack_start_stream(trigger: u8, addr: u8, len: u8, period_ms: u16) -> [u8; 5] {
     let p = period_ms.to_le_bytes();
     [trigger, addr, len, p[0], p[1]]
@@ -153,8 +193,9 @@ impl StreamData {
 }
 
 /// A decoded `RPT_BNO_INFO` report (38 bytes) — sensor identity (registers
-/// 0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap
-/// silently: watch increments. A rising `sensor_resets` means the bridge
+/// 0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch
+/// increments. `i2c_errors` is cleared by every successful reset handshake.
+/// A rising `sensor_resets` means the bridge
 /// pulsed nRESET to recover the bus — the sensor is back in CONFIG and the
 /// host must re-apply its configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,6 +221,7 @@ pub struct Bno055Info {
     pub read_avg_us: u16,
     /// Packets refused by a full USB TX ring.
     pub tx_dropped: u32,
+    /// Failed transfers since the last successful reset handshake.
     pub i2c_errors: u32,
     /// Stream slots dropped because the bus was still busy (since START_STREAM).
     pub slots_skipped: u32,
@@ -227,7 +269,12 @@ impl Bno055Info {
     /// All four identity registers hold the healthy values.
     pub fn ids_ok(&self) -> bool {
         (self.chip_id, self.acc_id, self.mag_id, self.gyr_id)
-            == (EXPECTED_CHIP_ID, EXPECTED_ACC_ID, EXPECTED_MAG_ID, EXPECTED_GYR_ID)
+            == (
+                EXPECTED_CHIP_ID,
+                EXPECTED_ACC_ID,
+                EXPECTED_MAG_ID,
+                EXPECTED_GYR_ID,
+            )
     }
 
     /// Sensor firmware revision as Bosch writes it: 0x0311 → `"03.11"`.

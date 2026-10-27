@@ -27,7 +27,10 @@ struct FakePlatform {
 impl FakePlatform {
     fn new() -> Arc<FakePlatform> {
         let p = FakePlatform::default();
-        p.reg.lock().unwrap().insert(uld::FIRMWARE__SYSTEM_STATUS, 0x03);
+        p.reg
+            .lock()
+            .unwrap()
+            .insert(uld::FIRMWARE__SYSTEM_STATUS, 0x03);
         p.reg.lock().unwrap().insert(uld::GPIO_HV_MUX__CTRL, 0x11); // INT active low, data ready
         p.seed_word(uld::IDENTIFICATION__MODEL_ID, uld::MODEL_ID_VL53L4CD);
         p.seed_word(uld::OSC_FREQUENCY, OSC_FREQUENCY_TYPICAL);
@@ -42,7 +45,13 @@ impl FakePlatform {
     }
 
     fn written_to(&self, addr: u16) -> Vec<Vec<u8>> {
-        self.writes.lock().unwrap().iter().filter(|(a, _)| *a == addr).map(|(_, d)| d.clone()).collect()
+        self.writes
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(a, _)| *a == addr)
+            .map(|(_, d)| d.clone())
+            .collect()
     }
 
     fn last(&self, addr: u16) -> Vec<u8> {
@@ -51,7 +60,10 @@ impl FakePlatform {
 
     /// Every result read returns a valid measurement with these values.
     fn seed_result(&self, distance_mm: u16, signal_raw: u16, spads_raw: u16) {
-        self.reg.lock().unwrap().insert(uld::RESULT__RANGE_STATUS, valid_raw());
+        self.reg
+            .lock()
+            .unwrap()
+            .insert(uld::RESULT__RANGE_STATUS, valid_raw());
         self.seed_word(uld::RESULT__SPAD_NB, spads_raw);
         self.seed_word(uld::RESULT__SIGNAL_RATE, signal_raw);
         self.seed_word(uld::RESULT__DISTANCE, distance_mm);
@@ -61,7 +73,9 @@ impl FakePlatform {
 impl Vl53l4Platform for FakePlatform {
     fn read_multi(&self, addr: u16, size: usize) -> Result<Vec<u8>> {
         let r = self.reg.lock().unwrap();
-        Ok((0..size).map(|i| *r.get(&(addr + i as u16)).unwrap_or(&0)).collect())
+        Ok((0..size)
+            .map(|i| *r.get(&(addr + i as u16)).unwrap_or(&0))
+            .collect())
     }
 
     fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()> {
@@ -82,7 +96,10 @@ impl Vl53l4Platform for FakePlatform {
 }
 
 fn valid_raw() -> u8 {
-    uld::STATUS_RTN.iter().position(|s| *s == 0).expect("a valid raw status") as u8
+    uld::STATUS_RTN
+        .iter()
+        .position(|s| *s == 0)
+        .expect("a valid raw status") as u8
 }
 
 fn word(b: &[u8]) -> u16 {
@@ -153,25 +170,43 @@ fn autonomous_mode_starts_with_0x40() {
 fn range_timing_bounds_and_settings_round_trip() {
     let p = FakePlatform::new();
     let drv = driver(&p);
-    assert!(matches!(drv.set_range_timing(9, 0), Err(DepzError::Sensor(_))));
-    assert!(matches!(drv.set_range_timing(201, 0), Err(DepzError::Sensor(_))));
-    assert!(matches!(drv.set_range_timing(50, 30), Err(DepzError::Sensor(_)))); // 0 < inter <= budget
+    // ERRATA A16: a refused argument is invalid_argument, not a sensor error
+    assert!(matches!(
+        drv.set_range_timing(9, 0),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        drv.set_range_timing(201, 0),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        drv.set_range_timing(50, 30),
+        Err(DepzError::InvalidArgument(_))
+    )); // 0 < inter <= budget
     for mm in [10, -10, 0, 255] {
         drv.set_offset(mm).unwrap();
         assert_eq!(drv.get_offset().unwrap(), mm);
     }
     drv.set_xtalk(20).unwrap();
     assert_eq!(drv.get_xtalk().unwrap(), 20);
-    drv.set_detection_thresholds(100, 300, uld::WINDOW_IN).unwrap();
+    drv.set_detection_thresholds(100, 300, uld::WINDOW_IN)
+        .unwrap();
     assert_eq!(
         drv.get_detection_thresholds().unwrap(),
-        DetectionThresholds { distance_low_mm: 100, distance_high_mm: 300, window: uld::WINDOW_IN }
+        DetectionThresholds {
+            distance_low_mm: 100,
+            distance_high_mm: 300,
+            window: uld::WINDOW_IN
+        }
     );
     drv.set_signal_threshold(1024).unwrap();
     assert_eq!(drv.get_signal_threshold().unwrap(), 1024);
     drv.set_sigma_threshold(15).unwrap();
     assert_eq!(drv.get_sigma_threshold().unwrap(), 15);
-    assert!(drv.set_sigma_threshold(0x4000).is_err());
+    assert!(matches!(
+        drv.set_sigma_threshold(0x4000),
+        Err(DepzError::InvalidArgument(_))
+    ));
 }
 
 #[test]
@@ -181,7 +216,10 @@ fn is_alive_and_waits_time_out() {
     assert!(drv.is_alive().unwrap());
     p.seed_word(uld::IDENTIFICATION__MODEL_ID, 0x1234);
     assert!(!drv.is_alive().unwrap());
-    p.reg.lock().unwrap().insert(uld::FIRMWARE__SYSTEM_STATUS, 0);
+    p.reg
+        .lock()
+        .unwrap()
+        .insert(uld::FIRMWARE__SYSTEM_STATUS, 0);
     assert!(matches!(drv.wait_boot(5), Err(DepzError::Sensor(_))));
     p.reg.lock().unwrap().insert(uld::GPIO__TIO_HV_STATUS, 1); // INT high: not at its active (low) level
     assert!(matches!(drv.wait_data_ready(5), Err(DepzError::Sensor(_))));
@@ -193,9 +231,18 @@ fn offset_calibration_programs_target_minus_mean() {
     let drv = driver(&p);
     p.seed_result(93, 200, 256 * 40);
     assert_eq!(drv.calibrate_offset(100, 5).unwrap(), 7);
-    assert_eq!(word(&p.last(uld::RANGE_OFFSET_MM)), uld::try_offset_raw(7).unwrap());
-    assert!(matches!(drv.calibrate_offset(5, 20), Err(DepzError::Sensor(_))));
-    assert!(matches!(drv.calibrate_offset(100, 4), Err(DepzError::Sensor(_))));
+    assert_eq!(
+        word(&p.last(uld::RANGE_OFFSET_MM)),
+        uld::try_offset_raw(7).unwrap()
+    );
+    assert!(matches!(
+        drv.calibrate_offset(5, 20),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert!(matches!(
+        drv.calibrate_offset(100, 4),
+        Err(DepzError::InvalidArgument(_))
+    ));
 }
 
 #[test]
@@ -208,7 +255,10 @@ fn xtalk_calibration_follows_the_st_formula() {
     // In binary floating point the product is 3.9999…, and the register takes the truncation.
     assert_eq!(word(&p.last(uld::XTALK_PLANE_OFFSET_KCPS)), 2047);
     p.seed_result(10, 0xFFFF, 256);
-    assert!(matches!(drv.calibrate_xtalk(1000, 5), Err(DepzError::Sensor(_)))); // > 127 kcps
+    assert!(matches!(
+        drv.calibrate_xtalk(1000, 5),
+        Err(DepzError::Sensor(_))
+    )); // > 127 kcps
 }
 
 fn reg_board() -> FakeBoard {
@@ -228,12 +278,21 @@ fn reg_board() -> FakeBoard {
 
 #[test]
 fn configuration_while_ranging_is_refused() {
-    let dev = Vl53l4cdDevice::attach(DepzDevice::new(reg_board(), Some(Duration::from_millis(500))));
+    let dev = Vl53l4cdDevice::attach(DepzDevice::new(
+        reg_board(),
+        Some(Duration::from_millis(500)),
+    ));
     dev.start_ranging().unwrap();
     assert!(dev.ranging());
-    assert!(matches!(dev.set_offset_mm(3), Err(DepzError::InvalidState(_))));
+    assert!(matches!(
+        dev.set_offset_mm(3),
+        Err(DepzError::InvalidState(_))
+    ));
     assert!(matches!(dev.init(None), Err(DepzError::InvalidState(_))));
-    assert!(matches!(dev.measure_once(None), Err(DepzError::InvalidState(_))));
+    assert!(matches!(
+        dev.measure_once(None),
+        Err(DepzError::InvalidState(_))
+    ));
     dev.stop_ranging().unwrap();
     assert!(!dev.ranging());
     dev.stop_ranging().unwrap(); // a no-op once stopped
@@ -260,7 +319,10 @@ fn stream_reports_decode_and_short_ones_are_counted() {
     board.inject(board.reply(Vl53l4Rpt::Stream as u8, &stream_payload(&block, 17)));
     board.inject(board.reply(Vl53l4Rpt::Stream as u8, &stream_payload(&block[..8], 17)));
     let m = q.take(Duration::from_secs(1)).unwrap();
-    assert_eq!((m.timestamp_us, m.distance_mm, m.range_status), (123456, 258, 0));
+    assert_eq!(
+        (m.timestamp_us, m.distance_mm, m.range_status),
+        (123456, 258, 0)
+    );
     assert!(m.valid());
     assert!(until(|| dev.stream_parse_errors() == 1, 1000));
     assert_eq!(q.len(), 0);

@@ -61,7 +61,22 @@ pub fn i2c_error_name(code: u8) -> &'static str {
     }
 }
 
-/// `VL53_READ_REG` payload: `addr u16, len u16` (little-endian).
+const REG_SPACE: usize = 0x10000; // a bridge transfer never runs past register 0xFFFF
+
+/// `VL53_READ_REG` payload: `addr u16, len u16` with the transfer limit of
+/// contract 10 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x10000` —
+/// refused before anything is written (contract 07 §3).
+pub fn try_pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError> {
+    if len < 1 || len as usize > XFER_MAX || addr as usize + len as usize > REG_SPACE {
+        return Err(CodecError(
+            "VL53_READ_REG: len must be 1..253 and addr+len <= 0x10000",
+        ));
+    }
+    Ok(pack_read_reg(addr, len))
+}
+
+/// `VL53_READ_REG` payload: `addr u16, len u16` (little-endian), unchecked —
+/// prefer [`try_pack_read_reg`].
 pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4] {
     let a = addr.to_le_bytes();
     let l = len.to_le_bytes();
@@ -69,10 +84,13 @@ pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4] {
 }
 
 /// `VL53_WRITE_REG` payload: `addr u16` followed by 1..=[`XFER_MAX`] raw
-/// register bytes; any other data length is refused (contract 07 §3).
+/// register bytes with `addr + N <= 0x10000`; anything else is refused
+/// (contract 07 §3).
 pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError> {
-    if data.is_empty() || data.len() > XFER_MAX {
-        return Err(CodecError("VL53_WRITE_REG: data must be 1..253 bytes"));
+    if data.is_empty() || data.len() > XFER_MAX || addr as usize + data.len() > REG_SPACE {
+        return Err(CodecError(
+            "VL53_WRITE_REG: data must be 1..253 bytes and addr+N <= 0x10000",
+        ));
     }
     Ok(pack_write_reg(addr, data))
 }
@@ -128,8 +146,10 @@ impl RegData {
     }
 }
 
-/// A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters are
-/// free-running and wrap silently; watch increments, not absolute values.
+/// A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters wrap
+/// silently; watch increments, not absolute values. `i2c_errors` counts since
+/// the last successful XSHUT reset (the bridge clears it there), not since
+/// power-up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Vl53l4Info {
     pub int_edges: u32,
@@ -141,7 +161,7 @@ pub struct Vl53l4Info {
     pub model_id: u16,
     /// 0x00E5 — expected 0x03 (booted).
     pub fw_status: u8,
-    /// 1 = MODEL_ID matched on this read.
+    /// 1 = MODEL_ID read back as 0xEBAA on this GET_INFO.
     pub initialized: u8,
     pub xshut_level: u8,
     pub int_level: u8,

@@ -5,8 +5,11 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from depz_sensor_sdk import Sr04
 from depz_sensor_sdk.dataset import DatasetReader, DatasetWriter, SessionRecorder
+from depz_sensor_sdk.errors import InvalidStateError
 
 from fake_device import FakeSr04
 
@@ -214,6 +217,10 @@ def test_reader_sorts_within_a_device(tmp_path: Path):
     for d, t in (("d0", 300), ("d0", 100), ("d1", 200), ("d0", 250), ("d1", 50)):
         w.write(d, t, "event", {})
     w.close()
+    with pytest.raises(InvalidStateError):
+        w.write("d0", 400, "event", {})  # contract 07 §3 (ERRATA A17)
+    with open(path, "a") as f:
+        f.write("\n   \n")  # blank lines are not records
     assert [(r.device_id, r.t_host_us) for r in DatasetReader(path)] == [
         ("d1", 50), ("d0", 100), ("d1", 200), ("d0", 250), ("d0", 300)]
 
@@ -233,3 +240,202 @@ def test_committed_dual_sr04_dataset(seen):
     assert [r.t_host_us for r in recs] == sorted(r.t_host_us for r in recs)
     assert {r.kind for r in recs} == {"sr04"}
     seen("recordings/dataset_dual_sr04.depzdata")
+
+
+class _MuteFakeSr04(FakeSr04):
+    """Firmware that refuses identity and temperature: the recorder must
+    still register and record the device (contract 09: meta is best effort)."""
+
+    def _handle(self, pkt):
+        if pkt.cmd in (0x04, 0x05, 0x07):
+            self._status(pkt.cmd, 0x07)  # ERR_CMD_NOT_SUPPORTED
+            return
+        super()._handle(pkt)
+
+
+def test_recorder_lifecycle_rules(tmp_path: Path):
+    """add() only before start, start() once, stop() idempotent, and a
+    recorder that never started leaves no file behind."""
+    fake, dev = _make_rig(mcu_time_us=1_000_000)
+    path = tmp_path / "run.depzdata"
+    try:
+        with SessionRecorder(tmp_path / "never.depzdata", temperature_hz=None) as rec0:
+            rec0.add(dev)
+        assert not (tmp_path / "never.depzdata").exists()
+        assert rec0.records_written == 0
+
+        with SessionRecorder(path, temperature_hz=None) as rec:
+            rec.add(dev, device_id="front")
+            rec.start()
+            rec.start()  # no-op
+            with pytest.raises(InvalidStateError):
+                rec.add(dev)
+            fake.send_measurement(0x37)
+            time.sleep(0.05)
+            assert rec.records_written == 1
+        assert rec.records_written == 0  # writer released on exit
+        rec.stop()  # idempotent after exit
+    finally:
+        dev.close()
+        fake.close()
+    reader = DatasetReader(path)
+    assert list(reader.devices) == ["front"]
+    assert [(r.device_id, r.kind) for r in reader] == [("front", "sr04")]
+    # the file is complete and closed: the records are readable twice
+    assert reader.records == list(reader)
+
+
+def test_recorder_tolerates_a_device_without_identity_or_temperature(tmp_path: Path):
+    from depz_sensor_sdk.device import DeviceBase
+
+    fake = _MuteFakeSr04()
+    dev = DeviceBase(fake.link, timeout=1.0)  # no sensor class: nothing to hook
+    path = tmp_path / "mute.depzdata"
+    try:
+        rec = SessionRecorder(path, temperature_hz=50)
+        did = rec.add(dev)
+        rec.start()
+        time.sleep(0.1)  # a few sampler periods: every reading is refused
+        rec.stop()
+    finally:
+        dev.close()
+        fake.close()
+    reader = DatasetReader(path)
+    meta = reader.devices[did]
+    assert meta["sensor_type"] == "unknown"
+    assert "serial" not in meta and "software_name" not in meta
+    assert "offset_us" in meta["time_sync"]
+    assert list(reader) == []
+
+
+def test_recorder_samples_mcu_and_sensor_temperature(tmp_path: Path):
+    """Contract 09 `temperature`: ~temperature_hz records per device from the
+    MCU thermometer, plus the sensor die once a frame reported it."""
+    import numpy as np
+
+    from depz_sensor_sdk.vl53l8 import Vl53l8, Vl53l8Frame
+
+    fake = FakeSr04()
+    dev = Vl53l8(fake.link, timeout=1.0)
+    path = tmp_path / "temp.depzdata"
+    z = 16
+    frame = Vl53l8Frame(
+        timestamp_us=2_000_000, resolution=z,
+        distance_mm=np.arange(64, dtype=np.int32), target_status=np.full(64, 5, np.uint8),
+        nb_target_detected=np.ones(64, np.uint8), signal_per_spad=np.zeros(64),
+        ambient_per_spad=np.zeros(64), nb_spads_enabled=np.zeros(64, np.int32),
+        range_sigma_mm=np.zeros(64), reflectance=np.zeros(64), silicon_temp_degc=41,
+        motion={"global_indicator_1": 7, "motion": [0, 1, 2]},
+    )
+    try:
+        rec = SessionRecorder(path, temperature_hz=50)
+        did = rec.add(dev)
+        rec.start()
+        for cb in list(dev._frame_cbs):
+            cb(frame)
+        time.sleep(0.15)
+        rec.stop()
+    finally:
+        dev.close()
+        fake.close()
+    reader = DatasetReader(path)
+    offset = reader.devices[did]["time_sync"]["offset_us"]
+    recs = list(reader)
+    frames = [r for r in recs if r.kind == "vl53l8"]
+    assert len(frames) == 1 and frames[0].t_host_us == 2_000_000 - offset
+    v = frames[0].value
+    assert v["distance_mm"] == list(range(z)) and v["motion"] == frame.motion
+    assert "signal_per_spad" not in v  # layers off by default
+    temps = [r.value for r in recs if r.kind == "temperature"]
+    sources = {t["source"] for t in temps}
+    assert sources == {"mcu", "sensor"}
+    assert all(t["celsius"] == 41 for t in temps if t["source"] == "sensor")
+    assert all(t["celsius"] == pytest.approx(27.3) for t in temps if t["source"] == "mcu")
+    assert len(temps) >= 2
+
+
+def test_recorder_works_without_the_vl53l8_extra(tmp_path: Path, monkeypatch):
+    """The VL53L8 class is optional (numpy); the recorder still hooks the other
+    sensors when its import fails."""
+    import sys
+
+    from depz_sensor_sdk.bno055 import Bno055, Bno055Sample, Units
+    from depz_sensor_sdk.bno055.regs import FULL_BLOCK
+
+    monkeypatch.setitem(sys.modules, "depz_sensor_sdk.vl53l8", None)
+    fake = FakeSr04()
+    imu = Bno055(fake.link, timeout=1.0)
+    path = tmp_path / "imu.depzdata"
+    try:
+        rec = SessionRecorder(path, temperature_hz=None)
+        rec.add(imu)
+        rec.start()
+        block = bytes.fromhex(
+            "c5ffb7ff9a032f00e2ffadfefeffffff0000cd046a0578e6b52963f9efcf0000"
+            "0000fbff0600b1ff0cfeb6fe1b0133")
+        s = Bno055Sample.decode(3_000_000, FULL_BLOCK[0], block, Units())
+        for cb in list(imu._sample_cbs):
+            cb(s)
+        rec.stop()
+    finally:
+        imu.close()
+        fake.close()
+    assert [r.kind for r in DatasetReader(path)] == ["bno055"]
+
+
+def test_tmf8829_records(tmp_path: Path):
+    """Contract 09 `tmf8829`: the builder's record value at the measurement's
+    host time."""
+    from depz_sensor_sdk.tmf8829 import Tmf8829
+    from depz_sensor_sdk.tmf8829.builder import record_value
+
+    from test_tmf8829_builder import MEAS, stream
+
+    _, (m, *_) = stream(next(iter(MEAS)))
+    fake = FakeSr04()
+    dev = Tmf8829(fake.link, timeout=1.0)
+    path = tmp_path / "tmf.depzdata"
+    try:
+        rec = SessionRecorder(path, temperature_hz=None)
+        did = rec.add(dev)
+        rec.start()
+        for cb in list(dev._meas_cbs):
+            cb(m)
+        rec.stop()
+    finally:
+        dev.close()
+        fake.close()
+    reader = DatasetReader(path)
+    offset = reader.devices[did]["time_sync"]["offset_us"]
+    (r,) = list(reader)
+    assert (r.kind, r.t_host_us) == ("tmf8829", m.timestamp_us - offset)
+    assert r.value == record_value(m)
+
+
+def test_reader_rejects_a_foreign_file(tmp_path: Path):
+    other = tmp_path / "x.depzdata"
+    other.write_text(json.dumps({"schema": "depz.rec/1"}) + "\n")
+    with pytest.raises(ValueError, match="not a depz.dataset"):
+        DatasetReader(other)
+
+
+def test_play_from_an_offset_and_stop_during_a_wait(tmp_path: Path):
+    path = tmp_path / "s.depzdata"
+    w = DatasetWriter(path, {"d0": {}})
+    for t in (100, 200, 300, 5_000_000):  # the last one 4.7 s after the third
+        w.write("d0", t, "event", {})
+    w.close()
+    reader = DatasetReader(path)
+
+    got: list[int] = []
+    reader.play(lambda r: got.append(r.t_host_us), speed=0, start_t_us=200)
+    assert got == [200, 300, 5_000_000]
+
+    # stop raised while play() waits for the 4.7 s gap ends it at once
+    stop = threading.Event()
+    got.clear()
+    threading.Timer(0.05, stop.set).start()
+    t0 = time.monotonic()
+    reader.play(lambda r: got.append(r.t_host_us), speed=1.0, stop=stop)
+    assert got == [100, 200, 300]
+    assert time.monotonic() - t0 < 1.0

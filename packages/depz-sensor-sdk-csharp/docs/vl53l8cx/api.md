@@ -20,7 +20,7 @@ in the source, not this file.
 public class Vl53l8cxDevice : DepzDevice
 ```
 
-VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here (`Uld`). `Init` downloads the ~84 KB sensor firmware (about a second), then configure and `StartRanging`: the board pushes one frame per INT edge in chunks, reassembled and parsed into `Frames`. Configuration needs `Init` and throws `InvalidOperationException` while ranging — the stream owns the register bank. The VL53L8CH superset is `Vl53l8chDevice`.
+VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here (`Uld`). `Init` downloads the ~84 KB sensor firmware (about a second), then configure and `StartRanging`: the board pushes one frame per INT edge in chunks, reassembled and parsed into `Frames`. Configuration needs `Init` and throws `InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH superset is `Vl53l8chDevice`.
 
 #### Vl53l8cxDevice.MinRangingFrequencyHz *(constant)*
 
@@ -29,6 +29,14 @@ public const int MinRangingFrequencyHz = 2
 ```
 
 Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.MaxRangingFrequencyHz
+
+```csharp
+public static int MaxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
 
 #### Vl53l8cxDevice.Vl53l8cxDevice *(constructor)*
 
@@ -39,7 +47,7 @@ public Vl53l8cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l8cxDevice.Vl53l8cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l8cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l8cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l8cxDevice.Uld *(property)*
@@ -108,7 +116,7 @@ public int GetRangingFrequencyHz()
 public void SetRangingFrequencyHz(int hz)
 ```
 
-At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8.
+At least `MinRangingHz`; at most `MaxRangingFrequencyHz` of the resolution last set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11 §3). Refused host-side, nothing reaches the bus.
 
 #### Vl53l8cxDevice.GetRangingMode
 
@@ -185,14 +193,18 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice.GetXtalkMargin
 
 ```csharp
-public double GetXtalkMargin()
+public int GetXtalkMargin()
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice.SetXtalkMargin
 
 ```csharp
-public void SetXtalkMargin(double marginKcps)
+public void SetXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
 
 #### Vl53l8cxDevice.CalibrateXtalk
 
@@ -254,7 +266,7 @@ public void SetDetectionThresholdsAutoStop(bool autoStop)
 public MotionConfig ConfigureMotionIndicator(int distanceMinMm = 400, int distanceMaxMm = 1500)
 ```
 
-Enable the motion indicator over [min, max] mm; every frame then carries `Motion`. Returns the configuration for further tuning.
+Enable the motion indicator over [min, max] mm; every frame then carries `Motion`. Returns the configuration for further tuning. On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH (`CnhSetup` null, no `CnhRaw`).
 
 #### Vl53l8cxDevice.StartRanging
 
@@ -747,16 +759,18 @@ Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs `
 #### Vl53l8Driver.GetXtalkMargin
 
 ```csharp
-public double GetXtalkMargin()
+public int GetXtalkMargin()
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver.SetXtalkMargin
 
 ```csharp
-public void SetXtalkMargin(double marginKcps)
+public void SetXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
 
 #### Vl53l8Driver.GetCaldataXtalk
 
@@ -815,6 +829,14 @@ public MotionConfig MotionIndicatorInit(int resolution)
 ```
 
 A default motion-indicator configuration for `resolution`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.MotionIndicatorDisarm
+
+```csharp
+public void MotionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `Motion` null. Called when the VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
 
 #### Vl53l8Driver.MotionIndicatorSetResolution
 
@@ -1016,7 +1038,7 @@ VL53_WRITE_REG payload: addr u16 LE, then at least one data byte (contract 04 §
 public static byte[] PackStartStream(int frameSize)
 ```
 
-VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE.
+VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE, 1..`StreamTotalMax` (contract 04 §4 rule 4 — the firmware refuses anything else too).
 
 #### Vl53l8Wire.StreamChunkMax *(constant)*
 
@@ -1070,7 +1092,7 @@ public sealed class FrameReassembler
 
 Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
 
-Rules (contract 04): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. Byte-exact with the reference Python `FrameReassembler`.
+Rules (contract 04 §4): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. A chunk out of the rule-4 bounds (more than `chunkMax` bytes, `FullSize` over `StreamTotalMax`, or running past `FullSize`) is damaged: dropped and counted as a lost frame like the other damaged input, never thrown. Byte-exact with the reference Python `FrameReassembler`.
 
 #### FrameReassembler.Completed *(property)*
 
@@ -1082,6 +1104,12 @@ public int Completed
 
 ```csharp
 public int Discarded
+```
+
+#### FrameReassembler.FrameReassembler *(constructor)*
+
+```csharp
+public FrameReassembler(int chunkMax = Vl53l8Wire.StreamChunkMax)
 ```
 
 #### FrameReassembler.public
@@ -1154,13 +1182,29 @@ public const int MotionIndicator = 19
 public const int NbThresholds = 64
 ```
 
+#### Vl53l8Advanced.XtalkMarginMaxKcps *(constant)*
+
+```csharp
+public const int XtalkMarginMaxKcps = 10000
+```
+
+Largest xtalk margin `SetXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
 #### Vl53l8Advanced.XtalkMarginRaw
 
 ```csharp
-public static uint XtalkMarginRaw(double marginKcps)
+public static uint XtalkMarginRaw(int marginKcps)
 ```
 
-Xtalk margin raw DCI value: round(kcps × 2048). The margin is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN included, is refused — never wrapped (contract 07 §3).
+Xtalk margin raw DCI value: kcps × 2048. As ST, the margin is a whole number of kcps/SPAD, 0..`XtalkMarginMaxKcps`; a negative or a bigger value is refused — never wrapped (contract 07 §3).
+
+#### Vl53l8Advanced.XtalkMarginKcps
+
+```csharp
+public static int XtalkMarginKcps(uint raw)
+```
+
+Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST).
 
 #### Vl53l8Advanced.DetectionThreshold
 

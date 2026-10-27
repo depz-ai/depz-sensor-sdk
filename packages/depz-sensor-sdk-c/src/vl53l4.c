@@ -32,6 +32,9 @@ static uint16_t rd_be16(const uint8_t *p) { return (uint16_t)((p[0] << 8) | p[1]
 /* ---- encoders --------------------------------------------------------------*/
 size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out)
 {
+    /* contract 10 §1: len 1..253 and addr + len <= 0x10000, like WRITE_REG */
+    if (len < 1 || len > DEPZ_VL53L4_XFER_MAX || (uint32_t)addr + len > 0x10000u)
+        return 0;
     put_u16(out, addr);
     put_u16(out + 2, len);
     return 4;
@@ -40,7 +43,7 @@ size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out)
 size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data,
                                   size_t data_len, uint8_t *out)
 {
-    if (data_len < 1 || data_len > DEPZ_VL53L4_XFER_MAX)
+    if (data_len < 1 || data_len > DEPZ_VL53L4_XFER_MAX || (size_t)addr + data_len > 0x10000u)
         return 0;
     put_u16(out, addr);
     for (size_t i = 0; i < data_len; i++)
@@ -127,7 +130,8 @@ static const uint8_t STATUS_RTN[24] = {
 int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len,
                                    depz_vl53l4_result *out)
 {
-    if (len < 15)
+    /* contract 10 §5: a 17-byte block; shorter is rejected, a tail ignored */
+    if (len < DEPZ_VL53L4_RESULT_BLOCK_LEN)
         return -1;
 
     int status = raw[0] & 0x1F;

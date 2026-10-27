@@ -9,7 +9,7 @@ namespace Depz.Sensor.Devices;
 /// sensor firmware (about a second), then configure and
 /// <see cref="StartRanging"/>: the board pushes one frame per INT edge in chunks,
 /// reassembled and parsed into <see cref="Frames"/>. Configuration needs
-/// <see cref="Init"/> and throws <see cref="InvalidOperationException"/> while
+/// <see cref="Init"/> and throws <see cref="InvalidStateException"/> while
 /// ranging — the stream owns the register bank. The VL53L8CH superset is
 /// <see cref="Vl53l8chDevice"/>.
 /// </summary>
@@ -17,6 +17,9 @@ public class Vl53l8cxDevice : DepzDevice
 {
     /// <summary>Below this the sensor never enters its ranging loop and streams nothing (contract 04).</summary>
     public const int MinRangingFrequencyHz = 2;
+
+    /// <summary>Highest ranging frequency at <paramref name="resolution"/> zones (contract 11 §3; the same silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.</summary>
+    public static int MaxRangingFrequencyHz(int resolution) => resolution == Vl53l8Driver.Resolution8x8 ? 15 : 60;
 
     private static readonly TimeSpan RegTimeout = TimeSpan.FromSeconds(2);
     private const int StreamMinBytes = 12;
@@ -48,14 +51,17 @@ public class Vl53l8cxDevice : DepzDevice
     /// <summary>Register bytes per WRITE_REG.</summary>
     protected virtual int WriteChunk => Vl53l8Wire.ChunkSize;
 
+    /// <summary>Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4).</summary>
+    protected virtual int StreamChunk => Vl53l8Wire.StreamChunkMax;
+
     /// <summary>The lowest ranging frequency that streams on this sensor.</summary>
     protected virtual int MinRangingHz => MinRangingFrequencyHz;
 
     private BridgePlatform Platform => _platform ??= new BridgePlatform(this);
 
     /// <summary>The ULD driver (escape hatch for DCI access).</summary>
-    /// <exception cref="InvalidOperationException">Before <see cref="Init"/>.</exception>
-    public Vl53l8Driver Uld => _uld ?? throw new InvalidOperationException("call Init() first");
+    /// <exception cref="InvalidStateException">Before <see cref="Init"/>.</exception>
+    public Vl53l8Driver Uld => _uld ?? throw new InvalidStateException("call Init() first");
 
     /// <summary>The firmware set in use after <see cref="Init"/> (cx / ch / l7cx / l7ch).</summary>
     public Vl53l8Firmware Firmware => Uld.Firmware;
@@ -91,6 +97,9 @@ public class Vl53l8cxDevice : DepzDevice
                 var driver = new Vl53l8Driver(Platform, FirmwareSet);
                 driver.Init(progress);
                 _uld = driver;
+                // A fresh driver has no motion indicator armed; the CNH setup is gone from the
+                // sensor too (ERRATA B4).
+                ArmedCnh = null;
             }
             finally
             {
@@ -116,12 +125,16 @@ public class Vl53l8cxDevice : DepzDevice
 
     public int GetRangingFrequencyHz() => Uld.GetRangingFrequencyHz();
 
-    /// <summary>At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8.</summary>
+    /// <summary>At least <see cref="MinRangingHz"/>; at most <see cref="MaxRangingFrequencyHz"/> of the resolution last set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11 §3). Refused host-side, nothing reaches the bus.</summary>
     public void SetRangingFrequencyHz(int hz)
     {
         if (hz < MinRangingHz)
             throw new ArgumentOutOfRangeException(nameof(hz), hz,
                 $"ranging frequency must be >= {MinRangingHz} Hz: below that the sensor never enters its ranging loop and streams nothing (contract 04)");
+        int maxHz = MaxRangingFrequencyHz(_resolution);
+        if (hz > maxHz)
+            throw new ArgumentOutOfRangeException(nameof(hz), hz,
+                $"ranging frequency must be <= {maxHz} Hz at {_resolution} zones (60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3)");
         RequireNotRanging();
         Uld.SetRangingFrequencyHz(hz);
     }
@@ -175,9 +188,11 @@ public class Vl53l8cxDevice : DepzDevice
         Uld.SetPowerMode(mode);
     }
 
-    public double GetXtalkMargin() => Uld.GetXtalkMargin();
+    /// <summary>Xtalk margin, whole kcps/SPAD (as ST).</summary>
+    public int GetXtalkMargin() => Uld.GetXtalkMargin();
 
-    public void SetXtalkMargin(double marginKcps)
+    /// <summary>Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.</summary>
+    public void SetXtalkMargin(int marginKcps)
     {
         RequireNotRanging();
         Uld.SetXtalkMargin(marginKcps);
@@ -228,11 +243,14 @@ public class Vl53l8cxDevice : DepzDevice
     }
 
     /// <summary>Enable the motion indicator over [min, max] mm; every frame then carries
-    /// <see cref="Vl53l8Frame.Motion"/>. Returns the configuration for further tuning.</summary>
+    /// <see cref="Vl53l8Frame.Motion"/>. Returns the configuration for further tuning. On CH
+    /// firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH
+    /// (<c>CnhSetup</c> null, no <see cref="Vl53l8Frame.CnhRaw"/>).</summary>
     public MotionConfig ConfigureMotionIndicator(int distanceMinMm = 400, int distanceMaxMm = 1500)
     {
         RequireNotRanging();
         var cfg = Uld.MotionIndicatorInit(GetResolution());
+        ArmedCnh = null;
         Uld.MotionIndicatorSetDistanceMotion(cfg, distanceMinMm, distanceMaxMm);
         return cfg;
     }
@@ -255,6 +273,7 @@ public class Vl53l8cxDevice : DepzDevice
         RequireNotRanging();
         setup.RequiredMemory(); // a blank or oversized setup is refused before anything is sent
         Uld.DciWriteData(Vl53l8CnhSetup.MiCfgDevIdx, setup.Pack());
+        Uld.MotionIndicatorDisarm(); // one DCI block (ERRATA B4)
         ArmedCnh = setup;
     }
 
@@ -272,7 +291,7 @@ public class Vl53l8cxDevice : DepzDevice
         int? cnhSize = ArmedCnh?.RequiredMemory();
         GetResolution(); // refresh the cache that shapes frames
         Uld.StartRanging(cnhSize);
-        _reassembler = new FrameReassembler();
+        _reassembler = new FrameReassembler(StreamChunk);
         RequestOk((int)Vl53l8Cmd.StartStream, Vl53l8Wire.PackStartStream(Uld.DataReadSize));
         _ranging = true;
     }
@@ -314,7 +333,7 @@ public class Vl53l8cxDevice : DepzDevice
     private protected void RequireNotRanging()
     {
         if (_ranging)
-            throw new InvalidOperationException("StopRanging() first — the stream owns the register bank");
+            throw new InvalidStateException("StopRanging() first — the stream owns the register bank");
     }
 
     private protected override bool HandleReport(Packet packet)
@@ -336,7 +355,7 @@ public class Vl53l8cxDevice : DepzDevice
             Interlocked.Increment(ref _frameParseErrors);
             return true;
         }
-        _frames.Emit(frame);
+        _frames.Emit(frame, Stats);
         return true;
     }
 
@@ -415,6 +434,8 @@ public class Vl53l8chDevice : Vl53l8cxDevice
 
     /// <summary>Arm CNH for the next <see cref="Vl53l8cxDevice.StartRanging"/>: every frame then carries
     /// <see cref="Vl53l8Frame.CnhRaw"/>, decoded with <see cref="Vl53l8Cnh.DecodeHistogram"/> and
-    /// <see cref="Vl53l8CnhSetup.ToDecodeConfig"/>.</summary>
+    /// <see cref="Vl53l8CnhSetup.ToDecodeConfig"/>. CNH and the motion indicator share one DCI
+    /// struct (0xBFAC): this disarms the motion indicator (frames carry no
+    /// <see cref="Vl53l8Frame.Motion"/>).</summary>
     public void ConfigureCnh(Vl53l8CnhSetup setup) => ArmCnh(setup);
 }

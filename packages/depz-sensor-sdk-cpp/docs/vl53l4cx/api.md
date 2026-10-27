@@ -683,8 +683,12 @@ std::pair<int, int> range_timing();
 #### Vl53lx.set_mode
 
 ```cpp
-void set_mode(const std::string& mode);
+std::optional<int> set_mode(const std::string& mode);
 ```
+
+-> the budget in effect after the change, ms, where the change can move
+it (VL53L1: one the new mode does not tabulate goes to the nearest one
+it does, contract 12 §5), else nullopt.
 
 #### Vl53lx.mode
 

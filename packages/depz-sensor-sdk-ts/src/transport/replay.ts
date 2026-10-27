@@ -3,7 +3,7 @@
  * Mirrors the Python reference `depz_sensor_sdk.transport.record_replay`.
  */
 
-import { LinkClosedError } from "../errors.js";
+import { LinkClosedError, ReplayMismatchError } from "../errors.js";
 import type { SerialTransport, SerialTransportInfo } from "./types.js";
 
 export const RECORDING_SCHEMA = "depz.rec/1";
@@ -14,12 +14,67 @@ function bytesToHex(data: Uint8Array): string {
   return s;
 }
 
-function hexToBytes(hex: string): Uint8Array {
+const HEX_BYTES = /^(?:[0-9a-fA-F]{2})*$/;
+
+/** `hex` as bytes; refused unless whole bytes of hex digits (even length). */
+function hexToBytes(hex: string): Uint8Array | null {
+  if (!HEX_BYTES.test(hex)) return null;
   const out = new Uint8Array(hex.length >>> 1);
   for (let i = 0; i < out.length; i++) {
     out[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
   }
   return out;
+}
+
+/** Contract 08 «Line rules»: lines end at LF only; a blank line is JSON whitespace only (not NBSP, NUL …). */
+const BLANK_LINE = /^[ \t\r]*$/;
+
+/**
+ * `line` as the JSON object a capture line must be, else a TypeError naming
+ * the line (a damaged capture is the caller's bad argument, contract 07 §3 —
+ * never a crash in the reader).
+ */
+function jsonObjectLine(lineno: number, line: string): Record<string, unknown> {
+  let obj: unknown;
+  try {
+    obj = JSON.parse(line);
+  } catch (bad) {
+    throw new TypeError(`.depzrec line ${lineno}: not JSON: ${(bad as Error).message}`);
+  }
+  if (typeof obj !== "object" || obj === null || Array.isArray(obj)) {
+    throw new TypeError(`.depzrec line ${lineno}: not a JSON object`);
+  }
+  return obj as Record<string, unknown>;
+}
+
+interface RecordedEvent {
+  tUs: number;
+  dir: string;
+  data: Uint8Array;
+}
+
+/**
+ * One capture event line (contract 08): `t` a non-negative integer (µs),
+ * `dir` a string, `data` a hex string of whole bytes — anything else is
+ * refused with the line number, never coerced.
+ */
+function eventLine(lineno: number, line: string): RecordedEvent {
+  const ev = jsonObjectLine(lineno, line);
+  const { t, dir, data } = ev;
+  if (typeof t !== "number" || !Number.isInteger(t) || t < 0) {
+    throw new RangeError(`.depzrec line ${lineno}: 't' must be a non-negative integer, got ${JSON.stringify(t)}`);
+  }
+  if (typeof dir !== "string") {
+    throw new TypeError(`.depzrec line ${lineno}: 'dir' must be a string, got ${JSON.stringify(dir)}`);
+  }
+  if (typeof data !== "string") {
+    throw new TypeError(`.depzrec line ${lineno}: 'data' must be a hex string, got ${JSON.stringify(data)}`);
+  }
+  const bytes = hexToBytes(data);
+  if (bytes === null) {
+    throw new RangeError(`.depzrec line ${lineno}: 'data' is not hex: ${JSON.stringify(data)}`);
+  }
+  return { tUs: t, dir, data: bytes };
 }
 
 /**
@@ -119,19 +174,25 @@ export class ReplayTransport implements SerialTransport {
   constructor(content: string, opts?: { realtime?: boolean; strictTx?: boolean }) {
     this.realtime = opts?.realtime ?? false;
     this.strictTx = opts?.strictTx ?? false;
-    const lines = content.split("\n").filter((l) => l.trim().length > 0);
-    this.header =
-      lines.length > 0 ? (JSON.parse(lines[0]!) as Record<string, unknown>) : {};
+    // Line 1 is the header (a JSON object; unknown fields are kept), every
+    // later non-blank line an event; a damaged line is refused by number
+    // (contract 08) rather than skipped or coerced.
+    if (content.length === 0) {
+      throw new TypeError(".depzrec: empty, not a capture (no header line)");
+    }
+    const lines = content.split("\n");
+    this.header = jsonObjectLine(1, lines[0]!);
     const txChunks: Uint8Array[] = [];
     let txLen = 0;
-    for (const line of lines.slice(1)) {
-      const ev = JSON.parse(line) as { t: number; dir: string; data: string };
-      const data = hexToBytes(ev.data);
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]!;
+      if (BLANK_LINE.test(line)) continue;
+      const ev = eventLine(i + 1, line);
       if (ev.dir === "rx") {
-        this.rx.push({ tUs: ev.t, data, txPrefix: txLen });
+        this.rx.push({ tUs: ev.tUs, data: ev.data, txPrefix: txLen });
       } else {
-        txChunks.push(data);
-        txLen += data.length;
+        txChunks.push(ev.data);
+        txLen += ev.data.length;
       }
     }
     this.txStream = new Uint8Array(txLen);
@@ -173,7 +234,7 @@ export class ReplayTransport implements SerialTransport {
         if (expected[i] !== data[i]) mismatch = true;
       }
       if (mismatch) {
-        throw new Error(
+        throw new ReplayMismatchError(
           `replay strictTx mismatch at offset ${this.txWritten}: ` +
             `expected ${bytesToHex(expected)}, got ${bytesToHex(data)}`,
         );

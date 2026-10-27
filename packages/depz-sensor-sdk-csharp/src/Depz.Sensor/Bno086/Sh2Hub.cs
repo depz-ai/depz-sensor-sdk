@@ -151,6 +151,8 @@ public static class FrsRecordId
     public const int ShakeDetectConfig = 0x7D7D;
     public const int StabilityDetectorConfig = 0xED85;
     public const int ActivityTrackerConfig = 0xED88;
+    /// <summary>Reference, sync interval, max error, prediction (SH-2 §4.3.24).</summary>
+    public const int GyroIntegratedRvConfig = 0xA1A2;
 
     /// <summary>Sensor id → its metadata FRS record.</summary>
     public static readonly IReadOnlyDictionary<int, int> MetadataRecords = new Dictionary<int, int>
@@ -213,7 +215,7 @@ public sealed record ProductId(int ResetCause, int SwVersionMajor, int SwVersion
 
     public static ProductId Unpack(ReadOnlySpan<byte> p)
     {
-        Protocol.Wire.NeedBytes("Product ID Response", p, 14);
+        Protocol.Wire.NeedBytes("Product ID Response", p, 16);
         if (p[0] != (int)ControlReport.ProductIdResponse)
             throw new Sh2Exception($"not a product-id response: 0x{p[0]:X2}");
         return new(p[1], p[2], p[3], BinaryPrimitives.ReadUInt32LittleEndian(p[4..]),

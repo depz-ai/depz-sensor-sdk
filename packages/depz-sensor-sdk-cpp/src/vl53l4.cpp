@@ -18,6 +18,9 @@ using detail::wr_le;
 // ── command encoders ────────────────────────────────────────────────────────
 
 bytes pack_read_reg(std::uint16_t addr, std::uint16_t len) {
+    // contract 10 §1: len 1..253 and addr + len <= 0x10000, like WRITE_REG (refused, never sent)
+    if (len < 1 || len > XFER_MAX || static_cast<std::uint32_t>(addr) + len > 0x10000u)
+        throw std::invalid_argument("VL53_READ_REG: len must be 1..253 and addr+len <= 0x10000");
     bytes out;
     wr_le(out, addr, 2);
     wr_le(out, len, 2);
@@ -25,9 +28,9 @@ bytes pack_read_reg(std::uint16_t addr, std::uint16_t len) {
 }
 
 bytes pack_write_reg(std::uint16_t addr, byte_span data) {
-    // contracts 10/12 §2: data 1..253 bytes (refused, never sent)
-    if (data.empty() || data.size() > XFER_MAX)
-        throw std::invalid_argument("VL53_WRITE_REG: data must be 1..253 bytes");
+    // contracts 10/12 §2: data 1..253 bytes and addr + N <= 0x10000 (refused, never sent)
+    if (data.empty() || data.size() > XFER_MAX || static_cast<std::size_t>(addr) + data.size() > 0x10000u)
+        throw std::invalid_argument("VL53_WRITE_REG: data must be 1..253 bytes and addr+N <= 0x10000");
     bytes out;
     out.reserve(2 + data.size());
     wr_le(out, addr, 2);
@@ -97,7 +100,8 @@ std::optional<StreamData> StreamData::unpack(byte_span payload) {
 // ── result-block decode ─────────────────────────────────────────────────────
 
 std::optional<Vl53l4Result> parse_result_block(byte_span raw) {
-    if (raw.size() < 15) return std::nullopt;
+    // contract 10 §5: a 17-byte block; shorter is rejected, a tail ignored
+    if (raw.size() < RESULT_BLOCK_LEN) return std::nullopt;
 
     // GetResult() raw status -> ULD status (status_rtn[24] in VL53L4CD_api.c).
     static constexpr int kStatusRtn[24] = {255, 255, 255, 5,   2,   4,   1,   7,

@@ -325,8 +325,9 @@ printf("model 0x%04X, %u kHz, %u INT edges, %u skipped, %u I2C errors\n",
 OFF and RESET stop any stream and wipe everything the ULD programmed —
 timing, offset, crosstalk, thresholds: `depz_vl53l4cd_initialized()` and
 `depz_vl53l4cd_ranging()` both go `false`. Call `init()` and reconfigure
-before measuring again. The bridge counters are free-running and wrap
-silently — watch increments, not absolute values.
+before measuring again. The bridge counters wrap silently — watch
+increments, not absolute values; `i2c_errors` is cleared by every successful
+RESET, so it counts bus errors since the last one, not since power-up.
 
 For anything the class does not wrap, `depz_vl53l4cd_read_reg()` /
 `depz_vl53l4cd_write_reg()` reach any register (16-bit address, contents
@@ -535,7 +536,7 @@ self-describing. The streaming FSM only reads; starting the sensor
 `depz_vl53l4_parse_result_block()` decodes the block exactly as
 `VL53L4CD_GetResult()`: status via the `STATUS_RTN` table (raw ≥ 24 passes
 through unmapped), rates ×8 kcps, sigma ÷4 mm; it returns `-1` when
-`len < 15`.
+`len < DEPZ_VL53L4_RESULT_BLOCK_LEN` (17, contract 10 §5).
 
 ### Range timing
 

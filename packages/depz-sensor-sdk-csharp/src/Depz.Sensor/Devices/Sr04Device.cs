@@ -15,8 +15,14 @@ public sealed record Sr04Measurement(ulong TimestampUs, int EchoTimeUs, string S
     /// <summary>Distance with the speed of sound for <paramref name="airTempC"/> °C.</summary>
     public double? DistanceMmAt(double airTempC) => Protocol.Sr04.DistanceMmFromEcho(EchoTimeUs, airTempC);
 
-    internal static Sr04Measurement From(Sr04Data d) =>
-        new(d.TimestampUs, d.EchoTimeUs, d.SourceCmd == (int)Sr04Cmd.StartMeasurementLoop ? "loop" : "once");
+    /// <summary>Null for a source cmd contract 03 §2 does not define (0x36 / 0x37 only, ERRATA
+    /// B11): not a measurement, it falls through to the hex text event.</summary>
+    internal static Sr04Measurement? From(Sr04Data d) => d.SourceCmd switch
+    {
+        (int)Sr04Cmd.MeasureOnce => new(d.TimestampUs, d.EchoTimeUs, "once"),
+        (int)Sr04Cmd.StartMeasurementLoop => new(d.TimestampUs, d.EchoTimeUs, "loop"),
+        _ => null,
+    };
 }
 
 /// <summary>
@@ -85,7 +91,7 @@ public sealed class Sr04Device : DepzDevice
             var d = Sr04Data.Unpack(p.Payload);
             if (d.SourceCmd != (int)Sr04Cmd.MeasureOnce)
                 return false;
-            m = Sr04Measurement.From(d);
+            m = Sr04Measurement.From(d)!;
             return true;
         }
         return Request<Sr04Measurement>((int)Sr04Cmd.MeasureOnce, null, Match, timeout ?? TimeSpan.FromSeconds(1));
@@ -110,7 +116,10 @@ public sealed class Sr04Device : DepzDevice
     {
         if (packet.Cmd != (int)Sr04Rpt.Data || packet.Payload.Length < DataMinBytes)
             return false;
-        _measurements.Emit(Sr04Measurement.From(Sr04Data.Unpack(packet.Payload)));
+        var m = Sr04Measurement.From(Sr04Data.Unpack(packet.Payload));
+        if (m is null)
+            return false;
+        _measurements.Emit(m, Stats);
         return true;
     }
 

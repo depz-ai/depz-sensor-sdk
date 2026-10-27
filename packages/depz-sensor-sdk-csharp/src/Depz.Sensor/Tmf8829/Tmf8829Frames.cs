@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using Depz.Sensor.Devices;
 
 namespace Depz.Sensor.Tmf8829;
 
@@ -94,7 +95,7 @@ public sealed record Tmf8829PixelResults(
 
     /// <summary>Raw distance of peak <paramref name="p"/> at (<paramref name="r"/>, <paramref name="c"/>).</summary>
     public ushort DistanceAt(int p, int r, int c) =>
-        (Distance ?? throw new InvalidOperationException("no peaks in this result format"))[(p * GridRows + r) * GridCols + c];
+        (Distance ?? throw new InvalidStateException("no peaks in this result format"))[(p * GridRows + r) * GridCols + c];
 }
 
 /// <summary>A raw histogram frame (25 377 B); decoding the bins is left to the caller (ams histogram layout).</summary>

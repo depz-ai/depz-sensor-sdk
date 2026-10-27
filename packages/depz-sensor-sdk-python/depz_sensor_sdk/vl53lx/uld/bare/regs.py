@@ -16,12 +16,29 @@ C codec applies. It is generated from `vl53lx_register_funcs.c`
 Reference C driver: ../../../temp/STSW-IMG033_L3/…/VL53L3CX_BareDriver/
 """
 
-from collections import namedtuple
+from __future__ import annotations
 
-F = namedtuple('F', 'name off width signed mask')
-Block = namedtuple('Block', 'base size writable fields')
+from typing import NamedTuple
 
-BLOCKS = {
+
+class F(NamedTuple):
+    """One field of a block: byte offset, byte width, signedness and the bit
+    mask the C codec applies (None when the field fills its bytes)."""
+    name:   str
+    off:    int
+    width:  int
+    signed: bool
+    mask:   int | None
+
+
+class Block(NamedTuple):
+    base:     int
+    size:     int
+    writable: bool
+    fields:   tuple[F, ...]
+
+
+BLOCKS: dict[str, Block] = {
     'static_nvm_managed': Block(0x0001, 11, True, (
         F('i2c_slave__device_address',                           0, 1, False, 0x7F),
         F('ana_config__vhv_ref_sel_vddpix',                      1, 1, False, 0xF),
@@ -318,7 +335,7 @@ BLOCKS = {
 }
 
 
-def _clip(value, f):
+def _clip(value: int, f: F) -> int:
     """Apply the field's mask and width, the way the C codec does."""
     value = int(value)
     bits = f.width * 8
@@ -329,7 +346,7 @@ def _clip(value, f):
     return value & ((1 << bits) - 1)
 
 
-def _unsign(value, f):
+def _unsign(value: int, f: F) -> int:
     bits = f.width * 8
     if f.signed and value >= (1 << (bits - 1)):
         value -= 1 << bits
@@ -345,27 +362,32 @@ class RegBlock:
 
     __slots__ = ('_block', '_name', '_v', '_raw')
 
-    def __init__(self, name):
+    _block: Block
+    _name:  str
+    _v:     dict[str, int]
+    _raw:   bytearray
+
+    def __init__(self, name: str) -> None:
         object.__setattr__(self, '_name', name)
         object.__setattr__(self, '_block', BLOCKS[name])
         object.__setattr__(self, '_v', {f.name: 0 for f in BLOCKS[name].fields})
         object.__setattr__(self, '_raw', bytearray(BLOCKS[name].size))
 
     # ── attribute access ──
-    def __getattr__(self, key):
+    def __getattr__(self, key: str) -> int:
         try:
             return self._v[key]
         except KeyError:
             raise AttributeError(f'{self._name} has no field {key}') from None
 
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: int) -> None:
         if key in self._v:
             self._v[key] = int(value)
         else:
             raise AttributeError(f'{self._name} has no field {key}')
 
     # ── codec ──
-    def decode(self, raw: bytes):
+    def decode(self, raw: bytes) -> RegBlock:
         if len(raw) < self._block.size:
             raise ValueError(f'{self._name}: {len(raw)} bytes, '
                              f'need {self._block.size}')
@@ -386,15 +408,15 @@ class RegBlock:
 
     # ── block geometry ──
     @property
-    def base(self):
+    def base(self) -> int:
         return self._block.base
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self._block.size
 
-    def items(self):
+    def items(self) -> list[tuple[str, int]]:
         return [(f.name, self._v[f.name]) for f in self._block.fields]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<{self._name} 0x{self.base:04X}+{self.size}>'

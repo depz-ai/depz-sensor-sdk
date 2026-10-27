@@ -72,23 +72,50 @@ impl HistConfig {
     /// sequence.
     pub fn copy_to_static_cfg(&self, img: &mut DeviceImage) {
         let stat = img.static_config_mut();
-        stat.set("sigma_estimator__effective_pulse_width_ns", self.high_amb_even_bin_0_1);
-        stat.set("sigma_estimator__effective_ambient_width_ns", self.high_amb_even_bin_2_3);
+        stat.set(
+            "sigma_estimator__effective_pulse_width_ns",
+            self.high_amb_even_bin_0_1,
+        );
+        stat.set(
+            "sigma_estimator__effective_ambient_width_ns",
+            self.high_amb_even_bin_2_3,
+        );
         stat.set("sigma_estimator__sigma_ref_mm", self.high_amb_even_bin_4_5);
-        stat.set("algo__crosstalk_compensation_valid_height_mm", self.high_amb_odd_bin_0_1);
-        stat.set("spare_host_config__static_config_spare_0", self.high_amb_odd_bin_2_3);
-        stat.set("spare_host_config__static_config_spare_1", self.high_amb_odd_bin_4_5);
+        stat.set(
+            "algo__crosstalk_compensation_valid_height_mm",
+            self.high_amb_odd_bin_0_1,
+        );
+        stat.set(
+            "spare_host_config__static_config_spare_0",
+            self.high_amb_odd_bin_2_3,
+        );
+        stat.set(
+            "spare_host_config__static_config_spare_1",
+            self.high_amb_odd_bin_4_5,
+        );
 
-        stat.set("algo__range_ignore_threshold_mcps", (self.mid_amb_even_bin_0_1 << 8) + self.mid_amb_even_bin_2_3);
-        stat.set("algo__range_ignore_valid_height_mm", self.mid_amb_even_bin_4_5);
+        stat.set(
+            "algo__range_ignore_threshold_mcps",
+            (self.mid_amb_even_bin_0_1 << 8) + self.mid_amb_even_bin_2_3,
+        );
+        stat.set(
+            "algo__range_ignore_valid_height_mm",
+            self.mid_amb_even_bin_4_5,
+        );
         stat.set("algo__range_min_clip", self.mid_amb_odd_bin_0_1);
         stat.set("algo__consistency_check__tolerance", self.mid_amb_odd_bin_2);
-        stat.set("spare_host_config__static_config_spare_2", self.mid_amb_odd_bin_3_4);
+        stat.set(
+            "spare_host_config__static_config_spare_2",
+            self.mid_amb_odd_bin_3_4,
+        );
         stat.set("sd_config__reset_stages_msb", self.mid_amb_odd_bin_5);
         stat.set("sd_config__reset_stages_lsb", self.user_bin_offset);
 
         let timing = img.timing_config_mut();
-        timing.set("range_config__sigma_thresh", (self.low_amb_even_bin_0_1 << 8) + self.low_amb_even_bin_2_3);
+        timing.set(
+            "range_config__sigma_thresh",
+            (self.low_amb_even_bin_0_1 << 8) + self.low_amb_even_bin_2_3,
+        );
         timing.set(
             "range_config__min_count_rate_rtn_limit_mcps",
             (self.low_amb_even_bin_4_5 << 8) + self.low_amb_odd_bin_0_1,
@@ -99,7 +126,10 @@ impl HistConfig {
         let dynamic = img.dynamic_config_mut();
         dynamic.set("system__thresh_high", self.amb_thresh_low);
         dynamic.set("system__thresh_low", self.amb_thresh_high);
-        dynamic.set("system__enable_xtalk_per_quadrant", self.spad_array_selection);
+        dynamic.set(
+            "system__enable_xtalk_per_quadrant",
+            self.spad_array_selection,
+        );
     }
 
     /// `VL53LX_hist_get_bin_sequence_config()`: which sequence the device used for this frame, even
@@ -120,9 +150,21 @@ impl HistConfig {
         }
         let packed = if stream_count & 0x01 == 0 {
             match level {
-                Level::Low => [self.low_amb_even_bin_0_1, self.low_amb_even_bin_2_3, self.low_amb_even_bin_4_5],
-                Level::High => [self.high_amb_even_bin_0_1, self.high_amb_even_bin_2_3, self.high_amb_even_bin_4_5],
-                Level::Mid => [self.mid_amb_even_bin_0_1, self.mid_amb_even_bin_2_3, self.mid_amb_even_bin_4_5],
+                Level::Low => [
+                    self.low_amb_even_bin_0_1,
+                    self.low_amb_even_bin_2_3,
+                    self.low_amb_even_bin_4_5,
+                ],
+                Level::High => [
+                    self.high_amb_even_bin_0_1,
+                    self.high_amb_even_bin_2_3,
+                    self.high_amb_even_bin_4_5,
+                ],
+                Level::Mid => [
+                    self.mid_amb_even_bin_0_1,
+                    self.mid_amb_even_bin_2_3,
+                    self.mid_amb_even_bin_4_5,
+                ],
             }
         } else if level == Level::Mid {
             // The mid odd sequence is the one packed differently.
@@ -135,9 +177,17 @@ impl HistConfig {
                 self.mid_amb_odd_bin_5 & 0x0F,
             ];
         } else if level == Level::Low {
-            [self.low_amb_odd_bin_0_1, self.low_amb_odd_bin_2_3, self.low_amb_odd_bin_4_5]
+            [
+                self.low_amb_odd_bin_0_1,
+                self.low_amb_odd_bin_2_3,
+                self.low_amb_odd_bin_4_5,
+            ]
         } else {
-            [self.high_amb_odd_bin_0_1, self.high_amb_odd_bin_2_3, self.high_amb_odd_bin_4_5]
+            [
+                self.high_amb_odd_bin_0_1,
+                self.high_amb_odd_bin_2_3,
+                self.high_amb_odd_bin_4_5,
+            ]
         };
         let mut seq = [0i64; 6];
         for i in 0..3 {
@@ -213,15 +263,27 @@ impl Default for HistPostProcessConfig {
             valid_phase_high: 0x88,
             consistency_phase_tolerance: d("TUNINGPARM_CONSISTENCY_HIST_PHASE_TOLERANCE_DEFAULT"),
             consistency_event_sigma: d("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_DEFAULT"),
-            consistency_event_min_spad_count: d("TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_MIN_SPAD_LIMIT_DEFAULT"),
-            consistency_min_max_tolerance: d("TUNINGPARM_CONSISTENCY_HIST_MIN_MAX_TOLERANCE_MM_DEFAULT"),
+            consistency_event_min_spad_count: d(
+                "TUNINGPARM_CONSISTENCY_HIST_EVENT_SIGMA_MIN_SPAD_LIMIT_DEFAULT",
+            ),
+            consistency_min_max_tolerance: d(
+                "TUNINGPARM_CONSISTENCY_HIST_MIN_MAX_TOLERANCE_MM_DEFAULT",
+            ),
             crosstalk_compensation_enable: 0,
-            crosstalk_detect_min_valid_range_mm: d("TUNINGPARM_XTALK_DETECT_MIN_VALID_RANGE_MM_DEFAULT"),
-            crosstalk_detect_max_valid_range_mm: d("TUNINGPARM_XTALK_DETECT_MAX_VALID_RANGE_MM_DEFAULT"),
-            crosstalk_detect_max_valid_rate_kcps: d("TUNINGPARM_XTALK_DETECT_MAX_VALID_RATE_KCPS_DEFAULT"),
+            crosstalk_detect_min_valid_range_mm: d(
+                "TUNINGPARM_XTALK_DETECT_MIN_VALID_RANGE_MM_DEFAULT",
+            ),
+            crosstalk_detect_max_valid_range_mm: d(
+                "TUNINGPARM_XTALK_DETECT_MAX_VALID_RANGE_MM_DEFAULT",
+            ),
+            crosstalk_detect_max_valid_rate_kcps: d(
+                "TUNINGPARM_XTALK_DETECT_MAX_VALID_RATE_KCPS_DEFAULT",
+            ),
             crosstalk_detect_max_sigma_mm: d("TUNINGPARM_XTALK_DETECT_MAX_SIGMA_MM_DEFAULT"),
             crosstalk_detect_event_sigma: d("TUNINGPARM_XTALK_DETECT_EVENT_SIGMA_DEFAULT"),
-            crosstalk_detect_min_max_tolerance: d("TUNINGPARM_XTALK_DETECT_MIN_MAX_TOLERANCE_DEFAULT"),
+            crosstalk_detect_min_max_tolerance: d(
+                "TUNINGPARM_XTALK_DETECT_MIN_MAX_TOLERANCE_DEFAULT",
+            ),
             crosstalk_compensation_plane_offset_kcps: 0,
             crosstalk_compensation_x_plane_gradient_kcps: 0,
             crosstalk_compensation_y_plane_gradient_kcps: 0,
@@ -347,19 +409,37 @@ impl HistogramBinData {
     /// The fields under the C driver's (and the Python SDK's) names, in the reference's order.
     pub fn fields(&self) -> Vec<(&'static str, Value)> {
         vec![
-            ("result__interrupt_status", Value::int(self.result_interrupt_status)),
+            (
+                "result__interrupt_status",
+                Value::int(self.result_interrupt_status),
+            ),
             ("result__range_status", Value::int(self.result_range_status)),
-            ("result__report_status", Value::int(self.result_report_status)),
+            (
+                "result__report_status",
+                Value::int(self.result_report_status),
+            ),
             ("result__stream_count", Value::int(self.result_stream_count)),
-            ("result__dss_actual_effective_spads", Value::int(self.result_dss_actual_effective_spads)),
-            ("phasecal_result__reference_phase", Value::int(self.phasecal_result_reference_phase)),
-            ("phasecal_result__vcsel_start", Value::int(self.phasecal_result_vcsel_start)),
+            (
+                "result__dss_actual_effective_spads",
+                Value::int(self.result_dss_actual_effective_spads),
+            ),
+            (
+                "phasecal_result__reference_phase",
+                Value::int(self.phasecal_result_reference_phase),
+            ),
+            (
+                "phasecal_result__vcsel_start",
+                Value::int(self.phasecal_result_vcsel_start),
+            ),
             ("bin_data", ints(&self.bin_data)),
             ("zone_id", Value::int(self.zone_id)),
             ("first_bin", Value::int(self.first_bin)),
             ("number_of_bins", Value::int(self.number_of_bins)),
             ("bins_in_data", Value::int(self.bins_in_data)),
-            ("cal_config__vcsel_start", Value::int(self.cal_config_vcsel_start)),
+            (
+                "cal_config__vcsel_start",
+                Value::int(self.cal_config_vcsel_start),
+            ),
             ("vcsel_width", Value::int(self.vcsel_width)),
             ("fast_osc_frequency", Value::int(self.fast_osc_frequency)),
             ("vcsel_period", Value::int(self.vcsel_period)),
@@ -367,15 +447,27 @@ impl HistogramBinData {
             ("bin_rep", ints(&self.bin_rep)),
             ("min_bin_value", Value::int(self.min_bin_value)),
             ("max_bin_value", Value::int(self.max_bin_value)),
-            ("number_of_ambient_bins", Value::int(self.number_of_ambient_bins)),
-            ("number_of_ambient_samples", Value::int(self.number_of_ambient_samples)),
+            (
+                "number_of_ambient_bins",
+                Value::int(self.number_of_ambient_bins),
+            ),
+            (
+                "number_of_ambient_samples",
+                Value::int(self.number_of_ambient_samples),
+            ),
             ("ambient_events_sum", Value::int(self.ambient_events_sum)),
             ("ambient_per_bin", Value::int(self.ambient_per_bin)),
-            ("total_periods_elapsed", Value::int(self.total_periods_elapsed)),
+            (
+                "total_periods_elapsed",
+                Value::int(self.total_periods_elapsed),
+            ),
             ("peak_duration_us", Value::int(self.peak_duration_us)),
             ("woi_duration_us", Value::int(self.woi_duration_us)),
             ("zero_distance_phase", Value::int(self.zero_distance_phase)),
-            ("roi_config__user_roi_centre_spad", Value::int(self.roi_config_user_roi_centre_spad)),
+            (
+                "roi_config__user_roi_centre_spad",
+                Value::int(self.roi_config_user_roi_centre_spad),
+            ),
             (
                 "roi_config__user_roi_requested_global_xy_size",
                 Value::int(self.roi_config_user_roi_requested_global_xy_size),
@@ -429,7 +521,9 @@ impl HistogramBinData {
         match key {
             "bin_data" => self.bin_data = a,
             "bin_seq" | "bin_rep" => {
-                let Ok(six) = <[i64; 6]>::try_from(a) else { return false };
+                let Ok(six) = <[i64; 6]>::try_from(a) else {
+                    return false;
+                };
                 if key == "bin_seq" {
                     self.bin_seq = six;
                 } else {
@@ -501,15 +595,20 @@ impl LlState {
             self.rd_timing_status = 0;
             return;
         }
-        self.rd_stream_count = if self.rd_stream_count == 0xFF { 0x80 } else { self.rd_stream_count + 1 };
+        self.rd_stream_count = if self.rd_stream_count == 0xFF {
+            0x80
+        } else {
+            self.rd_stream_count + 1
+        };
         self.rd_gph_id ^= regs::GROUPED_PARAMETER_HOLD_ID_MASK;
         match self.rd_device_state {
             BareDeviceState::SwStandby => {
-                self.rd_device_state = if grouped_parameter_hold & regs::GROUPED_PARAMETER_HOLD_ID_MASK != 0 {
-                    BareDeviceState::RangingWaitGphSync
-                } else {
-                    BareDeviceState::RangingOutputData
-                };
+                self.rd_device_state =
+                    if grouped_parameter_hold & regs::GROUPED_PARAMETER_HOLD_ID_MASK != 0 {
+                        BareDeviceState::RangingWaitGphSync
+                    } else {
+                        BareDeviceState::RangingOutputData
+                    };
                 self.rd_stream_count = 0;
                 self.rd_timing_status = 0;
             }
@@ -531,7 +630,11 @@ impl LlState {
             self.cfg_timing_status = 0;
             return;
         }
-        self.cfg_stream_count = if self.cfg_stream_count == 0xFF { 0x80 } else { self.cfg_stream_count + 1 };
+        self.cfg_stream_count = if self.cfg_stream_count == 0xFF {
+            0x80
+        } else {
+            self.cfg_stream_count + 1
+        };
         self.cfg_gph_id ^= regs::GROUPED_PARAMETER_HOLD_ID_MASK;
         match self.cfg_device_state {
             BareDeviceState::SwStandby => {
@@ -636,11 +739,20 @@ impl RangeData {
             ("ambient_events", self.ambient_events),
             ("total_events", self.total_events),
             ("signal_events", self.signal_events),
-            ("peak_signal_count_rate_mcps", self.peak_signal_count_rate_mcps),
-            ("avg_signal_count_rate_mcps", self.avg_signal_count_rate_mcps),
+            (
+                "peak_signal_count_rate_mcps",
+                self.peak_signal_count_rate_mcps,
+            ),
+            (
+                "avg_signal_count_rate_mcps",
+                self.avg_signal_count_rate_mcps,
+            ),
             ("ambient_count_rate_mcps", self.ambient_count_rate_mcps),
             ("total_rate_per_spad_mcps", self.total_rate_per_spad_mcps),
-            ("signal_events_per_spad_kcps", self.signal_events_per_spad_kcps),
+            (
+                "signal_events_per_spad_kcps",
+                self.signal_events_per_spad_kcps,
+            ),
             ("sigma", self.sigma),
             ("phase_start", self.phase_start),
             ("phase_mean", self.phase_mean),

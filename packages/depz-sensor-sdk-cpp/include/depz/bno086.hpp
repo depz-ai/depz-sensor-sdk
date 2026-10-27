@@ -5,6 +5,7 @@
 // Python/TS reference implementations (shtp.py / reports.py / sh2.py).
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
@@ -93,6 +94,7 @@ public:
     // Forget all TX seq counters and partial cargos (sensor reset).
     void reset();
 
+    // Incomplete / orphan cargos and junk-channel (>= 6) frames thrown away.
     std::size_t discarded = 0;
 
 private:
@@ -125,6 +127,79 @@ bytes sh2_build_frs_read_request(std::uint16_t frs_type, std::uint16_t offset_wo
 bytes sh2_build_frs_write_request(std::uint16_t frs_type, std::uint16_t length_words);
 // FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
 bytes sh2_build_frs_write_data(std::uint16_t offset_words, const std::vector<std::uint32_t>& words);
+
+// P0 of the Interactive Calibration command (0x0E, SH-2 §6.4.12.1): what the
+// host knows about the device's motion. Unknown is the hub's initial state.
+enum class MotionIntent : std::uint8_t {
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+};
+inline constexpr std::uint8_t CMD_INTERACTIVE_CALIBRATION = 0x0E;  // BNO086 only; no response
+// Interactive Calibration: a Command Request (0xF2) with command 0x0E and
+// P0 = intent, 12 bytes. BNO086 only, no response; a BNO085 ignores it.
+bytes sh2_build_interactive_calibration(std::uint8_t seq, MotionIntent intent);
+// Force Sensor Flush (0xF0) + sensor id, 2 bytes (SH-2 §6.5.6): the hub sends
+// the sensor's batched reports now and answers with the header-less Flush
+// Completed (FLUSH_COMPLETED) on the input channel.
+inline constexpr std::uint8_t FORCE_SENSOR_FLUSH = 0xF0;
+bytes sh2_build_force_flush(std::uint8_t sensor_id);
+
+// ── SH-2 control-channel responses (§4 table) ───────────────────────────────
+// Fixed lengths: Command Response 0xF1 16 B, FRS Read Response 0xF3 16 B, FRS
+// Write Response 0xF5 4 B, Product ID Response 0xF8 16 B, Get Feature Response
+// 0xFC 17 B. Every unpack() returns nullopt for another report id or a payload
+// shorter than its fields — never a record with missing or zero fields — and
+// ignores trailing bytes (contract 07 §3). The live layer (depz/device.hpp)
+// fails the request such an answer belongs to with ProtocolError.
+
+inline constexpr std::uint8_t SH2_COMMAND_RESPONSE = 0xF1;
+inline constexpr std::uint8_t SH2_FRS_READ_RESPONSE = 0xF3;
+inline constexpr std::uint8_t SH2_FRS_WRITE_RESPONSE = 0xF5;
+inline constexpr std::uint8_t SH2_PRODUCT_ID_RESPONSE = 0xF8;
+inline constexpr std::uint8_t SH2_GET_FEATURE_RESPONSE = 0xFC;
+
+// Get Feature Response: the rates in effect.
+struct Feature {
+    std::uint8_t sensor_id = 0, flags = 0;
+    std::uint16_t sensitivity = 0;
+    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
+    std::uint32_t batch_us = 0;
+    std::uint32_t cfg_word = 0;
+    static std::optional<Feature> unpack(byte_span payload);
+};
+
+struct ProductId {
+    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
+    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
+    std::uint32_t sw_build_number = 0;
+    std::uint16_t sw_version_patch = 0;
+    static std::optional<ProductId> unpack(byte_span payload);
+};
+
+struct CommandResponse {
+    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
+    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
+    static std::optional<CommandResponse> unpack(byte_span payload);
+};
+
+// FRS Read Response: `status` the low nibble of byte 1, `data_length` (0..2
+// words valid) its high nibble.
+struct FrsReadResponse {
+    std::uint8_t status = 0, data_length = 0;
+    std::uint16_t offset_words = 0;
+    std::uint32_t data0 = 0, data1 = 0;
+    std::uint16_t frs_type = 0;
+    static std::optional<FrsReadResponse> unpack(byte_span payload);
+};
+
+struct FrsWriteResponse {
+    std::uint8_t status = 0;
+    std::uint16_t offset_words = 0;
+    static std::optional<FrsWriteResponse> unpack(byte_span payload);
+};
 
 // ── SH-2 input reports (§5) ─────────────────────────────────────────────────
 

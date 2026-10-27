@@ -18,8 +18,8 @@ the headers, not this file.
 
 ## Contents
 
-- **BNO086 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
-- **BNO085 / BNO086 live class (depz/device.hpp)**: [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`Feature`](#feature), [`FeatureRequest`](#featurerequest), [`ProductId`](#productid), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CommandResponse`](#commandresponse), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`open_bno086`](#open_bno086)
+- **BNO086 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`MotionIntent`](#motionintent), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`sh2_build_interactive_calibration`](#sh2_build_interactive_calibration), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`sh2_build_force_flush`](#sh2_build_force_flush), [`SH2_COMMAND_RESPONSE`](#sh2_command_response), [`SH2_FRS_READ_RESPONSE`](#sh2_frs_read_response), [`SH2_FRS_WRITE_RESPONSE`](#sh2_frs_write_response), [`SH2_PRODUCT_ID_RESPONSE`](#sh2_product_id_response), [`SH2_GET_FEATURE_RESPONSE`](#sh2_get_feature_response), [`Feature`](#feature), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO085 / BNO086 live class (depz/device.hpp)**: [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FeatureRequest`](#featurerequest), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`open_bno086`](#open_bno086)
 
 ## BNO086 codecs (depz/bno086.hpp)
 
@@ -242,6 +242,171 @@ bytes sh2_build_frs_write_data(std::uint16_t offset_words, const std::vector<std
 
 FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
 
+### MotionIntent
+
+```cpp
+enum class MotionIntent : std::uint8_t {
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+};
+```
+
+P0 of the Interactive Calibration command (0x0E, SH-2 §6.4.12.1): what the
+host knows about the device's motion. Unknown is the hub's initial state.
+
+### CMD_INTERACTIVE_CALIBRATION
+
+```cpp
+inline constexpr std::uint8_t CMD_INTERACTIVE_CALIBRATION = 0x0E;
+```
+
+BNO086 only; no response
+
+### sh2_build_interactive_calibration
+
+```cpp
+bytes sh2_build_interactive_calibration(std::uint8_t seq, MotionIntent intent);
+```
+
+Interactive Calibration: a Command Request (0xF2) with command 0x0E and
+P0 = intent, 12 bytes. BNO086 only, no response; a BNO085 ignores it.
+
+### FORCE_SENSOR_FLUSH
+
+```cpp
+inline constexpr std::uint8_t FORCE_SENSOR_FLUSH = 0xF0;
+```
+
+Force Sensor Flush (0xF0) + sensor id, 2 bytes (SH-2 §6.5.6): the hub sends
+the sensor's batched reports now and answers with the header-less Flush
+Completed (FLUSH_COMPLETED) on the input channel.
+
+### sh2_build_force_flush
+
+```cpp
+bytes sh2_build_force_flush(std::uint8_t sensor_id);
+```
+
+### SH2_COMMAND_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_COMMAND_RESPONSE = 0xF1;
+```
+
+### SH2_FRS_READ_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_READ_RESPONSE = 0xF3;
+```
+
+### SH2_FRS_WRITE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_WRITE_RESPONSE = 0xF5;
+```
+
+### SH2_PRODUCT_ID_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_PRODUCT_ID_RESPONSE = 0xF8;
+```
+
+### SH2_GET_FEATURE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_GET_FEATURE_RESPONSE = 0xFC;
+```
+
+### Feature
+
+```cpp
+struct Feature {
+    std::uint8_t sensor_id = 0, flags = 0;
+    std::uint16_t sensitivity = 0;
+    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
+    std::uint32_t batch_us = 0;
+    std::uint32_t cfg_word = 0;
+};
+```
+
+Get Feature Response: the rates in effect.
+
+#### Feature.unpack
+
+```cpp
+static std::optional<Feature> unpack(byte_span payload);
+```
+
+### ProductId
+
+```cpp
+struct ProductId {
+    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
+    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
+    std::uint32_t sw_build_number = 0;
+    std::uint16_t sw_version_patch = 0;
+};
+```
+
+#### ProductId.unpack
+
+```cpp
+static std::optional<ProductId> unpack(byte_span payload);
+```
+
+### CommandResponse
+
+```cpp
+struct CommandResponse {
+    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
+    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
+};
+```
+
+#### CommandResponse.unpack
+
+```cpp
+static std::optional<CommandResponse> unpack(byte_span payload);
+```
+
+### FrsReadResponse
+
+```cpp
+struct FrsReadResponse {
+    std::uint8_t status = 0, data_length = 0;
+    std::uint16_t offset_words = 0;
+    std::uint32_t data0 = 0, data1 = 0;
+    std::uint16_t frs_type = 0;
+};
+```
+
+FRS Read Response: `status` the low nibble of byte 1, `data_length` (0..2
+words valid) its high nibble.
+
+#### FrsReadResponse.unpack
+
+```cpp
+static std::optional<FrsReadResponse> unpack(byte_span payload);
+```
+
+### FrsWriteResponse
+
+```cpp
+struct FrsWriteResponse {
+    std::uint8_t status = 0;
+    std::uint16_t offset_words = 0;
+};
+```
+
+#### FrsWriteResponse.unpack
+
+```cpp
+static std::optional<FrsWriteResponse> unpack(byte_span payload);
+```
+
 ### BASE_TIMESTAMP_REF
 
 ```cpp
@@ -399,20 +564,6 @@ enum class TareBasis : std::uint8_t {
 inline constexpr std::uint8_t TARE_X = 1, TARE_Y = 2, TARE_Z = 4, TARE_ALL = 7;
 ```
 
-### Feature
-
-```cpp
-struct Feature {
-    std::uint8_t sensor_id = 0, flags = 0;
-    std::uint16_t sensitivity = 0;
-    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
-    std::uint32_t batch_us = 0;
-    std::uint32_t cfg_word = 0;
-};
-```
-
-Get Feature Response: the rates in effect.
-
 ### FeatureRequest
 
 ```cpp
@@ -426,17 +577,6 @@ struct FeatureRequest {
 ```
 
 Everything Set Feature carries.
-
-### ProductId
-
-```cpp
-struct ProductId {
-    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
-    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
-    std::uint32_t sw_build_number = 0;
-    std::uint16_t sw_version_patch = 0;
-};
-```
 
 ### CalibrationConfig
 
@@ -460,15 +600,6 @@ struct ErrorRecord {
 struct Counts {
     std::uint8_t sensor_id;
     std::uint32_t offered, accepted, on, attempted;
-};
-```
-
-### CommandResponse
-
-```cpp
-struct CommandResponse {
-    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
-    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
 };
 ```
 
@@ -750,6 +881,39 @@ void save_dcd();
 ```cpp
 void configure_periodic_dcd(bool enable);
 ```
+
+#### Bno086.set_motion_intent
+
+```cpp
+void set_motion_intent(bno086::MotionIntent intent);
+```
+
+Interactive calibration (BNO086 only; a BNO085 ignores it): tell the hub
+how the device is about to move (command 0x0E), so it can refine the gyro
+zero-rate offset while the device is still. No SH-2 answer. The hub's own
+request — hold still, or go on — arrives as a MotionRequest report once
+SensorId::MotionRequest is enabled.
+
+#### Bno086.enable_motion_request
+
+```cpp
+void enable_motion_request(double hz = 1);
+```
+
+Enable MotionRequest (0x2B) reports. The hub sends one when its request
+changes, not at `hz`, and reads the rate back late: no read-back.
+
+#### Bno086.flush
+
+```cpp
+void flush(bno086::SensorId sensor);
+```
+
+Batching: Force Sensor Flush (0xF0) — the hub sends `sensor`'s batched
+reports now instead of when its batch interval runs out. Returns once the
+hub's Flush Completed (0xEF, ReportType::FlushCompleted) for `sensor`
+arrived — every report batched before the call has been emitted by then;
+TimeoutError after the device timeout (at least 1 s).
 
 #### Bno086.frs_read
 

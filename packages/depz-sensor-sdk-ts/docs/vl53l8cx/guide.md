@@ -93,7 +93,7 @@ Stop ranging first — these touch the register bank.
 await dev.setPowerMode(POWER_MODE_SLEEP);        // WAKEUP from DEEP_SLEEP re-runs init()
 
 // Crosstalk
-await dev.setXtalkMargin(50);                    // kcps/SPAD
+await dev.setXtalkMargin(50);                    // whole kcps/SPAD, 0..10000 (as ST)
 await dev.calibrateXtalk(16, 4, 600);            // reflectance %, samples, distance mm
 const blob = await dev.getCaldataXtalk();        // 776-byte save …
 await dev.setCaldataXtalk(blob);                 // … and restore

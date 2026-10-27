@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   DepzError,
   DepzTimeoutError,
+  InvalidStateError,
   StatusError,
   Tmf8829,
   Tmf8829Error,
@@ -29,6 +30,7 @@ const V: Any = loadVectors("tmf8829.json");
 const RAW = new Map<string, Uint8Array>(V.frames.map((c: Any) => [c.name, fromHex(c.raw)]));
 const raw = (name: string): Uint8Array => RAW.get(name)!;
 const MEAS = (name: string): Any => V.measurements.find((m: Any) => m.name === name);
+const CORRUPT = new Set<string>(V.frames.filter((c: Any) => "error" in c).map((c: Any) => c.name));
 
 const W = 0x33; // TMF_WRITE_REG
 const R = 0x32; // TMF_READ_REG
@@ -240,7 +242,7 @@ describe("configure()", () => {
 
   it("refuses while streaming", async () => {
     await dev.start();
-    await expect(dev.configure()).rejects.toThrow(/while streaming/);
+    await expect(dev.configure()).rejects.toThrow(InvalidStateError);
   });
 
   it("names the sensor's refusal of the page", async () => {
@@ -379,7 +381,7 @@ describe("measurements from the stream", () => {
     for (let i = 0; i < want.length; i++) checkAgainstVector(got[i]!, want[i]);
     expect(dev.framesDropped).toBe(0);
     expect(dev.framesDiscarded).toBe(0);
-    expect(dev.frameParseErrors).toBe(0);
+    expect(dev.frameParseErrors).toBe(MEAS(name).frames.filter((f: Any) => CORRUPT.has(f.raw_case)).length);
     expect(dev.clockRatioQ16).toBe(want[want.length - 1].ratio_q16);
   });
 

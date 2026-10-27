@@ -7,6 +7,7 @@
 //! [`crate::vl53l7`]). `RPT_VL53_FRAME` lives in [`super::framing`].
 
 use crate::protocol::common::CodecError;
+use crate::vl53l8::framing::STREAM_TOTAL_MAX;
 
 /// VL53L8 host→device command opcodes (0x34 is unused on VL53L8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,9 +57,14 @@ pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
     Ok(pack_write_reg(addr, data))
 }
 
-/// `VL53_START_STREAM` payload: `frame_size u16`.
-pub fn pack_start_stream(frame_size: u16) -> [u8; 2] {
-    frame_size.to_le_bytes()
+/// `VL53_START_STREAM` payload: `frame_size u16`, which must be
+/// 1..=[`STREAM_TOTAL_MAX`] (contract 04 §4 rule 4 — the firmware refuses
+/// anything else too).
+pub fn pack_start_stream(frame_size: u16) -> Result<[u8; 2], CodecError> {
+    if frame_size == 0 || usize::from(frame_size) > STREAM_TOTAL_MAX {
+        return Err(CodecError("VL53_START_STREAM: frame_size must be 1..8192"));
+    }
+    Ok(frame_size.to_le_bytes())
 }
 
 /// A decoded `RPT_VL53_REG_DATA` report (one register read).

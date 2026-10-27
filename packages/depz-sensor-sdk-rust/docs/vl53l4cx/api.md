@@ -390,7 +390,12 @@ pub fn get_detection_thresholds(&self) -> Result<Thresholds>
 #### Vl53lxDevice::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt; stays armed until the next init / configure.
@@ -488,7 +493,10 @@ streaming. `timeout` `None`: 1 s.
 #### Vl53lxDevice::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every streamed measurement (reader thread, or the thread of a call that
@@ -1680,7 +1688,12 @@ pub fn rate_maths(events: i64, time_us: i64) -> i64
 ### rate_per_spad_maths
 
 ```rust
-pub fn rate_per_spad_maths(frac_bits: u32, peak_count_rate: i64, num_spads: i64, max_output_value: i64) -> i64
+pub fn rate_per_spad_maths(
+    frac_bits: u32,
+    peak_count_rate: i64,
+    num_spads: i64,
+    max_output_value: i64,
+) -> i64
 ```
 
 `VL53LX_rate_per_spad_maths()`.
@@ -1728,7 +1741,10 @@ pub fn calc_zero_distance_phase(bins: &mut HistogramBinData)
 ### estimate_ambient_from_thresholded_bins
 
 ```rust
-pub fn estimate_ambient_from_thresholded_bins(ambient_threshold_sigma: i64, bins: &mut HistogramBinData)
+pub fn estimate_ambient_from_thresholded_bins(
+    ambient_threshold_sigma: i64,
+    bins: &mut HistogramBinData,
+)
 ```
 
 `VL53LX_hist_estimate_ambient_from_thresholded_bins()`: the floor from every bin near the
@@ -1754,7 +1770,10 @@ zero.
 ### process_data
 
 ```rust
-pub fn process_data(bins_input: &HistogramBinData, hpp: &HistPostProcessConfig) -> Result<RangeResults>
+pub fn process_data(
+    bins_input: &HistogramBinData,
+    hpp: &HistPostProcessConfig,
+) -> Result<RangeResults>
 ```
 
 `VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off, one merged frame.
@@ -2413,7 +2432,12 @@ A timeout in µs → its register encoding.
 ### duration_maths
 
 ```rust
-pub fn duration_maths(pll_period_us: i64, vcsel_parm_pclks: i64, window_vclks: i64, elapsed_mclks: i64) -> i64
+pub fn duration_maths(
+    pll_period_us: i64,
+    vcsel_parm_pclks: i64,
+    window_vclks: i64,
+    elapsed_mclks: i64,
+) -> i64
 ```
 
 `VL53LX_duration_maths()`: a window duration, µs.
@@ -2546,7 +2570,11 @@ NVM region of the FMT range results at 140 mm, dark.
 ### read_region
 
 ```rust
-pub fn read_region(p: &dyn Vl53lxPlatform, img: &mut DeviceImage, region: (usize, usize)) -> Result<Vec<u8>>
+pub fn read_region(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+    region: (usize, usize),
+) -> Result<Vec<u8>>
 ```
 
 `VL53LX_read_nvm_raw_data()`: (byte index, byte size), both word-aligned → the bytes. The image
@@ -2563,7 +2591,10 @@ The optical centre (zeroed on a never-programmed part).
 ### read_cal_peak_rate_map
 
 ```rust
-pub fn read_cal_peak_rate_map(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<CalPeakRateMap>
+pub fn read_cal_peak_rate_map(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+) -> Result<CalPeakRateMap>
 ```
 
 The 5x5 calibration peak-rate map.
@@ -2714,7 +2745,8 @@ pub const RESULT_HISTOGRAM_BIN_23_0_LSB: u16 = 0x00DA;
 ### HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES
 
 ```rust
-pub const HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES: u16 = RESULT_HISTOGRAM_BIN_23_0_LSB - HISTOGRAM_BIN_DATA_I2C_INDEX + 1;
+pub const HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES: u16 =
+    RESULT_HISTOGRAM_BIN_23_0_LSB - HISTOGRAM_BIN_DATA_I2C_INDEX + 1;
 ```
 
 Bytes in one histogram frame (83).
@@ -2946,7 +2978,8 @@ VCSEL periods of the ranging window.
 ### MACRO_PERIOD_VCSEL_PERIODS
 
 ```rust
-pub const MACRO_PERIOD_VCSEL_PERIODS: i64 = AMBIENT_WINDOW_VCSEL_PERIODS + RANGING_WINDOW_VCSEL_PERIODS;
+pub const MACRO_PERIOD_VCSEL_PERIODS: i64 =
+    AMBIENT_WINDOW_VCSEL_PERIODS + RANGING_WINDOW_VCSEL_PERIODS;
 ```
 
 VCSEL periods of one macro period.
@@ -4221,7 +4254,9 @@ pub trait Vl53lxDriver: Send {
         Vec::new()
     }
 
-    fn set_mode(&mut self, _name: &str) -> Result<()> {
+    /// Apply one of the modes. → the timing budget in effect after the change, ms, on a driver
+    /// whose mode change can move it (VL53L1: contract 12 §5), else `None`.
+    fn set_mode(&mut self, _name: &str) -> Result<Option<u32>> {
         Err(unsupported(self.product(), self.driver_name(), "mode"))
     }
 
@@ -4259,35 +4294,72 @@ pub trait Vl53lxDriver: Send {
 
     /// `nb_samples` `None`: the driver's default.
     fn calibrate_offset(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_offset"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_offset",
+        ))
     }
 
     fn calibrate_xtalk(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_xtalk"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_xtalk",
+        ))
     }
 
     fn get_detection_thresholds(&mut self) -> Result<Thresholds> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
-    fn set_detection_thresholds(&mut self, _distance_low_mm: u16, _distance_high_mm: u16, _window: u8) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+    fn set_detection_thresholds(
+        &mut self,
+        _distance_low_mm: u16,
+        _distance_high_mm: u16,
+        _window: u8,
+    ) -> Result<()> {
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
     fn get_signal_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn set_signal_threshold(&mut self, _signal_kcps: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn get_sigma_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     fn set_sigma_threshold(&mut self, _sigma_mm: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     /// (x, y) SPADs.
@@ -4308,7 +4380,11 @@ pub trait Vl53lxDriver: Send {
     }
 
     fn start_temperature_update(&mut self) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "temp_update"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "temp_update",
+        ))
     }
 
     /// VL53L0X: re-measure the reference SPADs → (count, is_aperture).
@@ -4320,12 +4396,18 @@ pub trait Vl53lxDriver: Send {
 
     /// The raw histogram of a frame (read from the sensor when `raw` is `None`).
     fn bin_data(&mut self, _raw: Option<&[u8]>) -> Result<BinData> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 
     /// A histogram frame → a range (the host-side ranging of the histogram driver).
     fn to_measurement(&mut self, _bins: &BinData) -> Result<Vl53lxRange> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 }
 ```
@@ -4467,7 +4549,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 4000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L1CB",
@@ -4475,7 +4560,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 8000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L3CX",
@@ -4483,7 +4571,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEAAA,
         reach_mm: 3000,
         default_driver: DriverKind::Ulp,
-        drivers: &[(DriverKind::Ulp, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Ulp, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CD",
@@ -4491,7 +4582,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEBAA,
         reach_mm: 1300,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CX",
@@ -5126,7 +5220,12 @@ Read off the loaded configuration: 1388 mm for the 0x38 window, 4563 mm for 0xB8
 #### Die::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The L4CD ULD thresholds: the window byte written whole.
@@ -5304,6 +5403,9 @@ pub struct Vl53l0xUldDriver {
     pre_range_timeout_us: i64,
     final_range_timeout_us: i64,
     target_ref_rate: i32,
+    sigma_est_ref_array: i32,
+    sigma_est_eff_pulse_width: i32,
+    sigma_est_eff_amb_width: i32,
     limit_checks_enable: [i32; CHECK_NUMBER_OF_CHECKS],
     limit_checks_value: [i64; CHECK_NUMBER_OF_CHECKS],
     mode: String,
@@ -5396,6 +5498,36 @@ pub fn part2part_offset_adjustment_nvm_um(&self) -> i64
 
 Factory part-to-part offset, µm.
 
+#### Vl53l0xUldDriver::target_ref_rate
+
+```rust
+pub fn target_ref_rate(&self) -> i32
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's `{0xFF, 3, msb, lsb}` record
+sets; the SPAD management converges on it.
+
+#### Vl53l0xUldDriver::sigma_est_ref_array
+
+```rust
+pub fn sigma_est_ref_array(&self) -> i32
+```
+
+The three sigma-estimate constants a tuning buffer's `{0xFF, 0..2, msb, lsb}` records set
+(stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver::sigma_est_eff_pulse_width
+
+```rust
+pub fn sigma_est_eff_pulse_width(&self) -> i32
+```
+
+#### Vl53l0xUldDriver::sigma_est_eff_amb_width
+
+```rust
+pub fn sigma_est_eff_amb_width(&self) -> i32
+```
+
 #### Vl53l0xUldDriver::osc_frequency_mhz
 
 ```rust
@@ -5445,6 +5577,15 @@ pub fn get_info_from_device(&mut self, option: i32) -> Result<()>
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product
 identification (2), the part UID and factory offset (4).
 
+#### Vl53l0xUldDriver::load_tuning_settings
+
+```rust
+pub fn load_tuning_settings(&mut self, buffer: &[u8]) -> Result<()>
+```
+
+VL53L0X_load_tuning_settings(): `{count, address, bytes...}` records, with count 0xFF
+carrying a host-side parameter instead; a zero count ends the buffer.
+
 #### Vl53l0xUldDriver::set_offset_um
 
 ```rust
@@ -5464,7 +5605,11 @@ The part-to-part offset, µm.
 #### Vl53l0xUldDriver::perform_offset_calibration
 
 ```rust
-pub fn perform_offset_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+pub fn perform_offset_calibration(
+    &mut self,
+    cal_distance_mm: i32,
+    nb_samples: i32,
+) -> Result<i64>
 ```
 
 VL53L0X_perform_offset_calibration() → µm (the contract's default is 50 samples). TCC and the
@@ -5473,7 +5618,11 @@ range-ignore threshold are off for the run.
 #### Vl53l0xUldDriver::perform_xtalk_calibration
 
 ```rust
-pub fn perform_xtalk_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+pub fn perform_xtalk_calibration(
+    &mut self,
+    cal_distance_mm: i32,
+    nb_samples: i32,
+) -> Result<i64>
 ```
 
 VL53L0X_perform_xtalk_calibration() → the rate, Mcps 16.16 (the contract's default is 50
@@ -5623,7 +5772,8 @@ The driver for one (product, kind) pair, and the caveat a UI shows about the pai
 pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
 ```
 
-`VL53_READ_REG` payload: `addr u16, len u16` (little-endian).
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian), unchecked —
+prefer [`try_pack_read_reg`].
 
 ### pack_write_reg
 

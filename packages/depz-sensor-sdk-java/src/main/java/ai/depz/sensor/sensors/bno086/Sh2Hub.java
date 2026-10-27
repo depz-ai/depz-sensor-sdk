@@ -101,6 +101,8 @@ public final class Sh2Hub {
     public static final int FRS_SHAKE_DETECT_CONFIG = 0x7D7D;
     public static final int FRS_STABILITY_DETECTOR_CONFIG = 0xED85;
     public static final int FRS_ACTIVITY_TRACKER_CONFIG = 0xED88;
+    /** Reference, sync interval, max error, prediction (SH-2 §4.3.24). */
+    public static final int FRS_GYRO_INTEGRATED_RV_CONFIG = 0xA1A2;
 
     /** Sensor id → its metadata FRS record. */
     public static final Map<Integer, Integer> METADATA_RECORDS = Map.ofEntries(
@@ -163,7 +165,7 @@ public final class Sh2Hub {
         }
 
         public static ProductId unpack(byte[] p) {
-            Wire.needBytes("Product ID Response", p, 14);
+            Wire.needBytes("Product ID Response", p, 16);
             expectId(p, Sh2.PRODUCT_ID_RESPONSE, "product-id");
             return new ProductId(p[1] & 0xFF, p[2] & 0xFF, p[3] & 0xFF, u32(p, 4), u32(p, 8), u16(p, 12));
         }

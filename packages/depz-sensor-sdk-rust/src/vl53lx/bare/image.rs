@@ -64,7 +64,11 @@ pub struct RegBlock {
 impl RegBlock {
     /// A zeroed block of the layout `def`.
     pub fn from_def(def: &'static RegBlockDef) -> RegBlock {
-        RegBlock { def, values: vec![0; def.fields.len()], raw: vec![0; def.size] }
+        RegBlock {
+            def,
+            values: vec![0; def.fields.len()],
+            raw: vec![0; def.size],
+        }
     }
 
     /// A zeroed block by name, or `None` when there is no such block.
@@ -106,7 +110,8 @@ impl RegBlock {
     /// # Panics
     /// When the block has no such field (the driver only names fields of the generated layout).
     pub fn get(&self, field: &str) -> i64 {
-        self.try_get(field).unwrap_or_else(|| panic!("{} has no field {}", self.def.name, field))
+        self.try_get(field)
+            .unwrap_or_else(|| panic!("{} has no field {}", self.def.name, field))
     }
 
     /// Set a field (the value is clipped only on [`RegBlock::encode`]); `false` when there is no such
@@ -133,7 +138,12 @@ impl RegBlock {
 
     /// Every field in block order, `(name, value)`.
     pub fn items(&self) -> Vec<(&'static str, i64)> {
-        self.def.fields.iter().zip(&self.values).map(|(f, v)| (f.name, *v)).collect()
+        self.def
+            .fields
+            .iter()
+            .zip(&self.values)
+            .map(|(f, v)| (f.name, *v))
+            .collect()
     }
 
     /// Take the block's bytes (at least [`RegBlock::size`] of them) into the fields.
@@ -231,7 +241,9 @@ macro_rules! accessors {
 impl DeviceImage {
     /// Every block of [`BLOCKS`], zeroed.
     pub fn new() -> DeviceImage {
-        DeviceImage { blocks: BLOCKS.iter().map(RegBlock::from_def).collect() }
+        DeviceImage {
+            blocks: BLOCKS.iter().map(RegBlock::from_def).collect(),
+        }
     }
 
     /// The block `name`, or `None` when there is none.
@@ -244,7 +256,8 @@ impl DeviceImage {
     /// # Panics
     /// When there is no such block.
     pub fn block(&self, name: &str) -> &RegBlock {
-        self.try_block(name).unwrap_or_else(|| panic!("no register block {name}"))
+        self.try_block(name)
+            .unwrap_or_else(|| panic!("no register block {name}"))
     }
 
     /// The block `name`, to edit.
@@ -334,7 +347,12 @@ impl DeviceImage {
         let mut lines = Vec::new();
         for n in names {
             let blk = self.block(n);
-            lines.push(format!("--- {} @ 0x{:04X} ({} B)", n, blk.base(), blk.size()));
+            lines.push(format!(
+                "--- {} @ 0x{:04X} ({} B)",
+                n,
+                blk.base(),
+                blk.size()
+            ));
             for (k, v) in blk.items() {
                 lines.push(format!("  {k:<52} {v}"));
             }

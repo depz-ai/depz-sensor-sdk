@@ -131,10 +131,18 @@ dotnet add reference path/to/src/Depz.Sensor/Depz.Sensor.csproj
 
 ### Unity
 
-Unity reads the `netstandard2.1` build. Either install `Depz.Sensor` with
-[NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity), or take
+Unity reads the `netstandard2.1` build: the **shared library**, which opens no
+port by itself. Ports are the job of a **communication module**, replaceable as
+a whole; the one shipped is for **Windows**, as the UPM package
+[`unity/`](../unity/README.md) (`ai.depz.sensor`): `WindowsSerialLink`,
+registry-based port discovery and `DepzDevicesUnity`, with install by git URL
+or by copying, and a sample `MonoBehaviour`. Current Unity LTS (6000.0+), API
+compatibility level **.NET Framework**.
+
+The shared library alone (any platform, your own `ILink`): install `Depz.Sensor`
+with [NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity), or take
 `lib/netstandard2.1/Depz.Sensor.dll` out of the `.nupkg` (a zip file) and put it
-under `Assets/Plugins/`. The SDK has no dependency outside the .NET Standard 2.1
+under `Assets/Plugins/`. It has no dependency outside the .NET Standard 2.1
 library, so nothing else needs to be copied.
 
 ```csharp
@@ -221,63 +229,50 @@ dev.Stop();
 
 ### Unity
 
-Unity's `System.IO.Ports` exists only on Windows, macOS and Linux with the API
-compatibility level **.NET Framework**, so the SDK does not open ports there by
-itself: open the port in your project, wrap it in an `ILink`, and open the
-device on it. Poll the queues from `Update()` — Unity objects must not be
-touched from the reader thread.
+The shared library opens no port in Unity; the **Windows communication module**
+([`unity/`](../unity/README.md), UPM package `ai.depz.sensor`) does.
+`DepzDevicesUnity` mirrors `DepzDevices` — `OpenDevice`, `OpenSr04` …
+`OpenTmf8829`, `OpenPort`, `ListDepzDevices`, `ProbePort` — over
+`WindowsSerialPorts` (COM ports with USB VID / PID / serial from the registry,
+behind `IRegistry` so it is testable with a fake) and `WindowsSerialLink` (an
+`ILink` over `System.IO.Ports.SerialPort`: 115200 8N1, DTR / RTS raised, short
+reads so `Close()` never waits on Mono's port). Selection is contract 02 §4.3
+(DEPZ USB ids, ordered by USB serial); the class comes from the probe, run on
+the one connection the device keeps (`DepzDevices.OpenOnLink`). Errors are the
+same types: `DeviceLostException`, `NoDepzDeviceException`, `WrongTypeException`.
 
 ```csharp
-using System;
-using System.IO.Ports;
 using Depz.Sensor.Devices;
+using Depz.Sensor.Unity;
 
-sealed class UnitySerialLink : ILink
+public sealed class RangeFinder : DepzSensorBehaviour     // the package's sample: open / poll / close
 {
-    readonly SerialPort _port;
-    readonly byte[] _buf = new byte[16384];
+    Subscription<Sr04Measurement>? _loop;
 
-    public UnitySerialLink(string port)
+    protected override void OnOpened(DepzDevice device)   // Start(): DepzDevicesUnity.OpenDevice() succeeded
     {
-        _port = new SerialPort(port, 115200) { DtrEnable = true, RtsEnable = true, ReadTimeout = 50 };
-        _port.Open();
+        var sr04 = DepzDevices.Expect<Sr04Device>(device, "an SR04");
+        _loop = sr04.Measurements();
+        sr04.Start();
     }
 
-    public string Name => _port.PortName;
-    public bool IsClosed => !_port.IsOpen;
-
-    public byte[] Read(TimeSpan timeout)
+    protected override void Update()
     {
-        try
-        {
-            int n = _port.Read(_buf, 0, _buf.Length);
-            var data = new byte[n];
-            Array.Copy(_buf, data, n);
-            return data;
-        }
-        catch (TimeoutException) { return Array.Empty<byte>(); }
-        catch (Exception e) { throw new DeviceLostException(e.Message, e); }
+        base.Update();                                    // device events: disconnect, faults
+        while (_loop != null && _loop.TryTake(out var m))
+            UnityEngine.Debug.Log($"{m.DistanceMm} mm");
     }
-
-    public void Write(byte[] data)
-    {
-        try { _port.Write(data, 0, data.Length); }
-        catch (Exception e) { throw new DeviceLostException(e.Message, e); }
-    }
-
-    public void Close() => _port.Close();
 }
-
-// In a MonoBehaviour:
-//   void Start()  { _dev = (Sr04Device)DepzDevices.OpenOnLink(new UnitySerialLink("COM5"));
-//                   _loop = _dev.Measurements(); _dev.Start(); }
-//   void Update() { while (_loop.TryTake(out var m)) Debug.Log(m.DistanceMm); }
-//   void OnDestroy() { _dev?.Close(); }
 ```
 
-`OpenOnLink` cannot see the port's USB id, so a board that needs it to pick its
-class (VL53L8CX vs CH, VL53L5CX/L7CX/L7CH) takes it as arguments:
-`OpenOnLink(link, usbVid, usbPid)`.
+Poll the queues from `Update()`: the reader thread must never touch Unity
+objects. Limits, honestly: discovery is **Windows only** for now (off Windows it
+finds nothing; `OpenPort("/dev/tty…")` may work where Mono has ports, untested);
+macOS / Linux .NET users keep the .NET 8 build's `SerialPortLink`; Android,
+iOS and WebGL are not covered. Another transport is another module: implement
+`ILink` and call `DepzDevices.OpenOnLink(link, usbVid, usbPid)` — the USB ids
+are optional and only break the VL53L8CX / CH and VL53L5CX / L7CX / L7CH ties
+(`DepzDevices.ProbeLink(link)` runs the probe alone).
 
 ## Discovery
 
@@ -504,6 +499,17 @@ It covers CRC KATs, framing encode/decode, USB identity + discovery ordering,
 the common commands, SR04 / VL53L4CD / VL53L8 / BNO086 codecs, the `.fwdepz` parse, the
 `.depzdata` read, and a recorded `.depzrec` VL53L8 replay driven end-to-end
 through `PacketParser` → `FrameReassembler` → `Vl53l8FrameDecoder`.
+
+Line coverage of the same suite, per class, with no tool beyond
+`coverlet.collector` (in the test project) and Python 3:
+
+```bash
+scripts/coverage.sh           # from packages/depz-sensor-sdk-csharp; --all lists every class
+```
+
+The Cobertura XML lands in `tests/Depz.Sensor.Tests/TestResults/coverage/`.
+Only what needs a serial port (`SerialPortLink`, `SerialPorts`) has no
+hardware-free test.
 
 ## Extension points
 

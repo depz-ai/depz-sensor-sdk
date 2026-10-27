@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag
 
 from ..errors import DepzError
-from ..protocol._wire import check_uint, checked_pack
+from ..protocol._wire import check_uint, checked_pack, need_bytes
 
 
 class Sh2Error(DepzError):
@@ -222,6 +222,7 @@ class FeatureResponse:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "FeatureResponse":
+        need_bytes("Get Feature Response", payload, 17)
         rid, sid, flags, sens, interval, batch, cfg = struct.unpack_from(
             "<BBBHIII", payload
         )
@@ -253,6 +254,7 @@ class ProductId:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "ProductId":
+        need_bytes("Product ID Response", payload, 16)
         rid, cause, maj, mnr, part, build, patch = struct.unpack_from(
             "<BBBBIIH", payload
         )
@@ -293,6 +295,7 @@ class CommandResponse:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "CommandResponse":
+        need_bytes("Command Response", payload, 16)
         if payload[0] != ControlReport.COMMAND_RESPONSE:
             raise Sh2Error(f"not a command response: 0x{payload[0]:02X}")
         return cls(payload[1], payload[2], payload[3], payload[4], tuple(payload[5:16]))
@@ -391,6 +394,7 @@ class FrsRecordId(IntEnum):
     SHAKE_DETECT_CONFIG = 0x7D7D
     STABILITY_DETECTOR_CONFIG = 0xED85
     ACTIVITY_TRACKER_CONFIG = 0xED88  # personal-activity-classifier config
+    GYRO_INTEGRATED_RV_CONFIG = 0xA1A2  # reference, sync interval, max error, prediction
 
 
 # Per-sensor metadata FRS record IDs (subset used by get_metadata()).
@@ -474,6 +478,7 @@ class FrsReadResponse:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "FrsReadResponse":
+        need_bytes("FRS Read Response", payload, 16)
         rid, len_status, off, d0, d1, ftype, _ = struct.unpack_from("<BBHIIHH", payload)
         if rid != ControlReport.FRS_READ_RESPONSE:
             raise Sh2Error(f"not an FRS read response: 0x{rid:02X}")
@@ -511,6 +516,7 @@ class FrsWriteResponse:
 
     @classmethod
     def unpack(cls, payload: bytes) -> "FrsWriteResponse":
+        need_bytes("FRS Write Response", payload, 4)
         rid, status, off = struct.unpack_from("<BBH", payload)
         if rid != ControlReport.FRS_WRITE_RESPONSE:
             raise Sh2Error(f"not an FRS write response: 0x{rid:02X}")

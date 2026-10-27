@@ -169,6 +169,18 @@ public static class Common
         return buf;
     }
 
+    /// <summary>SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2).</summary>
+    public const int PayloadCrcTypeMax = 3;
+
+    /// <summary>SET_PAYLOAD_CRC_TYPE payload: crc_type u8, 0..3 (contract 02 §2) — checked before anything is written (contract 07 §3).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Not a CrcType 0..3.</exception>
+    public static byte[] PackSetPayloadCrcType(int crcType)
+    {
+        if (crcType < 0 || crcType > PayloadCrcTypeMax)
+            throw new ArgumentOutOfRangeException(nameof(crcType), crcType, "not a CrcType (0..3)");
+        return new[] { (byte)crcType };
+    }
+
     /// <summary>
     /// NTP-style clock math, all µs (contract 02 §5). Returns (offsetUs, rttUs)
     /// where offset = device_clock - host_clock, computed with truncation toward

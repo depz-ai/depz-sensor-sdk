@@ -1,74 +1,11 @@
-/* util.c — per-thread error detail, stream hubs, callback lists. */
+/* util.c — stream hubs, callback lists (the error detail is error.c). */
 #include "io_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* ── errors ────────────────────────────────────────────────────────────── */
-
-#if defined(_MSC_VER)
-#  define DEPZ_TLS __declspec(thread)
-#else
-#  define DEPZ_TLS _Thread_local
-#endif
-
-static DEPZ_TLS char t_msg[512];
-static DEPZ_TLS int  t_status = -1;
-static DEPZ_TLS int  t_status_cmd = -1;
-
-const char *depz_err_str(int err)
-{
-    switch (err) {
-    case DEPZ_OK:                return "DEPZ_OK";
-    case DEPZ_E_ARG:             return "DEPZ_E_ARG";
-    case DEPZ_E_NOMEM:           return "DEPZ_E_NOMEM";
-    case DEPZ_E_IO:              return "DEPZ_E_IO";
-    case DEPZ_E_CLOSED:          return "DEPZ_E_CLOSED";
-    case DEPZ_E_TIMEOUT:         return "DEPZ_E_TIMEOUT";
-    case DEPZ_E_STATUS:          return "DEPZ_E_STATUS";
-    case DEPZ_E_BUSY:            return "DEPZ_E_BUSY";
-    case DEPZ_E_PROTOCOL:        return "DEPZ_E_PROTOCOL";
-    case DEPZ_E_NO_DEVICE:       return "DEPZ_E_NO_DEVICE";
-    case DEPZ_E_WRONG_TYPE:      return "DEPZ_E_WRONG_TYPE";
-    case DEPZ_E_REPLAY_MISMATCH: return "DEPZ_E_REPLAY_MISMATCH";
-    case DEPZ_E_BOOTLOADER:      return "DEPZ_E_BOOTLOADER";
-    default:                     return "DEPZ_E_?";
-    }
-}
-
-const char *depz_last_error(void) { return t_msg; }
-int depz_last_status(void) { return t_status; }
-int depz_last_status_cmd(void) { return t_status_cmd; }
-
-int depz_fail(int err, const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(t_msg, sizeof t_msg, fmt, ap);
-    va_end(ap);
-    t_status = -1;
-    t_status_cmd = -1;
-    return err;
-}
-
-static const char *status_name(uint8_t s)
-{
-    static const char *names[] = {
-        "OK", "ERROR", "ERR_INVALID_CMD", "ERR_PAYLOAD_FORMAT", "ERR_INVALID_PARAM",
-        "ERR_PAYLOAD_CRC", "ERR_BUSY", "ERR_CMD_NOT_SUPPORTED", "ERR_NOT_INITIALIZED",
-        "ERR_HARDWARE_FAULT"};
-    return s < sizeof names / sizeof names[0] ? names[s] : "?";
-}
-
-int depz_fail_status(int err, uint8_t cmd, uint8_t status)
-{
-    snprintf(t_msg, sizeof t_msg, "cmd 0x%02X failed: %s (0x%02X)", cmd, status_name(status),
-             status);
-    t_status = status;
-    t_status_cmd = cmd;
-    return err;
-}
+/* ── strings ───────────────────────────────────────────────────────────── */
 
 void depz_strlcpy(char *dst, const char *src, size_t cap)
 {

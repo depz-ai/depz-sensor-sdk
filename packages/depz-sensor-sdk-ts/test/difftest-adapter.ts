@@ -15,6 +15,10 @@
 import { createInterface } from "node:readline";
 import {
   CrcType,
+  DatasetReader,
+  DepzDevice,
+  LoopbackTransport,
+  ReplayTransport,
   PacketParser,
   buildPacket,
   bno086RecordValue,
@@ -26,6 +30,7 @@ import {
   orderPortsBySerial,
   packEchoDecay,
   packSamplePeriod,
+  packSetPayloadCrcType,
   packSyncPinConfig,
   packSyncTime,
   parseFwDepz,
@@ -47,6 +52,11 @@ import {
   ShtpLayer,
   packShtpHeader,
   unpackShtpHeader,
+  unpackCommandResponse,
+  unpackFeatureResponse,
+  unpackFrsReadResponse,
+  unpackFrsWriteResponse,
+  unpackProductId,
   buildCommandRequest,
   buildFrsReadRequest,
   buildFrsWriteData,
@@ -55,6 +65,7 @@ import {
   buildProductIdRequest,
   buildSetFeature,
   type DetectionThreshold,
+  type DeviceEvent,
 } from "../src/index.js";
 import { checkUint } from "../src/protocol/wire.js";
 import { packBno055ReadReg, packBno055StartStream, packBno055WriteReg } from "../src/protocol/bno055.js";
@@ -78,6 +89,7 @@ import {
   packVl53l7WriteReg,
   resolveVl53l7Model,
 } from "../src/protocol/vl53l7.js";
+import { packStartStream as packVl53l8StartStream } from "../src/protocol/vl53l8.js";
 import { packVl53lxSetAddrWidth, packVl53lxStartStream } from "../src/protocol/vl53lx.js";
 import {
   bno055FullyCalibrated,
@@ -134,6 +146,7 @@ import {
   vl53l4Decode,
   vl53l4Result,
   vl53l7Info,
+  vl53l8Decode,
   vl53lxInfo,
   vl53lxL0xRaw,
 } from "./golden/shapes.js";
@@ -191,12 +204,7 @@ export const OPS: Record<string, (i: Any) => unknown | Promise<unknown>> = {
   common_encode: (i) => {
     let p: Uint8Array;
     if (i.kind === "sync_time_request") p = packSyncTime(big(i.pc_timestamp_us));
-    else if (i.kind === "set_payload_crc_type") {
-      // No codec function: the device layer writes `Uint8Array.of(crcType)` with
-      // a CrcType-typed argument, so the op checks the enum like the type does.
-      if (CrcType[num(i.crc_type)] === undefined) throw new RangeError(`crc_type ${i.crc_type}`);
-      p = Uint8Array.of(num(i.crc_type));
-    }
+    else if (i.kind === "set_payload_crc_type") p = packSetPayloadCrcType(num(i.crc_type));
     else if (i.kind === "sync_pin_config") p = packSyncPinConfig({ pin: num(i.pin), mode: num(i.mode), polarity: num(i.polarity) });
     else throw new Error(i.kind);
     return { payload: toHex(p) };
@@ -216,6 +224,83 @@ export const OPS: Record<string, (i: Any) => unknown | Promise<unknown>> = {
       }
     }
     throw new Error(`report ${i.report}`);
+  },
+  // The event the device layer emits for an unsolicited common report —
+  // common_decode's twin through the dispatcher (contract 07 §2/§3): the
+  // packet goes in on a loopback pair with nothing pending, and the first
+  // event out is the answer.
+  common_event: async (i) => {
+    const [transport, side] = LoopbackTransport.pair();
+    const dev = new DepzDevice(transport, { timeoutMs: 1000 });
+    let ev: DeviceEvent;
+    try {
+      const first = new Promise<DeviceEvent>((resolve) => dev.onEvent(resolve));
+      await dev.open();
+      await side.write(buildPacket(num(i.report), h(i.payload)));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("the device emitted no event")), 2000);
+      });
+      ev = await Promise.race([first, late]).finally(() => clearTimeout(timer));
+    } finally {
+      await dev.close();
+    }
+    switch (ev.type) {
+      case "unsolicitedStatus":
+        return { event: "unsolicited_status", status: ev.status };
+      case "sequenceError":
+        return {
+          event: "sequence_error",
+          expected_seq: ev.expectedSeq,
+          received_seq: ev.receivedSeq,
+          reported_by_device: ev.reportedByDevice,
+        };
+      case "text":
+        return { event: "text", cmd: ev.cmd, text: ev.text };
+      case "temperature":
+        return { event: "temperature", timestamp_us: ev.timestampUs, celsius: ev.celsius };
+    }
+    throw new Error(`event ${ev.type}`);
+  },
+  // Host-observed seq gaps (contract 01 §5 step 5, ERRATA A1): one packet per
+  // `seqs` entry (unknown report 0x7F, payload 00 — each a hex `text` event)
+  // on a loopback pair; once every packet's own event is out, the `seqGap`
+  // events and stats.seqGaps are the answer (a gap comes before its packet).
+  common_seq_gap: async (i) => {
+    const seqs = (i.seqs as unknown[]).map(num);
+    if (seqs.some((s) => !Number.isInteger(s) || s < 0 || s > 0xff)) throw new Error("a seq is a byte");
+    const [transport, side] = LoopbackTransport.pair();
+    const dev = new DepzDevice(transport, { timeoutMs: 1000 });
+    const got: DeviceEvent[] = [];
+    let seqGaps: number;
+    try {
+      const all = new Promise<void>((resolve) => {
+        let texts = 0;
+        if (seqs.length === 0) resolve();
+        dev.onEvent((ev) => {
+          got.push(ev);
+          if (ev.type === "text" && ++texts === seqs.length) resolve();
+        });
+      });
+      await dev.open();
+      for (const s of seqs) await side.write(buildPacket(0x7f, Uint8Array.of(0), s));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("a packet produced no event")), 2000);
+      });
+      await Promise.race([all, late]).finally(() => clearTimeout(timer));
+      seqGaps = dev.stats.seqGaps;
+    } finally {
+      await dev.close();
+    }
+    return {
+      gaps: got.flatMap((ev) =>
+        ev.type === "seqGap"
+          ? [{ expected_seq: ev.expectedSeq, received_seq: ev.receivedSeq, missed: ev.missed }]
+          : [],
+      ),
+      seq_gaps: seqGaps,
+    };
   },
   sync_time_math: (i) => {
     const r = syncTimeOffsetRtt(big(i.t1), big(i.t2), big(i.t3), big(i.t4));
@@ -340,6 +425,37 @@ export const OPS: Record<string, (i: Any) => unknown | Promise<unknown>> = {
     }
     return { payload: toHex(p) };
   },
+  // A control-channel response (contract 05 §4 table) decoded to its fields,
+  // or invalid when shorter than them (contract 07 §3).
+  bno086_control_decode: (i) => {
+    const p = h(i.payload);
+    switch (i.kind) {
+      case "feature_response": {
+        const r = unpackFeatureResponse(p);
+        return { sensor_id: r.sensorId, flags: r.flags, sensitivity: r.sensitivity, interval_us: r.intervalUs, batch_us: r.batchUs, cfg_word: r.cfgWord };
+      }
+      case "product_id": {
+        const r = unpackProductId(p);
+        return {
+          reset_cause: r.resetCause, sw_version_major: r.swVersionMajor, sw_version_minor: r.swVersionMinor,
+          sw_part_number: r.swPartNumber, sw_build_number: r.swBuildNumber, sw_version_patch: r.swVersionPatch,
+        };
+      }
+      case "command_response": {
+        const r = unpackCommandResponse(p);
+        return { seq: r.seq, command: r.command, command_seq: r.commandSeq, response_seq: r.responseSeq, r: r.r };
+      }
+      case "frs_read_response": {
+        const r = unpackFrsReadResponse(p);
+        return { status: r.status, data_length: r.dataLength, offset_words: r.offsetWords, data0: r.data0, data1: r.data1, frs_type: r.frsType };
+      }
+      case "frs_write_response": {
+        const r = unpackFrsWriteResponse(p);
+        return { status: r.status, offset_words: r.offsetWords };
+      }
+      default: throw new Error(i.kind);
+    }
+  },
   bno086_input_cargo: (i) => ({
     reports: parseInputCargo(h(i.cargo), big(i.capture_timestamp_us)).map((r) => ({ type: r.type, fields: bno086Fields(r) })),
   }),
@@ -350,6 +466,30 @@ export const OPS: Record<string, (i: Any) => unknown | Promise<unknown>> = {
     const r = parseGyroRvCargo(h(i.cargo), big(i.capture_timestamp_us));
     return r === null ? null : { type: r.type, fields: bno086Fields(r) };
   },
+
+  // ── .depzrec / .depzdata readers (contracts 08, 09) ──
+  // `text` as a capture: every rx chunk the loose replay serves once the host
+  // has written more tx bytes than any event waits for, concatenated — or
+  // invalid for a damaged file.
+  depzrec_read: async (i) => {
+    const replay = new ReplayTransport(i.text as string);
+    await replay.open();
+    await replay.write(new Uint8Array(65536));
+    const chunks: Uint8Array[] = [];
+    if (!replay.exhausted) {
+      for await (const chunk of replay.readable()) {
+        chunks.push(chunk);
+        if (replay.exhausted) break;
+      }
+    }
+    await replay.close();
+    return { rx: chunks.map(toHex).join("") };
+  },
+  // `text` as a dataset: its records in reader order as [d, t, k] — or
+  // invalid for a damaged file.
+  depzdata_read: (i) => ({
+    records: new DatasetReader(i.text as string).records.map((r) => [r.deviceId, r.tHostUs, r.kind]),
+  }),
 
   // ── TMF8829 ──
   tmf8829_encode: (i) => {
@@ -431,6 +571,13 @@ export const OPS: Record<string, (i: Any) => unknown | Promise<unknown>> = {
     return vl53l7Info(h(i.payload));
   },
   vl53l7_model: (i) => ({ class: resolveVl53l7Model(i.usb_model, i.device_name) }),
+
+  // ── VL53L8 register bridge (contract 04) ──
+  vl53l8_encode: (i) => {
+    if (i.kind === "start_stream") return { payload: toHex(packVl53l8StartStream(num(i.frame_size))) };
+    throw new Error(i.kind as string);
+  },
+  vl53l8_decode: (i) => vl53l8Decode(num(i.report), h(i.payload)),
 
   // ── VL53L 1D family ──
   vl53lx_encode: (i) => {

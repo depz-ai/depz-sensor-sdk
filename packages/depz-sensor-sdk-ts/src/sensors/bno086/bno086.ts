@@ -11,7 +11,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { BusyError, DepzError, DepzTimeoutError } from "../../errors.js";
+import { BusyError, DepzError, DepzTimeoutError, InvalidReplyError } from "../../errors.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   BUSY_BACKOFF_MS,
@@ -122,6 +122,19 @@ function normalizeFilter(sensors: Iterable<number> | number | null | undefined):
 type ControlWaiter = (payload: Uint8Array) => void;
 
 /**
+ * A control response the hub answered a request with, decoded; one shorter
+ * than its fields (or with the wrong report id) fails that request with
+ * InvalidReplyError (contract 07 §3), never a bare RangeError.
+ */
+function decodeReply<T>(rid: number, raw: Uint8Array, unpack: (raw: Uint8Array) => T): T {
+  try {
+    return unpack(raw);
+  } catch (err) {
+    throw new InvalidReplyError(rid, err);
+  }
+}
+
+/**
  * BNO086 device: enable SH-2 sensors, stream typed reports.
  *
  * Typical use:
@@ -224,7 +237,7 @@ export class Bno086 extends DepzDevice {
       for (const done of [...(this.flushWaiters.get(rep.flushedSensor) ?? [])]) done();
     }
     for (const { cb, filter } of [...this.reportCbs]) {
-      if (filter === null || filter.has(rep.sensorId)) cb(rep);
+      if (filter === null || filter.has(rep.sensorId)) this.callGuarded(cb, rep);
     }
     for (const { queue, filter } of [...this.reportQueues]) {
       if (filter === null || filter.has(rep.sensorId)) queue.push(rep);
@@ -318,9 +331,9 @@ export class Bno086 extends DepzDevice {
       (raw, finish, fail) => {
         let obj: T;
         try {
-          obj = parse(raw);
+          obj = decodeReply(expectRid, raw, parse);
         } catch (err) {
-          fail(err instanceof Error ? err : new DepzError(String(err)));
+          fail(err as Error);
           return;
         }
         if (pred === undefined || pred(obj)) finish(obj);
@@ -381,9 +394,9 @@ export class Bno086 extends DepzDevice {
       (raw, finish, fail) => {
         let resp: CommandResponse;
         try {
-          resp = unpackCommandResponse(raw);
+          resp = decodeReply(ControlReport.CommandResponse, raw, unpackCommandResponse);
         } catch (err) {
-          fail(err instanceof Error ? err : new DepzError(String(err)));
+          fail(err as Error);
           return;
         }
         if (resp.command !== command || resp.commandSeq !== seq) return;
@@ -498,9 +511,9 @@ export class Bno086 extends DepzDevice {
       timeoutMs + settleMs,
       (raw, finish, fail) => {
         try {
-          out.push(unpackProductId(raw));
+          out.push(decodeReply(ControlReport.ProductIdResponse, raw, unpackProductId));
         } catch (err) {
-          fail(err instanceof Error ? err : new DepzError(String(err)));
+          fail(err as Error);
           return;
         }
         clearTimeout(settle);
@@ -789,7 +802,8 @@ export class Bno086 extends DepzDevice {
       timeoutMs,
       (raw, finish, fail) => {
         try {
-          if (session.feed(unpackFrsReadResponse(raw))) finish(session.words);
+          const resp = decodeReply(ControlReport.FrsReadResponse, raw, unpackFrsReadResponse);
+          if (session.feed(resp)) finish(session.words);
         } catch (err) {
           fail(err instanceof Error ? err : new DepzError(String(err)));
         }
@@ -806,7 +820,8 @@ export class Bno086 extends DepzDevice {
       timeoutMs,
       (raw, finish, fail) => {
         try {
-          const next = session.feed(unpackFrsWriteResponse(raw));
+          const resp = decodeReply(ControlReport.FrsWriteResponse, raw, unpackFrsWriteResponse);
+          const next = session.feed(resp);
           if (session.done) {
             finish(undefined);
           } else if (next !== null) {

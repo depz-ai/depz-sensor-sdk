@@ -7,16 +7,19 @@ bounded drop-oldest stream queues, callbacks run on the reader thread.
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Generic, Iterable, Iterator, TypeVar, Union, overload
 
 from .errors import (
     BusyError,
     DepzTimeoutError,
     DeviceLostError,
+    InvalidReplyError,
+    InvalidStateError,
     LinkClosedError,
     StatusError,
 )
@@ -34,6 +37,8 @@ from .protocol.common import (
     check_sync_pin,
     pack_sync_time,
     sync_time_offset_rtt,
+    pack_set_payload_crc_type,
+    unpack_payload_crc_type,
 )
 from .protocol.identity import Identity, parse_software_name
 from .transport import CrcError, CrcType, Packet, PacketParser, Trash, build_packet
@@ -41,6 +46,25 @@ from .transport.link import Link
 from .transport.serial_link import SerialLink
 
 DEFAULT_TIMEOUT = 0.2
+
+T = TypeVar("T")
+
+
+class _NoMatch:
+    """The type of `DeviceBase.NO_MATCH` — what a matcher returns to decline a
+    packet, so a matcher that may also return None stays unambiguous."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "NO_MATCH"
+
+
+_SENTINEL = _NoMatch()
+
+#: A request matcher: the parsed result for the packet that completes the
+#: request, `DeviceBase.NO_MATCH` for any other packet.
+Matcher = Callable[[Packet], Union[T, _NoMatch]]
 
 # ── events ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +79,18 @@ class SequenceErrorEvent(DeviceEvent):
     expected_seq: int
     received_seq: int
     reported_by_device: bool  # True: device saw a gap in host TX (RPT 0x84)
+
+
+@dataclass(frozen=True)
+class SeqGapEvent(DeviceEvent):
+    """A gap the host saw in the device->host seq (contract 01 §5 step 5):
+    the packet still arrives, `missed` packets before it did not. Counted in
+    `LinkStats.seq_gaps`; the device-reported gap (RPT 0x84) is
+    `SequenceErrorEvent`."""
+
+    expected_seq: int
+    received_seq: int
+    missed: int  # (received - expected) mod 256
 
 
 @dataclass(frozen=True)
@@ -112,6 +148,10 @@ class LinkStats:
     trash_bytes: int = 0
     seq_gaps: int = 0  # gaps in device->host seq (host-observed)
     device_seq_errors: int = 0  # RPT_SEQUENCE_ERROR count (device-observed)
+    callback_errors: int = 0  # callbacks that raised on the reader (contract 07 §3)
+
+
+_log = logging.getLogger("depz_sensor_sdk")
 
 
 def host_now_us() -> int:
@@ -119,9 +159,7 @@ def host_now_us() -> int:
     return time.monotonic_ns() // 1000
 
 
-def sync_time_all(
-    devices: "Iterable[DeviceBase]", samples: int = 5
-) -> "dict[DeviceBase, TimeSync]":
+def sync_time_all(devices: Iterable[DeviceBase], samples: int = 5) -> dict[DeviceBase, TimeSync]:
     """Software-sync several devices to the common host monotonic clock.
 
     Runs `sync_time()` on each device so that every device's
@@ -143,9 +181,9 @@ class _Pending:
     def __init__(
         self,
         cmd: int,
-        matcher: Callable[[Packet], Any] | None,
+        matcher: Matcher[Any] | None,
         ok_completes: bool,
-    ):
+    ) -> None:
         self.cmd = cmd
         self.matcher = matcher
         self.ok_completes = ok_completes
@@ -162,15 +200,15 @@ class _Pending:
         self.done.set()
 
 
-class StreamQueue:
+class StreamQueue(Generic[T]):
     """Bounded drop-oldest queue with a drop counter (contract 07 §3)."""
 
-    def __init__(self, maxsize: int):
-        self._q: queue.Queue[Any] = queue.Queue(maxsize)
+    def __init__(self, maxsize: int) -> None:
+        self._q: queue.Queue[T] = queue.Queue(maxsize)
         self.dropped_count = 0
         self.closed = False
 
-    def put(self, item: Any) -> None:
+    def put(self, item: T) -> None:
         while True:
             try:
                 self._q.put_nowait(item)
@@ -182,14 +220,11 @@ class StreamQueue:
                 except queue.Empty:
                     pass
 
-    def get(self, timeout: float | None = None) -> Any:
+    def get(self, timeout: float | None = None) -> T:
         return self._q.get(timeout=timeout)
 
 
-_SENTINEL = object()
-
-
-class StreamIterator:
+class StreamIterator(Generic[T]):
     """Iterator over a StreamQueue that registers **eagerly** at construction.
 
     A lazy generator would subscribe only on the first `next()`, losing
@@ -197,8 +232,17 @@ class StreamIterator:
     Ends when the device closes; deregisters on GC/close().
     """
 
-    def __init__(self, registry: list["StreamQueue"], maxsize: int, closed_fn):
-        self._queue = StreamQueue(maxsize)
+    def __init__(
+        self,
+        registry: list[StreamQueue[T]],
+        maxsize: int,
+        closed_fn: Callable[[], bool],
+        *,
+        queue: StreamQueue[T] | None = None,
+    ) -> None:
+        # `queue`: a subclass instance when the device filters per queue
+        # (Bno086.reports); otherwise a plain bounded queue of `maxsize`.
+        self._queue: StreamQueue[T] = StreamQueue(maxsize) if queue is None else queue
         self._registry = registry
         self._closed_fn = closed_fn
         registry.append(self._queue)
@@ -207,10 +251,10 @@ class StreamIterator:
     def dropped_count(self) -> int:
         return self._queue.dropped_count
 
-    def __iter__(self) -> "StreamIterator":
+    def __iter__(self) -> StreamIterator[T]:
         return self
 
-    def __next__(self):
+    def __next__(self) -> T:
         while True:
             try:
                 return self._queue.get(timeout=0.2)
@@ -238,7 +282,7 @@ class DeviceBase:
         *,
         timeout: float = DEFAULT_TIMEOUT,
         tx_crc_type: CrcType = CrcType.NONE,
-    ):
+    ) -> None:
         if isinstance(port_or_link, str):
             self._link: Link = SerialLink(port_or_link)
             self._port_name = port_or_link
@@ -255,7 +299,7 @@ class DeviceBase:
         self._pending: dict[int, _Pending] = {}
         self._pending_lock = threading.Lock()
         self._event_cbs: list[Callable[[DeviceEvent], None]] = []
-        self._event_queues: list[StreamQueue] = []
+        self._event_queues: list[StreamQueue[DeviceEvent]] = []
         self._last_rx_seq: int | None = None
         self._time_sync: TimeSync | None = None
         self._closing = False
@@ -271,7 +315,7 @@ class DeviceBase:
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
-    def __enter__(self) -> "DeviceBase":
+    def __enter__(self) -> DeviceBase:
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -322,8 +366,13 @@ class DeviceBase:
             self._fail_all_pending(LinkClosedError("device closed"))
 
     def _track_seq(self, seq: int) -> None:
-        if self._last_rx_seq is not None and seq != (self._last_rx_seq + 1) & 0xFF:
-            self.stats.seq_gaps += 1
+        # The first packet after open has nothing to be compared with. The
+        # gap is surfaced before that packet is dispatched.
+        if self._last_rx_seq is not None:
+            expected = (self._last_rx_seq + 1) & 0xFF
+            if seq != expected:
+                self.stats.seq_gaps += 1
+                self._emit_event(SeqGapEvent(expected, seq, (seq - expected) & 0xFF))
         self._last_rx_seq = seq
 
     def _fail_all_pending(self, exc: Exception) -> None:
@@ -361,31 +410,53 @@ class DeviceBase:
             self._emit_event(UnsolicitedStatusEvent(rep.status))
             return
 
-        # Give pending matchers first shot at any non-status packet.
+        # Give pending matchers first shot at any non-status packet. A matcher
+        # that raises has claimed the packet as its reply and failed to decode
+        # it (contract 07 §3: a reply shorter than its fields is rejected):
+        # that one request fails with InvalidReplyError and the reader goes
+        # on — an exception here must never end the reader thread, which
+        # would fail every later request on this device.
+        claimed: _Pending | None = None
+        result: Any = None
+        bad: Exception | None = None
         with self._pending_lock:
             for p in list(self._pending.values()):
                 if p.matcher is None:
                     continue
-                result = p.matcher(pkt)
-                if result is not _SENTINEL:
+                try:
+                    result = p.matcher(pkt)
+                except Exception as exc:  # noqa: BLE001 — any decode failure is this reply's
+                    bad = exc
+                if result is not _SENTINEL or bad is not None:
                     del self._pending[p.cmd]
-                    p.complete(result)
-                    return
+                    claimed = p
+                    break
+        if claimed is not None:
+            if bad is not None:
+                claimed.fail(InvalidReplyError(claimed.cmd, bad))
+            else:
+                claimed.complete(result)
+            return
 
-        if pkt.cmd == Rpt.SEQUENCE_ERROR and len(pkt.payload) == 2:
-            rep = SequenceErrorReport.unpack(pkt.payload)
+        # Contract 07 §3: a report longer than its fields is decoded and the
+        # tail ignored (a newer firmware may append fields); a shorter one is
+        # not a report of that kind and stays visible as hex text below.
+        if pkt.cmd == Rpt.SEQUENCE_ERROR and len(pkt.payload) >= 2:
+            seq_err = SequenceErrorReport.unpack(pkt.payload)
             self.stats.device_seq_errors += 1
             self._emit_event(
-                SequenceErrorEvent(rep.expected_seq, rep.received_seq, reported_by_device=True)
+                SequenceErrorEvent(
+                    seq_err.expected_seq, seq_err.received_seq, reported_by_device=True
+                )
             )
             return
         if pkt.cmd == Rpt.TEXT and pkt.payload:
-            rep = TextReport.unpack(pkt.payload)
-            self._emit_event(TextEvent(rep.cmd, rep.text))
+            text = TextReport.unpack(pkt.payload)
+            self._emit_event(TextEvent(text.cmd, text.text))
             return
-        if pkt.cmd == Rpt.TEMPERATURE and len(pkt.payload) == 10:
-            rep = TemperatureReport.unpack(pkt.payload)
-            self._emit_event(TemperatureEvent(rep.timestamp_us, rep.celsius))
+        if pkt.cmd == Rpt.TEMPERATURE and len(pkt.payload) >= 10:
+            temp = TemperatureReport.unpack(pkt.payload)
+            self._emit_event(TemperatureEvent(temp.timestamp_us, temp.celsius))
             return
 
         if self._handle_report(pkt):
@@ -417,16 +488,30 @@ class DeviceBase:
         self._event_cbs.append(cb)
         return lambda: self._event_cbs.remove(cb)
 
-    def events(self, maxsize: int = 256) -> StreamIterator:
+    def events(self, maxsize: int = 256) -> StreamIterator[DeviceEvent]:
         """Pull-style event stream (bounded, drop-oldest). Subscribes
         immediately — events emitted after this call are never missed."""
         return StreamIterator(self._event_queues, maxsize, lambda: self.closed)
 
     def _emit_event(self, event: DeviceEvent) -> None:
-        for cb in list(self._event_cbs):
-            cb(event)
-        for q in list(self._event_queues):
-            q.put(event)
+        self._deliver(self._event_cbs, self._event_queues, event)
+
+    def _deliver(self, cbs: Iterable[Callable[[Any], None]], queues: Iterable[Any], item: Any) -> None:
+        """Hand `item` to every callback, then to every queue (contract 07 §3)."""
+        for cb in list(cbs):
+            self._call_guarded(cb, item)
+        for q in list(queues):
+            q.put(item)
+
+    def _call_guarded(self, cb: Callable[[Any], None], item: Any) -> None:
+        """Run a user callback on the reader: one that raises is counted in
+        `stats.callback_errors`, logged and dropped — it never stops the
+        reader, the other callbacks or the queues (contract 07 §3)."""
+        try:
+            cb(item)
+        except Exception:
+            self.stats.callback_errors += 1
+            _log.exception("callback %r raised on %s", cb, type(item).__name__)
 
     # ── TX / requests ────────────────────────────────────────────────────────
 
@@ -440,12 +525,34 @@ class DeviceBase:
             self.stats.tx_packets += 1
             self.stats.tx_bytes += len(frame)
 
+    @overload
     def request(
         self,
         cmd: int,
         payload: bytes = b"",
         *,
-        matcher: Callable[[Packet], Any] | None = None,
+        matcher: Matcher[T],
+        ok_completes: bool = False,
+        timeout: float | None = None,
+    ) -> T: ...
+
+    @overload
+    def request(
+        self,
+        cmd: int,
+        payload: bytes = b"",
+        *,
+        matcher: None = None,
+        ok_completes: bool = False,
+        timeout: float | None = None,
+    ) -> None: ...
+
+    def request(
+        self,
+        cmd: int,
+        payload: bytes = b"",
+        *,
+        matcher: Matcher[Any] | None = None,
         ok_completes: bool = False,
         timeout: float | None = None,
     ) -> Any:
@@ -456,7 +563,9 @@ class DeviceBase:
         - `matcher` — first packet for which `matcher(pkt) is not
           request.NO_MATCH` finishes with the matcher's return value.
         Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-        ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+        ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+        it claims (a reply shorter than its fields) raises InvalidReplyError
+        here, and the device stays usable. One in-flight request per opcode.
         """
         if matcher is None and not ok_completes:
             raise ValueError("configure matcher or ok_completes")
@@ -481,10 +590,10 @@ class DeviceBase:
     NO_MATCH = _SENTINEL
 
     @staticmethod
-    def expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[Packet], Any]:
+    def expect_report(report_id: int, unpack: Callable[[bytes], T]) -> Matcher[T]:
         """Matcher for a typed report identified by its report ID alone."""
 
-        def match(pkt: Packet) -> Any:
+        def match(pkt: Packet) -> T | _NoMatch:
             if pkt.cmd != report_id:
                 return _SENTINEL
             return unpack(pkt.payload)
@@ -492,10 +601,10 @@ class DeviceBase:
         return match
 
     @staticmethod
-    def expect_text(request_cmd: int) -> Callable[[Packet], Any]:
+    def expect_text(request_cmd: int) -> Matcher[str]:
         """Matcher for RPT_TEXT echoing `request_cmd`."""
 
-        def match(pkt: Packet) -> Any:
+        def match(pkt: Packet) -> str | _NoMatch:
             if pkt.cmd != Rpt.TEXT or not pkt.payload or pkt.payload[0] != request_cmd:
                 return _SENTINEL
             return TextReport.unpack(pkt.payload).text
@@ -522,7 +631,7 @@ class DeviceBase:
 
     def read_mcu_temperature(self) -> float:
         """Last cached MCU temperature in °C (device refreshes ~2 Hz)."""
-        rep: TemperatureReport = self.request(
+        rep = self.request(
             Cmd.GET_MCU_TEMPERATURE,
             matcher=self.expect_report(Rpt.TEMPERATURE, TemperatureReport.unpack),
         )
@@ -533,7 +642,7 @@ class DeviceBase:
         best: TimeSync | None = None
         for _ in range(max(1, samples)):
             t1 = host_now_us()
-            rep: SyncTimeReport = self.request(
+            rep = self.request(
                 Cmd.SYNC_TIME,
                 pack_sync_time(t1),
                 matcher=self.expect_report(Rpt.SYNC_TIME, SyncTimeReport.unpack),
@@ -553,19 +662,19 @@ class DeviceBase:
     def to_host_time_us(self, device_timestamp_us: int) -> int:
         """Device µs → host monotonic µs (requires a prior `sync_time`)."""
         if self._time_sync is None:
-            raise RuntimeError("call sync_time() first")
+            raise InvalidStateError("call sync_time() first")
         return device_timestamp_us - self._time_sync.offset_us
 
     def get_report_payload_crc(self) -> CrcType:
         raw = self.request(
             Cmd.GET_PAYLOAD_CRC_TYPE,
-            matcher=self.expect_report(Rpt.PAYLOAD_CRC_TYPE, lambda p: p[0]),
+            matcher=self.expect_report(Rpt.PAYLOAD_CRC_TYPE, unpack_payload_crc_type),
         )
         return CrcType(raw)
 
     def set_report_payload_crc(self, crc_type: CrcType) -> None:
         """Set the device→host payload CRC mode (host→device is per-packet)."""
-        self.request(Cmd.SET_PAYLOAD_CRC_TYPE, bytes([crc_type]), ok_completes=True)
+        self.request(Cmd.SET_PAYLOAD_CRC_TYPE, pack_set_payload_crc_type(crc_type), ok_completes=True)
 
     def get_sync_pin(self, pin: int) -> SyncPinConfig:
         return self.request(

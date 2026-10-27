@@ -17,17 +17,16 @@ Typical use::
 
 from __future__ import annotations
 
-import operator
 import queue
 import struct
 import threading
 import time
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Callable
+from typing import Callable, SupportsIndex
 
 from ..device import DeviceBase, DeviceEvent, StreamIterator, StreamQueue
-from ..errors import DepzError, DepzTimeoutError, LinkClosedError
+from ..errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError
 from ..protocol.tmf8829 import (
     INT_HISTOGRAMS,
     INT_RESULTS,
@@ -198,11 +197,7 @@ class Tmf8829Config:
 
 
 def _is_int(v: object) -> bool:
-    try:
-        operator.index(v)
-    except TypeError:
-        return False
-    return True
+    return isinstance(v, SupportsIndex)
 
 
 _CLOSE_POLL_S = 0.05  # get_measurement(): how often a wait checks for close
@@ -224,7 +219,7 @@ class Tmf8829(DeviceBase):
         self._reassembler = FrameReassembler()
         self._builder = MeasurementBuilder()
         self._meas_cbs: list[Callable[[Tmf8829Measurement], None]] = []
-        self._meas_queues: list[StreamQueue] = []
+        self._meas_queues: list[StreamQueue[Tmf8829Measurement]] = []
         self._streaming = False
         self._stopping = False
         self._config: Tmf8829Config | None = None
@@ -427,7 +422,7 @@ class Tmf8829(DeviceBase):
         if preset not in PRESETS:
             raise ValueError(f"unknown preset {preset!r}; one of {', '.join(PRESETS)}")
         if self._streaming:
-            raise DepzError("configure() while streaming: stop() first")
+            raise InvalidStateError("configure() while streaming: stop() first")
         # The 3-bit field takes 0..7, the sensor reports at most 4.
         if not _is_int(nr_peaks) or not 1 <= nr_peaks <= 4:
             raise ValueError(f"nr_peaks {nr_peaks}, must be 1..4")
@@ -535,7 +530,7 @@ class Tmf8829(DeviceBase):
         self._meas_cbs.append(cb)
         return lambda: self._meas_cbs.remove(cb)
 
-    def measurements(self, maxsize: int = 16) -> StreamIterator:
+    def measurements(self, maxsize: int = 16) -> StreamIterator[Tmf8829Measurement]:
         """Blocking iterator over measurements (bounded, drop-oldest).
         Subscribes immediately — call before or after `start()`."""
         return StreamIterator(self._meas_queues, maxsize, lambda: self.closed)
@@ -545,7 +540,7 @@ class Tmf8829(DeviceBase):
         `timeout`, `LinkClosedError` as soon as the device is closed."""
         if self.closed:
             raise LinkClosedError("device is closed")
-        q = StreamQueue(1)
+        q: StreamQueue[Tmf8829Measurement] = StreamQueue(1)
         self._meas_queues.append(q)
         try:
             deadline = time.monotonic() + timeout
@@ -595,10 +590,7 @@ class Tmf8829(DeviceBase):
                 return True
             m = self._builder.add(raw.data, raw.timestamp_us, raw.edge_us)
             if m is not None:
-                for cb in list(self._meas_cbs):
-                    cb(m)
-                for q in list(self._meas_queues):
-                    q.put(m)
+                self._deliver(self._meas_cbs, self._meas_queues, m)
             return True
         if pkt.cmd == Tmf8829Rpt.EVENT:
             try:

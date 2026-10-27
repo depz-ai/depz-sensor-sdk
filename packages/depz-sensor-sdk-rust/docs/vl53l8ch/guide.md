@@ -89,9 +89,9 @@ fn print_cnh(res: &Vl53l8Results) -> Result<(), Box<dyn std::error::Error>> {
 
 Each [`CnhAggregate`](api.md#cnhaggregate) holds `feature_length` bins as an
 integer `hist_raw` plus a power-of-two `hist_scaler`; the bin value is
-`hist_raw / 2^hist_scaler`. `decode_cnh` returns `CnhError::EmptyConfig` for a
-zero aggregate count or bin count, and `CnhError::Truncated` when the block is
-shorter than the layout the config implies.
+`hist_raw / 2^hist_scaler`. A zero aggregate count or bin count decodes to
+empty histograms; `decode_cnh` returns `CnhError::Truncated` when the block is
+shorter than the layout the config implies (ambient fields included).
 
 ## Gotchas
 

@@ -162,7 +162,13 @@ export class VL53L1 extends VL53L1Die {
   }
 
   // ── ranging mode (VL53L1X_SetDistanceMode) ──
-  override async setMode(name: string): Promise<void> {
+  /**
+   * 'short' or 'long'; the budget is re-applied afterwards. → the budget in
+   * effect after the change, ms: one the new mode does not tabulate moves to
+   * the nearest one it does (contract 12 §5, the one exception to "refuse,
+   * don't round"), so the caller sees it.
+   */
+  override async setMode(name: string): Promise<number> {
     const mode = MODE_CODES[name];
     if (mode === undefined) {
       throw new Vl53Error(`no such mode: ${name} (have ${this.MODES.join(", ")})`);
@@ -197,6 +203,7 @@ export class VL53L1 extends VL53L1Die {
       budgetMs = best!;
     }
     await this.setRangeTiming(budgetMs, interMs);
+    return budgetMs;
   }
 
   /** → 'short' or 'long'. VL53L1X_GetDistanceMode(). */

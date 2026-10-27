@@ -4,7 +4,7 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::thread::JoinHandle;
@@ -12,11 +12,12 @@ use std::time::{Duration, Instant};
 
 use super::error::{DepzError, Result};
 use super::link::{hex_encode, Link};
+use super::serial::SerialPortLink;
 use super::stream::{Fanout, Hook, Subscription};
 use crate::framing::{build_packet, CrcType, Event, Packet, PacketParser};
 use crate::protocol::common::{
-    self, Cmd, Rpt, SequenceErrorReport, Status, StatusReport, SyncPinConfig, SyncTimeReport, TemperatureReport,
-    TextReport,
+    self, Cmd, Rpt, SequenceErrorReport, Status, StatusReport, SyncPinConfig, SyncTimeReport,
+    TemperatureReport, TextReport,
 };
 use crate::protocol::identity::{parse_software_name, Identity};
 
@@ -29,9 +30,19 @@ const READ_SLICE: Duration = Duration::from_millis(50);
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum DeviceEvent {
-    /// A gap in packet sequence numbers; `reported_by_device`: the board saw a gap in host TX
-    /// (RPT_SEQUENCE_ERROR), else the host saw one in the board's packets.
-    SequenceError { expected_seq: u8, received_seq: u8, reported_by_device: bool },
+    /// The board saw a gap in host TX (RPT_SEQUENCE_ERROR); `reported_by_device` is always true.
+    SequenceError {
+        expected_seq: u8,
+        received_seq: u8,
+        reported_by_device: bool,
+    },
+    /// The host saw a gap in the board's packets (contract 01 §5 step 5): the packet still
+    /// arrives, `missed` = (received − expected) mod 256 did not. Counted in `seq_gaps`.
+    SeqGap {
+        expected_seq: u8,
+        received_seq: u8,
+        missed: u8,
+    },
     /// A frame whose payload CRC failed (dropped).
     LinkCrcError { cmd: u8, seq: u8 },
     /// Bytes discarded while hunting for a frame.
@@ -45,7 +56,11 @@ pub enum DeviceEvent {
     /// The link dropped or the reader stopped.
     Disconnected(String),
     /// A sensor class's own event: `kind` names it, `payload` is the report's payload.
-    Sensor { kind: &'static str, code: u8, payload: Vec<u8> },
+    Sensor {
+        kind: &'static str,
+        code: u8,
+        payload: Vec<u8>,
+    },
 }
 
 /// Link counters (a snapshot).
@@ -60,6 +75,8 @@ pub struct LinkStats {
     pub trash_bytes: u64,
     pub seq_gaps: u64,
     pub device_seq_errors: u64,
+    /// Callbacks that panicked on the reader thread (contract 07 §3).
+    pub callback_errors: u64,
 }
 
 /// Result of [`DepzDevice::sync_time`]: device clock − host clock, the round trip of the kept
@@ -102,6 +119,7 @@ struct Tx {
 pub(crate) struct Core {
     link: Box<dyn Link>,
     stats: Mutex<LinkStats>,
+    callback_errors: Arc<AtomicU64>,
     pub(crate) events: Fanout<DeviceEvent>,
     timeout: Mutex<Duration>,
     tx_crc: Mutex<CrcType>,
@@ -125,10 +143,12 @@ pub struct DepzDevice {
 impl DepzDevice {
     /// Open a connection on any link; the device owns it and closes it. `timeout` `None`: 200 ms.
     pub fn new(link: impl Link + 'static, timeout: Option<Duration>) -> DepzDevice {
+        let callback_errors = Arc::new(AtomicU64::new(0));
         let core = Arc::new(Core {
             link: Box::new(link),
             stats: Mutex::new(LinkStats::default()),
-            events: Fanout::new(),
+            events: Fanout::new(callback_errors.clone()),
+            callback_errors,
             timeout: Mutex::new(timeout.unwrap_or(DEFAULT_TIMEOUT)),
             tx_crc: Mutex::new(CrcType::None),
             time_sync: Mutex::new(None),
@@ -145,6 +165,13 @@ impl DepzDevice {
             .expect("spawn the reader thread");
         *core.reader.lock().unwrap() = Some(handle);
         DepzDevice { core }
+    }
+
+    /// Open a plain connection on the serial port `port` ([`SerialPortLink::open`]): the common
+    /// commands, no sensor class. `timeout` `None`: 200 ms. [`DepzError::DeviceLost`] when the port
+    /// does not open.
+    pub fn open(port: &str, timeout: Option<Duration>) -> Result<DepzDevice> {
+        Ok(DepzDevice::new(SerialPortLink::open(port)?, timeout))
     }
 
     /// Route this connection's streaming reports to a sensor class (one handler; the last wins).
@@ -170,7 +197,9 @@ impl DepzDevice {
 
     pub fn set_timeout(&self, timeout: Duration) -> Result<()> {
         if timeout.is_zero() {
-            return Err(DepzError::InvalidArgument("timeout must be positive".into()));
+            return Err(DepzError::InvalidArgument(
+                "timeout must be positive".into(),
+            ));
         }
         *self.core.timeout.lock().unwrap() = timeout;
         Ok(())
@@ -186,7 +215,14 @@ impl DepzDevice {
     }
 
     pub fn stats(&self) -> LinkStats {
-        self.core.stats.lock().unwrap().clone()
+        let mut s = self.core.stats.lock().unwrap().clone();
+        s.callback_errors = self.core.callback_errors.load(Ordering::Relaxed);
+        s
+    }
+
+    /// The counter a sensor class's streams share with [`LinkStats::callback_errors`].
+    pub(crate) fn callback_errors_counter(&self) -> Arc<AtomicU64> {
+        self.core.callback_errors.clone()
     }
 
     /// Close the link and stop the reader; pending requests and streams end. Dropping does the same.
@@ -242,21 +278,44 @@ impl DepzDevice {
 
     /// Send `cmd` and wait for RPT_STATUS OK echoing it.
     pub fn request_ok(&self, cmd: u8, payload: &[u8], timeout: Option<Duration>) -> Result<()> {
-        self.core.request(cmd, payload, None, true, timeout.unwrap_or_else(|| self.timeout())).map(|_| ())
+        self.core
+            .request(
+                cmd,
+                payload,
+                None,
+                true,
+                timeout.unwrap_or_else(|| self.timeout()),
+            )
+            .map(|_| ())
     }
 
     // ── common commands (contract 02) ────────────────────────────────────────
 
     pub fn get_device_name(&self) -> Result<String> {
-        self.request(Cmd::GetDeviceName as u8, &[], expect_text(Cmd::GetDeviceName as u8), None)
+        self.request(
+            Cmd::GetDeviceName as u8,
+            &[],
+            expect_text(Cmd::GetDeviceName as u8),
+            None,
+        )
     }
 
     pub fn get_software_name(&self) -> Result<String> {
-        self.request(Cmd::GetNameActiveSoftware as u8, &[], expect_text(Cmd::GetNameActiveSoftware as u8), None)
+        self.request(
+            Cmd::GetNameActiveSoftware as u8,
+            &[],
+            expect_text(Cmd::GetNameActiveSoftware as u8),
+            None,
+        )
     }
 
     pub fn get_serial_number(&self) -> Result<String> {
-        self.request(Cmd::GetSerial as u8, &[], expect_text(Cmd::GetSerial as u8), None)
+        self.request(
+            Cmd::GetSerial as u8,
+            &[],
+            expect_text(Cmd::GetSerial as u8),
+            None,
+        )
     }
 
     /// The running firmware: the software name parsed into mode, sensor type and version (contract 02 §4).
@@ -287,9 +346,14 @@ impl DepzDevice {
                 None,
             )?;
             let t4 = host_now_us();
-            let (offset, rtt) = common::sync_time_offset_rtt(t1, rep.mcu_rx_us as i64, rep.mcu_tx_us as i64, t4);
-            if best.map_or(true, |b| rtt < b.rtt_us) {
-                best = Some(TimeSyncResult { offset_us: offset, rtt_us: rtt, synced_at_host_us: t4 });
+            let (offset, rtt) =
+                common::sync_time_offset_rtt(t1, rep.mcu_rx_us as i64, rep.mcu_tx_us as i64, t4);
+            if best.is_none_or(|b| rtt < b.rtt_us) {
+                best = Some(TimeSyncResult {
+                    offset_us: offset,
+                    rtt_us: rtt,
+                    synced_at_host_us: t4,
+                });
             }
         }
         *self.core.time_sync.lock().unwrap() = best;
@@ -315,7 +379,9 @@ impl DepzDevice {
             Cmd::GetPayloadCrcType as u8,
             &[],
             expect_report(Rpt::PayloadCrcType as u8, |p| {
-                p.first().copied().ok_or(common::CodecError("RPT_PAYLOAD_CRC_TYPE: need 1 byte"))
+                p.first()
+                    .copied()
+                    .ok_or(common::CodecError("RPT_PAYLOAD_CRC_TYPE: need 1 byte"))
             }),
             None,
         )?;
@@ -324,7 +390,11 @@ impl DepzDevice {
 
     /// Set the device → host payload CRC mode (host → device is per packet: [`DepzDevice::set_tx_crc_type`]).
     pub fn set_report_payload_crc(&self, crc: CrcType) -> Result<()> {
-        self.request_ok(Cmd::SetPayloadCrcType as u8, &common::pack_set_payload_crc_type(crc as u8), None)
+        self.request_ok(
+            Cmd::SetPayloadCrcType as u8,
+            &common::pack_set_payload_crc_type(crc as u8),
+            None,
+        )
     }
 
     pub fn get_sync_pin(&self, pin: u8) -> Result<SyncPinConfig> {
@@ -344,7 +414,9 @@ impl DepzDevice {
     }
 
     pub fn set_sync_pin(&self, config: &SyncPinConfig) -> Result<()> {
-        let payload = config.try_pack().map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?;
+        let payload = config
+            .try_pack()
+            .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?;
         self.request_ok(Cmd::SetSyncPinConfig as u8, &payload, None)
     }
 
@@ -376,15 +448,23 @@ impl Requester {
         matcher: impl Fn(&Packet) -> Option<Result<T>> + Send + 'static,
         timeout: Option<Duration>,
     ) -> Result<T> {
-        let erased: ErasedMatcher = Box::new(move |p| matcher(p).map(|r| r.map(|v| Box::new(v) as AnyBox)));
+        let erased: ErasedMatcher =
+            Box::new(move |p| matcher(p).map(|r| r.map(|v| Box::new(v) as AnyBox)));
         let t = timeout.unwrap_or_else(|| *self.core.timeout.lock().unwrap());
         match self.core.request(cmd, payload, Some(erased), false, t)? {
             Some(b) => Ok(*b.downcast::<T>().expect("matcher type")),
-            None => Err(DepzError::Protocol(format!("cmd 0x{cmd:02X}: no reply value"))),
+            None => Err(DepzError::Protocol(format!(
+                "cmd 0x{cmd:02X}: no reply value"
+            ))),
         }
     }
 
-    pub(crate) fn request_ok(&self, cmd: u8, payload: &[u8], timeout: Option<Duration>) -> Result<()> {
+    pub(crate) fn request_ok(
+        &self,
+        cmd: u8,
+        payload: &[u8],
+        timeout: Option<Duration>,
+    ) -> Result<()> {
         let t = timeout.unwrap_or_else(|| *self.core.timeout.lock().unwrap());
         self.core.request(cmd, payload, None, true, t).map(|_| ())
     }
@@ -403,7 +483,9 @@ impl Requester {
 
 impl DepzDevice {
     pub(crate) fn requester(&self) -> Requester {
-        Requester { core: self.core.clone() }
+        Requester {
+            core: self.core.clone(),
+        }
     }
 }
 
@@ -418,14 +500,24 @@ pub fn expect_report<T, E: Into<DepzError>>(
     report_id: u8,
     unpack: impl Fn(&[u8]) -> std::result::Result<T, E> + Send + 'static,
 ) -> impl Fn(&Packet) -> Option<Result<T>> + Send + 'static {
-    move |p: &Packet| if p.cmd == report_id { Some(unpack(&p.payload).map_err(Into::into)) } else { None }
+    move |p: &Packet| {
+        if p.cmd == report_id {
+            Some(unpack(&p.payload).map_err(Into::into))
+        } else {
+            None
+        }
+    }
 }
 
 /// A matcher for RPT_TEXT echoing `request_cmd`.
 pub fn expect_text(request_cmd: u8) -> impl Fn(&Packet) -> Option<Result<String>> + Send + 'static {
     move |p: &Packet| {
         if p.cmd == Rpt::Text as u8 && !p.payload.is_empty() && p.payload[0] == request_cmd {
-            Some(TextReport::unpack(&p.payload).map(|r| r.text).map_err(Into::into))
+            Some(
+                TextReport::unpack(&p.payload)
+                    .map(|r| r.text)
+                    .map_err(Into::into),
+            )
         } else {
             None
         }
@@ -435,7 +527,8 @@ pub fn expect_text(request_cmd: u8) -> impl Fn(&Packet) -> Option<Result<String>
 impl Core {
     fn send(&self, cmd: u8, payload: &[u8], crc: CrcType) -> Result<()> {
         let mut tx = self.tx.lock().unwrap();
-        let frame = build_packet(cmd, payload, tx.seq as u32, crc).map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
+        let frame = build_packet(cmd, payload, tx.seq as u32, crc)
+            .map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
         self.link.write(&frame)?;
         tx.seq = tx.seq.wrapping_add(1);
         let mut s = self.stats.lock().unwrap();
@@ -456,9 +549,19 @@ impl Core {
         {
             let mut pending = self.pending.lock().unwrap();
             if pending.contains_key(&cmd) {
-                return Err(DepzError::Status { cmd, status: Status::ErrBusy as u8 });
+                return Err(DepzError::Status {
+                    cmd,
+                    status: Status::ErrBusy as u8,
+                });
             }
-            pending.insert(cmd, Pending { matcher, ok_completes, done });
+            pending.insert(
+                cmd,
+                Pending {
+                    matcher,
+                    ok_completes,
+                    done,
+                },
+            );
         }
         let crc = *self.tx_crc.lock().unwrap();
         if let Err(e) = self.send(cmd, payload, crc) {
@@ -479,7 +582,13 @@ impl Core {
     }
 
     fn fail_all(&self, make: impl Fn() -> DepzError) {
-        let all: Vec<Pending> = self.pending.lock().unwrap().drain().map(|(_, p)| p).collect();
+        let all: Vec<Pending> = self
+            .pending
+            .lock()
+            .unwrap()
+            .drain()
+            .map(|(_, p)| p)
+            .collect();
         for p in all {
             let _ = p.done.try_send(Err(make()));
         }
@@ -490,9 +599,16 @@ impl Core {
     }
 
     fn dispatch(&self, pkt: &Packet, last_rx_seq: &mut Option<u8>) {
+        // The first packet after open is no gap; a gap is surfaced ahead of its packet.
         if let Some(last) = *last_rx_seq {
-            if pkt.seq != last.wrapping_add(1) {
+            let expected = last.wrapping_add(1);
+            if pkt.seq != expected {
                 self.stats.lock().unwrap().seq_gaps += 1;
+                self.emit(DeviceEvent::SeqGap {
+                    expected_seq: expected,
+                    received_seq: pkt.seq,
+                    missed: pkt.seq.wrapping_sub(expected),
+                });
             }
         }
         *last_rx_seq = Some(pkt.seq);
@@ -503,7 +619,10 @@ impl Core {
                     let mut pending = self.pending.lock().unwrap();
                     if let Some(p) = pending.get(&rep.cmd) {
                         let outcome = if rep.status != Status::Ok as u8 {
-                            Some(Err(DepzError::Status { cmd: rep.cmd, status: rep.status }))
+                            Some(Err(DepzError::Status {
+                                cmd: rep.cmd,
+                                status: rep.status,
+                            }))
                         } else if p.ok_completes {
                             Some(Ok(None))
                         } else {
@@ -539,13 +658,18 @@ impl Core {
         if let Some((p, cmd, r)) = claimed {
             let out = match r {
                 Ok(v) => Ok(Some(v)),
-                Err(e) => Err(DepzError::Protocol(format!("reply to cmd 0x{cmd:02X} does not decode: {e}"))),
+                Err(e) => Err(DepzError::Protocol(format!(
+                    "reply to cmd 0x{cmd:02X} does not decode: {e}"
+                ))),
             };
             let _ = p.done.try_send(out);
             return;
         }
 
-        if pkt.cmd == Rpt::SequenceError as u8 && payload.len() == 2 {
+        // Contract 07 §3: a report longer than its fields is decoded and the
+        // tail ignored (a newer firmware may append fields); a shorter one is
+        // not a report of that kind and stays visible as hex text below.
+        if pkt.cmd == Rpt::SequenceError as u8 && payload.len() >= 2 {
             if let Ok(rep) = SequenceErrorReport::unpack(payload) {
                 self.stats.lock().unwrap().device_seq_errors += 1;
                 self.emit(DeviceEvent::SequenceError {
@@ -558,13 +682,19 @@ impl Core {
         }
         if pkt.cmd == Rpt::Text as u8 && !payload.is_empty() {
             if let Ok(rep) = TextReport::unpack(payload) {
-                self.emit(DeviceEvent::Text { cmd: rep.cmd, text: rep.text });
+                self.emit(DeviceEvent::Text {
+                    cmd: rep.cmd,
+                    text: rep.text,
+                });
                 return;
             }
         }
-        if pkt.cmd == Rpt::Temperature as u8 && payload.len() == 10 {
+        if pkt.cmd == Rpt::Temperature as u8 && payload.len() >= 10 {
             if let Ok(rep) = TemperatureReport::unpack(payload) {
-                self.emit(DeviceEvent::Temperature { timestamp_us: rep.timestamp_us, celsius: rep.celsius() });
+                self.emit(DeviceEvent::Temperature {
+                    timestamp_us: rep.timestamp_us,
+                    celsius: rep.celsius(),
+                });
                 return;
             }
         }
@@ -575,7 +705,10 @@ impl Core {
             }
         }
         // An unrouted report stays visible, so new firmware is debuggable.
-        self.emit(DeviceEvent::Text { cmd: pkt.cmd, text: hex_encode(payload) });
+        self.emit(DeviceEvent::Text {
+            cmd: pkt.cmd,
+            text: hex_encode(payload),
+        });
     }
 }
 
@@ -620,8 +753,14 @@ fn reader_loop(core: Arc<Core>) {
     }));
     if outcome.is_err() {
         // A callback or handler panicked: the reader is gone, as in the reference SDK.
-        core.fail_all(|| DepzError::DeviceLost("device reader stopped: a callback panicked".into()));
-        let _ = catch_unwind(AssertUnwindSafe(|| core.emit(DeviceEvent::Disconnected("reader stopped: a callback panicked".into()))));
+        core.fail_all(|| {
+            DepzError::DeviceLost("device reader stopped: a callback panicked".into())
+        });
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            core.emit(DeviceEvent::Disconnected(
+                "reader stopped: a callback panicked".into(),
+            ))
+        }));
     }
     core.fail_all(|| DepzError::LinkClosed("device closed".into()));
     let handler = core.handler.read().unwrap().clone();

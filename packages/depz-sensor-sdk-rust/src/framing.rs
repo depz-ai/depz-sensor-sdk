@@ -215,10 +215,8 @@ impl PacketParser {
                 }
                 let cmd = self.buf[4];
                 let seq = self.buf[5];
-                let payload: Vec<u8> =
-                    self.buf[HEADER_SIZE..HEADER_SIZE + payload_size].to_vec();
-                let trailer: Vec<u8> =
-                    self.buf[HEADER_SIZE + payload_size..total].to_vec();
+                let payload: Vec<u8> = self.buf[HEADER_SIZE..HEADER_SIZE + payload_size].to_vec();
+                let trailer: Vec<u8> = self.buf[HEADER_SIZE + payload_size..total].to_vec();
                 self.buf.drain(..total);
                 if crc_size > 0 && payload_crc_bytes(crc_type, &payload) != trailer {
                     self.crc_errors += 1;

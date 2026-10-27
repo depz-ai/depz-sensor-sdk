@@ -251,7 +251,8 @@ static int rd(depz_device *dev, uint8_t addr, uint8_t *out, size_t len, uint64_t
         c.want = n;
         c.got = 0;
         c.ts = 0;
-        depz_bno055_pack_read_reg((uint8_t)a, (uint8_t)n, p);
+        if (depz_bno055_pack_read_reg((uint8_t)a, (uint8_t)n, p) == 0)
+            return depz_fail(DEPZ_E_ARG, "READ_REG 0x%02X+%zu: len 1..128 and addr+len <= 0x100", a, n);
         TRY(depz_device_request(dev, DEPZ_BNO055_CMD_READ_REG, p, 2, match_reg, &c, false, -1));
         if (c.got != n) return depz_fail(DEPZ_E_PROTOCOL, "READ_REG 0x%02X: expected %zu, got %zu", a, n, c.got);
         if (ts) *ts = c.ts;
@@ -271,6 +272,8 @@ static int wr(depz_device *dev, uint8_t addr, const uint8_t *data, size_t len)
         size_t n = len < DEPZ_BNO055_XFER_MAX ? len : DEPZ_BNO055_XFER_MAX;
         uint8_t p[2 + DEPZ_BNO055_XFER_MAX];
         size_t plen = depz_bno055_pack_write_reg((uint8_t)a, data, n, p);
+        if (plen == 0)
+            return depz_fail(DEPZ_E_ARG, "WRITE_REG 0x%02X+%zu: len 1..128 and addr+len <= 0x100", a, n);
         TRY(depz_device_request(dev, DEPZ_BNO055_CMD_WRITE_REG, p, plen, NULL, NULL, true, -1));
         data += n;
         a += (unsigned)n;
@@ -409,12 +412,12 @@ static void remember_units(depz_device *dev, const depz_bno055_units *u, bool kn
 /* Public entry: serialise the whole sequence. */
 #define LOCKED(body)                          \
     do {                                      \
-        int rc_;                              \
+        int locked_rc_;                       \
         TRY(need(dev));                       \
         depz_mutex_lock(&st(dev)->seq);       \
-        rc_ = (body);                         \
+        locked_rc_ = (body);                  \
         depz_mutex_unlock(&st(dev)->seq);     \
-        return rc_;                           \
+        return locked_rc_;                    \
     } while (0)
 
 /* A register write in CONFIG mode, the operating mode restored. */
@@ -877,13 +880,16 @@ static int do_start_stream(depz_device *dev, uint16_t period_ms, uint8_t addr, u
     uint8_t p[5];
     if (len < 1 || len > DEPZ_BNO055_XFER_MAX || addr + len > 0x100)
         return depz_fail(DEPZ_E_ARG, "bno055: block 0x%02X+%u outside 1..128 / page", addr, len);
+    /* Encoded (and so range-checked: TIMER period 1..60000) before the units
+     * read below — a refused argument puts nothing on the wire. */
+    if (depz_bno055_pack_start_stream(trigger, addr, len, period_ms, p) == 0)
+        return depz_fail(DEPZ_E_ARG, "bno055: TIMER period %u ms outside 1..60000", period_ms);
     /* Units first: the reader may decode the first sample before the
      * request below returns. */
     TRY(current_units(dev, &u));
     depz_mutex_lock(&s->lock);
     s->stream_units = u;
     depz_mutex_unlock(&s->lock);
-    depz_bno055_pack_start_stream(trigger, addr, len, period_ms, p);
     TRY(depz_device_request(dev, DEPZ_BNO055_CMD_START_STREAM, p, 5, NULL, NULL, true, -1));
     depz_mutex_lock(&s->lock);
     s->streaming = true;

@@ -114,8 +114,9 @@ selectable via `depz::vl53l8::Variant`.
   sensor-hub protocol over the SHTP pass-through: reset and product id,
   enabling outputs with the granted rate read back, `Bno086Report`s scaled to
   m/s², rad/s, µT and quaternions through callbacks and streams, calibration /
-  DCD / tare / reorientation, FRS records and sensor metadata, error queue and
-  counts, the busy back-off; verified on a replay of a real capture and live on
+  DCD / tare / reorientation, interactive calibration and the flush of batched
+  reports, FRS records and sensor metadata, error queue and counts, the busy
+  back-off; verified on a replay of a real capture and live on
   a lab BNO085), and the **TMF8829** (`depz::Tmf8829` — the host runs the
   sensor: `init()` with the firmware download and progress, `configure(preset,
   options)` writing every field a preset keeps and reading it back, the config
@@ -214,7 +215,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.7.0
+  GIT_TAG        v0.8.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -282,7 +283,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.7.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.8.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test
@@ -295,8 +296,9 @@ ctest --test-dir build
 
 Tests are gated behind the `DEPZ_SENSOR_SDK_CPP_BUILD_TESTS` option (ON for a
 standalone build, OFF when the project is pulled in via `add_subdirectory` /
-FetchContent). `ctest` runs 33 tests: the golden-vector suites and the
-`device_*` tests, which run the live layer against the C SDK's fake SR04,
+FetchContent). `ctest` runs 62 tests: the golden-vector suites (17), the
+cross-SDK scenarios of contract 15 (`scenario_*`, 29) and the 16 `device_*`
+tests, which run the live layer against the C SDK's fake SR04,
 fake VL53L4CD bridge, fake BNO086 hub and fake TMF8829 bridge (fed with frames
 captured on a board) over a loopback link and strictly
 replay a real SR04, a real VL53L4CD, a real VL53L8CH session (with the whole
@@ -306,7 +308,22 @@ BNO085 session (reset, three enables with their read-backs, 150 reports, a
 busy retry, calibration, metadata, counts), plus five VL53L 1D-family
 captures through `depz::Vl53lx` (the VL53L0X API, the VL53L1X ULD, the
 VL53L3CX ULP, the VL53L4CD ULD borrowed by a VL53L4CX, and the VL53L4CX
-histogram driver refusing its short preset on an L4 die). CI builds and tests Linux, macOS and Windows.
+histogram driver refusing its short preset on an L4 die). CI builds and tests Linux, macOS and Windows,
+with warnings as errors on gcc, clang and MSVC `/W4` (`DEPZ_SENSOR_SDK_CPP_WERROR`,
+on with the tests; packagers build with tests off and keep warnings as
+warnings).
+
+```bash
+scripts/coverage.sh                  # line coverage (gcc --coverage + gcovr) in build-coverage/
+../../scripts/sanitize.sh address cpp   # the suite under AddressSanitizer + LeakSanitizer
+```
+
+`scripts/coverage.sh` lists the least-covered files and fails below the floor
+in the script (`FLOOR`, the measured total rounded down — raise it when the
+tests grow, never lower it to make a change pass). CI also runs the whole
+suite under UndefinedBehaviorSanitizer, AddressSanitizer with LeakSanitizer
+and ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread cpp` at the
+repository root).
 
 The live layer has also been checked on real boards. SR04 (firmware
 `APP_usonic_SR04_v0.97`): `open_sr04`, temperature, `measure_once`,

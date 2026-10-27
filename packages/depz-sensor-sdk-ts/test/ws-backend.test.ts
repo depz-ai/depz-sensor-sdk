@@ -4,10 +4,12 @@
  * WS byte-pipe (open handshake, binary read/write, error + disconnect).
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_OPEN_TIMEOUT_MS,
   WsBackendTransport,
   backendHealth,
+  backendPermissions,
   listBackendDevices,
   type WebSocketLike,
 } from "../src/transport/ws-backend.js";
@@ -299,5 +301,185 @@ describe("WsBackendTransport open timeout", () => {
     });
     await t.open();
     await t.close();
+  });
+});
+
+// ── the paths the viewer's happy case never takes ─────────────────────────────
+
+describe("WsBackendTransport edges", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("defaults: the global WebSocket, the page origin, a 15 s ceiling, info from the path", async () => {
+    const made: FakeWebSocket[] = [];
+    vi.stubGlobal(
+      "WebSocket",
+      class extends FakeWebSocket {
+        constructor(url: string) {
+          super(url);
+          made.push(this);
+        }
+      },
+    );
+    vi.stubGlobal("location", { origin: "https://viewer.local:8443" });
+    expect(DEFAULT_OPEN_TIMEOUT_MS).toBe(15_000);
+    const t = new WsBackendTransport({ path: "COM5" });
+    expect(t.info).toEqual({ path: "COM5", usbVendorId: undefined, usbProductId: undefined, serialNumber: undefined });
+    const opening = t.open();
+    expect(made).toHaveLength(1);
+    expect(made[0]!.url).toBe("wss://viewer.local:8443/ws/serial?path=COM5&baud=115200");
+    expect(made[0]!.binaryType).toBe("arraybuffer");
+    made[0]!.connect();
+    made[0]!.recvText('{"opened":true}');
+    await opening;
+    await t.close();
+  });
+
+  it("outside a browser an explicit baseUrl is required", async () => {
+    const t = new WsBackendTransport({ path: "/dev/ttyACM0", webSocketFactory: (u) => new FakeWebSocket(u) });
+    await expect(t.open()).rejects.toThrow(/explicit baseUrl is required outside a browser/);
+    await expect(backendHealth("", fakeFetch({}))).resolves.toBeNull(); // swallowed into null
+    await expect(listBackendDevices("", fakeFetch({}))).rejects.toThrow(/explicit baseUrl/);
+  });
+
+  it("info overrides win over the path; a non-JSON or non-object text frame is ignored", async () => {
+    let ws!: FakeWebSocket;
+    const t = new WsBackendTransport({
+      baseUrl: BASE,
+      path: "/dev/ttyACM0",
+      info: { path: "COM9", usbVendorId: 0x1bcf, usbProductId: 0xee08, serialNumber: "SN1" },
+      webSocketFactory: (u) => (ws = new FakeWebSocket(u)),
+    });
+    expect(t.info).toEqual({ path: "COM9", usbVendorId: 0x1bcf, usbProductId: 0xee08, serialNumber: "SN1" });
+    let settled = false;
+    const opening = t.open().then(() => {
+      settled = true;
+    });
+    ws.connect();
+    ws.recvText("not json");
+    ws.recvText("42");
+    ws.recvText('{"opened":false}');
+    ws.recvText('{"error":7}'); // an error that is not a string is not an error frame
+    await new Promise((r) => setTimeout(r, 5));
+    expect(settled).toBe(false);
+    ws.recvText('{"opened":true}');
+    await opening;
+    expect(settled).toBe(true);
+    await t.close();
+  });
+
+  it("write() needs an open socket; close() survives a socket that throws, and twice", async () => {
+    let ws!: FakeWebSocket;
+    const t = new WsBackendTransport({
+      baseUrl: BASE,
+      path: "/dev/ttyACM0",
+      webSocketFactory: (u) => (ws = new FakeWebSocket(u)),
+    });
+    await expect(t.write(Uint8Array.of(1))).rejects.toThrow(/not open/);
+    const opening = t.open();
+    // the socket is still CONNECTING: no writes yet
+    await expect(t.write(Uint8Array.of(1))).rejects.toThrow(/not open/);
+    ws.connect();
+    ws.recvText('{"opened":true}');
+    await opening;
+    ws.close = () => {
+      throw new Error("already gone");
+    };
+    await t.close();
+    await t.close(); // ws already null
+    await expect(t.write(Uint8Array.of(1))).rejects.toThrow(/not open/);
+  });
+
+  it("binary frames of every shape: ArrayBuffer, Uint8Array, another view; empty ones dropped", async () => {
+    let ws!: FakeWebSocket;
+    const t = new WsBackendTransport({
+      baseUrl: BASE,
+      path: "/dev/ttyACM0",
+      webSocketFactory: (u) => (ws = new FakeWebSocket(u)),
+    });
+    const opening = t.open();
+    ws.connect();
+    ws.onmessage?.({ data: new Uint8Array([1, 2]) }); // first data byte = ready
+    await opening;
+    const got: number[][] = [];
+    const reader = (async () => {
+      for await (const c of t.readable()) got.push([...c]);
+    })();
+    await new Promise((r) => setTimeout(r, 5)); // the reader is parked on an empty queue
+    ws.onmessage?.({ data: new DataView(new Uint8Array([3, 4, 5]).buffer, 1) });
+    ws.onmessage?.({ data: new ArrayBuffer(0) });
+    ws.onmessage?.({ data: 12345 }); // neither text nor bytes: nothing
+    ws.recvBinary([6]);
+    await new Promise((r) => setTimeout(r, 5));
+    await t.close();
+    await reader;
+    expect(got).toEqual([[1, 2], [4, 5], [6]]);
+  });
+
+  it("a socket error before the port opens rejects open() and fires onDisconnect once", async () => {
+    let ws!: FakeWebSocket;
+    const t = new WsBackendTransport({
+      baseUrl: BASE,
+      path: "/dev/ttyACM0",
+      webSocketFactory: (u) => (ws = new FakeWebSocket(u)),
+    });
+    let fired = 0;
+    t.onDisconnect(() => {
+      fired += 1;
+    });
+    const opening = t.open();
+    ws.onerror?.({});
+    await expect(opening).rejects.toThrow(/cannot reach the standalone backend at ws:\/\/127\.0\.0\.1:8000/);
+    ws.onclose?.({}); // the close that follows an error changes nothing
+    expect(fired).toBe(1);
+    const chunks: Uint8Array[] = [];
+    for await (const c of t.readable()) chunks.push(c);
+    expect(chunks).toEqual([]);
+  });
+});
+
+describe("backend HTTP helper edges", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("backendHealth: non-2xx, a non-standalone body and a missing version", async () => {
+    expect(await backendHealth(BASE, fakeFetch({ "/api/health": { standalone: true } }, { status: 500 }))).toBeNull();
+    expect(await backendHealth(BASE, fakeFetch({ "/api/health": { standalone: false } }))).toBeNull();
+    expect(await backendHealth(BASE, fakeFetch({ "/api/health": null }))).toBeNull();
+    expect(await backendHealth(BASE, fakeFetch({ "/api/health": { standalone: true } }))).toEqual({
+      standalone: true,
+      version: "",
+    });
+  });
+
+  it("listBackendDevices: a non-2xx throws, a body without a list is empty", async () => {
+    await expect(listBackendDevices(BASE, fakeFetch({ "/api/devices": {} }, { status: 503 }))).rejects.toThrow(
+      /GET \/api\/devices → HTTP 503/,
+    );
+    expect(await listBackendDevices(BASE, fakeFetch({ "/api/devices": { devices: "nope" } }))).toEqual([]);
+    expect(await listBackendDevices(BASE, fakeFetch({ "/api/devices": null }))).toEqual([]);
+  });
+
+  it("backendPermissions: the object, null on non-2xx, null on a network error", async () => {
+    const perms = { ok: false, os: "linux", issues: ["not in dialout"], fix: { command: "usermod", explanation: "x" } };
+    expect(await backendPermissions(BASE, fakeFetch({ "/api/permissions": perms }))).toEqual(perms);
+    expect(await backendPermissions(BASE, fakeFetch({}))).toBeNull();
+    expect(
+      await backendPermissions(BASE, async () => {
+        throw new Error("ECONNREFUSED");
+      }),
+    ).toBeNull();
+  });
+
+  it("the default fetch is the global one", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: string) => {
+      calls.push(input);
+      return { ok: true, status: 200, json: async () => ({ standalone: true, version: "1.2.3" }) };
+    });
+    expect(await backendHealth(BASE)).toEqual({ standalone: true, version: "1.2.3" });
+    expect(calls).toEqual([`${BASE}/api/health`]);
   });
 });

@@ -39,7 +39,9 @@ public class Vl53l8chDevice extends Vl53l8cxDevice {
 
     /**
      * Arm CNH for the next {@link #startRanging()}: every frame then carries
-     * {@link Vl53l8Frame#cnhRaw()}, decoded with {@code Vl53l8Uld.decodeCnh}.
+     * {@link Vl53l8Frame#cnhRaw()}, decoded with {@code Vl53l8Uld.decodeCnh}. CNH and the motion
+     * indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+     * {@link Vl53l8Frame#motion()}).
      */
     public void configureCnh(Vl53l8CnhSetup setup) {
         armCnh(setup);

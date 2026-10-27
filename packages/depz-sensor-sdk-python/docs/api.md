@@ -11,7 +11,7 @@ Each sensor also has a focused reference with just its own symbols:
 ## Contents
 
 - **Discovery**: [`DeviceInfo`](#deviceinfo), [`list_depz_devices`](#list_depz_devices), [`probe_port`](#probe_port), [`open_device`](#open_device), [`open_on_link`](#open_on_link), [`resolve_sensor_class`](#resolve_sensor_class), [`attach_sensor_class`](#attach_sensor_class)
-- **Device core**: [`DeviceBase`](#devicebase), [`TimeSync`](#timesync), [`LinkStats`](#linkstats), [`StreamQueue`](#streamqueue), [`host_now_us`](#host_now_us), [`sync_time_all`](#sync_time_all), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`StreamIterator`](#streamiterator)
+- **Device core**: [`DeviceBase`](#devicebase), [`TimeSync`](#timesync), [`LinkStats`](#linkstats), [`StreamQueue`](#streamqueue), [`host_now_us`](#host_now_us), [`sync_time_all`](#sync_time_all), [`DeviceEvent`](#deviceevent), [`SeqGapEvent`](#seqgapevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`StreamIterator`](#streamiterator)
 - **SR04**: [`Sr04`](#sr04), [`Sr04Measurement`](#sr04measurement)
 - **VL53L4CD (ToF)**: [`Vl53l4cd`](#vl53l4cd), [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdError`](#vl53l4cderror), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`RANGE_STATUS_NAMES`](#range_status_names), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
 - **VL53L8 (ToF)**: [`Vl53l8`](#vl53l8), [`Vl53l8ch`](#vl53l8ch), [`Vl53l8Frame`](#vl53l8frame), [`CnhConfig`](#cnhconfig), [`Vl53l8cxError`](#vl53l8cxerror), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8)
@@ -23,8 +23,8 @@ Each sensor also has a focused reference with just its own symbols:
 - **Bootloader / firmware update**: [`BootloaderDevice`](#bootloaderdevice), [`update_firmware`](#update_firmware), [`find_bootloader_port`](#find_bootloader_port)
 - **Datasets (record & replay)**: [`SessionRecorder`](#sessionrecorder), [`DatasetReader`](#datasetreader), [`DatasetRecord`](#datasetrecord), [`DatasetPlayer`](#datasetplayer), [`PlayerState`](#playerstate)
 - **Transport**: [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`Packet`](#packet), [`Trash`](#trash), [`CrcError`](#crcerror), [`ParserEvent`](#parserevent), [`PacketParser`](#packetparser), [`build_packet`](#build_packet), [`payload_crc_bytes`](#payload_crc_bytes), [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`Link`](#link), [`LoopbackLink`](#loopbacklink)
-- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`Tmf8829Info`](#tmf8829info)
-- **Errors**: [`DepzError`](#depzerror), [`DepzTimeoutError`](#depztimeouterror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`DeviceLostError`](#devicelosterror), [`LinkClosedError`](#linkclosederror), [`NoDepzDeviceError`](#nodepzdeviceerror)
+- **Protocol codecs**: [`Vl53l4Info`](#vl53l4info), [`Vl53l7Info`](#vl53l7info), [`Vl53lxInfo`](#vl53lxinfo), [`Bno055Info`](#bno055info), [`FwDepzImage`](#fwdepzimage), [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`SyncPinConfig`](#syncpinconfig), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`UNSOLICITED`](#unsolicited), [`pack_set_payload_crc_type`](#pack_set_payload_crc_type), [`pack_sync_time`](#pack_sync_time), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string), [`Identity`](#identity), [`SensorType`](#sensortype), [`parse_software_name`](#parse_software_name), [`PinAction`](#pinaction), [`I2cError`](#i2cerror), [`Tmf8829Info`](#tmf8829info)
+- **Errors**: [`DepzError`](#depzerror), [`DepzTimeoutError`](#depztimeouterror), [`StatusError`](#statuserror), [`BusyError`](#busyerror), [`DeviceLostError`](#devicelosterror), [`InvalidReplyError`](#invalidreplyerror), [`InvalidStateError`](#invalidstateerror), [`LinkClosedError`](#linkclosederror), [`NoDepzDeviceError`](#nodepzdeviceerror), [`ReplayMismatchError`](#replaymismatcherror)
 - **Top level**: [`SENSOR_CLASS_NAMES`](#sensor_class_names), [`DEPZ_USB_VID`](#depz_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`DATASET_SCHEMA`](#dataset_schema), [`__version__`](#__version__)
 - **Usb_Ids**: [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint)
 
@@ -68,7 +68,7 @@ port — skip ports owned by other software via the `ports=` argument of
 ### open_device
 
 ```python
-open_device(target: str | int | depz_sensor_sdk.discovery.DeviceInfo | depz_sensor_sdk.transport.link.Link | None = None, *, serial: str | None = None, timeout: float = 0.2)
+open_device(target: str | int | depz_sensor_sdk.discovery.DeviceInfo | depz_sensor_sdk.transport.link.Link | None = None, *, serial: str | None = None, timeout: float = 0.2) -> depz_sensor_sdk.device.DeviceBase
 ```
 
 Open the right sensor class for `target` (contract 02 §4.3, §4.4).
@@ -78,8 +78,12 @@ Open the right sensor class for `target` (contract 02 §4.3, §4.4).
   serial matches. No candidate → `NoDepzDeviceError`.
 - ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial
   (0-based). Out of range → `NoDepzDeviceError`.
-- ``str`` (a port path): open exactly that port; if its USB (vid, pid) is
-  not a known DEPZ id, warn but proceed.
+- ``str`` (a port path): open exactly that port; its USB (vid, pid) is
+  that of the enumerated port the path names under any alias
+  (`/dev/serial/by-id/…`, a symlink, another name of the same device
+  node). If it is not a known DEPZ id — or the OS does not list the
+  port — warn but proceed. Nothing DEPZ answering the probe there →
+  `NoDepzDeviceError`, as on a link.
 - ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.
 - ``Link``/transport: `open_on_link` (probe and continue on that link).
 
@@ -91,7 +95,7 @@ contract 06 client).
 ### open_on_link
 
 ```python
-open_on_link(link: depz_sensor_sdk.transport.link.Link, usb_vid: int | None = None, usb_pid: int | None = None, *, timeout: float = 0.2)
+open_on_link(link: depz_sensor_sdk.transport.link.Link, usb_vid: int | None = None, usb_pid: int | None = None, *, timeout: float = 0.2) -> depz_sensor_sdk.device.DeviceBase
 ```
 
 Open a device on an already-open `link` that cannot be reopened (a
@@ -122,7 +126,7 @@ unknown (a replay, a bridge). Vectors: ``vectors/probe.json``.
 ### attach_sensor_class
 
 ```python
-attach_sensor_class(dev: depz_sensor_sdk.device.DeviceBase, class_name: str)
+attach_sensor_class(dev: depz_sensor_sdk.device.DeviceBase, class_name: str) -> depz_sensor_sdk.device.DeviceBase
 ```
 
 Continue the open base device `dev` as `class_name` on the same
@@ -138,7 +142,7 @@ between the two statements.
 ### DeviceBase
 
 ```python
-class DeviceBase(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class DeviceBase(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 Connection to one DEPZ device in application mode.
@@ -169,7 +173,7 @@ do not block). Returns an unsubscribe function.
 #### DeviceBase.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -186,7 +190,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### DeviceBase.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -196,12 +200,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### DeviceBase.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -209,7 +215,7 @@ Matcher for a typed report identified by its report ID alone.
 #### DeviceBase.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -320,13 +326,13 @@ class TimeSync(offset_us: int, rtt_us: int, synced_at_host_us: int) -> None
 ### LinkStats
 
 ```python
-class LinkStats(tx_packets: int = 0, rx_packets: int = 0, tx_bytes: int = 0, rx_bytes: int = 0, crc_errors: int = 0, header_errors: int = 0, trash_bytes: int = 0, seq_gaps: int = 0, device_seq_errors: int = 0) -> None
+class LinkStats(tx_packets: int = 0, rx_packets: int = 0, tx_bytes: int = 0, rx_bytes: int = 0, crc_errors: int = 0, header_errors: int = 0, trash_bytes: int = 0, seq_gaps: int = 0, device_seq_errors: int = 0, callback_errors: int = 0) -> None
 ```
 
 ### StreamQueue
 
 ```python
-class StreamQueue(maxsize: int)
+class StreamQueue(maxsize: int) -> None
 ```
 
 Bounded drop-oldest queue with a drop counter (contract 07 §3).
@@ -334,13 +340,13 @@ Bounded drop-oldest queue with a drop counter (contract 07 §3).
 #### StreamQueue.put
 
 ```python
-put(self, item: Any) -> None
+put(self, item: ~T) -> None
 ```
 
 #### StreamQueue.get
 
 ```python
-get(self, timeout: float | None = None) -> Any
+get(self, timeout: float | None = None) -> ~T
 ```
 
 ### host_now_us
@@ -354,7 +360,7 @@ Monotonic host clock in µs — the host side of all time-sync math.
 ### sync_time_all
 
 ```python
-sync_time_all(devices: 'Iterable[DeviceBase]', samples: int = 5) -> 'dict[DeviceBase, TimeSync]'
+sync_time_all(devices: Iterable[depz_sensor_sdk.device.DeviceBase], samples: int = 5) -> dict[depz_sensor_sdk.device.DeviceBase, depz_sensor_sdk.device.TimeSync]
 ```
 
 Software-sync several devices to the common host monotonic clock.
@@ -371,6 +377,17 @@ class DeviceEvent() -> None
 ```
 
 Base for unsolicited/diagnostic events (contract 07 §2).
+
+### SeqGapEvent
+
+```python
+class SeqGapEvent(expected_seq: int, received_seq: int, missed: int) -> None
+```
+
+A gap the host saw in the device->host seq (contract 01 §5 step 5):
+the packet still arrives, `missed` packets before it did not. Counted in
+`LinkStats.seq_gaps`; the device-reported gap (RPT 0x84) is
+`SequenceErrorEvent`.
 
 ### SequenceErrorEvent
 
@@ -419,7 +436,7 @@ class DisconnectedEvent(reason: str) -> None
 ### StreamIterator
 
 ```python
-class StreamIterator(registry: list['StreamQueue'], maxsize: int, closed_fn)
+class StreamIterator(registry: list[depz_sensor_sdk.device.StreamQueue[~T]], maxsize: int, closed_fn: Callable[[], bool], *, queue: Optional[depz_sensor_sdk.device.StreamQueue[~T]] = None) -> None
 ```
 
 Iterator over a StreamQueue that registers **eagerly** at construction.
@@ -441,7 +458,7 @@ close(self) -> None
 ### Sr04
 
 ```python
-class Sr04(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Sr04(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 HC-SR04 ultrasonic ranging device.
@@ -533,7 +550,7 @@ Returns an unsubscribe function.
 #### Sr04.stream
 
 ```python
-stream(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+stream(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.sr04.Sr04Measurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest;
@@ -563,7 +580,7 @@ do not block). Returns an unsubscribe function.
 #### Sr04.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -580,7 +597,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Sr04.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -590,12 +607,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Sr04.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -603,7 +622,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Sr04.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -732,7 +751,7 @@ Distance with temperature-compensated speed of sound.
 ### Vl53l4cd
 
 ```python
-class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L4CD single-zone ToF device.
@@ -786,7 +805,8 @@ needs init() again.
 reset_sensor(self) -> None
 ```
 
-Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD
+Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ.
+~2 ms; the reply is awaited up to 2 s). The ULD
 configuration is wiped — call init() again.
 
 #### Vl53l4cd.bridge_info
@@ -796,8 +816,8 @@ bridge_info(self) -> depz_sensor_sdk.protocol.vl53l4.Vl53l4Info
 ```
 
 RPT_VL53_INFO: sensor identity, pin levels and bridge counters.
-Counters are free-running (wrap silently) — watch increments. Safe to
-call while streaming.
+Counters wrap silently — watch increments; `i2c_errors` is cleared by
+a successful XSHUT reset. Safe to call while streaming.
 
 #### Vl53l4cd.set_i2c_speed_khz
 
@@ -973,7 +993,7 @@ block). Returns an unsubscribe function.
 #### Vl53l4cd.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l4.Vl53l4Measurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest;
@@ -1019,7 +1039,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l4cd.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -1036,7 +1056,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l4cd.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -1046,12 +1066,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l4cd.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -1059,7 +1081,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l4cd.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -1178,6 +1200,10 @@ One decoded ranging result (VL53L4CD_ResultsData_t + MCU timestamp).
 ```python
 class Vl53l4cdError
 ```
+
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is a ValueError (contract 07 §3).
 
 #### Vl53l4cdError.with_traceback
 
@@ -1334,7 +1360,7 @@ If the argument is a tuple, the return value is the same object.
 ### Vl53l8
 
 ```python
-class Vl53l8(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l8(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L8CX ToF device: `init()` downloads the ~84 KB sensor firmware
@@ -1408,10 +1434,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l8.get_ranging_mode
 
@@ -1500,14 +1529,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l8.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l8.calibrate_xtalk
 
@@ -1551,13 +1584,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l8.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l8.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -1573,12 +1606,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l8.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l8.start_ranging
 
@@ -1607,7 +1643,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l8.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -1657,7 +1693,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l8.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -1674,7 +1710,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l8.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -1684,12 +1720,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l8.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -1697,7 +1735,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l8.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -1802,7 +1840,7 @@ module (contract 06).
 ### Vl53l8ch
 
 ```python
-class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L8CH device: the VL53L8CX superset. Inherits every CX method and
@@ -1818,6 +1856,9 @@ configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
 
 Arm the CNH histogram block for the next start_ranging(). CH only —
 this method does not exist on Vl53l8cx.
+
+CNH and the motion indicator share one DCI struct (0xBFAC): this
+disarms the motion indicator (frames carry no `.motion`).
 
 #### Vl53l8ch.cnh_config *(property)*
 
@@ -1886,10 +1927,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l8ch.get_ranging_mode
 
@@ -1978,14 +2022,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l8ch.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8ch.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l8ch.calibrate_xtalk
 
@@ -2029,13 +2077,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l8ch.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l8ch.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -2051,12 +2099,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l8ch.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l8ch.start_ranging
 
@@ -2085,7 +2136,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l8ch.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -2135,7 +2186,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l8ch.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -2152,7 +2203,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l8ch.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -2162,12 +2213,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l8ch.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -2175,7 +2228,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l8ch.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -2280,7 +2333,7 @@ module (contract 06).
 ### Vl53l8Frame
 
 ```python
-class Vl53l8Frame(timestamp_us: int, resolution: int, distance_mm: numpy.ndarray, target_status: numpy.ndarray, nb_target_detected: numpy.ndarray, signal_per_spad: numpy.ndarray, ambient_per_spad: numpy.ndarray, nb_spads_enabled: numpy.ndarray, range_sigma_mm: numpy.ndarray, reflectance: numpy.ndarray, silicon_temp_degc: int, cnh_raw: bytes | None = None, motion: dict | None = None) -> None
+class Vl53l8Frame(timestamp_us: int, resolution: int, distance_mm: NDArray[numpy.int32], target_status: NDArray[numpy.uint8], nb_target_detected: NDArray[numpy.uint8], signal_per_spad: NDArray[numpy.float64], ambient_per_spad: NDArray[numpy.float64], nb_spads_enabled: NDArray[numpy.int32], range_sigma_mm: NDArray[numpy.float64], reflectance: NDArray[numpy.float64], silicon_temp_degc: int, cnh_raw: bytes | None = None, motion: depz_sensor_sdk.vl53l8.uld.MotionIndicator | None = None) -> None
 ```
 
 One parsed ranging frame. Arrays are sized to the active resolution
@@ -2289,7 +2342,7 @@ One parsed ranging frame. Arrays are sized to the active resolution
 #### Vl53l8Frame.grid
 
 ```python
-grid(self, field: str = 'distance_mm') -> numpy.ndarray
+grid(self, field: str = 'distance_mm') -> NDArray[typing.Any]
 ```
 
 Zone array reshaped to (4,4) or (8,8).
@@ -2297,7 +2350,7 @@ Zone array reshaped to (4,4) or (8,8).
 ### CnhConfig
 
 ```python
-class CnhConfig()
+class CnhConfig() -> None
 ```
 
 Mirror of VL53LMZ_Motion_Configuration plus the helpers that fill it.
@@ -2307,7 +2360,7 @@ required_memory(), then pack() the 156-byte struct for cnh_send_config.
 #### CnhConfig.init_config
 
 ```python
-init_config(self, start_bin, num_bins, sub_sample)
+init_config(self, start_bin: int, num_bins: int, sub_sample: int) -> None
 ```
 
 start_bin: first device-histogram bin; num_bins: CNH bins;
@@ -2316,7 +2369,7 @@ sub_sample: bins of the device histogram summed per CNH bin.
 #### CnhConfig.create_agg_map
 
 ```python
-create_agg_map(self, resolution, start_x, start_y, merge_x, merge_y, cols, rows)
+create_agg_map(self, resolution: int, start_x: int, start_y: int, merge_x: int, merge_y: int, cols: int, rows: int) -> None
 ```
 
 Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)
@@ -2325,7 +2378,7 @@ Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)
 #### CnhConfig.required_memory
 
 ```python
-required_memory(self)
+required_memory(self) -> int
 ```
 
 On-device CNH buffer size in bytes for this config. Raises if the
@@ -2334,7 +2387,7 @@ config is blank or the size exceeds CNH_MAX_DATA_BYTES.
 #### CnhConfig.min_max_distance_mm
 
 ```python
-min_max_distance_mm(self)
+min_max_distance_mm(self) -> tuple[int, int]
 ```
 
 (min, max) target distance, in mm, fully captured by the histogram.
@@ -2342,7 +2395,7 @@ min_max_distance_mm(self)
 #### CnhConfig.bin_center_mm
 
 ```python
-bin_center_mm(self, bin_idx)
+bin_center_mm(self, bin_idx: int) -> float
 ```
 
 Distance (mm) at the centre of CNH histogram bin `bin_idx`.
@@ -2350,13 +2403,13 @@ Distance (mm) at the centre of CNH histogram bin `bin_idx`.
 #### CnhConfig.pack
 
 ```python
-pack(self)
+pack(self) -> bytes
 ```
 
 ### Vl53l8cxError
 
 ```python
-class Vl53l8cxError(code, where='')
+class Vl53l8cxError(code: int, where: str = '') -> None
 ```
 
 #### Vl53l8cxError.with_traceback
@@ -2418,7 +2471,7 @@ Base 0 means to interpret the base from the string as an integer literal.
 ### Vl53l5cx
 
 ```python
-class Vl53l5cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l5cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L5CX ToF device (8×8 zones, 63° field of view). Same board, blob
@@ -2427,7 +2480,7 @@ and API as `Vl53l7cx`; the sensor reports module type MZ.
 #### Vl53l5cx.init
 
 ```python
-init(self, variant=None, *, progress=None, write_progress=None) -> None
+init(self, variant: str | None = None, *, progress: Optional[Callable[[str], NoneType]] = None, write_progress: Optional[Callable[[int, int], NoneType]] = None) -> None
 ```
 
 Initialize the sensor: firmware blob download + default config.
@@ -2525,10 +2578,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l5cx.get_ranging_mode
 
@@ -2617,14 +2673,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l5cx.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l5cx.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l5cx.calibrate_xtalk
 
@@ -2668,13 +2728,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l5cx.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l5cx.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -2690,12 +2750,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l5cx.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l5cx.start_ranging
 
@@ -2724,7 +2787,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l5cx.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -2774,7 +2837,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l5cx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -2791,7 +2854,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l5cx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -2801,12 +2864,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l5cx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -2814,7 +2879,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l5cx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -2919,7 +2984,7 @@ module (contract 06).
 ### Vl53l7cx
 
 ```python
-class Vl53l7cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l7cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L7CX ToF device (8×8 zones, 90° field of view). `init()` downloads
@@ -2932,7 +2997,7 @@ Base class of the I2C family: `Vl53l5cx` (same blob, MZ module) and
 #### Vl53l7cx.init
 
 ```python
-init(self, variant=None, *, progress=None, write_progress=None) -> None
+init(self, variant: str | None = None, *, progress: Optional[Callable[[str], NoneType]] = None, write_progress: Optional[Callable[[int, int], NoneType]] = None) -> None
 ```
 
 Initialize the sensor: firmware blob download + default config.
@@ -3030,10 +3095,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l7cx.get_ranging_mode
 
@@ -3122,14 +3190,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l7cx.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l7cx.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l7cx.calibrate_xtalk
 
@@ -3173,13 +3245,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l7cx.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l7cx.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -3195,12 +3267,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l7cx.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l7cx.start_ranging
 
@@ -3229,7 +3304,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l7cx.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -3279,7 +3354,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l7cx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -3296,7 +3371,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l7cx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -3306,12 +3381,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l7cx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -3319,7 +3396,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l7cx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -3424,7 +3501,7 @@ module (contract 06).
 ### Vl53l7ch
 
 ```python
-class Vl53l7ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l7ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L7CH ToF device: the VL53L7CX superset. `init()` downloads the CH
@@ -3441,6 +3518,9 @@ configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
 Arm the CNH histogram block for the next start_ranging(). CH only —
 this method does not exist on Vl53l8cx.
 
+CNH and the motion indicator share one DCI struct (0xBFAC): this
+disarms the motion indicator (frames carry no `.motion`).
+
 #### Vl53l7ch.cnh_config *(property)*
 
 The CNH config armed by :meth:`configure_cnh`, or ``None``.
@@ -3449,7 +3529,7 @@ Recorders read this to persist decode parameters next to raw blocks.
 #### Vl53l7ch.init
 
 ```python
-init(self, variant=None, *, progress=None, write_progress=None) -> None
+init(self, variant: str | None = None, *, progress: Optional[Callable[[str], NoneType]] = None, write_progress: Optional[Callable[[int, int], NoneType]] = None) -> None
 ```
 
 Initialize the sensor: firmware blob download + default config.
@@ -3547,10 +3627,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l7ch.get_ranging_mode
 
@@ -3639,14 +3722,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l7ch.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l7ch.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l7ch.calibrate_xtalk
 
@@ -3690,13 +3777,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l7ch.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l7ch.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -3712,12 +3799,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l7ch.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l7ch.start_ranging
 
@@ -3746,7 +3836,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l7ch.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -3796,7 +3886,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l7ch.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -3813,7 +3903,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l7ch.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -3823,12 +3913,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l7ch.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -3836,7 +3928,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l7ch.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -3943,7 +4035,7 @@ module (contract 06).
 ### Vl53lx
 
 ```python
-class Vl53lx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53lx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 A board of the VL53L 1D family (firmware ``APP_VL53L0_4``).
@@ -4005,7 +4097,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53lx.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -4234,7 +4326,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53lx.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -4278,7 +4370,7 @@ block). Returns an unsubscribe function.
 #### Vl53lx.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -4323,7 +4415,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53lx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -4340,7 +4432,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53lx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -4350,12 +4442,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53lx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -4363,7 +4457,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53lx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -4468,7 +4562,7 @@ module (contract 06).
 ### Vl53l0x
 
 ```python
-class Vl53l0x(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l0x(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L0X (2 m, 1-byte register addresses, 400 kHz): ULD API 1.0.4 with
@@ -4522,7 +4616,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53l0x.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -4751,7 +4845,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53l0x.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -4795,7 +4889,7 @@ block). Returns an unsubscribe function.
 #### Vl53l0x.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -4840,7 +4934,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l0x.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -4857,7 +4951,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l0x.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -4867,12 +4961,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l0x.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -4880,7 +4976,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l0x.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -4985,7 +5081,7 @@ module (contract 06).
 ### Vl53l1cx
 
 ```python
-class Vl53l1cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l1cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L1CX (4 m): VL53L1X ULD (short / long distance modes, tabulated
@@ -5038,7 +5134,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53l1cx.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -5267,7 +5363,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53l1cx.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -5311,7 +5407,7 @@ block). Returns an unsubscribe function.
 #### Vl53l1cx.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -5356,7 +5452,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l1cx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -5373,7 +5469,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l1cx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -5383,12 +5479,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l1cx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -5396,7 +5494,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l1cx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -5501,7 +5599,7 @@ module (contract 06).
 ### Vl53l1cb
 
 ```python
-class Vl53l1cb(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l1cb(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L1CB (8 m, cover-glass module): same die and drivers as VL53L1CX;
@@ -5554,7 +5652,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53l1cb.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -5783,7 +5881,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53l1cb.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -5827,7 +5925,7 @@ block). Returns an unsubscribe function.
 #### Vl53l1cb.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -5872,7 +5970,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l1cb.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -5889,7 +5987,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l1cb.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -5899,12 +5997,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l1cb.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -5912,7 +6012,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l1cb.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -6017,7 +6117,7 @@ module (contract 06).
 ### Vl53l3cx
 
 ```python
-class Vl53l3cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l3cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L3CX (3 m): ST's ULP driver (single target) or the histogram driver
@@ -6070,7 +6170,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53l3cx.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -6299,7 +6399,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53l3cx.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -6343,7 +6443,7 @@ block). Returns an unsubscribe function.
 #### Vl53l3cx.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -6388,7 +6488,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l3cx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -6405,7 +6505,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l3cx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -6415,12 +6515,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l3cx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -6428,7 +6530,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l3cx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -6533,7 +6635,7 @@ module (contract 06).
 ### Vl53l4cx
 
 ```python
-class Vl53l4cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l4cx(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L4CX (6 m): the histogram driver only — to run it light, borrow a
@@ -6586,7 +6688,7 @@ no row for raises NotImplementedError naming what the product has.
 #### Vl53l4cx.identify_product
 
 ```python
-identify_product(self) -> dict
+identify_product(self) -> dict[str, typing.Any]
 ```
 
 Everything about what is connected (needs init()). `model_id_ok`
@@ -6815,7 +6917,7 @@ Re-run VHV after an ambient change over 8 °C.
 #### Vl53l4cx.perform_ref_spad_management
 
 ```python
-perform_ref_spad_management(self) -> tuple
+perform_ref_spad_management(self) -> tuple[int, int]
 ```
 
 VL53L0X: re-measure the reference SPADs.
@@ -6859,7 +6961,7 @@ block). Returns an unsubscribe function.
 #### Vl53l4cx.measurements
 
 ```python
-measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 64) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -6904,7 +7006,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l4cx.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -6921,7 +7023,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l4cx.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -6931,12 +7033,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l4cx.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -6944,7 +7048,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l4cx.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -7049,7 +7153,7 @@ module (contract 06).
 ### Vl53lxMeasurement
 
 ```python
-class Vl53lxMeasurement(timestamp_us: int, distance_mm: int, status: int, status_text: str, signal_kcps: float, ambient_kcps: float, sigma_mm: float, spads: float, targets: tuple[depz_sensor_sdk.vl53lx.uld.base.Target, ...] = (), extra: dict = <factory>, bins: Any = None) -> None
+class Vl53lxMeasurement(timestamp_us: int, distance_mm: float, status: int, status_text: str, signal_kcps: float, ambient_kcps: float, sigma_mm: float, spads: float, targets: tuple[depz_sensor_sdk.vl53lx.uld.base.Target, ...] = (), extra: dict[str, typing.Any] = <factory>, bins: Any = None) -> None
 ```
 
 One ranging result, the same shape for every product of the family.
@@ -7071,13 +7175,13 @@ The frame has a usable range (PLOTTABLE_STATUSES).
 ### Target
 
 ```python
-class Target(distance_mm, status, status_text, signal_kcps, ambient_kcps, sigma_mm, min_range_mm, max_range_mm)
+class Target(distance_mm: float, status: int, status_text: str, signal_kcps: float, ambient_kcps: float, sigma_mm: float, min_range_mm: float, max_range_mm: float)
 ```
 
-One return of a multi-target frame, in the terms the CLI
-and the GUI already print. `min_range_mm`/`max_range_mm` are the edges of the
-target's own pulse, which only the histogram parts know; the others repeat them
-from `distance_mm`.
+One return of a multi-target frame, in the terms the CLI and the GUI
+already print. `min_range_mm`/`max_range_mm` are the edges of the target's
+own pulse, which only the histogram parts know; the others repeat them from
+`distance_mm`.
 
 #### Target.index
 
@@ -7197,7 +7301,7 @@ plottable one — or None when the frame produced nothing usable.
 ### plot_distances
 
 ```python
-plot_distances(m: depz_sensor_sdk.vl53lx.Vl53lxMeasurement) -> list[int]
+plot_distances(m: depz_sensor_sdk.vl53lx.Vl53lxMeasurement) -> list[float]
 ```
 
 The distances a chart should draw for one measurement: the plottable
@@ -7211,7 +7315,7 @@ instead of ``targets[0]``.
 ### Tmf8829
 
 ```python
-class Tmf8829(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Tmf8829(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone,
@@ -7342,7 +7446,7 @@ Subscribe to measurements (reader-thread context; don't block).
 #### Tmf8829.measurements
 
 ```python
-measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator
+measurements(self, maxsize: int = 16) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement]
 ```
 
 Blocking iterator over measurements (bounded, drop-oldest).
@@ -7388,7 +7492,7 @@ do not block). Returns an unsubscribe function.
 #### Tmf8829.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -7405,7 +7509,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Tmf8829.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -7415,12 +7519,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Tmf8829.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -7428,7 +7534,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Tmf8829.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -7901,7 +8007,7 @@ The sensor firmware image downloaded by `init()` (14 444 B).
 ### Bno086
 
 ```python
-class Bno086(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Bno086(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 BNO086 device: enable SH-2 sensors, stream typed reports.
@@ -8032,49 +8138,49 @@ Get Feature Request/Response round trip for `sensor`.
 #### Bno086.enable_rotation_vector
 
 ```python
-enable_rotation_vector(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_rotation_vector(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_game_rotation_vector
 
 ```python
-enable_game_rotation_vector(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_game_rotation_vector(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_accelerometer
 
 ```python
-enable_accelerometer(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_accelerometer(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gyroscope
 
 ```python
-enable_gyroscope(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gyroscope(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_magnetometer
 
 ```python
-enable_magnetometer(self, hz: float = 50, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_magnetometer(self, hz: float = 50, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_linear_acceleration
 
 ```python
-enable_linear_acceleration(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_linear_acceleration(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gravity
 
 ```python
-enable_gravity(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gravity(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gyro_integrated_rv
 
 ```python
-enable_gyro_integrated_rv(self, hz: float = 400, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gyro_integrated_rv(self, hz: float = 400, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.on_report
@@ -8089,7 +8195,7 @@ block). `sensors` filters by SensorId. Returns an unsubscribe fn.
 #### Bno086.reports
 
 ```python
-reports(self, sensors: Union[Iterable[int], int, NoneType] = None, maxsize: int = 1024) -> depz_sensor_sdk.device.StreamIterator
+reports(self, sensors: Union[Iterable[int], int, NoneType] = None, maxsize: int = 1024) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno086.reports.Report]
 ```
 
 Blocking iterator over typed reports (bounded, drop-oldest).
@@ -8175,7 +8281,7 @@ stop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST).
 #### Bno086.enable_motion_request
 
 ```python
-enable_motion_request(self, hz: float = 1, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_motion_request(self, hz: float = 1, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 Enable MotionRequest (0x2B) reports. The hub sends one when its
@@ -8220,10 +8326,11 @@ Read + parse the sensor's FRS metadata record.
 #### Bno086.get_oscillator_type
 
 ```python
-get_oscillator_type(self, timeout: float = 1.0) -> depz_sensor_sdk.bno086.sh2.OscillatorType
+get_oscillator_type(self, timeout: float = 1.0) -> depz_sensor_sdk.bno086.sh2.OscillatorType | int
 ```
 
-Get Oscillator Type (command 0x0A). r[0] is the type directly.
+Get Oscillator Type (command 0x0A). r[0] is the type directly; a
+value the enum does not know comes back as the raw int.
 
 #### Bno086.clear_dcd_and_reset
 
@@ -8283,7 +8390,7 @@ do not block). Returns an unsubscribe function.
 #### Bno086.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -8300,7 +8407,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Bno086.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -8310,12 +8417,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Bno086.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -8323,7 +8432,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Bno086.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -9606,7 +9715,7 @@ Per-sensor event counts (command 0x02 get response, 2 messages).
 ### Bno055
 
 ```python
-class Bno055(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Bno055(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 BNO055 absolute-orientation IMU.
@@ -9999,7 +10108,7 @@ Returns an unsubscribe function.
 #### Bno055.samples
 
 ```python
-samples(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+samples(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno055.Bno055Sample]
 ```
 
 Blocking iterator over streamed samples (bounded, drop-oldest;
@@ -10043,7 +10152,7 @@ do not block). Returns an unsubscribe function.
 #### Bno055.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -10060,7 +10169,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Bno055.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -10070,12 +10179,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Bno055.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -10083,7 +10194,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Bno055.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -10434,13 +10545,13 @@ unpack(cls, data: bytes) -> 'CalibrationProfile'
 #### CalibrationProfile.to_dict
 
 ```python
-to_dict(self) -> dict
+to_dict(self) -> dict[str, typing.Any]
 ```
 
 #### CalibrationProfile.from_dict *(classmethod)*
 
 ```python
-from_dict(cls, d: dict) -> 'CalibrationProfile'
+from_dict(cls, d: Mapping[str, Any]) -> 'CalibrationProfile'
 ```
 
 ### PwrMode
@@ -10852,7 +10963,8 @@ close(self) -> None
 transact(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>, timeout: float | None = None, min_len: int = 2) -> depz_sensor_sdk.transport.framing.Packet
 ```
 
-Send and wait for the reply echoing `cmd` in payload[0].
+Send and wait for the reply to `cmd`: the report contract 06 §1
+assigns to it (`reply_report`), echoing `cmd` in payload[0].
 
 #### BootloaderDevice.get_firmware_name
 
@@ -10920,10 +11032,14 @@ Does not boot the app — call `boot_application()` after.
 ### update_firmware
 
 ```python
-update_firmware(port: str, fwdepz_path: str, *, progress: Optional[Callable[[float, str], NoneType]] = None) -> None
+update_firmware(port: str, fwdepz_path: str, *, progress: Optional[Callable[[float, str], NoneType]] = None, app_timeout: float = 10.0) -> str
 ```
 
 Full app-mode → bootloader → flash → boot-app flow (contract 06 §3).
+
+Returns the software name the application answers with on `port` after
+the reboot (step 6); `ApplicationNotBackError` if it does not within
+`app_timeout` seconds.
 
 ### find_bootloader_port
 
@@ -12041,8 +12157,9 @@ close(self) -> None
 class Vl53l4Info(int_edges: int, slots_skipped: int, i2c_errors: int, last_i2c_error: int, model_id: int, fw_status: int, initialized: int, xshut_level: int, int_level: int, i2c_khz: int) -> None
 ```
 
-RPT_VL53_INFO — bridge diagnostics. Counters are free-running and wrap
-silently; watch increments, not absolute values.
+RPT_VL53_INFO — bridge diagnostics. Counters wrap silently; watch
+increments, not absolute values. `i2c_errors` counts since the last
+successful XSHUT reset (the bridge clears it there), not since power-up.
 
 #### Vl53l4Info.unpack *(classmethod)*
 
@@ -12072,7 +12189,7 @@ unpack(cls, payload: bytes) -> 'Vl53l7Info'
 class Vl53lxInfo(int_edges: int, slots_skipped: int, i2c_errors: int, last_i2c_error: int, xshut_level: int, int_level: int, i2c_khz: int, addr_width: int, n_clear: int, frames_dropped: int) -> None
 ```
 
-RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads
+RPT_VL53_INFO (v2.00 and v2.01, 23 bytes) — bridge state only; the bridge reads
 no sensor register. Counters are free-running (wrap silently): watch
 increments. `slots_skipped` = a slot that never got the bus, `i2c_errors`
 = a bus that answered badly (since power-up, the last XSHUT reset or
@@ -12093,8 +12210,9 @@ class Bno055Info(i2c_addr: int, chip_id: int, acc_id: int, mag_id: int, gyr_id: 
 ```
 
 RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
-diagnostics. Counters are free-running and wrap silently; watch
-increments, not absolute values. A rising `sensor_resets` means the
+diagnostics. Counters wrap silently; watch increments, not absolute
+values. `i2c_errors` is cleared by every successful reset handshake, the
+read timings and `slots_skipped` at START_STREAM. A rising `sensor_resets` means the
 bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG
 mode and the host must restore its configuration.
 
@@ -12133,11 +12251,12 @@ load(cls, path: str | pathlib.Path) -> 'FwDepzImage'
 #### FwDepzImage.build *(classmethod)*
 
 ```python
-build(cls, load_addr: int, payload: bytes, *, cur_sec: int = 1, tot_sec: int = 1) -> bytes
+build(cls, load_addr: int, payload: bytes, *, cur_sec: int = 0, tot_sec: int = 1) -> bytes
 ```
 
 Assemble a container (test/tooling helper; the fw_crc32 covers the
-payload exactly as flashed).
+payload exactly as flashed). Sections are 0-based: a shipped file is
+section 0 of 1, the only header parse() accepts.
 
 #### FwDepzImage.payload_crc_ok *(property)*
 
@@ -12799,6 +12918,15 @@ Base 0 means to interpret the base from the string as an integer literal.
 >>> int('0b100', base=0)
 4
 
+### pack_set_payload_crc_type
+
+```python
+pack_set_payload_crc_type(crc_type: int) -> bytes
+```
+
+SET_PAYLOAD_CRC_TYPE payload `crc_type u8`, 0..3 (contract 02 §2), else
+ValueError — checked before anything is written (contract 07 §3).
+
 ### pack_sync_time
 
 ```python
@@ -12828,7 +12956,7 @@ Decode an ASCII device string, dropping trailing NUL/0xFF filler.
 ### Identity
 
 ```python
-class Identity(mode: str, sensor_type: depz_sensor_sdk.protocol.identity.SensorType | None, software_name: str, version: str) -> None
+class Identity(mode: Literal['app', 'bootloader', 'unknown'], sensor_type: depz_sensor_sdk.protocol.identity.SensorType | None, software_name: str, version: str) -> None
 ```
 
 ### SensorType
@@ -13773,6 +13901,66 @@ add_note
 Exception.add_note(note) --
 add a note to the exception
 
+### InvalidReplyError
+
+```python
+class InvalidReplyError(cmd: int, cause: BaseException)
+```
+
+The reply to a request does not decode (contract 07 §3): shorter than
+the fields its contract defines, or a value the decoder refuses. Only that
+request fails; the reader goes on and the device stays usable.
+
+#### InvalidReplyError.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### InvalidReplyError.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### InvalidStateError
+
+```python
+class InvalidStateError
+```
+
+The call is not valid in the current state of the device or object
+(contract 07 §3): `to_host_time_us` before `sync_time`, a sensor call
+before `init()` / `configure()` or while streaming, `add()` after
+recording started, a closed `DatasetWriter` or `DatasetPlayer`,
+`wait()` without the player thread, a write to a read-only register
+block, a VL53Lx board name without a product number, a packaged
+firmware blob of the wrong size.
+
+#### InvalidStateError.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### InvalidStateError.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
 ### LinkClosedError
 
 ```python
@@ -13805,10 +13993,12 @@ add a note to the exception
 class NoDepzDeviceError
 ```
 
-Discovery found no DEPZ device matching the request.
+Discovery found nothing to open (contract 07 §3).
 
-Raised by `open_device()`/discovery when no candidate serial port has a
-known DEPZ USB identity (or none matches a requested serial/index).
+Raised by `open_device()` / `open_on_link()` when no candidate serial
+port has a known DEPZ USB identity, none matches a requested
+serial/index, or nothing DEPZ answers the probe on the port path or link
+given.
 
 #### NoDepzDeviceError.with_traceback
 
@@ -13820,6 +14010,34 @@ Exception.with_traceback(tb) --
 set self.__traceback__ to tb and return self.
 
 #### NoDepzDeviceError.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### ReplayMismatchError
+
+```python
+class ReplayMismatchError
+```
+
+A strict `ReplayLink` saw the host write bytes the capture does not
+hold (contract 08): the SDK under test diverged from the recorded
+protocol.
+
+#### ReplayMismatchError.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### ReplayMismatchError.add_note
 
 ```python
 add_note

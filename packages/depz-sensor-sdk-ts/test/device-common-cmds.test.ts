@@ -13,9 +13,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   CrcType,
   DepzDevice,
+  InvalidReplyError,
   LoopbackTransport,
   PacketParser,
-  StatusError,
   buildPacket,
   type DeviceEvent,
 } from "../src/index.js";
@@ -27,6 +27,10 @@ class ScriptedFirmware {
   crc = CrcType.None;
   /** Corrupt the CRC trailer of the next reply (link CRC error). */
   corruptNext = false;
+  /** Answer GET_MCU_TEMPERATURE with 3 of its 10 bytes (a short reply). */
+  shortTemperature = false;
+  /** Answer GET_PAYLOAD_CRC_TYPE with an empty payload (the ERRATA A4 example). */
+  emptyCrcType = false;
   private seq = 0;
   private readonly parser = new PacketParser();
 
@@ -45,6 +49,11 @@ class ScriptedFirmware {
     await this.side.write(pkt);
   }
 
+  /** Skip `n` seq values: the next packet arrives after a gap. */
+  skip(n: number): void {
+    this.seq = (this.seq + n) & 0xff;
+  }
+
   private status(cmd: number, status: number): Promise<void> {
     return this.send(0x80, Uint8Array.of(cmd, status));
   }
@@ -58,7 +67,7 @@ class ScriptedFirmware {
         if (cmd === 0x01 || cmd === 0x02) {
           await this.status(cmd, 0x00);
         } else if (cmd === 0x08) {
-          await this.send(0x87, Uint8Array.of(this.crc));
+          await this.send(0x87, this.emptyCrcType ? new Uint8Array(0) : Uint8Array.of(this.crc));
         } else if (cmd === 0x09) {
           const t = payload[0]!;
           if (t > 3) {
@@ -67,6 +76,8 @@ class ScriptedFirmware {
             await this.status(cmd, 0x00); // acked in the old mode
             this.crc = t as CrcType;
           }
+        } else if (cmd === 0x07 && this.shortTemperature) {
+          await this.send(0x83, new Uint8Array(3));
         } else if (cmd === 0x07) {
           const out = new Uint8Array(10);
           const dv = new DataView(out.buffer);
@@ -117,8 +128,14 @@ describe("payload CRC mode (0x08 / 0x09)", () => {
     expect(events.some((e) => e.type === "linkCrcError")).toBe(false);
   });
 
-  it("an out-of-range mode is refused by the device (StatusError)", async () => {
-    await expect(dev.setReportPayloadCrc(7 as CrcType)).rejects.toThrow(StatusError);
+  it("an out-of-range mode is refused on the host (RangeError), nothing reaches the wire", async () => {
+    // contract 02 §2 + 07 §3 (ERRATA A2): 4..255 are not CrcTypes, 300 does not fit the u8 field
+    const sets = fw.received.filter((c) => c === 0x09).length;
+    for (const bad of [4, 7, 255, 300, -1]) {
+      await expect(dev.setReportPayloadCrc(bad as CrcType)).rejects.toThrow(RangeError);
+    }
+    expect(fw.received.filter((c) => c === 0x09).length).toBe(sets);
+    expect(await dev.getReportPayloadCrc()).toBe(CrcType.None);
   });
 
   it("a reply with a bad CRC is a linkCrcError event, not a parsed report", async () => {
@@ -129,6 +146,30 @@ describe("payload CRC mode (0x08 / 0x09)", () => {
     const ev = events.find((e) => e.type === "linkCrcError")!;
     expect(ev).toMatchObject({ type: "linkCrcError", cmd: 0x83 });
     expect(events.some((e) => e.type === "temperature")).toBe(false);
+  });
+});
+
+describe("a reply shorter than its fields (contract 07 §3, ERRATA A4)", () => {
+  it("fails that one request with InvalidReplyError; the read pump goes on and the next request is answered", async () => {
+    fw.shortTemperature = true;
+    const err = await dev.readMcuTemperature().then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(InvalidReplyError);
+    expect((err as InvalidReplyError).cmd).toBe(0x07);
+    expect((err as InvalidReplyError).message).toContain("RPT_TEMPERATURE");
+    expect((err as InvalidReplyError).cause).toBeInstanceOf(RangeError);
+    // The ERRATA example: an empty RPT_PAYLOAD_CRC_TYPE.
+    fw.emptyCrcType = true;
+    await expect(dev.getReportPayloadCrc()).rejects.toThrow(InvalidReplyError);
+    // The pump is alive: well-formed replies complete the next requests.
+    fw.shortTemperature = false;
+    fw.emptyCrcType = false;
+    expect(await dev.readMcuTemperature()).toBeCloseTo(21.5, 5);
+    expect(await dev.getReportPayloadCrc()).toBe(CrcType.None);
+    expect(dev.stats.rxPackets).toBe(4);
+    expect(events.some((e) => e.type === "disconnected")).toBe(false);
   });
 });
 
@@ -164,5 +205,18 @@ describe("unclaimed reports on the base device", () => {
     const unknown = events.find((e) => e.type === "text" && e.cmd === 0xa5);
     expect(unknown).toBeDefined();
     expect((unknown as { text: string }).text.toLowerCase()).toContain("dead");
+  });
+
+  it("a gap the host sees in the device seq is a seqGap event ahead of its packet (ERRATA A1)", async () => {
+    await fw.send(0xa5, Uint8Array.of(0x01)); // the first packet after open: never a gap
+    fw.skip(3);
+    await fw.send(0xa5, Uint8Array.of(0x02)); // seq 1, 2, 3 never sent
+    await until(() => events.filter((e) => e.type === "text").length >= 2);
+
+    const gaps = events.filter((e) => e.type === "seqGap");
+    expect(gaps).toEqual([{ type: "seqGap", expectedSeq: 1, receivedSeq: 4, missed: 3 }]);
+    expect(events.indexOf(gaps[0]!)).toBe(events.findIndex((e) => e.type === "text" && e.text === "02") - 1);
+    expect(events.some((e) => e.type === "sequenceError")).toBe(false);
+    expect(dev.stats.seqGaps).toBe(1);
   });
 });

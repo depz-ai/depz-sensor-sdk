@@ -42,13 +42,16 @@ Reference C driver: ../../../temp/STSW-IMG033_L3/…/VL53L3CX_BareDriver/
   vl53lx_hist_algos_gen4.c, vl53lx_sigma_estimate.c, vl53lx_core_support.c
 """
 
-import collections
+from __future__ import annotations
+
 import copy
 import math
+from typing import NamedTuple
 
 from depz_sensor_sdk.vl53lx.uld.base import Measurement, Target
 from depz_sensor_sdk.vl53lx.uld.bare.core import (DEVICESTATE_RANGING_OUTPUT_DATA,
                              HISTOGRAM_BUFFER_SIZE, RANGING_WINDOW_VCSEL_PERIODS,
+                             HistogramBinData, HistPostProcessConfig,
                              calc_pll_period_us, decode_vcsel_period,
                              duration_maths)
 
@@ -194,7 +197,7 @@ class RangeData:
     """`VL53LX_range_data_t`: one target. The event sums and phases are what
     the algorithm produced; `*_range_mm` and the rates are what they mean."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.range_id = 0
         self.start_bin = 0           # VL53LX_p_012, window start
         self.first_bin = 0           # VL53LX_p_019, first bin over threshold
@@ -240,7 +243,7 @@ class RangeData:
     def ambient_kcps(self) -> int:
         return self.ambient_count_rate_mcps * 1000 // 128
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f'<RangeData {self.median_range_mm} mm '
                 f'[{self.min_range_mm}..{self.max_range_mm}] '
                 f'sigma {self.sigma_mm} mm signal {self.signal_kcps} kcps '
@@ -250,9 +253,9 @@ class RangeData:
 class RangeResults:
     """`VL53LX_range_results_t`, reduced to the single-zone case."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.stream_count = 0
-        self.targets = []            # VL53LX_p_003, active_results entries
+        self.targets: list[RangeData] = []   # VL53LX_p_003, active_results entries
         self.ambient_dmax_mm = [0] * 5   # VL53LX_p_022, E8.5
         self.wrap_dmax_mm = 0
 
@@ -260,7 +263,7 @@ class RangeResults:
 class PulseData:
     """`VL53LX_hist_pulse_data_t`: one run of bins above the threshold."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.start_bin = 0           # VL53LX_p_012
         self.first_bin = 0           # VL53LX_p_019
         self.peak_bin = 0xFF         # VL53LX_p_023
@@ -282,10 +285,10 @@ class _Gen3Algo:
     between its steps — per-bin thresholds and flags, the pulse list, and the
     four working copies of the histogram."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.reset()
 
-    def reset(self):                                        # VL53LX_f_003
+    def reset(self) -> None:                                # VL53LX_f_003
         n = HISTOGRAM_BUFFER_SIZE
         self.first_bin = 0                # VL53LX_p_019
         self.buffer_size = n              # VL53LX_p_020
@@ -302,18 +305,18 @@ class _Gen3Algo:
         self.max_pulses = MAX_PULSES      # VL53LX_p_045
         self.pulse_count = 0              # VL53LX_p_046
         self.pulses = [PulseData() for _ in range(MAX_PULSES)]   # VL53LX_p_003
-        self.bins = None                  # VL53LX_p_006, the working frame
-        self.xtalk = None                 # VL53LX_p_047
-        self.pulse_amb = None             # VL53LX_p_048, pulse padded ambient
-        self.pulse_zero = None            # VL53LX_p_049, pulse padded zero
-        self.pulse_xtalk = None           # VL53LX_p_050
+        self.bins: HistogramBinData | None = None          # VL53LX_p_006, the working frame
+        self.xtalk: HistogramBinData | None = None         # VL53LX_p_047
+        self.pulse_amb: HistogramBinData | None = None     # VL53LX_p_048, pulse padded ambient
+        self.pulse_zero: HistogramBinData | None = None    # VL53LX_p_049, pulse padded zero
+        self.pulse_xtalk: HistogramBinData | None = None   # VL53LX_p_050
 
 
 class _Filtered:
     """`VL53LX_hist_gen4_algo_filtered_data_t`: the three-tap window sums and
     the two edge signals whose sign change locates the peak."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         n = HISTOGRAM_BUFFER_SIZE
         self.a = [0] * n                  # VL53LX_p_007
         self.b = [0] * n                  # VL53LX_p_032
@@ -324,7 +327,7 @@ class _Filtered:
 
 
 # ── bin housekeeping (vl53lx_hist_core.c, vl53lx_core_support.c) ─────────────
-def average_repeated_bins(src):                             # VL53LX_f_031
+def average_repeated_bins(src: HistogramBinData) -> HistogramBinData:   # VL53LX_f_031
     """Fold the six bin-sequence codes together. The device may sample the
     same phase more than once in a frame; repeats land on the same four output
     bins and are averaged, so what comes out is one bin per distinct code."""
@@ -366,7 +369,7 @@ def average_repeated_bins(src):                             # VL53LX_f_031
     return dst
 
 
-def calc_zero_distance_phase(bins):    # VL53LX_hist_calc_zero_distance_phase
+def calc_zero_distance_phase(bins: HistogramBinData) -> None:   # VL53LX_hist_calc_zero_distance_phase
     period = 2048 * decode_vcsel_period(bins.vcsel_period)
     phase = (period + bins.phasecal_result__reference_phase
              + 2048 * bins.phasecal_result__vcsel_start
@@ -374,7 +377,8 @@ def calc_zero_distance_phase(bins):    # VL53LX_hist_calc_zero_distance_phase
     bins.zero_distance_phase = (phase % period) if period else 0
 
 
-def estimate_ambient_from_thresholded_bins(ambient_threshold_sigma, bins):
+def estimate_ambient_from_thresholded_bins(ambient_threshold_sigma: int,
+                                           bins: HistogramBinData) -> None:
     """VL53LX_hist_estimate_ambient_from_thresholded_bins(): the ambient floor
     from every bin that sits near the quietest one. Used when the frame has no
     ambient-only bins of its own, and always as the first estimate."""
@@ -400,7 +404,7 @@ def estimate_ambient_from_thresholded_bins(ambient_threshold_sigma, bins):
             bins.number_of_ambient_samples)
 
 
-def estimate_ambient_from_ambient_bins(bins):
+def estimate_ambient_from_ambient_bins(bins: HistogramBinData) -> None:
     """VL53LX_hist_estimate_ambient_from_ambient_bins(): the better estimate,
     from the bins the device took with the VCSEL off. Overrides the one above
     whenever the bin sequence has such bins, which ours do."""
@@ -412,11 +416,12 @@ def estimate_ambient_from_ambient_bins(bins):
             bins.number_of_ambient_bins)
 
 
-def remove_ambient_bins(bins):                # VL53LX_hist_remove_ambient_bins
+def remove_ambient_bins(bins: HistogramBinData) -> None:   # VL53LX_hist_remove_ambient_bins
     """Drop the ambient-only bins off the front, so what is left is the
     ranging window and bin 0 is again phase zero."""
     if (bins.bin_seq[0] & 0x07) == 0x07:
-        kept_seq, kept_rep = [], []
+        kept_seq: list[int] = []
+        kept_rep: list[int] = []
         for lc in range(MAX_BIN_SEQUENCE_LENGTH):
             if (bins.bin_seq[lc] & 0x07) != 0x07:
                 kept_seq.append(bins.bin_seq[lc])
@@ -432,7 +437,8 @@ def remove_ambient_bins(bins):                # VL53LX_hist_remove_ambient_bins
         bins.number_of_ambient_bins = 0
 
 
-def _woi_sums(bin_index, filter_woi, bins):                 # VL53LX_f_022
+def _woi_sums(bin_index: int, filter_woi: int,
+              bins: HistogramBinData) -> tuple[int, int, int]:   # VL53LX_f_022
     """The three-tap window around `bin_index`: everything below it, the bin
     itself, everything above it, over a half width of `filter_woi` bins."""
     a, b, c = 0, bins.bin_data[bin_index], 0
@@ -445,8 +451,9 @@ def _woi_sums(bin_index, filter_woi, bins):                 # VL53LX_f_022
     return a, b, c
 
 
-def _calc_rates(target, vcsel_width, fast_osc_frequency, total_periods_elapsed,
-                spads, merge_nb):                           # VL53LX_f_018
+def _calc_rates(target: RangeData, vcsel_width: int, fast_osc_frequency: int,
+                total_periods_elapsed: int, spads: int,
+                merge_nb: int) -> bool:                     # VL53LX_f_018
     """Event sums -> count rates, over the durations the pulse actually ran."""
     target.vcsel_width = vcsel_width
     target.fast_osc_frequency = fast_osc_frequency
@@ -485,7 +492,8 @@ def _calc_rates(target, vcsel_width, fast_osc_frequency, total_periods_elapsed,
     return True
 
 
-def _calc_ranges(gain_factor, range_offset_mm, target):      # VL53LX_f_019
+def _calc_ranges(gain_factor: int, range_offset_mm: int,
+                 target: RangeData) -> None:                # VL53LX_f_019
     for phase, name in ((target.phase_start, 'min_range_mm'),
                         (target.phase_mean, 'median_range_mm'),
                         (target.phase_end, 'max_range_mm')):
@@ -496,8 +504,10 @@ def _calc_ranges(gain_factor, range_offset_mm, target):      # VL53LX_f_019
 
 
 # ── sigma (vl53lx_sigma_estimate.c) ──────────────────────────────────────────
-def _sigma_estimate(sigma_ref_mm, a, b, c, a_zp, c_zp, bx, ax_zp, cx_zp,
-                    ambient_per_bin, fast_osc_frequency):    # VL53LX_f_023
+def _sigma_estimate(sigma_ref_mm: int, a: int, b: int, c: int, a_zp: int,
+                    c_zp: int, bx: int, ax_zp: int, cx_zp: int,
+                    ambient_per_bin: int,
+                    fast_osc_frequency: int) -> int:        # VL53LX_f_023
     """The width of the pulse, in 9.7 fixed point millimetres.
 
     The shape is a ratio: how far the window sums lean to one side, over how
@@ -550,28 +560,35 @@ def _sigma_estimate(sigma_ref_mm, a, b, c, a_zp, c_zp, bx, ax_zp, cx_zp,
     return isqrt(tmp0)
 
 
-def _pulse_sigma(pulse, sigma_ref_mm, algo, xtalk_enable):   # VL53LX_f_014
+def _pulse_sigma(pulse: PulseData, sigma_ref_mm: int, algo: _Gen3Algo,
+                 xtalk_enable: int) -> int:                 # VL53LX_f_014
     """The sigma of one pulse, from its two padded copies (and its crosstalk
     copy, when compensation is on)."""
     if algo.vcsel_period == 0:
         return SIGMA_INVALID
     i = pulse.peak_bin % algo.vcsel_period
 
-    a_zp, _, c_zp = _woi_sums(i, pulse.filter_woi, algo.pulse_zero)
-    a, b, c = _woi_sums(i, pulse.filter_woi, algo.pulse_amb)
+    # The three isolated copies are made by the caller for this very pulse.
+    pulse_zero, pulse_amb = algo.pulse_zero, algo.pulse_amb
+    assert pulse_zero is not None and pulse_amb is not None
+
+    a_zp, _, c_zp = _woi_sums(i, pulse.filter_woi, pulse_zero)
+    a, b, c = _woi_sums(i, pulse.filter_woi, pulse_amb)
     if xtalk_enable:
+        assert algo.pulse_xtalk is not None
         ax, bx, cx = _woi_sums(i, pulse.filter_woi, algo.pulse_xtalk)
     else:
         ax, bx, cx = 0, 0, 0
 
     return _sigma_estimate(sigma_ref_mm, a, b, c, a_zp, c_zp, bx, ax, cx,
-                           algo.pulse_amb.ambient_per_bin,
-                           algo.pulse_amb.fast_osc_frequency)
+                           pulse_amb.ambient_per_bin,
+                           pulse_amb.fast_osc_frequency)
 
 
 # ── pulse detection (vl53lx_hist_algos_gen3.c) ───────────────────────────────
-def _ambient_thresholds(scaler, threshold_sigma, min_threshold_events,
-                        xtalk_enable, bins, algo):           # VL53LX_f_006
+def _ambient_thresholds(scaler: int, threshold_sigma: int, min_threshold_events: int,
+                        xtalk_enable: int, bins: HistogramBinData,
+                        algo: _Gen3Algo) -> None:           # VL53LX_f_006
     """A detection threshold per bin, and the flags saying which bins clear it.
 
     The threshold is the ambient floor plus a sigma margin, and the margin
@@ -579,6 +596,8 @@ def _ambient_thresholds(scaler, threshold_sigma, min_threshold_events,
     device visited four times is four times as trustworthy as one it visited
     once, which is what `bin_rep` counts.
     """
+    xtalk = algo.xtalk                # set by process_data() before this runs
+    assert xtalk is not None
     algo.buffer_size = bins.number_of_bins
     algo.first_bin = bins.first_bin
     algo.bins_in_data = bins.bins_in_data
@@ -592,8 +611,8 @@ def _ambient_thresholds(scaler, threshold_sigma, min_threshold_events,
         if samples <= 0:
             continue
 
-        if lb < algo.xtalk.bins_in_data and xtalk_enable:
-            value = samples * (amb_events + algo.xtalk.bin_data[lb])
+        if lb < xtalk.bins_in_data and xtalk_enable:
+            value = samples * (amb_events + xtalk.bin_data[lb])
         else:
             value = samples * amb_events
 
@@ -617,7 +636,7 @@ def _ambient_thresholds(scaler, threshold_sigma, min_threshold_events,
         algo.bins_over_threshold += over
 
 
-def _find_first_rising_edge(algo):                           # VL53LX_f_007
+def _find_first_rising_edge(algo: _Gen3Algo) -> None:       # VL53LX_f_007
     """Where to start walking the histogram: the first quiet-to-loud step, so
     that a pulse wrapped across the end of the period is not cut in two."""
     algo.first_rising_bin = 0
@@ -630,7 +649,7 @@ def _find_first_rising_edge(algo):                           # VL53LX_f_007
                 found = True
 
 
-def _assign_pulse_numbers(algo):                             # VL53LX_f_008
+def _assign_pulse_numbers(algo: _Gen3Algo) -> None:         # VL53LX_f_008
     """Number the runs of over-threshold bins, from the first rising edge."""
     for lb in range(algo.first_rising_bin,
                     algo.first_rising_bin + algo.vcsel_period):
@@ -645,7 +664,7 @@ def _assign_pulse_numbers(algo):                             # VL53LX_f_008
         algo.pulse_no[i] = algo.pulse_count if algo.pulse_mask[i] > 0 else 0
 
 
-def _pulse_extents(algo):                                    # VL53LX_f_009
+def _pulse_extents(algo: _Gen3Algo) -> None:                # VL53LX_f_009
     """Turn each numbered run into a pulse: its window, its width, and the
     filter half width the rest of the algorithm will use on it."""
     max_filter_half_width = (algo.vcsel_period - 1) >> 1
@@ -678,7 +697,8 @@ def _pulse_extents(algo):                                    # VL53LX_f_009
                                        max_filter_half_width)
 
 
-def _pulse_event_sums(pulse_no, bins, algo):                 # VL53LX_f_010
+def _pulse_event_sums(pulse_no: int, bins: HistogramBinData,
+                      algo: _Gen3Algo) -> None:             # VL53LX_f_010
     """Total and ambient events inside the pulse window."""
     pulse = algo.pulses[pulse_no]
     pulse.total_events = 0
@@ -690,7 +710,8 @@ def _pulse_event_sums(pulse_no, bins, algo):                 # VL53LX_f_010
     pulse.signal_events = pulse.total_events - pulse.ambient_events
 
 
-def _isolate_pulse(pulse_no, bins, algo, pad_value):         # VL53LX_f_011
+def _isolate_pulse(pulse_no: int, bins: HistogramBinData, algo: _Gen3Algo,
+                   pad_value: int) -> HistogramBinData:     # VL53LX_f_011
     """A copy of the frame with everything outside the pulse replaced by
     `pad_value` — ambient for the estimate that keeps the floor, zero for the
     one that removes it."""
@@ -705,7 +726,8 @@ def _isolate_pulse(pulse_no, bins, algo, pad_value):         # VL53LX_f_011
     return out
 
 
-def _weighted_phase(start, end, vcsel_period, clip_events, bins):  # VL53LX_f_020
+def _weighted_phase(start: int, end: int, vcsel_period: int, clip_events: int,
+                    bins: HistogramBinData) -> int:         # VL53LX_f_020
     """Centre of mass of the bins in [start, end], in 1/2048ths of a bin."""
     event_sum = 0
     weighted_sum = 0
@@ -728,7 +750,8 @@ def _weighted_phase(start, end, vcsel_period, clip_events, bins):  # VL53LX_f_02
     return MAX_ALLOWED_PHASE
 
 
-def _pulse_phase_limits(pulse_no, clip_events, bins, algo):  # VL53LX_f_015
+def _pulse_phase_limits(pulse_no: int, clip_events: int, bins: HistogramBinData,
+                        algo: _Gen3Algo) -> None:           # VL53LX_f_015
     """The near and far phase of the pulse: the centre of mass of its leading
     three bins and of its trailing three, which is what min_range/max_range
     come from."""
@@ -753,7 +776,7 @@ def _pulse_phase_limits(pulse_no, clip_events, bins, algo):  # VL53LX_f_015
     pulse.phase_end = max(pulse.phase_end, pulse.phase_mean)
 
 
-def _sort_pulses(target_order, algo):                        # VL53LX_f_016
+def _sort_pulses(target_order: int, algo: _Gen3Algo) -> None:   # VL53LX_f_016
     """Strongest first or closest first, as the post-processing config says."""
     if algo.pulse_count <= 1:
         return
@@ -765,8 +788,9 @@ def _sort_pulses(target_order, algo):                        # VL53LX_f_016
     algo.pulses[:algo.pulse_count] = pulses
 
 
-def _fill_target(range_id, valid_phase_low, valid_phase_high, sigma_thresh,
-                 bins, pulse, target):                       # VL53LX_f_017
+def _fill_target(range_id: int, valid_phase_low: int, valid_phase_high: int,
+                 sigma_thresh: int, bins: HistogramBinData, pulse: PulseData,
+                 target: RangeData) -> None:                # VL53LX_f_017
     """Pulse -> target, plus the two checks that can fail it: sigma over the
     threshold, and a phase outside the window the preset mode is valid for."""
     target.range_id = range_id
@@ -802,7 +826,8 @@ def _fill_target(range_id, valid_phase_low, valid_phase_high, sigma_thresh,
 
 
 # ── peak location (vl53lx_hist_algos_gen4.c) ─────────────────────────────────
-def _filter_pulse(pulse_no, pulse_bins, algo, filtered):     # VL53LX_f_026
+def _filter_pulse(pulse_no: int, pulse_bins: HistogramBinData, algo: _Gen3Algo,
+                  filtered: _Filtered) -> None:             # VL53LX_f_026
     """Run the three-tap window over the pulse. `left` and `right` are the two
     halves of the window minus the other side; where both are positive the
     centre of mass is inside this bin."""
@@ -817,8 +842,8 @@ def _filter_pulse(pulse_no, pulse_bins, algo, filtered):     # VL53LX_f_026
         filtered.right[i] = (b + c) - (a + algo.ambient_per_bin)
 
 
-def _interpolate_phase(bin_index, a, b, c, ambient_per_bin,
-                       vcsel_period):                        # VL53LX_f_028
+def _interpolate_phase(bin_index: int, a: int, b: int, c: int, ambient_per_bin: int,
+                       vcsel_period: int) -> int | None:    # VL53LX_f_028
     """Sub-bin phase from the window sums: where between the two neighbours
     the zero crossing of (c - a) against (b - ambient) falls. Returns None
     when the pulse has no height, which is the division by zero the C driver
@@ -838,7 +863,8 @@ def _interpolate_phase(bin_index, a, b, c, ambient_per_bin,
     return mean_phase % (vcsel_period * 2048)
 
 
-def _find_peak_bin(pulse_no, filtered, algo):                # VL53LX_f_027
+def _find_peak_bin(pulse_no: int, filtered: _Filtered,
+                   algo: _Gen3Algo) -> None:                # VL53LX_f_027
     """Walk the pulse and keep the last bin where the filter says the centre
     of mass is here; that bin and its interpolated phase are the target."""
     pulse = algo.pulses[pulse_no]
@@ -870,7 +896,7 @@ def _find_peak_bin(pulse_no, filtered, algo):                # VL53LX_f_027
                 pulse.phase_mean = phase
 
 
-def _ambient_dmax(results):
+def _ambient_dmax(results: RangeResults) -> None:
     """`VL53LX_f_001` — the ambient-limited maximum range, five reflectances of
     it — deliberately left as this stub (E8.5).
 
@@ -885,7 +911,8 @@ def _ambient_dmax(results):
 
 
 # ── entry point ──────────────────────────────────────────────────────────────
-def process_data(bins_input, hpp, merge_nb=1) -> RangeResults:
+def process_data(bins_input: HistogramBinData, hpp: HistPostProcessConfig,
+                 merge_nb: int = 1) -> RangeResults:
     """`VL53LX_hist_process_data()` + `VL53LX_f_025`, with crosstalk off.
 
     `bins_input` is a `HistogramBinData` as `BareDriver.get_histogram_bin_data()`
@@ -962,8 +989,11 @@ def process_data(bins_input, hpp, merge_nb=1) -> RangeResults:
 
 
 # ── frame-to-frame consistency ───────────────────────────────────────────────
-PrevTarget = collections.namedtuple(
-    'PrevTarget', 'ambient_events total_events phase_mean range_status')
+class PrevTarget(NamedTuple):
+    ambient_events: int
+    total_events:   int
+    phase_mean:     int
+    range_status:   int
 
 
 class FrameHistory:
@@ -977,18 +1007,19 @@ class FrameHistory:
     so the driver owns one of these and hands it every frame.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Forget the stream so far. The next `apply()` only remembers: with no
         previous frame there is nothing to be consistent with."""
-        self.rd_device_state = None
+        self.rd_device_state: str | None = None
         self.total_periods_elapsed = 0
         self.spads = 0
-        self.targets = []
+        self.targets: list[PrevTarget] = []
 
-    def apply(self, results, bins, rd_device_state, hpp):
+    def apply(self, results: RangeResults, bins: HistogramBinData,
+              rd_device_state: str, hpp: HistPostProcessConfig) -> None:
         """Check `results` against the remembered frame, then remember it.
 
         The order is C's: `get_device_results()` runs both checks and only
@@ -1003,7 +1034,8 @@ class FrameHistory:
                                    t.phase_mean, t.range_status)
                         for t in results.targets]
 
-    def _phase_consistency_check(self, results, hpp):
+    def _phase_consistency_check(self, results: RangeResults,
+                                 hpp: HistPostProcessConfig) -> None:
         """`VL53LX_hist_phase_consistency_check()`.
 
         Every target that came out of this frame as a range starts guilty and
@@ -1046,8 +1078,9 @@ class FrameHistory:
                 target.range_status = status
 
 
-def _events_consistency_check(event_sigma, min_effective_spad_count,
-                              prev_frame, prev, target):
+def _events_consistency_check(event_sigma: int, min_effective_spad_count: int,
+                              prev_frame: FrameHistory, prev: PrevTarget,
+                              target: RangeData) -> int:
     """`VL53LX_hist_events_consistency_check()` -> a device error code.
 
     Two frames are not the same exposure: the periods elapsed and the effective
@@ -1089,7 +1122,7 @@ def _events_consistency_check(event_sigma, min_effective_spad_count,
     return DEVICEERROR_RANGECOMPLETE
 
 
-def _merged_pulse_check(min_max_tolerance_mm, target):
+def _merged_pulse_check(min_max_tolerance_mm: int, target: RangeData) -> int:
     """`VL53LX_hist_merged_pulse_check()`. A pulse far wider than one target
     should be is two targets the extraction failed to split; the range is still
     good, and saying so is what RANGECOMPLETE_MERGED_PULSE is for."""
@@ -1144,7 +1177,7 @@ def _to_target(data: RangeData) -> Target:
                   max_range_mm=data.max_range_mm)
 
 
-def to_measurement(results: RangeResults, bins) -> Measurement:
+def to_measurement(results: RangeResults, bins: HistogramBinData) -> Measurement:
     """RangeResults -> the Measurement the CLI and GUI speak. Every return the
     frame produced goes into `targets`; the first one is also the measurement
     itself, because that is the one field every other sensor of the family

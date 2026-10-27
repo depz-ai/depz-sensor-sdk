@@ -6,6 +6,12 @@ import java.util.Objects;
 public final class T {
     private T() {}
 
+    /** {@code a} and {@code b} are the one object (identity, not equality). */
+    @SuppressWarnings("ReferenceEquality") // identity is what this asks
+    public static boolean same(Object a, Object b) {
+        return a == b;
+    }
+
     public static void check(boolean ok, String what) {
         if (!ok) {
             throw new AssertionError(what);

@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use common::fake_board::{until, FakeBoard};
 use depz_sensor_sdk::devices::{
-    attach, AnyDevice, DepzDevice, DepzError, Hook, ReplayLink, Vl53l0xDevice, Vl53l1cxDevice, Vl53l4cxDevice,
-    Vl53lxDevice, Vl53lxMeasurement, PLOTTABLE_STATUSES,
+    attach, AnyDevice, DepzDevice, DepzError, Hook, ReplayLink, Vl53l0xDevice, Vl53l1cxDevice,
+    Vl53l4cxDevice, Vl53lxDevice, Vl53lxMeasurement, PLOTTABLE_STATUSES,
 };
 use depz_sensor_sdk::discovery::resolve_sensor_class;
 use depz_sensor_sdk::framing::{build_packet, CrcType, Packet};
@@ -123,8 +123,11 @@ impl FakeBridge {
                     vec![FakeBoard::status(cmd, 0)]
                 }
                 GET_INFO => vec![b.reply(0x92, &st.info)],
-                CLEAR_I2C_ERRORS if no_clear_i2c_errors => vec![FakeBoard::status(cmd, ERR_INVALID_CMD)],
-                XSHUT | START_STREAM | STOP_STREAM | SET_I2C_SPEED | SET_ADDR_WIDTH | CLEAR_I2C_ERRORS => {
+                CLEAR_I2C_ERRORS if no_clear_i2c_errors => {
+                    vec![FakeBoard::status(cmd, ERR_INVALID_CMD)]
+                }
+                XSHUT | START_STREAM | STOP_STREAM | SET_I2C_SPEED | SET_ADDR_WIDTH
+                | CLEAR_I2C_ERRORS => {
                     vec![FakeBoard::status(cmd, 0)]
                 }
                 _ => vec![FakeBoard::status(cmd, ERR_INVALID_CMD)],
@@ -134,7 +137,13 @@ impl FakeBridge {
     }
 
     fn fail_next(&self, cmd: u8, f: Fail) {
-        self.st.lock().unwrap().failures.entry(cmd).or_default().push_back(f);
+        self.st
+            .lock()
+            .unwrap()
+            .failures
+            .entry(cmd)
+            .or_default()
+            .push_back(f);
     }
 
     fn set_word(&self, addr: usize, v: u16) {
@@ -178,13 +187,24 @@ impl FakeBridge {
 
     /// Payloads of one opcode, hex, in order.
     fn sent(&self, cmd: u8) -> Vec<String> {
-        self.st.lock().unwrap().rx.iter().filter(|(c, _)| *c == cmd).map(|(_, p)| common::hex_encode(p)).collect()
+        self.st
+            .lock()
+            .unwrap()
+            .rx
+            .iter()
+            .filter(|(c, _)| *c == cmd)
+            .map(|(_, p)| common::hex_encode(p))
+            .collect()
     }
 
     /// Every WRITE_REG as (addr, data).
     fn writes(&self) -> Vec<(u16, Vec<u8>)> {
         let st = self.st.lock().unwrap();
-        st.rx.iter().filter(|(c, _)| *c == WRITE_REG).map(|(_, p)| (u16::from_le_bytes([p[0], p[1]]), p[2..].to_vec())).collect()
+        st.rx
+            .iter()
+            .filter(|(c, _)| *c == WRITE_REG)
+            .map(|(_, p)| (u16::from_le_bytes([p[0], p[1]]), p[2..].to_vec()))
+            .collect()
     }
 
     /// RPT_VL53_STREAM: ts u64, addr u16, len u16, data.
@@ -201,9 +221,16 @@ fn connect_as<T>(board: &str, make: impl FnOnce(DepzDevice) -> T) -> (T, FakeBri
     connect_with(board, false, make)
 }
 
-fn connect_with<T>(board: &str, no_clear: bool, make: impl FnOnce(DepzDevice) -> T) -> (T, FakeBridge) {
+fn connect_with<T>(
+    board: &str,
+    no_clear: bool,
+    make: impl FnOnce(DepzDevice) -> T,
+) -> (T, FakeBridge) {
     let fake = FakeBridge::new(board, no_clear);
-    let dev = make(DepzDevice::new(fake.board.clone(), Some(Duration::from_millis(500))));
+    let dev = make(DepzDevice::new(
+        fake.board.clone(),
+        Some(Duration::from_millis(500)),
+    ));
     (dev, fake)
 }
 
@@ -245,7 +272,10 @@ fn err_text(r: Result<impl std::fmt::Debug, DepzError>) -> String {
 }
 
 fn is_bridge_error(e: &DepzError) -> bool {
-    matches!(e, DepzError::Status { .. } | DepzError::Timeout { .. } | DepzError::Protocol(_))
+    matches!(
+        e,
+        DepzError::Status { .. } | DepzError::Timeout { .. } | DepzError::Protocol(_)
+    )
 }
 
 // ── pure helpers ─────────────────────────────────────────────────────────────
@@ -309,7 +339,10 @@ fn before_init_no_driver_no_product() {
     assert!(!dev.initialized());
     assert_eq!((dev.product(), dev.driver_kind()), (None, None));
     assert!(err_text(dev.with_driver(|_| Ok(()))).contains("call init() first"));
-    assert!(matches!(dev.supports("offset"), Err(DepzError::InvalidState(_))));
+    assert!(matches!(
+        dev.supports("offset"),
+        Err(DepzError::InvalidState(_))
+    ));
     assert!(err_text(dev.get_offset_mm()).contains("init"));
 }
 
@@ -318,7 +351,10 @@ fn init_binds_the_product_and_sets_the_address_width_first() {
     let (dev, fake) = connect(L4CD_BOARD);
     dev.init(None, None).unwrap();
     assert!(dev.initialized());
-    assert_eq!((dev.product(), dev.driver_kind()), (Some("VL53L4CD"), Some("uld")));
+    assert_eq!(
+        (dev.product(), dev.driver_kind()),
+        (Some("VL53L4CD"), Some("uld"))
+    );
     assert!(dev.supports("offset").unwrap());
     assert!(!dev.supports("roi").unwrap());
     assert!(dev.modes().unwrap().is_empty());
@@ -332,7 +368,12 @@ fn init_binds_the_product_and_sets_the_address_width_first() {
     // every init runs at 400 kHz, then the die's 1 MHz ceiling
     assert_eq!(fake.sent(SET_I2C_SPEED), ["9001", "e803"]);
     // the blob at 0x2D with byte 0 forced to FM+ (0x12)
-    let blob = fake.writes().into_iter().find(|(a, _)| *a == 0x2D).unwrap().1;
+    let blob = fake
+        .writes()
+        .into_iter()
+        .find(|(a, _)| *a == 0x2D)
+        .unwrap()
+        .1;
     assert_eq!((blob.len(), blob[0]), (91, 0x12));
     // VL53L4CD_SensorInit() closes with ALGO__RANGE_IGNORE_THRESHOLD_MCPS
     assert!(fake.writes().contains(&(0x0024, vec![0x05, 0x00])));
@@ -345,7 +386,10 @@ fn init_binds_the_product_and_sets_the_address_width_first() {
 fn l0x_sets_address_width_1_before_anything_else() {
     // Contract 12 §1: VL53L0X is the one 1-byte-address part; a class with its own product does not
     // need the device name. The L0X init needs a real die, so it fails here — after the width.
-    let (dev, fake) = connect_as("DEPZ ToF Sensor VL53L0X USB v2.1 SER", Vl53l0xDevice::attach);
+    let (dev, fake) = connect_as(
+        "DEPZ ToF Sensor VL53L0X USB v2.1 SER",
+        Vl53l0xDevice::attach,
+    );
     let _ = dev.init(None, None);
     assert_eq!(fake.cmds()[0], SET_ADDR_WIDTH);
     assert_eq!(fake.sent(SET_ADDR_WIDTH)[0], "01");
@@ -368,16 +412,25 @@ fn identify_product_reports_both_reaches_and_the_model_id_check() {
     let (dev, _fake) = ready(L4CD_BOARD, None);
     let info = dev.identify_product().unwrap();
     assert_eq!(info.board, L4CD_BOARD);
-    assert_eq!((info.detected, info.product, info.driver), (Some("VL53L4CD"), "VL53L4CD", "uld"));
+    assert_eq!(
+        (info.detected, info.product, info.driver),
+        (Some("VL53L4CD"), "VL53L4CD", "uld")
+    );
     assert_eq!(info.driver_class, "Vl53l4UldDriver");
     assert_eq!(info.kinds, ["uld", "histogram"]);
     assert_eq!((info.model_id, info.model_id_ok), (0xEBAA, true));
     assert!(info.modes.is_empty());
     assert_eq!((info.reach_mm, info.budget_ms), (Some(1300), (10, 200)));
     assert!(info.budget_choices.is_empty());
-    assert_eq!((info.histogram, info.max_khz, info.caveat), (false, 1000, None));
+    assert_eq!(
+        (info.histogram, info.max_khz, info.caveat),
+        (false, 1000, None)
+    );
     // §5: the 0x38 window at the die's own oscillator, ~1388 mm
-    assert_eq!(info.driver_reach_mm, Some(phase_window_mm(DIE_OSC as i64, 0x38) as i32));
+    assert_eq!(
+        info.driver_reach_mm,
+        Some(phase_window_mm(DIE_OSC as i64, 0x38) as i32)
+    );
     assert_eq!(info.driver_reach_mm, Some(1388));
     assert!(info.supports.contains(&"calib_xtalk"));
     assert!(dev.notes().unwrap().is_empty());
@@ -395,8 +448,14 @@ fn a_wrong_model_id_fails_the_cross_check_not_the_init() {
 fn borrowing_a_siblings_driver() {
     let (dev, _fake) = ready(L4CX_BOARD, Some("VL53L4CD"));
     let info = dev.identify_product().unwrap();
-    assert_eq!((info.detected, info.product), (Some("VL53L4CX"), "VL53L4CD"));
-    assert_eq!((info.reach_mm, info.driver_reach_mm), (Some(6000), Some(1388)));
+    assert_eq!(
+        (info.detected, info.product),
+        (Some("VL53L4CX"), "VL53L4CD")
+    );
+    assert_eq!(
+        (info.reach_mm, info.driver_reach_mm),
+        (Some(6000), Some(1388))
+    );
     let notes = dev.notes().unwrap();
     assert_eq!(notes.len(), 2);
     assert!(notes[0].contains("borrowing this driver - the board says it is a VL53L4CX"));
@@ -412,7 +471,10 @@ fn an_unstamped_board_needs_the_product_named() {
     assert!(fake.sent(SET_ADDR_WIDTH).is_empty());
     dev.init(None, Some("VL53L4CD")).unwrap();
     assert_eq!(dev.product(), Some("VL53L4CD"));
-    assert_eq!(dev.notes().unwrap(), ["VL53L4CD: board name carries no product number, named by hand"]);
+    assert_eq!(
+        dev.notes().unwrap(),
+        ["VL53L4CD: board name carries no product number, named by hand"]
+    );
 }
 
 #[test]
@@ -420,9 +482,15 @@ fn a_pair_the_table_has_no_row_for_is_refused_before_any_traffic() {
     let (dev, fake) = connect_as(L4CX_BOARD, Vl53l4cxDevice::attach);
     assert_eq!(dev.driver_kinds(None).unwrap(), ["histogram"]);
     let e = dev.init(Some("uld"), None).unwrap_err();
-    assert!(matches!(&e, DepzError::Unsupported(m) if m == "VL53L4CX has no 'uld' driver - it has histogram"), "{e}");
+    assert!(
+        matches!(&e, DepzError::Unsupported(m) if m == "VL53L4CX has no 'uld' driver - it has histogram"),
+        "{e}"
+    );
     let e = dev.init(None, Some("VL53L9ZZ")).unwrap_err();
-    assert!(matches!(&e, DepzError::Unsupported(m) if m.contains("no such product")), "{e}");
+    assert!(
+        matches!(&e, DepzError::Unsupported(m) if m.contains("no such product")),
+        "{e}"
+    );
     assert!(fake.cmds().iter().all(|c| *c == GET_DEVICE_NAME));
     assert!(!dev.initialized());
 }
@@ -431,14 +499,20 @@ fn a_pair_the_table_has_no_row_for_is_refused_before_any_traffic() {
 fn driver_kinds_of_a_named_product_and_of_the_class_product() {
     let (dev, _fake) = connect_as(UNSTAMPED, Vl53l1cxDevice::attach);
     assert_eq!(dev.driver_kinds(None).unwrap(), ["uld", "histogram"]);
-    assert_eq!(dev.driver_kinds(Some("VL53L3CX")).unwrap(), ["ulp", "histogram"]);
+    assert_eq!(
+        dev.driver_kinds(Some("VL53L3CX")).unwrap(),
+        ["ulp", "histogram"]
+    );
 }
 
 #[test]
 fn a_v2_00_bridge_is_told_to_reflash() {
     let (dev, _fake) = connect_with(L4CD_BOARD, true, Vl53lxDevice::attach);
     let e = dev.init(None, None).unwrap_err();
-    assert!(e.to_string().contains("predates APP_VL53L0_4_v0.24") && e.to_string().contains("reflash"), "{e}");
+    assert!(
+        e.to_string().contains("predates APP_VL53L0_4_v0.24") && e.to_string().contains("reflash"),
+        "{e}"
+    );
     assert!(!is_bridge_error(&e));
     assert!(!dev.initialized());
 }
@@ -466,10 +540,20 @@ fn bridge_info_decodes_rpt_vl53_info() {
     fake.st.lock().unwrap().info = hex(INFO_WRAPPED);
     let i = dev.bridge_info().unwrap();
     assert_eq!(
-        (i.int_edges, i.slots_skipped, i.i2c_errors, i.last_i2c_error, i.xshut_level, i.int_level),
+        (
+            i.int_edges,
+            i.slots_skipped,
+            i.i2c_errors,
+            i.last_i2c_error,
+            i.xshut_level,
+            i.int_level
+        ),
         (4294967295, 7, 3, 2, 1, 0)
     );
-    assert_eq!((i.i2c_khz, i.addr_width, i.n_clear, i.frames_dropped), (1000, 2, 1, 12));
+    assert_eq!(
+        (i.i2c_khz, i.addr_width, i.n_clear, i.frames_dropped),
+        (1000, 2, 1, 12)
+    );
 }
 
 #[test]
@@ -481,7 +565,10 @@ fn xshut_drops_the_driver_and_the_stream() {
     assert!(!dev.ranging());
     assert!(!dev.initialized());
     assert!(err_text(dev.with_driver(|_| Ok(()))).contains("init"));
-    assert!(matches!(dev.xshut(XSHUT_RESET + 1), Err(DepzError::InvalidArgument(_))));
+    assert!(matches!(
+        dev.xshut(XSHUT_RESET + 1),
+        Err(DepzError::InvalidArgument(_))
+    ));
 }
 
 // ── configuration and the capability-gated passthroughs ──────────────────────
@@ -489,7 +576,8 @@ fn xshut_drops_the_driver_and_the_stream() {
 #[test]
 fn configure_reinits_then_timing_offset_xtalk_signal() {
     let (dev, fake) = ready(L4CD_BOARD, None);
-    dev.configure(33, 0, None, Some(-10), Some(20), Some(1024)).unwrap();
+    dev.configure(33, 0, None, Some(-10), Some(20), Some(1024))
+        .unwrap();
     assert_eq!(fake.sent(CLEAR_I2C_ERRORS).len(), 1);
     // vectors/vl53l4.json tuning: offset -10 → 65496, xtalk 20 → 10240, signal 1024 → 128
     let w = fake.writes();
@@ -517,7 +605,10 @@ fn configure_reinits_then_timing_offset_xtalk_signal() {
 fn an_inter_measurement_period_selects_autonomous_mode() {
     let (dev, fake) = ready(L4CD_BOARD, None);
     dev.configure(50, 100, None, None, None, None).unwrap();
-    assert_eq!(fake.dword(0x006C), (1.055 * 100.0 * (DIE_PLL & 0x3FF) as f64) as u32);
+    assert_eq!(
+        fake.dword(0x006C),
+        (1.055 * 100.0 * (DIE_PLL & 0x3FF) as f64) as u32
+    );
     fake.clear();
     dev.start_ranging().unwrap();
     assert_eq!(fake.writes(), [(0x0087, vec![0x40])]);
@@ -533,8 +624,13 @@ fn a_period_not_above_the_budget_is_refused() {
 #[test]
 fn a_mode_on_a_product_without_modes_is_refused_before_the_reinit() {
     let (dev, fake) = ready(L4CD_BOARD, None);
-    let e = dev.configure(50, 0, Some("long"), None, None, None).unwrap_err();
-    assert!(matches!(&e, DepzError::Unsupported(m) if m == "VL53L4CD/uld does not support 'mode'"), "{e}");
+    let e = dev
+        .configure(50, 0, Some("long"), None, None, None)
+        .unwrap_err();
+    assert!(
+        matches!(&e, DepzError::Unsupported(m) if m == "VL53L4CD/uld does not support 'mode'"),
+        "{e}"
+    );
     assert!(fake.cmds().is_empty());
 }
 
@@ -543,7 +639,11 @@ fn snap_budget_clamps_to_the_drivers_range_when_any_budget_goes() {
     let (dev, _fake) = ready(L4CD_BOARD, None);
     assert!(dev.budget_choices().unwrap().is_empty());
     assert_eq!(
-        (dev.snap_budget(5).unwrap(), dev.snap_budget(77).unwrap(), dev.snap_budget(500).unwrap()),
+        (
+            dev.snap_budget(5).unwrap(),
+            dev.snap_budget(77).unwrap(),
+            dev.snap_budget(500).unwrap()
+        ),
         (10, 77, 200)
     );
 }
@@ -562,7 +662,11 @@ fn offset_xtalk_thresholds_signal_sigma_round_trip() {
     assert_eq!((fake.word(0x0072), fake.word(0x0074)), (300, 100));
     assert_eq!(
         dev.get_detection_thresholds().unwrap(),
-        Thresholds { distance_low_mm: 100, distance_high_mm: 300, window: 3 }
+        Thresholds {
+            distance_low_mm: 100,
+            distance_high_mm: 300,
+            window: 3
+        }
     );
     dev.set_signal_threshold_kcps(2048).unwrap();
     assert_eq!(fake.word(0x0066), 256);
@@ -594,10 +698,17 @@ fn the_refusal_names_the_caveat_and_comes_before_the_reinit() {
     let (dev, fake) = ready(L3CX_BOARD, None);
     assert_eq!(dev.driver_kind(), Some("ulp"));
     let e = err_text(dev.configure(50, 0, None, Some(5), None, None));
-    assert!(e.contains("VL53L3CX/ulp does not support 'offset' (single-target ranging only"), "{e}");
+    assert!(
+        e.contains("VL53L3CX/ulp does not support 'offset' (single-target ranging only"),
+        "{e}"
+    );
     assert!(err_text(dev.calibrate_xtalk(600, None)).contains("'calib_xtalk'"));
     assert!(fake.cmds().is_empty());
-    assert!(dev.notes().unwrap().iter().any(|n| n.starts_with("VL53L3CX/ulp: single-target")));
+    assert!(dev
+        .notes()
+        .unwrap()
+        .iter()
+        .any(|n| n.starts_with("VL53L3CX/ulp: single-target")));
 }
 
 #[test]
@@ -629,7 +740,14 @@ fn offset_calibration_target_minus_mean_programmed_x4() {
     assert_eq!(dev.get_offset_mm().unwrap(), -24);
     // offsets zeroed first, 10 heat frames + 5 samples each released
     let w = fake.writes();
-    assert_eq!(w[..3], [(0x001E, vec![0, 0]), (0x0020, vec![0, 0]), (0x0022, vec![0, 0])]);
+    assert_eq!(
+        w[..3],
+        [
+            (0x001E, vec![0, 0]),
+            (0x0020, vec![0, 0]),
+            (0x0022, vec![0, 0])
+        ]
+    );
     assert_eq!(w.iter().filter(|(a, _)| *a == 0x0086).count(), 15);
 }
 
@@ -673,19 +791,29 @@ fn l1_modes_budget_choices_that_move_with_the_mode_and_snap() {
     assert_eq!(dev.modes().unwrap(), ["long", "short"]);
     assert_eq!(dev.get_mode().unwrap().as_deref(), Some("long"));
     assert_eq!(dev.budget_choices().unwrap(), [20, 33, 50, 100, 200, 500]);
-    assert_eq!((dev.snap_budget(40).unwrap(), dev.snap_budget(1000).unwrap()), (33, 500));
-    dev.configure(15, 0, Some("short"), None, None, None).unwrap();
+    assert_eq!(
+        (dev.snap_budget(40).unwrap(), dev.snap_budget(1000).unwrap()),
+        (33, 500)
+    );
+    dev.configure(15, 0, Some("short"), None, None, None)
+        .unwrap();
     assert_eq!(dev.get_mode().unwrap().as_deref(), Some("short"));
     assert_eq!(dev.budget_choices().unwrap()[0], 15);
     assert_eq!(dev.get_range_timing().unwrap(), (15, 15));
-    assert_eq!(dev.identify_product().unwrap().driver_reach_mm, Some(phase_window_mm(DIE_OSC as i64, 0x38) as i32));
+    assert_eq!(
+        dev.identify_product().unwrap().driver_reach_mm,
+        Some(phase_window_mm(DIE_OSC as i64, 0x38) as i32)
+    );
 }
 
 #[test]
 fn l1_a_budget_the_mode_does_not_have_is_refused_not_rounded() {
     let (dev, _fake) = ready(L1CX_BOARD, None);
-    assert!(err_text(dev.configure(40, 0, None, None, None, None)).contains("pick one of 20, 33, 50, 100, 200, 500"));
-    assert!(err_text(dev.configure(50, 0, Some("medium"), None, None, None)).contains("no such mode"));
+    assert!(err_text(dev.configure(40, 0, None, None, None, None))
+        .contains("pick one of 20, 33, 50, 100, 200, 500"));
+    assert!(
+        err_text(dev.configure(50, 0, Some("medium"), None, None, None)).contains("no such mode")
+    );
 }
 
 #[test]
@@ -709,7 +837,14 @@ fn l1_streams_decode_with_the_l1_variant() {
     let x = dev.get_measurement(Some(Duration::from_secs(1))).unwrap();
     h.join().unwrap();
     assert_eq!(
-        (x.distance_mm, x.status, x.sigma_mm, x.signal_kcps, x.ambient_kcps, x.spads),
+        (
+            x.distance_mm,
+            x.status,
+            x.sigma_mm,
+            x.signal_kcps,
+            x.ambient_kcps,
+            x.spads
+        ),
         (576, 0, 3.0, 16072.0, 2552.0, 67.0)
     );
     let extra: Vec<(&str, ExtraValue)> = x.extra.iter().map(|(k, v)| (k.as_str(), *v)).collect();
@@ -747,10 +882,24 @@ fn each_streamed_block_is_decoded_once_to_every_subscriber() {
     settle(&fake, &dev);
     {
         let seen = seen.lock().unwrap();
-        assert_eq!(seen.iter().map(|x| x.timestamp_us).collect::<Vec<_>>(), [123_456, 123_789]);
+        assert_eq!(
+            seen.iter().map(|x| x.timestamp_us).collect::<Vec<_>>(),
+            [123_456, 123_789]
+        );
         let first = &seen[0];
-        assert_eq!((first.distance_mm, first.status, first.status_text.as_str()), (624, 0, "valid"));
-        assert_eq!((first.signal_kcps, first.ambient_kcps, first.sigma_mm, first.spads), (5160.0, 1096.0, 2.0, 211.0));
+        assert_eq!(
+            (first.distance_mm, first.status, first.status_text.as_str()),
+            (624, 0, "valid")
+        );
+        assert_eq!(
+            (
+                first.signal_kcps,
+                first.ambient_kcps,
+                first.sigma_mm,
+                first.spads
+            ),
+            (5160.0, 1096.0, 2.0, 211.0)
+        );
         assert!(first.targets.is_empty() && first.bins.is_none());
         assert_eq!(first.extra["signal_per_spad_kcps"], ExtraValue::Int(24));
         assert_eq!(first.extra["ambient_per_spad_kcps"], ExtraValue::Int(5));
@@ -791,7 +940,12 @@ fn a_block_the_driver_cannot_decode_is_counted_and_the_reader_survives() {
     settle(&fake, &dev);
     assert_eq!(dev.stream_parse_errors(), 2);
     let h = later(&fake, hex(L4_BLOCK), 2);
-    assert_eq!(dev.get_measurement(Some(Duration::from_secs(1))).unwrap().distance_mm, 624);
+    assert_eq!(
+        dev.get_measurement(Some(Duration::from_secs(1)))
+            .unwrap()
+            .distance_mm,
+        624
+    );
     h.join().unwrap();
     assert_eq!(dev.bridge_info().unwrap().addr_width, 0); // requests still answered
 }
@@ -804,7 +958,8 @@ fn a_stream_report_shorter_than_its_header_or_before_init_is_no_measurement() {
     settle(&fake, &dev);
     dev.init(None, None).unwrap();
     dev.start_ranging().unwrap();
-    fake.board.inject(build_packet(0x93, &[0u8; 11], 0, CrcType::None).unwrap());
+    fake.board
+        .inject(build_packet(0x93, &[0u8; 11], 0, CrcType::None).unwrap());
     settle(&fake, &dev);
     assert!(q.is_empty());
     assert_eq!(dev.stream_parse_errors(), 0);
@@ -829,7 +984,10 @@ fn measurements_is_bounded_drop_oldest_and_deregisters_on_drop() {
 #[test]
 fn get_measurement_times_out_and_leaves_no_queue() {
     let (dev, _fake) = ready(L4CD_BOARD, None);
-    assert!(matches!(dev.get_measurement(Some(Duration::from_millis(20))), Err(DepzError::Timeout { .. })));
+    assert!(matches!(
+        dev.get_measurement(Some(Duration::from_millis(20))),
+        Err(DepzError::Timeout { .. })
+    ));
     assert!(dev.stream_dropped_counts().is_empty());
 }
 
@@ -902,13 +1060,19 @@ fn measure_once_starts_waits_reads_releases_stops() {
     let (dev, fake) = ready(L4CD_BOARD, None);
     fake.set_result_block(&hex(L4_BLOCK));
     let x = dev.measure_once(None).unwrap();
-    assert_eq!((x.distance_mm, x.valid(), x.bins.is_none()), (624, true, true));
+    assert_eq!(
+        (x.distance_mm, x.valid(), x.bins.is_none()),
+        (624, true, true)
+    );
     // the timestamp of the last register read: the block itself
     assert_eq!(x.timestamp_us, fake.mcu_time_us() - 100);
     assert!(fake.sent(READ_REG).contains(&"89001100".to_string()));
     let w = fake.writes();
     assert_eq!(w[0], (0x0087, vec![0x21]));
-    assert_eq!(w[w.len() - 2..], [(0x0086, vec![0x01]), (0x0087, vec![0x80])]);
+    assert_eq!(
+        w[w.len() - 2..],
+        [(0x0086, vec![0x01]), (0x0087, vec![0x80])]
+    );
     assert!(fake.sent(START_STREAM).is_empty());
 }
 
@@ -916,7 +1080,8 @@ fn measure_once_starts_waits_reads_releases_stops() {
 fn a_data_ready_timeout_still_stops_the_sensor() {
     let (dev, fake) = ready(L4CD_BOARD, None);
     fake.set_reg(0x0031, 0x01); // INT never reaches the active level
-    assert!(err_text(dev.measure_once(Some(Duration::from_millis(30)))).contains("timeout waiting for data ready"));
+    assert!(err_text(dev.measure_once(Some(Duration::from_millis(30))))
+        .contains("timeout waiting for data ready"));
     assert_eq!(fake.writes().last(), Some(&(0x0087, vec![0x80])));
     assert!(!dev.ranging());
 }
@@ -961,7 +1126,10 @@ fn every_1d_class_attaches_and_gives_its_family_class() {
         let dev = any.into_vl53lx().unwrap();
         let kinds = dev.driver_kinds(None).unwrap();
         match fixed {
-            Some(p) => assert_eq!(kinds, depz_sensor_sdk::vl53lx::uld::driver_kinds(p).unwrap()),
+            Some(p) => assert_eq!(
+                kinds,
+                depz_sensor_sdk::vl53lx::uld::driver_kinds(p).unwrap()
+            ),
             None => assert!(kinds.is_empty()),
         }
     }
@@ -974,8 +1142,10 @@ fn every_1d_class_attaches_and_gives_its_family_class() {
 
 fn replay_to_init(stem: &str) -> (Vl53lxDevice, serde_json::Value) {
     let rec = common::recordings_dir();
-    let expected: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(rec.join(format!("{stem}.expected.json"))).unwrap()).unwrap();
+    let expected: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(rec.join(format!("{stem}.expected.json"))).unwrap(),
+    )
+    .unwrap();
     // The captures hold the pre-§4.4 probe (their scenarios are `probe: legacy`).
     let link = ReplayLink::open(rec.join(format!("{stem}.depzrec")), true, false).unwrap();
     let dev = DepzDevice::new(link, Some(Duration::from_secs(2)));
@@ -984,7 +1154,11 @@ fn replay_to_init(stem: &str) -> (Vl53lxDevice, serde_json::Value) {
     let any: AnyDevice = attach(dev, resolve_sensor_class(&software, &name, None, None)).unwrap();
     let dev = any.into_vl53lx().unwrap();
     dev.get_software_name().unwrap();
-    dev.init(expected["driver"].as_str(), expected["product_arg"].as_str()).unwrap();
+    dev.init(
+        expected["driver"].as_str(),
+        expected["product_arg"].as_str(),
+    )
+    .unwrap();
     (dev, expected)
 }
 
@@ -995,7 +1169,9 @@ fn configure_refuses_an_unsupported_group_before_the_reinit() {
     let (dev, exp) = replay_to_init("vl53l0x_uld_long-range_33ms");
     let budget = exp["budget_ms"].as_u64().unwrap() as u32;
     let mode = exp["mode"].as_str();
-    assert!(err_text(dev.configure(budget, 0, mode, None, None, Some(512))).contains("signal_thresh"));
+    assert!(
+        err_text(dev.configure(budget, 0, mode, None, None, Some(512))).contains("signal_thresh")
+    );
     dev.configure(budget, 0, mode, None, None, None).unwrap();
     let t = dev.get_range_timing().unwrap();
     assert_eq!(serde_json::json!([t.0, t.1]), exp["timing"]);
@@ -1007,16 +1183,30 @@ fn stream_dropped_counts_per_measurement_queue() {
     // get_measurement() leaves none behind.
     let (dev, exp) = replay_to_init("vl53l1cx_uld_long_33ms");
     assert!(dev.stream_dropped_counts().is_empty());
-    dev.configure(exp["budget_ms"].as_u64().unwrap() as u32, 0, exp["mode"].as_str(), None, None, None).unwrap();
+    dev.configure(
+        exp["budget_ms"].as_u64().unwrap() as u32,
+        0,
+        exp["mode"].as_str(),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     dev.get_range_timing().unwrap();
     let (small, big) = (dev.measurements(2), dev.measurements(4096));
     dev.start_ranging().unwrap();
     assert!(until(|| big.len() >= 20, 5000));
     let n = big.len() as u64;
     assert_eq!(dev.stream_dropped_counts(), [n - 2, 0]);
-    assert_eq!(dev.stream_dropped_counts(), [small.dropped_count(), big.dropped_count()]);
+    assert_eq!(
+        dev.stream_dropped_counts(),
+        [small.dropped_count(), big.dropped_count()]
+    );
     // the capture has no more frames
-    assert!(matches!(dev.get_measurement(Some(Duration::from_millis(100))), Err(DepzError::Timeout { .. })));
+    assert!(matches!(
+        dev.get_measurement(Some(Duration::from_millis(100))),
+        Err(DepzError::Timeout { .. })
+    ));
     assert_eq!(dev.stream_dropped_counts().len(), 2);
     drop(small);
     assert_eq!(dev.stream_dropped_counts(), [0]);
@@ -1039,33 +1229,57 @@ const DRIVER_CAPTURES: &[&str] = &[
 
 fn frame_matches(got: &Vl53lxMeasurement, want: &serde_json::Value) -> Result<(), String> {
     let int = |k: &str| want[k].as_i64().unwrap();
-    if (got.timestamp_us as i64, got.distance_mm as i64, got.status as i64)
-        != (int("timestamp_us"), int("distance_mm"), int("status"))
+    if (
+        got.timestamp_us as i64,
+        got.distance_mm as i64,
+        got.status as i64,
+    ) != (int("timestamp_us"), int("distance_mm"), int("status"))
     {
-        return Err(format!("({}, {}, {})", got.timestamp_us, got.distance_mm, got.status));
+        return Err(format!(
+            "({}, {}, {})",
+            got.timestamp_us, got.distance_mm, got.status
+        ));
     }
-    let targets: Vec<(i64, i64)> = got.targets.iter().map(|t| (t.distance_mm as i64, t.status as i64)).collect();
-    let want_targets: Vec<(i64, i64)> =
-        want["targets"].as_array().unwrap().iter().map(|t| (t[0].as_i64().unwrap(), t[1].as_i64().unwrap())).collect();
+    let targets: Vec<(i64, i64)> = got
+        .targets
+        .iter()
+        .map(|t| (t.distance_mm as i64, t.status as i64))
+        .collect();
+    let want_targets: Vec<(i64, i64)> = want["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| (t[0].as_i64().unwrap(), t[1].as_i64().unwrap()))
+        .collect();
     if targets != want_targets {
         return Err(format!("targets {targets:?}"));
     }
     match (&got.bins, want.get("bins")) {
         (None, None) => Ok(()),
         (Some(b), Some(w)) => {
-            let bins: Vec<i64> = w["bin_data"].as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect();
+            let bins: Vec<i64> = w["bin_data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_i64().unwrap())
+                .collect();
             let n = w["number_of_bins"].as_i64().unwrap();
             if b.bin_data[..n as usize] != bins[..]
                 || b.number_of_bins != n
                 || b.vcsel_period != w["vcsel_period"].as_i64().unwrap()
                 || b.result_stream_count != w["stream_count"].as_i64().unwrap()
-                || b.result_range_status != w["range_status"].as_i64().unwrap() // the raw register
+                || b.result_range_status != w["range_status"].as_i64().unwrap()
+            // the raw register
             {
                 return Err(format!("bins {b:?}"));
             }
             Ok(())
         }
-        (b, w) => Err(format!("bins {} where the sidecar has {}", b.is_some(), w.is_some())),
+        (b, w) => Err(format!(
+            "bins {} where the sidecar has {}",
+            b.is_some(),
+            w.is_some()
+        )),
     }
 }
 
@@ -1080,11 +1294,21 @@ fn driver_captures_replay_through_the_device_class() {
         if let Some(refused) = exp.get("refused") {
             // A preset the driver no longer has: refused as an argument; the frames are history.
             let after = &refused["after_init"];
-            assert_eq!(serde_json::json!(dev.modes().unwrap()), after["modes"], "{stem}");
+            assert_eq!(
+                serde_json::json!(dev.modes().unwrap()),
+                after["modes"],
+                "{stem}"
+            );
             let (lo, hi) = dev.budget_range().unwrap();
             assert_eq!(serde_json::json!([lo, hi]), after["budget_ms"], "{stem}");
-            assert_eq!(serde_json::json!(dev.driver_reach_mm().unwrap()), after["driver_reach_mm"], "{stem}");
-            let e = dev.configure(budget, 0, mode, None, None, None).unwrap_err();
+            assert_eq!(
+                serde_json::json!(dev.driver_reach_mm().unwrap()),
+                after["driver_reach_mm"],
+                "{stem}"
+            );
+            let e = dev
+                .configure(budget, 0, mode, None, None, None)
+                .unwrap_err();
             assert_eq!(e.kind(), Some("invalid_argument"), "{stem}: {e}");
             common::seen(format!("recordings/{stem}.depzrec").as_str());
             continue;
@@ -1095,7 +1319,9 @@ fn driver_captures_replay_through_the_device_class() {
         let q = dev.measurements(4096);
         dev.start_ranging().unwrap();
         for (i, want) in exp["frames"].as_array().unwrap().iter().enumerate() {
-            let got = q.take(Duration::from_secs(5)).unwrap_or_else(|e| panic!("{stem} frame {i}: {e}"));
+            let got = q
+                .take(Duration::from_secs(5))
+                .unwrap_or_else(|e| panic!("{stem} frame {i}: {e}"));
             if let Err(m) = frame_matches(&got, want) {
                 panic!("{stem} frame {i}: got {m}, want {want}");
             }

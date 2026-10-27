@@ -13,6 +13,7 @@
  * the default platform.h of the C driver).
  */
 
+import { InvalidStateError } from "../../errors.js";
 import { checkInt, checkUint } from "../../protocol/wire.js";
 import type { Vl53l8Assets, Vl53l8Variant } from "./assets/index.js";
 
@@ -457,15 +458,24 @@ export function defaultMotionConfig(resolution: number): MotionConfig {
   return cfg;
 }
 
+/** Largest xtalk margin setXtalkMargin accepts, kcps/SPAD (as ST). */
+export const XTALK_MARGIN_MAX_KCPS = 10000;
+
 /**
- * Xtalk margin (kcps/spad) → raw DCI value (round(kcps * 2048)). The margin is
- * 0..10000 kcps; anything else is a RangeError, never wrapped (contract 07 §3).
+ * Xtalk margin → raw DCI value (kcps * 2048). As ST, the margin is a whole
+ * number of kcps/SPAD, 0..10000: a fraction, a negative or a bigger value is
+ * a RangeError, never rounded or wrapped (contract 07 §3).
  */
 export function xtalkMarginToRaw(marginKcps: number): number {
-  if (!(marginKcps >= 0 && marginKcps <= 10000)) {
-    throw new RangeError(`marginKcps: ${marginKcps} out of range 0..10000`);
+  if (!Number.isInteger(marginKcps) || marginKcps < 0 || marginKcps > XTALK_MARGIN_MAX_KCPS) {
+    throw new RangeError(`marginKcps: ${marginKcps} is not a whole number 0..${XTALK_MARGIN_MAX_KCPS}`);
   }
-  return Math.round(marginKcps * 2048);
+  return marginKcps * 2048;
+}
+
+/** Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST). */
+export function xtalkMarginFromRaw(raw: number): number {
+  return Math.floor(raw / 2048);
 }
 
 /**
@@ -566,7 +576,7 @@ export class VL53L8CX {
     this.defaultXtalk = assets.defaultXtalk;
     this.getNvmCmd = assets.getNvmCmd;
     if (this.firmware.length !== 0x15000) {
-      throw new Error(`firmware.bin (${variant}) has wrong size — rerun the blob extractor`);
+      throw new InvalidStateError(`firmware.bin (${variant}) has wrong size — rerun the blob extractor`);
     }
   }
 
@@ -1531,18 +1541,23 @@ export class VL53L8CX {
 
   // ---------------- xtalk (vl53l8cx_plugin_xtalk.c) ----------------
 
-  /** Xtalk margin in kcps/spad. */
+  /** Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST). */
   async getXtalkMargin(): Promise<number> {
     const buf = await this.dciReadData(DCI_XTALK_CFG, 16);
-    return dvOf(buf).getUint32(0, true) / 2048.0;
+    return xtalkMarginFromRaw(dvOf(buf).getUint32(0, true));
   }
 
+  /**
+   * Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST). A fraction, a
+   * negative or a bigger value is INVALID_PARAM, nothing written (contract 07 §3).
+   */
   async setXtalkMargin(marginKcps: number): Promise<void> {
-    // 0..10000 kcps; below 0 (or NaN) is refused too, never wrapped (contract 07 §3)
-    if (!(marginKcps >= 0 && marginKcps <= 10000)) {
+    let raw: number;
+    try {
+      raw = xtalkMarginToRaw(marginKcps);
+    } catch {
       throw new Vl53l8cxError(STATUS_INVALID_PARAM, "set_xtalk_margin");
     }
-    const raw = xtalkMarginToRaw(marginKcps);
     const data = new Uint8Array(4);
     new DataView(data.buffer).setUint32(0, raw, true);
     await this.dciReplaceData(DCI_XTALK_CFG, 16, data, 0x00);
@@ -1656,6 +1671,15 @@ export class VL53L8CX {
     await this.dciWriteData(DCI_MOTION_DETECTOR_CFG, cfg.pack());
     this.motionPresent = true;
     return cfg;
+  }
+
+  /**
+   * Stop surfacing the motion block: frames parse with `motion` null. Called
+   * when the VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct
+   * (contract 04 §7, ERRATA B4).
+   */
+  motionIndicatorDisarm(): void {
+    this.motionPresent = false;
   }
 
   async motionIndicatorSetResolution(cfg: MotionConfig, resolution: number): Promise<void> {

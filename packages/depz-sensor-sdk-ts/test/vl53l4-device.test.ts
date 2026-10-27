@@ -10,10 +10,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   DepzError,
   DepzTimeoutError,
+  InvalidStateError,
   StatusError,
   Vl53l4cd,
   Vl53l4cdError,
   VL53L4_XSHUT_OFF,
+  RESULT_BLOCK_LEN,
+  parseResultBlock,
   type Vl53l4Measurement,
 } from "../src/index.js";
 import { FakeVl53lxBridge, hex } from "./fake-vl53lx-bridge.js";
@@ -148,6 +151,18 @@ describe("vl53l4cd init and identity", () => {
   });
 });
 
+describe("vl53l4cd result block (contract 10 §5)", () => {
+  it("is 17 bytes: 15 and 16 are short (ERRATA A8), a tail is ignored", () => {
+    expect(RESULT_BLOCK_LEN).toBe(17);
+    for (const n of [0, 14, 15, 16]) {
+      expect(() => parseResultBlock(new Uint8Array(n))).toThrow(Vl53l4cdError);
+      expect(() => parseResultBlock(new Uint8Array(n))).toThrow(/too short/);
+    }
+    const block = new Uint8Array(17);
+    expect(parseResultBlock(new Uint8Array([...block, 0xff, 0xff]))).toEqual(parseResultBlock(block));
+  });
+});
+
 describe("vl53l4cd configuration", () => {
   it("timing: continuous and autonomous", async () => {
     const { dev, fake } = await ready();
@@ -160,7 +175,15 @@ describe("vl53l4cd configuration", () => {
     await dev.setRangeTiming(33);
     expect(fake.dword(0x006c)).toBe(0);
     expect((await dev.getRangeTiming()).interMeasurementMs).toBe(0);
-    await expect(dev.setRangeTiming(5)).rejects.toThrow(Vl53l4cdError);
+    // ERRATA A16: a refused argument is invalid_argument (RangeError), not the
+    // driver's Vl53l4cdError, and is refused before any traffic, reads included
+    fake.rx.length = 0;
+    await expect(dev.setRangeTiming(5)).rejects.toThrow(RangeError);
+    await expect(dev.setRangeTiming(50, 30)).rejects.toThrow(RangeError);
+    await expect(dev.setRangeTiming(50, 50)).rejects.toThrow(RangeError);
+    await expect(dev.calibrateOffset(5)).rejects.toThrow(RangeError);
+    await expect(dev.calibrateXtalk(100, 4)).rejects.toThrow(RangeError);
+    expect(fake.rx).toEqual([]);
   });
 
   it("offset, xtalk, thresholds, signal and sigma (vectors tuning)", async () => {
@@ -189,8 +212,8 @@ describe("vl53l4cd configuration", () => {
     await dev.setSigmaThresholdMm(15);
     expect(fake.word(0x0064)).toBe(60);
     expect(await dev.getSigmaThresholdMm()).toBe(15);
-    await expect(dev.setSigmaThresholdMm(16384)).rejects.toThrow(/16383/);
-    await expect(dev.setXtalkKcps(128)).rejects.toThrow(Vl53l4cdError); // tuning_xtalk_too_wide
+    await expect(dev.setSigmaThresholdMm(16384)).rejects.toThrow(RangeError);
+    await expect(dev.setXtalkKcps(128)).rejects.toThrow(RangeError); // tuning_xtalk_too_wide
   });
 
   it("temperature update", async () => {
@@ -235,7 +258,7 @@ describe("vl53l4cd configuration", () => {
       () => dev.startRanging(),
       () => dev.measureOnce(),
     ]) {
-      await expect(call()).rejects.toThrow(/stopRanging\(\) first/);
+      await expect(call()).rejects.toThrow(InvalidStateError);
     }
     expect(fake.rx).toHaveLength(0);
   });

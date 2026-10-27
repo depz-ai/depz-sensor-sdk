@@ -9,12 +9,13 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
 import { chunkedRead, chunkedWrite } from "../reg-bridge.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   CHUNK_SIZE,
   FrameReassembler,
+  STREAM_CHUNK_MAX,
   Vl53l8Cmd,
   Vl53l8Rpt,
   packReadReg,
@@ -44,6 +45,14 @@ import {
 
 /** Below this the sensor never streams (contract 04). */
 export const MIN_RANGING_FREQUENCY_HZ = 2;
+/**
+ * Highest ranging frequency per resolution (contract 11 §3; the same silicon
+ * limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+ */
+export const MAX_RANGING_FREQUENCY_HZ: Readonly<Record<number, number>> = {
+  [RESOLUTION_4X4]: 60,
+  [RESOLUTION_8X8]: 15,
+};
 
 /**
  * One parsed ranging frame. Arrays are sized to the active resolution
@@ -114,6 +123,8 @@ export class Vl53l8cx extends DepzDevice {
   /** Register-bridge transfer limits (the I2C L5/L7 board reads less per call). */
   protected readonly readChunk: number = CHUNK_SIZE;
   protected readonly writeChunk: number = CHUNK_SIZE;
+  /** Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4). */
+  protected readonly streamChunk: number = STREAM_CHUNK_MAX;
   /** Lowest ranging frequency that actually streams on this sensor. */
   protected readonly minRangingHz: number = MIN_RANGING_FREQUENCY_HZ;
 
@@ -188,7 +199,7 @@ export class Vl53l8cx extends DepzDevice {
 
   /** The underlying ULD driver (escape hatch for advanced DCI access). */
   get uld(): VL53L8CX {
-    if (this.uldDriver === null) throw new DepzError("call init() first");
+    if (this.uldDriver === null) throw new InvalidStateError("call init() first");
     return this.uldDriver;
   }
 
@@ -232,6 +243,9 @@ export class Vl53l8cx extends DepzDevice {
       const driver = new VL53L8CX(this.platform, assets, this.variantId);
       await driver.init(opts?.progress);
       this.uldDriver = driver;
+      // A fresh driver has no motion indicator armed; the CNH setup is gone
+      // from the sensor too (ERRATA B4).
+      this.cnhConfig = null;
     } finally {
       this.writeProgressCb = null;
       this.fwWriteTotal = 0;
@@ -259,11 +273,24 @@ export class Vl53l8cx extends DepzDevice {
     return this.uld.getRangingFrequencyHz();
   }
 
+  /**
+   * Set the ranging frequency in Hz. Not while ranging. At least 2 Hz on the
+   * VL53L8 (1 Hz on L5/L7); at most 60 Hz at 4×4 and 15 Hz at 8×8 (contract
+   * 11 §3) — judged by the resolution last set or read through this class
+   * (4×4 after init). Refused host-side, nothing reaches the bus.
+   */
   async setRangingFrequencyHz(hz: number): Promise<void> {
-    if (hz < this.minRangingHz) {
+    if (!Number.isInteger(hz) || hz < this.minRangingHz) {
       throw new DepzError(
         `ranging frequency must be >= ${this.minRangingHz} Hz: below that ` +
           "the sensor never enters its ranging loop and streams nothing (contract 04)",
+      );
+    }
+    const maxHz = MAX_RANGING_FREQUENCY_HZ[this.resolution]!;
+    if (hz > maxHz) {
+      throw new DepzError(
+        `ranging frequency must be <= ${maxHz} Hz at ${this.resolution} zones ` +
+          `(60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3), got ${hz}`,
       );
     }
     this.requireNotRanging();
@@ -322,10 +349,12 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.setPowerMode(mode);
   }
 
+  /** Xtalk margin, whole kcps/SPAD (as ST). */
   async getXtalkMargin(): Promise<number> {
     return this.uld.getXtalkMargin();
   }
 
+  /** Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused. */
   async setXtalkMargin(marginKcps: number): Promise<void> {
     this.requireNotRanging();
     await this.uld.setXtalkMargin(marginKcps);
@@ -390,11 +419,15 @@ export class Vl53l8cx extends DepzDevice {
    * Enable the motion indicator over [distanceMinMm, distanceMaxMm] and
    * surface motion output in each frame's `.motion`. Returns the underlying
    * uld MotionConfig for advanced tuning.
+   *
+   * On CH firmware the motion indicator and CNH share one DCI struct
+   * (0xBFAC): this disarms CNH (`activeCnhConfig` → null, no `cnhRaw`).
    */
   async configureMotionIndicator(distanceMinMm = 400, distanceMaxMm = 1500): Promise<MotionConfig> {
     this.requireNotRanging();
     const resolution = await this.getResolution();
     const cfg = await this.uld.motionIndicatorInit(resolution);
+    this.cnhConfig = null;
     await this.uld.motionIndicatorSetDistanceMotion(cfg, distanceMinMm, distanceMaxMm);
     return cfg;
   }
@@ -408,7 +441,7 @@ export class Vl53l8cx extends DepzDevice {
     await this.getResolution(); // refresh the cache used for frame shaping
     await this.uld.startRanging(cnhSize);
     const frameSize = this.uld.dataReadSize;
-    this.reassembler = new FrameReassembler();
+    this.reassembler = new FrameReassembler(this.streamChunk);
     await this.request(Vl53l8Cmd.StartStream, packStartStream(frameSize), {
       okCompletes: true,
     });
@@ -495,7 +528,7 @@ export class Vl53l8cx extends DepzDevice {
 
   protected requireNotRanging(): void {
     if (this.rangingFlag) {
-      throw new DepzError("stopRanging() first — the stream owns the register bank");
+      throw new InvalidStateError("stopRanging() first — the stream owns the register bank");
     }
   }
 
@@ -514,7 +547,7 @@ export class Vl53l8cx extends DepzDevice {
       return true;
     }
     const frame = this.toFrame(done.timestampUs, parsed);
-    for (const cb of [...this.frameCbs]) cb(frame);
+    for (const cb of [...this.frameCbs]) this.callGuarded(cb, frame);
     for (const q of [...this.frameQueues]) q.push(frame);
     return true;
   }
@@ -550,10 +583,14 @@ export class Vl53l8ch extends Vl53l8cx {
   /**
    * Arm the CNH histogram block for the next startRanging(). CH only — this
    * method does not exist on Vl53l8cx.
+   *
+   * CNH and the motion indicator share one DCI struct (0xBFAC): this disarms
+   * the motion indicator (frames carry `motion` null).
    */
   async configureCnh(config: CnhConfig): Promise<void> {
     this.requireNotRanging();
     await this.uld.dciWriteData(MI_CFG_DEV_IDX, config.pack());
+    this.uld.motionIndicatorDisarm();
     this.cnhConfig = config;
   }
 }

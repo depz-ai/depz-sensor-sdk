@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Generate the C# SDK API reference (Markdown) from the public sources.
 
-Parses the public C# under ``src/Depz.Sensor/`` — types (class / record /
+Parses the public C# under ``src/Depz.Sensor/`` and the Unity communication
+module under ``unity/Runtime/`` — types (class / record /
 enum / static class, including nested types), their public members
 (methods, properties, constants, fields, enum members) and the ``///``
 XML-doc ``<summary>`` — and writes, in the SAME markdown shape as the
@@ -39,16 +40,18 @@ import re
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "Depz.Sensor"
+UNITY = Path(__file__).resolve().parents[1] / "unity" / "Runtime"
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 
 # Domain (documentation group) → section title, in reading order. Mirrors the
 # Python api.md grouping: the four sensors first, then the shared foundation.
 DOMAIN_ORDER = [
-    "devices", "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
+    "devices", "unity", "usb", "sr04", "vl53l4", "vl53l8", "vl53l7", "vl53lx", "bno086", "bno055",
     "tmf8829", "firmware", "dataset", "transport", "protocol",
 ]
 DOMAIN_TITLE = {
     "devices": "Live devices (connection, streams, discovery)",
+    "unity": "Unity (Windows communication module)",
     "usb": "USB identity",
     "sr04": "SR04",
     "vl53l4": "VL53L4CD (ToF)",
@@ -67,6 +70,7 @@ DOMAIN_TITLE = {
 # Nicer-than-alphabetical file ordering within a domain (headline codecs first).
 FILE_PRIORITY = [
     "DepzDevices.cs", "DepzDevice.cs", "Subscription.cs", "Links.cs", "SerialPorts.cs", "Errors.cs",
+    "DepzDevicesUnity.cs", "WindowsSerialLink.cs", "WindowsSerialPorts.cs", "IRegistry.cs", "DepzSensorBehaviour.cs",
     "Sr04Device.cs", "Sr04.cs",
     "Vl53l4cdDevice.cs", "Vl53l4Wire.cs", "Vl53l4Uld.cs", "Vl53l4cdDriver.cs",
     "Vl53l8cxDevice.cs", "Vl53l8Driver.cs", "FrameDecoder.cs", "Vl53l8Stream.cs", "Advanced.cs", "Cnh.cs", "CnhSetup.cs", "Vl53l8Tables.g.cs",
@@ -360,6 +364,12 @@ class Parser:
             if s.strip().startswith("namespace"):
                 start = idx + 1
                 break
+        # A block namespace (the Unity sources are C# 9): skip its opening brace;
+        # _parse_scope stops at the closing one.
+        while start < len(self.slines) and self.slines[start].strip() == "":
+            start += 1
+        if start < len(self.slines) and self.slines[start].strip() == "{":
+            start += 1
         syms, _ = self._parse_scope(start, len(self.slines))
         return syms
 
@@ -371,7 +381,7 @@ class Parser:
         while i < end:
             s = self.slines[i].strip()
             r = self.rlines[i].strip()
-            if s == "" or r.startswith("//") or r.startswith("["):
+            if s == "" or r.startswith("//") or r.startswith("[") or r.startswith("#"):
                 i += 1
                 continue
             if s.startswith("}"):
@@ -610,6 +620,11 @@ def _collect():
         syms = Parser(path.read_text()).parse()
         by_domain.setdefault(domain, []).extend(syms)
 
+    # The Unity communication module: the UPM package's sources (its MonoBehaviour included —
+    # the parser does not evaluate #if, so UNITY_5_3_OR_NEWER code is documented too).
+    for path in sorted(UNITY.glob("*.cs"), key=prio):
+        by_domain.setdefault("unity", []).extend(Parser(path.read_text()).parse())
+
     ordered = DOMAIN_ORDER + [d for d in by_domain if d not in DOMAIN_ORDER]
     return [(d, DOMAIN_TITLE.get(d, d.title()), by_domain[d])
             for d in ordered if by_domain.get(d)]
@@ -687,7 +702,8 @@ def main() -> None:
     root_head = [
         "# API reference",
         "",
-        "Auto-generated from the public C# surface under `src/Depz.Sensor/` by",
+        "Auto-generated from the public C# surface under `src/Depz.Sensor/` and",
+        "the Unity communication module under `unity/Runtime/` by",
         "`scripts/gen_api_md.py` — run it to regenerate (see below). Edit the",
         "`///` XML-doc summaries in the source, not this file.",
         "",

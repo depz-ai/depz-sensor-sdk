@@ -359,11 +359,11 @@ back; the ULD subtracts a per-zone crosstalk estimate. `init()` uploads ST's
 default estimate.
 
 ```c
-double margin;
+uint32_t margin;
 bool failed = false;
 uint8_t cal[DEPZ_VL53L8_XTALK_BUFFER_SIZE];            /* 776 bytes */
 
-depz_vl53l8_set_xtalk_margin(dev, 50.0);                /* kcps/SPAD, <= 10000 */
+depz_vl53l8_set_xtalk_margin(dev, 50);                  /* whole kcps/SPAD, 0..10000 (as ST) */
 depz_vl53l8_get_xtalk_margin(dev, &margin);
 
 /* A flat target of known reflectance at a known distance, behind the glass. */
@@ -592,9 +592,10 @@ writes:
 ```c
 static void advanced_codecs(void)
 {
-    /* crosstalk margin (kcps/SPAD) <-> raw DCI value (raw = round(kcps * 2048)) */
-    uint32_t raw = depz_vl53l8_xtalk_margin_to_raw(50.0);
-    double kcps = depz_vl53l8_xtalk_margin_from_raw(raw);
+    /* crosstalk margin, whole kcps/SPAD 0..10000 (as ST) <-> raw DCI value (raw = kcps * 2048) */
+    uint32_t raw;
+    if (depz_vl53l8_xtalk_margin_to_raw(50, &raw) != 0) return;   /* -1: above 10000 */
+    uint32_t kcps = depz_vl53l8_xtalk_margin_from_raw(raw);        /* raw / 2048 */
 
     /* detection thresholds -> the 768-byte DCI_DET_THRESH_START block */
     depz_vl53l8_threshold th = {

@@ -28,7 +28,12 @@ const GET_NVM_CMD: &[u8] = include_bytes!("../data/cx/get_nvm_cmd.bin");
 
 impl Vl53l8Firmware {
     /// Every firmware set, in declaration order.
-    pub const ALL: [Vl53l8Firmware; 4] = [Vl53l8Firmware::Cx, Vl53l8Firmware::Ch, Vl53l8Firmware::L7cx, Vl53l8Firmware::L7ch];
+    pub const ALL: [Vl53l8Firmware; 4] = [
+        Vl53l8Firmware::Cx,
+        Vl53l8Firmware::Ch,
+        Vl53l8Firmware::L7cx,
+        Vl53l8Firmware::L7ch,
+    ];
 
     /// The blob set name under `vl53l8/data` (`cx`, `ch`, `l7cx`, `l7ch`).
     pub fn set_name(self) -> &'static str {

@@ -55,7 +55,11 @@ public final class Vl53l4cdDriver {
         return getSensorId() == Vl53l4Uld.MODEL_ID;
     }
 
-    /** @throws Vl53l4Uld.Vl53l4Error FIRMWARE__SYSTEM_STATUS never read 0x03 */
+    /**
+     * Polls FIRMWARE__SYSTEM_STATUS until the sensor has booted, once per millisecond.
+     *
+     * @throws Vl53l4Uld.Vl53l4Error FIRMWARE__SYSTEM_STATUS never read 0x03
+     */
     public void waitBoot(int timeoutMs) {
         for (int i = 0; i < Math.max(1, timeoutMs); i++) {
             if (readByte(Vl53l4Uld.FIRMWARE_SYSTEM_STATUS) == 0x03) {
@@ -115,7 +119,11 @@ public final class Vl53l4cdDriver {
         return (readByte(Vl53l4Uld.GPIO_TIO_HV_STATUS) & 1) == intPol;
     }
 
-    /** @throws Vl53l4Uld.Vl53l4Error no data ready within {@code timeoutMs} polls */
+    /**
+     * Polls the data-ready flag, once per millisecond.
+     *
+     * @throws Vl53l4Uld.Vl53l4Error no data ready within {@code timeoutMs} polls
+     */
     public void waitDataReady(int timeoutMs) {
         for (int i = 0; i < Math.max(1, timeoutMs); i++) {
             if (checkForDataReady()) {
@@ -134,6 +142,8 @@ public final class Vl53l4cdDriver {
     // ── timing ───────────────────────────────────────────────────────────────
 
     public void setRangeTiming(int timingBudgetMs, long interMeasurementMs) {
+        // refused before any register traffic, not only before the writes
+        Vl53l4Uld.checkRangeTiming(timingBudgetMs, interMeasurementMs);
         int clockPll = interMeasurementMs > 0 ? readWord(Vl53l4Uld.RESULT_OSC_CALIBRATE_VAL) : 0;
         int[] r = Vl53l4Uld.rangeTimingRegisters(timingBudgetMs, interMeasurementMs, readWord(Vl53l4Uld.OSC_FREQUENCY), clockPll);
         writeDword(Vl53l4Uld.INTERMEASUREMENT_MS, Integer.toUnsignedLong(r[2]));
@@ -237,7 +247,7 @@ public final class Vl53l4cdDriver {
     /** Offset calibration against a target at {@code targetDistMm} (10–1000); returns the offset now programmed, mm. */
     public int calibrateOffset(int targetDistMm, int nbSamples) {
         if (nbSamples < 5 || nbSamples > 255 || targetDistMm < 10 || targetDistMm > 1000) {
-            throw new Vl53l4Uld.Vl53l4Error("nb_samples must be 5..255, target 10..1000 mm");
+            throw new IllegalArgumentException("nb_samples must be 5..255, target 10..1000 mm");
         }
         writeWord(Vl53l4Uld.RANGE_OFFSET_MM, 0);
         writeWord(Vl53l4Uld.INNER_OFFSET_MM, 0);
@@ -256,7 +266,7 @@ public final class Vl53l4cdDriver {
     /** Crosstalk calibration against a target at {@code targetDistMm} (10–5000); returns the xtalk now programmed, kcps (C rounding). */
     public int calibrateXtalk(int targetDistMm, int nbSamples) {
         if (nbSamples < 5 || nbSamples > 255 || targetDistMm < 10 || targetDistMm > 5000) {
-            throw new Vl53l4Uld.Vl53l4Error("nb_samples must be 5..255, target 10..5000 mm");
+            throw new IllegalArgumentException("nb_samples must be 5..255, target 10..5000 mm");
         }
         writeWord(Vl53l4Uld.XTALK_PLANE_OFFSET_KCPS, 0); // compensation off
 

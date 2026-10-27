@@ -4,6 +4,7 @@ import ai.depz.sensor.json.JsonText;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,33 +39,76 @@ public final class ReplayLink implements Link {
      * @param strictTx fail a write that differs from the recorded tx stream
      * @param realtime pace rx chunks by their recorded timestamps
      */
-    @SuppressWarnings("unchecked")
     public ReplayLink(Path path, boolean strictTx, boolean realtime) {
         this.name = "replay:" + path.getFileName();
         this.strictTx = strictTx;
         this.realtime = realtime;
-        List<String> lines;
+        String content;
         try {
-            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+            content = Files.readString(path, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException e) {
+            // not UTF-8 (a gzip container, ERRATA A6) is a damaged capture, not an I/O failure
+            throw new IllegalArgumentException(path + ": not UTF-8 text: " + e, e);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        header = !lines.isEmpty() && !lines.get(0).isBlank()
-                ? (Map<String, Object>) JsonText.parse(lines.get(0)) : Map.of();
+        if (content.isEmpty()) {
+            throw new IllegalArgumentException(path + ": empty, not a .depzrec capture (no header line)");
+        }
+        // contract 08 «Line rules»: LF ends a line (readAllLines would also cut at a lone CR)
+        List<String> lines = List.of(content.split("\n", -1));
+        header = jsonObject(path, 1, lines.get(0));
         ByteArrayOutputStream txs = new ByteArrayOutputStream();
         for (int i = 1; i < lines.size(); i++) {
-            if (lines.get(i).isBlank()) {
+            if (JsonText.isBlankLine(lines.get(i))) {
                 continue;
             }
-            Map<String, Object> ev = (Map<String, Object>) JsonText.parse(lines.get(i));
-            byte[] data = JsonText.unhex((String) ev.get("data"));
-            if ("rx".equals(ev.get("dir"))) {
-                rx.add(new Rx(((Number) ev.get("t")).longValue(), data, txs.size()));
+            int lineno = i + 1;
+            Map<String, Object> ev = jsonObject(path, lineno, lines.get(i));
+            Object t = ev.get("t");
+            if (!(t instanceof Long tUs) || tUs < 0) {
+                throw new IllegalArgumentException(path + ":" + lineno + ": 't' must be a non-negative integer, got " + t);
+            }
+            Object dir = ev.get("dir");
+            if (!(dir instanceof String)) {
+                throw new IllegalArgumentException(path + ":" + lineno + ": 'dir' must be a string, got " + dir);
+            }
+            Object hex = ev.get("data");
+            if (!(hex instanceof String h)) {
+                throw new IllegalArgumentException(path + ":" + lineno + ": 'data' must be a hex string, got " + hex);
+            }
+            byte[] data;
+            try {
+                data = JsonText.unhex(h);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(path + ":" + lineno + ": 'data' is not hex: " + h);
+            }
+            if ("rx".equals(dir)) {
+                rx.add(new Rx(tUs, data, txs.size()));
             } else {
                 txs.writeBytes(data);
             }
         }
         tx = txs.toByteArray();
+    }
+
+    /**
+     * {@code line} as the JSON object a capture line must be (contract 08), else
+     * {@link IllegalArgumentException} naming the file and line — a damaged capture is the
+     * caller's bad argument, never a crash.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> jsonObject(Path path, int lineno, String line) {
+        Object obj;
+        try {
+            obj = JsonText.parse(line);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(path + ":" + lineno + ": not JSON: " + e.getMessage());
+        }
+        if (!(obj instanceof Map)) {
+            throw new IllegalArgumentException(path + ":" + lineno + ": not a JSON object");
+        }
+        return (Map<String, Object>) obj;
     }
 
     public ReplayLink(Path path) {

@@ -138,7 +138,7 @@ Generated from the TypeScript sources by TypeDoc — run `bun run docs` to regen
 
 # Class: Bno086
 
-Defined in: [src/sensors/bno086/bno086.ts:137](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L137)
+Defined in: [src/sensors/bno086/bno086.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L150)
 
 BNO086 device: enable SH-2 sensors, stream typed reports.
 
@@ -164,7 +164,7 @@ methods (enable/tare/...) from inside one.
 new Bno086(transport, opts?): Bno086;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:158](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L158)
+Defined in: [src/sensors/bno086/bno086.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L171)
 
 #### Parameters
 
@@ -191,7 +191,7 @@ DepzDevice.constructor
 timeoutMs: number;
 ```
 
-Defined in: [src/device/device.ts:201](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L201)
+Defined in: [src/device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
 
 #### Inherited from
 
@@ -207,7 +207,7 @@ DepzDevice.timeoutMs
 protected readonly link: DepzLink;
 ```
 
-Defined in: [src/device/device.ts:203](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L203)
+Defined in: [src/device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
 
 #### Inherited from
 
@@ -223,7 +223,7 @@ DepzDevice.link
 busyRetries: number = 5;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:139](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L139)
+Defined in: [src/sensors/bno086/bno086.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L152)
 
 SEND_SHTP_PACKET attempts before giving up.
 
@@ -235,7 +235,7 @@ SEND_SHTP_PACKET attempts before giving up.
 busyBackoffMs: number = BUSY_BACKOFF_MS;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:141](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L141)
+Defined in: [src/sensors/bno086/bno086.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L154)
 
 >= 200 ms per the bridge spec (contract 05 §2).
 
@@ -249,7 +249,7 @@ Defined in: [src/sensors/bno086/bno086.ts:141](https://github.com/depz-ai/depz-s
 get stats(): LinkStats;
 ```
 
-Defined in: [src/device/device.ts:264](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L264)
+Defined in: [src/device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
 
 ##### Returns
 
@@ -271,7 +271,7 @@ DepzDevice.stats
 get timeSync(): TimeSync | null;
 ```
 
-Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L553)
+Defined in: [src/device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
 
 ##### Returns
 
@@ -293,7 +293,7 @@ DepzDevice.timeSync
 get advertisement(): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:468](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L468)
+Defined in: [src/sensors/bno086/bno086.ts:481](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L481)
 
 Raw SHTP channel-0 advertisement bytes seen since open/reset.
 
@@ -309,7 +309,7 @@ Raw SHTP channel-0 advertisement bytes seen since open/reset.
 open(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:230](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L230)
+Defined in: [src/device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
 
 Open the transport and start the read pump. A no-op on a device that
 continues an adopted connection (`attachSensorClass`) — already open.
@@ -332,7 +332,7 @@ DepzDevice.open
 close(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:237](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L237)
+Defined in: [src/device/device.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L251)
 
 Close the connection. A device that handed its connection over owns none.
 
@@ -354,7 +354,7 @@ DepzDevice.close
 protected registerStream(stream): () => void;
 ```
 
-Defined in: [src/device/device.ts:408](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L408)
+Defined in: [src/device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
 
 Register a stream to be closed on device teardown.
 
@@ -383,7 +383,7 @@ DepzDevice.registerStream
 onEvent(cb): () => void;
 ```
 
-Defined in: [src/device/device.ts:421](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L421)
+Defined in: [src/device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
 
 Subscribe to unsolicited/diagnostic events (read-pump context; do not
 block). Returns an unsubscribe function.
@@ -412,7 +412,7 @@ DepzDevice.onEvent
 protected emitEvent(event): void;
 ```
 
-Defined in: [src/device/device.ts:428](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L428)
+Defined in: [src/device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
 
 #### Parameters
 
@@ -432,6 +432,43 @@ DepzDevice.emitEvent
 
 ***
 
+### callGuarded()
+
+```ts
+protected callGuarded<T>(cb, item): void;
+```
+
+Defined in: [src/device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
+
+Run a user callback on the read pump: one that throws is counted in
+`stats.callbackErrors`, logged and dropped — it never stops the pump, the
+other callbacks or the queues (contract 07 §3).
+
+#### Type Parameters
+
+| Type Parameter |
+| ------ |
+| `T` |
+
+#### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `cb` | (`item`) => `void` |
+| `item` | `T` |
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+```ts
+DepzDevice.callGuarded
+```
+
+***
+
 ### request()
 
 ```ts
@@ -441,7 +478,7 @@ request<T>(
 opts?): Promise<T>;
 ```
 
-Defined in: [src/device/device.ts:444](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L444)
+Defined in: [src/device/device.ts:487](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L487)
 
 Send `cmd` and wait for its correlated completion (contract 02 §1).
 
@@ -484,7 +521,7 @@ DepzDevice.request
 static expectReport<T>(reportId, unpack): Matcher<T>;
 ```
 
-Defined in: [src/device/device.ts:488](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L488)
+Defined in: [src/device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
 
 Matcher for a typed report identified by its report ID alone.
 
@@ -519,7 +556,7 @@ DepzDevice.expectReport
 static expectText(requestCmd): Matcher<string>;
 ```
 
-Defined in: [src/device/device.ts:493](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L493)
+Defined in: [src/device/device.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L536)
 
 Matcher for RPT_TEXT echoing `requestCmd`.
 
@@ -547,7 +584,7 @@ DepzDevice.expectText
 getDeviceName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:504](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L504)
+Defined in: [src/device/device.ts:547](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L547)
 
 #### Returns
 
@@ -567,7 +604,7 @@ DepzDevice.getDeviceName
 getSoftwareName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:510](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L510)
+Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L553)
 
 #### Returns
 
@@ -587,7 +624,7 @@ DepzDevice.getSoftwareName
 getSerialNumber(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:516](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L516)
+Defined in: [src/device/device.ts:559](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L559)
 
 #### Returns
 
@@ -607,7 +644,7 @@ DepzDevice.getSerialNumber
 identify(): Promise<Identity>;
 ```
 
-Defined in: [src/device/device.ts:523](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L523)
+Defined in: [src/device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
 
 Classify the running firmware (contract 02 §4).
 
@@ -629,7 +666,7 @@ DepzDevice.identify
 readMcuTemperature(): Promise<number>;
 ```
 
-Defined in: [src/device/device.ts:528](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L528)
+Defined in: [src/device/device.ts:571](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L571)
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
@@ -651,7 +688,7 @@ DepzDevice.readMcuTemperature
 syncTime(samples?): Promise<TimeSync>;
 ```
 
-Defined in: [src/device/device.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L536)
+Defined in: [src/device/device.ts:579](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L579)
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
@@ -679,7 +716,7 @@ DepzDevice.syncTime
 toHostTimeUs(deviceTsUs): bigint;
 ```
 
-Defined in: [src/device/device.ts:558](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L558)
+Defined in: [src/device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
 
 Device µs → host monotonic µs (requires a prior `syncTime`).
 
@@ -707,7 +744,7 @@ DepzDevice.toHostTimeUs
 getReportPayloadCrc(): Promise<CrcType>;
 ```
 
-Defined in: [src/device/device.ts:563](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L563)
+Defined in: [src/device/device.ts:606](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L606)
 
 #### Returns
 
@@ -727,7 +764,7 @@ DepzDevice.getReportPayloadCrc
 setReportPayloadCrc(crcType): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:570](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L570)
+Defined in: [src/device/device.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L613)
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
@@ -755,7 +792,7 @@ DepzDevice.setReportPayloadCrc
 getSyncPin(pin): Promise<SyncPinConfig>;
 ```
 
-Defined in: [src/device/device.ts:574](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L574)
+Defined in: [src/device/device.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L617)
 
 #### Parameters
 
@@ -781,7 +818,7 @@ DepzDevice.getSyncPin
 setSyncPin(config): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:580](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L580)
+Defined in: [src/device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
 
 #### Parameters
 
@@ -807,7 +844,7 @@ DepzDevice.setSyncPin
 reset(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:585](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L585)
+Defined in: [src/device/device.ts:628](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L628)
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
@@ -829,7 +866,7 @@ DepzDevice.reset
 enterBootloaderMode(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:594](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L594)
+Defined in: [src/device/device.ts:637](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L637)
 
 Ask the device to reboot into the resident bootloader and close this
 connection. Re-discovery/flash flow lives in the bootloader module
@@ -853,7 +890,7 @@ DepzDevice.enterBootloaderMode
 protected onTeardown(error): void;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:164](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L164)
+Defined in: [src/sensors/bno086/bno086.ts:177](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L177)
 
 Hook for sensor subclasses: reject any subclass-managed in-flight requests
 and clear per-connection state when the link closes. Runs once, after the
@@ -883,7 +920,7 @@ DepzDevice.onTeardown
 protected handleReport(pkt): boolean;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:177](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L177)
+Defined in: [src/sensors/bno086/bno086.ts:190](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L190)
 
 Hook for sensor subclasses: route streaming reports here. Return true
 when the packet was consumed. Runs after status/matcher/common-report
@@ -913,7 +950,7 @@ DepzDevice.handleReport
 hardwareReset(timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:409](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L409)
+Defined in: [src/sensors/bno086/bno086.ts:422](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L422)
 
 Hard-reset the sensor via nRST (0x32). All SHTP state (seq counters,
 partial cargos) and cached features restart from zero.
@@ -943,7 +980,7 @@ in newer firmware); the best-effort wait handles both, so its absence is
 wake(): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:436](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L436)
+Defined in: [src/sensors/bno086/bno086.ts:449](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L449)
 
 Pulse WAKE (PS0): wakes the sensor from sleep, no state loss.
 
@@ -962,7 +999,7 @@ command; the SH-2 "On" command that ends [sleep](#sleep) is [powerOn](#poweron).
 sleep(): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:451](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L451)
+Defined in: [src/sensors/bno086/bno086.ts:464](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L464)
 
 Put the hub to sleep: SH-2 "Sleep" (0x03 on SHTP channel 1).
 
@@ -986,7 +1023,7 @@ sample; a Wakeup|AlwaysOn report kept streaming at full rate on channel 4.
 powerOn(): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:463](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L463)
+Defined in: [src/sensors/bno086/bno086.ts:476](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L476)
 
 End [sleep](#sleep): SH-2 "On" (0x02 on SHTP channel 1).
 
@@ -1007,7 +1044,7 @@ sending an SH-2 command.
 productId(timeoutMs?): Promise<ProductId>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:482](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L482)
+Defined in: [src/sensors/bno086/bno086.ts:495](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L495)
 
 The SH-2 application's Product ID — the first of `productIds()`.
 
@@ -1029,7 +1066,7 @@ The SH-2 application's Product ID — the first of `productIds()`.
 productIds(timeoutMs?, settleMs?): Promise<ProductId[]>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:493](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L493)
+Defined in: [src/sensors/bno086/bno086.ts:506](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L506)
 
 Product ID Request → every component's response, in the sensor's order
 (the SH-2 application first). Collects until no response came for
@@ -1059,7 +1096,7 @@ enable(
 opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:522](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L522)
+Defined in: [src/sensors/bno086/bno086.ts:535](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L535)
 
 Enable `sensor` at the requested rate via Set Feature (0xFD).
 
@@ -1089,7 +1126,7 @@ FeatureResponse (null when `verify: false`).
 disable(sensor): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:581](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L581)
+Defined in: [src/sensors/bno086/bno086.ts:594](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L594)
 
 Disable `sensor` (Set Feature with interval 0).
 
@@ -1111,7 +1148,7 @@ Disable `sensor` (Set Feature with interval 0).
 getFeature(sensor, timeoutMs?): Promise<FeatureResponse>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:587](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L587)
+Defined in: [src/sensors/bno086/bno086.ts:600](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L600)
 
 Get Feature Request/Response round trip for `sensor`.
 
@@ -1134,7 +1171,7 @@ Get Feature Request/Response round trip for `sensor`.
 enableRotationVector(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:598](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L598)
+Defined in: [src/sensors/bno086/bno086.ts:611](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L611)
 
 #### Parameters
 
@@ -1155,7 +1192,7 @@ Defined in: [src/sensors/bno086/bno086.ts:598](https://github.com/depz-ai/depz-s
 enableGameRotationVector(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:602](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L602)
+Defined in: [src/sensors/bno086/bno086.ts:615](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L615)
 
 #### Parameters
 
@@ -1176,7 +1213,7 @@ Defined in: [src/sensors/bno086/bno086.ts:602](https://github.com/depz-ai/depz-s
 enableAccelerometer(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:606](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L606)
+Defined in: [src/sensors/bno086/bno086.ts:619](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L619)
 
 #### Parameters
 
@@ -1197,7 +1234,7 @@ Defined in: [src/sensors/bno086/bno086.ts:606](https://github.com/depz-ai/depz-s
 enableGyroscope(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:610](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L610)
+Defined in: [src/sensors/bno086/bno086.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L623)
 
 #### Parameters
 
@@ -1218,7 +1255,7 @@ Defined in: [src/sensors/bno086/bno086.ts:610](https://github.com/depz-ai/depz-s
 enableMagnetometer(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:614](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L614)
+Defined in: [src/sensors/bno086/bno086.ts:627](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L627)
 
 #### Parameters
 
@@ -1239,7 +1276,7 @@ Defined in: [src/sensors/bno086/bno086.ts:614](https://github.com/depz-ai/depz-s
 enableLinearAcceleration(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L618)
+Defined in: [src/sensors/bno086/bno086.ts:631](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L631)
 
 #### Parameters
 
@@ -1260,7 +1297,7 @@ Defined in: [src/sensors/bno086/bno086.ts:618](https://github.com/depz-ai/depz-s
 enableGravity(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:622](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L622)
+Defined in: [src/sensors/bno086/bno086.ts:635](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L635)
 
 #### Parameters
 
@@ -1281,7 +1318,7 @@ Defined in: [src/sensors/bno086/bno086.ts:622](https://github.com/depz-ai/depz-s
 enableGyroIntegratedRv(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:626](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L626)
+Defined in: [src/sensors/bno086/bno086.ts:639](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L639)
 
 #### Parameters
 
@@ -1302,7 +1339,7 @@ Defined in: [src/sensors/bno086/bno086.ts:626](https://github.com/depz-ai/depz-s
 onReport(cb, sensors?): () => void;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:636](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L636)
+Defined in: [src/sensors/bno086/bno086.ts:649](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L649)
 
 Subscribe to typed sensor reports (read-pump context; do not block).
 `sensors` filters by SensorId. Returns an unsubscribe fn.
@@ -1326,7 +1363,7 @@ Subscribe to typed sensor reports (read-pump context; do not block).
 reports(sensors?, maxsize?): StreamQueue<Report>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:649](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L649)
+Defined in: [src/sensors/bno086/bno086.ts:662](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L662)
 
 Async iterator over typed reports — bounded, drop-oldest (contract 07
 §3). Subscribes eagerly — reports emitted after this call are never
@@ -1351,7 +1388,7 @@ missed.
 tareNow(axes?, basis?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:662](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L662)
+Defined in: [src/sensors/bno086/bno086.ts:675](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L675)
 
 Tare the selected axes against `basis` (no response per SH-2).
 
@@ -1374,7 +1411,7 @@ Tare the selected axes against `basis` (no response per SH-2).
 persistTare(): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:667](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L667)
+Defined in: [src/sensors/bno086/bno086.ts:680](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L680)
 
 Persist the current tare into FRS (no response per SH-2).
 
@@ -1394,7 +1431,7 @@ setReorientation(
 w): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:681](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L681)
+Defined in: [src/sensors/bno086/bno086.ts:694](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L694)
 
 Set the runtime reorientation quaternion (Q14 on the wire; all zeros
 clears). No response per SH-2.
@@ -1426,7 +1463,7 @@ about y (bench, 2026-10-22, SH-2 3.12.6). The System Orientation record
 setCalibration(config?, timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:686](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L686)
+Defined in: [src/sensors/bno086/bno086.ts:699](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L699)
 
 Configure ME calibration; rejects with Sh2Error on non-zero status.
 
@@ -1453,7 +1490,7 @@ Configure ME calibration; rejects with Sh2Error on non-zero status.
 getCalibration(timeoutMs?): Promise<CalibrationConfig>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:702](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L702)
+Defined in: [src/sensors/bno086/bno086.ts:715](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L715)
 
 Read back which ME calibrations are running.
 
@@ -1475,7 +1512,7 @@ Read back which ME calibrations are running.
 saveDcd(timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:717](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L717)
+Defined in: [src/sensors/bno086/bno086.ts:730](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L730)
 
 Save the dynamic calibration data to flash (DCD Save Now).
 
@@ -1497,7 +1534,7 @@ Save the dynamic calibration data to flash (DCD Save Now).
 configurePeriodicDcd(enable): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:725](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L725)
+Defined in: [src/sensors/bno086/bno086.ts:738](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L738)
 
 Enable/disable the hub's periodic DCD autosave (no response).
 
@@ -1519,7 +1556,7 @@ Enable/disable the hub's periodic DCD autosave (no response).
 setMotionIntent(intent): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:738](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L738)
+Defined in: [src/sensors/bno086/bno086.ts:751](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L751)
 
 Tell the hub how the device is about to move (Interactive Calibration,
 command 0x0E, see MotionIntent), so it can refine the gyro zero-rate
@@ -1545,7 +1582,7 @@ MotionRequest report (enable SensorId.MotionRequest).
 enableMotionRequest(hz?, opts?): Promise<FeatureResponse | null>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:747](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L747)
+Defined in: [src/sensors/bno086/bno086.ts:760](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L760)
 
 Enable MotionRequest (0x2B) reports. The hub sends one when its request
 changes, not at `hz`; it reads the rate back late, so the granted rate is
@@ -1570,7 +1607,7 @@ not checked.
 flush(sensor, timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:759](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L759)
+Defined in: [src/sensors/bno086/bno086.ts:772](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L772)
 
 Force Sensor Flush (0xF0): have the hub send `sensor`'s batched reports
 now instead of when its batch interval runs out. Resolves once the hub's
@@ -1596,7 +1633,7 @@ the call has been emitted by then.
 frsRead(recordId, timeoutMs?): Promise<number[]>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:785](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L785)
+Defined in: [src/sensors/bno086/bno086.ts:798](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L798)
 
 Read a whole FRS record; resolves with its 32-bit words.
 
@@ -1622,7 +1659,7 @@ frsWrite(
 timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:802](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L802)
+Defined in: [src/sensors/bno086/bno086.ts:816](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L816)
 
 Write a whole FRS record (word list); rejects with Sh2Error on failure.
 
@@ -1646,7 +1683,7 @@ Write a whole FRS record (word list); rejects with Sh2Error on failure.
 getMetadata(sensor, timeoutMs?): Promise<SensorMetadata>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:824](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L824)
+Defined in: [src/sensors/bno086/bno086.ts:839](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L839)
 
 Read + parse the sensor's FRS metadata record.
 
@@ -1669,7 +1706,7 @@ Read + parse the sensor's FRS metadata record.
 getOscillatorType(timeoutMs?): Promise<OscillatorType>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:837](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L837)
+Defined in: [src/sensors/bno086/bno086.ts:852](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L852)
 
 Get Oscillator Type (command 0x0A). r[0] is the type directly.
 
@@ -1691,7 +1728,7 @@ Get Oscillator Type (command 0x0A). r[0] is the type directly.
 clearDcdAndReset(timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:847](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L847)
+Defined in: [src/sensors/bno086/bno086.ts:862](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L862)
 
 Clear the in-RAM dynamic calibration and reset the sensor (command 0x0B).
 There is no command response — the hub resets, so this waits for the
@@ -1715,7 +1752,7 @@ executable reset-complete like hardwareReset().
 getErrors(severity?, timeoutMs?): Promise<ErrorRecord[]>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:874](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L874)
+Defined in: [src/sensors/bno086/bno086.ts:889](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L889)
 
 Read the error queue (command 0x01), filtered to `severity` or greater.
 Records stream until one with source == 255 (no more).
@@ -1739,7 +1776,7 @@ Records stream until one with source == 255 (no more).
 getCounts(sensor, timeoutMs?): Promise<Counts>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:892](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L892)
+Defined in: [src/sensors/bno086/bno086.ts:907](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L907)
 
 Read a sensor's event counts (command 0x02). The hub answers with two
 responses (responseSeq 0 then 1).
@@ -1763,7 +1800,7 @@ responses (responseSeq 0 then 1).
 clearCounts(sensor, timeoutMs?): Promise<void>;
 ```
 
-Defined in: [src/sensors/bno086/bno086.ts:917](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L917)
+Defined in: [src/sensors/bno086/bno086.ts:932](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/bno086.ts#L932)
 
 Clear a sensor's event counts (command 0x02, subcommand 1).
 
@@ -1780,7 +1817,7 @@ Clear a sensor's event counts (command 0x02, subcommand 1).
 
 # Class: FrsReadSession
 
-Defined in: [src/sensors/bno086/sh2.ts:609](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L609)
+Defined in: [src/sensors/bno086/sh2.ts:616](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L616)
 
 Multi-packet FRS read state machine (pure — feed parsed responses).
 
@@ -1795,7 +1832,7 @@ returns true; `words` holds the record. Error statuses throw.
 new FrsReadSession(frsType): FrsReadSession;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:614](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L614)
+Defined in: [src/sensors/bno086/sh2.ts:621](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L621)
 
 #### Parameters
 
@@ -1815,7 +1852,7 @@ Defined in: [src/sensors/bno086/sh2.ts:614](https://github.com/depz-ai/depz-sens
 readonly frsType: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:610](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L610)
+Defined in: [src/sensors/bno086/sh2.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L617)
 
 ***
 
@@ -1825,7 +1862,7 @@ Defined in: [src/sensors/bno086/sh2.ts:610](https://github.com/depz-ai/depz-sens
 words: number[] = [];
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:611](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L611)
+Defined in: [src/sensors/bno086/sh2.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L618)
 
 ***
 
@@ -1835,7 +1872,7 @@ Defined in: [src/sensors/bno086/sh2.ts:611](https://github.com/depz-ai/depz-sens
 done: boolean = false;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:612](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L612)
+Defined in: [src/sensors/bno086/sh2.ts:619](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L619)
 
 ## Methods
 
@@ -1845,7 +1882,7 @@ Defined in: [src/sensors/bno086/sh2.ts:612](https://github.com/depz-ai/depz-sens
 request(): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L618)
+Defined in: [src/sensors/bno086/sh2.ts:625](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L625)
 
 #### Returns
 
@@ -1859,7 +1896,7 @@ Defined in: [src/sensors/bno086/sh2.ts:618](https://github.com/depz-ai/depz-sens
 feed(resp): boolean;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:622](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L622)
+Defined in: [src/sensors/bno086/sh2.ts:629](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L629)
 
 #### Parameters
 
@@ -1873,7 +1910,7 @@ Defined in: [src/sensors/bno086/sh2.ts:622](https://github.com/depz-ai/depz-sens
 
 # Class: FrsWriteSession
 
-Defined in: [src/sensors/bno086/sh2.ts:657](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L657)
+Defined in: [src/sensors/bno086/sh2.ts:664](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L664)
 
 Multi-packet FRS write state machine (pure).
 
@@ -1889,7 +1926,7 @@ WriteCompleted. Error statuses throw.
 new FrsWriteSession(frsType, words): FrsWriteSession;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:663](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L663)
+Defined in: [src/sensors/bno086/sh2.ts:670](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L670)
 
 #### Parameters
 
@@ -1910,7 +1947,7 @@ Defined in: [src/sensors/bno086/sh2.ts:663](https://github.com/depz-ai/depz-sens
 readonly frsType: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:658](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L658)
+Defined in: [src/sensors/bno086/sh2.ts:665](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L665)
 
 ***
 
@@ -1920,7 +1957,7 @@ Defined in: [src/sensors/bno086/sh2.ts:658](https://github.com/depz-ai/depz-sens
 readonly words: number[];
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:659](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L659)
+Defined in: [src/sensors/bno086/sh2.ts:666](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L666)
 
 ***
 
@@ -1930,7 +1967,7 @@ Defined in: [src/sensors/bno086/sh2.ts:659](https://github.com/depz-ai/depz-sens
 offset: number = 0;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:660](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L660)
+Defined in: [src/sensors/bno086/sh2.ts:667](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L667)
 
 ***
 
@@ -1940,7 +1977,7 @@ Defined in: [src/sensors/bno086/sh2.ts:660](https://github.com/depz-ai/depz-sens
 done: boolean = false;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:661](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L661)
+Defined in: [src/sensors/bno086/sh2.ts:668](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L668)
 
 ## Methods
 
@@ -1950,7 +1987,7 @@ Defined in: [src/sensors/bno086/sh2.ts:661](https://github.com/depz-ai/depz-sens
 request(): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:668](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L668)
+Defined in: [src/sensors/bno086/sh2.ts:675](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L675)
 
 #### Returns
 
@@ -1964,7 +2001,7 @@ Defined in: [src/sensors/bno086/sh2.ts:668](https://github.com/depz-ai/depz-sens
 feed(resp): Uint8Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:680](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L680)
+Defined in: [src/sensors/bno086/sh2.ts:687](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L687)
 
 #### Parameters
 
@@ -2237,7 +2274,7 @@ discarded: number = 0;
 
 Defined in: [src/sensors/bno086/shtp.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/shtp.ts#L183)
 
-Incomplete cargos thrown away.
+Incomplete cargos and junk-channel (≥ 6) frames thrown away.
 
 ## Methods
 
@@ -2324,7 +2361,7 @@ FIRST fragment's — the base its 0xFB timestamps refer to.
 reset(): void;
 ```
 
-Defined in: [src/sensors/bno086/shtp.ts:271](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/shtp.ts#L271)
+Defined in: [src/sensors/bno086/shtp.ts:273](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/shtp.ts#L273)
 
 Forget all TX seq counters and partial cargos (sensor reset).
 
@@ -2605,7 +2642,7 @@ Bit 3: always-on — keeps running while the hub sleeps.
 
 # Enumeration: FrsRecordId
 
-Defined in: [src/sensors/bno086/sh2.ts:434](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L434)
+Defined in: [src/sensors/bno086/sh2.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L437)
 
 FRS record IDs used by this SDK (SH-2 figure 28; metadata records).
 
@@ -2617,7 +2654,7 @@ FRS record IDs used by this SDK (SH-2 figure 28; metadata records).
 StaticCalibrationAgm: 31097;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:435](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L435)
+Defined in: [src/sensors/bno086/sh2.ts:438](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L438)
 
 ***
 
@@ -2627,7 +2664,7 @@ Defined in: [src/sensors/bno086/sh2.ts:435](https://github.com/depz-ai/depz-sens
 NominalCalibration: 19789;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:436](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L436)
+Defined in: [src/sensors/bno086/sh2.ts:439](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L439)
 
 ***
 
@@ -2637,7 +2674,7 @@ Defined in: [src/sensors/bno086/sh2.ts:436](https://github.com/depz-ai/depz-sens
 DynamicCalibration: 7967;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L437)
+Defined in: [src/sensors/bno086/sh2.ts:440](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L440)
 
 ***
 
@@ -2647,7 +2684,7 @@ Defined in: [src/sensors/bno086/sh2.ts:437](https://github.com/depz-ai/depz-sens
 MePowerMgmt: 54242;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:438](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L438)
+Defined in: [src/sensors/bno086/sh2.ts:441](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L441)
 
 ***
 
@@ -2657,7 +2694,7 @@ Defined in: [src/sensors/bno086/sh2.ts:438](https://github.com/depz-ai/depz-sens
 SystemOrientation: 11582;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:440](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L440)
+Defined in: [src/sensors/bno086/sh2.ts:443](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L443)
 
 Mounting quaternion, 4 × Q30 words.
 
@@ -2669,7 +2706,7 @@ Mounting quaternion, 4 × Q30 words.
 AccelOrientation: 11585;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:441](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L441)
+Defined in: [src/sensors/bno086/sh2.ts:444](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L444)
 
 ***
 
@@ -2679,7 +2716,7 @@ Defined in: [src/sensors/bno086/sh2.ts:441](https://github.com/depz-ai/depz-sens
 GyroscopeOrientation: 11590;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:442](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L442)
+Defined in: [src/sensors/bno086/sh2.ts:445](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L445)
 
 ***
 
@@ -2689,7 +2726,7 @@ Defined in: [src/sensors/bno086/sh2.ts:442](https://github.com/depz-ai/depz-sens
 MagnetometerOrientation: 11596;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:443](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L443)
+Defined in: [src/sensors/bno086/sh2.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L446)
 
 ***
 
@@ -2699,7 +2736,7 @@ Defined in: [src/sensors/bno086/sh2.ts:443](https://github.com/depz-ai/depz-sens
 ArvrStabilizationRv: 15917;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:444](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L444)
+Defined in: [src/sensors/bno086/sh2.ts:447](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L447)
 
 ***
 
@@ -2709,7 +2746,7 @@ Defined in: [src/sensors/bno086/sh2.ts:444](https://github.com/depz-ai/depz-sens
 ArvrStabilizationGrv: 15918;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:445](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L445)
+Defined in: [src/sensors/bno086/sh2.ts:448](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L448)
 
 ***
 
@@ -2719,7 +2756,7 @@ Defined in: [src/sensors/bno086/sh2.ts:445](https://github.com/depz-ai/depz-sens
 SerialNumber: 19275;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:447](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L447)
+Defined in: [src/sensors/bno086/sh2.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L450)
 
 One 32-bit word; empty unless programmed.
 
@@ -2731,7 +2768,7 @@ One 32-bit word; empty unless programmed.
 UserRecord: 29876;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:449](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L449)
+Defined in: [src/sensors/bno086/sh2.ts:452](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L452)
 
 Free for the user, up to 64 words.
 
@@ -2743,7 +2780,7 @@ Free for the user, up to 64 words.
 SigMotionDetectConfig: 49780;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:451](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L451)
+Defined in: [src/sensors/bno086/sh2.ts:454](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L454)
 
 ***
 
@@ -2753,7 +2790,7 @@ Defined in: [src/sensors/bno086/sh2.ts:451](https://github.com/depz-ai/depz-sens
 ShakeDetectConfig: 32125;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:452](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L452)
+Defined in: [src/sensors/bno086/sh2.ts:455](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L455)
 
 ***
 
@@ -2763,7 +2800,7 @@ Defined in: [src/sensors/bno086/sh2.ts:452](https://github.com/depz-ai/depz-sens
 StabilityDetectorConfig: 60805;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:453](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L453)
+Defined in: [src/sensors/bno086/sh2.ts:456](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L456)
 
 ***
 
@@ -2773,13 +2810,25 @@ Defined in: [src/sensors/bno086/sh2.ts:453](https://github.com/depz-ai/depz-sens
 ActivityTrackerConfig: 60808;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:455](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L455)
+Defined in: [src/sensors/bno086/sh2.ts:458](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L458)
 
 Personal-activity-classifier config.
 
+***
+
+### GyroIntegratedRvConfig
+
+```ts
+GyroIntegratedRvConfig: 41378;
+```
+
+Defined in: [src/sensors/bno086/sh2.ts:460](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L460)
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 # Enumeration: FrsStatus
 
-Defined in: [src/sensors/bno086/sh2.ts:487](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L487)
+Defined in: [src/sensors/bno086/sh2.ts:492](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L492)
 
 FRS Read Response status (low nibble of the len/status byte).
 
@@ -2791,7 +2840,7 @@ FRS Read Response status (low nibble of the len/status byte).
 NoError: 0;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:488](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L488)
+Defined in: [src/sensors/bno086/sh2.ts:493](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L493)
 
 ***
 
@@ -2801,7 +2850,7 @@ Defined in: [src/sensors/bno086/sh2.ts:488](https://github.com/depz-ai/depz-sens
 UnrecognizedFrsType: 1;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:489](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L489)
+Defined in: [src/sensors/bno086/sh2.ts:494](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L494)
 
 ***
 
@@ -2811,7 +2860,7 @@ Defined in: [src/sensors/bno086/sh2.ts:489](https://github.com/depz-ai/depz-sens
 Busy: 2;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:490](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L490)
+Defined in: [src/sensors/bno086/sh2.ts:495](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L495)
 
 ***
 
@@ -2821,7 +2870,7 @@ Defined in: [src/sensors/bno086/sh2.ts:490](https://github.com/depz-ai/depz-sens
 ReadCompleted: 3;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:491](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L491)
+Defined in: [src/sensors/bno086/sh2.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L496)
 
 ***
 
@@ -2831,7 +2880,7 @@ Defined in: [src/sensors/bno086/sh2.ts:491](https://github.com/depz-ai/depz-sens
 OffsetOutOfRange: 4;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:492](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L492)
+Defined in: [src/sensors/bno086/sh2.ts:497](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L497)
 
 ***
 
@@ -2841,7 +2890,7 @@ Defined in: [src/sensors/bno086/sh2.ts:492](https://github.com/depz-ai/depz-sens
 RecordEmpty: 5;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:493](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L493)
+Defined in: [src/sensors/bno086/sh2.ts:498](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L498)
 
 ***
 
@@ -2851,7 +2900,7 @@ Defined in: [src/sensors/bno086/sh2.ts:493](https://github.com/depz-ai/depz-sens
 BlockCompleted: 6;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:494](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L494)
+Defined in: [src/sensors/bno086/sh2.ts:499](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L499)
 
 ***
 
@@ -2861,7 +2910,7 @@ Defined in: [src/sensors/bno086/sh2.ts:494](https://github.com/depz-ai/depz-sens
 BlockAndReadCompleted: 7;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:495](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L495)
+Defined in: [src/sensors/bno086/sh2.ts:500](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L500)
 
 ***
 
@@ -2871,11 +2920,11 @@ Defined in: [src/sensors/bno086/sh2.ts:495](https://github.com/depz-ai/depz-sens
 DeviceError: 8;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L496)
+Defined in: [src/sensors/bno086/sh2.ts:501](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L501)
 
 # Enumeration: FrsWriteStatus
 
-Defined in: [src/sensors/bno086/sh2.ts:499](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L499)
+Defined in: [src/sensors/bno086/sh2.ts:504](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L504)
 
 ## Enumeration Members
 
@@ -2885,7 +2934,7 @@ Defined in: [src/sensors/bno086/sh2.ts:499](https://github.com/depz-ai/depz-sens
 WordsReceived: 0;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:500](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L500)
+Defined in: [src/sensors/bno086/sh2.ts:505](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L505)
 
 ***
 
@@ -2895,7 +2944,7 @@ Defined in: [src/sensors/bno086/sh2.ts:500](https://github.com/depz-ai/depz-sens
 UnrecognizedFrsType: 1;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:501](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L501)
+Defined in: [src/sensors/bno086/sh2.ts:506](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L506)
 
 ***
 
@@ -2905,7 +2954,7 @@ Defined in: [src/sensors/bno086/sh2.ts:501](https://github.com/depz-ai/depz-sens
 Busy: 2;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:502](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L502)
+Defined in: [src/sensors/bno086/sh2.ts:507](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L507)
 
 ***
 
@@ -2915,7 +2964,7 @@ Defined in: [src/sensors/bno086/sh2.ts:502](https://github.com/depz-ai/depz-sens
 WriteCompleted: 3;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:503](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L503)
+Defined in: [src/sensors/bno086/sh2.ts:508](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L508)
 
 ***
 
@@ -2925,7 +2974,7 @@ Defined in: [src/sensors/bno086/sh2.ts:503](https://github.com/depz-ai/depz-sens
 WriteModeReady: 4;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:504](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L504)
+Defined in: [src/sensors/bno086/sh2.ts:509](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L509)
 
 ***
 
@@ -2935,7 +2984,7 @@ Defined in: [src/sensors/bno086/sh2.ts:504](https://github.com/depz-ai/depz-sens
 WriteFailed: 5;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:505](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L505)
+Defined in: [src/sensors/bno086/sh2.ts:510](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L510)
 
 ***
 
@@ -2945,7 +2994,7 @@ Defined in: [src/sensors/bno086/sh2.ts:505](https://github.com/depz-ai/depz-sens
 NotInWriteMode: 6;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:506](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L506)
+Defined in: [src/sensors/bno086/sh2.ts:511](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L511)
 
 ***
 
@@ -2955,7 +3004,7 @@ Defined in: [src/sensors/bno086/sh2.ts:506](https://github.com/depz-ai/depz-sens
 InvalidLength: 7;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:507](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L507)
+Defined in: [src/sensors/bno086/sh2.ts:512](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L512)
 
 ***
 
@@ -2965,7 +3014,7 @@ Defined in: [src/sensors/bno086/sh2.ts:507](https://github.com/depz-ai/depz-sens
 RecordValid: 8;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:508](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L508)
+Defined in: [src/sensors/bno086/sh2.ts:513](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L513)
 
 ***
 
@@ -2975,11 +3024,11 @@ Defined in: [src/sensors/bno086/sh2.ts:508](https://github.com/depz-ai/depz-sens
 RecordInvalid: 9;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:509](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L509)
+Defined in: [src/sensors/bno086/sh2.ts:514](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L514)
 
 # Enumeration: MotionIntent
 
-Defined in: [src/sensors/bno086/sh2.ts:404](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L404)
+Defined in: [src/sensors/bno086/sh2.ts:407](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L407)
 
 P0 of the Interactive Calibration command (0x0E), SH-2 §6.4.12.1 — what the
 host knows about the device's motion. Unknown is the hub's initial state.
@@ -2992,7 +3041,7 @@ host knows about the device's motion. Unknown is the hub's initial state.
 Unknown: 0;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:405](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L405)
+Defined in: [src/sensors/bno086/sh2.ts:408](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L408)
 
 ***
 
@@ -3002,7 +3051,7 @@ Defined in: [src/sensors/bno086/sh2.ts:405](https://github.com/depz-ai/depz-sens
 StationaryNoVibration: 1;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:406](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L406)
+Defined in: [src/sensors/bno086/sh2.ts:409](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L409)
 
 ***
 
@@ -3012,7 +3061,7 @@ Defined in: [src/sensors/bno086/sh2.ts:406](https://github.com/depz-ai/depz-sens
 StationaryWithVibration: 2;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:407](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L407)
+Defined in: [src/sensors/bno086/sh2.ts:410](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L410)
 
 ***
 
@@ -3022,7 +3071,7 @@ Defined in: [src/sensors/bno086/sh2.ts:407](https://github.com/depz-ai/depz-sens
 InMotion: 3;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:408](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L408)
+Defined in: [src/sensors/bno086/sh2.ts:411](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L411)
 
 ***
 
@@ -3032,7 +3081,7 @@ Defined in: [src/sensors/bno086/sh2.ts:408](https://github.com/depz-ai/depz-sens
 InMotionAccelerating: 4;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:409](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L409)
+Defined in: [src/sensors/bno086/sh2.ts:412](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L412)
 
 # Enumeration: OscillatorType
 
@@ -3749,7 +3798,7 @@ function buildCommandRequest(
    params?): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:295](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L295)
+Defined in: [src/sensors/bno086/sh2.ts:297](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L297)
 
 Command Request (0xF2), 12 bytes: id, seq, command, P0..P8.
 
@@ -3771,7 +3820,7 @@ Command Request (0xF2), 12 bytes: id, seq, command, P0..P8.
 function buildForceFlush(sensorId): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:426](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L426)
+Defined in: [src/sensors/bno086/sh2.ts:429](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L429)
 
 Force Sensor Flush (0xF0, SH-2 §6.5.6): flush `sensorId`'s batched data
 now. The hub answers with Flush Completed (0xEF) — on the input channel, as
@@ -3821,7 +3870,7 @@ function buildFrsReadRequest(
    blockWords?): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:513](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L513)
+Defined in: [src/sensors/bno086/sh2.ts:518](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L518)
 
 FRS Read Request (0xF4), 8 bytes. blockWords = 0 reads the record.
 
@@ -3843,7 +3892,7 @@ FRS Read Request (0xF4), 8 bytes. blockWords = 0 reads the record.
 function buildFrsWriteData(offsetWords, words): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:565](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L565)
+Defined in: [src/sensors/bno086/sh2.ts:571](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L571)
 
 FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
 
@@ -3864,7 +3913,7 @@ FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
 function buildFrsWriteRequest(frsType, lengthWords): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:554](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L554)
+Defined in: [src/sensors/bno086/sh2.ts:560](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L560)
 
 FRS Write Request (0xF7), 6 bytes. lengthWords = 0 erases the record.
 
@@ -3905,7 +3954,7 @@ Get Feature Request (0xFE), 2 bytes.
 function buildProductIdRequest(): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L251)
+Defined in: [src/sensors/bno086/sh2.ts:252](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L252)
 
 ## Returns
 
@@ -4060,7 +4109,7 @@ remaining length with the continuation bit set. seq increments per frame.
 function interactiveCalibrationParams(intent): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:416](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L416)
+Defined in: [src/sensors/bno086/sh2.ts:419](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L419)
 
 Interactive Calibration (command 0x0E, BNO086 only): P0 = motion intent,
 P1..P8 reserved. No command response is generated.
@@ -4086,7 +4135,7 @@ function meCalibrationParams(
    subcommand?): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:379](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L379)
+Defined in: [src/sensors/bno086/sh2.ts:382](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L382)
 
 ME Calibration (command 0x07). subcommand 0 = configure, 1 = get.
 
@@ -4177,7 +4226,7 @@ timestamp is `base + delay` where base = capture − baseDelta·100 µs.
 function periodicDcdParams(enable): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:396](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L396)
+Defined in: [src/sensors/bno086/sh2.ts:399](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L399)
 
 Periodic DCD save config (command 0x09). P0: 0 = enable, 1 = disable.
 No command response is generated.
@@ -4198,7 +4247,7 @@ No command response is generated.
 function persistTareParams(): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:353](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L353)
+Defined in: [src/sensors/bno086/sh2.ts:356](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L356)
 
 Tare subcommand 1 — persist current tare into FRS.
 
@@ -4212,7 +4261,7 @@ Tare subcommand 1 — persist current tare into FRS.
 function sensorMetadataFromWords(words): SensorMetadata;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:728](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L728)
+Defined in: [src/sensors/bno086/sh2.ts:735](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L735)
 
 ## Parameters
 
@@ -4234,7 +4283,7 @@ function setReorientationParams(
    w): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:364](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L364)
+Defined in: [src/sensors/bno086/sh2.ts:367](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L367)
 
 Tare subcommand 2 — set reorientation quaternion.
 
@@ -4283,7 +4332,7 @@ length is unknowable.
 function tareNowParams(axes?, basis?): Uint8Array;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:345](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L345)
+Defined in: [src/sensors/bno086/sh2.ts:348](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L348)
 
 Tare subcommand 0 — tare `axes` (bitmap X=1,Y=2,Z=4) using `basis`.
 
@@ -4304,7 +4353,7 @@ Tare subcommand 0 — tare `axes` (bitmap X=1,Y=2,Z=4) using `basis`.
 function unpackCommandResponse(payload): CommandResponse;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:329](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L329)
+Defined in: [src/sensors/bno086/sh2.ts:331](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L331)
 
 ## Parameters
 
@@ -4340,7 +4389,7 @@ Defined in: [src/sensors/bno086/sh2.ts:233](https://github.com/depz-ai/depz-sens
 function unpackFrsReadResponse(payload): FrsReadResponse;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L536)
+Defined in: [src/sensors/bno086/sh2.ts:541](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L541)
 
 ## Parameters
 
@@ -4358,7 +4407,7 @@ Defined in: [src/sensors/bno086/sh2.ts:536](https://github.com/depz-ai/depz-sens
 function unpackFrsWriteResponse(payload): FrsWriteResponse;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:586](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L586)
+Defined in: [src/sensors/bno086/sh2.ts:592](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L592)
 
 ## Parameters
 
@@ -4376,7 +4425,7 @@ Defined in: [src/sensors/bno086/sh2.ts:586](https://github.com/depz-ai/depz-sens
 function unpackProductId(payload): ProductId;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:272](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L272)
+Defined in: [src/sensors/bno086/sh2.ts:273](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L273)
 
 ## Parameters
 
@@ -4580,7 +4629,7 @@ Defined in: [src/sensors/bno086/bno086.ts:93](https://github.com/depz-ai/depz-se
 optional timeoutMs?: number;
 ```
 
-Defined in: [src/device/device.ts:170](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L170)
+Defined in: [src/device/device.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L183)
 
 #### Inherited from
 
@@ -4596,7 +4645,7 @@ DeviceOptions.timeoutMs
 optional txCrcType?: CrcType;
 ```
 
-Defined in: [src/device/device.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L171)
+Defined in: [src/device/device.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L184)
 
 #### Inherited from
 
@@ -4676,7 +4725,7 @@ Defined in: [src/sensors/bno086/bno086.ts:90](https://github.com/depz-ai/depz-se
 
 # Interface: CommandResponse
 
-Defined in: [src/sensors/bno086/sh2.ts:318](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L318)
+Defined in: [src/sensors/bno086/sh2.ts:320](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L320)
 
 Command Response (0xF1), 16 bytes.
 
@@ -4692,7 +4741,7 @@ R0 is the status word for most commands (0 = success).
 seq: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:319](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L319)
+Defined in: [src/sensors/bno086/sh2.ts:321](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L321)
 
 ***
 
@@ -4702,7 +4751,7 @@ Defined in: [src/sensors/bno086/sh2.ts:319](https://github.com/depz-ai/depz-sens
 command: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:320](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L320)
+Defined in: [src/sensors/bno086/sh2.ts:322](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L322)
 
 ***
 
@@ -4712,7 +4761,7 @@ Defined in: [src/sensors/bno086/sh2.ts:320](https://github.com/depz-ai/depz-sens
 commandSeq: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:321](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L321)
+Defined in: [src/sensors/bno086/sh2.ts:323](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L323)
 
 ***
 
@@ -4722,7 +4771,7 @@ Defined in: [src/sensors/bno086/sh2.ts:321](https://github.com/depz-ai/depz-sens
 responseSeq: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:322](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L322)
+Defined in: [src/sensors/bno086/sh2.ts:324](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L324)
 
 ***
 
@@ -4732,7 +4781,7 @@ Defined in: [src/sensors/bno086/sh2.ts:322](https://github.com/depz-ai/depz-sens
 r: number[];
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:324](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L324)
+Defined in: [src/sensors/bno086/sh2.ts:326](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L326)
 
 R0..R10.
 
@@ -4744,7 +4793,7 @@ R0..R10.
 status: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:326](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L326)
+Defined in: [src/sensors/bno086/sh2.ts:328](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L328)
 
 R0.
 
@@ -5079,7 +5128,7 @@ Defined in: [src/sensors/bno086/reports.ts:414](https://github.com/depz-ai/depz-
 
 # Interface: FrsReadResponse
 
-Defined in: [src/sensors/bno086/sh2.ts:525](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L525)
+Defined in: [src/sensors/bno086/sh2.ts:530](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L530)
 
 FRS Read Response (0xF3), 16 bytes; up to two data words per packet.
 
@@ -5091,7 +5140,7 @@ FRS Read Response (0xF3), 16 bytes; up to two data words per packet.
 status: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:527](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L527)
+Defined in: [src/sensors/bno086/sh2.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L532)
 
 FrsStatus.
 
@@ -5103,7 +5152,7 @@ FrsStatus.
 dataLength: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:529](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L529)
+Defined in: [src/sensors/bno086/sh2.ts:534](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L534)
 
 Valid words in data0/data1 (0–2).
 
@@ -5115,7 +5164,7 @@ Valid words in data0/data1 (0–2).
 offsetWords: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:530](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L530)
+Defined in: [src/sensors/bno086/sh2.ts:535](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L535)
 
 ***
 
@@ -5125,7 +5174,7 @@ Defined in: [src/sensors/bno086/sh2.ts:530](https://github.com/depz-ai/depz-sens
 data0: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L531)
+Defined in: [src/sensors/bno086/sh2.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L536)
 
 ***
 
@@ -5135,7 +5184,7 @@ Defined in: [src/sensors/bno086/sh2.ts:531](https://github.com/depz-ai/depz-sens
 data1: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L532)
+Defined in: [src/sensors/bno086/sh2.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L537)
 
 ***
 
@@ -5145,11 +5194,11 @@ Defined in: [src/sensors/bno086/sh2.ts:532](https://github.com/depz-ai/depz-sens
 frsType: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:533](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L533)
+Defined in: [src/sensors/bno086/sh2.ts:538](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L538)
 
 # Interface: FrsWriteResponse
 
-Defined in: [src/sensors/bno086/sh2.ts:580](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L580)
+Defined in: [src/sensors/bno086/sh2.ts:586](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L586)
 
 FRS Write Response (0xF5), 4 bytes.
 
@@ -5161,7 +5210,7 @@ FRS Write Response (0xF5), 4 bytes.
 status: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:582](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L582)
+Defined in: [src/sensors/bno086/sh2.ts:588](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L588)
 
 FrsWriteStatus.
 
@@ -5173,7 +5222,7 @@ FrsWriteStatus.
 offsetWords: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:583](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L583)
+Defined in: [src/sensors/bno086/sh2.ts:589](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L589)
 
 # Interface: GenericEvent
 
@@ -6162,7 +6211,7 @@ Defined in: [src/sensors/bno086/reports.ts:377](https://github.com/depz-ai/depz-
 
 # Interface: ProductId
 
-Defined in: [src/sensors/bno086/sh2.ts:261](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L261)
+Defined in: [src/sensors/bno086/sh2.ts:262](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L262)
 
 Product ID Response (0xF8), 16 bytes. The sensor sends one response per
 software component (a BNO085 sends four: the SH-2 application first, then
@@ -6177,7 +6226,7 @@ set on the first only.
 resetCause: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:262](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L262)
+Defined in: [src/sensors/bno086/sh2.ts:263](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L263)
 
 ***
 
@@ -6187,7 +6236,7 @@ Defined in: [src/sensors/bno086/sh2.ts:262](https://github.com/depz-ai/depz-sens
 swVersionMajor: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:263](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L263)
+Defined in: [src/sensors/bno086/sh2.ts:264](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L264)
 
 ***
 
@@ -6197,7 +6246,7 @@ Defined in: [src/sensors/bno086/sh2.ts:263](https://github.com/depz-ai/depz-sens
 swVersionMinor: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:264](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L264)
+Defined in: [src/sensors/bno086/sh2.ts:265](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L265)
 
 ***
 
@@ -6207,7 +6256,7 @@ Defined in: [src/sensors/bno086/sh2.ts:264](https://github.com/depz-ai/depz-sens
 swPartNumber: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:265](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L265)
+Defined in: [src/sensors/bno086/sh2.ts:266](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L266)
 
 ***
 
@@ -6217,7 +6266,7 @@ Defined in: [src/sensors/bno086/sh2.ts:265](https://github.com/depz-ai/depz-sens
 swBuildNumber: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:266](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L266)
+Defined in: [src/sensors/bno086/sh2.ts:267](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L267)
 
 ***
 
@@ -6227,7 +6276,7 @@ Defined in: [src/sensors/bno086/sh2.ts:266](https://github.com/depz-ai/depz-sens
 swVersionPatch: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:267](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L267)
+Defined in: [src/sensors/bno086/sh2.ts:268](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L268)
 
 ***
 
@@ -6237,7 +6286,7 @@ Defined in: [src/sensors/bno086/sh2.ts:267](https://github.com/depz-ai/depz-sens
 version: string;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:269](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L269)
+Defined in: [src/sensors/bno086/sh2.ts:270](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L270)
 
 "major.minor.patch".
 
@@ -6739,7 +6788,7 @@ Defined in: [src/sensors/bno086/reports.ts:313](https://github.com/depz-ai/depz-
 
 # Interface: SensorMetadata
 
-Defined in: [src/sensors/bno086/sh2.ts:705](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L705)
+Defined in: [src/sensors/bno086/sh2.ts:712](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L712)
 
 Parsed sensor metadata FRS record; `rawWords` is authoritative.
 
@@ -6754,7 +6803,7 @@ Field packing follows the sh2 reference driver (revision-gated fields are
 meVersion: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:706](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L706)
+Defined in: [src/sensors/bno086/sh2.ts:713](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L713)
 
 ***
 
@@ -6764,7 +6813,7 @@ Defined in: [src/sensors/bno086/sh2.ts:706](https://github.com/depz-ai/depz-sens
 mhVersion: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:707](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L707)
+Defined in: [src/sensors/bno086/sh2.ts:714](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L714)
 
 ***
 
@@ -6774,7 +6823,7 @@ Defined in: [src/sensors/bno086/sh2.ts:707](https://github.com/depz-ai/depz-sens
 shVersion: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:708](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L708)
+Defined in: [src/sensors/bno086/sh2.ts:715](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L715)
 
 ***
 
@@ -6784,7 +6833,7 @@ Defined in: [src/sensors/bno086/sh2.ts:708](https://github.com/depz-ai/depz-sens
 rangeRaw: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:710](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L710)
+Defined in: [src/sensors/bno086/sh2.ts:717](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L717)
 
 Same units & Q point as the sensor's reports.
 
@@ -6796,7 +6845,7 @@ Same units & Q point as the sensor's reports.
 resolutionRaw: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:711](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L711)
+Defined in: [src/sensors/bno086/sh2.ts:718](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L718)
 
 ***
 
@@ -6806,7 +6855,7 @@ Defined in: [src/sensors/bno086/sh2.ts:711](https://github.com/depz-ai/depz-sens
 revision: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:712](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L712)
+Defined in: [src/sensors/bno086/sh2.ts:719](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L719)
 
 ***
 
@@ -6816,7 +6865,7 @@ Defined in: [src/sensors/bno086/sh2.ts:712](https://github.com/depz-ai/depz-sens
 powerMaQ10: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:714](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L714)
+Defined in: [src/sensors/bno086/sh2.ts:721](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L721)
 
 mA in Q10.
 
@@ -6828,7 +6877,7 @@ mA in Q10.
 minPeriodUs: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:715](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L715)
+Defined in: [src/sensors/bno086/sh2.ts:722](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L722)
 
 ***
 
@@ -6838,7 +6887,7 @@ Defined in: [src/sensors/bno086/sh2.ts:715](https://github.com/depz-ai/depz-sens
 maxPeriodUs: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:717](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L717)
+Defined in: [src/sensors/bno086/sh2.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L724)
 
 Revision >= 4 only.
 
@@ -6850,7 +6899,7 @@ Revision >= 4 only.
 fifoMax: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:718](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L718)
+Defined in: [src/sensors/bno086/sh2.ts:725](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L725)
 
 ***
 
@@ -6860,7 +6909,7 @@ Defined in: [src/sensors/bno086/sh2.ts:718](https://github.com/depz-ai/depz-sens
 fifoReserved: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:719](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L719)
+Defined in: [src/sensors/bno086/sh2.ts:726](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L726)
 
 ***
 
@@ -6870,7 +6919,7 @@ Defined in: [src/sensors/bno086/sh2.ts:719](https://github.com/depz-ai/depz-sens
 batchBufferBytes: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:720](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L720)
+Defined in: [src/sensors/bno086/sh2.ts:727](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L727)
 
 ***
 
@@ -6880,7 +6929,7 @@ Defined in: [src/sensors/bno086/sh2.ts:720](https://github.com/depz-ai/depz-sens
 qPoint1: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:721](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L721)
+Defined in: [src/sensors/bno086/sh2.ts:728](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L728)
 
 ***
 
@@ -6890,7 +6939,7 @@ Defined in: [src/sensors/bno086/sh2.ts:721](https://github.com/depz-ai/depz-sens
 qPoint2: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:722](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L722)
+Defined in: [src/sensors/bno086/sh2.ts:729](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L729)
 
 ***
 
@@ -6900,7 +6949,7 @@ Defined in: [src/sensors/bno086/sh2.ts:722](https://github.com/depz-ai/depz-sens
 qPoint3: number;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L724)
+Defined in: [src/sensors/bno086/sh2.ts:731](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L731)
 
 Revision >= 3 only.
 
@@ -6912,7 +6961,7 @@ Revision >= 3 only.
 rawWords: number[];
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:725](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L725)
+Defined in: [src/sensors/bno086/sh2.ts:732](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L732)
 
 # Interface: ShakeDetector
 
@@ -8268,7 +8317,7 @@ Host->sensor frames must fit one MCU transmit slot (ERRATA E2: 2 x 64 B).
 const METADATA_RECORDS: Record<number, number>;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:459](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L459)
+Defined in: [src/sensors/bno086/sh2.ts:464](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L464)
 
 Per-sensor metadata FRS record IDs (subset used by getMetadata()).
 
@@ -8278,7 +8327,7 @@ Per-sensor metadata FRS record IDs (subset used by getMetadata()).
 const ME_CAL_GET: 1 = 0x01;
 ```
 
-Defined in: [src/sensors/bno086/sh2.ts:390](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L390)
+Defined in: [src/sensors/bno086/sh2.ts:393](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/bno086/sh2.ts#L393)
 
 Subcommand: report current ME calibration config.
 

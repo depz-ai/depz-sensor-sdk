@@ -1,6 +1,7 @@
 # API reference
 
-Auto-generated from the public C# surface under `src/Depz.Sensor/` by
+Auto-generated from the public C# surface under `src/Depz.Sensor/` and
+the Unity communication module under `unity/Runtime/` by
 `scripts/gen_api_md.py` — run it to regenerate (see below). Edit the
 `///` XML-doc summaries in the source, not this file.
 
@@ -11,7 +12,8 @@ Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 
 ## Contents
 
-- **Live devices (connection, streams, discovery)**: [`DeviceInfo`](#deviceinfo), [`DepzDevices`](#depzdevices), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`TimeSyncResult`](#timesyncresult), [`LinkStats`](#linkstats), [`ReplyMatcher`](#replymatcher), [`DepzDevice`](#depzdevice), [`Subscription`](#subscription), [`ILink`](#ilink), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`SerialPortInfo`](#serialportinfo), [`SerialPorts`](#serialports), [`SerialPortLink`](#serialportlink), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`StatusException`](#statusexception), [`BusyException`](#busyexception), [`DeviceLostException`](#devicelostexception), [`LinkClosedException`](#linkclosedexception), [`NoDepzDeviceException`](#nodepzdeviceexception), [`BootloaderModeException`](#bootloadermodeexception), [`WrongTypeException`](#wrongtypeexception), [`ReplayMismatchException`](#replaymismatchexception)
+- **Live devices (connection, streams, discovery)**: [`DeviceInfo`](#deviceinfo), [`DepzDevices`](#depzdevices), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`SeqGapEvent`](#seqgapevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`TimeSyncResult`](#timesyncresult), [`LinkStats`](#linkstats), [`ReplyMatcher`](#replymatcher), [`DepzDevice`](#depzdevice), [`Subscription`](#subscription), [`ILink`](#ilink), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`SerialPortInfo`](#serialportinfo), [`SerialPorts`](#serialports), [`SerialPortLink`](#serialportlink), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`InvalidReplyException`](#invalidreplyexception), [`StatusException`](#statusexception), [`BusyException`](#busyexception), [`DeviceLostException`](#devicelostexception), [`LinkClosedException`](#linkclosedexception), [`InvalidStateException`](#invalidstateexception), [`NoDepzDeviceException`](#nodepzdeviceexception), [`BootloaderModeException`](#bootloadermodeexception), [`WrongTypeException`](#wrongtypeexception), [`ReplayMismatchException`](#replaymismatchexception)
+- **Unity (Windows communication module)**: [`DepzDevicesUnity`](#depzdevicesunity), [`WindowsSerialLink`](#windowsseriallink), [`WindowsSerialPorts`](#windowsserialports), [`IRegistry`](#iregistry), [`WindowsRegistry`](#windowsregistry), [`DepzSensorBehaviour`](#depzsensorbehaviour)
 - **USB identity**: [`UsbIds`](#usbids), [`Discovery`](#discovery)
 - **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
 - **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`Vl53l4Xshut`](#vl53l4xshut), [`Vl53l4Wire`](#vl53l4wire), [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4Info`](#vl53l4info), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Exception`](#vl53l4exception), [`Vl53l4Results`](#vl53l4results), [`Vl53l4Uld`](#vl53l4uld), [`IVl53l4Platform`](#ivl53l4platform), [`Vl53l4cdDriver`](#vl53l4cddriver)
@@ -50,7 +52,7 @@ The model the USB-id table gives the port (contract 02 §4.2), or null.
 public static class DepzDevices
 ```
 
-Opening devices (contract 02 §4, contract 07 §2): the probe, class resolution and continuing a connection as its sensor class. Port discovery (`OpenDevice`, `ListDepzDevices`) needs .NET 8; in Unity open your own `ILink` and call `OpenOnLink`.
+Opening devices (contract 02 §4, contract 07 §2): the probe, class resolution and continuing a connection as its sensor class. Port discovery (`OpenDevice`, `ListDepzDevices`) needs .NET 8; in Unity on Windows use `DepzDevicesUnity` (the `unity/` module), elsewhere open your own `ILink` and call `OpenOnLink`.
 
 #### DepzDevices.OpenOnLink
 
@@ -76,11 +78,29 @@ public static (string SoftwareName, string DeviceName, string SerialNumber) Prob
 
 The contract 02 §4.4 probe on an open connection: GET_NAME_ACTIVE_SOFTWARE (required: its failure throws), then GET_DEVICE_NAME and GET_SERIAL (a timeout or error leaves ""). Returns (software name, device name, serial number).
 
-#### DepzDevices.cref
+#### DepzDevices.ProbeLink
 
 ```csharp
-#if NET /// <summary>Probe one port: open it, run <see cref="Probe"/>, close. Null when nothing DEPZ-shaped answers.</summary> public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+public static DeviceInfo? ProbeLink(ILink link, TimeSpan? timeout = null)
 ```
+
+Probe the device on `link` (the contract 02 §4.4 requests) and close the link. Null when nothing DEPZ-shaped answers. `Port` is the link's name; the USB ids stay null (a link knows none). For hosts that open their own ports.
+
+#### DepzDevices.Expect
+
+```csharp
+public static T Expect<T>(DepzDevice dev, string what) where T : DepzDevice
+```
+
+`dev` as ; any other class is closed and throws `WrongTypeException` ("the device is not `what`").
+
+#### DepzDevices.ProbePort
+
+```csharp
+public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+```
+
+Probe one port: open it, run the probe, close. Null when nothing DEPZ-shaped answers.
 
 #### DepzDevices.ListDepzDevices
 
@@ -112,7 +132,7 @@ Open the `index`-th DEPZ candidate, candidates sorted by USB serial.
 public static DepzDevice OpenPort(string port, TimeSpan? timeout = null)
 ```
 
-Open exactly `port` as its sensor class (also a port whose USB id is not a DEPZ one: an unprogrammed unit).
+Open exactly `port` as its sensor class (also a port whose USB id is not a DEPZ one: an unprogrammed unit). The USB id is that of the enumerated port the path names under any alias (`/dev/serial/by-id/…`; contract 02 §4.3).
 
 #### DepzDevices.OpenDevice
 
@@ -200,7 +220,15 @@ Base of the unsolicited / diagnostic events a device emits.
 public sealed record SequenceErrorEvent(int ExpectedSeq, int ReceivedSeq, bool ReportedByDevice) : DeviceEvent
 ```
 
-A gap in packet sequence numbers; `ReportedByDevice`: the board saw a gap in host TX (RPT_SEQUENCE_ERROR), else the host saw one in the board's packets.
+The board saw a gap in host TX (RPT_SEQUENCE_ERROR); `ReportedByDevice` is always true.
+
+### SeqGapEvent
+
+```csharp
+public sealed record SeqGapEvent(int ExpectedSeq, int ReceivedSeq, int Missed) : DeviceEvent
+```
+
+The host saw a gap in the board's packets (contract 01 §5 step 5): the packet still arrives, `Missed` = (received − expected) mod 256 did not. Counted in `LinkStats.SeqGaps`.
 
 ### LinkCrcErrorEvent
 
@@ -330,6 +358,14 @@ public long DeviceSeqErrors
 
 RPT_SEQUENCE_ERROR reports: gaps the device saw in host → device packets.
 
+#### LinkStats.CallbackErrors *(property)*
+
+```csharp
+public long CallbackErrors
+```
+
+Callbacks that threw on the reader thread (contract 07 §3).
+
 ### ReplyMatcher
 
 ```csharp
@@ -362,11 +398,13 @@ public DepzDevice(ILink link, TimeSpan? timeout = null)
 
 Open a connection on any link; the device owns it and closes it.
 
-#### DepzDevice.name
+#### DepzDevice.DepzDevice *(constructor)*
 
 ```csharp
-#if NET /// <summary>Open the serial port at <paramref name="port"/> (e.g. <c>/dev/ttyACM0</c>, <c>COM5</c>).</summary> public DepzDevice(string port, TimeSpan? timeout = null) : this(new SerialPortLink(port), timeout)
+public DepzDevice(string port, TimeSpan? timeout = null) : this(new SerialPortLink(port), timeout)
 ```
+
+Open the serial port at `port` (e.g. `/dev/ttyACM0`, `COM5`).
 
 #### DepzDevice.Port *(property)*
 
@@ -613,7 +651,7 @@ A blocking byte pipe to one device: a serial port, a `.depzrec` record/replay wr
 ### RecordingLink
 
 ```csharp
-public sealed class RecordingLink : ILink
+public sealed class RecordingLink : ILink, IDisposable
 ```
 
 Wraps any link and tees both directions into a `.depzrec` file (contract 08). TX is journaled before the physical write: a fast device reply could otherwise reach the reader and be journaled ahead of its own request, which breaks the causal rx gating replay relies on.
@@ -652,6 +690,12 @@ public byte[] Read(TimeSpan timeout)
 
 ```csharp
 public void Write(byte[] data)
+```
+
+#### RecordingLink.Dispose
+
+```csharp
+public void Dispose()
 ```
 
 #### RecordingLink.Close
@@ -750,15 +794,7 @@ One serial port and its USB identity, where the OS tells it.
 public static class SerialPorts
 ```
 
-Serial port enumeration with USB ids: Linux (sysfs) and Windows (the registry). On macOS the ports are listed without USB ids, so discovery finds no DEPZ candidate there: open a port path explicitly.
-
-#### SerialPorts.List
-
-```csharp
-public static IReadOnlyList<SerialPortInfo> List()
-```
-
-Every serial port the OS lists.
+Serial port enumeration with USB ids: Linux (sysfs) and Windows (the registry). On macOS the ports are listed without USB ids, so discovery finds no DEPZ candidate there: open a port path explicitly. Enumeration needs .NET 8; the netstandard2.1 build keeps the ordering only, and the Unity module (`unity/`) enumerates Windows ports on its own.
 
 #### SerialPorts.BySerial
 
@@ -768,10 +804,26 @@ public static IEnumerable<SerialPortInfo> BySerial(IEnumerable<SerialPortInfo> p
 
 Sorted by USB serial (none last), then by port path (contract 02 §4.3).
 
+#### SerialPorts.List
+
+```csharp
+public static IReadOnlyList<SerialPortInfo> List()
+```
+
+Every serial port the OS lists.
+
+#### SerialPorts.Find
+
+```csharp
+public static SerialPortInfo? Find(IEnumerable<SerialPortInfo> ports, string port)
+```
+
+The enumerated port `port` names, under any alias (contract 02 §4.3, ERRATA A5): the one whose path is the same string, else — on POSIX — the one whose resolved path is the same (`/dev/serial/by-id/…` is a symlink to the node). On Windows a COM name is matched by string only: a COM port is not a file, and resolving one opens it — a DTR pulse on every board of the bench. Null when the OS does not list the port. (The reference SDK also matches two names of one device node; .NET cannot read a device number.)
+
 ### SerialPortLink
 
 ```csharp
-public sealed class SerialPortLink : ILink
+public sealed class SerialPortLink : ILink, IDisposable
 ```
 
 A serial port as an `ILink` (System.IO.Ports). DTR and RTS are raised on open, as the reference SDK's pyserial does: a CDC device may hold its output until the host asserts DTR.
@@ -804,6 +856,12 @@ public byte[] Read(TimeSpan timeout)
 
 ```csharp
 public void Write(byte[] data)
+```
+
+#### SerialPortLink.Dispose
+
+```csharp
+public void Dispose()
 ```
 
 #### SerialPortLink.Close
@@ -858,6 +916,28 @@ public DepzTimeoutException(int cmd, TimeSpan timeout) : base($"no reply to cmd 
 
 ```csharp
 public DepzTimeoutException(string message) : base(message)
+```
+
+### InvalidReplyException
+
+```csharp
+public class InvalidReplyException : DepzException
+```
+
+The reply to a request does not decode (contract 07 §3): shorter than the fields its contract defines, or a value the decoder refuses. Only that request fails; the reader goes on and the device stays usable.
+
+#### InvalidReplyException.Cmd *(property)*
+
+```csharp
+public int Cmd
+```
+
+The request opcode whose reply was refused.
+
+#### InvalidReplyException.InvalidReplyException *(constructor)*
+
+```csharp
+public InvalidReplyException(int cmd, Exception cause) : base($"reply to cmd 0x{cmd:X2} does not decode: {cause.Message}", cause)
 ```
 
 ### StatusException
@@ -942,13 +1022,27 @@ I/O on a link that is already closed.
 public LinkClosedException(string message) : base(message)
 ```
 
+### InvalidStateException
+
+```csharp
+public sealed class InvalidStateException : DepzException
+```
+
+The call is not valid in the current state of the device or object (contract 07 §3): `ToHostTimeUs` before `SyncTime`, a sensor call before `Init()` / `Configure()` or while streaming, `Add()` after recording started, a closed dataset writer or player, `Wait()` without the player thread, a write to a read-only register block, a VL53Lx board name without a product number, a packaged firmware blob of the wrong size or missing from the assembly.
+
+#### InvalidStateException.InvalidStateException *(constructor)*
+
+```csharp
+public InvalidStateException(string message) : base(message)
+```
+
 ### NoDepzDeviceException
 
 ```csharp
 public sealed class NoDepzDeviceException : DepzException
 ```
 
-Discovery found no DEPZ device to open.
+Discovery found no DEPZ device to open — no candidate port, no match for the serial / index asked for, or nothing DEPZ answering the probe on the port or link.
 
 #### NoDepzDeviceException.NoDepzDeviceException *(constructor)*
 
@@ -1003,6 +1097,306 @@ A `ReplayLink` in strict mode saw the SDK write bytes the capture does not hold.
 ```csharp
 public ReplayMismatchException(string message) : base(message)
 ```
+
+## Unity (Windows communication module)
+
+### DepzDevicesUnity
+
+```csharp
+public static class DepzDevicesUnity
+```
+
+`DepzDevices` for Unity on Windows: the same discovery and open calls over `WindowsSerialPorts` (the registry) and `WindowsSerialLink`. Selection follows contract 02 §4.3 (only ports with a known DEPZ USB id, ordered by USB serial) and the class comes from the probe, run by `OpenOnLink` on the one connection the device then keeps. Every discovering call takes an optional `IRegistry` (default: the Windows registry), so it is testable with a fake. Off Windows there is no registry: discovery finds nothing and `OpenPort` is the way in.
+
+#### DepzDevicesUnity.ListPorts
+
+```csharp
+public static IReadOnlyList<SerialPortInfo> ListPorts(IRegistry? registry = null)
+```
+
+Every serial port present, with USB ids where the registry gives them.
+
+#### DepzDevicesUnity.ListDepzPorts
+
+```csharp
+public static IReadOnlyList<SerialPortInfo> ListDepzPorts(IRegistry? registry = null)
+```
+
+The ports with a known DEPZ USB id, sorted by USB serial (none last), then by port (contract 02 §4.3): the discovery candidates, index 0 is what `OpenDevice(string?, TimeSpan?, IRegistry?)` opens.
+
+#### DepzDevicesUnity.ProbePort
+
+```csharp
+public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+```
+
+Probe one port: open it, run the contract 02 §4.4 probe, close. Null when the port cannot be opened or nothing DEPZ-shaped answers.
+
+#### DepzDevicesUnity.ListDepzDevices
+
+```csharp
+public static IReadOnlyList<DeviceInfo> ListDepzDevices(IEnumerable<string>? ports = null, bool matchUsb = true, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+Probe the candidate ports and return every DEPZ device found, ordered by USB serial. With `matchUsb` (default) only ports with a known DEPZ USB id are probed; `ports` replaces enumeration with an explicit list.
+
+#### DepzDevicesUnity.OpenDevice
+
+```csharp
+public static DepzDevice OpenDevice(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+Open the DEPZ device with the smallest USB serial, or the one whose USB serial is `serial`, as its sensor class (contract 02 §4.3).
+
+#### DepzDevicesUnity.OpenDevice
+
+```csharp
+public static DepzDevice OpenDevice(int index, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+Open the `index`-th DEPZ candidate, candidates sorted by USB serial.
+
+#### DepzDevicesUnity.OpenPort
+
+```csharp
+public static DepzDevice OpenPort(string port, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+Open exactly `port` as its sensor class (also a port whose USB id is not a DEPZ one: an unprogrammed unit). The registry supplies the port's USB id, where it has one.
+
+#### DepzDevicesUnity.OpenDevice
+
+```csharp
+public static DepzDevice OpenDevice(DeviceInfo info, TimeSpan? timeout = null)
+```
+
+Open the port of a `ListDepzDevices` result as the class its probe answers resolve to.
+
+#### DepzDevicesUnity.OpenSr04
+
+```csharp
+public static Sr04Device OpenSr04(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is an SR04.
+
+#### DepzDevicesUnity.OpenVl53l4cd
+
+```csharp
+public static Vl53l4cdDevice OpenVl53l4cd(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a VL53L4CD.
+
+#### DepzDevicesUnity.OpenVl53l8
+
+```csharp
+public static Vl53l8cxDevice OpenVl53l8(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a VL53L8CX or VL53L8CH (`Vl53l8chDevice` derives from `Vl53l8cxDevice`).
+
+#### DepzDevicesUnity.OpenVl53l7
+
+```csharp
+public static Vl53l7cxDevice OpenVl53l7(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a VL53L5CX, VL53L7CX or VL53L7CH (all derive from `Vl53l7cxDevice`).
+
+#### DepzDevicesUnity.OpenBno055
+
+```csharp
+public static Bno055Device OpenBno055(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a BNO055.
+
+#### DepzDevicesUnity.OpenBno086
+
+```csharp
+public static Bno086Device OpenBno086(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a BNO085 / BNO086.
+
+#### DepzDevicesUnity.OpenVl53lx
+
+```csharp
+public static Vl53lxDevice OpenVl53lx(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a board of the VL53L 1D family (every class derives from `Vl53lxDevice`).
+
+#### DepzDevicesUnity.OpenTmf8829
+
+```csharp
+public static Tmf8829Device OpenTmf8829(string? serial = null, TimeSpan? timeout = null, IRegistry? registry = null)
+```
+
+`OpenDevice(string?, TimeSpan?, IRegistry?)`, and `WrongTypeException` unless it is a TMF8829.
+
+### WindowsSerialLink
+
+```csharp
+public sealed class WindowsSerialLink : ILink, IDisposable
+```
+
+A serial port as an `ILink` over the System.IO.Ports Unity's .NET Framework API level provides (Mono's, on Windows): 115200 8N1, DTR and RTS raised on open as the reference SDK's pyserial does (a CDC device may hold its output until the host asserts DTR). One read blocks the port for at most `MaxReadMs` and `Close` waits for the read in flight before releasing the port, because Mono's port must not be closed under a blocked read. Errors map as `SerialPortLink`'s: a port that cannot be opened or goes away is a `DeviceLostException`, I/O after Close a `LinkClosedException`.
+
+#### WindowsSerialLink.MaxReadMs *(constant)*
+
+```csharp
+public const int MaxReadMs = 100
+```
+
+The longest one `Read` holds the port, so `Close` never waits longer.
+
+#### WindowsSerialLink.WindowsSerialLink *(constructor)*
+
+```csharp
+public WindowsSerialLink(string port, int baudRate = 115200)
+```
+
+Open `port` (`COM5`; a `/dev/tty…` path where Mono has ports).
+
+#### WindowsSerialLink.Name *(property)*
+
+```csharp
+public string Name
+```
+
+#### WindowsSerialLink.IsClosed *(property)*
+
+```csharp
+public bool IsClosed
+```
+
+#### WindowsSerialLink.Read
+
+```csharp
+public byte[] Read(TimeSpan timeout)
+```
+
+#### WindowsSerialLink.Write
+
+```csharp
+public void Write(byte[] data)
+```
+
+#### WindowsSerialLink.Dispose
+
+```csharp
+public void Dispose()
+```
+
+#### WindowsSerialLink.Close
+
+```csharp
+public void Close()
+```
+
+### WindowsSerialPorts
+
+```csharp
+public static class WindowsSerialPorts
+```
+
+Windows serial-port enumeration from the registry, with USB ids. The ports present now are the values of `HKLM\HARDWARE\DEVICEMAP\SERIALCOMM`; which USB device owns which port is under `HKLM\SYSTEM\CurrentControlSet\Enum\USB\VID_xxxx&PID_xxxx[&MI_nn]\<instance>\Device Parameters\PortName`, where a plain device's instance id is its USB serial (a device without one gets a generated id with `&` in it: no serial). Pure reads over `IRegistry`, so it is testable without Windows.
+
+#### WindowsSerialPorts.SerialCommKey *(constant)*
+
+```csharp
+public const string SerialCommKey = @"HARDWARE\DEVICEMAP\SERIALCOMM"
+```
+
+The key whose values are the serial ports present now (name: driver device, data: `COMn`).
+
+#### WindowsSerialPorts.UsbEnumKey *(constant)*
+
+```csharp
+public const string UsbEnumKey = @"SYSTEM\CurrentControlSet\Enum\USB"
+```
+
+The USB device tree: `VID_xxxx&PID_xxxx[&MI_nn]\<instance>` keys.
+
+#### WindowsSerialPorts.List
+
+```csharp
+public static IReadOnlyList<SerialPortInfo> List(IRegistry registry)
+```
+
+Every COM port present now, with the USB ids of the device that owns it where the registry says so (null ids for a non-USB port, or one several devices claim). Sorted by port name.
+
+### IRegistry
+
+```csharp
+public interface IRegistry
+```
+
+The slice of the Windows registry port discovery reads, under HKEY_LOCAL_MACHINE. A missing or unreadable key is null, never an exception, so discovery degrades to "ports without USB ids" instead of failing. `WindowsRegistry` is the real one; tests supply a fake.
+
+### WindowsRegistry
+
+```csharp
+public sealed class WindowsRegistry : IRegistry
+```
+
+HKEY_LOCAL_MACHINE through Microsoft.Win32.Registry. Off Windows every key is missing.
+
+#### WindowsRegistry.IsAvailable *(property)*
+
+```csharp
+public static bool IsAvailable
+```
+
+True on Windows, where the registry exists.
+
+#### WindowsRegistry.SubKeyNames
+
+```csharp
+public IReadOnlyList<string>? SubKeyNames(string path)
+```
+
+#### WindowsRegistry.ValueNames
+
+```csharp
+public IReadOnlyList<string>? ValueNames(string path)
+```
+
+#### WindowsRegistry.GetString
+
+```csharp
+public string? GetString(string path, string name)
+```
+
+### DepzSensorBehaviour
+
+```csharp
+public class DepzSensorBehaviour : MonoBehaviour
+```
+
+Sample component: opens the first DEPZ board (or the one `Port` / `Serial` names) in Start(), drains its event queue from Update() and closes it in OnDestroy(). Derive from it and override `OnOpened` and `OnEvent`, or copy it. The device's reader thread must never touch Unity objects, so everything the SDK delivers is polled here, on the main thread, from `Subscription{T}` queues (`TryTake` never blocks).
+
+#### DepzSensorBehaviour.Port *(field)*
+
+```csharp
+public string Port = ""
+```
+
+#### DepzSensorBehaviour.Serial *(field)*
+
+```csharp
+public string Serial = ""
+```
+
+#### DepzSensorBehaviour.Device *(property)*
+
+```csharp
+public DepzDevice? Device
+```
+
+The open device, or null before Start() and after a failed open.
 
 ## USB identity
 
@@ -1201,7 +1595,7 @@ public Sr04Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Sr04Device.Sr04Device *(constructor)*
 
 ```csharp
-#if NET public Sr04Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Sr04Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Sr04Device.GetSamplePeriodUs
@@ -1428,7 +1822,7 @@ What `RangeStatus` means (`RangeStatusNames`).
 public sealed class Vl53l4cdDevice : DepzDevice
 ```
 
-VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here (`Uld`). `Init` first, then configure and `StartRanging`: one result block per INT edge streams to `Measurements`. Configuration while ranging throws `InvalidOperationException` — the stream owns the register bank.
+VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here (`Uld`). `Init` first, then configure and `StartRanging`: one result block per INT edge streams to `Measurements`. Configuration while ranging throws `InvalidStateException` — the stream owns the register bank.
 
 #### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
 
@@ -1439,7 +1833,7 @@ public Vl53l4cdDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l4cdDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l4cdDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l4cdDevice.Uld *(property)*
@@ -1494,7 +1888,7 @@ Drive XSHUT: `Off` / `On` / `Reset`. Off and Reset stop a stream; `Init` again a
 public void ResetSensor()
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); call `Init` again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call `Init` again.
 
 #### Vl53l4cdDevice.BridgeInfo
 
@@ -1502,7 +1896,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); call `Init` again.
 public Vl53l4Info BridgeInfo()
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (I2cErrors is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice.SetI2cSpeedKhz
 
@@ -1776,7 +2170,7 @@ Nominal SCL steps the firmware carries a TIMINGR for (VL53_SET_I2C_SPEED clamps 
 public static byte[] PackReadReg(ushort addr, ushort len)
 ```
 
-VL53_READ_REG payload: addr u16 LE, len u16 LE.
+VL53_READ_REG payload: addr u16 LE, len u16 LE, with the transfer limit of contract 10 §1 — len 1..`XferMax` and addr + len ≤ 0x10000.
 
 #### Vl53l4Wire.PackWriteReg
 
@@ -1784,7 +2178,7 @@ VL53_READ_REG payload: addr u16 LE, len u16 LE.
 public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
 ```
 
-VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`XferMax` bytes).
+VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`XferMax` bytes, addr + N ≤ 0x10000).
 
 #### Vl53l4Wire.PackXshut
 
@@ -1832,7 +2226,7 @@ Parse a RPT_VL53_REG_DATA payload: cmd u8, timestamp u64 LE, then data.
 public sealed record Vl53l4Info(uint IntEdges, uint SlotsSkipped, uint I2cErrors, byte LastI2cError, ushort ModelId, byte FwStatus, byte Initialized, byte XshutLevel, byte IntLevel, ushort I2cKhz)
 ```
 
-RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters are free-running and wrap silently; watch increments, not absolute values. `ModelId` expected 0xEBAA, `FwStatus` expected 0x03 (booted). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters wrap silently; watch increments, not absolute values. `I2cErrors` counts since the last successful XSHUT reset (the bridge clears it there), not since power-up. `Initialized` = 1 when MODEL_ID read back as 0xEBAA on this GET_INFO. `ModelId` expected 0xEBAA, `FwStatus` expected 0x03 (booted). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
 #### Vl53l4Info.Unpack
 
@@ -1864,7 +2258,7 @@ Parse a RPT_VL53_STREAM payload: ts u64 LE, addr u16 LE, len u16 LE, data[len].
 public sealed class Vl53l4Exception : Exception
 ```
 
-Raised on invalid VL53L4CD ULD inputs (short result block, out-of-range timing…).
+What the sensor did, not what the caller asked: a boot or data-ready timeout, a short result block, an oscillator word of 0, a failed xtalk calibration. A refused argument is an `ArgumentException` (contract 07 §3).
 
 #### Vl53l4Exception.Vl53l4Exception *(constructor)*
 
@@ -2206,6 +2600,14 @@ public static Vl53l4Results ParseResultBlock(ReadOnlySpan<byte> raw)
 
 Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult() decodes the same registers read one by one. Register contents are big-endian words (the bridge passes them through untouched). Raw status ≥ 24 passes through unmapped.
 
+#### Vl53l4Uld.CheckRangeTiming
+
+```csharp
+public static void CheckRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT), which need no register (contract 10 §5).
+
 #### Vl53l4Uld.static
 
 ```csharp
@@ -2518,7 +2920,7 @@ Crosstalk calibration against a target at `targetDistMm` (10–5000); returns th
 public class Vl53l8cxDevice : DepzDevice
 ```
 
-VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here (`Uld`). `Init` downloads the ~84 KB sensor firmware (about a second), then configure and `StartRanging`: the board pushes one frame per INT edge in chunks, reassembled and parsed into `Frames`. Configuration needs `Init` and throws `InvalidOperationException` while ranging — the stream owns the register bank. The VL53L8CH superset is `Vl53l8chDevice`.
+VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here (`Uld`). `Init` downloads the ~84 KB sensor firmware (about a second), then configure and `StartRanging`: the board pushes one frame per INT edge in chunks, reassembled and parsed into `Frames`. Configuration needs `Init` and throws `InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH superset is `Vl53l8chDevice`.
 
 #### Vl53l8cxDevice.MinRangingFrequencyHz *(constant)*
 
@@ -2527,6 +2929,14 @@ public const int MinRangingFrequencyHz = 2
 ```
 
 Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.MaxRangingFrequencyHz
+
+```csharp
+public static int MaxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
 
 #### Vl53l8cxDevice.Vl53l8cxDevice *(constructor)*
 
@@ -2537,7 +2947,7 @@ public Vl53l8cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l8cxDevice.Vl53l8cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l8cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l8cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l8cxDevice.Uld *(property)*
@@ -2606,7 +3016,7 @@ public int GetRangingFrequencyHz()
 public void SetRangingFrequencyHz(int hz)
 ```
 
-At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8.
+At least `MinRangingHz`; at most `MaxRangingFrequencyHz` of the resolution last set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11 §3). Refused host-side, nothing reaches the bus.
 
 #### Vl53l8cxDevice.GetRangingMode
 
@@ -2683,14 +3093,18 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice.GetXtalkMargin
 
 ```csharp
-public double GetXtalkMargin()
+public int GetXtalkMargin()
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice.SetXtalkMargin
 
 ```csharp
-public void SetXtalkMargin(double marginKcps)
+public void SetXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
 
 #### Vl53l8cxDevice.CalibrateXtalk
 
@@ -2752,7 +3166,7 @@ public void SetDetectionThresholdsAutoStop(bool autoStop)
 public MotionConfig ConfigureMotionIndicator(int distanceMinMm = 400, int distanceMaxMm = 1500)
 ```
 
-Enable the motion indicator over [min, max] mm; every frame then carries `Motion`. Returns the configuration for further tuning.
+Enable the motion indicator over [min, max] mm; every frame then carries `Motion`. Returns the configuration for further tuning. On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH (`CnhSetup` null, no `CnhRaw`).
 
 #### Vl53l8cxDevice.StartRanging
 
@@ -2831,7 +3245,7 @@ public Vl53l8chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l8chDevice.Vl53l8chDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l8chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l8chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l8chDevice.CnhSetup *(property)*
@@ -2848,7 +3262,7 @@ The CNH setup armed by `ConfigureCnh`, or null; recorders keep it next to the ra
 public void ConfigureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next `StartRanging`: every frame then carries `CnhRaw`, decoded with `DecodeHistogram` and `ToDecodeConfig`.
+Arm CNH for the next `StartRanging`: every frame then carries `CnhRaw`, decoded with `DecodeHistogram` and `ToDecodeConfig`. CNH and the motion indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no `Motion`).
 
 ### IVl53l8Platform
 
@@ -3281,16 +3695,18 @@ Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs `
 #### Vl53l8Driver.GetXtalkMargin
 
 ```csharp
-public double GetXtalkMargin()
+public int GetXtalkMargin()
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver.SetXtalkMargin
 
 ```csharp
-public void SetXtalkMargin(double marginKcps)
+public void SetXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
 
 #### Vl53l8Driver.GetCaldataXtalk
 
@@ -3349,6 +3765,14 @@ public MotionConfig MotionIndicatorInit(int resolution)
 ```
 
 A default motion-indicator configuration for `resolution`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.MotionIndicatorDisarm
+
+```csharp
+public void MotionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `Motion` null. Called when the VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
 
 #### Vl53l8Driver.MotionIndicatorSetResolution
 
@@ -3550,7 +3974,7 @@ VL53_WRITE_REG payload: addr u16 LE, then at least one data byte (contract 04 §
 public static byte[] PackStartStream(int frameSize)
 ```
 
-VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE.
+VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE, 1..`StreamTotalMax` (contract 04 §4 rule 4 — the firmware refuses anything else too).
 
 #### Vl53l8Wire.StreamChunkMax *(constant)*
 
@@ -3604,7 +4028,7 @@ public sealed class FrameReassembler
 
 Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
 
-Rules (contract 04): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. Byte-exact with the reference Python `FrameReassembler`.
+Rules (contract 04 §4): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. A chunk out of the rule-4 bounds (more than `chunkMax` bytes, `FullSize` over `StreamTotalMax`, or running past `FullSize`) is damaged: dropped and counted as a lost frame like the other damaged input, never thrown. Byte-exact with the reference Python `FrameReassembler`.
 
 #### FrameReassembler.Completed *(property)*
 
@@ -3616,6 +4040,12 @@ public int Completed
 
 ```csharp
 public int Discarded
+```
+
+#### FrameReassembler.FrameReassembler *(constructor)*
+
+```csharp
+public FrameReassembler(int chunkMax = Vl53l8Wire.StreamChunkMax)
 ```
 
 #### FrameReassembler.public
@@ -3688,13 +4118,29 @@ public const int MotionIndicator = 19
 public const int NbThresholds = 64
 ```
 
+#### Vl53l8Advanced.XtalkMarginMaxKcps *(constant)*
+
+```csharp
+public const int XtalkMarginMaxKcps = 10000
+```
+
+Largest xtalk margin `SetXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
 #### Vl53l8Advanced.XtalkMarginRaw
 
 ```csharp
-public static uint XtalkMarginRaw(double marginKcps)
+public static uint XtalkMarginRaw(int marginKcps)
 ```
 
-Xtalk margin raw DCI value: round(kcps × 2048). The margin is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN included, is refused — never wrapped (contract 07 §3).
+Xtalk margin raw DCI value: kcps × 2048. As ST, the margin is a whole number of kcps/SPAD, 0..`XtalkMarginMaxKcps`; a negative or a bigger value is refused — never wrapped (contract 07 §3).
+
+#### Vl53l8Advanced.XtalkMarginKcps
+
+```csharp
+public static int XtalkMarginKcps(uint raw)
+```
+
+Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST).
 
 #### Vl53l8Advanced.DetectionThreshold
 
@@ -4434,7 +4880,7 @@ public Vl53l7cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l7cxDevice.Vl53l7cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l7cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l7cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l7cxDevice.ModuleType *(property)*
@@ -4502,7 +4948,7 @@ public Vl53l5cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l5cxDevice.Vl53l5cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l5cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l5cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l7chDevice
@@ -4522,7 +4968,7 @@ public Vl53l7chDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l7chDevice.Vl53l7chDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l7chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l7chDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l7chDevice.CnhSetup *(property)*
@@ -4539,7 +4985,7 @@ The CNH setup armed by `ConfigureCnh`, or null.
 public void ConfigureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next start (as `ConfigureCnh`).
+Arm CNH for the next start (as `ConfigureCnh`); disarms the motion indicator.
 
 ## VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)
 
@@ -4989,7 +5435,7 @@ public Vl53lxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Vl53lxDevice.Vl53lxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53lxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53lxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53lxDevice.BoardName *(property)*
@@ -5357,7 +5803,7 @@ public Vl53l0xDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Vl53l0xDevice.Vl53l0xDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l0xDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l0xDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l1cxDevice
@@ -5377,7 +5823,7 @@ public Vl53l1cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l1cxDevice.Vl53l1cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l1cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l1cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l1cbDevice
@@ -5397,7 +5843,7 @@ public Vl53l1cbDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l1cbDevice.Vl53l1cbDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l1cbDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l1cbDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l3cxDevice
@@ -5417,7 +5863,7 @@ public Vl53l3cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l3cxDevice.Vl53l3cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l3cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l3cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### Vl53l4cxDevice
@@ -5437,7 +5883,7 @@ public Vl53l4cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l4cxDevice.Vl53l4cxDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l4cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l4cxDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 ### BareRegs
@@ -7826,6 +8272,34 @@ public long SignalRateMeasFixed400mm
 public long Part2PartOffsetAdjustmentNvmUm
 ```
 
+#### Vl53l0xUldDriver.TargetRefRate *(property)*
+
+```csharp
+public int TargetRefRate
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets; the SPAD management converges on it.
+
+#### Vl53l0xUldDriver.SigmaEstRefArray *(property)*
+
+```csharp
+public int SigmaEstRefArray
+```
+
+The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set (stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver.SigmaEstEffPulseWidth *(property)*
+
+```csharp
+public int SigmaEstEffPulseWidth
+```
+
+#### Vl53l0xUldDriver.SigmaEstEffAmbWidth *(property)*
+
+```csharp
+public int SigmaEstEffAmbWidth
+```
+
 #### Vl53l0xUldDriver.OscFrequencyMHz *(property)*
 
 ```csharp
@@ -7904,6 +8378,14 @@ public void GetInfoFromDevice(int option)
 
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product identification (2), the part UID and factory offset (4).
 
+#### Vl53l0xUldDriver.LoadTuningSettings
+
+```csharp
+public void LoadTuningSettings(byte[] buffer)
+```
+
+VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying a host-side parameter instead; a zero count ends the buffer.
+
 #### Vl53l0xUldDriver.ClearInterrupt
 
 ```csharp
@@ -7951,7 +8433,7 @@ VL53L0X_StopMeasurement().
 #### Vl53l0xUldDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
 Apply one of `Modes`: the sigma and signal limits, the budget and both VCSEL periods.
@@ -8649,10 +9131,10 @@ Timed mode only: this part has no free-running mode under the ULD configuration.
 #### Vl53l1UldDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
-"short" or "long"; the budget is re-applied (the VCSEL periods change what it means).
+"short" or "long"; the budget is re-applied (the VCSEL periods change what it means). Returns the budget in effect after the change, ms: one the new mode does not tabulate moves to the nearest one it does (contract 12 §5, the one exception to "refuse, don't round"), so the caller sees it.
 
 #### Vl53l1UldDriver.GetMode
 
@@ -8733,7 +9215,13 @@ The bridge refused a register command or did not answer it. The drivers catch it
 #### Vl53lxProtocolException.Vl53lxProtocolException *(constructor)*
 
 ```csharp
-public Vl53lxProtocolException(string message, Exception? inner = null) : base(message, inner ?? new Exception(message))
+public Vl53lxProtocolException(string message) : base(message)
+```
+
+#### Vl53lxProtocolException.Vl53lxProtocolException *(constructor)*
+
+```csharp
+public Vl53lxProtocolException(string message, Exception inner) : base(message, inner)
 ```
 
 ### Vl53lxPlatform
@@ -9007,8 +9495,10 @@ The only budgets accepted right now (ascending), or empty when any integer of `B
 #### Vl53lxDriver.SetMode
 
 ```csharp
-public virtual void SetMode(string name)
+public virtual int? SetMode(string name)
 ```
+
+Apply one of the modes. Returns the timing budget in effect after the change, ms, on a driver whose mode change can move it (VL53L1: contract 12 §5), else null.
 
 #### Vl53lxDriver.GetMode
 
@@ -9247,7 +9737,7 @@ Reset the part (whatever ran before left it ranging under another configuration)
 #### Vl53lxHistogramDriver.SetMode
 
 ```csharp
-public override void SetMode(string name)
+public override int? SetMode(string name)
 ```
 
 The device preset mode: the VCSEL period, which sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid phase window inside it (`ReachMm`). The bin is 199 mm wide in all three.
@@ -9383,7 +9873,7 @@ public Bno086Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Bno086Device.Bno086Device *(constructor)*
 
 ```csharp
-#if NET public Bno086Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Bno086Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Bno086Device.BusyRetries *(property)*
@@ -10827,6 +11317,14 @@ public const int StabilityDetectorConfig = 0xED85
 public const int ActivityTrackerConfig = 0xED88
 ```
 
+#### FrsRecordId.GyroIntegratedRvConfig *(constant)*
+
+```csharp
+public const int GyroIntegratedRvConfig = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 #### FrsRecordId.MetadataRecords *(field)*
 
 ```csharp
@@ -11452,7 +11950,21 @@ public const byte ExpectedGyrId = 0x0F
 public static byte[] PackReadReg(byte addr, byte len)
 ```
 
-BNO_READ_REG payload: addr u8, len u8.
+BNO_READ_REG payload: addr u8, len u8, with the transfer limit of contract 13 §1 — len 1..`XferMax` and addr + len ≤ 0x100.
+
+#### Bno055Wire.TimerPeriodMinMs *(constant)*
+
+```csharp
+public const int TimerPeriodMinMs = 1
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+#### Bno055Wire.TimerPeriodMaxMs *(constant)*
+
+```csharp
+public const int TimerPeriodMaxMs = 60000
+```
 
 #### Bno055Wire.PackWriteReg
 
@@ -11460,7 +11972,7 @@ BNO_READ_REG payload: addr u8, len u8.
 public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
 ```
 
-BNO_WRITE_REG payload: addr u8, then data[1..`XferMax`].
+BNO_WRITE_REG payload: addr u8, then data[1..`XferMax`] with addr + N ≤ 0x100.
 
 #### Bno055Wire.PackStartStream
 
@@ -11508,7 +12020,7 @@ Parse a RPT_BNO_REG_STREAM payload: timestamp u64 LE, addr u8, len u8, data[len]
 public sealed record Bno055Info(byte I2cAddr, byte ChipId, byte AccId, byte MagId, byte GyrId, ushort SwRev, byte BlRev, byte Initialized, byte IntLevel, uint IntEdges, ushort ReadMinUs, ushort ReadMaxUs, ushort ReadAvgUs, uint TxDropped, uint I2cErrors, uint SlotsSkipped, ushort BusRecoveries, byte LastI2cError, byte SensorResets, ushort LoopMaxUs)
 ```
 
-RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM, `I2cErrors` at every successful reset handshake. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
 #### Bno055Info.Unpack
 
@@ -12502,7 +13014,7 @@ public Bno055Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Bno055Device.Bno055Device *(constructor)*
 
 ```csharp
-#if NET public Bno055Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Bno055Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Bno055Device.BridgeInfo
@@ -12922,7 +13434,7 @@ public Tmf8829Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Tmf8829Device.Tmf8829Device *(constructor)*
 
 ```csharp
-#if NET public Tmf8829Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Tmf8829Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Tmf8829Device.AppVersion *(property)*
@@ -14202,7 +14714,7 @@ public bool PayloadCrcOk
 public static FwDepzImage Parse(byte[] blob)
 ```
 
-Parse and validate. Validation order (contract 06 §2): length, magic, then CRC-16/CCITT-FALSE over bytes [0..61] vs the u16 LE at offset 62, then fw_size == payload length.
+Parse and validate. Validation order (contract 06 §2): length, magic, then CRC-16/CCITT-FALSE over bytes [0..61] vs the u16 LE at offset 62, then fw_size == payload length, then section 0 of 1 (sections are 0-based; multi-section files are refused).
 
 ## Datasets (record & replay)
 
@@ -14279,7 +14791,7 @@ Host-time span from the first record to the last (0 with fewer than two records)
 #### DatasetReader.DatasetReader *(constructor)*
 
 ```csharp
-public DatasetReader(string path) : this(ReadAllLines(path))
+public DatasetReader(string path) : this(path, ReadAllLines(path))
 ```
 
 #### DatasetReader.Play
@@ -15062,6 +15574,22 @@ public static byte[] PackSyncTime(ulong pcTimestampUs)
 ```
 
 Encode a SYNC_TIME request payload (u64 LE µs).
+
+#### Common.PayloadCrcTypeMax *(constant)*
+
+```csharp
+public const int PayloadCrcTypeMax = 3
+```
+
+SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2).
+
+#### Common.PackSetPayloadCrcType
+
+```csharp
+public static byte[] PackSetPayloadCrcType(int crcType)
+```
+
+SET_PAYLOAD_CRC_TYPE payload: crc_type u8, 0..3 (contract 02 §2) — checked before anything is written (contract 07 §3).
 
 #### Common.static
 

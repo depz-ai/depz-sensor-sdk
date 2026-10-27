@@ -1,5 +1,7 @@
 """Golden-vector consumer: vl53l4.json (contract 10)."""
 
+import pytest
+
 from depz_sensor_sdk.protocol.vl53l4 import (
     RegData,
     StreamData,
@@ -30,6 +32,28 @@ def test_encode_vectors(vectors, seen):
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == case["payload"], case["name"]
         seen(case)
+
+
+@pytest.mark.parametrize(
+    "addr, length",
+    [(0x0089, 0), (0x0000, 254), (0xFFFF, 2), (0xFF00, 0x101), (0x10000, 1), (-1, 1), (0, 0x10000)],
+)
+def test_read_reg_refuses_len_outside_1_253_and_past_0xffff(addr, length):
+    """contract 10 §1 (ERRATA A13): `len` 1..253 and addr+len <= 0x10000, checked host-side."""
+    with pytest.raises(ValueError):
+        pack_read_reg(addr, length)
+
+
+def test_read_reg_accepts_the_limits():
+    assert pack_read_reg(0x0000, 253) == bytes.fromhex("0000fd00")
+    assert pack_read_reg(0xFFFF, 1) == bytes.fromhex("ffff0100")
+    assert pack_read_reg(0xFF03, 253) == bytes.fromhex("03fffd00")
+
+
+def test_write_reg_refuses_a_write_past_0xffff():
+    with pytest.raises(ValueError):
+        pack_write_reg(0xFFFF, b"\x01\x02")
+    assert pack_write_reg(0xFFFF, b"\x01") == bytes.fromhex("ffff01")
 
 
 def test_decode_vectors(vectors, seen):

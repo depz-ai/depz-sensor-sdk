@@ -1,0 +1,11 @@
+{
+  "name": "ai.depz.sensor",
+  "version": "0.7.0",
+  "displayName": "DEPZ Sensor SDK",
+  "description": "DEPZ USB sensors (SR04, VL53Lx ToF, TMF8829, BNO055/BNO086) in Unity: the Depz.Sensor shared library plus the Windows serial communication module (COM port discovery by USB id, serial link, DepzDevicesUnity).",
+  "unity": "6000.0",
+  "keywords": ["depz", "sensor", "serial", "usb", "tof", "imu"],
+  "author": { "name": "DEPZ", "url": "https://depz.ai" },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-csharp/unity/README.md"
+}

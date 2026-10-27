@@ -35,6 +35,14 @@ inline constexpr int RESOLUTION_8X8 = 64;
 
 // Max frame-data bytes carried in one RPT_VL53_FRAME chunk (contract 04).
 inline constexpr std::size_t STREAM_CHUNK_MAX = 1528;
+// Largest frame_size VL53_START_STREAM accepts (contract 04 §2).
+inline constexpr std::size_t STREAM_TOTAL_MAX = 8192;
+
+// VL53_START_STREAM (0x35) payload: frame_size u16 LE — the host ULD's
+// data_read_size (contract 04 §2). Byte-exact with the reference
+// pack_start_stream; frame_size outside 1..8192 throws std::invalid_argument
+// (contract 04 §4 rule 4 — the firmware refuses it too).
+bytes pack_start_stream(std::uint16_t frame_size);
 
 // The two DEPZ ToF die variants. Both stream the same results-frame layout
 // decoded by decode_frame(); they differ in the footer-id offset here, and the
@@ -71,11 +79,17 @@ struct FrameChunk {
 };
 
 // Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports. Rules
-// (contract 04): reset on offset==0; chunks must be contiguous — a gap discards
-// the frame in progress; a frame completes when the accumulated bytes equal
-// full_size.
+// (contract 04 §4): reset on offset==0; chunks must be contiguous — a gap
+// discards the frame in progress; a frame completes when the accumulated bytes
+// equal full_size. A chunk out of the rule-4 bounds (more than chunk_max bytes,
+// full_size over STREAM_TOTAL_MAX, or running past full_size) is damaged:
+// dropped and counted as a lost frame like the other damaged input, never
+// thrown. chunk_max is the device's VL53_STREAM_FRAME_MAX
+// (vl53l7::STREAM_CHUNK_MAX = 1536 on the I2C board, contract 11 §3).
 class FrameReassembler {
 public:
+    explicit FrameReassembler(std::size_t chunk_max = STREAM_CHUNK_MAX) : chunk_max_(chunk_max) {}
+
     // Returns (timestamp_us, frame_bytes) when a frame completes, else nullopt.
     std::optional<std::pair<std::uint64_t, bytes>> feed(const FrameChunk& chunk);
 
@@ -83,6 +97,7 @@ public:
     std::size_t discarded = 0;
 
 private:
+    std::size_t chunk_max_;
     bytes buf_;
     std::uint16_t full_size_ = 0;
     std::uint64_t timestamp_us_ = 0;
@@ -127,10 +142,14 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw,
 
 // ── advanced-feature DCI codecs (ST ULD, BSD-3) ─────────────────────────────
 
-// Xtalk margin (kcps/SPAD) <-> DCI_XTALK_CFG raw word (raw = round(kcps*2048)).
-// xtalk_margin_raw: std::out_of_range outside 0..10000 kcps (or NaN).
-std::uint32_t xtalk_margin_raw(double margin_kcps);
-double xtalk_margin_kcps(std::uint32_t raw);
+// Largest xtalk margin set_xtalk_margin accepts, kcps/SPAD (as ST).
+constexpr std::uint32_t XTALK_MARGIN_MAX_KCPS = 10000;
+
+// Xtalk margin, a whole number of kcps/SPAD (as ST) <-> DCI_XTALK_CFG raw word
+// (raw = kcps*2048). xtalk_margin_raw: std::out_of_range above
+// XTALK_MARGIN_MAX_KCPS. xtalk_margin_kcps: raw / 2048 (integer division).
+std::uint32_t xtalk_margin_raw(std::uint32_t margin_kcps);
+std::uint32_t xtalk_margin_kcps(std::uint32_t raw);
 
 // Detection-threshold measurement selectors (plugin source).
 enum ThreshMeasurement : std::uint8_t {

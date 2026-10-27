@@ -68,7 +68,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 28
+            "line": 30
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceInfo"
@@ -153,7 +153,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 124
+            "line": 165
           },
           "exported_as": [
             "depz_sensor_sdk.list_depz_devices"
@@ -180,7 +180,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 94
+            "line": 135
           },
           "exported_as": [
             "depz_sensor_sdk.probe_port"
@@ -210,15 +210,16 @@
               "default": 0.2
             }
           ],
+          "returns": "depz_sensor_sdk.device.DeviceBase",
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 165
+            "line": 202
           },
           "exported_as": [
             "depz_sensor_sdk.open_device"
           ],
-          "doc": "Open the right sensor class for `target` (contract 02 §4.3, §4.4).\n\n- ``None`` (default): the DEPZ candidate port with the alphabetically\n  smallest USB serial (index 0); with ``serial=`` the candidate whose USB\n  serial matches. No candidate → `NoDepzDeviceError`.\n- ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial\n  (0-based). Out of range → `NoDepzDeviceError`.\n- ``str`` (a port path): open exactly that port; if its USB (vid, pid) is\n  not a known DEPZ id, warn but proceed.\n- ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.\n- ``Link``/transport: `open_on_link` (probe and continue on that link).\n\nOn a port the probe runs on a connection of its own (`probe_port`), which\nis closed; the resolved class then opens the port afresh, so host packet\nsequence numbers restart at 0. Bootloader-mode devices raise (use the\ncontract 06 client)."
+          "doc": "Open the right sensor class for `target` (contract 02 §4.3, §4.4).\n\n- ``None`` (default): the DEPZ candidate port with the alphabetically\n  smallest USB serial (index 0); with ``serial=`` the candidate whose USB\n  serial matches. No candidate → `NoDepzDeviceError`.\n- ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial\n  (0-based). Out of range → `NoDepzDeviceError`.\n- ``str`` (a port path): open exactly that port; its USB (vid, pid) is\n  that of the enumerated port the path names under any alias\n  (`/dev/serial/by-id/…`, a symlink, another name of the same device\n  node). If it is not a known DEPZ id — or the OS does not list the\n  port — warn but proceed. Nothing DEPZ answering the probe there →\n  `NoDepzDeviceError`, as on a link.\n- ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.\n- ``Link``/transport: `open_on_link` (probe and continue on that link).\n\nOn a port the probe runs on a connection of its own (`probe_port`), which\nis closed; the resolved class then opens the port afresh, so host packet\nsequence numbers restart at 0. Bootloader-mode devices raise (use the\ncontract 06 client)."
         },
         {
           "name": "open_on_link",
@@ -248,10 +249,11 @@
               "default": 0.2
             }
           ],
+          "returns": "depz_sensor_sdk.device.DeviceBase",
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 246
+            "line": 286
           },
           "exported_as": [
             "depz_sensor_sdk.open_on_link"
@@ -290,7 +292,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 349
+            "line": 388
           },
           "exported_as": [
             "depz_sensor_sdk.resolve_sensor_class"
@@ -312,10 +314,11 @@
               "annotation": "str"
             }
           ],
+          "returns": "depz_sensor_sdk.device.DeviceBase",
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 430
+            "line": 469
           },
           "exported_as": [
             "depz_sensor_sdk.attach_sensor_class"
@@ -350,10 +353,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 227
+            "line": 271
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceBase"
@@ -362,7 +366,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -419,7 +423,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed."
             },
             {
@@ -473,7 +477,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -490,7 +494,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode."
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode."
             },
             {
               "name": "expect_report",
@@ -504,10 +508,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone."
             },
             {
@@ -520,7 +524,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`."
             },
             {
@@ -731,7 +735,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 97
+            "line": 133
           },
           "exported_as": [
             "depz_sensor_sdk.TimeSync"
@@ -810,13 +814,19 @@
               "kind": "positional_or_keyword",
               "annotation": "int",
               "default": 0
+            },
+            {
+              "name": "callback_errors",
+              "kind": "positional_or_keyword",
+              "annotation": "int",
+              "default": 0
             }
           ],
           "returns": "None",
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 104
+            "line": 140
           },
           "exported_as": [
             "depz_sensor_sdk.LinkStats"
@@ -866,6 +876,11 @@
               "name": "device_seq_errors",
               "type": "int",
               "default": 0
+            },
+            {
+              "name": "callback_errors",
+              "type": "int",
+              "default": 0
             }
           ],
           "members": []
@@ -873,7 +888,9 @@
         {
           "name": "StreamQueue",
           "kind": "class",
-          "bases": [],
+          "bases": [
+            "typing.Generic"
+          ],
           "parameters": [
             {
               "name": "maxsize",
@@ -881,10 +898,11 @@
               "annotation": "int"
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 165
+            "line": 203
           },
           "exported_as": [
             "depz_sensor_sdk.StreamQueue"
@@ -902,7 +920,7 @@
                 {
                   "name": "item",
                   "kind": "positional_or_keyword",
-                  "annotation": "Any"
+                  "annotation": "~T"
                 }
               ],
               "returns": "None"
@@ -922,7 +940,7 @@
                   "default": null
                 }
               ],
-              "returns": "Any"
+              "returns": "~T"
             }
           ]
         },
@@ -934,7 +952,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 117
+            "line": 157
           },
           "exported_as": [
             "depz_sensor_sdk.host_now_us"
@@ -948,7 +966,7 @@
             {
               "name": "devices",
               "kind": "positional_or_keyword",
-              "annotation": "Iterable[DeviceBase]"
+              "annotation": "Iterable[depz_sensor_sdk.device.DeviceBase]"
             },
             {
               "name": "samples",
@@ -957,11 +975,11 @@
               "default": 5
             }
           ],
-          "returns": "dict[DeviceBase, TimeSync]",
+          "returns": "dict[depz_sensor_sdk.device.DeviceBase, depz_sensor_sdk.device.TimeSync]",
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 122
+            "line": 162
           },
           "exported_as": [
             "depz_sensor_sdk.sync_time_all"
@@ -977,13 +995,62 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 48
+            "line": 72
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceEvent"
           ],
           "doc": "Base for unsolicited/diagnostic events (contract 07 §2).",
           "dataclass_fields": [],
+          "members": []
+        },
+        {
+          "name": "SeqGapEvent",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.device.DeviceEvent"
+          ],
+          "parameters": [
+            {
+              "name": "expected_seq",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "received_seq",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "missed",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "None",
+          "module": "depz_sensor_sdk.device",
+          "source": {
+            "file": "depz_sensor_sdk/device.py",
+            "line": 84
+          },
+          "exported_as": [
+            "depz_sensor_sdk.SeqGapEvent"
+          ],
+          "doc": "A gap the host saw in the device->host seq (contract 01 §5 step 5):\nthe packet still arrives, `missed` packets before it did not. Counted in\n`LinkStats.seq_gaps`; the device-reported gap (RPT 0x84) is\n`SequenceErrorEvent`.",
+          "dataclass_fields": [
+            {
+              "name": "expected_seq",
+              "type": "int"
+            },
+            {
+              "name": "received_seq",
+              "type": "int"
+            },
+            {
+              "name": "missed",
+              "type": "int"
+            }
+          ],
           "members": []
         },
         {
@@ -1013,7 +1080,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 53
+            "line": 77
           },
           "exported_as": [
             "depz_sensor_sdk.SequenceErrorEvent"
@@ -1056,7 +1123,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 60
+            "line": 96
           },
           "exported_as": [
             "depz_sensor_sdk.LinkCrcErrorEvent"
@@ -1090,7 +1157,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 66
+            "line": 102
           },
           "exported_as": [
             "depz_sensor_sdk.TrashEvent"
@@ -1120,7 +1187,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 71
+            "line": 107
           },
           "exported_as": [
             "depz_sensor_sdk.UnsolicitedStatusEvent"
@@ -1161,7 +1228,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 80
+            "line": 116
           },
           "exported_as": [
             "depz_sensor_sdk.TextEvent"
@@ -1200,7 +1267,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 86
+            "line": 122
           },
           "exported_as": [
             "depz_sensor_sdk.TemperatureEvent"
@@ -1234,7 +1301,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 92
+            "line": 128
           },
           "exported_as": [
             "depz_sensor_sdk.DisconnectedEvent"
@@ -1250,12 +1317,14 @@
         {
           "name": "StreamIterator",
           "kind": "class",
-          "bases": [],
+          "bases": [
+            "typing.Generic"
+          ],
           "parameters": [
             {
               "name": "registry",
               "kind": "positional_or_keyword",
-              "annotation": "list['StreamQueue']"
+              "annotation": "list[depz_sensor_sdk.device.StreamQueue[~T]]"
             },
             {
               "name": "maxsize",
@@ -1264,13 +1333,21 @@
             },
             {
               "name": "closed_fn",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "Callable[[], bool]"
+            },
+            {
+              "name": "queue",
+              "kind": "keyword_only",
+              "annotation": "Optional[depz_sensor_sdk.device.StreamQueue[~T]]",
+              "default": null
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 192
+            "line": 227
           },
           "exported_as": [
             "depz_sensor_sdk.StreamIterator"
@@ -1325,10 +1402,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.sr04",
           "source": {
             "file": "depz_sensor_sdk/sr04.py",
-            "line": 54
+            "line": 62
           },
           "exported_as": [
             "depz_sensor_sdk.Sr04"
@@ -1337,7 +1415,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -1473,7 +1551,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.sr04.Sr04Measurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest;\n`dropped_count` on the returned iterator). Subscribes immediately."
             },
             {
@@ -1538,7 +1616,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -1594,7 +1672,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -1611,7 +1689,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -1626,10 +1704,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -1643,7 +1721,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -1950,6 +2028,7 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l4",
           "source": {
             "file": "depz_sensor_sdk/vl53l4/__init__.py",
@@ -1963,7 +2042,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -2036,7 +2115,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD\nconfiguration is wiped — call init() again."
+              "doc": "Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ.\n~2 ms; the reply is awaited up to 2 s). The ULD\nconfiguration is wiped — call init() again."
             },
             {
               "name": "bridge_info",
@@ -2048,7 +2127,7 @@
                 }
               ],
               "returns": "depz_sensor_sdk.protocol.vl53l4.Vl53l4Info",
-              "doc": "RPT_VL53_INFO: sensor identity, pin levels and bridge counters.\nCounters are free-running (wrap silently) — watch increments. Safe to\ncall while streaming."
+              "doc": "RPT_VL53_INFO: sensor identity, pin levels and bridge counters.\nCounters wrap silently — watch increments; `i2c_errors` is cleared by\na successful XSHUT reset. Safe to call while streaming."
             },
             {
               "name": "set_i2c_speed_khz",
@@ -2391,7 +2470,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l4.Vl53l4Measurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest;\n`dropped_count` on the returned iterator). Subscribes immediately."
             },
             {
@@ -2480,7 +2559,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -2536,7 +2615,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -2553,7 +2632,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -2568,10 +2647,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -2585,7 +2664,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -2922,6 +3001,7 @@
           "exported_as": [
             "depz_sensor_sdk.vl53l4.Vl53l4cdError"
           ],
+          "doc": "What the sensor did, not what the caller asked: a boot or data-ready\ntimeout, a short result block, an oscillator word of 0, a failed xtalk\ncalibration. A refused argument is a ValueError (contract 07 §3).",
           "members": [
             {
               "name": "with_traceback",
@@ -3063,10 +3143,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 150
+            "line": 160
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8",
@@ -3078,7 +3159,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -3192,7 +3273,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.\n\nMax is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never\nenters its ranging loop and streams nothing (contract 04)."
+              "doc": "Set the ranging frequency in Hz. Not while ranging.\n\nAt least 2 Hz on the VL53L8 (below that the sensor never enters its\nranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at\nmost 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the\nresolution last set or read through this class (4×4 after init).\nRefused host-side, nothing reaches the bus."
             },
             {
               "name": "get_ranging_mode",
@@ -3348,7 +3429,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "float"
+              "returns": "int",
+              "doc": "Xtalk margin, whole kcps/SPAD (as ST)."
             },
             {
               "name": "set_xtalk_margin",
@@ -3361,10 +3443,11 @@
                 {
                   "name": "margin_kcps",
                   "kind": "positional_or_keyword",
-                  "annotation": "float"
+                  "annotation": "int"
                 }
               ],
-              "returns": "None"
+              "returns": "None",
+              "doc": "Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST)."
             },
             {
               "name": "calibrate_xtalk",
@@ -3458,7 +3541,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "list[dict]"
+              "returns": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
             },
             {
               "name": "set_detection_thresholds",
@@ -3471,7 +3554,7 @@
                 {
                   "name": "thresholds",
                   "kind": "positional_or_keyword",
-                  "annotation": "list[dict]"
+                  "annotation": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
                 }
               ],
               "returns": "None",
@@ -3514,7 +3597,8 @@
                   "default": 1500
                 }
               ],
-              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning."
+              "returns": "depz_sensor_sdk.vl53l8.uld.MotionConfig",
+              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.\n\nOn CH firmware the motion indicator and CNH share one DCI struct\n(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`)."
             },
             {
               "name": "start_ranging",
@@ -3576,7 +3660,7 @@
                   "default": 8
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]",
               "doc": "Blocking iterator over parsed frames (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging()."
             },
             {
@@ -3666,7 +3750,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -3722,7 +3806,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -3739,7 +3823,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -3754,10 +3838,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -3771,7 +3855,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -3998,10 +4082,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 529
+            "line": 569
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8ch",
@@ -4011,7 +4096,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -4030,7 +4115,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Arm the CNH histogram block for the next start_ranging(). CH only —\nthis method does not exist on Vl53l8cx.",
+              "doc": "Arm the CNH histogram block for the next start_ranging(). CH only —\nthis method does not exist on Vl53l8cx.\n\nCNH and the motion indicator share one DCI struct (0xBFAC): this\ndisarms the motion indicator (frames carry no `.motion`).",
               "defined_in": "depz_sensor_sdk.vl53l8.CnhMixin"
             },
             {
@@ -4157,7 +4242,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.\n\nMax is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never\nenters its ranging loop and streams nothing (contract 04).",
+              "doc": "Set the ranging frequency in Hz. Not while ranging.\n\nAt least 2 Hz on the VL53L8 (below that the sensor never enters its\nranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at\nmost 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the\nresolution last set or read through this class (4×4 after init).\nRefused host-side, nothing reaches the bus.",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4324,7 +4409,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "float",
+              "returns": "int",
+              "doc": "Xtalk margin, whole kcps/SPAD (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4338,10 +4424,11 @@
                 {
                   "name": "margin_kcps",
                   "kind": "positional_or_keyword",
-                  "annotation": "float"
+                  "annotation": "int"
                 }
               ],
               "returns": "None",
+              "doc": "Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4441,7 +4528,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "list[dict]",
+              "returns": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4455,7 +4542,7 @@
                 {
                   "name": "thresholds",
                   "kind": "positional_or_keyword",
-                  "annotation": "list[dict]"
+                  "annotation": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
                 }
               ],
               "returns": "None",
@@ -4500,7 +4587,8 @@
                   "default": 1500
                 }
               ],
-              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.",
+              "returns": "depz_sensor_sdk.vl53l8.uld.MotionConfig",
+              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.\n\nOn CH firmware the motion indicator and CNH share one DCI struct\n(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -4567,7 +4655,7 @@
                   "default": 8
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]",
               "doc": "Blocking iterator over parsed frames (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
@@ -4661,7 +4749,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -4717,7 +4805,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -4734,7 +4822,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -4749,10 +4837,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -4766,7 +4854,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -4985,42 +5073,42 @@
             {
               "name": "distance_mm",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.int32]"
             },
             {
               "name": "target_status",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.uint8]"
             },
             {
               "name": "nb_target_detected",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.uint8]"
             },
             {
               "name": "signal_per_spad",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.float64]"
             },
             {
               "name": "ambient_per_spad",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.float64]"
             },
             {
               "name": "nb_spads_enabled",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.int32]"
             },
             {
               "name": "range_sigma_mm",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.float64]"
             },
             {
               "name": "reflectance",
               "kind": "positional_or_keyword",
-              "annotation": "numpy.ndarray"
+              "annotation": "NDArray[numpy.float64]"
             },
             {
               "name": "silicon_temp_degc",
@@ -5036,7 +5124,7 @@
             {
               "name": "motion",
               "kind": "positional_or_keyword",
-              "annotation": "dict | None",
+              "annotation": "depz_sensor_sdk.vl53l8.uld.MotionIndicator | None",
               "default": null
             }
           ],
@@ -5044,7 +5132,7 @@
           "module": "depz_sensor_sdk.vl53l8",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/__init__.py",
-            "line": 81
+            "line": 90
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l8Frame",
@@ -5064,35 +5152,35 @@
             },
             {
               "name": "distance_mm",
-              "type": "np.ndarray"
+              "type": "NDArray[np.int32]"
             },
             {
               "name": "target_status",
-              "type": "np.ndarray"
+              "type": "NDArray[np.uint8]"
             },
             {
               "name": "nb_target_detected",
-              "type": "np.ndarray"
+              "type": "NDArray[np.uint8]"
             },
             {
               "name": "signal_per_spad",
-              "type": "np.ndarray"
+              "type": "NDArray[np.float64]"
             },
             {
               "name": "ambient_per_spad",
-              "type": "np.ndarray"
+              "type": "NDArray[np.float64]"
             },
             {
               "name": "nb_spads_enabled",
-              "type": "np.ndarray"
+              "type": "NDArray[np.int32]"
             },
             {
               "name": "range_sigma_mm",
-              "type": "np.ndarray"
+              "type": "NDArray[np.float64]"
             },
             {
               "name": "reflectance",
-              "type": "np.ndarray"
+              "type": "NDArray[np.float64]"
             },
             {
               "name": "silicon_temp_degc",
@@ -5105,7 +5193,7 @@
             },
             {
               "name": "motion",
-              "type": "dict | None",
+              "type": "MotionIndicator | None",
               "default": null
             }
           ],
@@ -5125,7 +5213,7 @@
                   "default": "distance_mm"
                 }
               ],
-              "returns": "numpy.ndarray",
+              "returns": "NDArray[typing.Any]",
               "doc": "Zone array reshaped to (4,4) or (8,8)."
             }
           ]
@@ -5135,10 +5223,11 @@
           "kind": "class",
           "bases": [],
           "parameters": [],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l8.cnh",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/cnh.py",
-            "line": 60
+            "line": 79
           },
           "exported_as": [
             "depz_sensor_sdk.CnhConfig",
@@ -5157,17 +5246,21 @@
                 },
                 {
                   "name": "start_bin",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "num_bins",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "sub_sample",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 }
               ],
+              "returns": "None",
               "doc": "start_bin: first device-histogram bin; num_bins: CNH bins;\nsub_sample: bins of the device histogram summed per CNH bin."
             },
             {
@@ -5180,33 +5273,41 @@
                 },
                 {
                   "name": "resolution",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "start_x",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "start_y",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "merge_x",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "merge_y",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "cols",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 },
                 {
                   "name": "rows",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 }
               ],
+              "returns": "None",
               "doc": "Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)\n— must match the value passed to set_resolution()."
             },
             {
@@ -5218,6 +5319,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
+              "returns": "int",
               "doc": "On-device CNH buffer size in bytes for this config. Raises if the\nconfig is blank or the size exceeds CNH_MAX_DATA_BYTES."
             },
             {
@@ -5229,6 +5331,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
+              "returns": "tuple[int, int]",
               "doc": "(min, max) target distance, in mm, fully captured by the histogram."
             },
             {
@@ -5241,9 +5344,11 @@
                 },
                 {
                   "name": "bin_idx",
-                  "kind": "positional_or_keyword"
+                  "kind": "positional_or_keyword",
+                  "annotation": "int"
                 }
               ],
+              "returns": "float",
               "doc": "Distance (mm) at the centre of CNH histogram bin `bin_idx`."
             },
             {
@@ -5254,7 +5359,8 @@
                   "name": "self",
                   "kind": "positional_or_keyword"
                 }
-              ]
+              ],
+              "returns": "bytes"
             }
           ]
         },
@@ -5267,18 +5373,21 @@
           "parameters": [
             {
               "name": "code",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "int"
             },
             {
               "name": "where",
               "kind": "positional_or_keyword",
+              "annotation": "str",
               "default": ""
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l8.uld",
           "source": {
             "file": "depz_sensor_sdk/vl53l8/uld.py",
-            "line": 456
+            "line": 513
           },
           "exported_as": [
             "depz_sensor_sdk.vl53l8.Vl53l8cxError"
@@ -5350,10 +5459,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/vl53l7/__init__.py",
-            "line": 156
+            "line": 165
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l5cx",
@@ -5363,7 +5473,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -5378,16 +5488,19 @@
                 {
                   "name": "variant",
                   "kind": "positional_or_keyword",
+                  "annotation": "str | None",
                   "default": null
                 },
                 {
                   "name": "progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[str], NoneType]]",
                   "default": null
                 },
                 {
                   "name": "write_progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[int, int], NoneType]]",
                   "default": null
                 }
               ],
@@ -5544,7 +5657,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.\n\nMax is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never\nenters its ranging loop and streams nothing (contract 04).",
+              "doc": "Set the ranging frequency in Hz. Not while ranging.\n\nAt least 2 Hz on the VL53L8 (below that the sensor never enters its\nranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at\nmost 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the\nresolution last set or read through this class (4×4 after init).\nRefused host-side, nothing reaches the bus.",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -5711,7 +5824,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "float",
+              "returns": "int",
+              "doc": "Xtalk margin, whole kcps/SPAD (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -5725,10 +5839,11 @@
                 {
                   "name": "margin_kcps",
                   "kind": "positional_or_keyword",
-                  "annotation": "float"
+                  "annotation": "int"
                 }
               ],
               "returns": "None",
+              "doc": "Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -5828,7 +5943,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "list[dict]",
+              "returns": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -5842,7 +5957,7 @@
                 {
                   "name": "thresholds",
                   "kind": "positional_or_keyword",
-                  "annotation": "list[dict]"
+                  "annotation": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
                 }
               ],
               "returns": "None",
@@ -5887,7 +6002,8 @@
                   "default": 1500
                 }
               ],
-              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.",
+              "returns": "depz_sensor_sdk.vl53l8.uld.MotionConfig",
+              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.\n\nOn CH firmware the motion indicator and CNH share one DCI struct\n(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -5954,7 +6070,7 @@
                   "default": 8
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]",
               "doc": "Blocking iterator over parsed frames (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
@@ -6048,7 +6164,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -6104,7 +6220,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -6121,7 +6237,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -6136,10 +6252,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -6153,7 +6269,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -6379,10 +6495,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/vl53l7/__init__.py",
-            "line": 74
+            "line": 76
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l7cx",
@@ -6392,7 +6509,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -6407,16 +6524,19 @@
                 {
                   "name": "variant",
                   "kind": "positional_or_keyword",
+                  "annotation": "str | None",
                   "default": null
                 },
                 {
                   "name": "progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[str], NoneType]]",
                   "default": null
                 },
                 {
                   "name": "write_progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[int, int], NoneType]]",
                   "default": null
                 }
               ],
@@ -6567,7 +6687,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.\n\nMax is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never\nenters its ranging loop and streams nothing (contract 04).",
+              "doc": "Set the ranging frequency in Hz. Not while ranging.\n\nAt least 2 Hz on the VL53L8 (below that the sensor never enters its\nranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at\nmost 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the\nresolution last set or read through this class (4×4 after init).\nRefused host-side, nothing reaches the bus.",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6734,7 +6854,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "float",
+              "returns": "int",
+              "doc": "Xtalk margin, whole kcps/SPAD (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6748,10 +6869,11 @@
                 {
                   "name": "margin_kcps",
                   "kind": "positional_or_keyword",
-                  "annotation": "float"
+                  "annotation": "int"
                 }
               ],
               "returns": "None",
+              "doc": "Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6851,7 +6973,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "list[dict]",
+              "returns": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6865,7 +6987,7 @@
                 {
                   "name": "thresholds",
                   "kind": "positional_or_keyword",
-                  "annotation": "list[dict]"
+                  "annotation": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
                 }
               ],
               "returns": "None",
@@ -6910,7 +7032,8 @@
                   "default": 1500
                 }
               ],
-              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.",
+              "returns": "depz_sensor_sdk.vl53l8.uld.MotionConfig",
+              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.\n\nOn CH firmware the motion indicator and CNH share one DCI struct\n(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -6977,7 +7100,7 @@
                   "default": 8
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]",
               "doc": "Blocking iterator over parsed frames (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
@@ -7071,7 +7194,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -7127,7 +7250,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -7144,7 +7267,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -7159,10 +7282,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -7176,7 +7299,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -7403,10 +7526,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53l7",
           "source": {
             "file": "depz_sensor_sdk/vl53l7/__init__.py",
-            "line": 163
+            "line": 172
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l7ch",
@@ -7416,7 +7540,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -7435,7 +7559,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Arm the CNH histogram block for the next start_ranging(). CH only —\nthis method does not exist on Vl53l8cx.",
+              "doc": "Arm the CNH histogram block for the next start_ranging(). CH only —\nthis method does not exist on Vl53l8cx.\n\nCNH and the motion indicator share one DCI struct (0xBFAC): this\ndisarms the motion indicator (frames carry no `.motion`).",
               "defined_in": "depz_sensor_sdk.vl53l8.CnhMixin"
             },
             {
@@ -7456,16 +7580,19 @@
                 {
                   "name": "variant",
                   "kind": "positional_or_keyword",
+                  "annotation": "str | None",
                   "default": null
                 },
                 {
                   "name": "progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[str], NoneType]]",
                   "default": null
                 },
                 {
                   "name": "write_progress",
                   "kind": "keyword_only",
+                  "annotation": "Optional[Callable[[int, int], NoneType]]",
                   "default": null
                 }
               ],
@@ -7622,7 +7749,7 @@
                 }
               ],
               "returns": "None",
-              "doc": "Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.\n\nMax is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never\nenters its ranging loop and streams nothing (contract 04).",
+              "doc": "Set the ranging frequency in Hz. Not while ranging.\n\nAt least 2 Hz on the VL53L8 (below that the sensor never enters its\nranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at\nmost 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the\nresolution last set or read through this class (4×4 after init).\nRefused host-side, nothing reaches the bus.",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -7789,7 +7916,8 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "float",
+              "returns": "int",
+              "doc": "Xtalk margin, whole kcps/SPAD (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -7803,10 +7931,11 @@
                 {
                   "name": "margin_kcps",
                   "kind": "positional_or_keyword",
-                  "annotation": "float"
+                  "annotation": "int"
                 }
               ],
               "returns": "None",
+              "doc": "Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -7906,7 +8035,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "list[dict]",
+              "returns": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -7920,7 +8049,7 @@
                 {
                   "name": "thresholds",
                   "kind": "positional_or_keyword",
-                  "annotation": "list[dict]"
+                  "annotation": "list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]"
                 }
               ],
               "returns": "None",
@@ -7965,7 +8094,8 @@
                   "default": 1500
                 }
               ],
-              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.",
+              "returns": "depz_sensor_sdk.vl53l8.uld.MotionConfig",
+              "doc": "Enable the motion indicator over [distance_min_mm, distance_max_mm]\nand surface motion output in each frame's `.motion`. Returns the\nunderlying uld MotionConfig for advanced tuning.\n\nOn CH firmware the motion indicator and CNH share one DCI struct\n(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
             {
@@ -8032,7 +8162,7 @@
                   "default": 8
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]",
               "doc": "Blocking iterator over parsed frames (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53l8.Vl53l8cx"
             },
@@ -8126,7 +8256,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -8182,7 +8312,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -8199,7 +8329,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -8214,10 +8344,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -8231,7 +8361,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -8462,10 +8592,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 151
+            "line": 206
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53lx",
@@ -8480,7 +8611,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -8569,7 +8700,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)"
             },
             {
@@ -9011,7 +9142,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs."
             },
             {
@@ -9092,7 +9223,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging()."
             },
             {
@@ -9182,7 +9313,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -9238,7 +9369,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -9255,7 +9386,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -9270,10 +9401,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -9287,7 +9418,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -9513,10 +9644,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 627
+            "line": 718
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l0x",
@@ -9531,7 +9663,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -9628,7 +9760,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -10098,7 +10230,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -10185,7 +10317,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -10279,7 +10411,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -10335,7 +10467,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -10352,7 +10484,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -10367,10 +10499,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -10384,7 +10516,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -10610,10 +10742,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 635
+            "line": 726
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cx",
@@ -10628,7 +10761,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -10725,7 +10858,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -11195,7 +11328,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -11282,7 +11415,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -11376,7 +11509,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -11432,7 +11565,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -11449,7 +11582,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -11464,10 +11597,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -11481,7 +11614,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -11707,10 +11840,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 642
+            "line": 733
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l1cb",
@@ -11725,7 +11859,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -11822,7 +11956,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -12292,7 +12426,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -12379,7 +12513,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -12473,7 +12607,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -12529,7 +12663,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -12546,7 +12680,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -12561,10 +12695,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -12578,7 +12712,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -12804,10 +12938,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 649
+            "line": 740
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l3cx",
@@ -12822,7 +12957,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -12919,7 +13054,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -13389,7 +13524,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -13476,7 +13611,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -13570,7 +13705,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -13626,7 +13761,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -13643,7 +13778,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -13658,10 +13793,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -13675,7 +13810,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -13901,10 +14036,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
-            "line": 656
+            "line": 747
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l4cx",
@@ -13919,7 +14055,7 @@
             },
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -14016,7 +14152,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict",
+              "returns": "dict[str, typing.Any]",
               "doc": "Everything about what is connected (needs init()). `model_id_ok`\nis a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.\n(Until 0.7.0 this was `identify()`, which now is the base class's\nparsed firmware name, as on every device.)",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -14486,7 +14622,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "tuple",
+              "returns": "tuple[int, int]",
               "doc": "VL53L0X: re-measure the reference SPADs.",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -14573,7 +14709,7 @@
                   "default": 64
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53lx.Vl53lxMeasurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after start_ranging().",
               "defined_in": "depz_sensor_sdk.vl53lx.Vl53lx"
             },
@@ -14667,7 +14803,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -14723,7 +14859,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -14740,7 +14876,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -14755,10 +14891,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -14772,7 +14908,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -14986,7 +15122,7 @@
             {
               "name": "distance_mm",
               "kind": "positional_or_keyword",
-              "annotation": "int"
+              "annotation": "float"
             },
             {
               "name": "status",
@@ -15027,7 +15163,7 @@
             {
               "name": "extra",
               "kind": "positional_or_keyword",
-              "annotation": "dict",
+              "annotation": "dict[str, typing.Any]",
               "default": "<factory>"
             },
             {
@@ -15055,7 +15191,7 @@
             },
             {
               "name": "distance_mm",
-              "type": "int"
+              "type": "float"
             },
             {
               "name": "status",
@@ -15088,7 +15224,7 @@
             },
             {
               "name": "extra",
-              "type": "dict",
+              "type": "dict[str, Any]",
               "default_factory": "dict"
             },
             {
@@ -15121,42 +15257,88 @@
           "parameters": [
             {
               "name": "distance_mm",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             },
             {
               "name": "status",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "int"
             },
             {
               "name": "status_text",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "str"
             },
             {
               "name": "signal_kcps",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             },
             {
               "name": "ambient_kcps",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             },
             {
               "name": "sigma_mm",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             },
             {
               "name": "min_range_mm",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             },
             {
               "name": "max_range_mm",
-              "kind": "positional_or_keyword"
+              "kind": "positional_or_keyword",
+              "annotation": "float"
             }
           ],
           "module": "depz_sensor_sdk.vl53lx.uld.base",
+          "source": {
+            "file": "depz_sensor_sdk/vl53lx/uld/base.py",
+            "line": 81
+          },
           "exported_as": [
             "depz_sensor_sdk.vl53lx.Target"
           ],
-          "doc": "One return of a multi-target frame, in the terms the CLI\nand the GUI already print. `min_range_mm`/`max_range_mm` are the edges of the\ntarget's own pulse, which only the histogram parts know; the others repeat them\nfrom `distance_mm`.",
+          "doc": "One return of a multi-target frame, in the terms the CLI and the GUI\nalready print. `min_range_mm`/`max_range_mm` are the edges of the target's\nown pulse, which only the histogram parts know; the others repeat them from\n`distance_mm`.",
+          "attributes": [
+            {
+              "name": "distance_mm",
+              "type": "float"
+            },
+            {
+              "name": "status",
+              "type": "int"
+            },
+            {
+              "name": "status_text",
+              "type": "str"
+            },
+            {
+              "name": "signal_kcps",
+              "type": "float"
+            },
+            {
+              "name": "ambient_kcps",
+              "type": "float"
+            },
+            {
+              "name": "sigma_mm",
+              "type": "float"
+            },
+            {
+              "name": "min_range_mm",
+              "type": "float"
+            },
+            {
+              "name": "max_range_mm",
+              "type": "float"
+            }
+          ],
           "members": [
             {
               "name": "index",
@@ -15211,7 +15393,7 @@
           "module": "depz_sensor_sdk.vl53lx._link",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/_link.py",
-            "line": 56
+            "line": 58
           },
           "exported_as": [
             "depz_sensor_sdk.vl53lx.Vl53Error"
@@ -15241,7 +15423,7 @@
           "module": "depz_sensor_sdk.vl53lx._link",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/_link.py",
-            "line": 61
+            "line": 63
           },
           "exported_as": [
             "depz_sensor_sdk.vl53lx.ProtocolError"
@@ -15323,7 +15505,7 @@
               "annotation": "depz_sensor_sdk.vl53lx.Vl53lxMeasurement"
             }
           ],
-          "returns": "list[int]",
+          "returns": "list[float]",
           "module": "depz_sensor_sdk.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/vl53lx/__init__.py",
@@ -15364,10 +15546,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 211
+            "line": 206
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829",
@@ -15377,7 +15560,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -15672,7 +15855,7 @@
                   "default": 16
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.tmf8829.builder.Tmf8829Measurement]",
               "doc": "Blocking iterator over measurements (bounded, drop-oldest).\nSubscribes immediately — call before or after `start()`."
             },
             {
@@ -15761,7 +15944,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -15817,7 +16000,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -15834,7 +16017,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -15849,10 +16032,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -15866,7 +16049,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -16103,7 +16286,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 184
+            "line": 183
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829Config",
@@ -16210,7 +16393,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 27
+            "line": 28
           },
           "exported_as": [
             "depz_sensor_sdk.Tmf8829Measurement",
@@ -16295,7 +16478,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 171
+            "line": 170
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.Tmf8829Error"
@@ -16333,7 +16516,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 175
+            "line": 174
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.Tmf8829InterruptEvent"
@@ -16761,7 +16944,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 71
+            "line": 72
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.MeasurementBuilder"
@@ -17157,7 +17340,7 @@
           "module": "depz_sensor_sdk.tmf8829.builder",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/builder.py",
-            "line": 63
+            "line": 64
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.distance_mm"
@@ -17275,7 +17458,7 @@
           "module": "depz_sensor_sdk.tmf8829",
           "source": {
             "file": "depz_sensor_sdk/tmf8829/__init__.py",
-            "line": 162
+            "line": 161
           },
           "exported_as": [
             "depz_sensor_sdk.tmf8829.firmware_image"
@@ -17312,10 +17495,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.bno086",
           "source": {
             "file": "depz_sensor_sdk/bno086/__init__.py",
-            "line": 134
+            "line": 155
           },
           "exported_as": [
             "depz_sensor_sdk.Bno086",
@@ -17325,7 +17509,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             },
             {
               "name": "busy_retries",
@@ -17560,7 +17744,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17581,7 +17766,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17602,7 +17788,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17623,7 +17810,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17644,7 +17832,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17665,7 +17854,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17686,7 +17876,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17707,7 +17898,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None"
@@ -17756,7 +17948,7 @@
                   "default": 1024
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno086.reports.Report]",
               "doc": "Blocking iterator over typed reports (bounded, drop-oldest).\nSubscribes eagerly — reports emitted after this call are never\nmissed."
             },
             {
@@ -17955,7 +18147,8 @@
                 },
                 {
                   "name": "kw",
-                  "kind": "var_keyword"
+                  "kind": "var_keyword",
+                  "annotation": "Any"
                 }
               ],
               "returns": "depz_sensor_sdk.bno086.sh2.FeatureResponse | None",
@@ -18073,8 +18266,8 @@
                   "default": 1.0
                 }
               ],
-              "returns": "depz_sensor_sdk.bno086.sh2.OscillatorType",
-              "doc": "Get Oscillator Type (command 0x0A). r[0] is the type directly."
+              "returns": "depz_sensor_sdk.bno086.sh2.OscillatorType | int",
+              "doc": "Get Oscillator Type (command 0x0A). r[0] is the type directly; a\nvalue the enum does not know comes back as the raw int."
             },
             {
               "name": "clear_dcd_and_reset",
@@ -18221,7 +18414,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -18277,7 +18470,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -18294,7 +18487,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -18309,10 +18502,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -18326,7 +18519,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -19633,7 +19826,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 338
+            "line": 341
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.MotionIntent"
@@ -20237,7 +20430,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 240
+            "line": 241
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.ProductId"
@@ -20328,7 +20521,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 280
+            "line": 282
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.CommandResponse"
@@ -20470,7 +20663,7 @@
           "module": "depz_sensor_sdk.bno086.sh2",
           "source": {
             "file": "depz_sensor_sdk/bno086/sh2.py",
-            "line": 601
+            "line": 607
           },
           "exported_as": [
             "depz_sensor_sdk.bno086.SensorMetadata"
@@ -21436,10 +21629,11 @@
               "default": 0
             }
           ],
+          "returns": "None",
           "module": "depz_sensor_sdk.bno055",
           "source": {
             "file": "depz_sensor_sdk/bno055/__init__.py",
-            "line": 177
+            "line": 182
           },
           "exported_as": [
             "depz_sensor_sdk.Bno055",
@@ -21449,7 +21643,7 @@
           "attributes": [
             {
               "name": "NO_MATCH",
-              "value": "<object object>"
+              "value": "NO_MATCH"
             }
           ],
           "members": [
@@ -22178,7 +22372,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno055.Bno055Sample]",
               "doc": "Blocking iterator over streamed samples (bounded, drop-oldest;\n`dropped_count` on the returned iterator). Subscribes immediately."
             },
             {
@@ -22267,7 +22461,7 @@
                   "default": 256
                 }
               ],
-              "returns": "depz_sensor_sdk.device.StreamIterator",
+              "returns": "depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]",
               "doc": "Pull-style event stream (bounded, drop-oldest). Subscribes\nimmediately — events emitted after this call are never missed.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -22323,7 +22517,7 @@
                 {
                   "name": "matcher",
                   "kind": "keyword_only",
-                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]]",
+                  "annotation": "Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]]",
                   "default": null
                 },
                 {
@@ -22340,7 +22534,7 @@
                 }
               ],
               "returns": "Any",
-              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise). One in-flight request per opcode.",
+              "doc": "Send `cmd` and wait for its correlated completion.\n\nExactly one of the completion paths must be configured:\n- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;\n- `matcher` — first packet for which `matcher(pkt) is not\n  request.NO_MATCH` finishes with the matcher's return value.\nNon-OK RPT_STATUS echoing `cmd` always raises (BusyError for\nERR_BUSY, StatusError otherwise); a matcher that raises on the packet\nit claims (a reply shorter than its fields) raises InvalidReplyError\nhere, and the device stays usable. One in-flight request per opcode.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
             {
@@ -22355,10 +22549,10 @@
                 {
                   "name": "unpack",
                   "kind": "positional_or_keyword",
-                  "annotation": "Callable[[bytes], Any]"
+                  "annotation": "Callable[[bytes], ~T]"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for a typed report identified by its report ID alone.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -22372,7 +22566,7 @@
                   "annotation": "int"
                 }
               ],
-              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Any]",
+              "returns": "Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]",
               "doc": "Matcher for RPT_TEXT echoing `request_cmd`.",
               "defined_in": "depz_sensor_sdk.device.DeviceBase"
             },
@@ -22754,7 +22948,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 107
+            "line": 108
           },
           "exported_as": [
             "depz_sensor_sdk.OprMode",
@@ -22970,7 +23164,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 202
+            "line": 203
           },
           "exported_as": [
             "depz_sensor_sdk.Units",
@@ -23100,7 +23294,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 358
+            "line": 367
           },
           "exported_as": [
             "depz_sensor_sdk.AxisRemap",
@@ -23222,7 +23416,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 263
+            "line": 264
           },
           "exported_as": [
             "depz_sensor_sdk.CalibStatus",
@@ -23317,7 +23511,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 287
+            "line": 294
           },
           "exported_as": [
             "depz_sensor_sdk.CalibrationProfile",
@@ -23383,7 +23577,7 @@
                   "kind": "positional_or_keyword"
                 }
               ],
-              "returns": "dict"
+              "returns": "dict[str, typing.Any]"
             },
             {
               "name": "from_dict",
@@ -23396,7 +23590,7 @@
                 {
                   "name": "d",
                   "kind": "positional_or_keyword",
-                  "annotation": "dict"
+                  "annotation": "Mapping[str, Any]"
                 }
               ],
               "returns": "CalibrationProfile"
@@ -23418,7 +23612,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 129
+            "line": 130
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.PwrMode"
@@ -23563,7 +23757,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 137
+            "line": 138
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.TempSource"
@@ -23719,7 +23913,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 493
+            "line": 502
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.SystemStatus"
@@ -23789,7 +23983,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 432
+            "line": 441
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.AccelConfig"
@@ -23870,7 +24064,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 451
+            "line": 460
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.GyroConfig"
@@ -23951,7 +24145,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 471
+            "line": 480
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.MagConfig"
@@ -24068,7 +24262,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 531
+            "line": 540
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.RawBlock"
@@ -24142,7 +24336,7 @@
           "module": "depz_sensor_sdk.bno055.regs",
           "source": {
             "file": "depz_sensor_sdk/bno055/regs.py",
-            "line": 547
+            "line": 556
           },
           "exported_as": [
             "depz_sensor_sdk.bno055.decode_block"
@@ -24224,7 +24418,7 @@
           "module": "depz_sensor_sdk.bootloader",
           "source": {
             "file": "depz_sensor_sdk/bootloader.py",
-            "line": 38
+            "line": 57
           },
           "exported_as": [
             "depz_sensor_sdk.BootloaderDevice"
@@ -24281,7 +24475,7 @@
                 }
               ],
               "returns": "depz_sensor_sdk.transport.framing.Packet",
-              "doc": "Send and wait for the reply echoing `cmd` in payload[0]."
+              "doc": "Send and wait for the reply to `cmd`: the report contract 06 §1\nassigns to it (`reply_report`), echoing `cmd` in payload[0]."
             },
             {
               "name": "get_firmware_name",
@@ -24433,18 +24627,24 @@
               "kind": "keyword_only",
               "annotation": "Optional[Callable[[float, str], NoneType]]",
               "default": null
+            },
+            {
+              "name": "app_timeout",
+              "kind": "keyword_only",
+              "annotation": "float",
+              "default": 10.0
             }
           ],
-          "returns": "None",
+          "returns": "str",
           "module": "depz_sensor_sdk.bootloader",
           "source": {
             "file": "depz_sensor_sdk/bootloader.py",
-            "line": 239
+            "line": 299
           },
           "exported_as": [
             "depz_sensor_sdk.update_firmware"
           ],
-          "doc": "Full app-mode → bootloader → flash → boot-app flow (contract 06 §3)."
+          "doc": "Full app-mode → bootloader → flash → boot-app flow (contract 06 §3).\n\nReturns the software name the application answers with on `port` after\nthe reboot (step 6); `ApplicationNotBackError` if it does not within\n`app_timeout` seconds."
         },
         {
           "name": "find_bootloader_port",
@@ -24466,7 +24666,7 @@
           "module": "depz_sensor_sdk.bootloader",
           "source": {
             "file": "depz_sensor_sdk/bootloader.py",
-            "line": 213
+            "line": 244
           },
           "exported_as": [
             "depz_sensor_sdk.find_bootloader_port"
@@ -24510,7 +24710,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 128
+            "line": 159
           },
           "exported_as": [
             "depz_sensor_sdk.SessionRecorder"
@@ -24589,7 +24789,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 401
+            "line": 433
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetReader"
@@ -24680,7 +24880,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 83
+            "line": 96
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetRecord"
@@ -24737,7 +24937,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 499
+            "line": 537
           },
           "exported_as": [
             "depz_sensor_sdk.DatasetPlayer"
@@ -24901,7 +25101,7 @@
           "module": "depz_sensor_sdk.dataset",
           "source": {
             "file": "depz_sensor_sdk/dataset.py",
-            "line": 486
+            "line": 518
           },
           "exported_as": [
             "depz_sensor_sdk.PlayerState"
@@ -26259,13 +26459,13 @@
           "module": "depz_sensor_sdk.protocol.vl53l4",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53l4.py",
-            "line": 90
+            "line": 100
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53l4Info",
             "depz_sensor_sdk.vl53l4.Vl53l4Info"
           ],
-          "doc": "RPT_VL53_INFO — bridge diagnostics. Counters are free-running and wrap\nsilently; watch increments, not absolute values.",
+          "doc": "RPT_VL53_INFO — bridge diagnostics. Counters wrap silently; watch\nincrements, not absolute values. `i2c_errors` counts since the last\nsuccessful XSHUT reset (the bridge clears it there), not since power-up.",
           "dataclass_fields": [
             {
               "name": "int_edges",
@@ -26506,13 +26706,13 @@
           "module": "depz_sensor_sdk.protocol.vl53lx",
           "source": {
             "file": "depz_sensor_sdk/protocol/vl53lx.py",
-            "line": 79
+            "line": 103
           },
           "exported_as": [
             "depz_sensor_sdk.Vl53lxInfo",
             "depz_sensor_sdk.vl53lx.Vl53lxInfo"
           ],
-          "doc": "RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads\nno sensor register. Counters are free-running (wrap silently): watch\nincrements. `slots_skipped` = a slot that never got the bus, `i2c_errors`\n= a bus that answered badly (since power-up, the last XSHUT reset or\nVL53_CLEAR_I2C_ERRORS — the SDK sends that at the end of every sensor\ninit, so the NACKs of a resetting die are not counted), `frames_dropped` =\na good sample the USB TX ring had no room for (since the stream was armed).",
+          "doc": "RPT_VL53_INFO (v2.00 and v2.01, 23 bytes) — bridge state only; the bridge reads\nno sensor register. Counters are free-running (wrap silently): watch\nincrements. `slots_skipped` = a slot that never got the bus, `i2c_errors`\n= a bus that answered badly (since power-up, the last XSHUT reset or\nVL53_CLEAR_I2C_ERRORS — the SDK sends that at the end of every sensor\ninit, so the NACKs of a resetting die are not counted), `frames_dropped` =\na good sample the USB TX ring had no room for (since the stream was armed).",
           "dataclass_fields": [
             {
               "name": "int_edges",
@@ -26684,13 +26884,13 @@
           "module": "depz_sensor_sdk.protocol.bno055",
           "source": {
             "file": "depz_sensor_sdk/protocol/bno055.py",
-            "line": 80
+            "line": 102
           },
           "exported_as": [
             "depz_sensor_sdk.Bno055Info",
             "depz_sensor_sdk.bno055.Bno055Info"
           ],
-          "doc": "RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge\ndiagnostics. Counters are free-running and wrap silently; watch\nincrements, not absolute values. A rising `sensor_resets` means the\nbridge pulsed nRESET to recover the bus: the sensor is back in CONFIG\nmode and the host must restore its configuration.",
+          "doc": "RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge\ndiagnostics. Counters wrap silently; watch increments, not absolute\nvalues. `i2c_errors` is cleared by every successful reset handshake, the\nread timings and `slots_skipped` at START_STREAM. A rising `sensor_resets` means the\nbridge pulsed nRESET to recover the bus: the sensor is back in CONFIG\nmode and the host must restore its configuration.",
           "dataclass_fields": [
             {
               "name": "i2c_addr",
@@ -26843,7 +27043,7 @@
           "module": "depz_sensor_sdk.protocol.bootloader",
           "source": {
             "file": "depz_sensor_sdk/protocol/bootloader.py",
-            "line": 77
+            "line": 103
           },
           "exported_as": [
             "depz_sensor_sdk.FwDepzImage"
@@ -26930,7 +27130,7 @@
                   "name": "cur_sec",
                   "kind": "keyword_only",
                   "annotation": "int",
-                  "default": 1
+                  "default": 0
                 },
                 {
                   "name": "tot_sec",
@@ -26940,7 +27140,7 @@
                 }
               ],
               "returns": "bytes",
-              "doc": "Assemble a container (test/tooling helper; the fw_crc32 covers the\npayload exactly as flashed)."
+              "doc": "Assemble a container (test/tooling helper; the fw_crc32 covers the\npayload exactly as flashed). Sections are 0-based: a shipped file is\nsection 0 of 1, the only header parse() accepts."
             },
             {
               "name": "payload_crc_ok",
@@ -27798,7 +27998,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 150
+            "line": 167
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SyncPinConfig"
@@ -28097,7 +28297,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 127
+            "line": 144
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SequenceErrorReport"
@@ -28148,6 +28348,27 @@
           "doc": "int(x, base=10) -> integer\n\nConvert a number or string to an integer, or return 0 if no arguments\nare given.  If x is a number, return x.__int__().  For floating-point\nnumbers, this truncates towards zero.\n\nIf x is not a number or if base is given, then x must be a string,\nbytes, or bytearray instance representing an integer literal in the\ngiven base.  The literal can be preceded by '+' or '-' and be surrounded\nby whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.\nBase 0 means to interpret the base from the string as an integer literal.\n>>> int('0b100', base=0)\n4"
         },
         {
+          "name": "pack_set_payload_crc_type",
+          "kind": "function",
+          "parameters": [
+            {
+              "name": "crc_type",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            }
+          ],
+          "returns": "bytes",
+          "module": "depz_sensor_sdk.protocol.common",
+          "source": {
+            "file": "depz_sensor_sdk/protocol/common.py",
+            "line": 130
+          },
+          "exported_as": [
+            "depz_sensor_sdk.protocol.pack_set_payload_crc_type"
+          ],
+          "doc": "SET_PAYLOAD_CRC_TYPE payload `crc_type u8`, 0..3 (contract 02 §2), else\nValueError — checked before anything is written (contract 07 §3)."
+        },
+        {
           "name": "pack_sync_time",
           "kind": "function",
           "parameters": [
@@ -28161,7 +28382,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 172
+            "line": 189
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.pack_sync_time"
@@ -28196,7 +28417,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 176
+            "line": 193
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.sync_time_offset_rtt"
@@ -28217,7 +28438,7 @@
           "module": "depz_sensor_sdk.protocol.common",
           "source": {
             "file": "depz_sensor_sdk/protocol/common.py",
-            "line": 189
+            "line": 206
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.strip_device_string"
@@ -28232,7 +28453,7 @@
             {
               "name": "mode",
               "kind": "positional_or_keyword",
-              "annotation": "str"
+              "annotation": "Literal['app', 'bootloader', 'unknown']"
             },
             {
               "name": "sensor_type",
@@ -28254,7 +28475,7 @@
           "module": "depz_sensor_sdk.protocol.identity",
           "source": {
             "file": "depz_sensor_sdk/protocol/identity.py",
-            "line": 22
+            "line": 23
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.Identity"
@@ -28262,7 +28483,7 @@
           "dataclass_fields": [
             {
               "name": "mode",
-              "type": "str"
+              "type": "Literal['app', 'bootloader', 'unknown']"
             },
             {
               "name": "sensor_type",
@@ -28295,7 +28516,7 @@
           "module": "depz_sensor_sdk.protocol.identity",
           "source": {
             "file": "depz_sensor_sdk/protocol/identity.py",
-            "line": 10
+            "line": 11
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.SensorType"
@@ -28982,7 +29203,7 @@
           "module": "depz_sensor_sdk.protocol.identity",
           "source": {
             "file": "depz_sensor_sdk/protocol/identity.py",
-            "line": 47
+            "line": 48
           },
           "exported_as": [
             "depz_sensor_sdk.protocol.parse_software_name"
@@ -29580,12 +29801,84 @@
           "module": "depz_sensor_sdk.errors",
           "source": {
             "file": "depz_sensor_sdk/errors.py",
-            "line": 55
+            "line": 66
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceLostError"
           ],
           "doc": "The serial link dropped (unplug, reboot) while in use.",
+          "members": [
+            {
+              "name": "with_traceback",
+              "kind": "method",
+              "doc": "Exception.with_traceback(tb) --\nset self.__traceback__ to tb and return self.",
+              "defined_in": "builtins.BaseException"
+            },
+            {
+              "name": "add_note",
+              "kind": "method",
+              "doc": "Exception.add_note(note) --\nadd a note to the exception",
+              "defined_in": "builtins.BaseException"
+            }
+          ]
+        },
+        {
+          "name": "InvalidReplyError",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.errors.DepzError"
+          ],
+          "parameters": [
+            {
+              "name": "cmd",
+              "kind": "positional_or_keyword",
+              "annotation": "int"
+            },
+            {
+              "name": "cause",
+              "kind": "positional_or_keyword",
+              "annotation": "BaseException"
+            }
+          ],
+          "module": "depz_sensor_sdk.errors",
+          "source": {
+            "file": "depz_sensor_sdk/errors.py",
+            "line": 55
+          },
+          "exported_as": [
+            "depz_sensor_sdk.InvalidReplyError"
+          ],
+          "doc": "The reply to a request does not decode (contract 07 §3): shorter than\nthe fields its contract defines, or a value the decoder refuses. Only that\nrequest fails; the reader goes on and the device stays usable.",
+          "members": [
+            {
+              "name": "with_traceback",
+              "kind": "method",
+              "doc": "Exception.with_traceback(tb) --\nset self.__traceback__ to tb and return self.",
+              "defined_in": "builtins.BaseException"
+            },
+            {
+              "name": "add_note",
+              "kind": "method",
+              "doc": "Exception.add_note(note) --\nadd a note to the exception",
+              "defined_in": "builtins.BaseException"
+            }
+          ]
+        },
+        {
+          "name": "InvalidStateError",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.errors.DepzError"
+          ],
+          "module": "depz_sensor_sdk.errors",
+          "source": {
+            "file": "depz_sensor_sdk/errors.py",
+            "line": 84
+          },
+          "exported_as": [
+            "depz_sensor_sdk.InvalidStateError"
+          ],
+          "doc": "The call is not valid in the current state of the device or object\n(contract 07 §3): `to_host_time_us` before `sync_time`, a sensor call\nbefore `init()` / `configure()` or while streaming, `add()` after\nrecording started, a closed `DatasetWriter` or `DatasetPlayer`,\n`wait()` without the player thread, a write to a read-only register\nblock, a VL53Lx board name without a product number, a packaged\nfirmware blob of the wrong size.",
           "members": [
             {
               "name": "with_traceback",
@@ -29610,7 +29903,7 @@
           "module": "depz_sensor_sdk.errors",
           "source": {
             "file": "depz_sensor_sdk/errors.py",
-            "line": 67
+            "line": 80
           },
           "exported_as": [
             "depz_sensor_sdk.LinkClosedError"
@@ -29640,12 +29933,42 @@
           "module": "depz_sensor_sdk.errors",
           "source": {
             "file": "depz_sensor_sdk/errors.py",
-            "line": 59
+            "line": 70
           },
           "exported_as": [
             "depz_sensor_sdk.NoDepzDeviceError"
           ],
-          "doc": "Discovery found no DEPZ device matching the request.\n\nRaised by `open_device()`/discovery when no candidate serial port has a\nknown DEPZ USB identity (or none matches a requested serial/index).",
+          "doc": "Discovery found nothing to open (contract 07 §3).\n\nRaised by `open_device()` / `open_on_link()` when no candidate serial\nport has a known DEPZ USB identity, none matches a requested\nserial/index, or nothing DEPZ answers the probe on the port path or link\ngiven.",
+          "members": [
+            {
+              "name": "with_traceback",
+              "kind": "method",
+              "doc": "Exception.with_traceback(tb) --\nset self.__traceback__ to tb and return self.",
+              "defined_in": "builtins.BaseException"
+            },
+            {
+              "name": "add_note",
+              "kind": "method",
+              "doc": "Exception.add_note(note) --\nadd a note to the exception",
+              "defined_in": "builtins.BaseException"
+            }
+          ]
+        },
+        {
+          "name": "ReplayMismatchError",
+          "kind": "class",
+          "bases": [
+            "depz_sensor_sdk.errors.DepzError"
+          ],
+          "module": "depz_sensor_sdk.errors",
+          "source": {
+            "file": "depz_sensor_sdk/errors.py",
+            "line": 94
+          },
+          "exported_as": [
+            "depz_sensor_sdk.ReplayMismatchError"
+          ],
+          "doc": "A strict `ReplayLink` saw the host write bytes the capture does not\nhold (contract 08): the SDK under test diverged from the recorded\nprotocol.",
           "members": [
             {
               "name": "with_traceback",
@@ -29710,7 +30033,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.7.0",
+          "value": "0.8.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

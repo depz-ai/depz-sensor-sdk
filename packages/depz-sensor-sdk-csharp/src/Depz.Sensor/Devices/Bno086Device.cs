@@ -133,7 +133,7 @@ public sealed class Bno086Device : DepzDevice
             cbs = _reportCallbacks.ToArray();
         foreach (var (cb, filter) in cbs)
             if (filter is null || filter.Contains(rep.SensorIdValue))
-                cb(rep);
+                Fanout<BnoReport>.Call(cb, rep, Stats);
         (Subscription<BnoReport>, HashSet<int>?)[] qs;
         lock (_reportQueues)
             qs = _reportQueues.ToArray();
@@ -201,6 +201,20 @@ public sealed class Bno086Device : DepzDevice
         return raw;
     }
 
+    // A control response the hub answered a request with, decoded; one shorter than its fields
+    // fails that request with InvalidReplyException (contract 07 §3), never a bare error.
+    private static T DecodeReply<T>(int rid, byte[] raw, Func<byte[], T> unpack)
+    {
+        try
+        {
+            return unpack(raw);
+        }
+        catch (ArgumentException bad)
+        {
+            throw new InvalidReplyException(rid, bad);
+        }
+    }
+
     // Send a control payload and wait for the first response of report id `rid` that `pred` accepts.
     private T ControlRequest<T>(byte[] payload, ControlReport rid, Func<byte[], T> parse, Func<T, bool>? pred, TimeSpan timeout)
     {
@@ -211,7 +225,7 @@ public sealed class Bno086Device : DepzDevice
             var clock = Stopwatch.StartNew();
             while (true)
             {
-                T obj = parse(Next(q, clock, timeout, (int)rid));
+                T obj = DecodeReply((int)rid, Next(q, clock, timeout, (int)rid), parse);
                 if (pred is null || pred(obj))
                     return obj;
             }
@@ -258,7 +272,7 @@ public sealed class Bno086Device : DepzDevice
             var clock = Stopwatch.StartNew();
             while (true)
             {
-                var resp = CommandResponse.Unpack(Next(q, clock, timeout, rid));
+                var resp = DecodeReply(rid, Next(q, clock, timeout, rid), p => CommandResponse.Unpack(p));
                 if (resp.Command != (int)command || resp.CommandSeq != seq)
                     continue;
                 if (collect(resp, results))
@@ -323,9 +337,9 @@ public sealed class Bno086Device : DepzDevice
             var t = timeout ?? TimeSpan.FromSeconds(1);
             if (!q.TryTake(out byte[]? first, t))
                 throw new DepzTimeoutException(rid, t);
-            var output = new List<ProductId> { Bno086.ProductId.Unpack(first) };
+            var output = new List<ProductId> { DecodeReply(rid, first, p => Bno086.ProductId.Unpack(p)) };
             while (q.TryTake(out byte[]? more, settle ?? TimeSpan.FromMilliseconds(150)))
-                output.Add(Bno086.ProductId.Unpack(more));
+                output.Add(DecodeReply(rid, more, p => Bno086.ProductId.Unpack(p)));
             return output;
         }
         finally
@@ -541,7 +555,7 @@ public sealed class Bno086Device : DepzDevice
             SendShtp(ShtpChannel.Control, session.Request());
             var clock = Stopwatch.StartNew();
             while (!session.Done)
-                session.Feed(FrsReadResponse.Unpack(Next(q, clock, t, rid)));
+                session.Feed(DecodeReply(rid, Next(q, clock, t, rid), p => FrsReadResponse.Unpack(p)));
         }
         finally
         {
@@ -563,7 +577,7 @@ public sealed class Bno086Device : DepzDevice
             var clock = Stopwatch.StartNew();
             while (!session.Done)
             {
-                byte[]? next = session.Feed(FrsWriteResponse.Unpack(Next(q, clock, t, rid)));
+                byte[]? next = session.Feed(DecodeReply(rid, Next(q, clock, t, rid), p => FrsWriteResponse.Unpack(p)));
                 if (next != null)
                     SendShtp(ShtpChannel.Control, next);
             }

@@ -102,13 +102,9 @@ public final class Hist {
     private static final class Gen3Algo {
         private static final int N = BareRegs.HISTOGRAM_BUFFER_SIZE;
 
-        long firstBin;            // VL53LX_p_019
-        long bufferSize = N;      // VL53LX_p_020
         long binsInData;          // VL53LX_p_021
         long vcselPeriod;         // VL53LX_p_030, bins per period
-        long binsOverThreshold;   // VL53LX_p_039
         long ambientPerBin;       // VL53LX_p_028
-        long ambientThreshold;    // VL53LX_p_031, the last one computed
         final long[] overThreshold = new long[N];   // VL53LX_p_040
         final long[] pulseMask = new long[N];       // VL53LX_p_041
         final long[] pulseNo = new long[N];         // VL53LX_p_042
@@ -117,7 +113,6 @@ public final class Hist {
         long maxPulses = MAX_PULSES;                // VL53LX_p_045
         long pulseCount;          // VL53LX_p_046
         final PulseData[] pulses = new PulseData[MAX_PULSES];
-        HistogramBinData bins;        // VL53LX_p_006, the working frame
         HistogramBinData xtalk;       // VL53LX_p_047
         HistogramBinData pulseAmb;    // VL53LX_p_048, pulse padded ambient
         HistogramBinData pulseZero;   // VL53LX_p_049, pulse padded zero
@@ -493,8 +488,6 @@ public final class Hist {
     // number of samples in the bin — and the flags saying which bins clear it.
     private static void ambientThresholds(long scaler, long thresholdSigma, long minThresholdEvents, boolean xtalkEnable,
             HistogramBinData bins, Gen3Algo algo) {
-        algo.bufferSize = bins.numberOfBins;
-        algo.firstBin = bins.firstBin;
         algo.binsInData = bins.binsInData;
         algo.ambientPerBin = bins.ambientPerBin;
         algo.vcselPeriod = BareMath.decodeVcselPeriod(bins.vcselPeriod);
@@ -518,15 +511,12 @@ public final class Hist {
             value += ambEvents;
             value = Math.max(value, minThresholdEvents);
             algo.threshold[(int) lb] = value;
-            algo.ambientThreshold = value;
         }
 
-        algo.binsOverThreshold = 0;
         for (long lb = bins.firstBin; lb < bins.binsInData; lb++) {
             long over = bins.binData[(int) lb] > algo.threshold[(int) lb] ? 1 : 0;
             algo.overThreshold[(int) lb] = over;
             algo.pulseMask[(int) lb] = over;
-            algo.binsOverThreshold += over;
         }
     }
 
@@ -810,7 +800,6 @@ public final class Hist {
         RangeResults results = new RangeResults();
 
         HistogramBinData bins = averageRepeatedBins(binsInput);
-        algo.bins = bins;
         // The crosstalk histogram: zero everywhere while compensation is off, full width so window sums stay defined.
         algo.xtalk = bins.clone();
         algo.xtalk.binData = new long[(int) bins.numberOfBins];

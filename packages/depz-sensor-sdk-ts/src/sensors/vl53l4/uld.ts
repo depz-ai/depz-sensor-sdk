@@ -126,12 +126,30 @@ export const RANGE_STATUS_NAMES: Readonly<Record<number, string>> = {
   255: "other error",
 };
 
-/** `v` when it is an integer in lo..hi, else Vl53l4cdError (contract 07 §3: never wrap). */
+/** `v` when it is an integer in lo..hi, else RangeError (contract 07 §3: invalid_argument, never wrap). */
 function inRange(name: string, v: number, lo: number, hi: number): number {
-  if (!Number.isInteger(v) || v < lo || v > hi) throw new Vl53l4cdError(`${name} ${v} out of range ${lo}..${hi}`);
+  if (!Number.isInteger(v) || v < lo || v > hi) throw new RangeError(`${name} ${v} out of range ${lo}..${hi}`);
   return v;
 }
 
+/**
+ * SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+ * which need no register: budget 10..200 ms, period 0 (continuous) or above
+ * the budget (autonomous) and a u32. RangeError otherwise (contract 10 §5).
+ */
+export function checkRangeTiming(timingBudgetMs: number, interMeasurementMs: number): void {
+  inRange("timingBudgetMs", timingBudgetMs, 10, 200);
+  inRange("interMeasurementMs", interMeasurementMs, 0, 0xffffffff);
+  if (interMeasurementMs > 0 && interMeasurementMs <= timingBudgetMs) {
+    throw new RangeError("interMeasurementMs must be 0 or > timingBudgetMs");
+  }
+}
+
+/**
+ * What the sensor did, not what the caller asked: a boot or data-ready
+ * timeout, a short result block, an oscillator word of 0, a failed xtalk
+ * calibration. A refused argument is a RangeError (contract 07 §3).
+ */
 export class Vl53l4cdError extends Error {
   constructor(message?: string) {
     super(message);
@@ -186,7 +204,8 @@ function beWord(raw: Uint8Array, off: number): number {
  * big-endian words (the bridge passes them through untouched).
  */
 export function parseResultBlock(raw: Uint8Array): Vl53l4Results {
-  if (raw.length < 15) {
+  // contract 10 §5: the block is 17 bytes; shorter is rejected, a tail is ignored
+  if (raw.length < RESULT_BLOCK_LEN) {
     throw new Vl53l4cdError(`result block too short: ${raw.length} bytes`);
   }
 
@@ -244,15 +263,11 @@ export function rangeTimingRegisters(
   oscFrequency: number,
   clockPll = 0,
 ): RangeTimingRegisters {
+  checkRangeTiming(timingBudgetMs, interMeasurementMs);
   if (oscFrequency === 0) throw new Vl53l4cdError("oscFrequency reads 0");
-  if (!(timingBudgetMs >= 10 && timingBudgetMs <= 200)) {
-    throw new Vl53l4cdError("timingBudgetMs must be 10..200");
-  }
-  // Register words (u16) and the u32 period: out of range is refused, never wrapped.
+  // Register words (u16): out of range is refused, never wrapped.
   inRange("oscFrequency", oscFrequency, 1, 0xffff);
   inRange("clockPll", clockPll, 0, 0xffff);
-  inRange("timingBudgetMs", timingBudgetMs, 10, 200);
-  inRange("interMeasurementMs", interMeasurementMs, 0, 0xffffffff);
 
   let timingBudgetUs = timingBudgetMs * 1000;
   const macroPeriodUs = u32(2304 * Math.floor(0x40000000 / oscFrequency)) >>> 6;
@@ -262,15 +277,14 @@ export function rangeTimingRegisters(
     // continuous
     intermeasurementRaw = 0;
     timingBudgetUs -= 2500;
-  } else if (interMeasurementMs > timingBudgetMs) {
-    // autonomous low power (1.055 is a frozen double-precision PLL factor)
+  } else {
+    // autonomous low power, above the budget (checkRangeTiming);
+    // 1.055 is a frozen double-precision PLL factor
     intermeasurementRaw = Math.floor(1.055 * interMeasurementMs * (clockPll & 0x3ff));
     if (intermeasurementRaw > 0xffffffff) {
-      throw new Vl53l4cdError(`interMeasurementMs ${interMeasurementMs}: INTERMEASUREMENT_MS overflows u32`);
+      throw new RangeError(`interMeasurementMs ${interMeasurementMs}: INTERMEASUREMENT_MS overflows u32`);
     }
     timingBudgetUs = Math.floor((timingBudgetUs - 4300) / 2);
-  } else {
-    throw new Vl53l4cdError("interMeasurementMs must be 0 or > timingBudgetMs");
   }
 
   timingBudgetUs = u32(timingBudgetUs * 4096); // (x << 12) & 0xFFFFFFFF
@@ -372,9 +386,6 @@ export function decodeSignalThreshold(rawWord: number): number {
 }
 
 export function sigmaThresholdRaw(sigmaMm: number): number {
-  if (sigmaMm > 0xffff >> 2) {
-    throw new Vl53l4cdError("sigmaMm must be <= 16383");
-  }
   inRange("sigmaMm", sigmaMm, 0, 0xffff >> 2);
   return sigmaMm << 2;
 }
@@ -520,6 +531,8 @@ export class VL53L4CD {
   // ── timing ─────────────────────────────────────────────────────────────────
 
   async setRangeTiming(timingBudgetMs: number, interMeasurementMs: number): Promise<void> {
+    // refused before any register traffic, not only before the writes
+    checkRangeTiming(timingBudgetMs, interMeasurementMs);
     const clockPll = interMeasurementMs > 0 ? await this.rdWord(RESULT__OSC_CALIBRATE_VAL) : 0;
     const { rangeConfigA, rangeConfigB, intermeasurementRaw } = rangeTimingRegisters(
       timingBudgetMs,
@@ -641,7 +654,7 @@ export class VL53L4CD {
 
   async calibrateOffset(targetDistMm: number, nbSamples = 20): Promise<number> {
     if (!(nbSamples >= 5 && nbSamples <= 255) || !(targetDistMm >= 10 && targetDistMm <= 1000)) {
-      throw new Vl53l4cdError("nbSamples must be 5..255, target 10..1000 mm");
+      throw new RangeError("nbSamples must be 5..255, target 10..1000 mm");
     }
 
     await this.wrWord(RANGE_OFFSET_MM, 0);
@@ -661,7 +674,7 @@ export class VL53L4CD {
 
   async calibrateXtalk(targetDistMm: number, nbSamples = 20): Promise<number> {
     if (!(nbSamples >= 5 && nbSamples <= 255) || !(targetDistMm >= 10 && targetDistMm <= 5000)) {
-      throw new Vl53l4cdError("nbSamples must be 5..255, target 10..5000 mm");
+      throw new RangeError("nbSamples must be 5..255, target 10..5000 mm");
     }
 
     await this.wrWord(XTALK_PLANE_OFFSET_KCPS, 0); // disable compensation

@@ -48,7 +48,10 @@ impl DepzError {
     pub fn timeout(cmd: u8, timeout: Duration) -> DepzError {
         DepzError::Timeout {
             cmd: Some(cmd),
-            message: format!("cmd 0x{cmd:02X}: no reply within {:.3}s", timeout.as_secs_f64()),
+            message: format!(
+                "cmd 0x{cmd:02X}: no reply within {:.3}s",
+                timeout.as_secs_f64()
+            ),
         }
     }
 
@@ -61,10 +64,13 @@ impl DepzError {
     pub fn kind(&self) -> Option<&'static str> {
         match self {
             DepzError::Timeout { .. } => Some("timeout"),
-            DepzError::Status { status, .. } if *status == Status::ErrCmdNotSupported as u8 => Some("not_supported"),
+            DepzError::Status { status, .. } if *status == Status::ErrCmdNotSupported as u8 => {
+                Some("not_supported")
+            }
             DepzError::Status { .. } => Some("device_error"),
             DepzError::InvalidArgument(_) => Some("invalid_argument"),
             DepzError::Unsupported(_) => Some("not_supported"),
+            DepzError::Protocol(_) => Some("invalid_reply"),
             _ => None,
         }
     }
@@ -77,7 +83,9 @@ impl fmt::Display for DepzError {
             DepzError::Status { cmd, status } if *status == Status::ErrBusy as u8 => {
                 write!(f, "cmd 0x{cmd:02X}: busy (ERR_BUSY or already in flight)")
             }
-            DepzError::Status { cmd, status } => write!(f, "cmd 0x{cmd:02X}: device status 0x{status:02X}"),
+            DepzError::Status { cmd, status } => {
+                write!(f, "cmd 0x{cmd:02X}: device status 0x{status:02X}")
+            }
             DepzError::DeviceLost(m) => write!(f, "device lost: {m}"),
             DepzError::LinkClosed(m) => write!(f, "link closed: {m}"),
             DepzError::NoDevice(m) => write!(f, "no DEPZ device: {m}"),

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from depz_sensor_sdk.errors import DepzError
+from depz_sensor_sdk.errors import InvalidStateError
 from depz_sensor_sdk.transport.link import LoopbackLink
 from depz_sensor_sdk.vl53l8 import (
     RANGING_MODE_AUTONOMOUS,
@@ -165,9 +165,9 @@ def test_config_while_ranging_raises():
     dev = _dev()
     try:
         dev._ranging = True  # pretend the stream owns the register bank
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             dev.set_resolution(RESOLUTION_8X8)
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             dev.set_ranging_frequency_hz(15)
     finally:
         dev.close()
@@ -176,7 +176,7 @@ def test_config_while_ranging_raises():
 def test_uld_property_before_init_raises():
     dev = _dev()
     try:
-        with pytest.raises(DepzError):
+        with pytest.raises(InvalidStateError):
             _ = dev.uld  # init() not called
     finally:
         dev.close()

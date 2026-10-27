@@ -21,12 +21,20 @@ fn floats(a: &[f64]) -> Value {
 }
 
 fn obj(entries: Vec<(&str, Value)>) -> Value {
-    Value::Object(entries.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
+    Value::Object(
+        entries
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect(),
+    )
 }
 
 /// `sr04`: `{echo_us, source}`.
 pub fn sr04(m: &Sr04Measurement) -> Value {
-    obj(vec![("echo_us", int(m.echo_time_us)), ("source", Value::String(m.source.to_string()))])
+    obj(vec![
+        ("echo_us", int(m.echo_time_us)),
+        ("source", Value::String(m.source.to_string())),
+    ])
 }
 
 /// `vl53l4`: the result fields, distance raw whatever the status.
@@ -50,15 +58,36 @@ pub fn vl53l8(f: &Vl53l8Frame, layers: bool) -> Value {
     let mut v = vec![
         ("resolution", int(n as i64)),
         ("silicon_temp_degc", int(f.silicon_temp_degc)),
-        ("distance_mm", ints(&f.distance_mm[..cut(f.distance_mm.len())])),
-        ("target_status", ints(&f.target_status[..cut(f.target_status.len())])),
-        ("nb_target_detected", ints(&f.nb_target_detected[..cut(f.nb_target_detected.len())])),
+        (
+            "distance_mm",
+            ints(&f.distance_mm[..cut(f.distance_mm.len())]),
+        ),
+        (
+            "target_status",
+            ints(&f.target_status[..cut(f.target_status.len())]),
+        ),
+        (
+            "nb_target_detected",
+            ints(&f.nb_target_detected[..cut(f.nb_target_detected.len())]),
+        ),
     ];
     if layers {
-        v.push(("signal_per_spad", floats(&f.signal_per_spad[..cut(f.signal_per_spad.len())])));
-        v.push(("ambient_per_spad", floats(&f.ambient_per_spad[..cut(f.ambient_per_spad.len())])));
-        v.push(("range_sigma_mm", floats(&f.range_sigma_mm[..cut(f.range_sigma_mm.len())])));
-        v.push(("reflectance", floats(&f.reflectance[..cut(f.reflectance.len())])));
+        v.push((
+            "signal_per_spad",
+            floats(&f.signal_per_spad[..cut(f.signal_per_spad.len())]),
+        ));
+        v.push((
+            "ambient_per_spad",
+            floats(&f.ambient_per_spad[..cut(f.ambient_per_spad.len())]),
+        ));
+        v.push((
+            "range_sigma_mm",
+            floats(&f.range_sigma_mm[..cut(f.range_sigma_mm.len())]),
+        ));
+        v.push((
+            "reflectance",
+            floats(&f.reflectance[..cut(f.reflectance.len())]),
+        ));
     }
     if let Some(mo) = &f.motion {
         v.push((
@@ -67,7 +96,10 @@ pub fn vl53l8(f: &Vl53l8Frame, layers: bool) -> Value {
                 ("global_indicator_1", int(mo.global_indicator_1)),
                 ("global_indicator_2", int(mo.global_indicator_2)),
                 ("status", int(mo.status)),
-                ("nb_of_detected_aggregates", int(mo.nb_of_detected_aggregates)),
+                (
+                    "nb_of_detected_aggregates",
+                    int(mo.nb_of_detected_aggregates),
+                ),
                 ("nb_of_aggregates", int(mo.nb_of_aggregates)),
                 ("motion", ints(&mo.motion)),
             ]),
@@ -82,7 +114,10 @@ pub fn vl53l8_cnh(cnh_raw: &[u8], setup: &Vl53l8CnhSetup) -> Value {
         ("nb_aggregates", int(setup.nb_of_aggregates())),
         ("feature_length", int(setup.feature_length())),
         ("sum_span", int(setup.sum_span())),
-        ("start_bin", int((setup.ref_bin_offset() as f64 / 2048.0).floor() as i64)),
+        (
+            "start_bin",
+            int((setup.ref_bin_offset() as f64 / 2048.0).floor() as i64),
+        ),
         ("cnh_raw_b64", Value::String(base64(cnh_raw))),
     ])
 }
@@ -103,7 +138,13 @@ pub fn vl53lx(m: &Vl53lxMeasurement, product: &str, driver: &str) -> Value {
         let targets = m
             .targets
             .iter()
-            .map(|t| obj(vec![("distance_mm", int(t.distance_mm)), ("status", int(t.status)), ("signal_kcps", Value::float(t.signal_kcps))]))
+            .map(|t| {
+                obj(vec![
+                    ("distance_mm", int(t.distance_mm)),
+                    ("status", int(t.status)),
+                    ("signal_kcps", Value::float(t.signal_kcps)),
+                ])
+            })
             .collect();
         v.push(("targets", Value::Array(targets)));
     }
@@ -140,7 +181,13 @@ pub fn bno055(s: &Bno055Sample) -> Value {
 pub fn tmf8829(m: &Tmf8829Measurement) -> Value {
     let r = &m.results;
     let (rows, cols) = m.shape();
-    let dist = m.distance_mm.as_deref().unwrap_or(&[]).iter().map(|&x| round1(x)).collect::<Vec<_>>();
+    let dist = m
+        .distance_mm
+        .as_deref()
+        .unwrap_or(&[])
+        .iter()
+        .map(|&x| round1(x))
+        .collect::<Vec<_>>();
     let mut v = vec![
         ("fp_mode", int(m.fp_mode)),
         ("rows", int(rows as i64)),
@@ -152,7 +199,11 @@ pub fn tmf8829(m: &Tmf8829Measurement) -> Value {
         ("distance_mm", floats(&dist)),
         ("snr", ints(r.snr.as_deref().unwrap_or(&[]))),
     ];
-    for (k, a) in [("signal", &r.signal), ("noise", &r.noise), ("xtalk", &r.xtalk)] {
+    for (k, a) in [
+        ("signal", &r.signal),
+        ("noise", &r.noise),
+        ("xtalk", &r.xtalk),
+    ] {
         if let Some(a) = a {
             v.push((k, ints(a)));
         }
@@ -163,9 +214,18 @@ pub fn tmf8829(m: &Tmf8829Measurement) -> Value {
 /// The report type name of the reference SDK (`Acceleration`, `RotationVector`, `ScalarReport` …).
 pub fn bno086_type(r: &Report) -> &'static str {
     match r {
-        Report::Vector3 { kind: Vector3Kind::Acceleration, .. } => "Acceleration",
-        Report::Vector3 { kind: Vector3Kind::Gyroscope, .. } => "Gyroscope",
-        Report::Vector3 { kind: Vector3Kind::Magnetometer, .. } => "Magnetometer",
+        Report::Vector3 {
+            kind: Vector3Kind::Acceleration,
+            ..
+        } => "Acceleration",
+        Report::Vector3 {
+            kind: Vector3Kind::Gyroscope,
+            ..
+        } => "Gyroscope",
+        Report::Vector3 {
+            kind: Vector3Kind::Magnetometer,
+            ..
+        } => "Magnetometer",
         Report::Vector3WithBias { is_gyro: true, .. } => "UncalibratedGyroscope",
         Report::Vector3WithBias { is_gyro: false, .. } => "UncalibratedMagnetometer",
         Report::RotationVector { .. } => "RotationVector",
@@ -194,52 +254,181 @@ fn scale(raw: impl Into<i64>, q: u32) -> Value {
 /// carries (scaled), the integer counts of the raw ADC streams, and the device timestamp.
 pub fn bno086(r: &Report) -> Value {
     let sensor = r.sensor_id();
-    let mut v = vec![("type", Value::String(bno086_type(r).to_string())), ("sensor_id", int(sensor))];
+    let mut v = vec![
+        ("type", Value::String(bno086_type(r).to_string())),
+        ("sensor_id", int(sensor)),
+    ];
     let acc = |a: u8| ("accuracy", int(a));
     match r {
-        Report::Vector3 { accuracy, x_raw, y_raw, z_raw, .. } => {
+        Report::Vector3 {
+            accuracy,
+            x_raw,
+            y_raw,
+            z_raw,
+            ..
+        } => {
             let q = q_point(sensor);
-            v.extend([("x", scale(*x_raw, q)), ("y", scale(*y_raw, q)), ("z", scale(*z_raw, q)), acc(*accuracy)]);
+            v.extend([
+                ("x", scale(*x_raw, q)),
+                ("y", scale(*y_raw, q)),
+                ("z", scale(*z_raw, q)),
+                acc(*accuracy),
+            ]);
         }
-        Report::Vector3WithBias { accuracy, x_raw, y_raw, z_raw, bias_x_raw, bias_y_raw, bias_z_raw, .. } => {
+        Report::Vector3WithBias {
+            accuracy,
+            x_raw,
+            y_raw,
+            z_raw,
+            bias_x_raw,
+            bias_y_raw,
+            bias_z_raw,
+            ..
+        } => {
             let q = q_point(sensor);
-            v.extend([("x", scale(*x_raw, q)), ("y", scale(*y_raw, q)), ("z", scale(*z_raw, q)), acc(*accuracy)]);
-            v.push(("bias", Value::Array(vec![scale(*bias_x_raw, q), scale(*bias_y_raw, q), scale(*bias_z_raw, q)])));
+            v.extend([
+                ("x", scale(*x_raw, q)),
+                ("y", scale(*y_raw, q)),
+                ("z", scale(*z_raw, q)),
+                acc(*accuracy),
+            ]);
+            v.push((
+                "bias",
+                Value::Array(vec![
+                    scale(*bias_x_raw, q),
+                    scale(*bias_y_raw, q),
+                    scale(*bias_z_raw, q),
+                ]),
+            ));
         }
-        Report::RotationVector { accuracy, i_raw, j_raw, k_raw, real_raw, accuracy_raw, .. } => {
-            v.extend([("i", scale(*i_raw, 14)), ("j", scale(*j_raw, 14)), ("k", scale(*k_raw, 14)), ("real", scale(*real_raw, 14))]);
+        Report::RotationVector {
+            accuracy,
+            i_raw,
+            j_raw,
+            k_raw,
+            real_raw,
+            accuracy_raw,
+            ..
+        } => {
+            v.extend([
+                ("i", scale(*i_raw, 14)),
+                ("j", scale(*j_raw, 14)),
+                ("k", scale(*k_raw, 14)),
+                ("real", scale(*real_raw, 14)),
+            ]);
             if let Some(a) = accuracy_raw {
                 v.push(("accuracy_rad", scale(*a, RV_ACCURACY_Q)));
             }
             v.push(acc(*accuracy));
         }
-        Report::GyroIntegratedRv { i_raw, j_raw, k_raw, real_raw, vx_raw, vy_raw, vz_raw, .. } => {
-            v.extend([("i", scale(*i_raw, 14)), ("j", scale(*j_raw, 14)), ("k", scale(*k_raw, 14)), ("real", scale(*real_raw, 14))]);
+        Report::GyroIntegratedRv {
+            i_raw,
+            j_raw,
+            k_raw,
+            real_raw,
+            vx_raw,
+            vy_raw,
+            vz_raw,
+            ..
+        } => {
+            v.extend([
+                ("i", scale(*i_raw, 14)),
+                ("j", scale(*j_raw, 14)),
+                ("k", scale(*k_raw, 14)),
+                ("real", scale(*real_raw, 14)),
+            ]);
             let w = GYRO_RV_ANGVEL_Q;
-            v.push(("angular_velocity", Value::Array(vec![scale(*vx_raw, w), scale(*vy_raw, w), scale(*vz_raw, w)])));
+            v.push((
+                "angular_velocity",
+                Value::Array(vec![
+                    scale(*vx_raw, w),
+                    scale(*vy_raw, w),
+                    scale(*vz_raw, w),
+                ]),
+            ));
         }
-        Report::Scalar { accuracy, value_raw, .. } => {
-            v.extend([acc(*accuracy), ("value", scale(*value_raw, q_point(sensor)))]);
+        Report::Scalar {
+            accuracy,
+            value_raw,
+            ..
+        } => {
+            v.extend([
+                acc(*accuracy),
+                ("value", scale(*value_raw, q_point(sensor))),
+            ]);
         }
-        Report::TapDetector { accuracy, flags, .. } => {
-            v.extend([acc(*accuracy), ("flags", int(*flags)), ("double_tap", Value::Bool(flags & 0x40 != 0))]);
+        Report::TapDetector {
+            accuracy, flags, ..
+        } => {
+            v.extend([
+                acc(*accuracy),
+                ("flags", int(*flags)),
+                ("double_tap", Value::Bool(flags & 0x40 != 0)),
+            ]);
         }
-        Report::StepCounter { accuracy, latency_us, steps, .. } => {
-            v.extend([acc(*accuracy), ("steps", int(*steps)), ("latency_us", int(*latency_us))]);
+        Report::StepCounter {
+            accuracy,
+            latency_us,
+            steps,
+            ..
+        } => {
+            v.extend([
+                acc(*accuracy),
+                ("steps", int(*steps)),
+                ("latency_us", int(*latency_us)),
+            ]);
         }
-        Report::StepDetector { accuracy, latency_us, .. } => v.extend([acc(*accuracy), ("latency_us", int(*latency_us))]),
-        Report::SignificantMotion { accuracy, motion, .. } => v.extend([acc(*accuracy), ("motion", int(*motion))]),
-        Report::StabilityClassifier { accuracy, classification, .. } => {
+        Report::StepDetector {
+            accuracy,
+            latency_us,
+            ..
+        } => v.extend([acc(*accuracy), ("latency_us", int(*latency_us))]),
+        Report::SignificantMotion {
+            accuracy, motion, ..
+        } => v.extend([acc(*accuracy), ("motion", int(*motion))]),
+        Report::StabilityClassifier {
+            accuracy,
+            classification,
+            ..
+        } => {
             v.extend([acc(*accuracy), ("classification", int(*classification))]);
         }
-        Report::MotionRequest { accuracy, intent, request, .. } => {
-            v.extend([acc(*accuracy), ("intent", int(*intent)), ("request", int(*request))]);
+        Report::MotionRequest {
+            accuracy,
+            intent,
+            request,
+            ..
+        } => {
+            v.extend([
+                acc(*accuracy),
+                ("intent", int(*intent)),
+                ("request", int(*request)),
+            ]);
         }
-        Report::ShakeDetector { accuracy, flags, .. } => v.extend([acc(*accuracy), ("flags", int(*flags))]),
-        Report::PersonalActivityClassifier { accuracy, most_likely_state, confidences, .. } => {
-            v.extend([acc(*accuracy), ("most_likely_state", int(*most_likely_state)), ("confidences", ints(confidences))]);
+        Report::ShakeDetector {
+            accuracy, flags, ..
+        } => v.extend([acc(*accuracy), ("flags", int(*flags))]),
+        Report::PersonalActivityClassifier {
+            accuracy,
+            most_likely_state,
+            confidences,
+            ..
+        } => {
+            v.extend([
+                acc(*accuracy),
+                ("most_likely_state", int(*most_likely_state)),
+                ("confidences", ints(confidences)),
+            ]);
         }
-        Report::RawSensor { accuracy, x_raw, y_raw, z_raw, sensor_timestamp_us, temperature_raw, .. } => {
+        Report::RawSensor {
+            accuracy,
+            x_raw,
+            y_raw,
+            z_raw,
+            sensor_timestamp_us,
+            temperature_raw,
+            ..
+        } => {
             v.push(acc(*accuracy));
             // The raw ADC streams (0x14..0x16) keep their integer counts.
             if (0x14..=0x16).contains(&sensor) {
@@ -252,8 +441,14 @@ pub fn bno086(r: &Report) -> Value {
                 ]);
             }
         }
-        Report::GenericEvent { accuracy, value_raw, .. } => v.extend([acc(*accuracy), ("value_raw", int(*value_raw))]),
-        Report::FlushCompleted { flushed_sensor, .. } => v.push(("flushed_sensor", int(*flushed_sensor))),
+        Report::GenericEvent {
+            accuracy,
+            value_raw,
+            ..
+        } => v.extend([acc(*accuracy), ("value_raw", int(*value_raw))]),
+        Report::FlushCompleted { flushed_sensor, .. } => {
+            v.push(("flushed_sensor", int(*flushed_sensor)))
+        }
         Report::Unknown { .. } => {}
     }
     v.push(("timestamp_us", int(r.timestamp_us())));
@@ -274,11 +469,21 @@ pub(crate) fn base64(data: &[u8]) -> String {
     const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for c in data.chunks(3) {
-        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        let n = (c[0] as u32) << 16
+            | (*c.get(1).unwrap_or(&0) as u32) << 8
+            | *c.get(2).unwrap_or(&0) as u32;
         out.push(A[(n >> 18) as usize & 63] as char);
         out.push(A[(n >> 12) as usize & 63] as char);
-        out.push(if c.len() > 1 { A[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if c.len() > 2 { A[n as usize & 63] as char } else { '=' });
+        out.push(if c.len() > 1 {
+            A[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if c.len() > 2 {
+            A[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
 }

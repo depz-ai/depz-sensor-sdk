@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 from dataclasses import dataclass
 from enum import Enum
 
@@ -21,7 +22,7 @@ class SensorType(str, Enum):
 
 @dataclass(frozen=True)
 class Identity:
-    mode: str  # "app" | "bootloader" | "unknown"
+    mode: Literal["app", "bootloader", "unknown"]
     sensor_type: SensorType | None  # None in bootloader mode
     software_name: str
     version: str  # "" when not parseable

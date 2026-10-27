@@ -11,11 +11,16 @@ typedef struct {
 
 typedef void (*sr04_fn)(const depz_sr04_measurement *, void *);
 
-static void from_data(const depz_sr04_data *d, depz_sr04_measurement *m)
+/* false for a source cmd contract 03 §2 does not define (0x36 / 0x37 only,
+ * ERRATA B11): not a measurement, it falls through to the hex text event. */
+static bool from_data(const depz_sr04_data *d, depz_sr04_measurement *m)
 {
+    if (d->source_cmd != DEPZ_SR04_MEASURE_ONCE && d->source_cmd != DEPZ_SR04_START_MEASUREMENT_LOOP)
+        return false;
     m->timestamp_us = d->timestamp_us;
     m->echo_time_us = d->echo_time_us;
     m->from_loop = d->source_cmd == DEPZ_SR04_START_MEASUREMENT_LOOP;
+    return true;
 }
 
 static bool sr04_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t len)
@@ -26,7 +31,7 @@ static bool sr04_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t 
     depz_cb_entry *cbs;
     size_t i, n;
     if (cmd != DEPZ_SR04_RPT_DATA || depz_sr04_unpack_data(p, len, &d) != 0) return false;
-    from_data(&d, &m);
+    if (!from_data(&d, &m)) return false;
     n = depz_cb_list_snapshot(&s->cbs, &cbs);
     for (i = 0; i < n; i++) ((sr04_fn)cbs[i].fn)(&m, cbs[i].user);
     free(cbs);
@@ -196,8 +201,7 @@ static bool match_once(uint8_t cmd, const uint8_t *p, size_t len, void *c)
     depz_sr04_data d;
     if (cmd != DEPZ_SR04_RPT_DATA || depz_sr04_unpack_data(p, len, &d) != 0) return false;
     if (d.source_cmd != DEPZ_SR04_MEASURE_ONCE) return false;
-    from_data(&d, &((once_ctx *)c)->m);
-    return true;
+    return from_data(&d, &((once_ctx *)c)->m);
 }
 
 int depz_sr04_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measurement *out)

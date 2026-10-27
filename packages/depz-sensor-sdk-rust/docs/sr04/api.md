@@ -139,7 +139,10 @@ Stop the measurement loop (idempotent).
 #### Sr04Device::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Sr04Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Sr04Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every measurement (reader thread). Drop the hook to stop.

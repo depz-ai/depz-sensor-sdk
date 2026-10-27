@@ -5,6 +5,7 @@ using Depz.Sensor.Tmf8829;
 using Depz.Sensor.Transport;
 using Depz.Sensor.Vl53l4;
 using Depz.Sensor.Vl53l7;
+using Depz.Sensor.Vl53l8;
 using Depz.Sensor.Vl53lx;
 
 namespace Depz.Sensor.Tests;
@@ -257,6 +258,33 @@ public static class VectorShapes
     }
 
     /// <summary>One completed frame of the reassembly shape.</summary>
+    /// <summary>vl53l8.json decode shape: one RPT_VL53_FRAME chunk (contract 04 §3).</summary>
+    public static Dictionary<string, object?> Vl53l8Decode(int report, byte[] payload)
+    {
+        if (report != (int)Vl53l8Rpt.Vl53Frame)
+            throw new ArgumentException($"unknown VL53L8 report {report}");
+        var c = FrameChunk.Unpack(payload);
+        return new()
+        {
+            ["timestamp_us"] = c.TimestampUs, ["full_size"] = c.FullSize, ["offset"] = c.Offset,
+            ["data"] = Vectors.ToHex(c.Data),
+        };
+    }
+
+    /// <summary>RPT_VL53_FRAME payloads through one reassembler; vl53l8.json reassembly shape (contract 04 §4).</summary>
+    public static Dictionary<string, object?> Vl53l8Reassembly(IEnumerable<byte[]> chunks)
+    {
+        var r = new FrameReassembler();
+        var frames = new List<object?>();
+        foreach (var ch in chunks)
+            if (r.Feed(FrameChunk.Unpack(ch)) is { } f)
+                frames.Add(new Dictionary<string, object?>
+                {
+                    ["timestamp_us"] = f.TimestampUs, ["size"] = f.Frame.Length, ["sha256"] = Sha256(f.Frame),
+                });
+        return new() { ["frames"] = frames, ["completed"] = r.Completed, ["discarded"] = r.Discarded };
+    }
+
     public static Dictionary<string, object?> Tmf8829Done(Tmf8829RawFrame f) => new()
     {
         ["frame_seq"] = f.FrameSeq, ["timestamp_us"] = f.TimestampUs, ["edge_us"] = f.EdgeUs,

@@ -29,11 +29,21 @@ export interface Sr04Measurement {
   distanceMm: number | null;
 }
 
-function measurementFromData(data: Sr04Data): Sr04Measurement {
+/** RPT_DATA.cmd → measurement source (contract 03 §2, ERRATA E3/B11). */
+const SOURCES: ReadonlyMap<number, "once" | "loop"> = new Map([
+  [Sr04Cmd.MeasureOnce, "once"],
+  [Sr04Cmd.StartMeasurementLoop, "loop"],
+]);
+
+/** null for a source cmd contract 03 §2 does not define: not a measurement
+ * (it falls through to the hex text event). */
+function measurementFromData(data: Sr04Data): Sr04Measurement | null {
+  const source = SOURCES.get(data.sourceCmd);
+  if (source === undefined) return null;
   return {
     timestampUs: data.timestampUs,
     echoTimeUs: data.echoTimeUs,
-    source: data.sourceCmd === Sr04Cmd.StartMeasurementLoop ? "loop" : "once",
+    source,
     valid: data.echoTimeUs !== ECHO_TIMEOUT,
     distanceMm: distanceMmFromEcho(data.echoTimeUs),
   };
@@ -96,7 +106,7 @@ export class Sr04 extends DepzDevice {
       if (pkt.cmd !== Sr04Rpt.Data || pkt.payload.length < 11) return NO_MATCH;
       const data = unpackSr04Data(pkt.payload);
       if (data.sourceCmd !== Sr04Cmd.MeasureOnce) return NO_MATCH;
-      return measurementFromData(data);
+      return measurementFromData(data) ?? NO_MATCH;
     };
     return this.request(Sr04Cmd.MeasureOnce, undefined, { matcher, timeoutMs });
   }
@@ -147,7 +157,8 @@ export class Sr04 extends DepzDevice {
   protected override handleReport(pkt: PacketEvent): boolean {
     if (pkt.cmd === Sr04Rpt.Data && pkt.payload.length >= 11) {
       const m = measurementFromData(unpackSr04Data(pkt.payload));
-      for (const cb of [...this.measureCbs]) cb(m);
+      if (m === null) return false;
+      for (const cb of [...this.measureCbs]) this.callGuarded(cb, m);
       for (const q of [...this.measureQueues]) q.push(m);
       return true;
     }

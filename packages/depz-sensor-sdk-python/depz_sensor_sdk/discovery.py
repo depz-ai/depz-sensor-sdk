@@ -9,7 +9,9 @@ device actually is; the USB table only chooses which port(s) to talk to.
 
 from __future__ import annotations
 
+import os
 import re
+import stat
 import warnings
 from dataclasses import dataclass
 from typing import Literal
@@ -60,6 +62,45 @@ def _enumerate_ports() -> list[_PortId]:
     ]
 
 
+def _device_node(path: str) -> int | None:
+    """The device number of the character device at `path`, None for anything
+    else (a regular file, a missing path). A zero device number is None too:
+    a platform that stats every port as an empty character device must not
+    make them one device."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    if not stat.S_ISCHR(st.st_mode) or st.st_rdev == 0:
+        return None
+    return st.st_rdev
+
+
+def _port_id(target: str, enumerated: list[_PortId] | None = None) -> _PortId:
+    """`target` with the USB identity of the enumerated port it names
+    (contract 02 §4.3, ERRATA A5): the port whose path is the same string,
+    else — on POSIX — the one whose resolved path is the same
+    (`/dev/serial/by-id/…` is a symlink to the node), else the one that is
+    the same character device under another name. On Windows a COM name is
+    matched by string only: a COM port is not a file, and resolving one
+    (realpath, stat) opens it — a DTR pulse on every board of the bench. A
+    path the OS does not list keeps `target` with no USB identity. The port
+    stays `target`: an explicit path is opened as given."""
+    if enumerated is None:
+        enumerated = _enumerate_ports()
+    match = next((pi for pi in enumerated if pi.port == target), None)
+    if match is None and os.name == "posix":
+        real = os.path.realpath(target)
+        match = next((pi for pi in enumerated if os.path.realpath(pi.port) == real), None)
+        if match is None:
+            node = _device_node(target)
+            if node is not None:
+                match = next((pi for pi in enumerated if _device_node(pi.port) == node), None)
+    if match is None:
+        return _PortId(target, None, None, None)
+    return _PortId(target, match.vid, match.pid, match.usb_serial)
+
+
 def _serial_sort_key(pi: _PortId) -> tuple[int, str, str]:
     """Sort by USB serial; None/empty sorts last, tie-break by port path."""
     if pi.usb_serial:
@@ -108,7 +149,7 @@ def probe_port(port: str, *, timeout: float = 0.2) -> DeviceInfo | None:
         ident = parse_software_name(software)
         return DeviceInfo(
             port=port,
-            mode=ident.mode,  # type: ignore[arg-type]
+            mode=ident.mode,
             sensor_type=ident.sensor_type,
             software_name=ident.software_name,
             fw_version=ident.version,
@@ -132,17 +173,13 @@ def list_depz_devices(
     overrides enumeration with an explicit list (still USB-annotated when the
     OS knows the port). Results are ordered by USB iSerial.
     """
-    enumerated = {pi.port: pi for pi in _enumerate_ports()}
+    enumerated = _enumerate_ports()
     if ports is None:
-        candidates = list(enumerated.values())
-        if match_usb:
-            candidates = [pi for pi in candidates if is_known_depz_usb(pi.vid, pi.pid)]
+        candidates = list(enumerated)
     else:
-        candidates = [
-            enumerated.get(p, _PortId(p, None, None, None)) for p in ports
-        ]
-        if match_usb:
-            candidates = [pi for pi in candidates if is_known_depz_usb(pi.vid, pi.pid)]
+        candidates = [_port_id(p, enumerated) for p in ports]
+    if match_usb:
+        candidates = [pi for pi in candidates if is_known_depz_usb(pi.vid, pi.pid)]
     candidates.sort(key=_serial_sort_key)
 
     found: list[DeviceInfo] = []
@@ -156,7 +193,7 @@ def list_depz_devices(
                         "usb_vid": pi.vid,
                         "usb_pid": pi.pid,
                         "usb_serial": pi.usb_serial,
-                    }  # type: ignore[arg-type]
+                    }
                 )
             )
     return found
@@ -167,7 +204,7 @@ def open_device(
     *,
     serial: str | None = None,
     timeout: float = 0.2,
-):
+) -> DeviceBase:
     """Open the right sensor class for `target` (contract 02 §4.3, §4.4).
 
     - ``None`` (default): the DEPZ candidate port with the alphabetically
@@ -175,8 +212,12 @@ def open_device(
       serial matches. No candidate → `NoDepzDeviceError`.
     - ``int N``: the Nth DEPZ candidate, candidates sorted by USB serial
       (0-based). Out of range → `NoDepzDeviceError`.
-    - ``str`` (a port path): open exactly that port; if its USB (vid, pid) is
-      not a known DEPZ id, warn but proceed.
+    - ``str`` (a port path): open exactly that port; its USB (vid, pid) is
+      that of the enumerated port the path names under any alias
+      (`/dev/serial/by-id/…`, a symlink, another name of the same device
+      node). If it is not a known DEPZ id — or the OS does not list the
+      port — warn but proceed. Nothing DEPZ answering the probe there →
+      `NoDepzDeviceError`, as on a link.
     - ``DeviceInfo``: its ``.port``, the class resolved from its probe answers.
     - ``Link``/transport: `open_on_link` (probe and continue on that link).
 
@@ -212,16 +253,15 @@ def open_device(
         return _open_probed(candidates[target].port, timeout)
 
     if isinstance(target, str):
-        enumerated = {pi.port: pi for pi in _enumerate_ports()}
-        pi = enumerated.get(target)
-        if pi is not None and not is_known_depz_usb(pi.vid, pi.pid):
+        pi = _port_id(target)
+        if not is_known_depz_usb(pi.vid, pi.pid):
             warnings.warn(
                 f"{target}: USB id "
                 f"{_fmt_vidpid(pi.vid, pi.pid)} is not a known DEPZ device — "
                 "opening anyway (unprogrammed unit / custom setup?)",
                 stacklevel=2,
             )
-        if serial is not None and pi is not None and pi.usb_serial not in (None, serial):
+        if serial is not None and pi.usb_serial not in (None, serial):
             warnings.warn(
                 f"{target}: USB serial {pi.usb_serial!r} != requested {serial!r}",
                 stacklevel=2,
@@ -249,7 +289,7 @@ def open_on_link(
     usb_pid: int | None = None,
     *,
     timeout: float = 0.2,
-):
+) -> DeviceBase:
     """Open a device on an already-open `link` that cannot be reopened (a
     replay or recording link, an adopted transport) — contract 02 §4.4.
 
@@ -282,17 +322,16 @@ def _fmt_vidpid(vid: int | None, pid: int | None) -> str:
     return f"{vid:04X}:{pid:04X}"
 
 
-def _open_probed(port: str, timeout: float):
+def _open_probed(port: str, timeout: float) -> DeviceBase:
     info = probe_port(port, timeout=timeout)
     if info is None:
-        raise DeviceLostError(f"no DEPZ device answered on {port}")
-    pi = {p.port: p for p in _enumerate_ports()}.get(port)
-    vid, pid = (pi.vid, pi.pid) if pi is not None else (None, None)
-    return _open_resolved(port, info, vid, pid, timeout)
+        raise NoDepzDeviceError(f"no DEPZ device answered on {port}")
+    pi = _port_id(port)
+    return _open_resolved(port, info, pi.vid, pi.pid, timeout)
 
 
 def _open_resolved(port: str, info: DeviceInfo, usb_vid: int | None, usb_pid: int | None,
-                   timeout: float):
+                   timeout: float) -> DeviceBase:
     """Open the class the probe answers resolve to on a fresh connection."""
     name = resolve_sensor_class(info.software_name, info.device_name, usb_vid, usb_pid)
     if name == "bootloader":
@@ -325,7 +364,7 @@ def _vl53l7_model(usb_model: str | None, device_name: str) -> str:
     device name (`… VL53L7CH USB v2.1 …`), then the CX base (contract 11 §1;
     the silicon cannot tell CX from CH, and the CX blob runs on every part)."""
     if usb_model in _VL53L7_MODELS:
-        return usb_model  # type: ignore[return-value]
+        return usb_model
     m = _VL53L7_PART_RE.search(device_name or "")
     if m:
         part = f"vl53l{m.group(1)}{m.group(2)}".lower()
@@ -427,7 +466,7 @@ def sensor_class(name: str) -> type[DeviceBase]:
     raise ValueError(f"no sensor class {name!r}")
 
 
-def attach_sensor_class(dev: DeviceBase, class_name: str):
+def attach_sensor_class(dev: DeviceBase, class_name: str) -> DeviceBase:
     """Continue the open base device `dev` as `class_name` on the same
     connection — no reopen, sequence numbers and reader run on (contract 02
     §4.4). `dev` must be a plain `DeviceBase` (no subclass yet); returns it,
@@ -442,15 +481,15 @@ def attach_sensor_class(dev: DeviceBase, class_name: str):
         raise TypeError(f"attach_sensor_class needs a plain DeviceBase, got {type(dev).__name__}")
     if cls is DeviceBase:
         return dev
-    cls._init_subclass_state(dev)  # type: ignore[arg-type]
+    cls._init_subclass_state(dev)
     dev.__class__ = cls
     return dev
 
 
 # Kept for the vector generators and tests that pick a family class directly.
-def _vl53l7_class(usb_model: str | None, device_name: str):
+def _vl53l7_class(usb_model: str | None, device_name: str) -> type[DeviceBase]:
     return sensor_class(_vl53l7_model(usb_model, device_name))
 
 
-def _vl53lx_class(usb_model: str | None, device_name: str):
+def _vl53lx_class(usb_model: str | None, device_name: str) -> type[DeviceBase]:
     return sensor_class(_vl53lx_name(usb_model, device_name))

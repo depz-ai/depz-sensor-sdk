@@ -136,7 +136,7 @@ export class VL53LX extends SensorDriver {
    * sets where the phase wraps (1.6 / 2.4 / 4.0 m), and the valid phase
    * window inside it (`reachMm()`). Host-side only.
    */
-  override async setMode(name: string): Promise<void> {
+  override async setMode(name: string): Promise<null> {
     if (!this.MODES.includes(name)) {
       throw new Vl53Error(`no such mode: ${name} (have ${this.MODES.join(", ")})`);
     }
@@ -146,6 +146,7 @@ export class VL53LX extends SensorDriver {
     // back or the first range-start write would switch the pad off at 1 MHz.
     this.bare.img.static_config.v.pad_i2c_hv__config = FMP_PAD_CONFIG;
     await this.setRangeTiming(this.budgetMs, this.interMs);
+    return null;
   }
 
   override async getMode(): Promise<string> {

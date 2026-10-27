@@ -14,6 +14,7 @@ from dataclasses import asdict
 
 from depz_sensor_sdk.dataset import bno086_record_value
 from depz_sensor_sdk.protocol import tmf8829 as P
+from depz_sensor_sdk.protocol import vl53l8 as L8P
 from depz_sensor_sdk.tmf8829 import MeasurementBuilder, parse_frame, parse_results
 from depz_sensor_sdk.tmf8829.frames import FID_RESULTS
 from depz_sensor_sdk.transport import CrcError, Packet, PacketParser, Trash
@@ -93,6 +94,26 @@ def tmf8829_arrays(res) -> dict:
         "noise": _flat(res.noise),
         "xtalk": _flat(res.xtalk),
     }
+
+
+def vl53l8_decode(report: int, payload: bytes) -> dict:
+    """vl53l8.json decode shape: one RPT_VL53_FRAME chunk (contract 04 §3)."""
+    if report == L8P.Vl53l8Rpt.VL53_FRAME:
+        c = L8P.FrameChunk.unpack(payload)
+        return {"timestamp_us": c.timestamp_us, "full_size": c.full_size, "offset": c.offset, "data": c.data.hex()}
+    raise ValueError(f"unknown VL53L8 report {report:#x}")
+
+
+def vl53l8_reassembly(chunks) -> dict:
+    """Feed RPT_VL53_FRAME payloads to one reassembler; vl53l8.json reassembly shape (contract 04 §4)."""
+    r = L8P.FrameReassembler()
+    done = []
+    for ch in chunks:
+        f = r.feed(L8P.FrameChunk.unpack(ch))
+        if f is not None:
+            ts, frame = f
+            done.append({"timestamp_us": ts, "size": len(frame), "sha256": hashlib.sha256(frame).hexdigest()})
+    return {"frames": done, "completed": r.completed, "discarded": r.discarded}
 
 
 def tmf8829_decode(report: int, payload: bytes) -> dict:

@@ -124,12 +124,16 @@ impl Product {
     /// Bridge parameters of one product/driver pair; `None` for a pair the
     /// table has no row for (a refusal, never a fallback).
     pub fn bus_params(&self, kind: DriverKind) -> Option<BusParams> {
-        self.drivers.iter().find(|(d, _)| *d == kind).map(|(_, p)| *p)
+        self.drivers
+            .iter()
+            .find(|(d, _)| *d == kind)
+            .map(|(_, p)| *p)
     }
 
     /// Bridge parameters of [`Product::default_driver`].
     pub fn default_bus_params(&self) -> BusParams {
-        self.bus_params(self.default_driver).expect("default driver is in the table")
+        self.bus_params(self.default_driver)
+            .expect("default driver is in the table")
     }
 
     /// Cross-check a model id the sensor answered. `true` only says "not
@@ -155,7 +159,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 4000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L1CB",
@@ -163,7 +170,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 8000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L3CX",
@@ -171,7 +181,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEAAA,
         reach_mm: 3000,
         default_driver: DriverKind::Ulp,
-        drivers: &[(DriverKind::Ulp, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Ulp, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CD",
@@ -179,7 +192,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEBAA,
         reach_mm: 1300,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CX",

@@ -76,6 +76,10 @@ enum {
 
 #define DEFAULT_MAX_LOOP      2000
 #define TARGET_REF_RATE       0x0A00 /* 20 Mcps in 9.7, the ref-SPAD target */
+#define MIN_TIMING_BUDGET_US  20000  /* cMinTimingBudgetMicroSeconds */
+/* The host-side parameters a tuning buffer may carry in a {0xFF, select, msb,
+ * lsb} record, by select value (VL53L0X_load_tuning_settings()). */
+#define TUNING_PARAM_COUNT    4
 #define SPEED_OF_LIGHT_IN_AIR 2997
 #define REF_SPAD_BUFFER_SIZE  6
 #define RESULT_BLOCK_LEN      12
@@ -148,6 +152,9 @@ typedef struct {
     int      pre_pclks, final_pclks;
     int64_t  pre_timeout_us, final_timeout_us;
     int      target_ref_rate;
+    /* Stored for the tuning loader; the 1.0.4 sigma estimate has these three
+     * as constants. */
+    int      sigma_est_ref_array, sigma_est_eff_pulse_width, sigma_est_eff_amb_width;
     int      limit_enable[CHECK_COUNT];
     int64_t  limit_value[CHECK_COUNT];
     int64_t  offset_nvm_um;
@@ -182,6 +189,8 @@ static int64_t fdiv(int64_t a, int64_t b)
 }
 
 static int64_t u32(int64_t v) { return (int64_t)((uint64_t)v & 0xFFFFFFFFu); }
+/* C int16 truncation (an assignment to an int16_t). */
+static int64_t i16(int64_t v) { int64_t r = v & 0xFFFF; return (r & 0x8000) ? r - 0x10000 : r; }
 
 /* VL53L0X_isqrt(): the bit-by-bit root, bit starting at 1 << 30. */
 static int64_t isqrt(int64_t num)
@@ -531,6 +540,9 @@ static int set_measurement_timing_budget(vlx_driver *d, int64_t budget_us)
 {
     bool steps[SEQ_COUNT];
     int64_t final_budget_us = budget_us - (START_OVERHEAD_US + END_OVERHEAD_US), us;
+    if (budget_us < MIN_TIMING_BUDGET_US)
+        return depz_fail(DEPZ_E_ARG, "vl53l0x: timing budget %lld us is below the %d us minimum",
+                         (long long)budget_us, MIN_TIMING_BUDGET_US);
     VLX_TRY(get_sequence_step_enables(d, steps));
     if (steps[SEQ_TCC] || steps[SEQ_MSRC] || steps[SEQ_DSS]) {
         /* TCC, MSRC and DSS share one timeout. */
@@ -649,7 +661,7 @@ static int get_info_from_device(vlx_driver *d, int option)
         good[5] = (uint8_t)(tmp >> 16);
     }
     if ((option & 2) == 2 && (done & 2) == 0) {
-        int byte;
+        int carry;
         VLX_TRY(vlx_wr_byte(P, 0x94, 0x02));
         VLX_TRY(device_read_strobe(d));
         VLX_TRY(vlx_rd_byte(P, 0x90, &module_id));
@@ -659,15 +671,15 @@ static int get_info_from_device(vlx_driver *d, int option)
 #define CH(v) (product_id[nchars++] = (char)((v) & 0x7F))
         VLX_TRY(nvm_dword(d, 0x77, &tmp));
         CH(tmp >> 25); CH(tmp >> 18); CH(tmp >> 11); CH(tmp >> 4);
-        byte = (int)((tmp & 0x00F) << 3);
+        carry = (int)((tmp & 0x00F) << 3);
         VLX_TRY(nvm_dword(d, 0x78, &tmp));
-        CH(byte + ((tmp >> 29) & 0x7F)); CH(tmp >> 22); CH(tmp >> 15); CH(tmp >> 8); CH(tmp >> 1);
-        byte = (int)((tmp & 0x001) << 6);
+        CH(carry + ((tmp >> 29) & 0x7F)); CH(tmp >> 22); CH(tmp >> 15); CH(tmp >> 8); CH(tmp >> 1);
+        carry = (int)((tmp & 0x001) << 6);
         VLX_TRY(nvm_dword(d, 0x79, &tmp));
-        CH(byte + ((tmp >> 26) & 0x7F)); CH(tmp >> 19); CH(tmp >> 12); CH(tmp >> 5);
-        byte = (int)((tmp & 0x01F) << 2);
+        CH(carry + ((tmp >> 26) & 0x7F)); CH(tmp >> 19); CH(tmp >> 12); CH(tmp >> 5);
+        carry = (int)((tmp & 0x01F) << 2);
         VLX_TRY(nvm_dword(d, 0x7A, &tmp));
-        CH(byte + ((tmp >> 30) & 0x7F)); CH(tmp >> 23); CH(tmp >> 16); CH(tmp >> 9); CH(tmp >> 2);
+        CH(carry + ((tmp >> 30) & 0x7F)); CH(tmp >> 23); CH(tmp >> 16); CH(tmp >> 9); CH(tmp >> 2);
 #undef CH
     }
     if ((option & 4) == 4 && (done & 4) == 0) {
@@ -706,8 +718,13 @@ static int get_info_from_device(vlx_driver *d, int option)
         s->signal_rate_400mm = sig_400 << 9;
         s->offset_nvm_um = 0;
         if (dist_400 != 0) {
+            /* uint32 difference, uint32 product, then an int16_t: the C
+             * driver's types, kept because they are what makes the sign come
+             * out right. A target measured nearer than 400 mm wraps the
+             * uint32 difference, and only the int16 truncation turns that
+             * back into the positive offset it stands for. */
             int64_t offset_1104_mm = u32(dist_400 - (400 << 4));
-            s->offset_nvm_um = -((offset_1104_mm * 1000) >> 4);
+            s->offset_nvm_um = i16(-i16(u32(offset_1104_mm * 1000) >> 4));
         }
     }
     s->read_done = done | option;
@@ -722,7 +739,7 @@ static int add_good_spads(l0x_drv *s, uint8_t *spad_array, int start, int curr, 
 {
     int i;
     for (i = 0; i < count; i++) {
-        bool ap;
+        bool ap = false;
         int next_good = get_next_good_spad(s->good_spad_map, REF_SPAD_BUFFER_SIZE, curr);
         if (next_good == -1) return VL53_ERR("ran out of good reference SPADs");
         VLX_TRY(is_aperture(start + next_good, &ap));
@@ -739,7 +756,7 @@ static int add_good_spads(l0x_drv *s, uint8_t *spad_array, int start, int curr, 
 static int skip_to_aperture(int start, int *curr)
 {
     for (;;) {
-        bool ap;
+        bool ap = false;
         VLX_TRY(is_aperture(start + *curr, &ap));
         if (ap || *curr >= 44) return DEPZ_OK;
         (*curr)++;
@@ -785,11 +802,26 @@ static int set_reference_spads(vlx_driver *d, int count, int aperture)
 
 static int load_tuning_settings(vlx_driver *d, const uint8_t *buf)
 {
+    l0x_drv *s = ld(d);
     size_t index = 0;
     while (buf[index] != 0) {
         int n = buf[index++];
         if (n == 0xFF) {
-            index += 3; /* host-side sigma parameters, unused by 1.0.4 */
+            /* A host-side parameter: {0xFF, select, msb, lsb}. The three
+             * sigma parameters are constants in the 1.0.4 sigma estimate and
+             * only get stored; the fourth is the rate the reference SPAD
+             * management converges on. */
+            int select = buf[index];
+            int value = (buf[index + 1] << 8) | buf[index + 2];
+            if (select >= TUNING_PARAM_COUNT)
+                return VL53_ERR("bad tuning parameter %d at offset %zu", select, index - 1);
+            switch (select) {
+            case 0: s->sigma_est_ref_array = value; break;
+            case 1: s->sigma_est_eff_pulse_width = value; break;
+            case 2: s->sigma_est_eff_amb_width = value; break;
+            default: s->target_ref_rate = value; break;
+            }
+            index += 3;
         } else if (n <= 4) {
             uint8_t address = buf[index++];
             VLX_TRY(vlx_wr_multi(P, address, buf + index, (size_t)n));
@@ -1255,10 +1287,11 @@ static size_t modes(const vlx_driver *d, const char **names, size_t cap)
     return 4;
 }
 
-static int set_mode(vlx_driver *d, const char *name)
+static int set_mode(vlx_driver *d, const char *name, int *budget_ms)
 {
     const l0x_mode *m = NULL;
     int i;
+    (void)budget_ms;
     for (i = 0; i < 4; i++)
         if (!strcmp(MODES[i].name, name)) m = &MODES[i];
     if (!m) return depz_fail(DEPZ_E_ARG, "vl53l0x: no such mode: %s (have default, long-range, high-speed, high-accuracy)", name);
@@ -1468,7 +1501,7 @@ static int perform_ref_spad_management(vlx_driver *d, uint32_t *count_out, bool 
     const int start = 0xB4, minimum = 3, max_spad_count = 44;
     const int64_t target = s->target_ref_rate;
     uint8_t spad_array[REF_SPAD_BUFFER_SIZE] = {0}, last[REF_SPAD_BUFFER_SIZE];
-    int curr, need_apt = 0, ref_count;
+    int curr = 0, need_apt = 0, ref_count;
     int64_t peak, last_diff;
 
     VLX_TRY(spad_prologue(d, start));
@@ -1483,7 +1516,7 @@ static int perform_ref_spad_management(vlx_driver *d, uint32_t *count_out, bool 
         /* Too bright even at the minimum: start over on aperture SPADs. */
         memset(spad_array, 0, sizeof spad_array);
         for (;;) {
-            bool ap;
+            bool ap = false;
             VLX_TRY(is_aperture(start + curr, &ap));
             if (ap || curr >= max_spad_count) break;
             curr++;
@@ -1506,7 +1539,7 @@ static int perform_ref_spad_management(vlx_driver *d, uint32_t *count_out, bool 
     last_diff = llabs(peak - target);
 
     while (peak < target) {
-        bool ap;
+        bool ap = false;
         int64_t diff;
         int next_good = get_next_good_spad(s->good_spad_map, REF_SPAD_BUFFER_SIZE, curr);
         if (next_good == -1) return VL53_ERR("ran out of good reference SPADs");
@@ -1578,7 +1611,26 @@ vlx_driver *vlx_new_l0x(vlx_plat *p, depz_vl53lx_product product)
     s->device_mode = DEVICEMODE_SINGLE_RANGING;
     s->pin0_functionality = GPIOFUNCTIONALITY_NEW_MEASURE_READY;
     s->target_ref_rate = TARGET_REF_RATE;
+    s->sigma_est_ref_array = 100;
+    s->sigma_est_eff_pulse_width = 900;
+    s->sigma_est_eff_amb_width = 500;
     s->ref_spads_from_nvm = true;
     s->mode = MODES[0].name;
     return &s->base;
+}
+
+/* ── test seams (vl53lx.json l0x_uld) ─────────────────────────────────── */
+
+int vlx_l0x_get_info_from_device(vlx_driver *d, int option) { return get_info_from_device(d, option); }
+
+int vlx_l0x_load_tuning_settings(vlx_driver *d, const uint8_t *buffer) { return load_tuning_settings(d, buffer); }
+
+void vlx_l0x_host_state_get(const vlx_driver *d, vlx_l0x_host_state *out)
+{
+    const l0x_drv *s = (const l0x_drv *)d;
+    out->offset_nvm_um = s->offset_nvm_um;
+    out->target_ref_rate = s->target_ref_rate;
+    out->sigma_est_ref_array = s->sigma_est_ref_array;
+    out->sigma_est_eff_pulse_width = s->sigma_est_eff_pulse_width;
+    out->sigma_est_eff_amb_width = s->sigma_est_eff_amb_width;
 }

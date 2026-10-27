@@ -12,6 +12,7 @@ import {
   DCI_DET_THRESH_START,
   DCI_MOTION_DETECTOR_CFG,
   DCI_PIPE_CONTROL,
+  DCI_XTALK_CFG,
   DCI_ZONE_CONFIG,
   DIST_MM,
   LAST_THRESHOLD,
@@ -60,13 +61,24 @@ describe("vl53l8 uld: power modes", () => {
 describe("vl53l8 uld: xtalk margin", () => {
   it("roundtrips through the DCI codec", async () => {
     const { drv } = makeDriver();
-    await drv.setXtalkMargin(50.0);
-    expect(await drv.getXtalkMargin()).toBeCloseTo(50.0, 3);
+    await drv.setXtalkMargin(50);
+    expect(await drv.getXtalkMargin()).toBe(50);
   });
 
-  it("rejects an out-of-range margin", async () => {
-    const { drv } = makeDriver();
-    await expect(drv.setXtalkMargin(20000)).rejects.toThrow(Vl53l8cxError);
+  it("is a whole number of kcps 0..10000, as ST", async () => {
+    for (const bad of [12.5, -1, 10001, 20000, NaN]) {
+      const { drv, p } = makeDriver();
+      await expect(drv.setXtalkMargin(bad), String(bad)).rejects.toThrow(Vl53l8cxError);
+      expect(p.dci.has(DCI_XTALK_CFG), String(bad)).toBe(false);
+    }
+  });
+
+  it("reads back whole kcps (raw / 2048 rounded down)", async () => {
+    const { drv, p } = makeDriver();
+    const raw = new Uint8Array(16);
+    new DataView(raw.buffer).setUint32(0, 50 * 2048 + 2047, true);
+    p.dci.set(DCI_XTALK_CFG, raw);
+    expect(await drv.getXtalkMargin()).toBe(50);
   });
 });
 

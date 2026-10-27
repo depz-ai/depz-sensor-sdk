@@ -35,35 +35,9 @@
 extern "C" {
 #endif
 
-/* ======================================================================== */
-/* Errors                                                                    */
-/* ======================================================================== */
-
-typedef enum {
-    DEPZ_OK                 = 0,
-    DEPZ_E_ARG              = -1,  /* bad argument, or not valid in this state */
-    DEPZ_E_NOMEM            = -2,
-    DEPZ_E_IO               = -3,  /* the OS refused: port cannot be opened... */
-    DEPZ_E_CLOSED           = -4,  /* link closed or device lost */
-    DEPZ_E_TIMEOUT          = -5,  /* no reply in time */
-    DEPZ_E_STATUS           = -6,  /* device answered a non-OK RPT_STATUS */
-    DEPZ_E_BUSY             = -7,  /* ERR_BUSY from the device, or the same
-                                      opcode is already in flight */
-    DEPZ_E_PROTOCOL         = -8,  /* a reply that does not parse */
-    DEPZ_E_NO_DEVICE        = -9,  /* discovery found no (matching) DEPZ device */
-    DEPZ_E_WRONG_TYPE       = -10, /* sensor call on a device of another type */
-    DEPZ_E_REPLAY_MISMATCH  = -11, /* strict replay: written bytes differ */
-    DEPZ_E_BOOTLOADER       = -12  /* the device is in bootloader mode */
-} depz_err;
-
-/* Short constant name of an error code ("DEPZ_E_TIMEOUT"). */
-const char *depz_err_str(int err);
-/* Human-readable detail of the last failure on the calling thread. */
-const char *depz_last_error(void);
-/* depz_status of the last DEPZ_E_STATUS / DEPZ_E_BUSY on the calling thread
- * (and the opcode it answered), -1 when the last failure was something else. */
-int depz_last_status(void);
-int depz_last_status_cmd(void);
+/* Errors: the depz_err codes, depz_err_str() and the per-thread failure
+ * detail (depz_last_error(), depz_last_status()) are in depz_sensor_sdk.h —
+ * the dataset reader reports a damaged file the same way. */
 
 /* ======================================================================== */
 /* Byte links (contract 07 §1 layer 1, contract 08)                          */
@@ -148,6 +122,8 @@ typedef struct {
     uint64_t crc_errors, header_errors, trash_bytes;
     uint64_t seq_gaps;          /* gaps in device->host seq (host-observed) */
     uint64_t device_seq_errors; /* RPT_SEQUENCE_ERROR count (device-observed) */
+    uint64_t callback_errors;   /* callbacks that raised (contract 07 §3): always 0 here, a C
+                                 * callback cannot raise; the C++ wrapper counts its own */
 } depz_link_stats;
 
 /* A plain device on a serial port / on a link (takes ownership of `link`,
@@ -253,6 +229,9 @@ int  depz_device_to_host_time_us(const depz_device *dev, uint64_t device_us, int
 
 typedef enum {
     DEPZ_DEV_EV_SEQUENCE_ERROR,      /* expected_seq, received_seq, by_device */
+    DEPZ_DEV_EV_SEQ_GAP,             /* expected_seq, received_seq, missed: a gap
+                                        the host saw in the device->host seq
+                                        (contract 01 §5), ahead of its packet */
     DEPZ_DEV_EV_CRC_ERROR,           /* cmd, seq */
     DEPZ_DEV_EV_TRASH,               /* data / data_len (first bytes), trash_len */
     DEPZ_DEV_EV_UNSOLICITED_STATUS,  /* status (ERR_HARDWARE_FAULT: a fault) */
@@ -265,6 +244,7 @@ typedef struct {
     depz_device_event_type type;
     uint8_t  cmd, seq;
     uint8_t  expected_seq, received_seq;
+    uint8_t  missed;   /* SEQ_GAP: (received_seq - expected_seq) mod 256 */
     bool     by_device;
     uint8_t  status;
     uint64_t timestamp_us;
@@ -296,6 +276,9 @@ typedef struct {
 /* Every serial port the OS lists, with its USB identity where known. */
 int  depz_list_serial_ports(depz_port_info **out, size_t *count);
 void depz_free_port_list(depz_port_info *list);
+/* The discovery order (contract 02 §4), in place: by USB serial ascending,
+ * ports without a serial last, then by port path (depz_port_order_cmp). */
+void depz_sort_ports_by_serial(depz_port_info *ports, size_t count);
 
 typedef struct {
     char port[256];
@@ -594,8 +577,11 @@ bool depz_vl53l8_ranging(const depz_device *dev);
 /* Configuration — init() first, never while ranging. */
 int depz_vl53l8_get_resolution(depz_device *dev, int *zones);        /* 16 | 64 */
 int depz_vl53l8_set_resolution(depz_device *dev, int zones);
-/* >= 2 Hz on VL53L8 (below that it never ranges), >= 1 Hz on L5/L7; max 60
- * at 4x4, 15 at 8x8. */
+/* >= 2 Hz on VL53L8 (below that it never ranges), >= 1 Hz on L5/L7; at most
+ * depz_vl53l8_max_ranging_frequency_hz() of the resolution last set or read
+ * through this API (16 after open) — 60 Hz at 4x4, 15 Hz at 8x8 (contract 11
+ * §3). Refused with DEPZ_E_ARG before anything reaches the bus. */
+int depz_vl53l8_max_ranging_frequency_hz(int resolution);
 int depz_vl53l8_get_ranging_frequency_hz(depz_device *dev, uint8_t *hz);
 int depz_vl53l8_set_ranging_frequency_hz(depz_device *dev, uint8_t hz);
 int depz_vl53l8_get_ranging_mode(depz_device *dev, uint8_t *mode);
@@ -611,8 +597,10 @@ int depz_vl53l8_set_target_order(depz_device *dev, uint8_t order);
 /* DEPZ_VL53L8_POWER_MODE_*; waking from deep sleep re-runs init(). */
 int depz_vl53l8_get_power_mode(depz_device *dev, uint8_t *mode);
 int depz_vl53l8_set_power_mode(depz_device *dev, uint8_t mode);
-int depz_vl53l8_get_xtalk_margin(depz_device *dev, double *kcps_per_spad);
-int depz_vl53l8_set_xtalk_margin(depz_device *dev, double kcps_per_spad); /* 0..10000 */
+/* Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+ * refused, nothing written. get: raw / 2048 rounded down. */
+int depz_vl53l8_get_xtalk_margin(depz_device *dev, uint32_t *kcps_per_spad);
+int depz_vl53l8_set_xtalk_margin(depz_device *dev, uint32_t kcps_per_spad);
 /* Crosstalk calibration against a flat target (reflectance 1..99 %,
  * nb_samples 1..16, distance 600..3000 mm); blocks several seconds. With no
  * cover glass the firmware answers "nothing to calibrate": *failed (optional)
@@ -630,11 +618,15 @@ int depz_vl53l8_set_detection_thresholds(depz_device *dev, const depz_vl53l8_thr
                                          size_t n);
 int depz_vl53l8_set_detection_thresholds_auto_stop(depz_device *dev, bool auto_stop);
 /* Motion indicator over [min, max] mm (400..4000, span <= 1500); frames then
- * carry `motion`. */
+ * carry `motion`. It shares DCI 0xBFAC with CNH: this disarms CNH. */
 int depz_vl53l8_configure_motion_indicator(depz_device *dev, uint16_t min_mm, uint16_t max_mm);
-/* CH only: arm the CNH block for the next start_ranging(). init() disarms it
- * (the fresh sensor holds no CNH configuration). */
+/* CH only: arm the CNH block for the next start_ranging(); this disarms the
+ * motion indicator (one DCI block: frames carry no `motion`). init() disarms
+ * both (the fresh sensor holds neither configuration). */
 int depz_vl53l8_configure_cnh(depz_device *dev, const depz_vl53l8_cnh_setup *setup);
+/* The CNH setup armed by configure_cnh() (copied to *setup, which may be
+ * NULL); false when none is armed. */
+bool depz_vl53l8_cnh_armed(const depz_device *dev, depz_vl53l8_cnh_setup *setup);
 
 /* Ranging. */
 int  depz_vl53l8_start_ranging(depz_device *dev);
@@ -1115,7 +1107,11 @@ int  depz_vl53lx_configure(depz_device *dev, int budget_ms, int inter_ms, const 
 int  depz_vl53lx_configure_ex(depz_device *dev, int budget_ms, int inter_ms, const char *mode,
                               const int32_t *offset_mm, const int32_t *xtalk_kcps, const int *signal_kcps);
 int  depz_vl53lx_get_range_timing(depz_device *dev, int *budget_ms, int *inter_ms);
-int  depz_vl53lx_set_mode(depz_device *dev, const char *mode);
+/* `budget_ms` (NULL = don't want it) gets the timing budget in effect after
+ * the change on a driver whose mode change can move it — VL53L1: a budget the
+ * new mode does not tabulate moves to the nearest one it does (15 ms short ->
+ * 20 ms long; contract 12 §5) — else 0. */
+int  depz_vl53lx_set_mode(depz_device *dev, const char *mode, int *budget_ms);
 /* The mode in use; NULL (and DEPZ_OK) on a product without modes. */
 int  depz_vl53lx_get_mode(depz_device *dev, const char **mode);
 
@@ -1267,7 +1263,8 @@ void depz_bno086_off_report(depz_device *dev, int token);
 depz_stream *depz_bno086_reports(depz_device *dev, size_t maxsize);
 /* The next report (< 0 timeout = 1000 ms). */
 int  depz_bno086_get_report(depz_device *dev, int timeout_ms, depz_bno_report *out);
-/* Incomplete / orphan SHTP cargos thrown away by the reassembler. */
+/* Incomplete / orphan SHTP cargos and junk-channel (>= 6) frames thrown away
+ * by the reassembler. */
 uint64_t depz_bno086_shtp_discarded(const depz_device *dev);
 
 /* Tare and calibration (commands 3, 6, 7, 9). Tare and periodic DCD have no
@@ -1280,6 +1277,26 @@ int depz_bno086_set_calibration(depz_device *dev, bool accel, bool gyro, bool ma
 int depz_bno086_get_calibration(depz_device *dev, depz_bno086_calibration *out);
 int depz_bno086_save_dcd(depz_device *dev);
 int depz_bno086_configure_periodic_dcd(depz_device *dev, bool enable);
+
+/* Interactive calibration (BNO086 only; a BNO085 ignores it). Tell the hub
+ * how the device is about to move (command 0x0E, `intent` =
+ * DEPZ_BNO_MOTION_INTENT_*), so it can refine the gyro zero-rate offset while
+ * the device is still. No SH-2 answer: returns once the bridge took the
+ * frame. The hub's own request — hold still, or go on — arrives as a
+ * DEPZ_BNO_MOTION_REQUEST report once DEPZ_BNO_SENSOR_MOTION_REQUEST is
+ * enabled. */
+int depz_bno086_set_motion_intent(depz_device *dev, uint8_t intent);
+/* Enable MotionRequest (0x2B) reports. The hub sends one when its request
+ * changes, not at `hz`, and reads the rate back late, so there is no
+ * read-back of the granted rate. */
+int depz_bno086_enable_motion_request(depz_device *dev, double hz);
+
+/* Batching: Force Sensor Flush (0xF0) — the hub sends `sensor`'s batched
+ * reports now instead of when its batch interval runs out. Returns once the
+ * hub's Flush Completed (0xEF, a DEPZ_BNO_FLUSH_COMPLETED_REPORT) for `sensor`
+ * arrived — every report batched before the call has been emitted by then —
+ * or DEPZ_E_TIMEOUT after the device timeout (at least 1 s). */
+int depz_bno086_flush(depz_device *dev, uint8_t sensor);
 
 /* FRS records. read: *n = the record's word count (DEPZ_E_ARG after reading
  * when it exceeds `cap`). */
@@ -1304,6 +1321,68 @@ int depz_bno086_clear_counts(depz_device *dev, uint8_t sensor);
 int depz_bno086_command(depz_device *dev, uint8_t command, const uint8_t *params, size_t n,
                         depz_bno_command_response *resp);
 int depz_bno086_send_shtp(depz_device *dev, uint8_t channel, const uint8_t *payload, size_t len);
+
+/* ======================================================================== */
+/* Datasets: the live record values and the session recorder (contract 09)  */
+/* ======================================================================== */
+
+/* The contract 09 record value (`v`) of the result types that only exist in
+ * the live layer, key for key the Python reference; the codec layer
+ * (depz_sensor_sdk.h, depz_dataset_*_record) builds the rest. */
+
+/* `sr04`: {echo_us, source: "once" | "loop"}. */
+depz_json *depz_dataset_sr04_record(const depz_sr04_measurement *m);
+/* `vl53l8`: the frame (depz_dataset_vl53l8_record) plus `motion` when the
+ * frame carried the motion-indicator block. */
+depz_json *depz_dataset_vl53l8_live_record(const depz_vl53l8_live_frame *f, bool layers);
+/* `vl53l8_cnh`: the raw CNH block of a frame, base64, with the armed setup's
+ * decode parameters (nb_aggregates, feature_length, sum_span, start_bin). */
+depz_json *depz_dataset_vl53l8_cnh_record(const uint8_t *cnh_raw, size_t len,
+                                          const depz_vl53l8_cnh_setup *setup);
+/* `vl53lx`: product, driver, status, distance_mm, sigma_mm, signal_kcps,
+ * ambient_kcps, spads, and `targets` when the driver reported several. */
+depz_json *depz_dataset_vl53lx_record(const depz_vl53lx_measurement *m, const char *product,
+                                      const char *driver);
+/* `bno055`: unit_sel and every channel the block covered, scaled. */
+depz_json *depz_dataset_bno055_record(const depz_bno055_sample *s);
+
+/* Record decoded data from several devices onto one host timeline. add()
+ * each open device (it runs depz_device_sync_time() and hooks the device's
+ * result stream), then start(): a record per result at device time − offset,
+ * written on the device's reader thread. The recorder never reconfigures a
+ * device — start and stop streaming yourself. stop() closes the file; free()
+ * stops first. A class without a result stream records nothing. */
+typedef struct depz_session_recorder depz_session_recorder;
+
+typedef struct {
+    const char *note;      /* free text in the header, NULL for none */
+    bool        vl53l8_layers; /* VL53L8 records also carry signal / ambient / sigma / reflectance */
+    double      temperature_hz; /* about this many `temperature` records per device and
+                                   second (the MCU thermometer, and the sensor die where
+                                   frames carry one); 0 = none */
+} depz_session_recorder_options;
+
+#define DEPZ_SESSION_RECORDER_OPTIONS_INIT { NULL, false, 1.0 }
+
+/* A recorder writing `path` (`.depzdata`, or `.depzdata.gz`); `opt` NULL =
+ * the defaults. NULL out of memory. */
+depz_session_recorder *depz_session_recorder_new(const char *path,
+                                                 const depz_session_recorder_options *opt);
+/* Register a device before recording starts (DEPZ_E_ARG after): runs
+ * sync_time with `sync_samples` rounds so its timestamps land on the shared
+ * timeline, reads its serial and software name, hooks its stream. The device
+ * id is `device_id`, or d0, d1, … in add order; it is copied to `id_out`
+ * (cap bytes, may be NULL). */
+int depz_session_recorder_add(depz_session_recorder *rec, depz_device *dev, const char *device_id,
+                              int sync_samples, char *id_out, size_t cap);
+/* Open the file and start writing. No-op while recording; DEPZ_E_IO when the
+ * file cannot be created. */
+int depz_session_recorder_start(depz_session_recorder *rec);
+/* Stop writing, unhook the devices and close the file. Idempotent. */
+int depz_session_recorder_stop(depz_session_recorder *rec);
+uint64_t depz_session_recorder_records_written(const depz_session_recorder *rec);
+/* stop() and free; NULL is a no-op. */
+void depz_session_recorder_free(depz_session_recorder *rec);
 
 #ifdef __cplusplus
 }

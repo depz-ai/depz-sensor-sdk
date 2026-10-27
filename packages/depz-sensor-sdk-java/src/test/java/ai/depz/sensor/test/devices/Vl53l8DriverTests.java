@@ -69,6 +69,12 @@ public final class Vl53l8DriverTests {
         @Override
         public void sleepMs(int ms) {}
 
+        /** The sensor rebooted: no DCI read or GET_XTALK is pending any more. */
+        void clearPending() {
+            pendingRead = null;
+            xtalkPending = false;
+        }
+
         @Override
         public void writeMulti(int addr, byte[] data) {
             data = data.clone();
@@ -220,8 +226,8 @@ public final class Vl53l8DriverTests {
         eq(want.stream().map(W::key).toList(), got.stream().map(W::key).toList(), "writes");
     }
 
-    static <T> List<T> concat(List<T> a, List<T> b) {
-        List<T> out = new ArrayList<>(a);
+    static <E> List<E> concat(List<E> a, List<E> b) {
+        List<E> out = new ArrayList<>(a);
         out.addAll(b);
         return out;
     }
@@ -555,7 +561,7 @@ public final class Vl53l8DriverTests {
                         m.nbOfAggregates()));
         long[] want = new long[32];
         for (int k = 0; k < 32; k++) {
-            want[k] = 100 + k;
+            want[k] = 100L + k;
         }
         eq(want, m.motion());
     }
@@ -625,11 +631,20 @@ public final class Vl53l8DriverTests {
     // ── xtalk, thresholds, motion ────────────────────────────────────────────
 
     public static void xtalkMarginOutOfRangeIsRefused() {
-        for (double bad : new double[] {-0.5, 10000.5, Double.NaN}) {
+        // as ST: whole kcps 0..10000 (a fraction is not an int)
+        for (int bad : new int[] {-1, 10001, Integer.MAX_VALUE}) {
             FakePlatform p = new FakePlatform();
             throwsType(Vl53l8Error.class, () -> new Vl53l8Driver(p).setXtalkMargin(bad));
             check(!p.dci.containsKey(0xAD94), "nothing written for " + bad);
         }
+    }
+
+    public static void xtalkMarginRoundtripsInWholeKcps() {
+        FakePlatform p = new FakePlatform();
+        Vl53l8Driver drv = new Vl53l8Driver(p);
+        drv.setXtalkMargin(10000);
+        check(Vl53l8Uld.xtalkMarginToRaw(10000) == 10000L * 2048, "raw = kcps * 2048");
+        check(drv.getXtalkMargin() == 10000, "whole kcps back: " + drv.getXtalkMargin());
     }
 
     static byte[] xtalkReply() {

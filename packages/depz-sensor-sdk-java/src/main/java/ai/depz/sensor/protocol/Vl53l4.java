@@ -37,7 +37,7 @@ public final class Vl53l4 {
     public static final int XSHUT_OFF = 0;
     /** VL53_XSHUT action: drive XSHUT high, no boot handshake. */
     public static final int XSHUT_ON = 1;
-    /** VL53_XSHUT action: pulse low then wait for the boot handshake (~3 ms). */
+    /** VL53_XSHUT action: pulse low then wait for the boot handshake (≤ 20 ms, typ. ~2 ms). */
     public static final int XSHUT_RESET = 2;
 
     /**
@@ -48,20 +48,26 @@ public final class Vl53l4 {
 
     // ── command payload encoders ─────────────────────────────────────────────
 
-    /** VL53_READ_REG payload: {@code addr u16, len u16} little-endian. */
+    /**
+     * VL53_READ_REG payload {@code addr u16, len u16} with the transfer limit of contract 10 §1:
+     * {@code len} 1..253 and {@code addr + len <= 0x10000}, else IllegalArgumentException.
+     */
     public static byte[] packReadReg(int addr, int len) {
         Wire.checkUint("addr", addr, 16);
         Wire.checkUint("length", len, 16);
+        if (len < 1 || len > XFER_MAX || addr + len > 0x10000) {
+            throw new IllegalArgumentException("READ_REG length must be 1.." + XFER_MAX + " and addr+length <= 0x10000");
+        }
         return new byte[] {
             (byte) addr, (byte) (addr >>> 8), (byte) len, (byte) (len >>> 8)
         };
     }
 
-    /** VL53_WRITE_REG payload: {@code addr u16, data[1..253]}, else IllegalArgumentException. */
+    /** VL53_WRITE_REG payload: {@code addr u16, data[1..253]} with {@code addr + N <= 0x10000}, else IllegalArgumentException. */
     public static byte[] packWriteReg(int addr, byte[] data) {
         Wire.checkUint("addr", addr, 16);
-        if (data.length < 1 || data.length > XFER_MAX) {
-            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes");
+        if (data.length < 1 || data.length > XFER_MAX || addr + data.length > 0x10000) {
+            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes and addr+N <= 0x10000");
         }
         byte[] out = new byte[2 + data.length];
         out[0] = (byte) addr;
@@ -108,8 +114,11 @@ public final class Vl53l4 {
     }
 
     /**
-     * RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters are
-     * free-running and wrap silently; watch increments, not absolute values.
+     * RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters wrap
+     * silently; watch increments, not absolute values. {@code i2cErrors} counts
+     * since the last successful XSHUT reset (the bridge clears it there), not
+     * since power-up; {@code initialized} = 1 when MODEL_ID read back as 0xEBAA
+     * on this GET_INFO.
      * {@code modelId} expected 0xEBAA, {@code fwStatus} expected 0x03 (booted);
      * {@code lastI2cError}: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
      */

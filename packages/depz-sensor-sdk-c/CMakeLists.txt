@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.7.0 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.8.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -34,6 +34,7 @@ add_library(depz_sensor_sdk_c
   src/usb_ids.c
   src/identity.c
   src/common.c
+  src/error.c
   src/sr04.c
   src/fwdepz.c
   # sensor-decode layer (contract-first, verifiable):
@@ -75,7 +76,8 @@ if(DEPZ_SENSOR_SDK_C_BUILD_IO)
     src/io/vl53lx_l0x.c
     src/io/vl53lx_bare.c
     src/io/vl53lx_bare_hist.c
-    src/io/vl53lx_bare_tables.c)
+    src/io/vl53lx_bare_tables.c
+    src/io/recorder.c)
   if(WIN32)
     target_sources(depz_sensor_sdk_c PRIVATE src/io/serial_win32.c src/io/ports_win32.c)
     target_link_libraries(depz_sensor_sdk_c PUBLIC setupapi cfgmgr32)
@@ -97,16 +99,25 @@ endif()
 # exact same target name as installed/find_package consumers.
 add_library(depz::sensor_sdk_c ALIAS depz_sensor_sdk_c)
 
-# Only apply our warning flags when we own the build; don't force them on
-# consumers who embed us.
-if(DEPZ_SENSOR_SDK_C_IS_TOP_LEVEL)
-  if(MSVC)
-    target_compile_options(depz_sensor_sdk_c PRIVATE /W3)
-    target_compile_definitions(depz_sensor_sdk_c PRIVATE _CRT_SECURE_NO_WARNINGS)
-  else()
-    target_compile_options(depz_sensor_sdk_c PRIVATE -Wall -Wextra)
+# Warnings: the full set whenever we own the build (never forced on consumers
+# who embed us); as errors in our own builds — tests on, i.e. development and
+# CI — but not for packagers (vcpkg / Conan build with tests off), whose newer
+# compiler may know warnings this code has never met.
+option(DEPZ_SENSOR_SDK_C_WERROR "Treat compiler warnings as errors"
+       ${DEPZ_SENSOR_SDK_C_BUILD_TESTS})
+function(depz_c_warnings target)
+  if(NOT DEPZ_SENSOR_SDK_C_IS_TOP_LEVEL)
+    return()
   endif()
-endif()
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 $<$<BOOL:${DEPZ_SENSOR_SDK_C_WERROR}>:/WX>)
+    target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic
+                           $<$<BOOL:${DEPZ_SENSOR_SDK_C_WERROR}>:-Werror>)
+  endif()
+endfunction()
+depz_c_warnings(depz_sensor_sdk_c)
 
 target_include_directories(depz_sensor_sdk_c PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -131,6 +142,7 @@ if(DEPZ_SENSOR_SDK_C_BUILD_IO AND DEPZ_SENSOR_SDK_C_BUILD_EXAMPLES)
   foreach(ex depz_list sr04_minimal bno086_minimal vl53lx_minimal)
     add_executable(${ex} examples/${ex}.c)
     target_link_libraries(${ex} PRIVATE depz_sensor_sdk_c)
+    depz_c_warnings(${ex})
   endforeach()
 endif()
 
@@ -194,9 +206,11 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
 
   add_executable(test_vectors
     tests/test_vectors.c
+    tests/fake_vl53lx_trace.c
     tests/json.c
   )
   target_link_libraries(test_vectors PRIVATE depz_sensor_sdk_c)
+  depz_c_warnings(test_vectors)
   target_include_directories(test_vectors PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_definitions(test_vectors PRIVATE
     DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
@@ -208,6 +222,7 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   # (scripts/difftest.py) builds and starts. Not part of `all`.
   add_executable(difftest_adapter EXCLUDE_FROM_ALL tests/difftest_adapter.c tests/json.c)
   target_link_libraries(difftest_adapter PRIVATE depz_sensor_sdk_c)
+  depz_c_warnings(difftest_adapter)
   target_include_directories(difftest_adapter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   if(DEPZ_SENSOR_SDK_C_BUILD_IO)
     target_compile_definitions(difftest_adapter PRIVATE DEPZ_DIFFTEST_HAS_IO=1)
@@ -219,7 +234,9 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   # the CX/CH-shared decode plus the CH-only CNH decode: vl53l8_advanced =
   # shared DCI codecs, vl53l8_replay = a CH device capture through the shared
   # frame decoder, vl53l8_cnh = CH compact-network-histogram decode
-  # (live-capture golden vector). vl53l4 = the VL53L4CD wire codecs + host-ULD
+  # (live-capture golden vector); vl53l8 = the SPI bridge's streaming side
+  # (START_STREAM, RPT_VL53_FRAME chunks, the §4 reassembler rules).
+  # vl53l4 = the VL53L4CD wire codecs + host-ULD
   # math (contract 10). vl53l7 = the VL53L5CX/L7CX/L7CH I2C-bridge codecs +
   # class resolution (contract 11); vec_vl53l7_replay_<capture> = one live
   # L5/L7 capture each through framing -> reassembler -> L5/L7 frame decoder.
@@ -229,11 +246,14 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
   # calibration / axis remap / page-1 configs, register-window decode.
   # tmf8829 = the TMF8829 SPI bridge (contract 14): codecs, reassembly, frames,
   # measurements, config page, firmware; tmf8829_frame_time = the clock model
-  # and capture time over 27 recorded streams.
+  # and capture time over 27 recorded streams. depzrec / depzdata = the
+  # .depzrec replay and .depzdata dataset readers on damaged files (contracts
+  # 08, 09; input_rules only).
   foreach(stem
       crc usb_ids identity probe common_commands sr04 framing_encode framing_decode fwdepz
       vl53l8_advanced vl53l4 bno086_shtp bno086_reports vl53l8_replay vl53l8_cnh
-      dataset vl53l7 vl53lx bno055 tmf8829 tmf8829_frame_time)
+      dataset vl53l8 vl53l7 vl53lx bno055 tmf8829 tmf8829_frame_time
+      depzrec depzdata)
     add_test(NAME vec_${stem} COMMAND test_vectors ${stem})
   endforeach()
   # The live-hardware layer against a fake SR04 over loopback (no device).
@@ -254,8 +274,9 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
     endforeach()
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h.in" "${_ids_h}")
     configure_file("${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h.in" "${CMAKE_CURRENT_BINARY_DIR}/scenario_ids.h" COPYONLY)
-    add_executable(test_io tests/test_io.c tests/scenarios.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/fake_tmf8829.c tests/json.c)
+    add_executable(test_io tests/test_io.c tests/scenarios.c tests/fake_sr04.c tests/fake_vl53l4.c tests/fake_bno086.c tests/fake_tmf8829.c tests/fake_vl53lx.c tests/fake_bno055.c tests/fake_vl53l8.c tests/json.c)
     target_link_libraries(test_io PRIVATE depz_sensor_sdk_c)
+    depz_c_warnings(test_io)
     target_include_directories(test_io PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(test_io PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}"
                                DEPZ_SCENARIOS_DIR="${DEPZ_SCENARIOS_DIR}")
@@ -269,12 +290,25 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         measure_once_is_source_once loop_samples_are_source_loop start_stop_idempotent
         measure_once_busy_during_loop no_echo_timeout_sentinel temperature_compensated_distance
         stream_drop_oldest_counter two_independent_streams sync_in_single_shot_reaches_stream
-        events_and_disconnect same_opcode_in_flight_is_busy record_then_replay
+        events_and_disconnect host_seq_gap_is_an_event same_opcode_in_flight_is_busy record_then_replay
         l4_init_boot_speed_then_retimes l4_init_at_400_never_retimes l4_init_config_block_and_vhv
         l4_range_timing_roundtrip_and_bounds l4_tuning_roundtrips l4_is_alive_checks_model_id
         l4_config_refused_while_ranging l4_stream_decodes_and_counts_short_blocks
-        l4_measure_once_polls_and_stops l8_guards_and_cnh_math bno086_features bno086_busy_retry bno086_reports bno086_cargo_capture bno086_commands
-        bno086_frs bno086_codecs tmf8829_fake_session vlx_unsupported_group_refused)
+        l4_measure_once_polls_and_stops l8_guards_and_cnh_math
+        l8_init_downloads_and_reads_the_defaults l8_configuration_round_trips l8_thresholds_motion_and_power
+        l8_xtalk_calibration_round_trip l8_start_stop_and_refusals l8ch_cnh_and_lmz_calibration_table
+        l8ch_cnh_and_motion_exclusive
+        bno086_features bno086_busy_retry bno086_reports bno086_cargo_capture bno086_commands
+        bno086_frs bno086_codecs tmf8829_fake_session vlx_unsupported_group_refused
+        vlx_l1_set_mode_hands_back_the_budget
+        dataset_recorder_two_sr04 dataset_recorder_temperature_gz dataset_recorder_bno086
+        dataset_live_records vlx_bare_tables_roundtrip discovery_without_a_port discovery_open_on_link_attaches_in_place
+        vlx_l1_mode_change_moves_the_budget vlx_l1_unreadable_mode_byte_is_an_error vlx_l1_thresholds_keep_the_other_bits vlx_l1_offset_calibration vlx_l1_xtalk_calibration
+        vlx_l1_roi_size_and_centre vlx_l1_stream_decodes_and_counts_bad_blocks vlx_l4_configure_reinits_then_tunes vlx_l4_period_selects_autonomous_mode vlx_l4_tuning_round_trips
+        vlx_l4_temperature_update_reruns_vhv vlx_l4_calibrations vlx_l4_measure_once_polls_the_block vlx_l3_refusals_name_the_caveat vlx_init_binding_and_bridge_refusals
+        b055_identity_and_raw_registers b055_operation_and_power_modes b055_found_asleep_and_stuck_fusion b055_units_axes_temperature_source
+        b055_configure_restore_and_reset b055_configure_boot_states b055_status_self_test_calibration b055_page1_configs_and_interrupts
+        b055_polling_scales_by_the_units b055_stream_wire_units_and_bad_reports)
       add_test(NAME io_${t} COMMAND test_io ${t})
     endforeach()
   endif()

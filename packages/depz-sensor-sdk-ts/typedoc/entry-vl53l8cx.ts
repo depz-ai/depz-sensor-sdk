@@ -11,6 +11,7 @@
  */
 
 export {
+  MAX_RANGING_FREQUENCY_HZ,
   MIN_RANGING_FREQUENCY_HZ,
   Vl53l8,
   Vl53l8cx,
@@ -47,6 +48,8 @@ export {
   motionConfigSetResolution,
   packDetectionThresholds,
   swapBuffer,
+  XTALK_MARGIN_MAX_KCPS,
+  xtalkMarginFromRaw,
   xtalkMarginToRaw,
 } from "../src/sensors/vl53l8/uld.js";
 export type {

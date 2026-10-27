@@ -309,7 +309,9 @@ Console.WriteLine($"ids ok: {info.IdsOk}, sensor firmware {info.SwRevText}, bloc
                   + $"last I2C error {info.LastI2cError} (0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR)");
 ```
 
-The counters are free-running and wrap silently — watch increments. A rising
+The counters wrap silently — watch increments. `I2cErrors` is cleared by every
+successful reset handshake (the chip-ID poll after nRESET), so it counts failed
+transfers since the last one, not since power-up. A rising
 `SensorResets` means the bridge recovered a stuck bus by pulsing nRESET: the
 stream keeps running, but the sensor is back in CONFIG with power-on settings
 (every output zero) and must be configured again.

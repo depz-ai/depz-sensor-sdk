@@ -85,6 +85,13 @@ const CHECK_NUMBER_OF_CHECKS: usize = 6;
 
 const DEFAULT_MAX_LOOP: usize = 2000;
 const TARGET_REF_RATE_DEFAULT: i32 = 0x0A00;
+/// cMinTimingBudgetMicroSeconds: the C driver refuses anything under it.
+const MIN_TIMING_BUDGET_US: i64 = 20000;
+/// Select values of the `{0xFF, select, msb, lsb}` tuning-buffer records
+/// (VL53L0X_load_tuning_settings()): the three sigma parameters, constants
+/// in the 1.0.4 sigma estimate and only stored, then the reference-SPAD
+/// target rate.
+const TUNING_PARAM_COUNT: u8 = 4;
 const SPEED_OF_LIGHT_IN_AIR: i64 = 2997;
 const REF_SPAD_BUFFER_SIZE: usize = 6;
 
@@ -100,10 +107,38 @@ struct ModeSetting {
 
 // The four ST examples.
 const MODE_SETTINGS: [ModeSetting; 4] = [
-    ModeSetting { name: "default", signal: 0.25, sigma: 18, budget_us: 33000, pre: 14, fin: 10 },
-    ModeSetting { name: "long-range", signal: 0.10, sigma: 60, budget_us: 33000, pre: 18, fin: 14 },
-    ModeSetting { name: "high-speed", signal: 0.25, sigma: 32, budget_us: 30000, pre: 14, fin: 10 },
-    ModeSetting { name: "high-accuracy", signal: 0.25, sigma: 18, budget_us: 200000, pre: 14, fin: 10 },
+    ModeSetting {
+        name: "default",
+        signal: 0.25,
+        sigma: 18,
+        budget_us: 33000,
+        pre: 14,
+        fin: 10,
+    },
+    ModeSetting {
+        name: "long-range",
+        signal: 0.10,
+        sigma: 60,
+        budget_us: 33000,
+        pre: 18,
+        fin: 14,
+    },
+    ModeSetting {
+        name: "high-speed",
+        signal: 0.25,
+        sigma: 32,
+        budget_us: 30000,
+        pre: 14,
+        fin: 10,
+    },
+    ModeSetting {
+        name: "high-accuracy",
+        signal: 0.25,
+        sigma: 18,
+        budget_us: 200000,
+        pre: 14,
+        fin: 10,
+    },
 ];
 
 // DefaultTuningSettings[] (vl53l0x_tuning.h, v36): {count, address, bytes…} records, 0 ends.
@@ -112,36 +147,57 @@ const DEFAULT_TUNING_SETTINGS: &[u8] = &[
     0x01, 0xFF, 0x00, 0x01, 0x09, 0x00, 0x01, 0x10, 0x00, 0x01, 0x11, 0x00, //
     0x01, 0x24, 0x01, 0x01, 0x25, 0xff, 0x01, 0x75, 0x00, //
     0x01, 0xFF, 0x01, 0x01, 0x4e, 0x2c, 0x01, 0x48, 0x00, 0x01, 0x30, 0x20, //
-    0x01, 0xFF, 0x00, 0x01, 0x30, 0x09, 0x01, 0x54, 0x00, 0x01, 0x31, 0x04, 0x01, 0x32, 0x03, //
-    0x01, 0x40, 0x83, 0x01, 0x46, 0x25, 0x01, 0x60, 0x00, 0x01, 0x27, 0x00, 0x01, 0x50, 0x06, //
-    0x01, 0x51, 0x00, 0x01, 0x52, 0x96, 0x01, 0x56, 0x08, 0x01, 0x57, 0x30, 0x01, 0x61, 0x00, //
+    0x01, 0xFF, 0x00, 0x01, 0x30, 0x09, 0x01, 0x54, 0x00, 0x01, 0x31, 0x04, 0x01, 0x32,
+    0x03, //
+    0x01, 0x40, 0x83, 0x01, 0x46, 0x25, 0x01, 0x60, 0x00, 0x01, 0x27, 0x00, 0x01, 0x50,
+    0x06, //
+    0x01, 0x51, 0x00, 0x01, 0x52, 0x96, 0x01, 0x56, 0x08, 0x01, 0x57, 0x30, 0x01, 0x61,
+    0x00, //
     0x01, 0x62, 0x00, 0x01, 0x64, 0x00, 0x01, 0x65, 0x00, 0x01, 0x66, 0xa0, //
-    0x01, 0xFF, 0x01, 0x01, 0x22, 0x32, 0x01, 0x47, 0x14, 0x01, 0x49, 0xff, 0x01, 0x4a, 0x00, //
+    0x01, 0xFF, 0x01, 0x01, 0x22, 0x32, 0x01, 0x47, 0x14, 0x01, 0x49, 0xff, 0x01, 0x4a,
+    0x00, //
     0x01, 0xFF, 0x00, 0x01, 0x7a, 0x0a, 0x01, 0x7b, 0x00, 0x01, 0x78, 0x21, //
-    0x01, 0xFF, 0x01, 0x01, 0x23, 0x34, 0x01, 0x42, 0x00, 0x01, 0x44, 0xff, 0x01, 0x45, 0x26, //
-    0x01, 0x46, 0x05, 0x01, 0x40, 0x40, 0x01, 0x0E, 0x06, 0x01, 0x20, 0x1a, 0x01, 0x43, 0x40, //
+    0x01, 0xFF, 0x01, 0x01, 0x23, 0x34, 0x01, 0x42, 0x00, 0x01, 0x44, 0xff, 0x01, 0x45,
+    0x26, //
+    0x01, 0x46, 0x05, 0x01, 0x40, 0x40, 0x01, 0x0E, 0x06, 0x01, 0x20, 0x1a, 0x01, 0x43,
+    0x40, //
     0x01, 0xFF, 0x00, 0x01, 0x34, 0x03, 0x01, 0x35, 0x44, //
-    0x01, 0xFF, 0x01, 0x01, 0x31, 0x04, 0x01, 0x4b, 0x09, 0x01, 0x4c, 0x05, 0x01, 0x4d, 0x04, //
-    0x01, 0xFF, 0x00, 0x01, 0x44, 0x00, 0x01, 0x45, 0x20, 0x01, 0x47, 0x08, 0x01, 0x48, 0x28, //
-    0x01, 0x67, 0x00, 0x01, 0x70, 0x04, 0x01, 0x71, 0x01, 0x01, 0x72, 0xfe, 0x01, 0x76, 0x00, //
+    0x01, 0xFF, 0x01, 0x01, 0x31, 0x04, 0x01, 0x4b, 0x09, 0x01, 0x4c, 0x05, 0x01, 0x4d,
+    0x04, //
+    0x01, 0xFF, 0x00, 0x01, 0x44, 0x00, 0x01, 0x45, 0x20, 0x01, 0x47, 0x08, 0x01, 0x48,
+    0x28, //
+    0x01, 0x67, 0x00, 0x01, 0x70, 0x04, 0x01, 0x71, 0x01, 0x01, 0x72, 0xfe, 0x01, 0x76,
+    0x00, //
     0x01, 0x77, 0x00, //
     0x01, 0xFF, 0x01, 0x01, 0x0d, 0x01, //
     0x01, 0xFF, 0x00, 0x01, 0x80, 0x01, 0x01, 0x01, 0xF8, //
-    0x01, 0xFF, 0x01, 0x01, 0x8e, 0x01, 0x01, 0x00, 0x01, 0x01, 0xFF, 0x00, 0x01, 0x80, 0x00, //
+    0x01, 0xFF, 0x01, 0x01, 0x8e, 0x01, 0x01, 0x00, 0x01, 0x01, 0xFF, 0x00, 0x01, 0x80,
+    0x00, //
     0x00, 0x00, 0x00,
 ];
 
 // Dmax lookup table (FixPoint16.16).
-const DMAX_LUT_AMB_RATE_MCPS: [i64; 7] =
-    [0x00000000, 0x0000B333, 0x00020000, 0x0003CCCC, 0x00074CCC, 0x000A0000, 0x000F0000];
-const DMAX_LUT_DMAX_MM: [i64; 7] = [0x04B00000, 0x044C0000, 0x03840000, 0x02EE0000, 0x02260000, 0x01F40000, 0x01900000];
+const DMAX_LUT_AMB_RATE_MCPS: [i64; 7] = [
+    0x00000000, 0x0000B333, 0x00020000, 0x0003CCCC, 0x00074CCC, 0x000A0000, 0x000F0000,
+];
+const DMAX_LUT_DMAX_MM: [i64; 7] = [
+    0x04B00000, 0x044C0000, 0x03840000, 0x02EE0000, 0x02260000, 0x01F40000, 0x01900000,
+];
 
 const RESULT_BLOCK_ADDR: u16 = RESULT_RANGE_STATUS;
 const RESULT_BLOCK_LEN: usize = 12;
 
 const REF_ARRAY_QUADRANTS: [i32; 4] = [10, 5, 0, 5];
 
-const GROUPS: &[&str] = &["mode", "timing", "offset", "xtalk", "calib_offset", "calib_xtalk", "refspad"];
+const GROUPS: &[&str] = &[
+    "mode",
+    "timing",
+    "offset",
+    "xtalk",
+    "calib_offset",
+    "calib_xtalk",
+    "refspad",
+];
 
 const START_OVERHEAD_US: i64 = 1910;
 const END_OVERHEAD_US: i64 = 960;
@@ -182,6 +238,16 @@ struct RangingData {
     dmax_mm: i64,
     sigma_mm: i64,
     device_range_status: i32,
+}
+
+/// C int16 truncation (an assignment to an int16_t).
+fn i16m(v: i64) -> i64 {
+    let r = v & 0xFFFF;
+    if r & 0x8000 != 0 {
+        r - 0x1_0000
+    } else {
+        r
+    }
 }
 
 fn u32m(v: i64) -> i64 {
@@ -314,6 +380,9 @@ pub struct Vl53l0xUldDriver {
     pre_range_timeout_us: i64,
     final_range_timeout_us: i64,
     target_ref_rate: i32,
+    sigma_est_ref_array: i32,
+    sigma_est_eff_pulse_width: i32,
+    sigma_est_eff_amb_width: i32,
     limit_checks_enable: [i32; CHECK_NUMBER_OF_CHECKS],
     limit_checks_value: [i64; CHECK_NUMBER_OF_CHECKS],
     mode: String,
@@ -354,6 +423,9 @@ impl Vl53l0xUldDriver {
             pre_range_timeout_us: 0,
             final_range_timeout_us: 0,
             target_ref_rate: TARGET_REF_RATE_DEFAULT,
+            sigma_est_ref_array: 100,
+            sigma_est_eff_pulse_width: 900,
+            sigma_est_eff_amb_width: 500,
             limit_checks_enable: [0; CHECK_NUMBER_OF_CHECKS],
             limit_checks_value: [0; CHECK_NUMBER_OF_CHECKS],
             mode: "default".to_string(),
@@ -409,6 +481,26 @@ impl Vl53l0xUldDriver {
         self.part2part_offset_adjustment_nvm_um
     }
 
+    /// The reference-SPAD target rate (9.7 Mcps) a tuning buffer's `{0xFF, 3, msb, lsb}` record
+    /// sets; the SPAD management converges on it.
+    pub fn target_ref_rate(&self) -> i32 {
+        self.target_ref_rate
+    }
+
+    /// The three sigma-estimate constants a tuning buffer's `{0xFF, 0..2, msb, lsb}` records set
+    /// (stored only: the 1.0.4 sigma estimate has them as constants).
+    pub fn sigma_est_ref_array(&self) -> i32 {
+        self.sigma_est_ref_array
+    }
+
+    pub fn sigma_est_eff_pulse_width(&self) -> i32 {
+        self.sigma_est_eff_pulse_width
+    }
+
+    pub fn sigma_est_eff_amb_width(&self) -> i32 {
+        self.sigma_est_eff_amb_width
+    }
+
     /// Oscillator frequency, MHz 16.16.
     pub fn osc_frequency_mhz(&self) -> i64 {
         self.osc_frequency_mhz
@@ -416,7 +508,10 @@ impl Vl53l0xUldDriver {
 
     /// The reference SPAD set in use.
     pub fn get_reference_spads(&self) -> RefSpads {
-        RefSpads { count: self.reference_spad_count, is_aperture: self.reference_spad_type }
+        RefSpads {
+            count: self.reference_spad_count,
+            is_aperture: self.reference_spad_type,
+        }
     }
 
     /// No firmware-status register: the model id answering says the die is up.
@@ -506,7 +601,8 @@ impl Vl53l0xUldDriver {
         self.get_info_from_device(1)?;
         let count = self.reference_spad_count;
         let aperture = self.reference_spad_type;
-        self.ref_spads_from_nvm = !(aperture > 1 || (aperture == 1 && count > 32) || (aperture == 0 && count > 12));
+        self.ref_spads_from_nvm =
+            !(aperture > 1 || (aperture == 1 && count > 32) || (aperture == 0 && count > 12));
         if self.ref_spads_from_nvm {
             self.set_reference_spads(count, aperture)?;
         }
@@ -536,22 +632,38 @@ impl Vl53l0xUldDriver {
     // ── reference calibration (VHV / phase) ──────────────────────────────────
 
     fn perform_single_ref_calibration(&mut self, vhv_init_byte: u8) -> Result<()> {
-        self.p.write_byte(SYSRANGE_START, SYSRANGE_MODE_START_STOP | vhv_init_byte)?;
+        self.p
+            .write_byte(SYSRANGE_START, SYSRANGE_MODE_START_STOP | vhv_init_byte)?;
         self.wait_ready(1000)?;
         self.clear_interrupt_mask()?;
         self.p.write_byte(SYSRANGE_START, 0x00)
     }
 
-    fn ref_calibration_io_read(&self, vhv_enable: bool, phase_enable: bool) -> Result<RefCalibration> {
+    fn ref_calibration_io_read(
+        &self,
+        vhv_enable: bool,
+        phase_enable: bool,
+    ) -> Result<RefCalibration> {
         self.p.write_byte(0xFF, 0x01)?;
         self.p.write_byte(0x00, 0x00)?;
         self.p.write_byte(0xFF, 0x00)?;
-        let vhv = if vhv_enable { self.p.read_byte(0xCB)? } else { 0 };
-        let phase = if phase_enable { self.p.read_byte(0xEE)? } else { 0 };
+        let vhv = if vhv_enable {
+            self.p.read_byte(0xCB)?
+        } else {
+            0
+        };
+        let phase = if phase_enable {
+            self.p.read_byte(0xEE)?
+        } else {
+            0
+        };
         self.p.write_byte(0xFF, 0x01)?;
         self.p.write_byte(0x00, 0x01)?;
         self.p.write_byte(0xFF, 0x00)?;
-        Ok(RefCalibration { vhv, phase: phase & 0xEF })
+        Ok(RefCalibration {
+            vhv,
+            phase: phase & 0xEF,
+        })
     }
 
     /// VL53L0X_PerformRefCalibration(): VHV, then phase → (vhv, phase). Not optional in practice.
@@ -563,7 +675,8 @@ impl Vl53l0xUldDriver {
         self.p.write_byte(SYSTEM_SEQUENCE_CONFIG, 0x02)?; // phase only
         self.perform_single_ref_calibration(0x00)?;
         let phase = self.ref_calibration_io_read(false, true)?.phase;
-        self.p.write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
+        self.p
+            .write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
         self.sequence_config = saved_sequence_config;
         Ok(RefCalibration { vhv, phase })
     }
@@ -614,7 +727,8 @@ impl Vl53l0xUldDriver {
         let (mut ref_spad_count, mut ref_spad_type) = (0, 0);
         let mut product_id = String::new();
         let (mut new_module_id, mut new_revision) = (0u8, 0u8);
-        let (mut uid_upper, mut uid_lower, mut signal_rate400, mut dist400) = (0i64, 0i64, 0i64, 0i64);
+        let (mut uid_upper, mut uid_lower, mut signal_rate400, mut dist400) =
+            (0i64, 0i64, 0i64, 0i64);
 
         if option & 1 == 1 && done & 1 == 0 {
             let tmp = self.nvm_dword(0x6B)?;
@@ -640,16 +754,38 @@ impl Vl53l0xUldDriver {
 
             let mut chars: Vec<i64> = Vec::new();
             let tmp = self.nvm_dword(0x77)?;
-            chars.extend([tmp >> 25 & 0x7F, tmp >> 18 & 0x7F, tmp >> 11 & 0x7F, tmp >> 4 & 0x7F]);
+            chars.extend([
+                tmp >> 25 & 0x7F,
+                tmp >> 18 & 0x7F,
+                tmp >> 11 & 0x7F,
+                tmp >> 4 & 0x7F,
+            ]);
             let b = (tmp & 0x00F) << 3;
             let tmp = self.nvm_dword(0x78)?;
-            chars.extend([b + (tmp >> 29 & 0x7F), tmp >> 22 & 0x7F, tmp >> 15 & 0x7F, tmp >> 8 & 0x7F, tmp >> 1 & 0x7F]);
+            chars.extend([
+                b + (tmp >> 29 & 0x7F),
+                tmp >> 22 & 0x7F,
+                tmp >> 15 & 0x7F,
+                tmp >> 8 & 0x7F,
+                tmp >> 1 & 0x7F,
+            ]);
             let b = (tmp & 0x001) << 6;
             let tmp = self.nvm_dword(0x79)?;
-            chars.extend([b + (tmp >> 26 & 0x7F), tmp >> 19 & 0x7F, tmp >> 12 & 0x7F, tmp >> 5 & 0x7F]);
+            chars.extend([
+                b + (tmp >> 26 & 0x7F),
+                tmp >> 19 & 0x7F,
+                tmp >> 12 & 0x7F,
+                tmp >> 5 & 0x7F,
+            ]);
             let b = (tmp & 0x01F) << 2;
             let tmp = self.nvm_dword(0x7A)?;
-            chars.extend([b + (tmp >> 30 & 0x7F), tmp >> 23 & 0x7F, tmp >> 16 & 0x7F, tmp >> 9 & 0x7F, tmp >> 2 & 0x7F]);
+            chars.extend([
+                b + (tmp >> 30 & 0x7F),
+                tmp >> 23 & 0x7F,
+                tmp >> 16 & 0x7F,
+                tmp >> 9 & 0x7F,
+                tmp >> 2 & 0x7F,
+            ]);
             product_id = chars.iter().map(|&c| (c & 0x7F) as u8 as char).collect();
         }
 
@@ -687,8 +823,13 @@ impl Vl53l0xUldDriver {
             self.signal_rate_meas_fixed_400mm = signal_rate400 << 9;
             let mut offset_um = 0;
             if dist400 != 0 {
+                // uint32 difference, uint32 product, then an int16_t: the C
+                // driver's types, kept because they are what makes the sign
+                // come out right. A target measured nearer than 400 mm wraps
+                // the uint32 difference, and only the int16 truncation turns
+                // that back into the positive offset it stands for.
                 let offset1104_mm = u32m(dist400 - (400 << 4));
-                offset_um = -((offset1104_mm * 1000) >> 4);
+                offset_um = i16m(-i16m(u32m(offset1104_mm * 1000) >> 4));
             }
             self.part2part_offset_adjustment_nvm_um = offset_um;
         }
@@ -703,9 +844,11 @@ impl Vl53l0xUldDriver {
         let max_spad_count: i32 = 44;
         self.p.write_byte(0xFF, 0x01)?;
         self.p.write_byte(DYNAMIC_SPAD_REF_EN_START_OFFSET, 0x00)?;
-        self.p.write_byte(DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 0x2C)?;
+        self.p
+            .write_byte(DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 0x2C)?;
         self.p.write_byte(0xFF, 0x00)?;
-        self.p.write_byte(GLOBAL_CONFIG_REF_EN_START_SELECT, start_select as u8)?;
+        self.p
+            .write_byte(GLOBAL_CONFIG_REF_EN_START_SELECT, start_select as u8)?;
 
         let mut spad_array = [0u8; REF_SPAD_BUFFER_SIZE];
         let mut current: i32 = 0;
@@ -726,8 +869,13 @@ impl Vl53l0xUldDriver {
             spad_array[(current / 8) as usize] |= 1 << (current % 8);
             current += 1;
         }
-        self.p.write_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, &spad_array)?;
-        if self.p.read_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, REF_SPAD_BUFFER_SIZE)? != spad_array {
+        self.p
+            .write_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, &spad_array)?;
+        if self
+            .p
+            .read_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, REF_SPAD_BUFFER_SIZE)?
+            != spad_array
+        {
             return Err(uld_err("reference SPAD map did not read back"));
         }
         self.ref_spad_enables = spad_array;
@@ -738,17 +886,38 @@ impl Vl53l0xUldDriver {
 
     // ── tuning settings ──────────────────────────────────────────────────────
 
-    fn load_tuning_settings(&self, buffer: &[u8]) -> Result<()> {
+    /// VL53L0X_load_tuning_settings(): `{count, address, bytes...}` records, with count 0xFF
+    /// carrying a host-side parameter instead; a zero count ends the buffer.
+    pub fn load_tuning_settings(&mut self, buffer: &[u8]) -> Result<()> {
         let mut index = 0;
         while buffer[index] != 0 {
             let writes = buffer[index] as usize;
             index += 1;
             if writes == 0xFF {
-                index += 3; // host-side sigma parameters, constants in the 1.0.4 sigma estimate
+                // A host-side parameter: {0xFF, select, msb, lsb}. The three
+                // sigma parameters are constants in the 1.0.4 sigma estimate
+                // and only get stored; the fourth is the rate the reference
+                // SPAD management converges on.
+                let select = buffer[index];
+                if select >= TUNING_PARAM_COUNT {
+                    return Err(uld_err(format!(
+                        "bad tuning parameter {select} at offset {}",
+                        index - 1
+                    )));
+                }
+                let value = ((buffer[index + 1] as i32) << 8) | buffer[index + 2] as i32;
+                match select {
+                    0 => self.sigma_est_ref_array = value,
+                    1 => self.sigma_est_eff_pulse_width = value,
+                    2 => self.sigma_est_eff_amb_width = value,
+                    _ => self.target_ref_rate = value,
+                }
+                index += 3;
             } else if writes <= 4 {
                 let address = buffer[index] as u16;
                 index += 1;
-                self.p.write_multi(address, &buffer[index..index + writes])?;
+                self.p
+                    .write_multi(address, &buffer[index..index + writes])?;
                 index += writes;
             } else {
                 return Err(uld_err(format!("bad tuning record at offset {index}")));
@@ -760,10 +929,12 @@ impl Vl53l0xUldDriver {
     // ── GPIO / interrupt ─────────────────────────────────────────────────────
 
     fn set_gpio_config(&mut self, functionality: u8, polarity_low: bool) -> Result<()> {
-        self.p.write_byte(SYSTEM_INTERRUPT_CONFIG_GPIO, functionality)?;
+        self.p
+            .write_byte(SYSTEM_INTERRUPT_CONFIG_GPIO, functionality)?;
         let data = if polarity_low { 0x00 } else { 0x10 };
         let current = self.p.read_byte(GPIO_HV_MUX_ACTIVE_HIGH)?;
-        self.p.write_byte(GPIO_HV_MUX_ACTIVE_HIGH, (current & 0xEF) | data)?;
+        self.p
+            .write_byte(GPIO_HV_MUX_ACTIVE_HIGH, (current & 0xEF) | data)?;
         self.pin0_gpio_functionality = functionality;
         self.clear_interrupt_mask()
     }
@@ -783,7 +954,9 @@ impl Vl53l0xUldDriver {
     fn get_interrupt_mask_status(&self) -> Result<u8> {
         let b = self.p.read_byte(RESULT_INTERRUPT_STATUS)?;
         if b & 0x18 != 0 {
-            return Err(uld_err(format!("range error reported in RESULT_INTERRUPT_STATUS 0x{b:02X}")));
+            return Err(uld_err(format!(
+                "range error reported in RESULT_INTERRUPT_STATUS 0x{b:02X}"
+            )));
         }
         Ok(b & 0x07)
     }
@@ -821,7 +994,11 @@ impl Vl53l0xUldDriver {
 
     fn set_sequence_step_enable(&mut self, step: usize, enabled: i32) -> Result<()> {
         let config = self.p.read_byte(SYSTEM_SEQUENCE_CONFIG)?;
-        let next = if enabled != 0 { config | SEQ_SET[step] } else { config & SEQ_CLEAR[step] };
+        let next = if enabled != 0 {
+            config | SEQ_SET[step]
+        } else {
+            config & SEQ_CLEAR[step]
+        };
         if next == config {
             return Ok(());
         }
@@ -832,7 +1009,11 @@ impl Vl53l0xUldDriver {
     }
 
     fn get_vcsel_pulse_period(&self, kind: i32) -> Result<i32> {
-        let reg = if kind == VCSEL_PRE_RANGE { PRE_RANGE_CONFIG_VCSEL_PERIOD } else { FINAL_RANGE_CONFIG_VCSEL_PERIOD };
+        let reg = if kind == VCSEL_PRE_RANGE {
+            PRE_RANGE_CONFIG_VCSEL_PERIOD
+        } else {
+            FINAL_RANGE_CONFIG_VCSEL_PERIOD
+        };
         Ok(decode_vcsel_period(self.p.read_byte(reg)?))
     }
 
@@ -845,17 +1026,21 @@ impl Vl53l0xUldDriver {
             }
             SEQ_PRE_RANGE => {
                 let vcsel = self.get_vcsel_pulse_period(VCSEL_PRE_RANGE)?;
-                let mclks = decode_timeout(self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
+                let mclks =
+                    decode_timeout(self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
                 Ok(timeout_us(mclks, vcsel))
             }
             SEQ_FINAL_RANGE => {
                 let steps = self.get_sequence_step_enables()?;
                 let mut pre = 0;
                 if steps[SEQ_PRE_RANGE] {
-                    pre = decode_timeout(self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
+                    pre = decode_timeout(
+                        self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64
+                    );
                 }
                 let vcsel = self.get_vcsel_pulse_period(VCSEL_FINAL_RANGE)?;
-                let fin = decode_timeout(self.p.read_word(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
+                let fin =
+                    decode_timeout(self.p.read_word(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
                 Ok(timeout_us((fin - pre) & 0xFFFF, vcsel))
             }
             _ => Err(uld_err(format!("no timeout for sequence step {step}"))),
@@ -867,12 +1052,19 @@ impl Vl53l0xUldDriver {
             SEQ_TCC | SEQ_DSS | SEQ_MSRC => {
                 let vcsel = self.get_vcsel_pulse_period(VCSEL_PRE_RANGE)?;
                 let mclks = timeout_mclks(timeout_us, vcsel);
-                let encoded = if mclks > 256 { 255 } else { ((mclks - 1) & 0xFF) as u8 };
+                let encoded = if mclks > 256 {
+                    255
+                } else {
+                    ((mclks - 1) & 0xFF) as u8
+                };
                 self.p.write_byte(MSRC_CONFIG_TIMEOUT_MACROP, encoded)
             }
             SEQ_PRE_RANGE => {
                 let vcsel = self.get_vcsel_pulse_period(VCSEL_PRE_RANGE)?;
-                self.p.write_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, encode_timeout(timeout_mclks(timeout_us, vcsel)))?;
+                self.p.write_word(
+                    PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI,
+                    encode_timeout(timeout_mclks(timeout_us, vcsel)),
+                )?;
                 self.pre_range_timeout_us = timeout_us;
                 Ok(())
             }
@@ -881,7 +1073,9 @@ impl Vl53l0xUldDriver {
                 let steps = self.get_sequence_step_enables()?;
                 let mut pre = 0;
                 if steps[SEQ_PRE_RANGE] {
-                    pre = decode_timeout(self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64);
+                    pre = decode_timeout(
+                        self.p.read_word(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)? as i64
+                    );
                 }
                 let vcsel = self.get_vcsel_pulse_period(VCSEL_FINAL_RANGE)?;
                 self.p.write_word(
@@ -898,6 +1092,11 @@ impl Vl53l0xUldDriver {
     // ── timing budget ────────────────────────────────────────────────────────
 
     fn set_measurement_timing_budget(&mut self, budget_us: i64) -> Result<()> {
+        if budget_us < MIN_TIMING_BUDGET_US {
+            return Err(uld_err(format!(
+                "timing budget {budget_us} us is below the {MIN_TIMING_BUDGET_US} us minimum"
+            )));
+        }
         let steps = self.get_sequence_step_enables()?;
         let mut final_budget_us = budget_us - (START_OVERHEAD_US + END_OVERHEAD_US);
         let take = |final_budget_us: &mut i64, sub: i64| -> Result<()> {
@@ -958,14 +1157,23 @@ impl Vl53l0xUldDriver {
 
     fn set_inter_measurement_period(&self, period_ms: i64) -> Result<()> {
         let osc_calibrate_val = self.p.read_word(OSC_CALIBRATE_VAL)? as i64;
-        let value = if osc_calibrate_val != 0 { period_ms * osc_calibrate_val } else { period_ms };
-        self.p.write_dword(SYSTEM_INTERMEASUREMENT_PERIOD, value as u32)
+        let value = if osc_calibrate_val != 0 {
+            period_ms * osc_calibrate_val
+        } else {
+            period_ms
+        };
+        self.p
+            .write_dword(SYSTEM_INTERMEASUREMENT_PERIOD, value as u32)
     }
 
     fn get_inter_measurement_period(&self) -> Result<i64> {
         let osc_calibrate_val = self.p.read_word(OSC_CALIBRATE_VAL)? as i64;
         let value = self.p.read_dword(SYSTEM_INTERMEASUREMENT_PERIOD)? as i64;
-        Ok(if osc_calibrate_val != 0 { value / osc_calibrate_val } else { value })
+        Ok(if osc_calibrate_val != 0 {
+            value / osc_calibrate_val
+        } else {
+            value
+        })
     }
 
     // ── ranging ──────────────────────────────────────────────────────────────
@@ -1025,7 +1233,10 @@ impl Vl53l0xUldDriver {
     /// the cached device data, so a streamed frame decodes exactly like a polled one.
     fn parse_result_block(&self, raw: &[u8]) -> Result<RangingData> {
         if raw.len() < RESULT_BLOCK_LEN {
-            return Err(uld_err(format!("result block too short: {} bytes", raw.len())));
+            return Err(uld_err(format!(
+                "result block too short: {} bytes",
+                raw.len()
+            )));
         }
         let distance = ((raw[10] as i32) << 8) + raw[11] as i32;
         let mut data = RangingData {
@@ -1049,7 +1260,9 @@ impl Vl53l0xUldDriver {
         if self.xtalk_compensation_enable == 0 {
             return 0;
         }
-        let total = data.effective_spad_rtn_count.wrapping_mul(self.xtalk_compensation_rate_mega_cps);
+        let total = data
+            .effective_spad_rtn_count
+            .wrapping_mul(self.xtalk_compensation_rate_mega_cps);
         (total + 0x80) >> 8
     }
 
@@ -1075,18 +1288,24 @@ impl Vl53l0xUldDriver {
 
         let final_range_timeout_us_cached = self.final_range_timeout_us;
         let final_range_vcsel_pclks = self.final_range_vcsel_pulse_period;
-        let final_range_macro_pclks = timeout_mclks(final_range_timeout_us_cached, final_range_vcsel_pclks);
+        let final_range_macro_pclks =
+            timeout_mclks(final_range_timeout_us_cached, final_range_vcsel_pclks);
         let pre_range_timeout_us_cached = self.pre_range_timeout_us;
-        let pre_range_macro_pclks = timeout_mclks(pre_range_timeout_us_cached, self.pre_range_vcsel_pulse_period);
+        let pre_range_macro_pclks = timeout_mclks(
+            pre_range_timeout_us_cached,
+            self.pre_range_vcsel_pulse_period,
+        );
 
         let vcsel_width: i64 = if final_range_vcsel_pclks == 8 { 2 } else { 3 };
-        let mut peak_vcsel_duration_us = vcsel_width * 2048 * (pre_range_macro_pclks + final_range_macro_pclks);
+        let mut peak_vcsel_duration_us =
+            vcsel_width * 2048 * (pre_range_macro_pclks + final_range_macro_pclks);
         peak_vcsel_duration_us = (peak_vcsel_duration_us + 500) / 1000;
         peak_vcsel_duration_us *= C_PLL_PERIOD_PS;
         peak_vcsel_duration_us = (peak_vcsel_duration_us + 500) / 1000;
 
         let total_signal_rate2408 = (total_signal_rate_mcps + 0x80) >> 8;
-        let mut vcsel_total_events_rtn = ((total_signal_rate2408 * peak_vcsel_duration_us) + 0x80) >> 8;
+        let mut vcsel_total_events_rtn =
+            ((total_signal_rate2408 * peak_vcsel_duration_us) + 0x80) >> 8;
 
         if peak_signal_rate_kcps == 0 {
             return C_SIGMA_EST_MAX;
@@ -1100,7 +1319,8 @@ impl Vl53l0xUldDriver {
         let p3 = 2 * isqrt(vcsel_total_events_rtn * 12);
 
         let delta_t_ps = data.distance_mm as i64 * C_TOF_PER_MM_PS;
-        let mut diff1_mcps = u32m(u32m((peak_signal_rate_kcps << 16) - 2 * xtalk_comp_rate_kcps) + 500) / 1000;
+        let mut diff1_mcps =
+            u32m(u32m((peak_signal_rate_kcps << 16) - 2 * xtalk_comp_rate_kcps) + 500) / 1000;
         let diff2_mcps = ((peak_signal_rate_kcps << 16) + 500) / 1000;
         diff1_mcps <<= 8;
         let xtalk_correction = (diff1_mcps / diff2_mcps).abs() << 8;
@@ -1123,14 +1343,20 @@ impl Vl53l0xUldDriver {
         sigma_est_rtn = (sigma_est_rtn + 5000) / 10000;
         sigma_est_rtn = sigma_est_rtn.min(C_SIGMA_EST_RTN_MAX);
 
-        let final_range_integration_time_ms = (final_range_timeout_us_cached + pre_range_timeout_us_cached + 500) / 1000;
+        let final_range_integration_time_ms =
+            (final_range_timeout_us_cached + pre_range_timeout_us_cached + 500) / 1000;
         let mut sigma_est_ref = isqrt(
-            (C_DFLT_FINAL_RANGE_INTEGRATION_TIME_MS + final_range_integration_time_ms / 2) / final_range_integration_time_ms,
+            (C_DFLT_FINAL_RANGE_INTEGRATION_TIME_MS + final_range_integration_time_ms / 2)
+                / final_range_integration_time_ms,
         ) << 8;
         sigma_est_ref = (sigma_est_ref + 500) / 1000;
 
-        let mut sigma_estimate = 1000 * isqrt(sigma_est_rtn * sigma_est_rtn + sigma_est_ref * sigma_est_ref);
-        if peak_signal_rate_kcps < 1 || vcsel_total_events_rtn < 1 || sigma_estimate > C_SIGMA_EST_MAX {
+        let mut sigma_estimate =
+            1000 * isqrt(sigma_est_rtn * sigma_est_rtn + sigma_est_ref * sigma_est_ref);
+        if peak_signal_rate_kcps < 1
+            || vcsel_total_events_rtn < 1
+            || sigma_estimate > C_SIGMA_EST_MAX
+        {
             sigma_estimate = C_SIGMA_EST_MAX;
         }
         sigma_estimate
@@ -1200,7 +1426,10 @@ impl Vl53l0xUldDriver {
     fn as_range(r: &RangingData) -> Vl53lxRange {
         let mut extra = BTreeMap::new();
         extra.insert("dmax_mm".to_string(), ExtraValue::Int(r.dmax_mm));
-        extra.insert("device_range_status".to_string(), ExtraValue::Int(r.device_range_status as i64));
+        extra.insert(
+            "device_range_status".to_string(),
+            ExtraValue::Int(r.device_range_status as i64),
+        );
         Vl53lxRange {
             distance_mm: r.distance_mm,
             status: r.range_status,
@@ -1239,12 +1468,17 @@ impl Vl53l0xUldDriver {
             _ => {
                 return Err(uld_err(format!(
                     "VCSEL period {pclks} PCLK is out of range for the {}",
-                    if kind == VCSEL_PRE_RANGE { "pre-range" } else { "final range" }
+                    if kind == VCSEL_PRE_RANGE {
+                        "pre-range"
+                    } else {
+                        "final range"
+                    }
                 )))
             }
         };
         if kind == VCSEL_PRE_RANGE {
-            self.p.write_byte(PRE_RANGE_CONFIG_VALID_PHASE_HIGH, limit)?;
+            self.p
+                .write_byte(PRE_RANGE_CONFIG_VALID_PHASE_HIGH, limit)?;
             self.p.write_byte(PRE_RANGE_CONFIG_VALID_PHASE_LOW, 0x08)?;
         } else {
             // The final range also retunes the VCSEL width and the phase-cal limits.
@@ -1254,8 +1488,10 @@ impl Vl53l0xUldDriver {
                 12 => (0x03, 0x08, 0x20),
                 _ => (0x03, 0x07, 0x20),
             };
-            self.p.write_byte(FINAL_RANGE_CONFIG_VALID_PHASE_HIGH, limit)?;
-            self.p.write_byte(FINAL_RANGE_CONFIG_VALID_PHASE_LOW, 0x08)?;
+            self.p
+                .write_byte(FINAL_RANGE_CONFIG_VALID_PHASE_HIGH, limit)?;
+            self.p
+                .write_byte(FINAL_RANGE_CONFIG_VALID_PHASE_LOW, 0x08)?;
             self.p.write_byte(GLOBAL_CONFIG_VCSEL_WIDTH, width)?;
             self.p.write_byte(ALGO_PHASECAL_CONFIG_TIMEOUT, timeout)?;
             self.p.write_byte(0xFF, 0x01)?;
@@ -1284,7 +1520,8 @@ impl Vl53l0xUldDriver {
         let saved_sequence_config = self.sequence_config;
         self.p.write_byte(SYSTEM_SEQUENCE_CONFIG, 0x02)?;
         self.perform_single_ref_calibration(0x00)?;
-        self.p.write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
+        self.p
+            .write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
         self.sequence_config = saved_sequence_config;
         Ok(())
     }
@@ -1296,18 +1533,27 @@ impl Vl53l0xUldDriver {
         let offset_um = offset_um.clamp(-512000, 511000);
         let steps = offset_um.abs() / 250;
         let encoded = if offset_um >= 0 { steps } else { 4096 - steps };
-        self.p.write_word(ALGO_PART_TO_PART_RANGE_OFFSET_MM, (encoded & 0xFFFF) as u16)
+        self.p
+            .write_word(ALGO_PART_TO_PART_RANGE_OFFSET_MM, (encoded & 0xFFFF) as u16)
     }
 
     /// The part-to-part offset, µm.
     pub fn get_offset_um(&self) -> Result<i64> {
         let reg = (self.p.read_word(ALGO_PART_TO_PART_RANGE_OFFSET_MM)? & 0x0FFF) as i64;
-        Ok(if reg > 2047 { (reg - 4096) * 250 } else { reg * 250 })
+        Ok(if reg > 2047 {
+            (reg - 4096) * 250
+        } else {
+            reg * 250
+        })
     }
 
     /// VL53L0X_perform_offset_calibration() → µm (the contract's default is 50 samples). TCC and the
     /// range-ignore threshold are off for the run.
-    pub fn perform_offset_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64> {
+    pub fn perform_offset_calibration(
+        &mut self,
+        cal_distance_mm: i32,
+        nb_samples: i32,
+    ) -> Result<i64> {
         if cal_distance_mm <= 0 {
             return Err(uld_err("the calibration distance must be positive"));
         }
@@ -1347,15 +1593,25 @@ impl Vl53l0xUldDriver {
     // ── crosstalk ────────────────────────────────────────────────────────────
 
     fn set_xtalk_enable(&mut self, enable: i32) -> Result<()> {
-        let rate = if enable != 0 { self.xtalk_compensation_rate_mega_cps } else { 0 };
-        self.p.write_word(CROSSTALK_COMPENSATION_PEAK_RATE_MCPS, ((rate >> 3) & 0xFFFF) as u16)?; // 16.16 → 3.13
+        let rate = if enable != 0 {
+            self.xtalk_compensation_rate_mega_cps
+        } else {
+            0
+        };
+        self.p.write_word(
+            CROSSTALK_COMPENSATION_PEAK_RATE_MCPS,
+            ((rate >> 3) & 0xFFFF) as u16,
+        )?; // 16.16 → 3.13
         self.xtalk_compensation_enable = if enable != 0 { 1 } else { 0 };
         Ok(())
     }
 
     fn set_xtalk_rate_mcps(&mut self, rate_mcps: i64) -> Result<()> {
         if self.xtalk_compensation_enable != 0 {
-            self.p.write_word(CROSSTALK_COMPENSATION_PEAK_RATE_MCPS, ((rate_mcps >> 3) & 0xFFFF) as u16)?;
+            self.p.write_word(
+                CROSSTALK_COMPENSATION_PEAK_RATE_MCPS,
+                ((rate_mcps >> 3) & 0xFFFF) as u16,
+            )?;
         }
         self.xtalk_compensation_rate_mega_cps = rate_mcps;
         Ok(())
@@ -1367,7 +1623,11 @@ impl Vl53l0xUldDriver {
 
     /// VL53L0X_perform_xtalk_calibration() → the rate, Mcps 16.16 (the contract's default is 50
     /// samples).
-    pub fn perform_xtalk_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64> {
+    pub fn perform_xtalk_calibration(
+        &mut self,
+        cal_distance_mm: i32,
+        nb_samples: i32,
+    ) -> Result<i64> {
         if cal_distance_mm <= 0 {
             return Err(uld_err("the calibration distance must be positive"));
         }
@@ -1410,11 +1670,13 @@ impl Vl53l0xUldDriver {
     // ── reference SPAD management ────────────────────────────────────────────
 
     fn set_ref_spad_map(&self, spad_array: &[u8; REF_SPAD_BUFFER_SIZE]) -> Result<()> {
-        self.p.write_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, spad_array)
+        self.p
+            .write_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, spad_array)
     }
 
     fn get_ref_spad_map(&self) -> Result<Vec<u8>> {
-        self.p.read_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, REF_SPAD_BUFFER_SIZE)
+        self.p
+            .read_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, REF_SPAD_BUFFER_SIZE)
     }
 
     fn enable_ref_spads(
@@ -1452,7 +1714,8 @@ impl Vl53l0xUldDriver {
         self.p.write_byte(0xFF, 0x01)?;
         let peak = self.p.read_word(RESULT_PEAK_SIGNAL_RATE_REF)? as i32;
         self.p.write_byte(0xFF, 0x00)?;
-        self.p.write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
+        self.p
+            .write_byte(SYSTEM_SEQUENCE_CONFIG, saved_sequence_config)?;
         self.sequence_config = saved_sequence_config;
         Ok(peak)
     }
@@ -1466,14 +1729,22 @@ impl Vl53l0xUldDriver {
         let mut spad_array = [0u8; REF_SPAD_BUFFER_SIZE];
         self.p.write_byte(0xFF, 0x01)?;
         self.p.write_byte(DYNAMIC_SPAD_REF_EN_START_OFFSET, 0x00)?;
-        self.p.write_byte(DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 0x2C)?;
+        self.p
+            .write_byte(DYNAMIC_SPAD_NUM_REQUESTED_REF_SPAD, 0x2C)?;
         self.p.write_byte(0xFF, 0x00)?;
-        self.p.write_byte(GLOBAL_CONFIG_REF_EN_START_SELECT, start_select as u8)?;
+        self.p
+            .write_byte(GLOBAL_CONFIG_REF_EN_START_SELECT, start_select as u8)?;
         self.p.write_byte(POWER_MANAGEMENT_GO1_POWER_FORCE, 0x00)?;
         self.perform_ref_calibration()?;
 
         let mut need_apt: i32 = 0;
-        let mut current = self.enable_ref_spads(need_apt, &mut spad_array, start_select, 0, minimum_spad_count)?;
+        let mut current = self.enable_ref_spads(
+            need_apt,
+            &mut spad_array,
+            start_select,
+            0,
+            minimum_spad_count,
+        )?;
         let mut peak = self.perform_ref_signal_measurement()?;
         if peak > self.target_ref_rate {
             spad_array = [0u8; REF_SPAD_BUFFER_SIZE];
@@ -1481,11 +1752,20 @@ impl Vl53l0xUldDriver {
                 current += 1;
             }
             need_apt = 1;
-            current = self.enable_ref_spads(need_apt, &mut spad_array, start_select, current, minimum_spad_count)?;
+            current = self.enable_ref_spads(
+                need_apt,
+                &mut spad_array,
+                start_select,
+                current,
+                minimum_spad_count,
+            )?;
             peak = self.perform_ref_signal_measurement()?;
             if peak > self.target_ref_rate {
                 self.store_ref_spads(minimum_spad_count, 1, &spad_array);
-                return Ok(RefSpads { count: minimum_spad_count, is_aperture: 1 });
+                return Ok(RefSpads {
+                    count: minimum_spad_count,
+                    is_aperture: 1,
+                });
             }
         }
         let mut ref_spad_count = minimum_spad_count;
@@ -1521,10 +1801,18 @@ impl Vl53l0xUldDriver {
             last_spad_array = spad_array;
         }
         self.store_ref_spads(ref_spad_count, need_apt, &spad_array);
-        Ok(RefSpads { count: ref_spad_count, is_aperture: need_apt })
+        Ok(RefSpads {
+            count: ref_spad_count,
+            is_aperture: need_apt,
+        })
     }
 
-    fn store_ref_spads(&mut self, count: i32, is_aperture_spads: i32, spad_array: &[u8; REF_SPAD_BUFFER_SIZE]) {
+    fn store_ref_spads(
+        &mut self,
+        count: i32,
+        is_aperture_spads: i32,
+        spad_array: &[u8; REF_SPAD_BUFFER_SIZE],
+    ) {
         self.ref_spad_enables = *spad_array;
         self.reference_spad_count = count;
         self.reference_spad_type = is_aperture_spads;
@@ -1536,16 +1824,25 @@ impl Vl53l0xUldDriver {
         if check >= CHECK_NUMBER_OF_CHECKS {
             return Err(uld_err(format!("no limit check {check}")));
         }
-        let value = if enable == 0 { 0 } else { self.limit_checks_value[check] };
+        let value = if enable == 0 {
+            0
+        } else {
+            self.limit_checks_value[check]
+        };
         let disable: u8 = if enable == 0 { 1 } else { 0 };
         if check == CHECK_SIGNAL_RATE_FINAL_RANGE {
-            self.p.write_word(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, ((value >> 9) & 0xFFFF) as u16)?;
+            self.p.write_word(
+                FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT,
+                ((value >> 9) & 0xFFFF) as u16,
+            )?;
         } else if check == CHECK_SIGNAL_RATE_MSRC {
             let current = self.p.read_byte(MSRC_CONFIG_CONTROL)?;
-            self.p.write_byte(MSRC_CONFIG_CONTROL, (current & 0xFE) | (disable << 1))?;
+            self.p
+                .write_byte(MSRC_CONFIG_CONTROL, (current & 0xFE) | (disable << 1))?;
         } else if check == CHECK_SIGNAL_RATE_PRE_RANGE {
             let current = self.p.read_byte(MSRC_CONFIG_CONTROL)?;
-            self.p.write_byte(MSRC_CONFIG_CONTROL, (current & 0xEF) | (disable << 4))?;
+            self.p
+                .write_byte(MSRC_CONFIG_CONTROL, (current & 0xEF) | (disable << 4))?;
         }
         self.limit_checks_enable[check] = if enable == 0 { 0 } else { 1 }; // the other three checks are host-side only
         Ok(())
@@ -1557,9 +1854,15 @@ impl Vl53l0xUldDriver {
             return Ok(());
         }
         if check == CHECK_SIGNAL_RATE_FINAL_RANGE {
-            self.p.write_word(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT, ((value >> 9) & 0xFFFF) as u16)?;
+            self.p.write_word(
+                FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT,
+                ((value >> 9) & 0xFFFF) as u16,
+            )?;
         } else if check == CHECK_SIGNAL_RATE_MSRC || check == CHECK_SIGNAL_RATE_PRE_RANGE {
-            self.p.write_word(PRE_RANGE_MIN_COUNT_RATE_RTN_LIMIT, ((value >> 9) & 0xFFFF) as u16)?;
+            self.p.write_word(
+                PRE_RANGE_MIN_COUNT_RATE_RTN_LIMIT,
+                ((value >> 9) & 0xFFFF) as u16,
+            )?;
         }
         self.limit_checks_value[check] = value;
         Ok(())
@@ -1567,7 +1870,11 @@ impl Vl53l0xUldDriver {
 
     fn get_limit_check_value(&self, check: usize) -> Result<i64> {
         if check == CHECK_SIGNAL_RATE_FINAL_RANGE {
-            return Ok((self.p.read_word(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT)? as i64) << 9);
+            return Ok((self
+                .p
+                .read_word(FINAL_RANGE_CONFIG_MIN_COUNT_RATE_RTN_LIMIT)?
+                as i64)
+                << 9);
         }
         if check == CHECK_SIGNAL_RATE_MSRC || check == CHECK_SIGNAL_RATE_PRE_RANGE {
             return Ok((self.p.read_word(PRE_RANGE_MIN_COUNT_RATE_RTN_LIMIT)? as i64) << 9);
@@ -1591,7 +1898,10 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
     }
 
     fn clear_steps(&self) -> Vec<(u16, u8)> {
-        vec![(SYSTEM_INTERRUPT_CLEAR, 0x01), (SYSTEM_INTERRUPT_CLEAR, 0x00)]
+        vec![
+            (SYSTEM_INTERRUPT_CLEAR, 0x01),
+            (SYSTEM_INTERRUPT_CLEAR, 0x00),
+        ]
     }
 
     /// No Fast Mode Plus on this die.
@@ -1651,7 +1961,8 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
 
     /// VL53L0X_StopMeasurement().
     fn stop_ranging(&mut self) -> Result<()> {
-        self.p.write_byte(SYSRANGE_START, SYSRANGE_MODE_SINGLESHOT)?;
+        self.p
+            .write_byte(SYSRANGE_START, SYSRANGE_MODE_SINGLESHOT)?;
         self.p.write_byte(0xFF, 0x01)?;
         self.p.write_byte(0x00, 0x00)?;
         self.p.write_byte(0x91, 0x00)?;
@@ -1702,7 +2013,7 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
     }
 
     /// Apply one of the modes: the sigma and signal limits, the budget and both VCSEL periods.
-    fn set_mode(&mut self, name: &str) -> Result<()> {
+    fn set_mode(&mut self, name: &str) -> Result<Option<u32>> {
         let Some(settings) = MODE_SETTINGS.iter().find(|m| m.name == name) else {
             return Err(DepzError::InvalidArgument(format!(
                 "no such mode: {name} (have {})",
@@ -1711,13 +2022,16 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
         };
         self.set_limit_check_enable(CHECK_SIGMA_FINAL_RANGE, 1)?;
         self.set_limit_check_enable(CHECK_SIGNAL_RATE_FINAL_RANGE, 1)?;
-        self.set_limit_check_value(CHECK_SIGNAL_RATE_FINAL_RANGE, (settings.signal * 65536.0) as i64)?;
+        self.set_limit_check_value(
+            CHECK_SIGNAL_RATE_FINAL_RANGE,
+            (settings.signal * 65536.0) as i64,
+        )?;
         self.set_limit_check_value(CHECK_SIGMA_FINAL_RANGE, settings.sigma * 65536)?;
         self.set_measurement_timing_budget(settings.budget_us)?;
         self.set_vcsel_pulse_period(VCSEL_PRE_RANGE, settings.pre)?;
         self.set_vcsel_pulse_period(VCSEL_FINAL_RANGE, settings.fin)?;
         self.mode = name.to_string();
-        Ok(())
+        Ok(None)
     }
 
     fn get_mode(&mut self) -> Result<String> {
@@ -1737,15 +2051,28 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
         let mut info = BTreeMap::new();
         info.insert(
             "signal_mcps".to_string(),
-            ExtraValue::Float(self.get_limit_check_value(CHECK_SIGNAL_RATE_FINAL_RANGE)? as f64 / 65536.0),
+            ExtraValue::Float(
+                self.get_limit_check_value(CHECK_SIGNAL_RATE_FINAL_RANGE)? as f64 / 65536.0,
+            ),
         );
         info.insert(
             "sigma_mm".to_string(),
-            ExtraValue::Float(self.get_limit_check_value(CHECK_SIGMA_FINAL_RANGE)? as f64 / 65536.0),
+            ExtraValue::Float(
+                self.get_limit_check_value(CHECK_SIGMA_FINAL_RANGE)? as f64 / 65536.0,
+            ),
         );
-        info.insert("budget_us".to_string(), ExtraValue::Int(self.get_measurement_timing_budget()?));
-        info.insert("pre_pclks".to_string(), ExtraValue::Int(self.get_vcsel_pulse_period(VCSEL_PRE_RANGE)? as i64));
-        info.insert("final_pclks".to_string(), ExtraValue::Int(self.get_vcsel_pulse_period(VCSEL_FINAL_RANGE)? as i64));
+        info.insert(
+            "budget_us".to_string(),
+            ExtraValue::Int(self.get_measurement_timing_budget()?),
+        );
+        info.insert(
+            "pre_pclks".to_string(),
+            ExtraValue::Int(self.get_vcsel_pulse_period(VCSEL_PRE_RANGE)? as i64),
+        );
+        info.insert(
+            "final_pclks".to_string(),
+            ExtraValue::Int(self.get_vcsel_pulse_period(VCSEL_FINAL_RANGE)? as i64),
+        );
         Ok(info)
     }
 
@@ -1758,7 +2085,8 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
     }
 
     fn calibrate_offset(&mut self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
-        let um = self.perform_offset_calibration(target_dist_mm, nb_samples.unwrap_or(50) as i32)?;
+        let um =
+            self.perform_offset_calibration(target_dist_mm, nb_samples.unwrap_or(50) as i32)?;
         Ok((um as f64 / 1000.0).round_ties_even() as i32)
     }
 
@@ -1772,7 +2100,8 @@ impl Vl53lxDriver for Vl53l0xUldDriver {
     }
 
     fn calibrate_xtalk(&mut self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32> {
-        let rate = self.perform_xtalk_calibration(target_dist_mm, nb_samples.unwrap_or(50) as i32)?;
+        let rate =
+            self.perform_xtalk_calibration(target_dist_mm, nb_samples.unwrap_or(50) as i32)?;
         Ok(((rate * 1000) >> 16) as i32)
     }
 

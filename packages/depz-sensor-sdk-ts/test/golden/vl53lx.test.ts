@@ -17,12 +17,60 @@ import {
   packXshut,
 } from "../../src/protocol/vl53l4.js";
 import { decodeDieBlock, decodeHistogramRaw } from "../../src/sensors/vl53lx/decode.js";
+import { BridgePlatform } from "../../src/sensors/vl53lx/uld/base.js";
+import { VL53L0X } from "../../src/sensors/vl53lx/uld/l0x.js";
+import { VL53L1 } from "../../src/sensors/vl53lx/uld/l1.js";
+import type { BridgeDevice } from "../../src/sensors/vl53lx/uld/link.js";
 import * as registry from "../../src/sensors/vl53lx/uld/registry.js";
-import { resolveVl53lxClass } from "../../src/sensors/vl53lx/vl53lx.js";
+import { Vl53Error, resolveVl53lxClass } from "../../src/sensors/vl53lx/vl53lx.js";
 import { snake, vl53lxInfo, vl53lxL0xRaw } from "./shapes.js";
 import { fromHex, loadVectors, toHex, seen } from "./vectors.js";
 
 const v = loadVectors<any>("vl53lx.json");
+
+/**
+ * The scripted BridgeDevice of the l0x_uld cases: every register op the driver
+ * issues must be the next one of the vector's trace, a read answered with its
+ * recorded bytes.
+ */
+class TraceDevice implements BridgeDevice {
+  next = 0;
+  constructor(readonly ops: Array<{ op: string; addr: number; data: string }>) {}
+
+  private take(op: string, addr: number): Uint8Array {
+    const want = this.ops[this.next];
+    if (want === undefined) throw new Error(`op #${this.next} beyond the trace: ${op} 0x${addr.toString(16)}`);
+    this.next++;
+    expect([op, addr], `op #${this.next - 1}`).toEqual([want.op, want.addr]);
+    return fromHex(want.data);
+  }
+
+  async readReg(addr: number, length: number): Promise<Uint8Array> {
+    const data = this.take("r", addr);
+    expect(data.length, `read 0x${addr.toString(16)}`).toBe(length);
+    return data;
+  }
+
+  async writeReg(addr: number, data: Uint8Array): Promise<void> {
+    expect(toHex(data), `write 0x${addr.toString(16)}`).toBe(toHex(this.take("w", addr)));
+  }
+
+  async setI2cSpeed(): Promise<void> {
+    throw new Error("SET_I2C_SPEED is not in the trace");
+  }
+
+  async setAddrWidth(): Promise<void> {
+    throw new Error("SET_ADDR_WIDTH is not in the trace");
+  }
+
+  async clearI2cErrors(): Promise<void> {
+    throw new Error("CLEAR_I2C_ERRORS is not in the trace");
+  }
+
+  async xshut(): Promise<void> {
+    throw new Error("XSHUT is not in the trace");
+  }
+}
 
 /** The Bare Driver (uld/bare/driver.ts) fills the histogram rows once it lands. */
 const HISTOGRAM_READY = registry.TABLE.VL53L4CX!.drivers.histogram !== undefined;
@@ -124,6 +172,74 @@ describe("vl53lx.json", () => {
   for (const c of v.histogram_raw) {
     it(`histogram_raw ${c.name}`, () => {
       expect(snake({ ...decodeHistogramRaw(fromHex(c.raw)) })).toEqual(c.expect);
+      seen(c);
+    });
+  }
+
+  // The VL53L0X ULD calls over the recorded register traces (the three ST
+  // divergences of 2fa4be5), on a fresh driver: the ops must come out in the
+  // recorded order, the trace must be used up, the host state / error match.
+  for (const c of v.l0x_uld) {
+    it(`l0x_uld ${c.name}`, async () => {
+      const dev = new TraceDevice(c.trace);
+      const drv = new VL53L0X(new BridgePlatform(dev, async () => {}), "VL53L0X");
+      const call = async () => {
+        if (c.kind === "nvm_offset") await drv.getInfoFromDevice(c.option);
+        else if (c.kind === "timing_budget") await drv.setRangeTiming(c.timing_budget_ms, c.inter_measurement_ms);
+        else if (c.kind === "tuning") await drv.loadTuningSettings(fromHex(c.buffer));
+        else throw new Error(`unknown l0x_uld kind ${c.kind}`);
+      };
+      if (c.error !== undefined) {
+        let err: unknown;
+        try {
+          await call();
+        } catch (e) {
+          err = e;
+        }
+        expect(err).toBeInstanceOf(Vl53Error);
+        expect((err as Error).message).toContain(c.error);
+      } else {
+        await call();
+        const d = drv.d;
+        if (c.kind === "nvm_offset") {
+          expect({ part2part_offset_adjustment_nvm_um: d.Part2PartOffsetAdjustmentNVMMicroMeter }).toEqual(c.expect);
+        } else if (c.kind === "tuning") {
+          expect({
+            sigma_est_ref_array: d.SigmaEstRefArray,
+            sigma_est_eff_pulse_width: d.SigmaEstEffPulseWidth,
+            sigma_est_eff_amb_width: d.SigmaEstEffAmbWidth,
+            target_ref_rate: d.TargetRefRate,
+          }).toEqual(c.expect);
+        }
+      }
+      expect(dev.next, `${c.name}: ops issued`).toBe(c.trace.length);
+      seen(c);
+    });
+  }
+
+  // VL53L1X setMode over the recorded register traces, on a fresh driver
+  // (ERRATA A9): the ops come out in the recorded order and use the trace up,
+  // and the call returns the budget in effect — one the new mode does not
+  // tabulate moved to the nearest one — or fails as the case says.
+  it("l1_uld cases present", () => expect(v.l1_uld.length).toBeGreaterThanOrEqual(3));
+  for (const c of v.l1_uld) {
+    it(`l1_uld ${c.name}`, async () => {
+      expect(c.kind).toBe("set_mode");
+      const dev = new TraceDevice(c.trace);
+      const drv = new VL53L1(new BridgePlatform(dev, async () => {}), "VL53L1CX");
+      if (c.error !== undefined) {
+        let err: unknown;
+        try {
+          await drv.setMode(c.mode);
+        } catch (e) {
+          err = e;
+        }
+        expect(err).toBeInstanceOf(Vl53Error);
+        expect((err as Error).message).toContain(c.error);
+      } else {
+        expect(await drv.setMode(c.mode)).toBe(c.expect.timing_budget_ms);
+      }
+      expect(dev.next, `${c.name}: ops issued`).toBe(c.trace.length);
       seen(c);
     });
   }

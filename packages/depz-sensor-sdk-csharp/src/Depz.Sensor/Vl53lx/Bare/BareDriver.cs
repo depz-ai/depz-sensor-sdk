@@ -607,6 +607,10 @@ public sealed class BareDriver
             0x03, 0x28, "tp_init_phase_rtn_hist_short", "tp_init_phase_ref_hist_short", BareRegs.SequenceMm1En),
     };
 
+    // the bin sequence of VL53LX_preset_mode_histogram_ranging()
+    private static readonly int[] HistogramRangingEvenBins = { 7, 0, 1, 2, 3, 4 };
+    private static readonly int[] HistogramRangingOddBins = { 0, 1, 2, 3, 4, 5 };
+
     private static readonly Dictionary<string, string> PhasecalKey = new()
     {
         ["short"] = "tp_phasecal_timeout_hist_short_us",
@@ -904,7 +908,7 @@ public sealed class BareDriver
         PresetModeStandardRanging();
 
         Img.StaticConfig["dss_config__target_total_rate_mcps"] = 0x1400;
-        HistCfg.SetBinSequence(new[] { 7, 0, 1, 2, 3, 4 }, new[] { 0, 1, 2, 3, 4, 5 });
+        HistCfg.SetBinSequence(HistogramRangingEvenBins, HistogramRangingOddBins);
 
         var timing = Img.TimingConfig;
         var dynamic = Img.DynamicConfig;
@@ -1056,7 +1060,9 @@ public sealed class BareDriver
     /// <summary>VL53LX_clear_interrupt_and_enable_next_range(): in histogram mode the interrupt is cleared by
     /// rewriting general_config onwards.</summary>
     public void ClearInterruptAndStartNextRange() =>
-        InitAndStartRange(new[] { "general_config", "timing_config", "dynamic_config", "system_control" });
+        InitAndStartRange(NextRangeBlocks);
+
+    private static readonly string[] NextRangeBlocks = { "general_config", "timing_config", "dynamic_config", "system_control" };
 
     public void StopRange()
     {

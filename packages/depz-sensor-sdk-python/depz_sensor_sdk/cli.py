@@ -8,6 +8,10 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # the SDK modules are imported lazily inside each command
+    from .device import DeviceBase
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -42,18 +46,17 @@ def cmd_info(args: argparse.Namespace) -> int:
     return 0
 
 
-def _open_for_streaming(port: str, record_path: str | None):
-    from .discovery import _enumerate_ports, open_device, open_on_link
+def _open_for_streaming(port: str, record_path: str | None) -> DeviceBase:
+    from .discovery import _port_id, open_device, open_on_link
     from .transport.record_replay import RecordingLink
     from .transport.serial_link import SerialLink
 
     if record_path is None:
         return open_device(port)
     link = RecordingLink(SerialLink(port), record_path, header_extra={"port": port})
-    pi = {p.port: p for p in _enumerate_ports()}.get(port)
-    vid, pid = (pi.vid, pi.pid) if pi is not None else (None, None)
+    pi = _port_id(port)  # the USB id of the port under any alias (02 §4.3)
     # One connection, so the recording holds the probe too (contract 02 §4.4).
-    return open_on_link(link, vid, pid, timeout=0.2)
+    return open_on_link(link, pi.vid, pi.pid, timeout=0.2)
 
 
 def cmd_monitor(args: argparse.Namespace) -> int:
@@ -64,16 +67,20 @@ def cmd_monitor(args: argparse.Namespace) -> int:
     try:
         print(f"connected: {dev.get_software_name()} (Ctrl+C to stop)")
         dev.on_event(lambda ev: print(f"[event] {ev}"))
+        # Subscribe BEFORE starting: the iterator registers eagerly, so samples
+        # the device emits between the start ack and the loop are not lost.
         if isinstance(dev, Sr04):
+            samples = dev.stream()
             dev.start()
-            for m in dev.stream():
+            for m in samples:
                 d = m.distance_mm
                 dist = f"{d:8.1f} mm" if d is not None else "   no echo"
                 print(f"{m.timestamp_us:>12} us  {m.echo_time_us:>6} us  {dist}  [{m.source}]")
         elif isinstance(dev, Vl53l4cd):
             dev.init()
+            results = dev.measurements()
             dev.start_ranging()
-            for r in dev.measurements():
+            for r in results:
                 print(
                     f"{r.timestamp_us:>12} us  {r.distance_mm:>5} mm  "
                     f"sigma {r.sigma_mm:>3}  signal {r.signal_rate_kcps:>6} kcps  "
@@ -155,16 +162,16 @@ def cmd_record_data(args: argparse.Namespace) -> int:
 
 
 def cmd_play_data(args: argparse.Namespace) -> int:
-    from .dataset import DatasetReader
+    from .dataset import DatasetReader, DatasetRecord
 
     reader = DatasetReader(args.path)
     print("devices:", {k: v.get("sensor_type") for k, v in reader.devices.items()})
     n = 0
 
-    def show(rec):
+    def show(rec: DatasetRecord) -> None:
         nonlocal n
         n += 1
-        summary = rec.value
+        summary: object = rec.value
         if rec.kind == "vl53l8":
             d = rec.value["distance_mm"]
             summary = f"res={rec.value['resolution']} d[min..max]={min(d)}..{max(d)}mm"
@@ -186,8 +193,8 @@ def cmd_flash(args: argparse.Namespace) -> int:
     def progress(frac: float, msg: str) -> None:
         print(f"[{frac * 100:5.1f}%] {msg}")
 
-    update_firmware(args.port, args.fwdepz, progress=progress)
-    print("firmware updated; device rebooted into the application")
+    name = update_firmware(args.port, args.fwdepz, progress=progress)
+    print(f"firmware updated; the device answers as {name}")
     return 0
 
 
@@ -245,7 +252,8 @@ def main(argv: list[str] | None = None) -> int:
     if not getattr(args, "command", None):
         parser.print_help()
         return 0
-    return args.func(args)
+    status: int = args.func(args)
+    return status
 
 
 if __name__ == "__main__":

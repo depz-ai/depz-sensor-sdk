@@ -47,6 +47,9 @@ size_t depz_vl53l8_pack_read_reg(uint16_t addr, uint16_t length, uint8_t *out)
 
 size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out)
 {
+    /* contract 04 §4 rule 4: the firmware refuses 0 and > 8192; so does the host */
+    if (frame_size < 1 || frame_size > DEPZ_VL53L8_STREAM_TOTAL_MAX)
+        return 0;
     put_u16(out, frame_size);
     return 2;
 }
@@ -78,9 +81,10 @@ int depz_vl53l8_unpack_reg_data(const uint8_t *payload, size_t len,
 }
 
 /* ---- reassembler -----------------------------------------------------------*/
-void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r)
+void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r, size_t chunk_max)
 {
     memset(r, 0, sizeof(*r));
+    r->chunk_max = chunk_max;
 }
 
 static void reasm_reset(depz_vl53l8_reassembler *r)
@@ -92,21 +96,28 @@ static void reasm_reset(depz_vl53l8_reassembler *r)
 int depz_vl53l8_reasm_feed(depz_vl53l8_reassembler *r, const depz_vl53l8_chunk *c,
                            const uint8_t **frame, size_t *frame_len, uint64_t *ts)
 {
+    /* Rule 4 first: past it, offset + data_len <= full_size <= sizeof(r->buf),
+     * so neither copy below can overrun the buffer. */
+    if (c->data_len > r->chunk_max || c->full_size > DEPZ_VL53L8_STREAM_TOTAL_MAX ||
+        (size_t)c->offset + c->data_len > c->full_size) {
+        /* damaged: the frame in progress is lost (counted, rules 1-2) and so
+         * is the frame an offset-0 chunk starts (counted); a damaged orphan
+         * with nothing in progress is dropped like any orphan */
+        if (r->len > 0)
+            r->discarded++;
+        if (c->offset == 0)
+            r->discarded++;
+        reasm_reset(r);
+        return 0;
+    }
     if (c->offset == 0) {
         if (r->len > 0 && r->len != r->full_size)
             r->discarded++;
-        reasm_reset(r);
-        if (c->full_size > DEPZ_VL53L8_STREAM_TOTAL_MAX ||
-            c->data_len > sizeof(r->buf)) {
-            r->discarded++;
-            return 0;
-        }
         memcpy(r->buf, c->data, c->data_len);
         r->len = c->data_len;
         r->full_size = c->full_size;
         r->timestamp_us = c->timestamp_us;
-    } else if (c->offset == r->len && r->full_size == c->full_size && r->len > 0 &&
-               r->len + c->data_len <= sizeof(r->buf)) {
+    } else if (c->offset == r->len && r->full_size == c->full_size && r->len > 0) {
         memcpy(r->buf + r->len, c->data, c->data_len);
         r->len += c->data_len;
     } else {
@@ -123,10 +134,6 @@ int depz_vl53l8_reasm_feed(depz_vl53l8_reassembler *r, const depz_vl53l8_chunk *
         r->completed++;
         reasm_reset(r);
         return 1;
-    }
-    if (r->len > r->full_size) {
-        r->discarded++;
-        reasm_reset(r);
     }
     return 0;
 }

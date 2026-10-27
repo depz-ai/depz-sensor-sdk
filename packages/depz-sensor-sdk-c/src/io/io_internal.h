@@ -4,19 +4,10 @@
 
 #include "depz_sensor_io.h"
 #include "platform.h"
+#include "../internal.h" /* depz_fail / depz_fail_status (error.c) */
 
-#include <stdarg.h>
+/* ── strings ───────────────────────────────────────────────────────────── */
 
-/* ── errors ────────────────────────────────────────────────────────────── */
-
-/* Record the calling thread's failure detail and return `err`. */
-int depz_fail(int err, const char *fmt, ...)
-#if defined(__GNUC__) || defined(__clang__)
-    __attribute__((format(printf, 2, 3)))
-#endif
-    ;
-/* As depz_fail, plus the device status that caused it. */
-int depz_fail_status(int err, uint8_t cmd, uint8_t status);
 /* Copy `src` into `dst` (capacity `cap`), always terminated. */
 void depz_strlcpy(char *dst, const char *src, size_t cap);
 
@@ -38,6 +29,11 @@ void depz_replay_pending_impl(void *self, size_t *tx_left, size_t *rx_left);
 int depz_serial_link_open(const char *port, depz_link **out);
 /* Platform port enumeration (ports_linux.c / ports_macos.c / ports_win32.c). */
 int depz_enumerate_ports(depz_port_info **out, size_t *count);
+/* `a` and `b` name the same port (contract 02 §4.3, ERRATA A5): the same
+ * resolved path (/dev/serial/by-id/… is a symlink to the node), or the same
+ * character device under two names. Never true of a COM name: Windows ports
+ * are not files (serial_posix.c / serial_win32.c). */
+bool depz_same_port(const char *a, const char *b);
 
 /* ── stream hubs: one per kind of item a device publishes ───────────────── */
 

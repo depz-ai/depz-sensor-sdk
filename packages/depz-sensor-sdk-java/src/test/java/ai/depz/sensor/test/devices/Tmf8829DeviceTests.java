@@ -2,10 +2,12 @@ package ai.depz.sensor.test.devices;
 
 import static ai.depz.sensor.test.devices.T.check;
 import static ai.depz.sensor.test.devices.T.eq;
+import static ai.depz.sensor.test.devices.T.same;
 import static ai.depz.sensor.test.devices.T.throwsType;
 
 import ai.depz.sensor.devices.DepzException;
 import ai.depz.sensor.devices.DepzTimeoutException;
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.StatusException;
 import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.devices.Tmf8829AppliedConfig;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 
 /**
@@ -73,7 +76,7 @@ public final class Tmf8829DeviceTests {
         volatile int deviceId = 0x9E;
         final Map<Integer, Integer> blStatus = new HashMap<>();
         final Map<Integer, Integer> appStatus = new HashMap<>();
-        volatile int busyPolls;
+        final AtomicInteger busyPolls = new AtomicInteger();
         volatile boolean stuckBeforeBootloader;
         volatile Integer cidOverride;
         final Map<Integer, Integer> stuckBytes = new HashMap<>();
@@ -236,8 +239,7 @@ public final class Tmf8829DeviceTests {
                 // 0 over SPI until the sensor's I2C is off
                 return mode.equals("bootloader") && !i2cOff ? 0 : (regs[a] & 0xFF) | 0x80;
             }
-            if (a == REG_CMD_STAT && busyPolls > 0) {
-                busyPolls--;
+            if (a == REG_CMD_STAT && busyPolls.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
                 return pendingCmd;
             }
             return regs[a] & 0xFF;
@@ -409,6 +411,7 @@ public final class Tmf8829DeviceTests {
     private static Map<String, Object> vectors;
     private static Map<String, byte[]> raw;
     private static Map<String, Map<String, Object>> meas;
+    private static Set<String> corrupt; // results frames whose pixel decode fails
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> obj(Object o) {
@@ -443,9 +446,11 @@ public final class Tmf8829DeviceTests {
             throw new IllegalStateException("tmf8829.json: " + e.getMessage(), e);
         }
         raw = new LinkedHashMap<>();
+        corrupt = new HashSet<>();
         for (Object o : arr(vectors.get("frames"))) {
             Map<String, Object> c = obj(o);
             raw.put((String) c.get("name"), hex((String) c.get("raw")));
+            if (c.containsKey("error")) corrupt.add((String) c.get("name"));
         }
         meas = new LinkedHashMap<>();
         for (Object o : arr(vectors.get("measurements"))) {
@@ -560,7 +565,7 @@ public final class Tmf8829DeviceTests {
         Made mk = make();
         FakeTmf8829 fake = mk.fake();
         try (Tmf8829Device dev = mk.dev()) {
-            fake.busyPolls = 3;
+            fake.busyPolls.set(3);
             eq("2.200.0", dev.init().appVersion());
             fake.deviceId = 0x00;
             Tmf8829Exception e = throwsType(Tmf8829Exception.class, dev::init);
@@ -611,7 +616,7 @@ public final class Tmf8829DeviceTests {
             for (Map.Entry<String, Integer> kv : want.entrySet()) {
                 eq(kv.getValue(), cfg.fields().get(kv.getKey()), kv.getKey());
             }
-            check(cfg == dev.config(), "config() is the configure() result");
+            check(same(cfg, dev.config()), "config() is the configure() result");
         }
     }
 
@@ -671,7 +676,7 @@ public final class Tmf8829DeviceTests {
             eq(new int[][] {{0xFA, 0x30}, {0xE1, 0xFF}, {0xE2, 0x01}}, grid(w.subList(i, i + 3)));
             eq(new byte[][] {bytes(0x01, 0x00)}, grid2(fake.sent(0x35)));
             eq(new int[] {0x08, 0x10}, w.get(w.size() - 1)); // MEASURE after the stream is armed
-            throwsType(IllegalStateException.class, dev::configure);
+            throwsType(InvalidStateException.class, dev::configure);
             dev.start(); // no-op while streaming
             eq(1, fake.sent(0x35).size(), "one START_STREAM");
 
@@ -774,7 +779,12 @@ public final class Tmf8829DeviceTests {
                 for (int k = 0; k < want.size(); k++) {
                     assertFields(name + "#" + k, obj(want.get(k)), measFields(got.get(k)));
                 }
-                eq(new int[] {0, 0, 0}, new int[] {dev.framesDropped(), dev.framesDiscarded(), dev.frameParseErrors()},
+                int nCorrupt = 0;
+                for (Object fo : arr(meas.get(name).get("frames"))) {
+                    if (corrupt.contains((String) obj(fo).get("raw_case"))) nCorrupt++;
+                }
+                eq(new int[] {0, 0, nCorrupt},
+                        new int[] {dev.framesDropped(), dev.framesDiscarded(), dev.frameParseErrors()},
                         name + ": dropped/discarded/parse errors");
                 eq(lng(obj(want.get(want.size() - 1)).get("ratio_q16")), dev.clockRatioQ16(), name + ": ratio_q16");
             }

@@ -40,19 +40,23 @@ public sealed class DatasetReader
     /// <summary>Host-time span from the first record to the last (0 with fewer than two records).</summary>
     public long DurationUs => Records.Count < 2 ? 0 : Records[Records.Count - 1].THostUs - Records[0].THostUs;
 
+    /// <exception cref="ArgumentException">A damaged file (contract 09): an empty file, a header that is
+    /// not an object or whose <c>schema</c> is not <c>depz.dataset/*</c>, a record line that is not a JSON
+    /// object, a record whose <c>d</c> / <c>k</c> are not strings, <c>t</c> not an integer or <c>v</c> not
+    /// an object — the message names the line.</exception>
     public DatasetReader(string path)
-        : this(ReadAllLines(path))
+        : this(path, ReadAllLines(path))
     {
     }
 
-    private DatasetReader(IReadOnlyList<string> lines)
+    private DatasetReader(string path, IReadOnlyList<string> lines)
     {
         if (lines.Count == 0)
-            throw new InvalidDataException("empty dataset (no header line)");
+            throw new ArgumentException($"{path}: empty, not a .depzdata file (no header line)");
 
-        var header = AsObject(JsonText.Parse(lines[0]), "header");
+        var header = JsonObjectLine(path, 1, lines[0]);
         if (!(GetStringOrNull(header, "schema") ?? "").StartsWith("depz.dataset/", StringComparison.Ordinal))
-            throw new InvalidDataException("not a depz.dataset file");
+            throw new ArgumentException($"{path}: not a depz.dataset file");
         Header = header;
 
         var devices = new Dictionary<string, DatasetDevice>();
@@ -66,8 +70,8 @@ public sealed class DatasetReader
                 if (m.TryGetValue("time_sync", out object? ts) && ts is Dictionary<string, object?> tsMap)
                 {
                     sync = new TimeSync(
-                        GetLong(tsMap, "offset_us"),
-                        tsMap.ContainsKey("rtt_us") ? GetLong(tsMap, "rtt_us") : 0);
+                        GetLong(tsMap, "offset_us", $"{path}:1"),
+                        tsMap.ContainsKey("rtt_us") ? GetLong(tsMap, "rtt_us", $"{path}:1") : 0);
                 }
                 devices[dev.Key] = new DatasetDevice(
                     dev.Key,
@@ -85,18 +89,10 @@ public sealed class DatasetReader
         for (int i = 1; i < lines.Count; i++)
         {
             string line = lines[i];
-            if (line.Length == 0)
+            if (JsonText.IsBlankLine(line))
                 continue;
-            var r = AsObject(JsonText.Parse(line), $"line {i + 1}");
-            long t = GetLong(r, "t");
-            var rec = new DatasetRecord(
-                GetString(r, "d"),
-                t,
-                GetString(r, "k"),
-                r.TryGetValue("v", out object? v) && v is Dictionary<string, object?> value
-                    ? value
-                    : new Dictionary<string, object?>());
-            records.Add((t, order++, rec));
+            var rec = Record(path, i + 1, line);
+            records.Add((rec.THostUs, order++, rec));
         }
         // Merge by host time; stable within equal t (append order preserved).
         records.Sort((a, b) =>
@@ -136,16 +132,46 @@ public sealed class DatasetReader
         }
     }
 
-    private static Dictionary<string, object?> AsObject(object? v, string where) =>
-        v as Dictionary<string, object?> ?? throw new InvalidDataException($"dataset {where}: not a JSON object");
+    // `line` as the JSON object a dataset line must be, else ArgumentException naming the file and
+    // line (a damaged file is the caller's bad argument, contract 07 §3 — never a cast / key error).
+    private static Dictionary<string, object?> JsonObjectLine(string path, int lineno, string line)
+    {
+        object? obj;
+        try
+        {
+            obj = JsonText.Parse(line);
+        }
+        catch (FormatException bad)
+        {
+            throw new ArgumentException($"{path}:{lineno}: not JSON: {bad.Message}");
+        }
+        return obj as Dictionary<string, object?>
+            ?? throw new ArgumentException($"{path}:{lineno}: not a JSON object");
+    }
 
-    private static long GetLong(Dictionary<string, object?> obj, string name) =>
+    // One record line (contract 09): `d` and `k` strings, `t` an integer (host µs), `v` an object.
+    private static DatasetRecord Record(string path, int lineno, string line)
+    {
+        var ev = JsonObjectLine(path, lineno, line);
+        ev.TryGetValue("d", out object? d);
+        ev.TryGetValue("t", out object? t);
+        ev.TryGetValue("k", out object? k);
+        ev.TryGetValue("v", out object? v);
+        if (d is not string deviceId)
+            throw new ArgumentException($"{path}:{lineno}: 'd' must be a device id string, got {JsonText.Serialize(d)}");
+        if (t is not long tHostUs)
+            throw new ArgumentException($"{path}:{lineno}: 't' must be an integer (host µs), got {JsonText.Serialize(t)}");
+        if (k is not string kind)
+            throw new ArgumentException($"{path}:{lineno}: 'k' must be a record kind string, got {JsonText.Serialize(k)}");
+        if (v is not Dictionary<string, object?> value)
+            throw new ArgumentException($"{path}:{lineno}: 'v' must be an object, got {JsonText.Serialize(v)}");
+        return new DatasetRecord(deviceId, tHostUs, kind, value);
+    }
+
+    private static long GetLong(Dictionary<string, object?> obj, string name, string where) =>
         obj.TryGetValue(name, out object? e) && e is long l
             ? l
-            : throw new InvalidDataException($"dataset: '{name}' is missing or not an integer");
-
-    private static string GetString(Dictionary<string, object?> obj, string name) =>
-        GetStringOrNull(obj, name) ?? throw new InvalidDataException($"dataset: '{name}' is missing or not a string");
+            : throw new ArgumentException($"{where}: '{name}' is missing or not an integer");
 
     private static string? GetStringOrNull(Dictionary<string, object?> obj, string name) =>
         obj.TryGetValue(name, out object? e) ? e as string : null;
@@ -158,10 +184,15 @@ public sealed class DatasetReader
         {
             using var ms = new MemoryStream(raw);
             using var gz = new GZipStream(ms, CompressionMode.Decompress);
-            using var reader = new StreamReader(gz, Encoding.UTF8);
+            using var reader = new StreamReader(gz, Encoding.UTF8, detectEncodingFromByteOrderMarks: false);
             raw = Encoding.UTF8.GetBytes(reader.ReadToEnd());
         }
         string text = Encoding.UTF8.GetString(raw);
-        return text.Split('\n').Where(l => l.Trim().Length > 0).ToArray();
+        // Every line, blank ones included, so a message can name the line as the file has it.
+        return text.Length == 0
+            ? Array.Empty<string>()
+            : text.Split(LineBreaks, StringSplitOptions.None);
     }
+
+    private static readonly string[] LineBreaks = { "\r\n", "\n" };
 }

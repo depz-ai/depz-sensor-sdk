@@ -266,7 +266,7 @@ public sealed class Bno055Device : DepzDevice
     /// <c>BridgeInfo().SensorResets</c> rose (bus recovery pulses nRESET). A running stream keeps running.</summary>
     public void RestoreConfiguration()
     {
-        var c = _configured ?? throw new InvalidOperationException("Configure() has not been called");
+        var c = _configured ?? throw new InvalidStateException("Configure() has not been called");
         Configure(c.Mode, c.Units, c.Remap, c.Calibration);
     }
 
@@ -414,11 +414,14 @@ public sealed class Bno055Device : DepzDevice
         if (periodMs < 0 || periodMs > ushort.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(periodMs), periodMs, "period must be 0..65535 ms");
         CheckEnum(trigger, nameof(trigger));
+        // Encoded (and so range-checked: TIMER period 1..60000) before the units read below —
+        // a refused argument puts nothing on the wire.
+        byte[] payload = Bno055Wire.PackStartStream(trigger, addr, length, (ushort)periodMs);
         lock (_regLock)
         {
             // Units first: the reader may decode the first sample before the request returns.
             _streamUnits = CurrentUnits();
-            RequestOk((int)Bno055Cmd.StartStream, Bno055Wire.PackStartStream(trigger, addr, length, (ushort)periodMs));
+            RequestOk((int)Bno055Cmd.StartStream, payload);
             _streaming = true;
         }
     }
@@ -621,7 +624,7 @@ public sealed class Bno055Device : DepzDevice
     private void RequireNotStreaming()
     {
         if (_streaming)
-            throw new InvalidOperationException("StopStream() first — the stream reads page 0");
+            throw new InvalidStateException("StopStream() first — the stream reads page 0");
     }
 
     private protected override bool HandleReport(Packet packet)
@@ -641,7 +644,7 @@ public sealed class Bno055Device : DepzDevice
             Interlocked.Increment(ref _streamParseErrors);
             return true;
         }
-        _samples.Emit(sample);
+        _samples.Emit(sample, Stats);
         return true;
     }
 

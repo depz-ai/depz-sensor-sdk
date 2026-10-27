@@ -811,6 +811,36 @@ public long signalRateMeasFixed400mm()
 public long part2PartOffsetAdjustmentNvmUm()
 ```
 
+#### Vl53l0xUldDriver.targetRefRate
+
+```java
+public int targetRefRate()
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets;
+the SPAD management converges on it.
+
+#### Vl53l0xUldDriver.sigmaEstRefArray
+
+```java
+public int sigmaEstRefArray()
+```
+
+The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set
+(stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver.sigmaEstEffPulseWidth
+
+```java
+public int sigmaEstEffPulseWidth()
+```
+
+#### Vl53l0xUldDriver.sigmaEstEffAmbWidth
+
+```java
+public int sigmaEstEffAmbWidth()
+```
+
 #### Vl53l0xUldDriver.oscFrequencyMHz
 
 ```java
@@ -873,6 +903,15 @@ public void getInfoFromDevice(int option)
 
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product
 identification (2), the part UID and factory offset (4).
+
+#### Vl53l0xUldDriver.loadTuningSettings
+
+```java
+public void loadTuningSettings(int[] buffer)
+```
+
+VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying a
+host-side parameter instead; a zero count ends the buffer.
 
 #### Vl53l0xUldDriver.setOffsetUm
 
@@ -1684,8 +1723,11 @@ The only budgets accepted right now (ascending), or empty when any integer of `b
 #### Vl53lxDriver.setMode
 
 ```java
-public void setMode(String name)
+public Integer setMode(String name)
 ```
+
+Apply one of `modes()`. Returns the timing budget in effect after the change, ms, on a driver whose
+mode change can move it (VL53L1: contract 12 §5), else null.
 
 #### Vl53lxDriver.getMode
 

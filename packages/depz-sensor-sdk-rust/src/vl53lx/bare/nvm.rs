@@ -100,7 +100,8 @@ fn enable(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<()> {
     // disable_firmware / enable_powerforce, through system_control so the image stays truthful.
     img.system_control_mut().set("firmware__enable", 0);
     p.write_byte(super::regs::FIRMWARE_ENABLE, 0)?;
-    img.system_control_mut().set("power_management__go1_power_force", 1);
+    img.system_control_mut()
+        .set("power_management__go1_power_force", 1);
     p.write_byte(super::regs::POWER_MANAGEMENT_GO1_POWER_FORCE, 1)?;
     p.sleep_ms(1); // 250 us settling, rounded up
 
@@ -114,7 +115,8 @@ fn enable(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<()> {
 fn disable(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<()> {
     p.write_byte(NVM_CTRL_READN, 0x01)?;
     p.write_byte(NVM_CTRL_PDN, 0x00)?;
-    img.system_control_mut().set("power_management__go1_power_force", 0);
+    img.system_control_mut()
+        .set("power_management__go1_power_force", 0);
     p.write_byte(super::regs::POWER_MANAGEMENT_GO1_POWER_FORCE, 0)?;
     img.system_control_mut().set("firmware__enable", 1);
     p.write_byte(super::regs::FIRMWARE_ENABLE, 1)
@@ -134,10 +136,16 @@ fn read_words(p: &dyn Vl53lxPlatform, start_word: usize, count: usize) -> Result
 
 /// `VL53LX_read_nvm_raw_data()`: (byte index, byte size), both word-aligned → the bytes. The image
 /// is passed so the firmware / power-force fields it toggles stay truthful.
-pub fn read_region(p: &dyn Vl53lxPlatform, img: &mut DeviceImage, region: (usize, usize)) -> Result<Vec<u8>> {
+pub fn read_region(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+    region: (usize, usize),
+) -> Result<Vec<u8>> {
     let (index, size) = region;
     if index & 3 != 0 || size & 3 != 0 {
-        return Err(DepzError::InvalidArgument(format!("NVM region 0x{index:04X}+{size} is not word-aligned")));
+        return Err(DepzError::InvalidArgument(format!(
+            "NVM region 0x{index:04X}+{size} is not word-aligned"
+        )));
     }
     enable(p, img)?;
     let words = read_words(p, index >> 2, size >> 2);
@@ -154,11 +162,17 @@ pub fn read_optical_centre(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Res
     // Stored as a distance down from 0x0100; on a never-programmed part the driver zeroes it, which is
     // what makes read_p2p_data fall back to the mm ROI centre.
     let x = 0x0100 - buf[2] as i64;
-    Ok(OpticalCentre { x_centre: if x <= 0xFF { x } else { 0 }, y_centre: buf[3] as i64 })
+    Ok(OpticalCentre {
+        x_centre: if x <= 0xFF { x } else { 0 },
+        y_centre: buf[3] as i64,
+    })
 }
 
 /// The 5x5 calibration peak-rate map.
-pub fn read_cal_peak_rate_map(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<CalPeakRateMap> {
+pub fn read_cal_peak_rate_map(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+) -> Result<CalPeakRateMap> {
     let buf = read_region(p, img, FMT_CAL_PEAK_RATE_MAP)?;
     Ok(CalPeakRateMap {
         cal_distance_mm: u16_at(&buf, 0),
@@ -166,7 +180,9 @@ pub fn read_cal_peak_rate_map(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> 
         max_samples: PEAK_RATE_MAP_SAMPLES as i64,
         width: PEAK_RATE_MAP_WIDTH,
         height: PEAK_RATE_MAP_HEIGHT,
-        peak_rate_mcps: (0..PEAK_RATE_MAP_SAMPLES).map(|i| u16_at(&buf, 4 + 2 * i)).collect(),
+        peak_rate_mcps: (0..PEAK_RATE_MAP_SAMPLES)
+            .map(|i| u16_at(&buf, 4 + 2 * i))
+            .collect(),
     })
 }
 

@@ -237,15 +237,15 @@ def test_accuracy_field_is_in_range(imu):
         assert 0 <= r.accuracy <= 3, f"accuracy status bits {r.accuracy} out of 0..3"
 
 
-def test_first_command_after_reopen_latency_is_bounded(bno_info):
-    """Pin ERRATA E12: the first command after a CDC reopen costs ~119 ms.
+def test_first_command_after_reopen_is_fast(bno_info):
+    """ERRATA E12 stays fixed: the first command after a CDC reopen is fast.
 
-    Not a pass/fail on the device being fast — it is a *characterisation* lock.
-    E12 is firmware behaviour we cannot fix from here, but it drives real
-    host-side decisions (the viewer's 1000 ms timeout; probe_port's 200 ms
-    default silently dropping the device). If a firmware update fixes it, or if
-    it degrades past the point where the SDK's default timeout works at all,
-    this test says so instead of letting the assumption rot.
+    Firmware up to APP_BNO086_v0.97 took a flat ~119 ms for it (E12); v1.06
+    answers it in ~0.5 ms like every later command (bench 2026-10-27). The
+    bound is 20 ms: ~40x today's cost and the USB jitter seen (max 2.7 ms), yet
+    a sixth of the old defect, so its return fails here instead of eating into
+    probe_port()'s 200 ms default, where a BNO086 silently drops out of
+    discovery.
     """
     import statistics
 
@@ -266,17 +266,10 @@ def test_first_command_after_reopen_latency_is_bounded(bno_info):
     median = statistics.median(latencies)
     print(f"\n[E12] BNO086 first-command latency: median {median:.1f} ms, max {max(latencies):.1f} ms")
 
-    # Upper bound: past this, probe_port's 200 ms default starts dropping the
-    # device silently and the SDK's story stops holding together.
-    assert median < 190, (
-        f"BNO086 first-command latency regressed to {median:.1f} ms — "
-        "probe_port()'s 200ms default will start silently dropping the device (ERRATA E12)"
+    assert median < 20, (
+        f"BNO086 first-command latency is back to {median:.1f} ms after a reopen — "
+        "ERRATA E12 (~119 ms up to APP_BNO086_v0.97, resolved in v1.06) has returned"
     )
-    if median < 20:
-        pytest.fail(
-            f"BNO086 first-command latency is now {median:.1f} ms — ERRATA E12 documents "
-            "~119 ms. If firmware fixed it, mark E12 resolved and drop this guard."
-        )
 
 
 def test_probe_finds_the_bno086_at_the_sdk_default_timeout(bno_info):

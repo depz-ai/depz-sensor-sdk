@@ -48,7 +48,7 @@ pub(crate) fn thresh_scale(measurement: u8) -> i64 {
 pub enum AdvancedError {
     /// Motion indicator resolution other than 16 (4×4) or 64 (8×8).
     InvalidResolution(usize),
-    /// Xtalk margin outside 0..=10000 kcps (or not a number).
+    /// Xtalk margin above 10000 kcps.
     XtalkMarginOutOfRange,
     /// Threshold `index`: low/high × its measurement scale does not fit i32.
     ThresholdOverflow(usize),
@@ -62,9 +62,15 @@ impl std::fmt::Display for AdvancedError {
             AdvancedError::InvalidResolution(r) => {
                 write!(f, "VL53L8 motion resolution {}: 16 or 64", r)
             }
-            AdvancedError::XtalkMarginOutOfRange => write!(f, "VL53L8 xtalk margin out of range 0..10000"),
+            AdvancedError::XtalkMarginOutOfRange => {
+                write!(f, "VL53L8 xtalk margin out of range 0..10000")
+            }
             AdvancedError::ThresholdOverflow(k) => {
-                write!(f, "VL53L8 thresholds[{}]: scaled low/high out of range for i32", k)
+                write!(
+                    f,
+                    "VL53L8 thresholds[{}]: scaled low/high out of range for i32",
+                    k
+                )
             }
             AdvancedError::TooManyThresholds(n) => {
                 write!(f, "VL53L8 at most {} thresholds, got {}", NB_THRESHOLDS, n)
@@ -75,17 +81,22 @@ impl std::fmt::Display for AdvancedError {
 
 impl std::error::Error for AdvancedError {}
 
-/// Largest xtalk margin `set_xtalk_margin` accepts, kcps/SPAD.
-pub const XTALK_MARGIN_MAX_KCPS: f64 = 10000.0;
+/// Largest xtalk margin `set_xtalk_margin` accepts, whole kcps/SPAD (as ST).
+pub const XTALK_MARGIN_MAX_KCPS: u32 = 10000;
 
-/// Xtalk margin (kcps/SPAD) → raw DCI value `round(kcps * 2048)`, as
-/// `set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`], else
-/// [`AdvancedError::XtalkMarginOutOfRange`].
-pub fn try_xtalk_margin_to_raw(margin_kcps: f64) -> Result<u32, AdvancedError> {
-    if !(0.0..=XTALK_MARGIN_MAX_KCPS).contains(&margin_kcps) {
+/// Xtalk margin, a whole number of kcps/SPAD (as ST) → raw DCI value
+/// `kcps * 2048`, as `set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`],
+/// else [`AdvancedError::XtalkMarginOutOfRange`].
+pub fn try_xtalk_margin_to_raw(margin_kcps: u32) -> Result<u32, AdvancedError> {
+    if margin_kcps > XTALK_MARGIN_MAX_KCPS {
         return Err(AdvancedError::XtalkMarginOutOfRange);
     }
-    Ok((margin_kcps * 2048.0).round() as u32)
+    Ok(margin_kcps * 2048)
+}
+
+/// Inverse: raw DCI value → whole kcps/SPAD (`raw / 2048`, integer division as ST).
+pub fn xtalk_margin_from_raw(raw: u32) -> u32 {
+    raw / 2048
 }
 
 /// Mirror of `VL53L8CX_Motion_Configuration` (156 bytes, plugin source).
@@ -264,7 +275,9 @@ pub fn try_pack_detection_thresholds(
     Ok(pack_detection_thresholds_unchecked(thresholds))
 }
 
-fn pack_detection_thresholds_unchecked(thresholds: &[DetectionThreshold]) -> DetectionThresholdBlocks {
+fn pack_detection_thresholds_unchecked(
+    thresholds: &[DetectionThreshold],
+) -> DetectionThresholdBlocks {
     let valid = vec![0x05u8; 8];
     let mut start = vec![0u8; NB_THRESHOLDS * 12];
     for k in 0..NB_THRESHOLDS {

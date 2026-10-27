@@ -4,6 +4,7 @@ import ai.depz.sensor.devices.Bno055Device;
 import ai.depz.sensor.devices.Bno086Device;
 import ai.depz.sensor.devices.DepzDevice;
 import ai.depz.sensor.devices.DepzException;
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.Sr04Device;
 import ai.depz.sensor.devices.TimeSyncResult;
 import ai.depz.sensor.devices.Tmf8829Device;
@@ -46,7 +47,7 @@ public final class SessionRecorder implements AutoCloseable {
      * @param path the {@code .depzdata} (or {@code .depzdata.gz}) to write
      * @param note header note ("" for none)
      * @param vl53l8Layers VL53L8 records also carry signal / ambient / sigma / reflectance
-     * @param temperatureHz about this many {@code temperature} records per device and second (the MCU
+     * @param temperatureHz about this many temperature-kind records per device and second (the MCU
      *     thermometer, and the sensor die where frames carry one); null for none
      */
     public SessionRecorder(Path path, String note, boolean vl53l8Layers, Double temperatureHz) {
@@ -73,7 +74,7 @@ public final class SessionRecorder implements AutoCloseable {
             throw new IllegalArgumentException("device must not be null");
         }
         if (writer != null) {
-            throw new IllegalStateException("add() every device before recording starts");
+            throw new InvalidStateException("add() every device before recording starts");
         }
         String id = deviceId != null ? deviceId : "d" + entries.size();
         TimeSyncResult sync = device.syncTime(syncSamples);

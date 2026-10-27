@@ -1,7 +1,11 @@
 using System.Buffers.Binary;
+using Depz.Sensor.Bno055;
+using Depz.Sensor.Bno086;
 using Depz.Sensor.Dataset;
 using Depz.Sensor.Devices;
 using Depz.Sensor.Protocol;
+using Depz.Sensor.Vl53l4;
+using Depz.Sensor.Vl53l8;
 using Xunit;
 
 namespace Depz.Sensor.Tests;
@@ -80,7 +84,7 @@ public class DatasetRecorderTests
             {
                 Assert.Equal(("d0", "d1"), (rec.Add(devA), rec.Add(devB)));
                 rec.Start();
-                Assert.Throws<InvalidOperationException>(() => rec.Add(devA));
+                Assert.Throws<InvalidStateException>(() => rec.Add(devA));
                 a.SendMeasurement(0x37);
                 Thread.Sleep(20);
                 b.SendMeasurement(0x37);
@@ -134,6 +138,186 @@ public class DatasetRecorderTests
         }
     }
 
+    /// <summary>Put SYNC_TIME (device clock <paramref name="mcuUs"/>) and GET_SERIAL (null: refused) in front of a
+    /// sensor fake that does not answer them; GET_NAME_ACTIVE_SOFTWARE and GET_MCU_TEMPERATURE are refused, as by a
+    /// board without them.</summary>
+    private static void AnswerSync(FakeBoardLink link, ulong mcuUs, string? serial)
+    {
+        var inner = link.OnPacket!;
+        link.OnPacket = p =>
+        {
+            switch (p.Cmd)
+            {
+                case (int)Cmd.SyncTime:
+                {
+                    var r = new byte[24];
+                    p.Payload.AsSpan(0, 8).CopyTo(r);
+                    BinaryPrimitives.WriteUInt64LittleEndian(r.AsSpan(8), mcuUs);
+                    BinaryPrimitives.WriteUInt64LittleEndian(r.AsSpan(16), mcuUs);
+                    return new[] { link.Reply((int)Rpt.SyncTime, r) };
+                }
+                case (int)Cmd.GetSerial when serial is not null:
+                    var t = new[] { (byte)p.Cmd }.Concat(System.Text.Encoding.ASCII.GetBytes(serial)).Concat(new byte[] { 0 });
+                    return new[] { link.Reply((int)Rpt.Text, t.ToArray()) };
+                case (int)Cmd.GetSerial:
+                case (int)Cmd.GetNameActiveSoftware:
+                case (int)Cmd.GetMcuTemperature:
+                    return new[] { FakeBoardLink.Status(p.Cmd, Status.ErrCmdNotSupported) };
+                default:
+                    return inner(p);
+            }
+        };
+    }
+
+    [Fact]
+    public void EverySensorKindIsRecordedAtItsDeviceTimeMinusTheOffset()
+    {
+        // Contract 09 vl53l4 / vl53lx / bno055 / bno086: each device's results, as its reader thread hands them
+        // out, at the device timestamp minus that device's sync offset.
+        var l4 = new FakeVl53l4cdBoard();
+        var lx = new FakeVl53lxBridge("DEPZ ToF Sensor VL53L4CD USB v2.1 TESTSERIAL");
+        var b55 = new FakeBno055Board();
+        var b86 = new FakeBno086Hub();
+        AnswerSync(l4.Link, 1_000_000, "SN-L4");
+        AnswerSync(b55.Link, 3_000_000, "SN-55");
+        AnswerSync(b86.Link, 4_000_000, "SN-86");
+        string path = TempPath();
+        try
+        {
+            var timeout = TimeSpan.FromMilliseconds(500);
+            using (var l4Dev = new Vl53l4cdDevice(l4.Link, timeout))
+            using (var lxDev = new Vl53lxDevice(lx.Link, timeout))
+            using (var b55Dev = new Bno055Device(b55.Link, timeout))
+            using (var b86Dev = new Bno086Device(b86.Link, timeout))
+            using (var rec = new SessionRecorder(path, temperatureHz: null))
+            {
+                l4Dev.Init();
+                lxDev.Init();
+                AnswerSync(lx.Link, 2_000_000, "SN-LX"); // after Init: the fake's own name answer picks the driver
+                Assert.Equal(new[] { "l4", "lx", "b55", "b86" },
+                    new[] { rec.Add(l4Dev, "l4"), rec.Add(lxDev, "lx"), rec.Add(b55Dev, "b55"), rec.Add(b86Dev, "b86") });
+                rec.Start();
+                rec.Start(); // a no-op: one file, one hook per device
+                l4Dev.StartRanging();
+                lxDev.StartRanging();
+                b55Dev.StartStream(20, (Bno055Regs.AccData, 6));
+
+                l4.McuTimeUs = 1_500_000;
+                l4.SendStream(Vl53l4Uld.ResultBlockAddr, FakeVl53l4cdBoard.ResultBlock(291));
+                lx.Stream(Vl53lxDriverTests.L4Block, 2_500_000);
+                var acc = new byte[16];
+                BinaryPrimitives.WriteUInt64LittleEndian(acc, 3_500_000);
+                acc[8] = Bno055Regs.AccData;
+                acc[9] = 6;
+                BinaryPrimitives.WriteInt16LittleEndian(acc.AsSpan(10), 100);
+                b55.Link.Inject(b55.Link.Reply((int)Bno055Rpt.Stream, acc));
+                // one cargo: the 0xFB base, then an accelerometer report; its time is the frame's capture (1 s)
+                b86.Link.Inject(b86.Data((int)ShtpChannel.InputNormal,
+                    new byte[] { 0xFB, 0, 0, 0, 0, 0x01, 0, 0, 0, 1, 0, 2, 0, 3, 0 }));
+                Assert.True(SpinWait.SpinUntil(() => rec.RecordsWritten == 4, 5000), $"{rec.RecordsWritten} records");
+            }
+            var reader = new DatasetReader(path);
+            Assert.Equal(new (string?, string?)[] { ("SN-L4", "unknown"), ("SN-LX", "unknown"), ("SN-55", "unknown"), ("SN-86", "unknown") },
+                new[] { "l4", "lx", "b55", "b86" }.Select(id => (reader.Devices[id].Serial, reader.Devices[id].SensorType)));
+            Assert.All(reader.Devices.Values, d => Assert.Null(d.SoftwareName)); // the refused name is left out
+            var byId = reader.Records.ToDictionary(r => r.DeviceId);
+            long Offset(string id) => reader.Devices[id].TimeSync!.OffsetUs;
+
+            var v4 = byId["l4"];
+            Assert.Equal(("vl53l4", 1_500_000 - Offset("l4")), (v4.Kind, v4.THostUs));
+            Assert.Equal((291L, 0L), ((long)v4.Value["distance_mm"]!, (long)v4.Value["range_status"]!));
+            var vx = byId["lx"];
+            Assert.Equal(("vl53lx", 2_500_000 - Offset("lx")), (vx.Kind, vx.THostUs));
+            Assert.Equal(("VL53L4CD", 624L), ((string)vx.Value["product"]!, (long)vx.Value["distance_mm"]!));
+            var v55 = byId["b55"];
+            Assert.Equal(("bno055", 3_500_000 - Offset("b55")), (v55.Kind, v55.THostUs));
+            Assert.Equal(new[] { 1.0, 0.0, 0.0 }, ((List<object?>)v55.Value["accel"]!).Select(Convert.ToDouble)); // 100 LSB at 100 LSB per m/s²
+            var v86 = byId["b86"];
+            Assert.Equal(("bno086", 1_000_000 - Offset("b86")), (v86.Kind, v86.THostUs));
+            Assert.Equal(("Acceleration", 0x01L), ((string)v86.Value["type"]!, (long)v86.Value["sensor_id"]!));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Vl53l8FramesAndTheSensorDieTemperatureAreRecorded()
+    {
+        // As the Python test_recorder_samples_mcu_and_sensor_temperature: the frame at its device time, and once a
+        // frame reported the die temperature, "sensor" temperature records from the sampler (this board has no
+        // MCU thermometer: those readings are skipped).
+        using var r = Vl53l8Rig.Cx();
+        r.Ready(16, Vl53l8Rig.L8Frame4x4);
+        AnswerSync(r.Board.Link, 1_000_000, "SN-L8");
+        string path = TempPath();
+        try
+        {
+            Vl53l8Frame seen;
+            using (var q = r.Dev.Frames(4))
+            using (var rec = new SessionRecorder(path, temperatureHz: 50))
+            {
+                string id = rec.Add(r.Dev);
+                rec.Start();
+                r.Dev.StartRanging();
+                r.Board.SendFrame(r.Frame(40), 2_000_000, Vl53l8Wire.StreamChunkMax);
+                seen = q.Take(TimeSpan.FromSeconds(2));
+                Assert.True(SpinWait.SpinUntil(() => rec.RecordsWritten >= 3, 5000), $"{rec.RecordsWritten} records");
+                r.P.SetU32(0x2FFC, 0x4FF, swapped: false); // stopped on its own: no MCU stop handshake
+                r.Dev.StopRanging();
+            }
+            var reader = new DatasetReader(path);
+            long offset = reader.Devices["d0"].TimeSync!.OffsetUs;
+            var frames = reader.Records.Where(x => x.Kind == "vl53l8").ToList();
+            var frame = Assert.Single(frames);
+            Assert.Equal(2_000_000 - offset, frame.THostUs);
+            Assert.Equal(Enumerable.Repeat(40L, 16), ((List<object?>)frame.Value["distance_mm"]!).Cast<long>());
+            Assert.False(frame.Value.ContainsKey("signal_per_spad")); // layers off by default
+            var temps = reader.Records.Where(x => x.Kind == "temperature").Select(x => x.Value).ToList();
+            Assert.NotEmpty(temps);
+            Assert.All(temps, t => Assert.Equal(("sensor", (double)seen.SiliconTempDegc),
+                ((string)t["source"]!, Convert.ToDouble(t["celsius"]))));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ADeviceWithoutIdentityOrTemperatureIsStillRecorded()
+    {
+        // As the Python test_recorder_tolerates_a_device_without_identity_or_temperature: a board that
+        // answers SYNC_TIME and refuses everything else — no serial, no name, no MCU thermometer.
+        var link = new FakeBoardLink();
+        link.OnPacket = p => new[] { FakeBoardLink.Status(p.Cmd, Status.ErrCmdNotSupported) };
+        AnswerSync(link, 1_000_000, serial: null);
+        string path = TempPath();
+        try
+        {
+            using (var dev = new DepzDevice(link, TimeSpan.FromMilliseconds(500))) // no sensor class: nothing to hook
+            using (var rec = new SessionRecorder(path, temperatureHz: 50))
+            {
+                string id = rec.Add(dev);
+                Assert.Equal("d0", id);
+                rec.Start();
+                // a few sampler periods: every reading is refused
+                Assert.True(SpinWait.SpinUntil(
+                    () => link.Sent.Count(s => s.Cmd == (int)Cmd.GetMcuTemperature) >= 2, 5000));
+            }
+            var reader = new DatasetReader(path);
+            var meta = reader.Devices["d0"];
+            Assert.Equal(("unknown", (string?)null, (string?)null), (meta.SensorType, meta.Serial, meta.SoftwareName));
+            Assert.NotNull(meta.TimeSync);
+            Assert.Empty(reader.Records);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void WriterAndReaderRoundTripAndSortWithinADevice()
     {
@@ -149,6 +333,8 @@ public class DatasetRecorderTests
                 foreach (var (d, t) in new[] { ("d0", 300L), ("d0", 100L), ("d1", 200L), ("d0", 250L), ("d1", 50L) })
                     w.Write(d, t, "event", new Dictionary<string, object?> { ["arr"] = new List<object?> { 1L, 2.5 } });
                 Assert.Equal(5, w.RecordsWritten);
+                w.Dispose();
+                Assert.Throws<InvalidStateException>(() => w.Write("d0", 400L, "event", new Dictionary<string, object?>()));
             }
             var r = new DatasetReader(path);
             Assert.Equal(DatasetWriter.Schema, r.Header["schema"]);
@@ -183,6 +369,8 @@ public class DatasetRecorderTests
     [InlineData(-0.25, -0.2)]
     [InlineData(1234.56789, 1234.6)]
     [InlineData(0.0, 0.0)]
+    [InlineData(double.Epsilon, 0.0)]                      // subnormal: the implicit bit is absent
+    [InlineData(9007199254740992.0, 9007199254740992.0)]  // 2^53: an integer, no fraction to round
     public void Round1IsPythonsRound(double x, double want) => Assert.Equal(want, DatasetRecords.Round1(x));
 }
 
@@ -367,10 +555,10 @@ public class DatasetPlayerTests
         q.Play();
         q.Tick();
         Assert.Equal(0, got);
-        Assert.Throws<InvalidOperationException>(() => q.Wait(TimeSpan.Zero));
+        Assert.Throws<InvalidStateException>(() => q.Wait(TimeSpan.Zero));
         q.Close();
         q.Close();
-        Assert.Throws<ObjectDisposedException>(() => q.Play());
+        Assert.Throws<InvalidStateException>(() => q.Play());
     }
 
     [Fact]

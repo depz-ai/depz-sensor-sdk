@@ -691,7 +691,7 @@ void bind_bno055(Binding& b, depz::Bno055* d)
     // Python start_stream(period_ms, block=(addr, len)); C++ takes addr, len flat.
     b.calls["start_stream"] = {"start_stream()", [d](const Array& a) {
         nargs(a, 0, 2);
-        const auto period = a.empty() ? 10 : static_cast<std::uint16_t>(ai(a, 0));
+        const auto period = a.empty() ? std::uint16_t{10} : static_cast<std::uint16_t>(ai(a, 0));
         if (a.size() > 1) {
             if (a[1].type != Type::Array || a[1].arr.size() != 2) fail("argument 1: expected [addr, len]");
             d->start_stream(period, static_cast<std::uint8_t>(ai(a[1].arr, 0)), static_cast<std::uint8_t>(ai(a[1].arr, 1)));
@@ -813,12 +813,13 @@ Binding bind(depz::Device* dev)
 {
     Binding b;
     bind_device(b, dev);
-    if (auto* x = dynamic_cast<depz::Sr04*>(dev)) bind_sr04(b, x);
-    else if (auto* x = dynamic_cast<depz::Vl53l4cd*>(dev)) bind_vl53l4cd(b, x);
-    else if (auto* x = dynamic_cast<depz::Vl53l8*>(dev)) bind_vl53l8(b, x);
-    else if (auto* x = dynamic_cast<depz::Bno055*>(dev)) bind_bno055(b, x);
-    else if (auto* x = dynamic_cast<depz::Bno086*>(dev)) bind_bno086(b, x);
-    else if (auto* x = dynamic_cast<depz::Vl53lx*>(dev)) bind_vl53lx(b, x);
+    // one name per branch: an if-else chain nests, and MSVC sees each x hiding the last (C4456)
+    if (auto* sr04 = dynamic_cast<depz::Sr04*>(dev)) bind_sr04(b, sr04);
+    else if (auto* l4 = dynamic_cast<depz::Vl53l4cd*>(dev)) bind_vl53l4cd(b, l4);
+    else if (auto* l8 = dynamic_cast<depz::Vl53l8*>(dev)) bind_vl53l8(b, l8);
+    else if (auto* b55 = dynamic_cast<depz::Bno055*>(dev)) bind_bno055(b, b55);
+    else if (auto* b86 = dynamic_cast<depz::Bno086*>(dev)) bind_bno086(b, b86);
+    else if (auto* lx = dynamic_cast<depz::Vl53lx*>(dev)) bind_vl53lx(b, lx);
     else fail("no binding for " + canonical_class(dev) + ": add it to the alias table");
     return b;
 }
@@ -870,6 +871,9 @@ std::optional<std::string> error_kind(std::string& what)
     } catch (const depz::ArgumentError& e) {
         what = e.what();
         return "invalid_argument";
+    } catch (const depz::ProtocolError& e) {  // a reply the SDK refused (contract 07 §3)
+        what = e.what();
+        return "invalid_reply";
     } catch (const depz::WrongTypeError& e) {  // a CH-only call on a CX, say
         what = e.what();
         return "not_supported";

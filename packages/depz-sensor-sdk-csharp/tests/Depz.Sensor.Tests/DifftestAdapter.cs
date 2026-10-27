@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Depz.Sensor.Bno055;
 using Depz.Sensor.Bno086;
+using Depz.Sensor.Devices;
 using Depz.Sensor.Protocol;
 using Depz.Sensor.Tmf8829;
 using Depz.Sensor.Transport;
@@ -112,6 +113,43 @@ public static class DifftestAdapter
 
     private static Dictionary<string, object?> Payload(byte[] p) => new() { ["payload"] = Vectors.ToHex(p) };
 
+    private static Dictionary<string, object?> ControlDecode(string kind, byte[] p)
+    {
+        switch (kind)
+        {
+            case "feature_response":
+                var f = FeatureResponse.Unpack(p);
+                return O(("sensor_id", f.SensorId), ("flags", f.Flags), ("sensitivity", f.Sensitivity),
+                    ("interval_us", f.IntervalUs), ("batch_us", f.BatchUs), ("cfg_word", f.CfgWord));
+            case "product_id":
+                var pid = Bno086.ProductId.Unpack(p);
+                return O(("reset_cause", pid.ResetCause), ("sw_version_major", pid.SwVersionMajor),
+                    ("sw_version_minor", pid.SwVersionMinor), ("sw_part_number", pid.SwPartNumber),
+                    ("sw_build_number", pid.SwBuildNumber), ("sw_version_patch", pid.SwVersionPatch));
+            case "command_response":
+                var c = CommandResponse.Unpack(p);
+                return O(("seq", c.Seq), ("command", c.Command), ("command_seq", c.CommandSeq),
+                    ("response_seq", c.ResponseSeq), ("r", c.R.Select(b => (int)b).ToList()));
+            case "frs_read_response":
+                var fr = FrsReadResponse.Unpack(p);
+                return O(("status", fr.Status), ("data_length", fr.DataLength), ("offset_words", fr.OffsetWords),
+                    ("data0", fr.Data0), ("data1", fr.Data1), ("frs_type", fr.FrsType));
+            case "frs_write_response":
+                var fw = FrsWriteResponse.Unpack(p);
+                return O(("status", fw.Status), ("offset_words", fw.OffsetWords));
+            default:
+                throw new ArgumentException(kind);
+        }
+    }
+
+    /// <summary>`text` written (UTF-8, no BOM, LF) to a fresh temp file the caller deletes.</summary>
+    private static string TempFile(string text, string suffix)
+    {
+        string path = Path.Combine(Path.GetTempPath(), "depz-difftest-" + Path.GetRandomFileName() + suffix);
+        File.WriteAllText(path, text, new UTF8Encoding(false));
+        return path;
+    }
+
     private static Dictionary<string, object?> O(params (string Key, object? Value)[] kv)
     {
         var d = new Dictionary<string, object?>();
@@ -150,11 +188,7 @@ public static class DifftestAdapter
         ["common_encode"] = i => Str(P(i, "kind")) switch
         {
             "sync_time_request" => Payload(Common.PackSyncTime(U64(P(i, "pc_timestamp_us")))),
-            // No codec function: the device layer writes the byte of a CrcType
-            // argument, so the op checks the enum like the type does.
-            "set_payload_crc_type" => Enum.IsDefined((CrcType)I32(P(i, "crc_type")))
-                ? Payload(new[] { (byte)I32(P(i, "crc_type")) })
-                : throw new ArgumentException("crc_type not a CrcType"),
+            "set_payload_crc_type" => Payload(Common.PackSetPayloadCrcType(I32(P(i, "crc_type")))),
             "sync_pin_config" => Payload(new SyncPinConfig(I32(P(i, "pin")), (SyncPinMode)I32(P(i, "mode")),
                 (SyncPinPolarity)I32(P(i, "polarity"))).Pack()),
             var k => throw new ArgumentException(k),
@@ -179,6 +213,55 @@ public static class DifftestAdapter
                 default:
                     throw new ArgumentException("unknown report");
             }
+        },
+        // The event the device layer emits for an unsolicited common report —
+        // common_decode's twin through the dispatcher (contract 07 §2/§3): the
+        // packet goes in on a fake board with nothing pending, and the first
+        // event out is the answer.
+        ["common_event"] = i =>
+        {
+            var link = new FakeBoardLink();
+            using var dev = new DepzDevice(link, TimeSpan.FromSeconds(1));
+            using var events = dev.Events(8);
+            link.Inject(link.Reply(I32(P(i, "report")), H(P(i, "payload"))));
+            return events.Take(TimeSpan.FromSeconds(2)) switch
+            {
+                UnsolicitedStatusEvent s => O(("event", "unsolicited_status"), ("status", s.Status)),
+                SequenceErrorEvent e => O(("event", "sequence_error"), ("expected_seq", e.ExpectedSeq),
+                    ("received_seq", e.ReceivedSeq), ("reported_by_device", e.ReportedByDevice)),
+                TextEvent t => O(("event", "text"), ("cmd", t.Cmd), ("text", t.Text)),
+                TemperatureEvent r => O(("event", "temperature"), ("timestamp_us", r.TimestampUs), ("celsius", r.Celsius)),
+                var other => throw new InvalidOperationException($"event {other}"),
+            };
+        },
+        // The host-observed seq gaps (contract 01 §5 step 5): one packet per
+        // seqs entry (report 0x7F, payload 00 — each becomes a hex text event)
+        // goes in; once every packet's own event is out, the seq_gap events and
+        // stats.seq_gaps are the answer. A gap is surfaced ahead of its packet.
+        ["common_seq_gap"] = i =>
+        {
+            var seqs = L(P(i, "seqs")).Select(e => (int)In(e, 0, 0xFF, "u8")).ToList();
+            var link = new FakeBoardLink();
+            using var dev = new DepzDevice(link, TimeSpan.FromSeconds(1));
+            using var events = dev.Events(2 * seqs.Count + 8);
+            foreach (int s in seqs)
+                link.Inject(Framing.BuildPacket(0x7F, new byte[] { 0 }, s));
+            var gaps = new List<object?>();
+            for (int texts = 0; texts < seqs.Count;)
+            {
+                switch (events.Take(TimeSpan.FromSeconds(2)))
+                {
+                    case SeqGapEvent g:
+                        gaps.Add(O(("expected_seq", g.ExpectedSeq), ("received_seq", g.ReceivedSeq), ("missed", g.Missed)));
+                        break;
+                    case TextEvent:
+                        texts++;
+                        break;
+                    case var other:
+                        throw new InvalidOperationException($"event {other}");
+                }
+            }
+            return O(("gaps", gaps), ("seq_gaps", dev.Stats.SeqGaps));
         },
         ["sync_time_math"] = i =>
         {
@@ -324,6 +407,50 @@ public static class DifftestAdapter
             I64(P(i, "capture_timestamp_us"))).Select(r => (object?)Dataset.DatasetRecords.Bno086(r)).ToList())),
         ["bno086_gyro_rv"] = i => Sh2Reports.ParseGyroRvCargo(H(P(i, "cargo")), I64(P(i, "capture_timestamp_us"))) is { } r
             ? VectorShapes.Bno086Report(r) : null,
+        // A control-channel response (contract 05 §4 table) decoded: its fields, or invalid when
+        // shorter than them (contract 07 §3).
+        ["bno086_control_decode"] = i => ControlDecode(Str(P(i, "kind")), H(P(i, "payload"))),
+
+        // ── .depzrec / .depzdata readers (contracts 08, 09) ──
+        // `text` as a capture: every rx chunk the loose replay serves once the host has written
+        // more tx bytes than any event waits for, concatenated — or invalid for a damaged file.
+        ["depzrec_read"] = i =>
+        {
+            string path = TempFile(Str(P(i, "text")), ".depzrec");
+            try
+            {
+                var link = new ReplayLink(path);
+                link.Write(new byte[65536]);
+                var rx = new List<byte>();
+                while (!link.RxExhausted)
+                {
+                    byte[] chunk = link.Read(TimeSpan.Zero);
+                    if (chunk.Length == 0)
+                        break; // gate not satisfied: never spin
+                    rx.AddRange(chunk);
+                }
+                link.Close();
+                return O(("rx", Vectors.ToHex(rx.ToArray())));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        },
+        // `text` as a dataset: its records in reader order as [d, t, k] — or invalid for a damaged file.
+        ["depzdata_read"] = i =>
+        {
+            string path = TempFile(Str(P(i, "text")), ".depzdata");
+            try
+            {
+                return O(("records", new Dataset.DatasetReader(path).Records
+                    .Select(r => (object?)new List<object?> { r.DeviceId, r.THostUs, r.Kind }).ToList()));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        },
 
         // ── TMF8829 ──
         ["tmf8829_encode"] = i => (Tmf8829Cmd)I32(P(i, "cmd")) switch
@@ -434,6 +561,14 @@ public static class DifftestAdapter
         ["vl53l7_model"] = i => O(("class",
             Vl53l7Discovery.ResolveModel(S(P(i, "usb_model")), S(P(i, "device_name"))).ToString().ToLowerInvariant())),
 
+        // ── VL53L8 register bridge (contract 04) ──
+        ["vl53l8_encode"] = i => Str(P(i, "kind")) switch
+        {
+            "start_stream" => Payload(Vl53l8Wire.PackStartStream(I32(P(i, "frame_size")))),
+            var k => throw new ArgumentException(k),
+        },
+        ["vl53l8_decode"] = i => VectorShapes.Vl53l8Decode(I32(P(i, "report")), H(P(i, "payload"))),
+
         // ── VL53L 1D family ──
         ["vl53lx_encode"] = i => Str(P(i, "kind")) switch
         {
@@ -463,7 +598,8 @@ public static class DifftestAdapter
 
         // ── VL53L8 advanced ──
         // The pure DCI codecs the driver methods call (Vl53l8Driver writes them to the sensor);
-        // set_xtalk_margin's own check (0..10000) lives in XtalkMarginRaw.
+        // set_xtalk_margin's own check (whole kcps 0..10000, as ST) lives in XtalkMarginRaw;
+        // a fraction is not an int (NotRepresentable -> invalid).
         ["vl53l8_motion_config"] = i => O(("pack", Vectors.ToHex(MotionConfig.InitDefault(I32(P(i, "resolution"))).Pack()))),
         ["vl53l8_detection_thresholds"] = i => O(
             ("start_block", Vectors.ToHex(Vl53l8Advanced.PackDetectionThresholds(L(P(i, "thresholds")).Select(t =>
@@ -471,7 +607,7 @@ public static class DifftestAdapter
                     I32(P(t, "measurement")), I32(P(t, "type")), I32(P(t, "zone_num")), I32(P(t, "operation"))))
                 .ToList()))),
             ("valid_status", Vectors.ToHex(Vl53l8Advanced.ThresholdValidStatus()))),
-        ["vl53l8_xtalk_margin"] = i => O(("raw", Vl53l8Advanced.XtalkMarginRaw(D(P(i, "kcps"))))),
+        ["vl53l8_xtalk_margin"] = i => O(("raw", Vl53l8Advanced.XtalkMarginRaw(I32(P(i, "kcps"))))),
         ["vl53l8_cnh_decode"] = i =>
         {
             var c = P(i, "config");

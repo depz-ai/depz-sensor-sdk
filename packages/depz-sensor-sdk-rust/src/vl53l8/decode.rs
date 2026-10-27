@@ -146,7 +146,11 @@ pub fn swap_buffer(data: &[u8]) -> Vec<u8> {
 
 /// union Block_header: `type[3:0]`, `size[15:4]`, `idx[31:16]`.
 fn bh_fields(bh: u32) -> (u32, usize, u16) {
-    (bh & 0xf, ((bh >> 4) & 0xfff) as usize, ((bh >> 16) & 0xffff) as u16)
+    (
+        bh & 0xf,
+        ((bh >> 4) & 0xfff) as usize,
+        ((bh >> 16) & 0xffff) as u16,
+    )
 }
 
 fn u32_le(buf: &[u8], i: usize) -> u32 {
@@ -277,13 +281,15 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
     let scale = |v: &[u32], n: f64| v.iter().map(|&x| x as f64 / n).collect::<Vec<f64>>();
     let signal_per_spad = scale(&signal_per_spad, 2048.0);
     let ambient_per_spad = scale(&ambient_per_spad, 2048.0);
-    let range_sigma_mm: Vec<f64> = range_sigma_mm_raw.iter().map(|&x| x as f64 / 128.0).collect();
+    let range_sigma_mm: Vec<f64> = range_sigma_mm_raw
+        .iter()
+        .map(|&x| x as f64 / 128.0)
+        .collect();
     let reflectance: Vec<f64> = reflectance.iter().map(|&x| x as f64 / 2.0).collect();
 
     // No target detected -> status 255. Iterate zones actually present.
-    let nzones = nb_target_detected.len();
-    for z in 0..nzones {
-        if nb_target_detected[z] == 0 {
+    for (z, &detected) in nb_target_detected.iter().enumerate() {
+        if detected == 0 {
             for t in 0..NB_TARGET_PER_ZONE {
                 let idx = NB_TARGET_PER_ZONE * z + t;
                 if idx < target_status.len() {

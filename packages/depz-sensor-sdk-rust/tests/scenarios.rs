@@ -15,7 +15,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use depz_sensor_sdk::devices::{
-    attach, open_on_link, AnyDevice, DepzDevice, DepzError, ReplayLink, Subscription, Vl53lxDevice, Vl53lxMeasurement,
+    attach, open_on_link, AnyDevice, DepzDevice, DepzError, ReplayLink, Subscription, Vl53lxDevice,
+    Vl53lxMeasurement,
 };
 use depz_sensor_sdk::discovery::resolve_sensor_class;
 use depz_sensor_sdk::protocol::identity::{parse_software_name, Identity, SensorType};
@@ -28,8 +29,8 @@ const TAKE_TIMEOUT: Duration = Duration::from_secs(5); // per streamed item
 
 /// The classes this SDK runs scenarios for so far.
 const CLASSES: &[&str] = &[
-    "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx", "vl53l7ch", "bno055", "bno086", "tmf8829",
-    "vl53lx", "vl53l0x", "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx",
+    "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx", "vl53l7ch", "bno055",
+    "bno086", "tmf8829", "vl53lx", "vl53l0x", "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx",
 ];
 
 fn scenarios_dir() -> PathBuf {
@@ -144,7 +145,11 @@ fn bno055_sample(s: &depz_sensor_sdk::devices::Bno055Sample) -> Value {
 }
 
 fn units_arg(v: &Value) -> Result<depz_sensor_sdk::bno055::regs::Units, DepzError> {
-    let b = |k: &str| v.get(k).and_then(Value::as_bool).ok_or_else(|| DepzError::InvalidArgument(format!("units.{k}")));
+    let b = |k: &str| {
+        v.get(k)
+            .and_then(Value::as_bool)
+            .ok_or_else(|| DepzError::InvalidArgument(format!("units.{k}")))
+    };
     Ok(depz_sensor_sdk::bno055::regs::Units {
         accel_mg: b("accel_mg")?,
         gyro_rps: b("gyro_rps")?,
@@ -157,7 +162,10 @@ fn units_arg(v: &Value) -> Result<depz_sensor_sdk::bno055::regs::Units, DepzErro
 fn block_arg(v: Option<&Value>) -> Result<Option<(u8, u8)>, DepzError> {
     match v {
         None | Some(Value::Null) => Ok(None),
-        Some(Value::Array(a)) if a.len() == 2 => Ok(Some((a[0].as_u64().unwrap() as u8, a[1].as_u64().unwrap() as u8))),
+        Some(Value::Array(a)) if a.len() == 2 => Ok(Some((
+            a[0].as_u64().unwrap() as u8,
+            a[1].as_u64().unwrap() as u8,
+        ))),
         Some(other) => Err(DepzError::InvalidArgument(format!("block {other}"))),
     }
 }
@@ -179,7 +187,9 @@ fn tmf8829_measurement(m: &depz_sensor_sdk::tmf8829::Tmf8829Measurement) -> Valu
         "distance_mm": m.distance_mm, "n_histograms": m.histograms.len(), "n_ref_frames": m.ref_frames.len(),
         "problems": m.problems,
     });
-    v.as_object_mut().unwrap().insert("results".into(), common::shapes::arrays(&m.results));
+    v.as_object_mut()
+        .unwrap()
+        .insert("results".into(), common::shapes::arrays(&m.results));
     v
 }
 
@@ -192,9 +202,24 @@ fn tmf8829_configure(d: &depz_sensor_sdk::devices::Tmf8829Device, args: &[Value]
     o.period_ms = n(1).unwrap_or(o.period_ms);
     o.kilo_iterations = n(2);
     o.nr_peaks = n(3).unwrap_or(o.nr_peaks);
-    (o.signal_strength, o.noise_strength, o.xtalk, o.histograms, o.ref_frame) = (b(4, false), b(5, false), b(6, false), b(7, false), b(8, false));
+    (
+        o.signal_strength,
+        o.noise_strength,
+        o.xtalk,
+        o.histograms,
+        o.ref_frame,
+    ) = (
+        b(4, false),
+        b(5, false),
+        b(6, false),
+        b(7, false),
+        b(8, false),
+    );
     if let Some(Value::Object(f)) = args.get(9) {
-        o.fields = f.iter().map(|(k, v)| (k.clone(), v.as_u64().unwrap_or(0) as u32)).collect();
+        o.fields = f
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_u64().unwrap_or(0) as u32))
+            .collect();
     }
     let preset = args.first().and_then(Value::as_str).unwrap_or("8x8");
     d.configure(preset, &o).map(|c| {
@@ -217,23 +242,51 @@ fn vl53l8_frame(f: &depz_sensor_sdk::vl53l8::driver::Vl53l8Frame) -> Value {
     })
 }
 
-fn cnh_arg(v: Option<&Value>) -> Result<depz_sensor_sdk::vl53l8::driver::Vl53l8CnhSetup, DepzError> {
+fn cnh_arg(
+    v: Option<&Value>,
+) -> Result<depz_sensor_sdk::vl53l8::driver::Vl53l8CnhSetup, DepzError> {
     let r = v.ok_or_else(|| DepzError::InvalidArgument("missing CNH setup".into()))?;
-    let n = |v: &Value| v.as_i64().map(|x| x as i32).ok_or_else(|| DepzError::InvalidArgument(format!("{v}: not an integer")));
+    let n = |v: &Value| {
+        v.as_i64()
+            .map(|x| x as i32)
+            .ok_or_else(|| DepzError::InvalidArgument(format!("{v}: not an integer")))
+    };
     let mut setup = depz_sensor_sdk::vl53l8::driver::Vl53l8CnhSetup::new();
-    setup.init_config(n(&r["start_bin"])?, n(&r["num_bins"])?, n(&r["sub_sample"])?)?;
-    let m = r["agg_map"].as_array().ok_or_else(|| DepzError::InvalidArgument("agg_map".into()))?;
-    setup.create_agg_map(n(&r["resolution"])? as usize, n(&m[0])?, n(&m[1])?, n(&m[2])?, n(&m[3])?, n(&m[4])?, n(&m[5])?)?;
+    setup.init_config(
+        n(&r["start_bin"])?,
+        n(&r["num_bins"])?,
+        n(&r["sub_sample"])?,
+    )?;
+    let m = r["agg_map"]
+        .as_array()
+        .ok_or_else(|| DepzError::InvalidArgument("agg_map".into()))?;
+    setup.create_agg_map(
+        n(&r["resolution"])? as usize,
+        n(&m[0])?,
+        n(&m[1])?,
+        n(&m[2])?,
+        n(&m[3])?,
+        n(&m[4])?,
+        n(&m[5])?,
+    )?;
     Ok(setup)
 }
 
 // The calls every VL53L8 / L5 / L7 class has (they all deref to Vl53l8cxDevice).
-fn vl53l8_call(d: &depz_sensor_sdk::devices::Vl53l8cxDevice, name: &str, args: &[Value]) -> Option<CallResult> {
+fn vl53l8_call(
+    d: &depz_sensor_sdk::devices::Vl53l8cxDevice,
+    name: &str,
+    args: &[Value],
+) -> Option<CallResult> {
     Some(match name {
         "init" => d.init().map(|_| Value::Null),
-        "set_resolution" => arg_i64(args, 0).and_then(|z| d.set_resolution(z as usize)).map(|_| Value::Null),
+        "set_resolution" => arg_i64(args, 0)
+            .and_then(|z| d.set_resolution(z as usize))
+            .map(|_| Value::Null),
         "get_resolution" => d.get_resolution().map(|z| json!(z)),
-        "set_ranging_frequency_hz" => arg_i64(args, 0).and_then(|hz| d.set_ranging_frequency_hz(hz as i32)).map(|_| Value::Null),
+        "set_ranging_frequency_hz" => arg_i64(args, 0)
+            .and_then(|hz| d.set_ranging_frequency_hz(hz as i32))
+            .map(|_| Value::Null),
         "get_ranging_frequency_hz" => d.get_ranging_frequency_hz().map(int),
         "start_ranging" => d.start_ranging().map(|_| Value::Null),
         "stop_ranging" => d.stop_ranging().map(|_| Value::Null),
@@ -253,7 +306,10 @@ fn vl53lx_measurement(m: &Vl53lxMeasurement) -> Value {
     // The frame's HistogramBinData::fields(), under the reference's names.
     let bins = m.bins.as_ref().map_or(Value::Null, |b| {
         Value::Object(
-            b.fields().into_iter().map(|(k, v)| (k.to_string(), serde_json::from_str(&v.to_json()).unwrap())).collect(),
+            b.fields()
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), serde_json::from_str(&v.to_json()).unwrap()))
+                .collect(),
         )
     });
     let targets: Vec<Value> = m
@@ -301,9 +357,18 @@ fn arg_str(args: &[Value], i: usize) -> Option<&str> {
 
 fn call_vl53lx(d: &Vl53lxDevice, name: &str, args: &[Value]) -> CallResult {
     match name {
-        "init" => d.init(arg_str(args, 0), arg_str(args, 1)).map(|_| Value::Null),
+        "init" => d
+            .init(arg_str(args, 0), arg_str(args, 1))
+            .map(|_| Value::Null),
         "configure" => d
-            .configure(arg_i64(args, 0)? as u32, arg_i64(args, 1)? as u32, arg_str(args, 2), None, None, None)
+            .configure(
+                arg_i64(args, 0)? as u32,
+                arg_i64(args, 1)? as u32,
+                arg_str(args, 2),
+                None,
+                None,
+                None,
+            )
             .map(|_| Value::Null),
         "get_range_timing" => d.get_range_timing().map(pair),
         "measure_once" => d.measure_once(None).map(|m| vl53lx_measurement(&m)),
@@ -492,37 +557,76 @@ fn get(dev: &AnyDevice, prop: &str) -> CallResult {
 
 fn subscribe(dev: &AnyDevice, stream: &str, capacity: usize) -> Box<dyn Taker> {
     match (dev, stream) {
-        (AnyDevice::Sr04(d), "measurements") => Box::new(Typed { sub: d.measurements(capacity), canon: sr04_measurement }),
-        (AnyDevice::Bno086(d), "reports") => Box::new(Typed { sub: d.reports(None, capacity), canon: bno086_report }),
-        (AnyDevice::Vl53l8cx(d), "frames") => Box::new(Typed { sub: d.frames(capacity), canon: vl53l8_frame }),
-        (AnyDevice::Vl53l8ch(d), "frames") => Box::new(Typed { sub: d.frames(capacity), canon: vl53l8_frame }),
-        (AnyDevice::Vl53l5cx(d), "frames") => Box::new(Typed { sub: d.frames(capacity), canon: vl53l8_frame }),
-        (AnyDevice::Vl53l7cx(d), "frames") => Box::new(Typed { sub: d.frames(capacity), canon: vl53l8_frame }),
-        (AnyDevice::Vl53l7ch(d), "frames") => Box::new(Typed { sub: d.frames(capacity), canon: vl53l8_frame }),
-        (AnyDevice::Bno055(d), "samples") => Box::new(Typed { sub: d.samples(capacity), canon: bno055_sample }),
-        (AnyDevice::Tmf8829(d), "measurements") => {
-            Box::new(Typed { sub: d.measurements(capacity), canon: tmf8829_measurement })
-        }
-        (AnyDevice::Vl53l4cd(d), "measurements") => {
-            Box::new(Typed { sub: d.measurements(capacity), canon: vl53l4_measurement })
-        }
-        (other, "measurements") if vl53lx(other).is_some() => {
-            Box::new(Typed { sub: vl53lx(other).unwrap().measurements(capacity), canon: vl53lx_measurement })
-        }
-        _ => panic!("{} has no stream '{stream}' in the Rust adapter table", dev.class_name()),
+        (AnyDevice::Sr04(d), "measurements") => Box::new(Typed {
+            sub: d.measurements(capacity),
+            canon: sr04_measurement,
+        }),
+        (AnyDevice::Bno086(d), "reports") => Box::new(Typed {
+            sub: d.reports(None, capacity),
+            canon: bno086_report,
+        }),
+        (AnyDevice::Vl53l8cx(d), "frames") => Box::new(Typed {
+            sub: d.frames(capacity),
+            canon: vl53l8_frame,
+        }),
+        (AnyDevice::Vl53l8ch(d), "frames") => Box::new(Typed {
+            sub: d.frames(capacity),
+            canon: vl53l8_frame,
+        }),
+        (AnyDevice::Vl53l5cx(d), "frames") => Box::new(Typed {
+            sub: d.frames(capacity),
+            canon: vl53l8_frame,
+        }),
+        (AnyDevice::Vl53l7cx(d), "frames") => Box::new(Typed {
+            sub: d.frames(capacity),
+            canon: vl53l8_frame,
+        }),
+        (AnyDevice::Vl53l7ch(d), "frames") => Box::new(Typed {
+            sub: d.frames(capacity),
+            canon: vl53l8_frame,
+        }),
+        (AnyDevice::Bno055(d), "samples") => Box::new(Typed {
+            sub: d.samples(capacity),
+            canon: bno055_sample,
+        }),
+        (AnyDevice::Tmf8829(d), "measurements") => Box::new(Typed {
+            sub: d.measurements(capacity),
+            canon: tmf8829_measurement,
+        }),
+        (AnyDevice::Vl53l4cd(d), "measurements") => Box::new(Typed {
+            sub: d.measurements(capacity),
+            canon: vl53l4_measurement,
+        }),
+        (other, "measurements") if vl53lx(other).is_some() => Box::new(Typed {
+            sub: vl53lx(other).unwrap().measurements(capacity),
+            canon: vl53lx_measurement,
+        }),
+        _ => panic!(
+            "{} has no stream '{stream}' in the Rust adapter table",
+            dev.class_name()
+        ),
     }
 }
 
 // ── matching (§3) ───────────────────────────────────────────────────────────
 
 fn mismatch(got: &Value, want: &Value, path: &str) -> Option<String> {
-    let at = if path.is_empty() { "result".to_string() } else { path.to_string() };
+    let at = if path.is_empty() {
+        "result".to_string()
+    } else {
+        path.to_string()
+    };
     match want {
         Value::Object(w) => {
-            let Value::Object(g) = got else { return Some(format!("{at}: expected an object, got {got}")) };
+            let Value::Object(g) = got else {
+                return Some(format!("{at}: expected an object, got {got}"));
+            };
             for (k, wv) in w {
                 let Some(gv) = g.get(k) else {
-                    return Some(format!("{at}.{k}: missing (fields: {})", g.keys().cloned().collect::<Vec<_>>().join(", ")));
+                    return Some(format!(
+                        "{at}.{k}: missing (fields: {})",
+                        g.keys().cloned().collect::<Vec<_>>().join(", ")
+                    ));
                 };
                 if let Some(m) = mismatch(gv, wv, &format!("{path}.{k}")) {
                     return Some(m);
@@ -531,16 +635,27 @@ fn mismatch(got: &Value, want: &Value, path: &str) -> Option<String> {
             None
         }
         Value::Array(w) => {
-            let Value::Array(g) = got else { return Some(format!("{at}: expected an array, got {got}")) };
+            let Value::Array(g) = got else {
+                return Some(format!("{at}: expected an array, got {got}"));
+            };
             if g.len() != w.len() {
-                return Some(format!("{at}: expected {} elements, got {}", w.len(), g.len()));
+                return Some(format!(
+                    "{at}: expected {} elements, got {}",
+                    w.len(),
+                    g.len()
+                ));
             }
-            w.iter().zip(g).enumerate().find_map(|(i, (wv, gv))| mismatch(gv, wv, &format!("{path}[{i}]")))
+            w.iter()
+                .zip(g)
+                .enumerate()
+                .find_map(|(i, (wv, gv))| mismatch(gv, wv, &format!("{path}[{i}]")))
         }
         Value::Number(wn) if wn.is_f64() => {
             let wd = wn.as_f64().unwrap();
             match got.as_f64() {
-                Some(gd) if got.is_number() && (gd - wd).abs() <= (1e-9 * wd.abs()).max(1e-12) => None,
+                Some(gd) if got.is_number() && (gd - wd).abs() <= (1e-9 * wd.abs()).max(1e-12) => {
+                    None
+                }
                 _ => Some(format!("{at}: expected {want}, got {got}")),
             }
         }
@@ -577,21 +692,36 @@ fn open(sc: &Value, link: Arc<ReplayLink>) -> AnyDevice {
                 pid = Some(p);
             }
         }
-        assert!(pid.is_some(), "usb_model '{model}' is not in the USB-id table");
+        assert!(
+            pid.is_some(),
+            "usb_model '{model}' is not in the USB-id table"
+        );
     }
-    let probe = sc.get("probe").and_then(Value::as_str).unwrap_or("canonical");
+    let probe = sc
+        .get("probe")
+        .and_then(Value::as_str)
+        .unwrap_or("canonical");
     if probe == "canonical" {
-        assert!(sc.get("identity").is_none(), "`identity` is for legacy captures only");
-        return open_on_link(link, vid, pid, Some(REQUEST_TIMEOUT)).unwrap_or_else(|e| panic!("open_on_link: {e}"));
+        assert!(
+            sc.get("identity").is_none(),
+            "`identity` is for legacy captures only"
+        );
+        return open_on_link(link, vid, pid, Some(REQUEST_TIMEOUT))
+            .unwrap_or_else(|e| panic!("open_on_link: {e}"));
     }
     assert_eq!(probe, "legacy");
     // The probe the SDKs made before contract 02 §4.4: GET_NAME_ACTIVE_SOFTWARE, plus GET_DEVICE_NAME
     // for the L5/L7 and 1D families only; the class attached in place.
     let dev = DepzDevice::new(link, Some(REQUEST_TIMEOUT));
-    let software = dev.get_software_name().unwrap_or_else(|e| panic!("get_software_name: {e}"));
+    let software = dev
+        .get_software_name()
+        .unwrap_or_else(|e| panic!("get_software_name: {e}"));
     let ident = parse_software_name(&software);
     let mut device_name = String::new();
-    if matches!(ident.sensor_type, Some(SensorType::Vl53l7) | Some(SensorType::Vl53lx)) {
+    if matches!(
+        ident.sensor_type,
+        Some(SensorType::Vl53l7) | Some(SensorType::Vl53lx)
+    ) {
         device_name = dev.get_device_name().unwrap_or_default();
     }
     if let Some(want) = sc.get("identity") {
@@ -599,14 +729,18 @@ fn open(sc: &Value, link: Arc<ReplayLink>) -> AnyDevice {
             panic!("{m}");
         }
     }
-    attach(dev, resolve_sensor_class(&software, &device_name, vid, pid)).unwrap_or_else(|e| panic!("attach: {e}"))
+    attach(dev, resolve_sensor_class(&software, &device_name, vid, pid))
+        .unwrap_or_else(|e| panic!("attach: {e}"))
 }
 
 fn run(file: &PathBuf) -> Vec<String> {
     let sc: Value = serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
     assert_eq!(sc["schema"], "depz.scenario/1");
     let id = sc["id"].as_str().unwrap().to_string();
-    assert_eq!(format!("{id}.json"), file.file_name().unwrap().to_string_lossy());
+    assert_eq!(
+        format!("{id}.json"),
+        file.file_name().unwrap().to_string_lossy()
+    );
     let steps = sc["steps"].as_array().unwrap();
     // No drops: each queue holds everything its scenario takes, plus what streams on after.
     let mut sizes: HashMap<String, usize> = HashMap::new();
@@ -616,19 +750,31 @@ fn run(file: &PathBuf) -> Vec<String> {
         }
     }
     let recording = sc["recording"].as_str().unwrap();
-    let link = Arc::new(ReplayLink::open(common::recordings_dir().join(recording), true, false).unwrap());
+    let link =
+        Arc::new(ReplayLink::open(common::recordings_dir().join(recording), true, false).unwrap());
     let dev = open(&sc, link.clone());
-    assert_eq!(dev.class_name(), sc["class"].as_str().unwrap(), "{id}: resolved class");
+    assert_eq!(
+        dev.class_name(),
+        sc["class"].as_str().unwrap(),
+        "{id}: resolved class"
+    );
     let mut subs: HashMap<String, Box<dyn Taker>> = HashMap::new();
     for (i, step) in steps.iter().enumerate() {
         let fail = |m: String| -> ! { panic!("{id} step {i} {step}: {m}") };
         if let Some(name) = step.get("call").and_then(Value::as_str) {
-            let args: Vec<Value> = step.get("args").and_then(Value::as_array).cloned().unwrap_or_default();
+            let args: Vec<Value> = step
+                .get("args")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
             let r = call(&dev, name, &args);
             if let Some(want_err) = step.get("error").and_then(Value::as_str) {
                 match r {
                     Err(e) if e.kind() == Some(want_err) => {}
-                    Err(e) => fail(format!("expected error {want_err}, got {:?} ({e})", e.kind())),
+                    Err(e) => fail(format!(
+                        "expected error {want_err}, got {:?} ({e})",
+                        e.kind()
+                    )),
                     Ok(v) => fail(format!("expected error {want_err}, succeeded with {v}")),
                 }
                 continue;
@@ -697,7 +843,11 @@ fn scenarios() {
     for f in files {
         let sc: Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
         let class = sc["class"].as_str().unwrap();
-        if !CLASSES.contains(&class) || filter.as_deref().is_some_and(|x| !sc["id"].as_str().unwrap().contains(x)) {
+        if !CLASSES.contains(&class)
+            || filter
+                .as_deref()
+                .is_some_and(|x| !sc["id"].as_str().unwrap().contains(x))
+        {
             continue;
         }
         for id in run(&f) {

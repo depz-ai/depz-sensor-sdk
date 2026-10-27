@@ -7,8 +7,8 @@ use super::device::{expect_report, DepzDevice};
 use super::error::{DepzError, Result};
 use super::vl53l8::{Profile, Vl53l8cxDevice};
 use crate::vl53l7::{
-    pack_pin_ctrl, pack_set_i2c_speed, Vl53l7Cmd, Vl53l7Info, Vl53l7Rpt, MIN_RANGING_FREQUENCY_HZ, PIN_LPN_OFF,
-    PIN_SOFT_CYCLE, READ_MAX_LEN, WRITE_MAX_LEN,
+    pack_pin_ctrl, pack_set_i2c_speed, Vl53l7Cmd, Vl53l7Info, Vl53l7Rpt, MIN_RANGING_FREQUENCY_HZ,
+    PIN_LPN_OFF, PIN_SOFT_CYCLE, READ_MAX_LEN, STREAM_CHUNK_MAX, WRITE_MAX_LEN,
 };
 use crate::vl53l8::driver::{Vl53l8CnhSetup, Vl53l8Firmware, MODULE_TYPE_MZ, MODULE_TYPE_MZEVO};
 
@@ -16,14 +16,23 @@ const L7CX: Profile = Profile {
     firmware: Vl53l8Firmware::L7cx,
     read_chunk: READ_MAX_LEN,
     write_chunk: WRITE_MAX_LEN,
+    stream_chunk: STREAM_CHUNK_MAX,
     min_hz: MIN_RANGING_FREQUENCY_HZ as i32,
     expected_module: Some(MODULE_TYPE_MZEVO),
     class: "Vl53l7cxDevice",
 };
 
-const L5CX: Profile = Profile { expected_module: Some(MODULE_TYPE_MZ), class: "Vl53l5cxDevice", ..L7CX };
+const L5CX: Profile = Profile {
+    expected_module: Some(MODULE_TYPE_MZ),
+    class: "Vl53l5cxDevice",
+    ..L7CX
+};
 
-const L7CH: Profile = Profile { firmware: Vl53l8Firmware::L7ch, class: "Vl53l7chDevice", ..L7CX };
+const L7CH: Profile = Profile {
+    firmware: Vl53l8Firmware::L7ch,
+    class: "Vl53l7chDevice",
+    ..L7CX
+};
 
 /// VL53L7CX multizone ToF (8×8 zones, 90° field of view) on the I2C bridge board (contract 11): a
 /// [`Vl53l8cxDevice`] (every method, through `Deref`) with the L5/L7 firmware set (ULD 2.0.1),
@@ -54,7 +63,9 @@ impl Vl53l7cxDevice {
 
     /// The last `calibrate_xtalk` found nothing to calibrate ("coverglass too good").
     pub fn xtalk_calibration_failed(&self) -> bool {
-        self.0.with_uld(|u| Ok(u.xtalk_calibration_failed())).unwrap_or(false)
+        self.0
+            .with_uld(|u| Ok(u.xtalk_calibration_failed()))
+            .unwrap_or(false)
     }
 
     // ── board commands (contract 11 §2) ─────────────────────────────────────
@@ -62,16 +73,27 @@ impl Vl53l7cxDevice {
     /// Bridge counters and pin levels (the sensor is not touched). Read it before and after a run:
     /// during one each call takes the bus from the stream and can cost a frame.
     pub fn get_bridge_info(&self) -> Result<Vl53l7Info> {
-        self.request(Vl53l7Cmd::GetInfo as u8, &[], expect_report(Vl53l7Rpt::Info as u8, Vl53l7Info::unpack), None)
+        self.request(
+            Vl53l7Cmd::GetInfo as u8,
+            &[],
+            expect_report(Vl53l7Rpt::Info as u8, Vl53l7Info::unpack),
+            None,
+        )
     }
 
     /// Sensor bus SCL; the board takes the nearest of 100, 200, 400, 500 … 1000 kHz. Returns the
     /// value in effect. A busy status mid-transfer ([`DepzError::is_busy`]): stop ranging first.
     pub fn set_i2c_speed_khz(&self, khz: u32) -> Result<u16> {
         if !(1..=0xFFFF).contains(&khz) {
-            return Err(DepzError::InvalidArgument(format!("khz must be 1..65535, got {khz}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "khz must be 1..65535, got {khz}"
+            )));
         }
-        self.request_ok(Vl53l7Cmd::SetI2cSpeed as u8, &pack_set_i2c_speed(khz as u16), None)?;
+        self.request_ok(
+            Vl53l7Cmd::SetI2cSpeed as u8,
+            &pack_set_i2c_speed(khz as u16),
+            None,
+        )?;
         Ok(self.get_bridge_info()?.i2c_khz)
     }
 
@@ -128,7 +150,8 @@ impl Vl53l7chDevice {
         self.armed_cnh()
     }
 
-    /// Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]).
+    /// Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]); disarms the motion
+    /// indicator (one DCI block).
     pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()> {
         self.arm_cnh(setup)
     }

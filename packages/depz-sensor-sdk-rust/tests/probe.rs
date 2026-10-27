@@ -8,8 +8,12 @@ use depz_sensor_sdk::{resolve_sensor_class, SENSOR_CLASS_NAMES};
 #[test]
 fn probe_class_names() {
     let v = load("probe.json");
-    let want: Vec<&str> =
-        v["classes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect();
+    let want: Vec<&str> = v["classes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap())
+        .collect();
     assert_eq!(SENSOR_CLASS_NAMES.to_vec(), want);
     seen("probe/classes");
 }

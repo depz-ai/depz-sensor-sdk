@@ -20,9 +20,9 @@ shared across sensors — see the [common guide](../guide.md).
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::{DepzDevice, ReplayLink, Sr04Device};
+use depz_sensor_sdk::devices::open_first_device;
 
-let sr04 = Sr04Device::attach(DepzDevice::new(ReplayLink::open("sr04.depzrec", true, false)?, None));
+let sr04 = open_first_device(None)?.into_sr04()?;   // or open_device("/dev/ttyACM0", None)
 sr04.set_sample_period_us(20_000)?;         // the stored minimum interval between starts
 let once = sr04.measure_once(None)?;        // waits for the echo (1 s default)
 println!("{} µs echo, {:?} mm", once.echo_time_us, once.distance_mm());

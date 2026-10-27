@@ -17,26 +17,80 @@ pub const HIST_CAVEAT: &str =
     "the histogram driver has no calibrations and no detection thresholds - the light drivers are the ones with those";
 
 const L0X_CAVEAT: &str = "no detection thresholds; there is no ROI on this die at all";
-const L3_ULP_CAVEAT: &str = "single-target ranging only - the histogram driver gives several targets instead";
+const L3_ULP_CAVEAT: &str =
+    "single-target ranging only - the histogram driver gives several targets instead";
 
 // (product, kind, constructor, caveat); the Java registration order.
 const DRIVERS: &[(&str, &str, DriverCtor, Option<&str>)] = &[
-    ("VL53L0X", "uld", |p, s| Box::new(Vl53l0xUldDriver::new(p, s)), Some(L0X_CAVEAT)),
-    ("VL53L1CX", "uld", |p, s| Box::new(Vl53l1UldDriver::new(p, s)), None),
-    ("VL53L1CB", "uld", |p, s| Box::new(Vl53l1UldDriver::new(p, s)), None),
-    ("VL53L3CX", "ulp", |p, s| Box::new(Vl53l3UlpDriver::new(p, s)), Some(L3_ULP_CAVEAT)),
-    ("VL53L4CD", "uld", |p, s| Box::new(Vl53l4UldDriver::new(p, s)), None),
-    ("VL53L1CX", "histogram", |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)), Some(HIST_CAVEAT)),
-    ("VL53L1CB", "histogram", |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)), Some(HIST_CAVEAT)),
-    ("VL53L3CX", "histogram", |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)), Some(HIST_CAVEAT)),
-    ("VL53L4CD", "histogram", |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)), Some(HIST_CAVEAT)),
-    ("VL53L4CX", "histogram", |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)), Some(HIST_CAVEAT)),
+    (
+        "VL53L0X",
+        "uld",
+        |p, s| Box::new(Vl53l0xUldDriver::new(p, s)),
+        Some(L0X_CAVEAT),
+    ),
+    (
+        "VL53L1CX",
+        "uld",
+        |p, s| Box::new(Vl53l1UldDriver::new(p, s)),
+        None,
+    ),
+    (
+        "VL53L1CB",
+        "uld",
+        |p, s| Box::new(Vl53l1UldDriver::new(p, s)),
+        None,
+    ),
+    (
+        "VL53L3CX",
+        "ulp",
+        |p, s| Box::new(Vl53l3UlpDriver::new(p, s)),
+        Some(L3_ULP_CAVEAT),
+    ),
+    (
+        "VL53L4CD",
+        "uld",
+        |p, s| Box::new(Vl53l4UldDriver::new(p, s)),
+        None,
+    ),
+    (
+        "VL53L1CX",
+        "histogram",
+        |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)),
+        Some(HIST_CAVEAT),
+    ),
+    (
+        "VL53L1CB",
+        "histogram",
+        |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)),
+        Some(HIST_CAVEAT),
+    ),
+    (
+        "VL53L3CX",
+        "histogram",
+        |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)),
+        Some(HIST_CAVEAT),
+    ),
+    (
+        "VL53L4CD",
+        "histogram",
+        |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)),
+        Some(HIST_CAVEAT),
+    ),
+    (
+        "VL53L4CX",
+        "histogram",
+        |p, s| Box::new(Vl53lxHistogramDriver::new(p, s)),
+        Some(HIST_CAVEAT),
+    ),
 ];
 
 fn check_product(product: &str) -> Result<()> {
     if product_row(product).is_none() {
         let served: Vec<&str> = PRODUCTS.iter().map(|p| p.name).collect();
-        return Err(DepzError::Unsupported(format!("no such product: {product} - served: {}", served.join(", "))));
+        return Err(DepzError::Unsupported(format!(
+            "no such product: {product} - served: {}",
+            served.join(", ")
+        )));
     }
     Ok(())
 }
@@ -48,7 +102,11 @@ pub fn driver_kinds(product: &str) -> Result<Vec<&'static str>> {
     Ok(DRIVER_KINDS
         .iter()
         .map(|k| k.as_str())
-        .filter(|k| DRIVERS.iter().any(|(p, kind, _, _)| *p == product && kind == k))
+        .filter(|k| {
+            DRIVERS
+                .iter()
+                .any(|(p, kind, _, _)| *p == product && kind == k)
+        })
         .collect())
 }
 
@@ -60,7 +118,10 @@ pub fn create_driver(
     platform: Arc<dyn Vl53lxPlatform>,
 ) -> Result<(Box<dyn Vl53lxDriver>, Option<&'static str>)> {
     check_product(product)?;
-    match DRIVERS.iter().find(|(p, k, _, _)| *p == product && *k == kind) {
+    match DRIVERS
+        .iter()
+        .find(|(p, k, _, _)| *p == product && *k == kind)
+    {
         Some((_, _, create, caveat)) => Ok((create(platform, product), *caveat)),
         None => Err(DepzError::Unsupported(format!(
             "{product} has no '{kind}' driver - it has {}",

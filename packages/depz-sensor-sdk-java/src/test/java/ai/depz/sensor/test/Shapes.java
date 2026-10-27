@@ -20,6 +20,7 @@ import ai.depz.sensor.sensors.tmf8829.CaptureTimer;
 import ai.depz.sensor.sensors.tmf8829.Frames;
 import ai.depz.sensor.sensors.tmf8829.MeasurementBuilder;
 import ai.depz.sensor.sensors.vl53l4.Vl53l4Uld;
+import ai.depz.sensor.sensors.vl53l8.FrameReassembler;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxDecode;
 import ai.depz.sensor.transport.CrcError;
 import ai.depz.sensor.transport.Event;
@@ -231,6 +232,30 @@ public final class Shapes {
                 "frame_id", e.frameId(), "fifo_status", e.fifoStatus());
         }
         throw new IllegalArgumentException("unknown TMF8829 report " + report);
+    }
+
+    /** vl53l8.json decode shape: one RPT_VL53_FRAME chunk (contract 04 §3). */
+    public static Map<String, Object> vl53l8Decode(int report, byte[] payload) {
+        if (report != ai.depz.sensor.protocol.Vl53l8.Vl53l8Rpt.VL53_FRAME.value) {
+            throw new IllegalArgumentException("unknown VL53L8 report " + report);
+        }
+        FrameReassembler.FrameChunk c = FrameReassembler.unpackFrameChunk(payload);
+        return map("timestamp_us", u64(c.timestampUs()), "full_size", c.fullSize(), "offset", c.offset(),
+            "data", hex(c.data()));
+    }
+
+    /** RPT_VL53_FRAME payloads through one reassembler; vl53l8.json reassembly shape (contract 04 §4). */
+    public static Map<String, Object> vl53l8Reassembly(List<byte[]> chunks) {
+        FrameReassembler r = new FrameReassembler();
+        List<Object> frames = new ArrayList<>();
+        for (byte[] ch : chunks) {
+            FrameReassembler.CompletedFrame f = r.feed(FrameReassembler.unpackFrameChunk(ch));
+            if (f != null) {
+                frames.add(map("timestamp_us", u64(f.timestampUs()), "size", f.frame().length,
+                    "sha256", sha256(f.frame())));
+            }
+        }
+        return map("frames", frames, "completed", r.completed, "discarded", r.discarded);
     }
 
     /** FRAME-chunk payloads fed to one reassembler; the reassembly shape. */

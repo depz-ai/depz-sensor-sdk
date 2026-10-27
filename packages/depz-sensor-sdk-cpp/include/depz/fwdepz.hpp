@@ -58,7 +58,7 @@ struct FlashInfo {
 bytes pack_write_page(std::uint32_t addr, byte_span data);
 bytes pack_read_page(std::uint32_t addr, std::uint16_t size);
 
-enum class FwDepzErrorKind { TooShort, Magic, HeaderCrc, Size };
+enum class FwDepzErrorKind { TooShort, Magic, HeaderCrc, Size, Section };
 
 class FwDepzError : public std::runtime_error {
 public:
@@ -77,11 +77,12 @@ struct FwDepzImage {
     bytes payload;
 
     // Validation order: length, magic, header CRC (CCITT-FALSE over [0..61]
-    // vs u16 LE at 62), then fw_size == payload length. Throws FwDepzError.
+    // vs u16 LE at 62), then fw_size == payload length, then section 0 of 1
+    // (sections are 0-based; multi-section files are refused). Throws FwDepzError.
     static FwDepzImage parse(byte_span blob);
 
-    // Assemble a container (test/tooling helper).
-    static bytes build(std::uint32_t load_addr, byte_span payload, std::uint8_t cur_sec = 1,
+    // Assemble a container (test/tooling helper). A shipped file is section 0 of 1.
+    static bytes build(std::uint32_t load_addr, byte_span payload, std::uint8_t cur_sec = 0,
                        std::uint8_t tot_sec = 1);
 
     bool payload_crc_ok() const;

@@ -2,8 +2,9 @@
 //! `resolve_sensor_class`): which SDK class a device opens as, from its probe
 //! answers and its port's USB (vid, pid).
 //!
-//! This SDK is decode-only (no device layer), so it carries the pure part of
-//! §4.4 only: [`resolve_sensor_class`] and the [`SENSOR_CLASS_NAMES`] list.
+//! The pure part of §4.4: [`resolve_sensor_class`] and the [`SENSOR_CLASS_NAMES`]
+//! list. Port enumeration, the probe and opening live in [`crate::devices`]
+//! (`list_depz_devices`, `open_device`).
 
 use crate::protocol::identity::{parse_software_name, Mode, SensorType};
 use crate::usb_ids::usb_model_hint;
@@ -16,9 +17,24 @@ use crate::{vl53l7, vl53lx};
 /// `BOOTDEPZ`) and `"bootloader"` (use the contract 06 client). BNO085 boards
 /// run `APP_BNO086` and resolve to `"bno086"`.
 pub const SENSOR_CLASS_NAMES: [&str; 18] = [
-    "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx", "vl53l7ch", "vl53l0x",
-    "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx", "vl53lx", "bno086", "bno055", "tmf8829",
-    "device", "bootloader",
+    "sr04",
+    "vl53l4cd",
+    "vl53l8cx",
+    "vl53l8ch",
+    "vl53l5cx",
+    "vl53l7cx",
+    "vl53l7ch",
+    "vl53l0x",
+    "vl53l1cx",
+    "vl53l1cb",
+    "vl53l3cx",
+    "vl53l4cx",
+    "vl53lx",
+    "bno086",
+    "bno055",
+    "tmf8829",
+    "device",
+    "bootloader",
 ];
 
 /// The canonical class name (one of [`SENSOR_CLASS_NAMES`]) for a device's

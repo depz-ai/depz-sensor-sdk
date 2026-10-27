@@ -29,6 +29,8 @@ public class Vl53l7cxDevice : Vl53l8cxDevice
 
     protected override int WriteChunk => Vl53l7Wire.WriteMaxLen;
 
+    protected override int StreamChunk => Vl53l7Wire.StreamChunkMax;
+
     protected override int MinRangingHz => Vl53l7Frames.MinRangingFrequencyHz;
 
     /// <summary>The module type this class expects after <see cref="Init"/> (L5 and L7 share a firmware).</summary>
@@ -123,6 +125,7 @@ public class Vl53l7chDevice : Vl53l7cxDevice
     /// <summary>The CNH setup armed by <see cref="ConfigureCnh"/>, or null.</summary>
     public Vl53l8CnhSetup? CnhSetup => ArmedCnh;
 
-    /// <summary>Arm CNH for the next start (as <see cref="Vl53l8chDevice.ConfigureCnh"/>).</summary>
+    /// <summary>Arm CNH for the next start (as <see cref="Vl53l8chDevice.ConfigureCnh"/>); disarms
+    /// the motion indicator.</summary>
     public void ConfigureCnh(Vl53l8CnhSetup setup) => ArmCnh(setup);
 }

@@ -7,10 +7,27 @@ import time
 from pathlib import Path
 from typing import IO, Any
 
-from ..errors import LinkClosedError
+from .._jsonl import is_blank, json_object, split_lines
+from ..errors import LinkClosedError, ReplayMismatchError
 from .link import Link
 
 SCHEMA = "depz.rec/1"
+
+
+def _event(path: str | Path, lineno: int, line: str) -> tuple[int, str, bytes]:
+    """One capture event line (contract 08) as (t_us, dir, data)."""
+    ev = json_object(path, lineno, line)
+    t_us, direction, data = ev.get("t"), ev.get("dir"), ev.get("data")
+    if not isinstance(t_us, int) or isinstance(t_us, bool) or t_us < 0:
+        raise ValueError(f"{path}:{lineno}: 't' must be a non-negative integer, got {t_us!r}")
+    if not isinstance(direction, str):
+        raise ValueError(f"{path}:{lineno}: 'dir' must be a string, got {direction!r}")
+    if not isinstance(data, str):
+        raise ValueError(f"{path}:{lineno}: 'data' must be a hex string, got {data!r}")
+    # pairs of hex digits only: bytes.fromhex alone would also skip spaces
+    if len(data) % 2 or data.strip("0123456789abcdefABCDEF"):
+        raise ValueError(f"{path}:{lineno}: 'data' is not hex: {data!r}")
+    return t_us, direction, bytes.fromhex(data)
 
 
 class RecordingLink(Link):
@@ -73,25 +90,29 @@ class ReplayLink(Link):
     preceded that event in the recording. Without this gating a replay would
     deliver responses before the SDK even sends the requests.
 
-    `strict_tx=True` additionally asserts the written bytes match the
-    recorded tx stream byte-for-byte (protocol regression mode).
+    `strict_tx=True` additionally requires the written bytes to match the
+    recorded tx stream byte-for-byte (protocol regression mode); the first
+    write that differs raises `ReplayMismatchError`.
     `realtime=True` paces rx events by their recorded timestamps.
     """
 
     def __init__(self, path: str | Path, *, realtime: bool = False, strict_tx: bool = False):
         import threading
 
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
-        self.header: dict[str, Any] = json.loads(lines[0]) if lines else {}
+        with open(path, encoding="utf-8", newline="") as f:  # newline="": no CR translation
+            text = f.read()
+        lines = split_lines(text)
+        if not text:
+            raise ValueError(f"{path}: empty, not a .depzrec capture (no header line)")
+        self.header: dict[str, Any] = json_object(path, 1, lines[0])
         self._rx: list[tuple[int, bytes, int]] = []  # (t_us, data, tx_prefix_bytes)
         tx_stream = bytearray()
-        for line in lines[1:]:
-            if not line.strip():
+        for lineno, line in enumerate(lines[1:], 2):
+            if is_blank(line):
                 continue
-            ev = json.loads(line)
-            data = bytes.fromhex(ev["data"])
-            if ev["dir"] == "rx":
-                self._rx.append((ev["t"], data, len(tx_stream)))
+            t_us, direction, data = _event(path, lineno, line)
+            if direction == "rx":
+                self._rx.append((t_us, data, len(tx_stream)))
             else:
                 tx_stream.extend(data)
         self._tx_stream = bytes(tx_stream)
@@ -143,7 +164,7 @@ class ReplayLink(Link):
             if self._strict_tx:
                 expected = self._tx_stream[self._tx_written : self._tx_written + len(data)]
                 if expected != bytes(data):
-                    raise AssertionError(
+                    raise ReplayMismatchError(
                         f"replay strict_tx mismatch at offset {self._tx_written}: "
                         f"expected {expected.hex()}, got {data.hex()}"
                     )

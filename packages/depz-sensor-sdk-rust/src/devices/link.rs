@@ -8,7 +8,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::error::{DepzError, Result};
-use crate::json::Value;
+use crate::json::{is_blank_line, Value};
 
 /// A blocking byte pipe to one device: a serial port, a `.depzrec` record / replay wrapper, or
 /// anything a host supplies. Device classes accept any link, which keeps every layer above the port
@@ -37,16 +37,63 @@ pub(crate) fn hex_encode(b: &[u8]) -> String {
     s
 }
 
+/// `s` as bytes when it is hex digit pairs, else `None` (walked by byte: a non-ASCII character
+/// is a refusal, never a slice inside it).
 pub(crate) fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    let b = s.as_bytes();
+    if !b.len().is_multiple_of(2) {
         return None;
     }
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok()).collect()
+    let nibble = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+    b.as_chunks::<2>()
+        .0
+        .iter()
+        .map(|[hi, lo]| Some(nibble(*hi)? << 4 | nibble(*lo)?))
+        .collect()
+}
+
+/// One `.depzrec` event line (contract 08) as (t_us, dir, data), else what is wrong with it.
+fn replay_event(line: &str) -> std::result::Result<(u64, String, Vec<u8>), String> {
+    let ev = Value::parse(line).map_err(|e| format!("not JSON: {e}"))?;
+    if ev.entries().is_none() {
+        return Err("not a JSON object".into());
+    }
+    let t_us = match ev.get("t") {
+        Some(t) => match t.as_i64() {
+            Some(t) if t >= 0 => t as u64,
+            _ => {
+                return Err(format!(
+                    "'t' must be a non-negative integer, got {}",
+                    t.to_json()
+                ))
+            }
+        },
+        None => return Err("'t' must be a non-negative integer, got nothing".into()),
+    };
+    let dir = match ev.get("dir") {
+        Some(d) => d
+            .as_str()
+            .ok_or_else(|| format!("'dir' must be a string, got {}", d.to_json()))?,
+        None => return Err("'dir' must be a string, got nothing".into()),
+    };
+    let data = match ev.get("data") {
+        Some(d) => {
+            let hex = d
+                .as_str()
+                .ok_or_else(|| format!("'data' must be a hex string, got {}", d.to_json()))?;
+            hex_decode(hex).ok_or_else(|| format!("'data' is not hex: {}", d.to_json()))?
+        }
+        None => return Err("'data' must be a hex string, got nothing".into()),
+    };
+    Ok((t_us, dir.to_string(), data))
 }
 
 /// `YYYY-MM-DDTHH:MM:SSZ` for now (UTC).
 pub(crate) fn utc_now_iso() -> String {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
     // civil from days (Howard Hinnant)
@@ -59,7 +106,12 @@ pub(crate) fn utc_now_iso() -> String {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + if m <= 2 { 1 } else { 0 };
-    format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z", rem / 3600, rem % 3600 / 60, rem % 60)
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
 }
 
 struct Rx {
@@ -76,7 +128,8 @@ struct ReplayState {
 
 /// Replays the rx side of a `.depzrec` capture causally (contract 08): an rx chunk is served only
 /// after the host has written as many tx bytes as preceded it in the capture. With `strict_tx` every
-/// written byte must also equal the recorded tx stream ([`DepzError::ReplayMismatch`]).
+/// written byte must also equal the recorded tx stream ([`DepzError::ReplayMismatch`]). A damaged
+/// capture is refused by [`ReplayLink::open`] with [`DepzError::InvalidArgument`] naming the line.
 pub struct ReplayLink {
     rx: Vec<Rx>,
     tx: Vec<u8>,
@@ -91,27 +144,46 @@ pub struct ReplayLink {
 
 impl ReplayLink {
     /// Load `path`; `strict_tx` fails a write that differs from the recorded tx stream, `realtime`
-    /// paces rx chunks by their recorded timestamps.
+    /// paces rx chunks by their recorded timestamps. A damaged capture (contract 08: an empty file,
+    /// a header that is not a JSON object, an event line that is not one or whose `t` / `dir` /
+    /// `data` are not a non-negative integer / a string / hex digit pairs) is
+    /// [`DepzError::InvalidArgument`] naming the line; blank lines are skipped, any `dir` other
+    /// than `"rx"` counts as tx.
     pub fn open(path: impl AsRef<Path>, strict_tx: bool, realtime: bool) -> Result<ReplayLink> {
         let path = path.as_ref();
-        let text = std::fs::read_to_string(path)?;
-        let mut lines = text.lines();
-        let bad = |m: &str| DepzError::Protocol(format!("{}: {m}", path.display()));
-        let header = match lines.next() {
-            Some(l) if !l.trim().is_empty() => Value::parse(l).map_err(|e| bad(&e.to_string()))?,
-            _ => Value::Object(Vec::new()),
+        // not UTF-8 (a gzip container, ERRATA A6) is a damaged capture, not an I/O failure
+        let text = String::from_utf8(std::fs::read(path)?).map_err(|e| {
+            DepzError::InvalidArgument(format!("{}: not UTF-8 text: {e}", path.display()))
+        })?;
+        let bad = |lineno: usize, m: String| {
+            DepzError::InvalidArgument(format!("{}:{lineno}: {m}", path.display()))
         };
+        let mut lines = text.lines().enumerate();
+        let header = match lines.next() {
+            Some((_, l)) => Value::parse(l).map_err(|e| bad(1, format!("not JSON: {e}")))?,
+            None => {
+                return Err(DepzError::InvalidArgument(format!(
+                    "{}: empty, not a .depzrec capture (no header line)",
+                    path.display()
+                )))
+            }
+        };
+        if header.entries().is_none() {
+            return Err(bad(1, "header is not a JSON object".into()));
+        }
         let mut rx = Vec::new();
         let mut tx = Vec::new();
-        for line in lines {
-            if line.trim().is_empty() {
+        for (idx, line) in lines {
+            if is_blank_line(line) {
                 continue;
             }
-            let ev = Value::parse(line).map_err(|e| bad(&e.to_string()))?;
-            let data = ev.get("data").and_then(Value::as_str).and_then(hex_decode).ok_or_else(|| bad("an event without hex data"))?;
-            if ev.get("dir").and_then(Value::as_str) == Some("rx") {
-                let t_us = ev.get("t").and_then(Value::as_i64).unwrap_or(0).max(0) as u64;
-                rx.push(Rx { t_us, data, tx_prefix: tx.len() });
+            let (t_us, dir, data) = replay_event(line).map_err(|m| bad(idx + 1, m))?;
+            if dir == "rx" {
+                rx.push(Rx {
+                    t_us,
+                    data,
+                    tx_prefix: tx.len(),
+                });
             } else {
                 tx.extend_from_slice(&data);
             }
@@ -122,9 +194,18 @@ impl ReplayLink {
             strict_tx,
             realtime,
             t0: Instant::now(),
-            name: format!("replay:{}", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+            name: format!(
+                "replay:{}",
+                path.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            ),
             header,
-            state: Mutex::new(ReplayState { rx_idx: 0, tx_written: 0, closed: false }),
+            state: Mutex::new(ReplayState {
+                rx_idx: 0,
+                tx_written: 0,
+                closed: false,
+            }),
             cond: Condvar::new(),
         })
     }
@@ -146,7 +227,9 @@ impl ReplayLink {
 
     /// Recorded tx bytes the host has not written yet.
     pub fn tx_remaining(&self) -> usize {
-        self.tx.len().saturating_sub(self.state.lock().unwrap().tx_written)
+        self.tx
+            .len()
+            .saturating_sub(self.state.lock().unwrap().tx_written)
     }
 }
 
@@ -264,7 +347,11 @@ pub const RECORDING_SCHEMA: &str = "depz.rec/1";
 impl<L: Link> RecordingLink<L> {
     /// Record `inner` into `path` (overwritten); `header_extra` adds header fields (contract 08),
     /// e.g. `device`. Closing this link closes `inner`.
-    pub fn create(inner: L, path: impl AsRef<Path>, header_extra: Vec<(String, Value)>) -> Result<RecordingLink<L>> {
+    pub fn create(
+        inner: L,
+        path: impl AsRef<Path>,
+        header_extra: Vec<(String, Value)>,
+    ) -> Result<RecordingLink<L>> {
         let mut file = BufWriter::new(File::create(path)?);
         let mut header = vec![
             ("schema".to_string(), Value::String(RECORDING_SCHEMA.into())),
@@ -272,7 +359,11 @@ impl<L: Link> RecordingLink<L> {
         ];
         header.extend(header_extra);
         writeln!(file, "{}", Value::Object(header).to_json())?;
-        Ok(RecordingLink { inner, file: Mutex::new(Some(file)), t0: Instant::now() })
+        Ok(RecordingLink {
+            inner,
+            file: Mutex::new(Some(file)),
+            t0: Instant::now(),
+        })
     }
 
     fn emit(&self, dir: &str, data: &[u8]) -> Result<()> {

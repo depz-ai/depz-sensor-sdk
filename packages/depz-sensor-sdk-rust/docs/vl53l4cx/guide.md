@@ -23,9 +23,9 @@ commands and the stateless decode of what the board streams.
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::open_on_link;
+use depz_sensor_sdk::devices::open_first_device;
 
-let tof = open_on_link(link, None, None, None)?.into_vl53lx()?;   // a Vl53l4cxDevice underneath
+let tof = open_first_device(None)?.into_vl53lx()?;   // a Vl53l4cxDevice underneath
 tof.init(None, None)?;                                   // VL53L4CX / histogram
 tof.configure(50, 0, Some("medium"), None, None, None)?;
 let frames = tof.measurements(64);

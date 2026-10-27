@@ -14,6 +14,7 @@ import {
   Bno086,
   DatasetReader,
   DatasetRecorder,
+  InvalidStateError,
   Sr04,
   Vl53l8ch,
   Vl53l8cx,
@@ -51,6 +52,21 @@ function emitFrame(dev: Vl53l8cx, timestampUs: bigint, resolution = 16): void {
 }
 
 describe("DatasetRecorder cross-sensor sync", () => {
+  it("add() after start() and dump() before it are invalid-state errors", async () => {
+    // Contract 07 §3 (ERRATA A17).
+    const fake = new FakeSr04();
+    const dev = new Sr04(fake.transport, { timeoutMs: 1000 });
+    await dev.open();
+    const rec = new DatasetRecorder();
+    expect(() => rec.dump()).toThrow(InvalidStateError);
+    await rec.add(dev);
+    rec.start();
+    await expect(rec.add(dev)).rejects.toThrow(InvalidStateError);
+    rec.stop();
+    await dev.close();
+    await fake.close();
+  });
+
   it("records two devices on a shared host timeline", async () => {
     const fakeA = new FakeSr04();
     const fakeB = new FakeSr04();

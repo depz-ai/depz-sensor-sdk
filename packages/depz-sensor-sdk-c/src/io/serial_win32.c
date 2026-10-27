@@ -161,4 +161,12 @@ int depz_serial_link_open(const char *port, depz_link **out)
     return rc;
 }
 
+/* A COM port is not a file: a name is matched by string only. */
+bool depz_same_port(const char *a, const char *b)
+{
+    (void)a;
+    (void)b;
+    return false;
+}
+
 #endif /* _WIN32 */

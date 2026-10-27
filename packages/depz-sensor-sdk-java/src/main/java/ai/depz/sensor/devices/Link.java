@@ -16,7 +16,11 @@ public interface Link {
      */
     byte[] read(Duration timeout);
 
-    /** @throws DeviceLostException the link is closed or the device is gone */
+    /**
+     * Writes {@code data} to the board.
+     *
+     * @throws DeviceLostException the link is closed or the device is gone
+     */
     void write(byte[] data);
 
     void close();

@@ -227,7 +227,7 @@ public final class Bno086Device extends DepzDevice {
         }
         for (Listener l : cbs) {
             if (l.filter() == null || l.filter().contains(sensor)) {
-                l.callback().accept(rep);
+                Fanout.call(l.callback(), rep, stats());
             }
         }
         List<ReportQueue> qs;
@@ -323,6 +323,19 @@ public final class Bno086Device extends DepzDevice {
         return timeout != null ? timeout : fallback;
     }
 
+    /**
+     * A control response the hub answered a request with, decoded; one shorter than its fields
+     * (or otherwise refused by the decoder) fails that request with {@link InvalidReplyException}
+     * (contract 07 §3), never a bare error.
+     */
+    private static <T> T decodeReply(int rid, byte[] raw, Function<byte[], T> unpack) {
+        try {
+            return unpack.apply(raw);
+        } catch (IllegalArgumentException | Sh2Exception bad) {
+            throw new InvalidReplyException(rid, bad);
+        }
+    }
+
     // Send a control payload and wait for the first response of report id `rid` that `pred` accepts.
     private <T> T controlRequest(byte[] payload, int rid, Function<byte[], T> parse, Predicate<T> pred, Duration timeout) {
         LinkedBlockingQueue<byte[]> q = await(rid);
@@ -330,7 +343,7 @@ public final class Bno086Device extends DepzDevice {
             sendShtp(Sh2Hub.CHANNEL_CONTROL, payload);
             long end = deadline(timeout);
             while (true) {
-                T obj = parse.apply(next(q, end, timeout, rid));
+                T obj = decodeReply(rid, next(q, end, timeout, rid), parse);
                 if (pred == null || pred.test(obj)) {
                     return obj;
                 }
@@ -370,7 +383,7 @@ public final class Bno086Device extends DepzDevice {
             sendShtp(Sh2Hub.CHANNEL_CONTROL, payload);
             long end = deadline(timeout);
             while (true) {
-                CommandResponse resp = CommandResponse.unpack(next(q, end, timeout, rid));
+                CommandResponse resp = decodeReply(rid, next(q, end, timeout, rid), CommandResponse::unpack);
                 if (resp.command() != command || resp.commandSeq() != seq) {
                     continue;
                 }
@@ -475,7 +488,7 @@ public final class Bno086Device extends DepzDevice {
             sendShtp(Sh2Hub.CHANNEL_CONTROL, Sh2.buildProductIdRequest());
             Duration t = or(timeout, DEFAULT_TIMEOUT);
             List<ProductId> out = new ArrayList<>();
-            out.add(ProductId.unpack(next(q, deadline(t), t, rid)));
+            out.add(decodeReply(rid, next(q, deadline(t), t, rid), ProductId::unpack));
             Duration s = or(settle, PRODUCT_ID_SETTLE);
             while (true) {
                 byte[] more;
@@ -488,7 +501,7 @@ public final class Bno086Device extends DepzDevice {
                 if (more == null) {
                     break;
                 }
-                out.add(ProductId.unpack(more));
+                out.add(decodeReply(rid, more, ProductId::unpack));
             }
             return out;
         } finally {
@@ -799,7 +812,7 @@ public final class Bno086Device extends DepzDevice {
             sendShtp(Sh2Hub.CHANNEL_CONTROL, session.request());
             long end = deadline(t);
             while (!session.done()) {
-                session.feed(FrsReadResponse.unpack(next(q, end, t, rid)));
+                session.feed(decodeReply(rid, next(q, end, t, rid), FrsReadResponse::unpack));
             }
         } finally {
             unwait(rid, q);
@@ -821,7 +834,7 @@ public final class Bno086Device extends DepzDevice {
             sendShtp(Sh2Hub.CHANNEL_CONTROL, session.request());
             long end = deadline(t);
             while (!session.done()) {
-                byte[] next = session.feed(FrsWriteResponse.unpack(next(q, end, t, rid)));
+                byte[] next = session.feed(decodeReply(rid, next(q, end, t, rid), FrsWriteResponse::unpack));
                 if (next != null) {
                     sendShtp(Sh2Hub.CHANNEL_CONTROL, next);
                 }

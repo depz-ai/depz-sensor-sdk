@@ -108,7 +108,7 @@ class FrameInfo:
 
 def frame_size(head: bytes) -> int:
     """Full frame size (pre-header included) from its first 21 bytes."""
-    return PRE_HEADER_SIZE + 4 + struct.unpack_from("<H", head, 7)[0]
+    return PRE_HEADER_SIZE + 4 + int(struct.unpack_from("<H", head, 7)[0])
 
 
 def parse_frame(raw: bytes) -> FrameInfo:

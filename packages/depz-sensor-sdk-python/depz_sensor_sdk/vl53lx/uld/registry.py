@@ -30,6 +30,7 @@ because guessing would be worse than asking.
 
 import re
 
+from depz_sensor_sdk.vl53lx.uld.base import SensorDriver
 from depz_sensor_sdk.vl53lx.uld.l0x import VL53L0X
 from depz_sensor_sdk.vl53lx.uld.l1 import VL53L1
 from depz_sensor_sdk.vl53lx.uld.l3 import VL53L3
@@ -71,11 +72,13 @@ class Product:
     with that pair.
     """
 
-    def __init__(self, model_id, reach_mm, drivers, caveats=None):
+    def __init__(self, model_id: int, reach_mm: int,
+                 drivers: dict[str, type[SensorDriver]],
+                 caveats: dict[str, str] | None = None) -> None:
         self.model_id = model_id
         self.reach_mm = reach_mm
         self.drivers = drivers
-        self.caveats = caveats or {}
+        self.caveats: dict[str, str] = caveats or {}
 
 
 _HIST_CAVEAT = ('the histogram driver has no calibrations and no detection '
@@ -83,7 +86,7 @@ _HIST_CAVEAT = ('the histogram driver has no calibrations and no detection '
 
 # Which pairs exist. Everything measured on hardware; see the plan's note
 # "Матрица product x driver снята на железе".
-TABLE = {
+TABLE: dict[str, Product] = {
     'VL53L0X': Product(
         # The only part of the family on its own silicon: no histogram firmware
         # in the die and no Fast Mode Plus on the pad.
@@ -126,7 +129,7 @@ TABLE = {
 _NAME_RE = re.compile(r'VL53L(\d[A-Z0-9]*)')
 
 
-def product_from_board_name(name: str):
+def product_from_board_name(name: str) -> str | None:
     """`ToF Sensor VL53L4CD USB v2.1` -> 'VL53L4CD'. None if the name carries
     no product number — an unstamped board, or a name we do not recognise."""
     if not name:
@@ -148,13 +151,13 @@ def product(name: str) -> Product:
             f'{", ".join(supported_products())}') from None
 
 
-def driver_kinds(name: str) -> tuple:
+def driver_kinds(name: str) -> tuple[str, ...]:
     """-> the driver kinds this product has, in DRIVER_KINDS order."""
     have = product(name).drivers
     return tuple(k for k in DRIVER_KINDS if k in have)
 
 
-def driver_for(name: str, kind: str):
+def driver_for(name: str, kind: str) -> tuple[type[SensorDriver], str | None]:
     """-> (driver class, caveat or None) for one product/driver pair.
 
     Raises for a pair the table has no row for, naming what the product does
@@ -170,7 +173,7 @@ def driver_for(name: str, kind: str):
             f'{", ".join(driver_kinds(name))}') from None
 
 
-def reach_mm(name: str):
+def reach_mm(name: str) -> int | None:
     """The product's rated maximum ranging distance, mm (datasheet)."""
     row = TABLE.get(name)
     return row.reach_mm if row else None
@@ -181,8 +184,8 @@ def model_id_ok(name: str, value: int) -> bool:
     True only says "not something else entirely": the pairs that share an id
     cannot be told apart this way."""
     row = TABLE.get(name)
-    return bool(row) and row.model_id == value
+    return row is not None and row.model_id == value
 
 
-def supported_products() -> tuple:
+def supported_products() -> tuple[str, ...]:
     return tuple(p for p in PRODUCTS if p in TABLE)

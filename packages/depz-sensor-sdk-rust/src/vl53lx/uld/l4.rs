@@ -4,8 +4,9 @@
 use std::sync::Arc;
 
 use super::die::{
-    self, collect, die_base_timing, die_common, uld_err, Die, DieConfig, DieDriver, INNER_OFFSET_MM,
-    OUTER_OFFSET_MM, PHASECAL_CONFIG_TIMEOUT_MACROP, RANGE_OFFSET_MM, XTALK_PLANE_OFFSET_KCPS,
+    self, collect, die_base_timing, die_common, uld_err, Die, DieConfig, DieDriver,
+    INNER_OFFSET_MM, OUTER_OFFSET_MM, PHASECAL_CONFIG_TIMEOUT_MACROP, RANGE_OFFSET_MM,
+    XTALK_PLANE_OFFSET_KCPS,
 };
 use crate::devices::Result;
 use crate::vl53lx::driver::{Vl53lxDriver, Vl53lxPlatform, Vl53lxRange};
@@ -29,10 +30,24 @@ static L3_CONFIGURATION: [u8; 91] = [
 ];
 
 const L4_GROUPS: &[&str] = &[
-    "timing", "offset", "xtalk", "thresholds", "signal_thresh", "sigma_thresh", "temp_update", "calib_offset", "calib_xtalk",
+    "timing",
+    "offset",
+    "xtalk",
+    "thresholds",
+    "signal_thresh",
+    "sigma_thresh",
+    "temp_update",
+    "calib_offset",
+    "calib_xtalk",
 ];
 
-const L3_GROUPS: &[&str] = &["timing", "thresholds", "signal_thresh", "sigma_thresh", "roi"];
+const L3_GROUPS: &[&str] = &[
+    "timing",
+    "thresholds",
+    "signal_thresh",
+    "sigma_thresh",
+    "roi",
+];
 
 /// VL53L4CD ULD 2.2.3 for VL53L4CD and VL53L4CX alike.
 pub struct Vl53l4UldDriver {
@@ -42,8 +57,15 @@ pub struct Vl53l4UldDriver {
 impl Vl53l4UldDriver {
     /// A driver over `platform`, bound for `product`.
     pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l4UldDriver {
-        let cfg = DieConfig { configuration: &L4_CONFIGURATION, stop_mode: 0x80, signal_at: 5, per_spad_k: 256 };
-        Vl53l4UldDriver { die: Die::new(platform, product, cfg) }
+        let cfg = DieConfig {
+            configuration: &L4_CONFIGURATION,
+            stop_mode: 0x80,
+            signal_at: 5,
+            per_spad_k: 256,
+        };
+        Vl53l4UldDriver {
+            die: Die::new(platform, product, cfg),
+        }
     }
 
     /// The die underneath (boot state, reset, interrupt polarity).
@@ -113,9 +135,14 @@ impl Vl53lxDriver for Vl53l4UldDriver {
         let tmp = (1.0 - avg_distance / target_dist_mm as f64) * (avg_signal / avg_spad_nb);
         if tmp > 127.0 {
             // 65536 / 512
-            return Err(uld_err(format!("xtalk calibration failed: {tmp:.1} kcps > 127")));
+            return Err(uld_err(format!(
+                "xtalk calibration failed: {tmp:.1} kcps > 127"
+            )));
         }
-        p.write_word(XTALK_PLANE_OFFSET_KCPS, ((tmp * 512.0) as i32 & 0xFFFF) as u16)?;
+        p.write_word(
+            XTALK_PLANE_OFFSET_KCPS,
+            ((tmp * 512.0) as i32 & 0xFFFF) as u16,
+        )?;
         Ok(die::round_half_away(tmp) as i32)
     }
 }
@@ -128,8 +155,15 @@ pub struct Vl53l3UlpDriver {
 impl Vl53l3UlpDriver {
     /// A driver over `platform`, bound for `product`.
     pub fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str) -> Vl53l3UlpDriver {
-        let cfg = DieConfig { configuration: &L3_CONFIGURATION, stop_mode: 0x00, signal_at: 5, per_spad_k: 256 };
-        Vl53l3UlpDriver { die: Die::new(platform, product, cfg) }
+        let cfg = DieConfig {
+            configuration: &L3_CONFIGURATION,
+            stop_mode: 0x00,
+            signal_at: 5,
+            per_spad_k: 256,
+        };
+        Vl53l3UlpDriver {
+            die: Die::new(platform, product, cfg),
+        }
     }
 
     /// The die underneath (boot state, reset, interrupt polarity).

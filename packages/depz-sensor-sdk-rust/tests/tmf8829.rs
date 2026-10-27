@@ -18,7 +18,8 @@ use common::shapes::{self, sha256};
 use common::{hex_decode, hex_encode, load, recordings_dir, seen};
 
 fn u(v: &Value) -> u64 {
-    v.as_u64().unwrap_or_else(|| panic!("not an unsigned int: {}", v))
+    v.as_u64()
+        .unwrap_or_else(|| panic!("not an unsigned int: {}", v))
 }
 
 fn i(v: &Value) -> i64 {
@@ -109,8 +110,12 @@ fn tmf8829_reassembly_vectors() {
     let mut n = 0;
     for c in doc["reassembly"].as_array().unwrap() {
         let name = s(&c["name"]);
-        let chunks: Vec<Vec<u8>> =
-            c["chunks"].as_array().unwrap().iter().map(|ch| hex_decode(s(ch))).collect();
+        let chunks: Vec<Vec<u8>> = c["chunks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|ch| hex_decode(s(ch)))
+            .collect();
         let got = shapes::tmf8829_reassembly(&chunks).unwrap_or_else(|e| panic!("{}: {}", name, e));
         assert_eq!(got, c["expect"], "{}", name);
         seen(c);
@@ -127,6 +132,17 @@ fn tmf8829_frame_vectors() {
     let mut n = 0;
     for c in doc["frames"].as_array().unwrap() {
         let name = s(&c["name"]);
+        if c.get("error").is_some() {
+            // a results frame whose pixel decode must fail
+            assert!(
+                shapes::tmf8829_frame(&hex_decode(s(&c["raw"]))).is_err(),
+                "{}: decode refused",
+                name
+            );
+            seen(c);
+            n += 1;
+            continue;
+        }
         let got = shapes::tmf8829_frame(&hex_decode(s(&c["raw"])))
             .unwrap_or_else(|e| panic!("{}: {}", name, e));
         let mut want = json!({"header": c["header"], "problems": c["problems"]});
@@ -139,7 +155,7 @@ fn tmf8829_frame_vectors() {
         seen(c);
         n += 1;
     }
-    assert_eq!(n, 18);
+    assert_eq!(n, 20);
 }
 
 // ---- measurements ----------------------------------------------------------
@@ -160,13 +176,24 @@ fn tmf8829_measurement_vectors() {
             .as_array()
             .unwrap()
             .iter()
-            .map(|f| (raw_by_case[s(&f["raw_case"])].clone(), u(&f["timestamp_us"]), u(&f["edge_us"])))
+            .map(|f| {
+                (
+                    raw_by_case[s(&f["raw_case"])].clone(),
+                    u(&f["timestamp_us"]),
+                    u(&f["edge_us"]),
+                )
+            })
             .collect();
-        assert_eq!(shapes::tmf8829_measurements(&frames), sc["expect"], "{}", name);
+        assert_eq!(
+            shapes::tmf8829_measurements(&frames),
+            sc["expect"],
+            "{}",
+            name
+        );
         seen(sc);
         n += 1;
     }
-    assert_eq!(n, 9);
+    assert_eq!(n, 11);
 }
 
 // ---- config ----------------------------------------------------------------
@@ -295,7 +322,11 @@ fn tmf8829_frame_time_recording() {
     let text = std::fs::read_to_string(recordings_dir().join("tmf8829_frame_time.jsonl")).unwrap();
     let (mut streams, mut checked) = (0, 0);
     let mut state: Option<(SensorClock, CaptureTimer)> = None;
-    for (no, line) in text.lines().enumerate().filter(|(_, l)| !l.trim().is_empty()) {
+    for (no, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| !l.trim().is_empty())
+    {
         let v: Value = serde_json::from_str(line).unwrap();
         if v.get("scenario").is_some() {
             state = Some((SensorClock::new(), CaptureTimer::new()));
@@ -326,8 +357,18 @@ fn tmf8829_frame_time_recording() {
         );
         let e = &v["exp"];
         assert_eq!(
-            (t.timestamp_us, t.t1_len_us as i64, t.flags as i64, clock.ratio_q16 as i64),
-            (i(&e["timestamp_us"]), i(&e["t1_len_us"]), i(&e["flags"]), i(&e["ratio_q16"])),
+            (
+                t.timestamp_us,
+                t.t1_len_us as i64,
+                t.flags as i64,
+                clock.ratio_q16 as i64
+            ),
+            (
+                i(&e["timestamp_us"]),
+                i(&e["t1_len_us"]),
+                i(&e["flags"]),
+                i(&e["ratio_q16"])
+            ),
             "line {}",
             no + 1
         );

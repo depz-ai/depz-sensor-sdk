@@ -69,8 +69,6 @@ Result of [`decode_cnh`].
 pub enum CnhError {
     /// `raw` is too short for the header or the computed block extends past it.
     Truncated,
-    /// `nb_of_aggregates` or `feature_length` is zero.
-    EmptyConfig,
 }
 ```
 
@@ -89,7 +87,8 @@ into per-aggregate integer histograms plus the reference-residual word.
 Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
 DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
 device reports a single buffer and the ping/pong selection resolves to the
-sole buffer.
+sole buffer. As the reference, an empty configuration (no aggregates or no
+bins) decodes to empty histograms rather than an error.
 
 ### CNH_DATA_IDX
 

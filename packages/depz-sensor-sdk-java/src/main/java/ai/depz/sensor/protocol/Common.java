@@ -176,6 +176,20 @@ public final class Common {
         return u64leBytes(pcTimestampUs);
     }
 
+    /** SET_PAYLOAD_CRC_TYPE takes 0..3 (contract 02 §2). */
+    public static final int PAYLOAD_CRC_TYPE_MAX = 3;
+
+    /**
+     * SET_PAYLOAD_CRC_TYPE payload {@code crc_type u8}, 0..3 (contract 02 §2), else
+     * IllegalArgumentException — checked before anything is written (contract 07 §3).
+     */
+    public static byte[] packSetPayloadCrcType(int crcType) {
+        if (crcType < 0 || crcType > PAYLOAD_CRC_TYPE_MAX) {
+            throw new IllegalArgumentException("crcType: " + crcType + " is not a CrcType 0.." + PAYLOAD_CRC_TYPE_MAX);
+        }
+        return new byte[] {(byte) crcType};
+    }
+
     /**
      * NTP-style clock math, all µs (contract 02 §5). Returns
      * {@code {offset_us, rtt_us}} where offset = device_clock - host_clock,

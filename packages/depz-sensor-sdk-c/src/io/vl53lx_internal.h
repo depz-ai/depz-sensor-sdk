@@ -95,7 +95,10 @@ typedef struct {
     /* Optional (NULL when not served; the class checks `supports` first). */
     size_t (*modes)(const vlx_driver *d, const char **names, size_t cap);
     size_t (*budget_choices)(vlx_driver *d, int *out, size_t cap);
-    int  (*set_mode)(vlx_driver *d, const char *name);
+    /* `*budget_ms` (never NULL) gets the timing budget in effect after the
+     * change on a driver whose mode change can move it (VL53L1, contract 12
+     * §5); the others leave it alone. */
+    int  (*set_mode)(vlx_driver *d, const char *name, int *budget_ms);
     int  (*get_mode)(vlx_driver *d, const char **name);
     /* How far the configuration in use can measure (`reach_mm()`); `*out` 0 =
      * not characterised. May read the sensor. */
@@ -137,6 +140,18 @@ vlx_driver *vlx_new_l3(vlx_plat *p, depz_vl53lx_product product);   /* uld/l3.py
 vlx_driver *vlx_new_l1(vlx_plat *p, depz_vl53lx_product product);   /* uld/l1.py  */
 vlx_driver *vlx_new_l0x(vlx_plat *p, depz_vl53lx_product product);  /* uld/l0x.py */
 vlx_driver *vlx_new_bare(vlx_plat *p, depz_vl53lx_product product); /* uld/bare/  */
+
+/* VL53L0X internals the golden vectors drive directly (vl53lx.json l0x_uld,
+ * tests/test_vectors.c): the NVM identification read, the tuning loader and
+ * the host-side state they leave behind. Test seams, not public API. */
+typedef struct {
+    int64_t offset_nvm_um;        /* Part2PartOffsetAdjustmentNVMMicroMeter  */
+    int     target_ref_rate;      /* the reference-SPAD target, 9.7 Mcps     */
+    int     sigma_est_ref_array, sigma_est_eff_pulse_width, sigma_est_eff_amb_width;
+} vlx_l0x_host_state;
+int  vlx_l0x_get_info_from_device(vlx_driver *d, int option);
+int  vlx_l0x_load_tuning_settings(vlx_driver *d, const uint8_t *buffer);
+void vlx_l0x_host_state_get(const vlx_driver *d, vlx_l0x_host_state *out);
 
 /* How far a target can be before the VL53L1 die fails it with status 4, mm:
  * RANGE_CONFIG__VALID_PHASE_HIGH (5.3 fixed point, PLL periods from the

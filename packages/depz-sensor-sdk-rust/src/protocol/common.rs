@@ -215,7 +215,9 @@ impl SyncPinConfig {
             return Err(CodecError("sync-pin mode is not a SyncPinMode (0..4)"));
         }
         if self.polarity > SyncPinPolarity::IdleHigh as u8 {
-            return Err(CodecError("sync-pin polarity is not a SyncPinPolarity (0..1)"));
+            return Err(CodecError(
+                "sync-pin polarity is not a SyncPinPolarity (0..1)",
+            ));
         }
         Ok([self.pin, self.mode, self.polarity])
     }
@@ -242,7 +244,24 @@ pub fn pack_sync_time(pc_timestamp_us: u64) -> [u8; 8] {
     pc_timestamp_us.to_le_bytes()
 }
 
-/// Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte).
+/// `SET_PAYLOAD_CRC_TYPE` takes 0..3 (contract 02 §2).
+pub const PAYLOAD_CRC_TYPE_MAX: u8 = 3;
+
+/// Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte); a value
+/// outside 0..=[`PAYLOAD_CRC_TYPE_MAX`] is refused before anything is written
+/// (contract 07 §3).
+pub fn try_pack_set_payload_crc_type(crc_type: u8) -> Result<[u8; 1], CodecError> {
+    if crc_type > PAYLOAD_CRC_TYPE_MAX {
+        return Err(CodecError(
+            "SET_PAYLOAD_CRC_TYPE: crc_type is not a CrcType 0..3",
+        ));
+    }
+    Ok(pack_set_payload_crc_type(crc_type))
+}
+
+/// Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte), unchecked
+/// — prefer [`try_pack_set_payload_crc_type`] for an untyped value (the
+/// device layer passes a [`crate::framing::CrcType`], always 0..3).
 pub fn pack_set_payload_crc_type(crc_type: u8) -> [u8; 1] {
     [crc_type]
 }
@@ -273,6 +292,12 @@ pub fn strip_device_string(raw: &[u8]) -> String {
         .map_or(0, |i| i + 1);
     raw[..end]
         .iter()
-        .map(|&b| if b < 0x80 { b as char } else { char::REPLACEMENT_CHARACTER })
+        .map(|&b| {
+            if b < 0x80 {
+                b as char
+            } else {
+                char::REPLACEMENT_CHARACTER
+            }
+        })
         .collect()
 }

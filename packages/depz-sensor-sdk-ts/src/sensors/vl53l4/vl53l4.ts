@@ -10,7 +10,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
 import { chunkedRead, chunkedWrite } from "../reg-bridge.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
@@ -194,7 +194,8 @@ export class Vl53l4cd extends DepzDevice {
   }
 
   /**
-   * Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD
+   * Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ. ~2 ms;
+   * the reply is awaited up to 2 s). The ULD
    * configuration is wiped — call init() again.
    */
   async resetSensor(): Promise<void> {
@@ -205,8 +206,8 @@ export class Vl53l4cd extends DepzDevice {
 
   /**
    * RPT_VL53_INFO: sensor identity, pin levels and bridge counters. Counters
-   * are free-running (wrap silently) — watch increments. Safe to call while
-   * streaming.
+   * wrap silently — watch increments; `i2cErrors` is cleared by a successful
+   * XSHUT reset. Safe to call while streaming.
    */
   async bridgeInfo(): Promise<Vl53l4Info> {
     return this.request(Vl53l4Cmd.GetInfo, undefined, {
@@ -466,7 +467,7 @@ export class Vl53l4cd extends DepzDevice {
 
   protected requireNotRanging(): void {
     if (this.rangingFlag) {
-      throw new DepzError("stopRanging() first — the stream owns the register bank");
+      throw new InvalidStateError("stopRanging() first — the stream owns the register bank");
     }
   }
 
@@ -487,7 +488,7 @@ export class Vl53l4cd extends DepzDevice {
       return true;
     }
     const m = measurementFromResults(sample.timestampUs, result);
-    for (const cb of [...this.measureCbs]) cb(m);
+    for (const cb of [...this.measureCbs]) this.callGuarded(cb, m);
     for (const q of [...this.measureQueues]) q.push(m);
     return true;
   }

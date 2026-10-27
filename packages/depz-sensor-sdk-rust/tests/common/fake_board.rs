@@ -30,7 +30,15 @@ pub struct FakeBoard {
 impl FakeBoard {
     pub fn new() -> FakeBoard {
         FakeBoard {
-            state: Arc::new((Mutex::new(State { rx: VecDeque::new(), closed: false, unplugged: false, seq: 0 }), Condvar::new())),
+            state: Arc::new((
+                Mutex::new(State {
+                    rx: VecDeque::new(),
+                    closed: false,
+                    unplugged: false,
+                    seq: 0,
+                }),
+                Condvar::new(),
+            )),
             parser: Arc::new(Mutex::new(PacketParser::new())),
             sent: Arc::new(Mutex::new(Vec::new())),
             handler: Arc::new(Mutex::new(None)),
@@ -134,6 +142,82 @@ impl Link for FakeBoard {
     fn name(&self) -> String {
         "fake".into()
     }
+}
+
+/// The event the device layer emits for an unsolicited common report, as the
+/// differential-test op `common_event` reports it (contract 16) — `common_decode`'s
+/// twin through the dispatcher (contract 07 §2/§3): the packet goes in with nothing
+/// pending, and the first event out is the answer.
+pub fn common_event(report: u8, payload: &[u8]) -> Result<serde_json::Value, String> {
+    use depz_sensor_sdk::devices::{DepzDevice, DeviceEvent};
+    use serde_json::json;
+
+    let board = FakeBoard::new();
+    let dev = DepzDevice::new(board.clone(), Some(Duration::from_secs(1)));
+    let events = dev.events(8);
+    board.inject(board.reply(report, payload));
+    let ev = events
+        .take(Duration::from_secs(2))
+        .map_err(|e| format!("{e:?}"))?;
+    Ok(match ev {
+        DeviceEvent::UnsolicitedStatus(status) => {
+            json!({ "event": "unsolicited_status", "status": status })
+        }
+        DeviceEvent::SequenceError {
+            expected_seq,
+            received_seq,
+            reported_by_device,
+        } => json!({
+            "event": "sequence_error",
+            "expected_seq": expected_seq,
+            "received_seq": received_seq,
+            "reported_by_device": reported_by_device,
+        }),
+        DeviceEvent::Text { cmd, text } => json!({ "event": "text", "cmd": cmd, "text": text }),
+        DeviceEvent::Temperature {
+            timestamp_us,
+            celsius,
+        } => json!({ "event": "temperature", "timestamp_us": timestamp_us, "celsius": celsius }),
+        other => return Err(format!("event {other:?}")),
+    })
+}
+
+/// The host-observed seq gaps, as the differential-test op `common_seq_gap` reports them
+/// (contract 01 §5 step 5, contract 16): one packet per `seqs` entry (report 0x7F, payload 00 —
+/// each becomes a hex `text` event) goes in; once every packet's own event is out, the
+/// `seq_gap` events and `stats.seq_gaps` are the answer. A gap is surfaced ahead of its
+/// packet, so none can still be on the way.
+pub fn common_seq_gap(seqs: &[u8]) -> Result<serde_json::Value, String> {
+    use depz_sensor_sdk::devices::{DepzDevice, DeviceEvent};
+    use serde_json::json;
+
+    let board = FakeBoard::new();
+    let dev = DepzDevice::new(board.clone(), Some(Duration::from_secs(1)));
+    let events = dev.events(2 * seqs.len() + 8);
+    for &seq in seqs {
+        board.inject(build_packet(0x7F, &[0], seq as u32, CrcType::None).unwrap());
+    }
+    let mut gaps = Vec::new();
+    let mut texts = 0;
+    while texts < seqs.len() {
+        match events
+            .take(Duration::from_secs(2))
+            .map_err(|e| format!("{e:?}"))?
+        {
+            DeviceEvent::SeqGap {
+                expected_seq,
+                received_seq,
+                missed,
+            } => gaps.push(json!({
+                "expected_seq": expected_seq,
+                "received_seq": received_seq,
+                "missed": missed,
+            })),
+            DeviceEvent::Text { .. } => texts += 1,
+            other => return Err(format!("event {other:?}")),
+        }
+    }
+    Ok(json!({ "gaps": gaps, "seq_gaps": dev.stats().seq_gaps }))
 }
 
 /// Wait until `cond` holds, up to `ms`.

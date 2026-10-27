@@ -8,10 +8,13 @@ use std::time::{Duration, Instant};
 use super::device::{expect_report, DepzDevice, ReportHandler, Requester};
 use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
-use crate::bno055::regs::{self as r, CalibStatus, CalibrationProfile, OprMode, PwrMode, TempSource, Units};
+use crate::bno055::regs::{
+    self as r, CalibStatus, CalibrationProfile, OprMode, PwrMode, TempSource, Units,
+};
 use crate::bno055::{
-    decode_block, pack_read_reg, pack_start_stream, pack_write_reg, AccelConfig, AxisRemap, Bno055Cmd, Bno055Info,
-    Bno055Rpt, GyroConfig, MagConfig, RegData, StreamData, TRIGGER_INT, TRIGGER_TIMER, XFER_MAX,
+    decode_block, try_pack_read_reg, try_pack_start_stream, try_pack_write_reg, AccelConfig,
+    AxisRemap, Bno055Cmd, Bno055Info, Bno055Rpt, GyroConfig, MagConfig, RegData, StreamData,
+    TRIGGER_INT, TRIGGER_TIMER, XFER_MAX,
 };
 use crate::framing::Packet;
 
@@ -70,7 +73,9 @@ impl Bno055SystemStatus {
             "fusion algorithm configuration error",
             "sensor configuration error",
         ];
-        NAMES.get(self.error as usize).map_or_else(|| format!("unknown ({})", self.error), |s| s.to_string())
+        NAMES
+            .get(self.error as usize)
+            .map_or_else(|| format!("unknown ({})", self.error), |s| s.to_string())
     }
 
     pub fn self_test_passed(&self) -> bool {
@@ -137,11 +142,16 @@ impl ReportHandler for Streams {
             return false;
         }
         // shorter than its own length field: refused
-        let s = if packet.payload.len() < STREAM_MIN_BYTES { None } else { StreamData::unpack(&packet.payload).ok() };
+        let s = if packet.payload.len() < STREAM_MIN_BYTES {
+            None
+        } else {
+            StreamData::unpack(&packet.payload).ok()
+        };
         match s {
             Some(s) => {
                 let units = *self.units.lock().unwrap();
-                self.samples.emit(Bno055Sample::decode(s.timestamp_us, s.addr, &s.data, units));
+                self.samples
+                    .emit(Bno055Sample::decode(s.timestamp_us, s.addr, &s.data, units));
             }
             None => {
                 self.parse_errors.fetch_add(1, Ordering::Relaxed);
@@ -197,7 +207,7 @@ impl Bno055Device {
     /// Continue the open connection `dev` as a BNO055.
     pub fn attach(dev: DepzDevice) -> Bno055Device {
         let streams = Arc::new(Streams {
-            samples: Fanout::new(),
+            samples: Fanout::new(dev.callback_errors_counter()),
             parse_errors: AtomicU64::new(0),
             units: Mutex::new(Units::unpack(0)),
         });
@@ -207,7 +217,11 @@ impl Bno055Device {
             dev,
             req,
             streams,
-            state: Mutex::new(State { units: None, configured: None, mode_before_suspend: None }),
+            state: Mutex::new(State {
+                units: None,
+                configured: None,
+                mode_before_suspend: None,
+            }),
             streaming: AtomicBool::new(false),
         }
     }
@@ -216,12 +230,19 @@ impl Bno055Device {
 
     /// RPT_BNO_INFO: chip ids, sensor firmware revision, bridge counters. Safe while streaming.
     pub fn bridge_info(&self) -> Result<Bno055Info> {
-        self.request(Bno055Cmd::GetInfo as u8, &[], expect_report(Bno055Rpt::Info as u8, Bno055Info::unpack), None)
+        self.request(
+            Bno055Cmd::GetInfo as u8,
+            &[],
+            expect_report(Bno055Rpt::Info as u8, Bno055Info::unpack),
+            None,
+        )
     }
 
     /// True when the bridge passed the chip-id handshake and the sensor answers with the BNO055 ids.
     pub fn is_alive(&self) -> bool {
-        self.bridge_info().map(|i| i.initialized != 0 && i.ids_ok()).unwrap_or(false)
+        self.bridge_info()
+            .map(|i| i.initialized != 0 && i.ids_ok())
+            .unwrap_or(false)
     }
 
     /// Hardware reset through nRESET (the bridge answers after the ~0.5 s boot handshake). Stops a
@@ -334,17 +355,21 @@ impl Bno055Device {
     /// Remap the output axes for the board's mounting (`AxisRemap::placement` gives the datasheet
     /// placements P0..P7; P1 is the default).
     pub fn set_axis_remap(&self, remap: &AxisRemap) -> Result<()> {
-        let (config, sign) = remap.pack().map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?;
+        let (config, sign) = remap
+            .pack()
+            .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?;
         let _st = self.state.lock().unwrap();
         self.in_config_mode(|| self.write(r::REG_AXIS_MAP_CONFIG, &[config, sign]))
     }
 
     pub fn get_temperature_source(&self) -> Result<TempSource> {
-        Ok(if self.read_register(r::REG_TEMP_SOURCE, 0)? & 0x03 == TempSource::Gyro as u8 {
-            TempSource::Gyro
-        } else {
-            TempSource::Accel
-        })
+        Ok(
+            if self.read_register(r::REG_TEMP_SOURCE, 0)? & 0x03 == TempSource::Gyro as u8 {
+                TempSource::Gyro
+            } else {
+                TempSource::Accel
+            },
+        )
     }
 
     pub fn set_temperature_source(&self, source: TempSource) -> Result<()> {
@@ -365,7 +390,10 @@ impl Bno055Device {
     ) -> Result<()> {
         let u = units.unwrap_or_else(|| Units::unpack(0));
         let remap = match &axis_remap {
-            Some(a) => Some(a.pack().map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?),
+            Some(a) => Some(
+                a.pack()
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
+            ),
             None => None,
         };
         let mut st = self.state.lock().unwrap();
@@ -383,7 +411,12 @@ impl Bno055Device {
         if mode.is_fusion() {
             self.wait_fusion_started(true)?;
         }
-        st.configured = Some(Configured { mode, units: u, remap: axis_remap, calibration });
+        st.configured = Some(Configured {
+            mode,
+            units: u,
+            remap: axis_remap,
+            calibration,
+        });
         Ok(())
     }
 
@@ -393,7 +426,9 @@ impl Bno055Device {
         let c = self.state.lock().unwrap().configured;
         match c {
             Some(c) => self.configure(c.mode, Some(c.units), c.remap, c.calibration),
-            None => Err(DepzError::InvalidState("configure() has not been called".into())),
+            None => Err(DepzError::InvalidState(
+                "configure() has not been called".into(),
+            )),
         }
     }
 
@@ -408,7 +443,12 @@ impl Bno055Device {
     fn system_status_locked(&self) -> Result<Bno055SystemStatus> {
         let st = self.read(r::REG_ST_RESULT, 1)?.1[0];
         let b = self.read(r::REG_SYS_CLK_STATUS, 3)?.1;
-        Ok(Bno055SystemStatus { self_test: st, clk_status: b[0], status: b[1], error: b[2] })
+        Ok(Bno055SystemStatus {
+            self_test: st,
+            clk_status: b[0],
+            status: b[1],
+            error: b[2],
+        })
     }
 
     /// The built-in self-test (datasheet §3.9.2), in CONFIG, ~400 ms; the operating mode is restored
@@ -439,13 +479,16 @@ impl Bno055Device {
 
     /// CALIB_STAT: 0..3 per sensor; in NDOF the sensor calibrates in the background.
     pub fn calibration_status(&self) -> Result<CalibStatus> {
-        Ok(CalibStatus::unpack(self.read_register(r::REG_CALIB_STAT, 0)?))
+        Ok(CalibStatus::unpack(
+            self.read_register(r::REG_CALIB_STAT, 0)?,
+        ))
     }
 
     /// Offsets and radii (0x55..0x6A), only readable in CONFIG: the driver switches there and back.
     pub fn read_calibration_profile(&self) -> Result<CalibrationProfile> {
         let _st = self.state.lock().unwrap();
-        let data = self.in_config_mode(|| Ok(self.read(r::REG_CALIB_PROFILE, r::CALIB_PROFILE_LEN)?.1))?;
+        let data =
+            self.in_config_mode(|| Ok(self.read(r::REG_CALIB_PROFILE, r::CALIB_PROFILE_LEN)?.1))?;
         Ok(CalibrationProfile::unpack(&data)?)
     }
 
@@ -459,7 +502,11 @@ impl Bno055Device {
 
     /// Soft-iron compensation matrix, 9 × i16 row-major, 1.0 = 16384.
     pub fn get_sic_matrix(&self) -> Result<[i16; 9]> {
-        Ok(r::unpack_sic_matrix(&self.read_registers(r::REG_SIC_MATRIX, 18, 0)?)?)
+        Ok(r::unpack_sic_matrix(&self.read_registers(
+            r::REG_SIC_MATRIX,
+            18,
+            0,
+        )?)?)
     }
 
     /// `matrix` `None` writes the identity.
@@ -472,7 +519,9 @@ impl Bno055Device {
     // ── page 1: raw sensor configuration (non-fusion modes) ──────────────────
 
     pub fn get_accel_config(&self) -> Result<AccelConfig> {
-        Ok(AccelConfig::unpack(self.read_register(r::REG1_ACC_CONFIG, 1)?))
+        Ok(AccelConfig::unpack(
+            self.read_register(r::REG1_ACC_CONFIG, 1)?,
+        ))
     }
 
     /// Accelerometer range / bandwidth / power; fusion modes override it.
@@ -481,7 +530,11 @@ impl Bno055Device {
     }
 
     pub fn get_gyro_config(&self) -> Result<GyroConfig> {
-        Ok(GyroConfig::unpack(&self.read_registers(r::REG1_GYR_CONFIG_0, 2, 1)?)?)
+        Ok(GyroConfig::unpack(&self.read_registers(
+            r::REG1_GYR_CONFIG_0,
+            2,
+            1,
+        )?)?)
     }
 
     pub fn set_gyro_config(&self, config: &GyroConfig) -> Result<()> {
@@ -489,7 +542,9 @@ impl Bno055Device {
     }
 
     pub fn get_mag_config(&self) -> Result<MagConfig> {
-        Ok(MagConfig::unpack(self.read_register(r::REG1_MAG_CONFIG, 1)?))
+        Ok(MagConfig::unpack(
+            self.read_register(r::REG1_MAG_CONFIG, 1)?,
+        ))
     }
 
     pub fn set_mag_config(&self, config: &MagConfig) -> Result<()> {
@@ -557,22 +612,40 @@ impl Bno055Device {
 
     /// (w, x, y, z) — the cheapest orientation read (8 bytes).
     pub fn read_quaternion(&self) -> Result<[f64; 4]> {
-        Ok(self.read_sample(Some(r::QUAT_BLOCK))?.quaternion.unwrap_or_default())
+        Ok(self
+            .read_sample(Some(r::QUAT_BLOCK))?
+            .quaternion
+            .unwrap_or_default())
     }
 
     /// Arm the bridge to read `block` (`None`: the full block) every `period_ms` and push it. Fusion
     /// runs at 100 Hz, so 10 ms is the useful floor. `int_trigger` reads on the INT edge, `period_ms`
     /// then a missed-edge watchdog (0 = none). Replaces a running stream.
-    pub fn start_stream(&self, period_ms: u16, block: Option<(u8, u8)>, int_trigger: bool) -> Result<()> {
+    pub fn start_stream(
+        &self,
+        period_ms: u16,
+        block: Option<(u8, u8)>,
+        int_trigger: bool,
+    ) -> Result<()> {
         let (addr, length) = block.unwrap_or(r::FULL_BLOCK);
         if length < 1 || length as usize > XFER_MAX || addr as usize + length as usize > 0x100 {
-            return Err(DepzError::InvalidArgument(format!("block 0x{addr:02X}+{length} outside 1..{XFER_MAX} / page")));
+            return Err(DepzError::InvalidArgument(format!(
+                "block 0x{addr:02X}+{length} outside 1..{XFER_MAX} / page"
+            )));
         }
+        let trigger = if int_trigger {
+            TRIGGER_INT
+        } else {
+            TRIGGER_TIMER
+        };
+        // Encoded (and so range-checked: TIMER period 1..60000) before the units
+        // read below — a refused argument puts nothing on the wire.
+        let payload = try_pack_start_stream(trigger, addr, length, period_ms)
+            .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?;
         let mut st = self.state.lock().unwrap();
         // Units first: the reader may decode the first sample before the request returns.
         *self.streams.units.lock().unwrap() = self.current_units(&mut st)?;
-        let trigger = if int_trigger { TRIGGER_INT } else { TRIGGER_TIMER };
-        self.request_ok(Bno055Cmd::StartStream as u8, &pack_start_stream(trigger, addr, length, period_ms), None)?;
+        self.request_ok(Bno055Cmd::StartStream as u8, &payload, None)?;
         self.streaming.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -602,7 +675,11 @@ impl Bno055Device {
 
     /// The next streamed sample (contract 07 §3); `timeout` `None`: 1 s.
     pub fn get_sample(&self, timeout: Option<Duration>) -> Result<Bno055Sample> {
-        self.streams.samples.next(timeout.unwrap_or(Duration::from_secs(1)), Bno055Rpt::Stream as u8, self.is_closed())
+        self.streams.samples.next(
+            timeout.unwrap_or(Duration::from_secs(1)),
+            Bno055Rpt::Stream as u8,
+            self.is_closed(),
+        )
     }
 
     /// Stream reports dropped because they did not decode (a short block).
@@ -624,16 +701,22 @@ impl Bno055Device {
         while out.len() < length {
             let n = (length - out.len()).min(XFER_MAX);
             if a > 0xFF {
-                return Err(DepzError::InvalidArgument(format!("register 0x{a:X} past the page")));
+                return Err(DepzError::InvalidArgument(format!(
+                    "register 0x{a:X} past the page"
+                )));
             }
             let rep: RegData = self.req.request(
                 Bno055Cmd::ReadReg as u8,
-                &pack_read_reg(a as u8, n as u8),
+                &try_pack_read_reg(a as u8, n as u8)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
                 expect_report(Bno055Rpt::RegData as u8, RegData::unpack),
                 None,
             )?;
             if rep.data.len() != n {
-                return Err(DepzError::Protocol(format!("READ_REG 0x{a:02X}: expected {n}, got {}", rep.data.len())));
+                return Err(DepzError::Protocol(format!(
+                    "READ_REG 0x{a:02X}: expected {n}, got {}",
+                    rep.data.len()
+                )));
             }
             ts = rep.timestamp_us;
             out.extend_from_slice(&rep.data);
@@ -646,9 +729,16 @@ impl Bno055Device {
         let mut a = addr as usize;
         for chunk in data.chunks(XFER_MAX) {
             if a > 0xFF {
-                return Err(DepzError::InvalidArgument(format!("register 0x{a:X} past the page")));
+                return Err(DepzError::InvalidArgument(format!(
+                    "register 0x{a:X} past the page"
+                )));
             }
-            self.req.request_ok(Bno055Cmd::WriteReg as u8, &pack_write_reg(a as u8, chunk), None)?;
+            self.req.request_ok(
+                Bno055Cmd::WriteReg as u8,
+                &try_pack_write_reg(a as u8, chunk)
+                    .map_err(|e| DepzError::InvalidArgument(e.0.to_string()))?,
+                None,
+            )?;
             a += chunk.len();
         }
         Ok(())
@@ -661,7 +751,11 @@ impl Bno055Device {
     // One OPR_MODE write plus its settle time (no via-CONFIG logic).
     fn switch_mode(&self, mode: OprMode) -> Result<()> {
         self.write(r::REG_OPR_MODE, &[mode as u8])?;
-        std::thread::sleep(if mode == OprMode::Config { MODE_SWITCH_TO_CONFIG } else { MODE_SWITCH_FROM_CONFIG });
+        std::thread::sleep(if mode == OprMode::Config {
+            MODE_SWITCH_TO_CONFIG
+        } else {
+            MODE_SWITCH_FROM_CONFIG
+        });
         if mode.is_fusion() {
             self.wait_fusion_started(false)?;
         }
@@ -680,7 +774,9 @@ impl Bno055Device {
                 back?;
                 Ok(out)
             }
-            _ => Err(DepzError::InvalidArgument(format!("BNO055 has register pages 0 and 1, got {page}"))),
+            _ => Err(DepzError::InvalidArgument(format!(
+                "BNO055 has register pages 0 and 1, got {page}"
+            ))),
         }
     }
 
@@ -722,7 +818,9 @@ impl Bno055Device {
                 continue;
             }
             if Instant::now() > deadline {
-                return Err(DepzError::Sensor("BNO055 did not finish booting (SYS_STATUS stuck)".into()));
+                return Err(DepzError::Sensor(
+                    "BNO055 did not finish booting (SYS_STATUS stuck)".into(),
+                ));
             }
             std::thread::sleep(Duration::from_millis(5));
         }
@@ -735,7 +833,9 @@ impl Bno055Device {
         while self.read(r::REG_QUA_DATA, 8)?.1.iter().all(|b| *b == 0) {
             if Instant::now() > deadline {
                 if strict {
-                    return Err(DepzError::Sensor("BNO055 fusion did not start (quaternion stays zero)".into()));
+                    return Err(DepzError::Sensor(
+                        "BNO055 fusion did not start (quaternion stays zero)".into(),
+                    ));
                 }
                 return Ok(());
             }
@@ -761,14 +861,21 @@ impl Bno055Device {
 
     fn require_not_streaming(&self) -> Result<()> {
         if self.streaming() {
-            return Err(DepzError::InvalidState("stop_stream() first — the stream reads page 0".into()));
+            return Err(DepzError::InvalidState(
+                "stop_stream() first — the stream reads page 0".into(),
+            ));
         }
         Ok(())
     }
 }
 
 fn opr_mode(value: u8) -> Result<OprMode> {
-    OprMode::from_reg(value).ok_or_else(|| DepzError::Protocol(format!("OPR_MODE reads 0x{:X}, not a BNO055 mode", value & 0x0F)))
+    OprMode::from_reg(value).ok_or_else(|| {
+        DepzError::Protocol(format!(
+            "OPR_MODE reads 0x{:X}, not a BNO055 mode",
+            value & 0x0F
+        ))
+    })
 }
 
 fn pwr_mode(value: u8) -> Result<PwrMode> {
@@ -776,6 +883,8 @@ fn pwr_mode(value: u8) -> Result<PwrMode> {
         0 => Ok(PwrMode::Normal),
         1 => Ok(PwrMode::LowPower),
         2 => Ok(PwrMode::Suspend),
-        v => Err(DepzError::Protocol(format!("PWR_MODE reads {v}, not a BNO055 power mode"))),
+        v => Err(DepzError::Protocol(format!(
+            "PWR_MODE reads {v}, not a BNO055 power mode"
+        ))),
     }
 }

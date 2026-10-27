@@ -14,10 +14,10 @@ import threading
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Any, Callable, Iterable, TypeVar
 
 from ..device import DeviceBase, StreamIterator, StreamQueue
-from ..errors import BusyError, DepzTimeoutError
+from ..errors import BusyError, DepzTimeoutError, InvalidReplyError
 from ..protocol.bno086 import BUSY_BACKOFF_S, Bno086Cmd, Bno086Data, Bno086Rpt
 from ..transport import Packet
 from .reports import (
@@ -131,6 +131,27 @@ class CalibrationConfig:
     planar: bool
 
 
+_R = TypeVar("_R")
+
+
+def _decode_reply(rid: int, raw: bytes, unpack: Callable[[bytes], _R]) -> _R:
+    """A control response the hub answered a request with, decoded; one
+    shorter than its fields fails that request with InvalidReplyError
+    (contract 07 §3), never a bare error."""
+    try:
+        return unpack(raw)
+    except ValueError as bad:
+        raise InvalidReplyError(rid, bad) from None
+
+
+class _ReportQueue(StreamQueue[Report]):
+    """A report stream's queue with the SensorId filter `reports()` set on it."""
+
+    def __init__(self, maxsize: int, sensor_filter: frozenset[int] | None) -> None:
+        super().__init__(maxsize)
+        self.sensor_filter = sensor_filter
+
+
 class Bno086(DeviceBase):
     """BNO086 device: enable SH-2 sensors, stream typed reports.
 
@@ -152,8 +173,8 @@ class Bno086(DeviceBase):
         self._shtp_lock = threading.Lock()  # RX side (reader thread) + reset
         self._shtp_tx_lock = threading.Lock()  # serialize SEND_SHTP_PACKET
         self._report_cbs: list[tuple[Callable[[Report], None], frozenset[int] | None]] = []
-        self._report_queues: list[StreamQueue] = []
-        self._control_waiters: dict[int, list[queue.SimpleQueue]] = {}
+        self._report_queues: list[StreamQueue[Report]] = []
+        self._control_waiters: dict[int, list[queue.SimpleQueue[bytes]]] = {}
         self._control_lock = threading.Lock()
         self._cmd_seq = 0
         self._reset_event = threading.Event()
@@ -200,9 +221,9 @@ class Bno086(DeviceBase):
                 self._emit_report(rep)
             return
         if ch == ShtpChannel.GYRO_RV:
-            rep = parse_gyro_rv_cargo(cargo.payload, capture_us)
-            if rep is not None:
-                self._emit_report(rep)
+            gyro_rv = parse_gyro_rv_cargo(cargo.payload, capture_us)
+            if gyro_rv is not None:
+                self._emit_report(gyro_rv)
 
     def _emit_report(self, rep: Report) -> None:
         if isinstance(rep, FlushCompleted):
@@ -212,9 +233,9 @@ class Bno086(DeviceBase):
                 ev.set()
         for cb, filt in list(self._report_cbs):
             if filt is None or rep.sensor_id in filt:
-                cb(rep)
+                self._call_guarded(cb, rep)
         for q in list(self._report_queues):
-            filt = getattr(q, "sensor_filter", None)
+            filt = q.sensor_filter if isinstance(q, _ReportQueue) else None
             if filt is None or rep.sensor_id in filt:
                 q.put(rep)
 
@@ -241,16 +262,16 @@ class Bno086(DeviceBase):
         self,
         payload: bytes,
         expect_rid: int,
-        parse: Callable[[bytes], object],
-        pred: Callable[[object], bool] | None = None,
+        parse: Callable[[bytes], _R],
+        pred: Callable[[_R], bool] | None = None,
         timeout: float = 1.0,
-    ):
+    ) -> _R:
         """Send a control-channel payload and wait for a matching response.
 
         Correlation is purely SH-2-level: `expect_rid` selects the response
         report ID, `pred` (on the parsed object) narrows further (sensor id,
         command seq, ...)."""
-        q: queue.SimpleQueue = queue.SimpleQueue()
+        q: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         with self._control_lock:
             self._control_waiters.setdefault(expect_rid, []).append(q)
         try:
@@ -298,7 +319,7 @@ class Bno086(DeviceBase):
         self,
         command: int,
         params: bytes,
-        collect: Callable[[CommandResponse, list], bool],
+        collect: Callable[[CommandResponse, list[CommandResponse]], bool],
         timeout: float = 1.0,
     ) -> list[CommandResponse]:
         """Send a Command Request and gather every Command Response correlated
@@ -308,7 +329,7 @@ class Bno086(DeviceBase):
         several 0xF1 responses with an incrementing response_seq."""
         seq = self._next_cmd_seq()
         payload = build_command_request(seq, command, params)
-        q: queue.SimpleQueue = queue.SimpleQueue()
+        q: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         with self._control_lock:
             self._control_waiters.setdefault(ControlReport.COMMAND_RESPONSE, []).append(q)
         results: list[CommandResponse] = []
@@ -323,7 +344,7 @@ class Bno086(DeviceBase):
                     raw = q.get(timeout=remaining)
                 except queue.Empty:
                     raise DepzTimeoutError(ControlReport.COMMAND_RESPONSE, timeout) from None
-                resp = CommandResponse.unpack(raw)
+                resp = _decode_reply(ControlReport.COMMAND_RESPONSE, raw, CommandResponse.unpack)
                 if resp.command != command or resp.command_seq != seq:
                     continue
                 if collect(resp, results):
@@ -406,19 +427,19 @@ class Bno086(DeviceBase):
         for `settle` s, so the late ones can't answer the next request (they
         arrive in a second cargo; taking only the first once returned the
         bootloader's version on a back-to-back call)."""
-        q: queue.SimpleQueue = queue.SimpleQueue()
+        q: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         rid = ControlReport.PRODUCT_ID_RESPONSE
         with self._control_lock:
             self._control_waiters.setdefault(rid, []).append(q)
         try:
             self._send_shtp(ShtpChannel.CONTROL, build_product_id_request())
             try:
-                out = [ProductId.unpack(q.get(timeout=timeout))]
+                out = [_decode_reply(rid, q.get(timeout=timeout), ProductId.unpack)]
             except queue.Empty:
                 raise DepzTimeoutError(rid, timeout) from None
             while True:
                 try:
-                    out.append(ProductId.unpack(q.get(timeout=settle)))
+                    out.append(_decode_reply(rid, q.get(timeout=settle), ProductId.unpack))
                 except queue.Empty:
                     return out
         finally:
@@ -514,28 +535,28 @@ class Bno086(DeviceBase):
         )
 
     # sugar for the everyday sensors
-    def enable_rotation_vector(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_rotation_vector(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.ROTATION_VECTOR, hz, **kw)
 
-    def enable_game_rotation_vector(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_game_rotation_vector(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.GAME_ROTATION_VECTOR, hz, **kw)
 
-    def enable_accelerometer(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_accelerometer(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.ACCELEROMETER, hz, **kw)
 
-    def enable_gyroscope(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_gyroscope(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.GYROSCOPE, hz, **kw)
 
-    def enable_magnetometer(self, hz: float = 50, **kw) -> FeatureResponse | None:
+    def enable_magnetometer(self, hz: float = 50, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.MAGNETOMETER, hz, **kw)
 
-    def enable_linear_acceleration(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_linear_acceleration(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.LINEAR_ACCELERATION, hz, **kw)
 
-    def enable_gravity(self, hz: float = 100, **kw) -> FeatureResponse | None:
+    def enable_gravity(self, hz: float = 100, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.GRAVITY, hz, **kw)
 
-    def enable_gyro_integrated_rv(self, hz: float = 400, **kw) -> FeatureResponse | None:
+    def enable_gyro_integrated_rv(self, hz: float = 400, **kw: Any) -> FeatureResponse | None:
         return self.enable(SensorId.GYRO_INTEGRATED_RV, hz, **kw)
 
     # ── report streaming ─────────────────────────────────────────────────────
@@ -556,13 +577,16 @@ class Bno086(DeviceBase):
         self,
         sensors: Iterable[int] | int | None = None,
         maxsize: int = 1024,
-    ) -> StreamIterator:
+    ) -> StreamIterator[Report]:
         """Blocking iterator over typed reports (bounded, drop-oldest).
         Subscribes eagerly — reports emitted after this call are never
         missed."""
-        it = StreamIterator(self._report_queues, maxsize, lambda: self.closed)
-        it._queue.sensor_filter = _normalize_filter(sensors)  # type: ignore[attr-defined]
-        return it
+        return StreamIterator(
+            self._report_queues,
+            maxsize,
+            lambda: self.closed,
+            queue=_ReportQueue(maxsize, _normalize_filter(sensors)),
+        )
 
     # ── tare / calibration facade ────────────────────────────────────────────
 
@@ -652,7 +676,7 @@ class Bno086(DeviceBase):
             wait_response=False,
         )
 
-    def enable_motion_request(self, hz: float = 1, **kw) -> FeatureResponse | None:
+    def enable_motion_request(self, hz: float = 1, **kw: Any) -> FeatureResponse | None:
         """Enable MotionRequest (0x2B) reports. The hub sends one when its
         request changes, not at `hz`; it reads the rate back late, so the
         granted rate is not checked."""
@@ -682,7 +706,7 @@ class Bno086(DeviceBase):
     def frs_read(self, record_id: int, timeout: float = 2.0) -> tuple[int, ...]:
         """Read a whole FRS record; returns its 32-bit words."""
         session = FrsReadSession(record_id)
-        q: queue.SimpleQueue = queue.SimpleQueue()
+        q: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         with self._control_lock:
             self._control_waiters.setdefault(ControlReport.FRS_READ_RESPONSE, []).append(q)
         try:
@@ -696,7 +720,7 @@ class Bno086(DeviceBase):
                     raw = q.get(timeout=remaining)
                 except queue.Empty:
                     raise DepzTimeoutError(ControlReport.FRS_READ_RESPONSE, timeout) from None
-                session.feed(FrsReadResponse.unpack(raw))
+                session.feed(_decode_reply(ControlReport.FRS_READ_RESPONSE, raw, FrsReadResponse.unpack))
         finally:
             with self._control_lock:
                 self._control_waiters[ControlReport.FRS_READ_RESPONSE].remove(q)
@@ -705,7 +729,7 @@ class Bno086(DeviceBase):
     def frs_write(self, record_id: int, words: Iterable[int], timeout: float = 2.0) -> None:
         """Write a whole FRS record (word list); raises Sh2Error on failure."""
         session = FrsWriteSession(record_id, list(words))
-        q: queue.SimpleQueue = queue.SimpleQueue()
+        q: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         with self._control_lock:
             self._control_waiters.setdefault(ControlReport.FRS_WRITE_RESPONSE, []).append(q)
         try:
@@ -719,7 +743,7 @@ class Bno086(DeviceBase):
                     raw = q.get(timeout=remaining)
                 except queue.Empty:
                     raise DepzTimeoutError(ControlReport.FRS_WRITE_RESPONSE, timeout) from None
-                nxt = session.feed(FrsWriteResponse.unpack(raw))
+                nxt = session.feed(_decode_reply(ControlReport.FRS_WRITE_RESPONSE, raw, FrsWriteResponse.unpack))
                 if nxt is not None:
                     self._send_shtp(ShtpChannel.CONTROL, nxt)
         finally:
@@ -735,8 +759,9 @@ class Bno086(DeviceBase):
 
     # ── diagnostics / housekeeping commands ──────────────────────────────────
 
-    def get_oscillator_type(self, timeout: float = 1.0) -> OscillatorType:
-        """Get Oscillator Type (command 0x0A). r[0] is the type directly."""
+    def get_oscillator_type(self, timeout: float = 1.0) -> OscillatorType | int:
+        """Get Oscillator Type (command 0x0A). r[0] is the type directly; a
+        value the enum does not know comes back as the raw int."""
         resp = self._command(
             Sh2Command.GET_OSCILLATOR_TYPE, b"", wait_response=True, timeout=timeout
         )
@@ -769,7 +794,7 @@ class Bno086(DeviceBase):
         """Read the error queue (command 0x01), filtered to `severity` or
         greater. Records stream until one with source == 255 (no more)."""
 
-        def collect(resp: CommandResponse, acc: list) -> bool:
+        def collect(resp: CommandResponse, acc: list[CommandResponse]) -> bool:
             if resp.r[2] == ErrorSource.NO_MORE_ERRORS:
                 return True  # terminator, not a real record
             acc.append(resp)
@@ -785,7 +810,7 @@ class Bno086(DeviceBase):
         two responses (response_seq 0 then 1)."""
         import struct
 
-        def collect(resp: CommandResponse, acc: list) -> bool:
+        def collect(resp: CommandResponse, acc: list[CommandResponse]) -> bool:
             acc.append(resp)
             return any(r.response_seq == 1 for r in acc)
 

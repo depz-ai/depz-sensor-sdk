@@ -1,6 +1,8 @@
 //! Stream subscribers (contract 07 §3): callbacks and bounded pull queues.
 
 use std::collections::VecDeque;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::time::{Duration, Instant};
 
@@ -44,6 +46,8 @@ struct FanoutInner<T> {
     callbacks: Mutex<Vec<(u64, Callback<T>)>>,
     queues: Mutex<Vec<Arc<Queue<T>>>>,
     next_id: Mutex<u64>,
+    /// Callbacks that panicked — the device's `LinkStats::callback_errors`.
+    callback_errors: Arc<AtomicU64>,
 }
 
 /// The subscribers of one stream. Cloning shares it.
@@ -53,17 +57,22 @@ pub(crate) struct Fanout<T> {
 
 impl<T> Clone for Fanout<T> {
     fn clone(&self) -> Self {
-        Fanout { inner: self.inner.clone() }
+        Fanout {
+            inner: self.inner.clone(),
+        }
     }
 }
 
 impl<T: Clone + Send + 'static> Fanout<T> {
-    pub(crate) fn new() -> Self {
+    /// A stream whose panicking callbacks count in `callback_errors` — the device's counter
+    /// ([`super::device::DepzDevice::callback_errors_counter`]).
+    pub(crate) fn new(callback_errors: Arc<AtomicU64>) -> Self {
         Fanout {
             inner: Arc::new(FanoutInner {
                 callbacks: Mutex::new(Vec::new()),
                 queues: Mutex::new(Vec::new()),
                 next_id: Mutex::new(0),
+                callback_errors,
             }),
         }
     }
@@ -74,7 +83,11 @@ impl<T: Clone + Send + 'static> Fanout<T> {
             *n += 1;
             *n
         };
-        self.inner.callbacks.lock().unwrap().push((id, Arc::new(callback)));
+        self.inner
+            .callbacks
+            .lock()
+            .unwrap()
+            .push((id, Arc::new(callback)));
         let weak: Weak<FanoutInner<T>> = Arc::downgrade(&self.inner);
         Hook::new(move || {
             if let Some(f) = weak.upgrade() {
@@ -86,21 +99,46 @@ impl<T: Clone + Send + 'static> Fanout<T> {
     pub(crate) fn subscribe(&self, capacity: usize) -> Subscription<T> {
         let q = Arc::new(Queue {
             capacity: capacity.max(1),
-            state: Mutex::new(QueueState { items: VecDeque::new(), dropped: 0, closed: false }),
+            state: Mutex::new(QueueState {
+                items: VecDeque::new(),
+                dropped: 0,
+                closed: false,
+            }),
             ready: Condvar::new(),
         });
         self.inner.queues.lock().unwrap().push(q.clone());
-        Subscription { queue: q, fanout: Arc::downgrade(&self.inner) }
+        Subscription {
+            queue: q,
+            fanout: Arc::downgrade(&self.inner),
+        }
     }
 
     pub(crate) fn dropped_counts(&self) -> Vec<u64> {
-        self.inner.queues.lock().unwrap().iter().map(|q| q.state.lock().unwrap().dropped).collect()
+        self.inner
+            .queues
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|q| q.state.lock().unwrap().dropped)
+            .collect()
     }
 
     pub(crate) fn emit(&self, item: T) {
-        let cbs: Vec<Callback<T>> = self.inner.callbacks.lock().unwrap().iter().map(|(_, c)| c.clone()).collect();
+        let cbs: Vec<Callback<T>> = self
+            .inner
+            .callbacks
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, c)| c.clone())
+            .collect();
         for cb in cbs {
-            cb(&item);
+            // Contract 07 §3: a panicking callback is counted and dropped; the reader, the other
+            // callbacks and the queues go on (the panic hook has already printed it to stderr).
+            if catch_unwind(AssertUnwindSafe(|| cb(&item))).is_err() {
+                self.inner.callback_errors.fetch_add(1, Ordering::Relaxed);
+                eprintln!("depz-sensor-sdk: a callback panicked on the reader thread; dropped");
+            }
         }
         let qs: Vec<Arc<Queue<T>>> = self.inner.queues.lock().unwrap().clone();
         for q in qs {
@@ -117,7 +155,10 @@ impl<T: Clone + Send + 'static> Fanout<T> {
         match sub.take(timeout) {
             Err(DepzError::Timeout { .. }) => Err(DepzError::Timeout {
                 cmd: Some(report_id),
-                message: format!("no report 0x{report_id:02X} within {:.3}s", timeout.as_secs_f64()),
+                message: format!(
+                    "no report 0x{report_id:02X} within {:.3}s",
+                    timeout.as_secs_f64()
+                ),
             }),
             other => other,
         }
@@ -173,7 +214,9 @@ impl<T> Subscription<T> {
                 return Ok(item);
             }
             if s.closed {
-                return Err(DepzError::DeviceLost("stream closed: the device is closed".into()));
+                return Err(DepzError::DeviceLost(
+                    "stream closed: the device is closed".into(),
+                ));
             }
             let now = Instant::now();
             if now >= deadline {
@@ -196,7 +239,10 @@ impl<T> Drop for Subscription<T> {
     fn drop(&mut self) {
         self.queue.mark_closed();
         if let Some(f) = self.fanout.upgrade() {
-            f.queues.lock().unwrap().retain(|q| !Arc::ptr_eq(q, &self.queue));
+            f.queues
+                .lock()
+                .unwrap()
+                .retain(|q| !Arc::ptr_eq(q, &self.queue));
         }
     }
 }
@@ -210,7 +256,9 @@ pub struct Hook {
 
 impl Hook {
     pub(crate) fn new(undo: impl FnOnce() + Send + 'static) -> Hook {
-        Hook { undo: Some(Box::new(undo)) }
+        Hook {
+            undo: Some(Box::new(undo)),
+        }
     }
 
     /// Unregister now.

@@ -84,6 +84,24 @@ public class Bno055VectorTests
     }
 
     [Fact]
+    public void ReadRegAndTimerPeriod_LimitsCheckedOnTheHost()
+    {
+        // contract 13 §1 (ERRATA A13): READ_REG len 1..128 and addr+len <= 0x100, like WRITE_REG
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackReadReg(0x00, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackReadReg(0x00, 129));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackReadReg(0xFF, 2));
+        Assert.Equal(new byte[] { 0x80, 0x80 }, Bno055Wire.PackReadReg(0x80, 128));
+        Assert.Equal(new byte[] { 0xFF, 0x01 }, Bno055Wire.PackReadReg(0xFF, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackWriteReg(0xFF, new byte[] { 1, 2 }));
+        // contract 13 §2: the TIMER period is 1..60000 ms; for INT it is the watchdog and 0 disables it
+        Assert.Equal((1, 60000), (Bno055Wire.TimerPeriodMinMs, Bno055Wire.TimerPeriodMaxMs));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackStartStream(Bno055Trigger.Timer, 0x08, 46, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Bno055Wire.PackStartStream(Bno055Trigger.Timer, 0x08, 46, 60001));
+        Assert.Equal(new byte[] { 0x00, 0x08, 0x2E, 0x60, 0xEA }, Bno055Wire.PackStartStream(Bno055Trigger.Timer, 0x08, 46, 60000));
+        Assert.Equal(new byte[] { 0x01, 0x35, 0x01, 0x00, 0x00 }, Bno055Wire.PackStartStream(Bno055Trigger.Int, 0x35, 1, 0));
+    }
+
+    [Fact]
     public void Decode_FieldExact()
     {
         var seen = new HashSet<int>();

@@ -42,7 +42,7 @@ What `RangeStatus` means (`RangeStatusNames`).
 public sealed class Vl53l4cdDevice : DepzDevice
 ```
 
-VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here (`Uld`). `Init` first, then configure and `StartRanging`: one result block per INT edge streams to `Measurements`. Configuration while ranging throws `InvalidOperationException` — the stream owns the register bank.
+VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here (`Uld`). `Init` first, then configure and `StartRanging`: one result block per INT edge streams to `Measurements`. Configuration while ranging throws `InvalidStateException` — the stream owns the register bank.
 
 #### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
 
@@ -53,7 +53,7 @@ public Vl53l4cdDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout
 #### Vl53l4cdDevice.Vl53l4cdDevice *(constructor)*
 
 ```csharp
-#if NET public Vl53l4cdDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Vl53l4cdDevice(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Vl53l4cdDevice.Uld *(property)*
@@ -108,7 +108,7 @@ Drive XSHUT: `Off` / `On` / `Reset`. Off and Reset stop a stream; `Init` again a
 public void ResetSensor()
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); call `Init` again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call `Init` again.
 
 #### Vl53l4cdDevice.BridgeInfo
 
@@ -116,7 +116,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); call `Init` again.
 public Vl53l4Info BridgeInfo()
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (I2cErrors is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice.SetI2cSpeedKhz
 
@@ -390,7 +390,7 @@ Nominal SCL steps the firmware carries a TIMINGR for (VL53_SET_I2C_SPEED clamps 
 public static byte[] PackReadReg(ushort addr, ushort len)
 ```
 
-VL53_READ_REG payload: addr u16 LE, len u16 LE.
+VL53_READ_REG payload: addr u16 LE, len u16 LE, with the transfer limit of contract 10 §1 — len 1..`XferMax` and addr + len ≤ 0x10000.
 
 #### Vl53l4Wire.PackWriteReg
 
@@ -398,7 +398,7 @@ VL53_READ_REG payload: addr u16 LE, len u16 LE.
 public static byte[] PackWriteReg(ushort addr, ReadOnlySpan<byte> data)
 ```
 
-VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`XferMax` bytes).
+VL53_WRITE_REG payload: addr u16 LE, then the raw register data (1..`XferMax` bytes, addr + N ≤ 0x10000).
 
 #### Vl53l4Wire.PackXshut
 
@@ -446,7 +446,7 @@ Parse a RPT_VL53_REG_DATA payload: cmd u8, timestamp u64 LE, then data.
 public sealed record Vl53l4Info(uint IntEdges, uint SlotsSkipped, uint I2cErrors, byte LastI2cError, ushort ModelId, byte FwStatus, byte Initialized, byte XshutLevel, byte IntLevel, ushort I2cKhz)
 ```
 
-RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters are free-running and wrap silently; watch increments, not absolute values. `ModelId` expected 0xEBAA, `FwStatus` expected 0x03 (booted). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+RPT_VL53_INFO — bridge diagnostics (21-byte payload). Counters wrap silently; watch increments, not absolute values. `I2cErrors` counts since the last successful XSHUT reset (the bridge clears it there), not since power-up. `Initialized` = 1 when MODEL_ID read back as 0xEBAA on this GET_INFO. `ModelId` expected 0xEBAA, `FwStatus` expected 0x03 (booted). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
 #### Vl53l4Info.Unpack
 
@@ -478,7 +478,7 @@ Parse a RPT_VL53_STREAM payload: ts u64 LE, addr u16 LE, len u16 LE, data[len].
 public sealed class Vl53l4Exception : Exception
 ```
 
-Raised on invalid VL53L4CD ULD inputs (short result block, out-of-range timing…).
+What the sensor did, not what the caller asked: a boot or data-ready timeout, a short result block, an oscillator word of 0, a failed xtalk calibration. A refused argument is an `ArgumentException` (contract 07 §3).
 
 #### Vl53l4Exception.Vl53l4Exception *(constructor)*
 
@@ -819,6 +819,14 @@ public static Vl53l4Results ParseResultBlock(ReadOnlySpan<byte> raw)
 ```
 
 Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult() decodes the same registers read one by one. Register contents are big-endian words (the bridge passes them through untouched). Raw status ≥ 24 passes through unmapped.
+
+#### Vl53l4Uld.CheckRangeTiming
+
+```csharp
+public static void CheckRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT), which need no register (contract 10 §5).
 
 #### Vl53l4Uld.static
 

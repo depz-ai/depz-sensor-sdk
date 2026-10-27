@@ -24,10 +24,10 @@ from __future__ import annotations
 import queue
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Literal, Protocol, overload
 
 from ..device import DeviceBase, StreamIterator, StreamQueue
-from ..errors import DepzError, DepzTimeoutError, LinkClosedError
+from ..errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError
 from ..protocol.vl53lx import (
     XSHUT_OFF,
     XSHUT_ON,
@@ -90,7 +90,7 @@ class Vl53lxMeasurement:
     per-SPAD rates...) — show it, don't branch on it."""
 
     timestamp_us: int  # MCU uptime at the INT edge (stream) / read (poll)
-    distance_mm: int
+    distance_mm: float
     status: int
     status_text: str
     signal_kcps: float
@@ -98,7 +98,7 @@ class Vl53lxMeasurement:
     sigma_mm: float
     spads: float
     targets: tuple[Target, ...] = ()
-    extra: dict = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
     bins: Any = None
 
     @property
@@ -128,7 +128,7 @@ class Vl53lxMeasurement:
         )
 
 
-def plot_distances(m: Vl53lxMeasurement) -> list[int]:
+def plot_distances(m: Vl53lxMeasurement) -> list[float]:
     """The distances a chart should draw for one measurement: the plottable
     targets in driver order (invalid ones dropped, not holding a slot), or the
     single distance on a light driver. On the short/medium histogram presets
@@ -146,6 +146,61 @@ def primary_target(m: Vl53lxMeasurement) -> Target | None:
         if t.status in PLOTTABLE_STATUSES:
             return t
     return None
+
+
+# What each optional capability group of `SensorDriver.SUPPORTS` gives. The
+# contract in uld/base.py declares only what every driver has; a group's
+# methods exist on a driver exactly when the group is in its SUPPORTS, and
+# `Vl53lx._need(group)` is the one place that check is made — so it is also
+# the one place that names the methods the check vouches for.
+class _OffsetGroup(Protocol):
+    def get_offset(self) -> int: ...
+    def set_offset(self, offset_mm: int) -> None: ...
+
+
+class _XtalkGroup(Protocol):
+    def get_xtalk(self) -> int: ...
+    def set_xtalk(self, xtalk_kcps: int) -> None: ...
+
+
+class _CalibOffsetGroup(Protocol):
+    def calibrate_offset(self, target_dist_mm: int, nb_samples: int = ...) -> int: ...
+
+
+class _CalibXtalkGroup(Protocol):
+    def calibrate_xtalk(self, target_dist_mm: int, nb_samples: int = ...) -> int: ...
+
+
+class _ThresholdsGroup(Protocol):
+    def get_detection_thresholds(self) -> tuple[int, int, int]: ...
+    def set_detection_thresholds(
+        self, distance_low_mm: int, distance_high_mm: int, window: int
+    ) -> None: ...
+
+
+class _SignalThreshGroup(Protocol):
+    def get_signal_threshold(self) -> int: ...
+    def set_signal_threshold(self, signal_kcps: int) -> None: ...
+
+
+class _SigmaThreshGroup(Protocol):
+    def get_sigma_threshold(self) -> int: ...
+    def set_sigma_threshold(self, sigma_mm: int) -> None: ...
+
+
+class _RoiGroup(Protocol):
+    def get_roi(self) -> tuple[int, int]: ...
+    def set_roi(self, x: int, y: int) -> None: ...
+    def get_roi_center(self) -> int: ...
+    def set_roi_center(self, center_spad: int) -> None: ...
+
+
+class _TempUpdateGroup(Protocol):
+    def start_temperature_update(self) -> None: ...
+
+
+class _RefSpadGroup(Protocol):
+    def perform_ref_spad_management(self) -> tuple[int, int]: ...
 
 
 class Vl53lx(DeviceBase):
@@ -173,7 +228,7 @@ class Vl53lx(DeviceBase):
         self._caveat: str | None = None
         self._board_name: str | None = None
         self._measure_cbs: list[Callable[[Vl53lxMeasurement], None]] = []
-        self._measure_queues: list[StreamQueue] = []
+        self._measure_queues: list[StreamQueue[Vl53lxMeasurement]] = []
         self._ranging = False
         self._stream_parse_errors = 0
 
@@ -207,7 +262,7 @@ class Vl53lx(DeviceBase):
         """The ULD port in use — escape hatch for product-specific calls
         (L0X reference SPADs, L1 distance modes by register...)."""
         if self._driver is None:
-            raise DepzError("call init() first")
+            raise InvalidStateError("call init() first")
         return self._driver
 
     @property
@@ -231,7 +286,7 @@ class Vl53lx(DeviceBase):
         self._require_not_ranging()
         name = product or self.PRODUCT or self.detected
         if name is None:
-            raise DepzError(
+            raise InvalidStateError(
                 f"board {self.board_name!r} carries no product number — "
                 "pass product= explicitly"
             )
@@ -244,31 +299,32 @@ class Vl53lx(DeviceBase):
         self._sensor_init(drv)
         self._driver, self._product, self._driver_kind, self._caveat = drv, name, kind, caveat
 
-    def _sensor_init(self, drv) -> None:
+    def _sensor_init(self, drv: SensorDriver) -> None:
         # A reset makes the die NACK for a moment (the VL53L0X soft reset does
         # it); the driver waits those out, and they are no bus fault.
         drv.sensor_init()
         self._bridge.clear_i2c_errors()
 
-    def identify_product(self) -> dict:
+    def identify_product(self) -> dict[str, Any]:
         """Everything about what is connected (needs init()). `model_id_ok`
         is a cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
         (Until 0.7.0 this was `identify()`, which now is the base class's
         parsed firmware name, as on every device.)"""
         drv = self.driver
+        product = self._bound_product
         model_id = drv.model_id()
         return {
             "board": self.board_name,
             "detected": self.detected,
-            "product": self._product,
+            "product": product,
             "driver": self._driver_kind,
             "driver_class": type(drv).__name__,
-            "kinds": registry.driver_kinds(self._product),
+            "kinds": registry.driver_kinds(product),
             "model_id": model_id,
-            "model_id_ok": registry.model_id_ok(self._product, model_id),
+            "model_id_ok": registry.model_id_ok(product, model_id),
             "supports": frozenset(drv.SUPPORTS),
             "modes": tuple(drv.MODES),
-            "reach_mm": registry.reach_mm(self.detected or self._product),
+            "reach_mm": registry.reach_mm(self.detected or product),
             "driver_reach_mm": drv.reach_mm(),
             "budget_ms": tuple(drv.BUDGET_MS),
             "budget_choices": self.budget_choices(),
@@ -282,14 +338,15 @@ class Vl53lx(DeviceBase):
         hand, a borrowed driver, a pair that reaches less than the board is
         rated for, the driver's caveat."""
         drv = self.driver
-        out = []
+        product = self._bound_product
+        out: list[str] = []
         if self.detected is None:
             out.append(f"{self._product}: board name carries no product number, named by hand")
         elif self.detected != self._product:
             out.append(
                 f"{self._product}: borrowing this driver - the board says it is a {self.detected}"
             )
-        rated = registry.reach_mm(self.detected or self._product)
+        rated = registry.reach_mm(self.detected or product)
         reach = drv.reach_mm()
         if rated and reach and reach < rated:
             out.append(
@@ -361,17 +418,17 @@ class Vl53lx(DeviceBase):
         for group, value in (("mode", mode), ("offset", offset_mm), ("xtalk", xtalk_kcps),
                              ("signal_thresh", signal_kcps)):
             if value is not None:
-                self._need(group)
+                self._require_group(group)
         self._sensor_init(drv)
         if mode is not None:
             drv.set_mode(mode)
         drv.set_range_timing(budget_ms, inter_ms)
         if offset_mm is not None:
-            drv.set_offset(offset_mm)
+            self._need("offset").set_offset(offset_mm)
         if xtalk_kcps is not None:
-            drv.set_xtalk(xtalk_kcps)
+            self._need("xtalk").set_xtalk(xtalk_kcps)
         if signal_kcps is not None:
-            drv.set_signal_threshold(signal_kcps)
+            self._need("signal_thresh").set_signal_threshold(signal_kcps)
 
     def get_range_timing(self) -> tuple[int, int]:
         """→ (timing_budget_ms, inter_measurement_ms) read back from the
@@ -419,16 +476,18 @@ class Vl53lx(DeviceBase):
         sensor RAM and is lost on reset."""
         self._require_not_ranging()
         drv = self._need("calib_offset")
-        args = (target_dist_mm,) if nb_samples is None else (target_dist_mm, nb_samples)
-        return drv.calibrate_offset(*args)
+        if nb_samples is None:
+            return drv.calibrate_offset(target_dist_mm)
+        return drv.calibrate_offset(target_dist_mm, nb_samples)
 
     def calibrate_xtalk(self, target_dist_mm: int, nb_samples: int | None = None) -> int:
         """Crosstalk calibration against a target at `target_dist_mm`;
         returns the xtalk now programmed (kcps). Store it on the host."""
         self._require_not_ranging()
         drv = self._need("calib_xtalk")
-        args = (target_dist_mm,) if nb_samples is None else (target_dist_mm, nb_samples)
-        return drv.calibrate_xtalk(*args)
+        if nb_samples is None:
+            return drv.calibrate_xtalk(target_dist_mm)
+        return drv.calibrate_xtalk(target_dist_mm, nb_samples)
 
     def get_detection_thresholds(self) -> tuple[int, int, int]:
         """→ (distance_low_mm, distance_high_mm, window)."""
@@ -478,7 +537,7 @@ class Vl53lx(DeviceBase):
         self._require_not_ranging()
         self._need("temp_update").start_temperature_update()
 
-    def perform_ref_spad_management(self) -> tuple:
+    def perform_ref_spad_management(self) -> tuple[int, int]:
         """VL53L0X: re-measure the reference SPADs."""
         self._require_not_ranging()
         return self._need("refspad").perform_ref_spad_management()
@@ -535,7 +594,7 @@ class Vl53lx(DeviceBase):
         self._measure_cbs.append(cb)
         return lambda: self._measure_cbs.remove(cb)
 
-    def measurements(self, maxsize: int = 64) -> StreamIterator:
+    def measurements(self, maxsize: int = 64) -> StreamIterator[Vl53lxMeasurement]:
         """Blocking iterator over measurements (bounded, drop-oldest).
         Subscribes immediately — call before or after start_ranging()."""
         return StreamIterator(self._measure_queues, maxsize, lambda: self.closed)
@@ -545,7 +604,7 @@ class Vl53lx(DeviceBase):
         after `timeout`, LinkClosedError as soon as the device is closed."""
         if self.closed:
             raise LinkClosedError("device is closed")
-        q = StreamQueue(1)
+        q: StreamQueue[Vl53lxMeasurement] = StreamQueue(1)
         self._measure_queues.append(q)
         try:
             deadline = time.monotonic() + timeout
@@ -575,7 +634,42 @@ class Vl53lx(DeviceBase):
 
     # ── internal ─────────────────────────────────────────────────────────────
 
-    def _need(self, group: str) -> SensorDriver:
+    @property
+    def _bound_product(self) -> str:
+        # Set together with _driver by init(); `self.driver` has raised
+        # already when it is not.
+        product = self._product
+        assert product is not None
+        return product
+
+    @overload
+    def _need(self, group: Literal["offset"]) -> _OffsetGroup: ...
+    @overload
+    def _need(self, group: Literal["xtalk"]) -> _XtalkGroup: ...
+    @overload
+    def _need(self, group: Literal["calib_offset"]) -> _CalibOffsetGroup: ...
+    @overload
+    def _need(self, group: Literal["calib_xtalk"]) -> _CalibXtalkGroup: ...
+    @overload
+    def _need(self, group: Literal["thresholds"]) -> _ThresholdsGroup: ...
+    @overload
+    def _need(self, group: Literal["signal_thresh"]) -> _SignalThreshGroup: ...
+    @overload
+    def _need(self, group: Literal["sigma_thresh"]) -> _SigmaThreshGroup: ...
+    @overload
+    def _need(self, group: Literal["roi"]) -> _RoiGroup: ...
+    @overload
+    def _need(self, group: Literal["temp_update"]) -> _TempUpdateGroup: ...
+    @overload
+    def _need(self, group: Literal["refspad"]) -> _RefSpadGroup: ...
+
+    def _need(self, group: str) -> Any:
+        # The SUPPORTS check is what guarantees the group's methods exist on
+        # this driver; the overloads above say which ones. Any here, not a
+        # cast per call site: SensorDriver has no name for them (uld/base.py).
+        return self._require_group(group)
+
+    def _require_group(self, group: str) -> SensorDriver:
         drv = self.driver
         if group not in drv.SUPPORTS:
             raise DepzError(
@@ -586,16 +680,16 @@ class Vl53lx(DeviceBase):
 
     def _require_not_ranging(self) -> None:
         if self._ranging:
-            raise DepzError("stop_ranging() first — the stream owns the bus")
+            raise InvalidStateError("stop_ranging() first — the stream owns the bus")
 
     @staticmethod
-    def _read_polled(drv: SensorDriver):
+    def _read_polled(drv: SensorDriver) -> tuple[Measurement, Any]:
         if drv.HISTOGRAM:
             bins = drv.bin_data()
             return drv.to_measurement(bins), bins
         return drv.read_measurement(), None
 
-    def _decode(self, drv: SensorDriver, data: bytes):
+    def _decode(self, drv: SensorDriver, data: bytes) -> tuple[Measurement, Any]:
         # Decoded exactly once per sample: the histogram driver steps its own
         # frame-pair state on every frame it sees.
         if drv.HISTOGRAM:
@@ -617,10 +711,7 @@ class Vl53lx(DeviceBase):
             self._stream_parse_errors += 1
             return True
         out = Vl53lxMeasurement._from(sample.timestamp_us, m, bins)
-        for cb in list(self._measure_cbs):
-            cb(out)
-        for q in list(self._measure_queues):
-            q.put(out)
+        self._deliver(self._measure_cbs, self._measure_queues, out)
         return True
 
 

@@ -49,6 +49,32 @@ class BlStatus(IntEnum):
     ERR_FLASH = 0x06
 
 
+# The report each command's success reply arrives in (contract 06 §1).
+# BOOT_APPLICATION is absent: fire-and-forget, nothing comes back.
+BL_REPLY_RPT: dict[int, BlRpt] = {
+    BlCmd.DEVICE_RESET: BlRpt.STATUS,
+    BlCmd.GET_DEVICE_NAME: BlRpt.STRING,
+    BlCmd.GET_FIRMWARE_NAME: BlRpt.STRING,
+    BlCmd.GET_SERIAL: BlRpt.STRING,
+    BlCmd.GET_MCU_ID: BlRpt.MCU_ID,
+    BlCmd.GET_MCU_UID: BlRpt.MCU_UID,
+    BlCmd.GET_FLASH_INFO: BlRpt.FLASH_INFO,
+    BlCmd.ERASE_APP: BlRpt.STATUS,
+    BlCmd.WRITE_PAGE: BlRpt.WRITE_PAGE,
+    BlCmd.READ_PAGE: BlRpt.READ_PAGE,
+    BlCmd.VERIFY_APP_CRC: BlRpt.VERIFY_APP_CRC,
+}
+
+
+def reply_report(cmd: int) -> BlRpt:
+    """The report id that answers `cmd`; ValueError for a command without a
+    reply (BOOT_APPLICATION) or outside the bootloader opcode space."""
+    try:
+        return BL_REPLY_RPT[cmd]
+    except KeyError:
+        raise ValueError(f"bootloader cmd 0x{cmd:02X} has no reply to wait for") from None
+
+
 @dataclass(frozen=True)
 class FlashInfo:
     page_size: int
@@ -102,6 +128,12 @@ class FwDepzImage:
         payload = blob[FWDEPZ_HEADER_SIZE:]
         if fw_size != len(payload):
             raise FwDepzError(f"fw_size={fw_size} but payload is {len(payload)} bytes")
+        # Sections are 0-based and every shipped file holds one (ERRATA B9).
+        if (cur_sec, tot_sec) != (0, 1):
+            raise FwDepzError(
+                f"section {cur_sec} of {tot_sec}: only section 0 of 1 is supported "
+                "(multi-section files are not)"
+            )
         return cls(load_addr, fw_size, fw_crc32, cur_sec, tot_sec, payload)
 
     @classmethod
@@ -109,9 +141,10 @@ class FwDepzImage:
         return cls.parse(Path(path).read_bytes())
 
     @classmethod
-    def build(cls, load_addr: int, payload: bytes, *, cur_sec: int = 1, tot_sec: int = 1) -> bytes:
+    def build(cls, load_addr: int, payload: bytes, *, cur_sec: int = 0, tot_sec: int = 1) -> bytes:
         """Assemble a container (test/tooling helper; the fw_crc32 covers the
-        payload exactly as flashed)."""
+        payload exactly as flashed). Sections are 0-based: a shipped file is
+        section 0 of 1, the only header parse() accepts."""
         hdr = bytearray(FWDEPZ_HEADER_SIZE)
         hdr[:8] = FWDEPZ_MAGIC
         struct.pack_into(

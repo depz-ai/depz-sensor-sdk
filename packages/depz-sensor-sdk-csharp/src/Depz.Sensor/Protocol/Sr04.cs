@@ -48,8 +48,11 @@ public static class Sr04
         return buf;
     }
 
-    public static uint UnpackSamplePeriod(ReadOnlySpan<byte> payload) =>
-        BinaryPrimitives.ReadUInt32LittleEndian(payload);
+    public static uint UnpackSamplePeriod(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_SAMPLE_PERIOD", payload, 4);
+        return BinaryPrimitives.ReadUInt32LittleEndian(payload);
+    }
 
     public static byte[] PackEchoDecay(ushort decayUs)
     {
@@ -58,8 +61,11 @@ public static class Sr04
         return buf;
     }
 
-    public static ushort UnpackEchoDecay(ReadOnlySpan<byte> payload) =>
-        BinaryPrimitives.ReadUInt16LittleEndian(payload);
+    public static ushort UnpackEchoDecay(ReadOnlySpan<byte> payload)
+    {
+        Wire.NeedBytes("RPT_ECHO_DECAY", payload, 2);
+        return BinaryPrimitives.ReadUInt16LittleEndian(payload);
+    }
 
     /// <summary>
     /// Round-trip echo time → distance in mm; null for the timeout sentinel.

@@ -179,7 +179,7 @@ function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
  * serializes access.
  */
 export class ShtpLayer {
-  /** Incomplete cargos thrown away. */
+  /** Incomplete cargos and junk-channel (≥ 6) frames thrown away. */
   discarded = 0;
 
   private txSeqs: number[] = new Array<number>(NUM_CHANNELS).fill(0);
@@ -226,13 +226,15 @@ export class ShtpLayer {
     checkU64("captureUs", captureUs); // MCU uptime µs (contract 05 §3)
     if (frame.length < SHTP_HEADER_SIZE) return null;
     const hdr = unpackShtpHeader(frame);
-    if (hdr.channel >= NUM_CHANNELS || hdr.length < SHTP_HEADER_SIZE) {
-      return null; // empty/padding header ("no data" read) or junk
+    if (hdr.length < SHTP_HEADER_SIZE) return null; // empty/padding header ("no data" read)
+    if (hdr.channel >= NUM_CHANNELS) {
+      this.discarded += 1; // junk channel
+      return null;
     }
     const chunk = frame.subarray(SHTP_HEADER_SIZE);
     const rx = this.rx[hdr.channel]!;
     if (!hdr.continuation) {
-      if (rx.expected !== 0 && rx.received !== 0) this.discarded += 1;
+      if (rx.expected !== 0) this.discarded += 1; // a partial, even one with no bytes yet
       rx.chunks = [chunk.slice()];
       rx.received = chunk.length;
       rx.expected = hdr.length - SHTP_HEADER_SIZE;

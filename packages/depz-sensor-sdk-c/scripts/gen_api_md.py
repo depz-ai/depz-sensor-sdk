@@ -52,6 +52,7 @@ DOMAIN_ORDER = [
     # depz_sensor_io.h — the live-hardware layer
     "io_errors", "io_links", "io_streams", "io_device", "io_discovery", "sr04_io",
     "vl53l4_io", "vl53l8_io", "vl53lx_io", "bno055_io", "tmf8829_io", "bno086_io",
+    "dataset_io",
 ]
 DOMAIN_TITLE = {
     "discovery": "Discovery",
@@ -79,6 +80,7 @@ DOMAIN_TITLE = {
     "tmf8829_io": "TMF8829 sensor class (live layer)",
     "bno086_io": "BNO085 / BNO086 sensor class (live layer)",
     "vl53lx_io": "VL53L 1D family sensor class (live layer)",
+    "dataset_io": "Datasets: live record values and the session recorder (live layer)",
 }
 
 # The VL53L8 ToF domain is ONE header section but TWO sensors — the CX base and
@@ -99,6 +101,7 @@ VL53L8CH_IO_SYMBOLS = {
     "depz_vl53l8_cnh_init_config", "depz_vl53l8_cnh_create_agg_map",
     "depz_vl53l8_cnh_required_memory", "depz_vl53l8_cnh_pack",
     "depz_vl53l8_cnh_decode_config", "depz_vl53l8_configure_cnh",
+    "depz_vl53l8_cnh_armed",
 }
 # The same class also serves the L5/L7 boards; their board commands are no
 # VL53L8 API and go to the L5/L7 pages instead of the VL53L8CX one.
@@ -161,6 +164,8 @@ def _io_domain_for_banner(title: str, current: str) -> str:
     # Checked first: this banner names VL53L4CX / VL53L4CD too.
     if "TMF8829" in t:
         return "tmf8829_io"
+    if "Datasets" in t:
+        return "dataset_io"
     if "1D ToF family" in t:
         return "vl53lx_io"
     if "SR04" in t:

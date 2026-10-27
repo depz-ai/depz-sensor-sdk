@@ -330,6 +330,7 @@ public class ScenarioTests
     {
         DepzTimeoutException => "timeout",
         StatusException s => s.Status == (int)Status.ErrCmdNotSupported ? "not_supported" : "device_error",
+        InvalidReplyException => "invalid_reply",
         ArgumentException => "invalid_argument",
         NotSupportedException => "not_supported",
         _ => null,

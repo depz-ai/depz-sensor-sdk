@@ -45,7 +45,7 @@ public final class Vl53l4cdDevice extends DepzDevice
 VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs
 here (`uld()`). `init()` first, then configure and `startRanging()`: one
 result block per INT edge streams to `measurements`. Configuration while ranging throws
-`IllegalStateException` — the stream owns the register bank.
+`InvalidStateException` — the stream owns the register bank.
 
 #### Vl53l4cdDevice.uld
 
@@ -106,7 +106,7 @@ Off and Reset stop a stream; `init()` again after.
 public void resetSensor()
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); call `init()` again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call `init()` again.
 
 #### Vl53l4cdDevice.bridgeInfo
 
@@ -114,7 +114,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); call `init()` again.
 public Vl53l4.Vl53l4Info bridgeInfo()
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2cErrors` is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice.setI2cSpeedKhz
 
@@ -362,7 +362,7 @@ VL53_XSHUT action: drive XSHUT high, no boot handshake.
 public static final int XSHUT_RESET = 2
 ```
 
-VL53_XSHUT action: pulse low then wait for the boot handshake (~3 ms).
+VL53_XSHUT action: pulse low then wait for the boot handshake (≤ 20 ms, typ. ~2 ms).
 
 #### Vl53l4.SF_INT_ACT_HIGH *(field)*
 
@@ -379,7 +379,8 @@ GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
 public static byte[] packReadReg(int addr, int len)
 ```
 
-VL53_READ_REG payload: `addr u16, len u16` little-endian.
+VL53_READ_REG payload `addr u16, len u16` with the transfer limit of contract 10 §1:
+`len` 1..253 and `addr + len <= 0x10000`, else IllegalArgumentException.
 
 #### Vl53l4.packWriteReg
 
@@ -387,7 +388,7 @@ VL53_READ_REG payload: `addr u16, len u16` little-endian.
 public static byte[] packWriteReg(int addr, byte[] data)
 ```
 
-VL53_WRITE_REG payload: `addr u16, data[1..253]`, else IllegalArgumentException.
+VL53_WRITE_REG payload: `addr u16, data[1..253]` with `addr + N <= 0x10000`, else IllegalArgumentException.
 
 #### Vl53l4.packXshut
 
@@ -466,8 +467,11 @@ public static RegData unpack(byte[] p)
 public record Vl53l4Info(long intEdges, long slotsSkipped, long i2cErrors, int lastI2cError, int modelId, int fwStatus, int initialized, int xshutLevel, int intLevel, int i2cKhz)
 ```
 
-RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters are
-free-running and wrap silently; watch increments, not absolute values.
+RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters wrap
+silently; watch increments, not absolute values. `i2cErrors` counts
+since the last successful XSHUT reset (the bridge clears it there), not
+since power-up; `initialized` = 1 when MODEL_ID read back as 0xEBAA
+on this GET_INFO.
 `modelId` expected 0xEBAA, `fwStatus` expected 0x03 (booted);
 `lastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
@@ -856,7 +860,19 @@ public static Results parseResultBlock(byte[] raw)
 Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
 decodes the same registers read one by one. Register contents are
 big-endian words (the bridge passes them through untouched). Throws
-`Vl53l4Error` when `raw` is shorter than 15 bytes.
+`Vl53l4Error` when `raw` is shorter than `RESULT_BLOCK_LEN` (17) bytes
+(contract 10 §5); a longer buffer is decoded and the tail ignored.
+
+#### Vl53l4Uld.checkRangeTiming
+
+```java
+public static void checkRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+which need no register: budget 10..200 ms, period 0 (continuous) or above
+the budget (autonomous) and a u32 — `IllegalArgumentException`
+otherwise (contract 10 §5).
 
 #### Vl53l4Uld.rangeTimingRegisters
 
@@ -871,10 +887,12 @@ INTERMEASUREMENT_MS raw dword}`.
 is the word read from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
 mode, i.e. when `interMeasurementMs > 0`). Budget 10..200 ms;
 `interMeasurementMs` 0 (continuous) or greater than the budget
-(autonomous low power) — anything else throws `Vl53l4Error`.
+(autonomous low power) — anything else throws
+`IllegalArgumentException` (`checkRangeTiming`).
 Register words are refused out of range, never wrapped: `oscFrequency`
-1..65535, `clockPll` 0..65535, `interMeasurementMs` a u32, and
-an INTERMEASUREMENT_MS dword that would overflow u32 throws too.
+1..65535 (0 reads as `Vl53l4Error`), `clockPll` 0..65535, and
+an INTERMEASUREMENT_MS dword that would overflow u32 throws
+`IllegalArgumentException` too.
 The third element (the dword) is a u32 in Java's `int` convention
 (`Integer#toUnsignedLong`).
 
@@ -889,8 +907,8 @@ inter_measurement_ms}`.
 
 Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
 RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
-word. A value wider than its register (dword u32, words u16) throws
-`Vl53l4Error`.
+word. An oscillator word of 0 throws `Vl53l4Error`; a value wider
+than its register (dword u32, words u16) `IllegalArgumentException`.
 
 #### Vl53l4Uld.offsetRaw
 
@@ -971,7 +989,10 @@ GetSigmaThreshold: word → mm.
 public static final class Vl53l4Error extends RuntimeException
 ```
 
-ULD error.
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is an `IllegalArgumentException`
+(contract 07 §3).
 
 ### Vl53l4Uld.Results
 
@@ -1046,6 +1067,8 @@ public boolean isAlive()
 public void waitBoot(int timeoutMs)
 ```
 
+Polls FIRMWARE__SYSTEM_STATUS until the sensor has booted, once per millisecond.
+
 #### Vl53l4cdDriver.sensorInit
 
 ```java
@@ -1090,6 +1113,8 @@ public boolean checkForDataReady()
 ```java
 public void waitDataReady(int timeoutMs)
 ```
+
+Polls the data-ready flag, once per millisecond.
 
 #### Vl53l4cdDriver.getResult
 

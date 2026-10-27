@@ -35,19 +35,19 @@ public final class HistConfig {
      * byte, repeated across the three ambient levels.
      */
     public void setBinSequence(int[] even, int[] odd) {
-        lowAmbEvenBin01 = (even[1] << 4) + even[0];
-        lowAmbEvenBin23 = (even[3] << 4) + even[2];
-        lowAmbEvenBin45 = (even[5] << 4) + even[4];
-        lowAmbOddBin01 = (odd[1] << 4) + odd[0];
-        lowAmbOddBin23 = (odd[3] << 4) + odd[2];
-        lowAmbOddBin45 = (odd[5] << 4) + odd[4];
+        lowAmbEvenBin01 = ((long) even[1] << 4) + even[0];
+        lowAmbEvenBin23 = ((long) even[3] << 4) + even[2];
+        lowAmbEvenBin45 = ((long) even[5] << 4) + even[4];
+        lowAmbOddBin01 = ((long) odd[1] << 4) + odd[0];
+        lowAmbOddBin23 = ((long) odd[3] << 4) + odd[2];
+        lowAmbOddBin45 = ((long) odd[5] << 4) + odd[4];
 
         midAmbEvenBin01 = lowAmbEvenBin01;
         midAmbEvenBin23 = lowAmbEvenBin23;
         midAmbEvenBin45 = lowAmbEvenBin45;
         midAmbOddBin01 = lowAmbOddBin01;
         midAmbOddBin2 = odd[2];
-        midAmbOddBin34 = (odd[4] << 4) + odd[3];
+        midAmbOddBin34 = ((long) odd[4] << 4) + odd[3];
         midAmbOddBin5 = odd[5];
         userBinOffset = 0x00;
 

@@ -1,5 +1,6 @@
 package ai.depz.sensor.dataset;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.json.JsonText;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -81,7 +82,7 @@ public final class DatasetWriter implements AutoCloseable {
         String line = JsonText.serialize(rec);
         synchronized (lock) {
             if (closed) {
-                throw new IllegalStateException("DatasetWriter is closed");
+                throw new InvalidStateException("DatasetWriter is closed");
             }
             try {
                 writer.write(line);

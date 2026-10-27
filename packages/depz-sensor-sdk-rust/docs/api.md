@@ -11,19 +11,19 @@ Each sensor also has a focused reference with just its own symbols:
 ## Contents
 
 - **Discovery**: [`SENSOR_CLASS_NAMES`](#sensor_class_names), [`resolve_sensor_class`](#resolve_sensor_class), [`SensorType`](#sensortype), [`Mode`](#mode), [`Identity`](#identity), [`parse_software_name`](#parse_software_name), [`DEPZ_USB_VID`](#depz_usb_vid), [`PID_SR04`](#pid_sr04), [`DEV_USB_VID`](#dev_usb_vid), [`DEPZ_PID_MODEL`](#depz_pid_model), [`is_known_depz_usb`](#is_known_depz_usb), [`usb_model_hint`](#usb_model_hint), [`PortEntry`](#portentry), [`order_ports`](#order_ports)
-- **Live devices**: [`DEFAULT_TIMEOUT`](#default_timeout), [`DeviceEvent`](#deviceevent), [`LinkStats`](#linkstats), [`TimeSyncResult`](#timesyncresult), [`host_now_us`](#host_now_us), [`ReportHandler`](#reporthandler), [`DepzDevice`](#depzdevice), [`expect_report`](#expect_report), [`expect_text`](#expect_text), [`DepzError`](#depzerror), [`Result`](#result), [`Link`](#link), [`ReplayLink`](#replaylink), [`RecordingLink`](#recordinglink), [`RECORDING_SCHEMA`](#recording_schema), [`ProbeResult`](#proberesult), [`AnyDevice`](#anydevice), [`probe`](#probe), [`attach`](#attach), [`open_on_link`](#open_on_link), [`Subscription`](#subscription), [`Hook`](#hook)
+- **Live devices**: [`DEFAULT_TIMEOUT`](#default_timeout), [`DeviceEvent`](#deviceevent), [`LinkStats`](#linkstats), [`TimeSyncResult`](#timesyncresult), [`host_now_us`](#host_now_us), [`ReportHandler`](#reporthandler), [`DepzDevice`](#depzdevice), [`expect_report`](#expect_report), [`expect_text`](#expect_text), [`DepzError`](#depzerror), [`Result`](#result), [`Link`](#link), [`ReplayLink`](#replaylink), [`RecordingLink`](#recordinglink), [`RECORDING_SCHEMA`](#recording_schema), [`ProbeResult`](#proberesult), [`DeviceInfo`](#deviceinfo), [`AnyDevice`](#anydevice), [`probe`](#probe), [`attach`](#attach), [`open_on_link`](#open_on_link), [`probe_port`](#probe_port), [`list_depz_devices`](#list_depz_devices), [`open_device`](#open_device), [`open_first_device`](#open_first_device), [`open_device_by_serial`](#open_device_by_serial), [`open_device_at`](#open_device_at), [`open_device_info`](#open_device_info), [`DEFAULT_BAUD_RATE`](#default_baud_rate), [`SerialPortInfo`](#serialportinfo), [`list_serial_ports`](#list_serial_ports), [`find_port`](#find_port), [`by_serial`](#by_serial), [`list_depz_ports`](#list_depz_ports), [`SerialPortLink`](#serialportlink), [`Subscription`](#subscription), [`Hook`](#hook)
 - **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
-- **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps), [`i2c_error_name`](#i2c_error_name), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Platform`](#vl53l4platform), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cdDriver`](#vl53l4cddriver), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE__DEVICE_ADDRESS`](#i2c_slave__device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config__timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX__CTRL`](#gpio_hv_mux__ctrl), [`GPIO__TIO_HV_STATUS`](#gpio__tio_hv_status), [`SYSTEM__INTERRUPT`](#system__interrupt), [`RANGE_CONFIG_A`](#range_config_a), [`RANGE_CONFIG_B`](#range_config_b), [`RANGE_CONFIG__SIGMA_THRESH`](#range_config__sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SYSTEM__INTERRUPT_CLEAR`](#system__interrupt_clear), [`SYSTEM_START`](#system_start), [`RESULT__RANGE_STATUS`](#result__range_status), [`RESULT__SPAD_NB`](#result__spad_nb), [`RESULT__SIGNAL_RATE`](#result__signal_rate), [`RESULT__AMBIENT_RATE`](#result__ambient_rate), [`RESULT__SIGMA`](#result__sigma), [`RESULT__DISTANCE`](#result__distance), [`RESULT__OSC_CALIBRATE_VAL`](#result__osc_calibrate_val), [`FIRMWARE__SYSTEM_STATUS`](#firmware__system_status), [`IDENTIFICATION__MODEL_ID`](#identification__model_id), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`DEFAULT_CONFIGURATION`](#default_configuration), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`config_block`](#config_block), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`STATUS_RTN`](#status_rtn), [`range_status_name`](#range_status_name), [`Vl53l4Error`](#vl53l4error), [`Vl53l4Results`](#vl53l4results), [`parse_result_block`](#parse_result_block), [`range_timing_registers`](#range_timing_registers), [`decode_range_timing`](#decode_range_timing), [`try_offset_raw`](#try_offset_raw), [`decode_offset`](#decode_offset), [`try_xtalk_raw`](#try_xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold)
-- **VL53L8 (ToF)**: [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`BridgeUld`](#bridgeuld), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8chDevice`](#vl53l8chdevice), [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`AdvancedError`](#advancederror), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`try_xtalk_margin_to_raw`](#try_xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`try_default_motion_config`](#try_default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`try_pack_detection_thresholds`](#try_pack_detection_thresholds), [`CnhDecodeConfig`](#cnhdecodeconfig), [`CnhAggregate`](#cnhaggregate), [`CnhData`](#cnhdata), [`CnhError`](#cnherror), [`decode_cnh`](#decode_cnh), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`CNH_DATA_IDX`](#cnh_data_idx), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8UldError`](#vl53l8ulderror), [`UldResult`](#uldresult), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Platform`](#vl53l8platform), [`get_xtalk_cmd`](#get_xtalk_cmd), [`calibrate_xtalk_cx`](#calibrate_xtalk_cx), [`calibrate_xtalk_lmz`](#calibrate_xtalk_lmz), [`calibrate_xtalk_l7cx`](#calibrate_xtalk_l7cx), [`xtalk_cal_output`](#xtalk_cal_output), [`xtalk_cal_output_enable`](#xtalk_cal_output_enable), [`RANGING_MODE_CONTINUOUS`](#ranging_mode_continuous), [`RANGING_MODE_AUTONOMOUS`](#ranging_mode_autonomous), [`TARGET_ORDER_CLOSEST`](#target_order_closest), [`TARGET_ORDER_STRONGEST`](#target_order_strongest), [`MODULE_TYPE_MZ`](#module_type_mz), [`MODULE_TYPE_MZEVO`](#module_type_mzevo), [`MODULE_TYPE_MZPLUS`](#module_type_mzplus), [`NVM_DATA_SIZE`](#nvm_data_size), [`OFFSET_BUFFER_SIZE`](#offset_buffer_size), [`XTALK_BUFFER_SIZE`](#xtalk_buffer_size), [`Vl53l8Driver`](#vl53l8driver), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
+- **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps), [`i2c_error_name`](#i2c_error_name), [`try_pack_read_reg`](#try_pack_read_reg), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Platform`](#vl53l4platform), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cdDriver`](#vl53l4cddriver), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE__DEVICE_ADDRESS`](#i2c_slave__device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config__timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX__CTRL`](#gpio_hv_mux__ctrl), [`GPIO__TIO_HV_STATUS`](#gpio__tio_hv_status), [`SYSTEM__INTERRUPT`](#system__interrupt), [`RANGE_CONFIG_A`](#range_config_a), [`RANGE_CONFIG_B`](#range_config_b), [`RANGE_CONFIG__SIGMA_THRESH`](#range_config__sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SYSTEM__INTERRUPT_CLEAR`](#system__interrupt_clear), [`SYSTEM_START`](#system_start), [`RESULT__RANGE_STATUS`](#result__range_status), [`RESULT__SPAD_NB`](#result__spad_nb), [`RESULT__SIGNAL_RATE`](#result__signal_rate), [`RESULT__AMBIENT_RATE`](#result__ambient_rate), [`RESULT__SIGMA`](#result__sigma), [`RESULT__DISTANCE`](#result__distance), [`RESULT__OSC_CALIBRATE_VAL`](#result__osc_calibrate_val), [`FIRMWARE__SYSTEM_STATUS`](#firmware__system_status), [`IDENTIFICATION__MODEL_ID`](#identification__model_id), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`DEFAULT_CONFIGURATION`](#default_configuration), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`config_block`](#config_block), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`STATUS_RTN`](#status_rtn), [`range_status_name`](#range_status_name), [`Vl53l4Error`](#vl53l4error), [`Vl53l4Results`](#vl53l4results), [`parse_result_block`](#parse_result_block), [`check_range_timing`](#check_range_timing), [`range_timing_registers`](#range_timing_registers), [`decode_range_timing`](#decode_range_timing), [`try_offset_raw`](#try_offset_raw), [`decode_offset`](#decode_offset), [`try_xtalk_raw`](#try_xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold)
+- **VL53L8 (ToF)**: [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`max_ranging_frequency_hz`](#max_ranging_frequency_hz), [`BridgeUld`](#bridgeuld), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8chDevice`](#vl53l8chdevice), [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`AdvancedError`](#advancederror), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`try_xtalk_margin_to_raw`](#try_xtalk_margin_to_raw), [`xtalk_margin_from_raw`](#xtalk_margin_from_raw), [`MotionConfig`](#motionconfig), [`try_default_motion_config`](#try_default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`try_pack_detection_thresholds`](#try_pack_detection_thresholds), [`CnhDecodeConfig`](#cnhdecodeconfig), [`CnhAggregate`](#cnhaggregate), [`CnhData`](#cnhdata), [`CnhError`](#cnherror), [`decode_cnh`](#decode_cnh), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`CNH_DATA_IDX`](#cnh_data_idx), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8UldError`](#vl53l8ulderror), [`UldResult`](#uldresult), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Platform`](#vl53l8platform), [`get_xtalk_cmd`](#get_xtalk_cmd), [`calibrate_xtalk_cx`](#calibrate_xtalk_cx), [`calibrate_xtalk_lmz`](#calibrate_xtalk_lmz), [`calibrate_xtalk_l7cx`](#calibrate_xtalk_l7cx), [`xtalk_cal_output`](#xtalk_cal_output), [`xtalk_cal_output_enable`](#xtalk_cal_output_enable), [`RANGING_MODE_CONTINUOUS`](#ranging_mode_continuous), [`RANGING_MODE_AUTONOMOUS`](#ranging_mode_autonomous), [`TARGET_ORDER_CLOSEST`](#target_order_closest), [`TARGET_ORDER_STRONGEST`](#target_order_strongest), [`MODULE_TYPE_MZ`](#module_type_mz), [`MODULE_TYPE_MZEVO`](#module_type_mzevo), [`MODULE_TYPE_MZPLUS`](#module_type_mzplus), [`NVM_DATA_SIZE`](#nvm_data_size), [`OFFSET_BUFFER_SIZE`](#offset_buffer_size), [`XTALK_BUFFER_SIZE`](#xtalk_buffer_size), [`Vl53l8Driver`](#vl53l8driver), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
 - **VL53L5CX / VL53L7CX / VL53L7CH (ToF)**: [`Vl53l7cxDevice`](#vl53l7cxdevice), [`Vl53l5cxDevice`](#vl53l5cxdevice), [`Vl53l7chDevice`](#vl53l7chdevice), [`Vl53l7Cmd`](#vl53l7cmd), [`Vl53l7Rpt`](#vl53l7rpt), [`PIN_LPN_OFF`](#pin_lpn_off), [`PIN_LPN_ON`](#pin_lpn_on), [`PIN_I2C_RST`](#pin_i2c_rst), [`PIN_SOFT_CYCLE`](#pin_soft_cycle), [`READ_MAX_LEN`](#read_max_len), [`WRITE_MAX_LEN`](#write_max_len), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`INFO_SIZE`](#info_size), [`I2C_SPEED_STEPS_KHZ`](#i2c_speed_steps_khz), [`i2c_error_name`](#i2c_error_name), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_pin_ctrl`](#pack_pin_ctrl), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`Vl53l7Info`](#vl53l7info), [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`Vl53l7Model`](#vl53l7model), [`resolve_model`](#resolve_model)
 - **VL53L0X / L1CX / L1CB / L3CX / L4CX (ToF)**: [`PLOTTABLE_STATUSES`](#plottable_statuses), [`Vl53lxMeasurement`](#vl53lxmeasurement), [`Vl53lxProductInfo`](#vl53lxproductinfo), [`Vl53lxDevice`](#vl53lxdevice), [`Vl53l0xDevice`](#vl53l0xdevice), [`Vl53l1cxDevice`](#vl53l1cxdevice), [`Vl53l1cbDevice`](#vl53l1cbdevice), [`Vl53l3cxDevice`](#vl53l3cxdevice), [`Vl53l4cxDevice`](#vl53l4cxdevice), [`BareDriver`](#baredriver), [`HistConfig`](#histconfig), [`HistPostProcessConfig`](#histpostprocessconfig), [`HistogramBinData`](#histogrambindata), [`BareDeviceState`](#baredevicestate), [`LlState`](#llstate), [`RangeData`](#rangedata), [`RangeResults`](#rangeresults), [`MAX_BIN_SEQUENCE_LENGTH`](#max_bin_sequence_length), [`MAX_BIN_SEQUENCE_CODE`](#max_bin_sequence_code), [`MAX_PULSES`](#max_pulses), [`MAX_RANGE_RESULTS`](#max_range_results), [`MAX_ALLOWED_PHASE`](#max_allowed_phase), [`SPAD_TOTAL_COUNT_MAX`](#spad_total_count_max), [`SPAD_TOTAL_COUNT_RES_THRES`](#spad_total_count_res_thres), [`SPEED_OF_LIGHT_IN_AIR_DIV8`](#speed_of_light_in_air_div8), [`SIGMA_INVALID`](#sigma_invalid), [`DEVICE_ERROR_NO_UPDATE`](#device_error_no_update), [`DEVICE_ERROR_RANGE_PHASE_CHECK`](#device_error_range_phase_check), [`DEVICE_ERROR_SIGMA_THRESHOLD_CHECK`](#device_error_sigma_threshold_check), [`DEVICE_ERROR_PHASE_CONSISTENCY`](#device_error_phase_consistency), [`DEVICE_ERROR_RANGE_COMPLETE`](#device_error_range_complete), [`DEVICE_ERROR_RANGE_COMPLETE_NO_WRAP_CHECK`](#device_error_range_complete_no_wrap_check), [`DEVICE_ERROR_EVENT_CONSISTENCY`](#device_error_event_consistency), [`DEVICE_ERROR_RANGE_COMPLETE_MERGED_PULSE`](#device_error_range_complete_merged_pulse), [`DEVICE_ERROR_PREV_RANGE_NO_TARGETS`](#device_error_prev_range_no_targets), [`HIST_TARGET_ORDER_STRONGEST_FIRST`](#hist_target_order_strongest_first), [`HIST_TARGET_ORDER_CLOSEST_FIRST`](#hist_target_order_closest_first), [`RANGE_STATUS_RANGE_VALID`](#range_status_range_valid), [`RANGE_STATUS_SIGMA_FAIL`](#range_status_sigma_fail), [`RANGE_STATUS_OUT_OF_BOUNDS_FAIL`](#range_status_out_of_bounds_fail), [`RANGE_STATUS_RANGE_VALID_NO_WRAP_CHECK`](#range_status_range_valid_no_wrap_check), [`RANGE_STATUS_WRAP_TARGET_FAIL`](#range_status_wrap_target_fail), [`RANGE_STATUS_RANGE_VALID_MERGED_PULSE`](#range_status_range_valid_merged_pulse), [`RANGE_STATUS_TARGET_PRESENT_LACK_OF_SIGNAL`](#range_status_target_present_lack_of_signal), [`RANGE_STATUS_NONE`](#range_status_none), [`status_name`](#status_name), [`PrevTarget`](#prevtarget), [`py_mod`](#py_mod), [`isqrt`](#isqrt), [`calc_pll_period_mm`](#calc_pll_period_mm), [`rate_maths`](#rate_maths), [`rate_per_spad_maths`](#rate_per_spad_maths), [`events_per_spad_maths`](#events_per_spad_maths), [`range_maths`](#range_maths), [`average_repeated_bins`](#average_repeated_bins), [`calc_zero_distance_phase`](#calc_zero_distance_phase), [`estimate_ambient_from_thresholded_bins`](#estimate_ambient_from_thresholded_bins), [`estimate_ambient_from_ambient_bins`](#estimate_ambient_from_ambient_bins), [`remove_ambient_bins`](#remove_ambient_bins), [`process_data`](#process_data), [`process_data_merged`](#process_data_merged), [`events_consistency_check`](#events_consistency_check), [`merged_pulse_check`](#merged_pulse_check), [`convert_status`](#convert_status), [`to_range`](#to_range), [`Vl53lxHistogramDriver`](#vl53lxhistogramdriver), [`FrameHistory`](#framehistory), [`RegField`](#regfield), [`RegBlockDef`](#regblockdef), [`block_def`](#block_def), [`tuning_default`](#tuning_default), [`header_default`](#header_default), [`RegBlock`](#regblock), [`RANGE_START_BLOCKS`](#range_start_blocks), [`DeviceImage`](#deviceimage), [`encode_row_col`](#encode_row_col), [`decode_row_col`](#decode_row_col), [`decode_zone_size`](#decode_zone_size), [`encode_zone_size`](#encode_zone_size), [`decode_zone_limits`](#decode_zone_limits), [`is_aperture_location`](#is_aperture_location), [`calc_mm_effective_spads`](#calc_mm_effective_spads), [`combine_mm1_mm2_offsets`](#combine_mm1_mm2_offsets), [`rtn_good_spads`](#rtn_good_spads), [`calc_pll_period_us`](#calc_pll_period_us), [`decode_vcsel_period`](#decode_vcsel_period), [`calc_macro_period_us`](#calc_macro_period_us), [`calc_timeout_mclks`](#calc_timeout_mclks), [`encode_timeout`](#encode_timeout), [`decode_timeout`](#decode_timeout), [`calc_encoded_timeout`](#calc_encoded_timeout), [`duration_maths`](#duration_maths), [`calc_timeout_register_values`](#calc_timeout_register_values), [`OpticalCentre`](#opticalcentre), [`CalPeakRateMap`](#calpeakratemap), [`AdditionalOffsetCalData`](#additionaloffsetcaldata), [`FmtRangeData`](#fmtrangedata), [`FMT_OPTICAL_CENTRE`](#fmt_optical_centre), [`FMT_CAL_PEAK_RATE_MAP`](#fmt_cal_peak_rate_map), [`FMT_ADDITIONAL_OFFSET_CAL`](#fmt_additional_offset_cal), [`FMT_RANGE_RESULTS_140MM_DARK`](#fmt_range_results_140mm_dark), [`read_region`](#read_region), [`read_optical_centre`](#read_optical_centre), [`read_cal_peak_rate_map`](#read_cal_peak_rate_map), [`read_additional_offset_cal_data`](#read_additional_offset_cal_data), [`read_fmt_range_results`](#read_fmt_range_results), [`POWER_MANAGEMENT_GO1_POWER_FORCE`](#power_management_go1_power_force), [`FIRMWARE_ENABLE`](#firmware_enable), [`RESULT_OSC_CALIBRATE_VAL`](#result_osc_calibrate_val), [`PATCH_CTRL`](#patch_ctrl), [`PATCH_JMP_ENABLES`](#patch_jmp_enables), [`PATCH_DATA_ENABLES`](#patch_data_enables), [`PATCH_OFFSET_0`](#patch_offset_0), [`PATCH_ADDRESS_0`](#patch_address_0), [`HISTOGRAM_BIN_DATA_I2C_INDEX`](#histogram_bin_data_i2c_index), [`RESULT_HISTOGRAM_BIN_0_2`](#result_histogram_bin_0_2), [`RESULT_HISTOGRAM_BIN_23_0`](#result_histogram_bin_23_0), [`PHASECAL_RESULT_REFERENCE_PHASE`](#phasecal_result_reference_phase), [`PHASECAL_RESULT_VCSEL_START`](#phasecal_result_vcsel_start), [`RESULT_HISTOGRAM_BIN_23_0_MSB`](#result_histogram_bin_23_0_msb), [`RESULT_HISTOGRAM_BIN_23_0_LSB`](#result_histogram_bin_23_0_lsb), [`HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES`](#histogram_bin_data_i2c_size_bytes), [`DEVICE_MEASUREMENT_MODE_BACK_TO_BACK`](#device_measurement_mode_back_to_back), [`DEVICE_MEASUREMENT_MODE_ABORT`](#device_measurement_mode_abort), [`DEVICE_MEASUREMENT_MODE_STOP_MASK`](#device_measurement_mode_stop_mask), [`DEVICE_MEASUREMENT_MODE_MODE_MASK`](#device_measurement_mode_mode_mask), [`DEVICE_SCHEDULER_MODE_STREAMING`](#device_scheduler_mode_streaming), [`DEVICE_SCHEDULER_MODE_HISTOGRAM`](#device_scheduler_mode_histogram), [`DEVICE_READOUT_MODE_SINGLE_SD`](#device_readout_mode_single_sd), [`DEVICE_READOUT_MODE_DUAL_SD`](#device_readout_mode_dual_sd), [`GROUPED_PARAMETER_HOLD_ID_MASK`](#grouped_parameter_hold_id_mask), [`INTERRUPT_CONFIG_NEW_SAMPLE_READY`](#interrupt_config_new_sample_ready), [`CLEAR_RANGE_INT`](#clear_range_int), [`RANGE_STATUS_MASK`](#range_status_mask), [`DEVICE_INTERRUPT_POLARITY_ACTIVE_LOW`](#device_interrupt_polarity_active_low), [`DEVICE_GPIO_MODE_OUTPUT_RANGE_AND_ERROR_INTERRUPTS`](#device_gpio_mode_output_range_and_error_interrupts), [`DEVICE_DSS_MODE_TARGET_RATE`](#device_dss_mode_target_rate), [`SEQUENCE_VHV_EN`](#sequence_vhv_en), [`SEQUENCE_PHASECAL_EN`](#sequence_phasecal_en), [`SEQUENCE_DSS1_EN`](#sequence_dss1_en), [`SEQUENCE_DSS2_EN`](#sequence_dss2_en), [`SEQUENCE_MM1_EN`](#sequence_mm1_en), [`SEQUENCE_MM2_EN`](#sequence_mm2_en), [`SEQUENCE_RANGE_EN`](#sequence_range_en), [`SPAD_ARRAY_WIDTH`](#spad_array_width), [`SPAD_ARRAY_HEIGHT`](#spad_array_height), [`RTN_SPAD_APERTURE_TRANSMISSION`](#rtn_spad_aperture_transmission), [`RTN_SPAD_UNITY_TRANSMISSION`](#rtn_spad_unity_transmission), [`AMBIENT_WINDOW_VCSEL_PERIODS`](#ambient_window_vcsel_periods), [`RANGING_WINDOW_VCSEL_PERIODS`](#ranging_window_vcsel_periods), [`MACRO_PERIOD_VCSEL_PERIODS`](#macro_period_vcsel_periods), [`HISTOGRAM_BUFFER_SIZE`](#histogram_buffer_size), [`DISTANCE_MODES`](#distance_modes), [`L4_DISTANCE_MODES`](#l4_distance_modes), [`TIMING_GUARD_US`](#timing_guard_us), [`TIMING_DIVISOR`](#timing_divisor), [`FDA_MAX_TIMING_BUDGET_US`](#fda_max_timing_budget_us), [`L4_FDA_MAX_TIMING_BUDGET_US`](#l4_fda_max_timing_budget_us), [`BLOCKS`](#blocks), [`TUNING`](#tuning), [`DEFAULTS`](#defaults), [`Vl53lxCmd`](#vl53lxcmd), [`Vl53lxRpt`](#vl53lxrpt), [`CLEAR_STEPS_MAX`](#clear_steps_max), [`INFO_SIZE`](#info_size), [`pack_set_addr_width`](#pack_set_addr_width), [`pack_start_stream`](#pack_start_stream), [`Vl53lxInfo`](#vl53lxinfo), [`DIE_BLOCK_ADDR`](#die_block_addr), [`DIE_BLOCK_LEN`](#die_block_len), [`L0X_BLOCK_ADDR`](#l0x_block_addr), [`L0X_BLOCK_LEN`](#l0x_block_len), [`HISTOGRAM_BLOCK_ADDR`](#histogram_block_addr), [`HISTOGRAM_BLOCK_LEN`](#histogram_block_len), [`HISTOGRAM_BINS`](#histogram_bins), [`DieVariant`](#dievariant), [`ShortBlock`](#shortblock), [`DieResult`](#dieresult), [`decode_die_block`](#decode_die_block), [`L0xRaw`](#l0xraw), [`decode_l0x_raw`](#decode_l0x_raw), [`HistogramRaw`](#histogramraw), [`decode_histogram_raw`](#decode_histogram_raw), [`Vl53lxPlatform`](#vl53lxplatform), [`Vl53lxTarget`](#vl53lxtarget), [`ExtraValue`](#extravalue), [`Vl53lxRange`](#vl53lxrange), [`Thresholds`](#thresholds), [`BinData`](#bindata), [`Vl53lxDriver`](#vl53lxdriver), [`DriverKind`](#driverkind), [`DRIVER_KINDS`](#driver_kinds), [`BusParams`](#busparams), [`Product`](#product), [`PRODUCTS`](#products), [`product`](#product), [`product_from_board_name`](#product_from_board_name), [`Vl53lxClass`](#vl53lxclass), [`resolve_product`](#resolve_product), [`resolve_class`](#resolve_class), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE_DEVICE_ADDRESS`](#i2c_slave_device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config_timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX_CTRL`](#gpio_hv_mux_ctrl), [`GPIO_TIO_HV_STATUS`](#gpio_tio_hv_status), [`SYSTEM_INTERRUPT_CONFIG_GPIO`](#system_interrupt_config_gpio), [`PHASECAL_CONFIG_TIMEOUT_MACROP`](#phasecal_config_timeout_macrop), [`RANGE_CONFIG_TIMEOUT_MACROP_A_HI`](#range_config_timeout_macrop_a_hi), [`RANGE_CONFIG_VCSEL_PERIOD_A`](#range_config_vcsel_period_a), [`RANGE_CONFIG_TIMEOUT_MACROP_B_HI`](#range_config_timeout_macrop_b_hi), [`RANGE_CONFIG_VCSEL_PERIOD_B`](#range_config_vcsel_period_b), [`RANGE_CONFIG_SIGMA_THRESH`](#range_config_sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`RANGE_CONFIG_VALID_PHASE_HIGH`](#range_config_valid_phase_high), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SD_CONFIG_WOI_SD0`](#sd_config_woi_sd0), [`SD_CONFIG_INITIAL_PHASE_SD0`](#sd_config_initial_phase_sd0), [`ROI_CONFIG_USER_ROI_CENTRE_SPAD`](#roi_config_user_roi_centre_spad), [`ROI_CONFIG_USER_ROI_XY_SIZE`](#roi_config_user_roi_xy_size), [`SYSTEM_INTERRUPT_CLEAR`](#system_interrupt_clear), [`SYSTEM_MODE_START`](#system_mode_start), [`RESULT_RANGE_STATUS`](#result_range_status), [`RESULT_OSC_CALIBRATE_VAL`](#result_osc_calibrate_val), [`FIRMWARE_SYSTEM_STATUS`](#firmware_system_status), [`IDENTIFICATION_MODEL_ID`](#identification_model_id), [`ROI_CONFIG_MODE_ROI_CENTRE_SPAD`](#roi_config_mode_roi_centre_spad), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`DieConfig`](#dieconfig), [`phase_window_mm`](#phase_window_mm), [`status_text`](#status_text), [`Die`](#die), [`MODEL_ID_VL53L0X`](#model_id_vl53l0x), [`RefCalibration`](#refcalibration), [`RefSpads`](#refspads), [`isqrt`](#isqrt), [`Vl53l0xUldDriver`](#vl53l0xulddriver), [`Vl53l1UldDriver`](#vl53l1ulddriver), [`Vl53l4UldDriver`](#vl53l4ulddriver), [`Vl53l3UlpDriver`](#vl53l3ulpdriver), [`DriverCtor`](#driverctor), [`HIST_CAVEAT`](#hist_caveat), [`driver_kinds`](#driver_kinds), [`create_driver`](#create_driver)
-- **BNO086 (IMU)**: [`Bno086Cmd`](#bno086cmd), [`RPT_DATA`](#rpt_data), [`BUSY_BACKOFF_MS`](#busy_backoff_ms), [`Bno086Data`](#bno086data), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`EXECUTABLE_RESET_COMPLETE`](#executable_reset_complete), [`CMD_ERRORS`](#cmd_errors), [`CMD_COUNTER`](#cmd_counter), [`CMD_TARE`](#cmd_tare), [`CMD_INITIALIZE`](#cmd_initialize), [`CMD_SAVE_DCD`](#cmd_save_dcd), [`CMD_ME_CALIBRATE`](#cmd_me_calibrate), [`CMD_PERIODIC_DCD_CONFIG`](#cmd_periodic_dcd_config), [`CMD_GET_OSCILLATOR_TYPE`](#cmd_get_oscillator_type), [`CMD_CLEAR_DCD_AND_RESET`](#cmd_clear_dcd_and_reset), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`OSC_INTERNAL`](#osc_internal), [`OSC_EXT_CRYSTAL`](#osc_ext_crystal), [`OSC_EXT_CLOCK`](#osc_ext_clock), [`ERROR_SOURCE_NO_MORE_ERRORS`](#error_source_no_more_errors), [`TARE_X`](#tare_x), [`TARE_Y`](#tare_y), [`TARE_Z`](#tare_z), [`TARE_ALL`](#tare_all), [`TareBasis`](#tarebasis), [`MotionIntent`](#motionintent), [`FRS_STATIC_CALIBRATION_AGM`](#frs_static_calibration_agm), [`FRS_NOMINAL_CALIBRATION`](#frs_nominal_calibration), [`FRS_DYNAMIC_CALIBRATION`](#frs_dynamic_calibration), [`FRS_ME_POWER_MGMT`](#frs_me_power_mgmt), [`FRS_SYSTEM_ORIENTATION`](#frs_system_orientation), [`FRS_ACCEL_ORIENTATION`](#frs_accel_orientation), [`FRS_GYROSCOPE_ORIENTATION`](#frs_gyroscope_orientation), [`FRS_MAGNETOMETER_ORIENTATION`](#frs_magnetometer_orientation), [`FRS_ARVR_STABILIZATION_RV`](#frs_arvr_stabilization_rv), [`FRS_ARVR_STABILIZATION_GRV`](#frs_arvr_stabilization_grv), [`FRS_SERIAL_NUMBER`](#frs_serial_number), [`FRS_USER_RECORD`](#frs_user_record), [`FRS_SIG_MOTION_DETECT_CONFIG`](#frs_sig_motion_detect_config), [`FRS_SHAKE_DETECT_CONFIG`](#frs_shake_detect_config), [`FRS_STABILITY_DETECTOR_CONFIG`](#frs_stability_detector_config), [`FRS_ACTIVITY_TRACKER_CONFIG`](#frs_activity_tracker_config), [`METADATA_RECORDS`](#metadata_records), [`FRS_NO_ERROR`](#frs_no_error), [`FRS_UNRECOGNIZED_FRS_TYPE`](#frs_unrecognized_frs_type), [`FRS_BUSY`](#frs_busy), [`FRS_READ_COMPLETED`](#frs_read_completed), [`FRS_OFFSET_OUT_OF_RANGE`](#frs_offset_out_of_range), [`FRS_RECORD_EMPTY`](#frs_record_empty), [`FRS_BLOCK_COMPLETED`](#frs_block_completed), [`FRS_BLOCK_AND_READ_COMPLETED`](#frs_block_and_read_completed), [`FRS_DEVICE_ERROR`](#frs_device_error), [`FRS_WRITE_WORDS_RECEIVED`](#frs_write_words_received), [`FRS_WRITE_UNRECOGNIZED_FRS_TYPE`](#frs_write_unrecognized_frs_type), [`FRS_WRITE_BUSY`](#frs_write_busy), [`FRS_WRITE_COMPLETED`](#frs_write_completed), [`FRS_WRITE_MODE_READY`](#frs_write_mode_ready), [`FRS_WRITE_FAILED`](#frs_write_failed), [`FRS_WRITE_NOT_IN_WRITE_MODE`](#frs_write_not_in_write_mode), [`FRS_WRITE_INVALID_LENGTH`](#frs_write_invalid_length), [`FRS_WRITE_RECORD_VALID`](#frs_write_record_valid), [`FRS_WRITE_RECORD_INVALID`](#frs_write_record_invalid), [`Sh2HubError`](#sh2huberror), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`COUNTS_GET`](#counts_get), [`COUNTS_CLEAR`](#counts_clear), [`ME_CAL_GET`](#me_cal_get), [`split_control_cargo`](#split_control_cargo), [`counts_get_params`](#counts_get_params), [`counts_clear_params`](#counts_clear_params), [`errors_params`](#errors_params), [`tare_now_params`](#tare_now_params), [`persist_tare_params`](#persist_tare_params), [`set_reorientation_params`](#set_reorientation_params), [`me_calibration_params`](#me_calibration_params), [`interactive_calibration_params`](#interactive_calibration_params), [`force_flush`](#force_flush), [`periodic_dcd_params`](#periodic_dcd_params), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`try_parse_input_cargo`](#try_parse_input_cargo), [`try_parse_gyro_rv_cargo`](#try_parse_gyro_rv_cargo), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`ShtpError`](#shtperror), [`try_pack_shtp_header`](#try_pack_shtp_header), [`try_unpack_shtp_header`](#try_unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`try_build_frame`](#try_build_frame), [`ShtpLayer`](#shtplayer), [`RATE_LOW_FACTOR`](#rate_low_factor), [`RATE_HIGH_FACTOR`](#rate_high_factor), [`Bno086Device`](#bno086device)
-- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`MODE_SWITCH_FROM_CONFIG`](#mode_switch_from_config), [`MODE_SWITCH_TO_CONFIG`](#mode_switch_to_config), [`SELF_TEST_TIME`](#self_test_time), [`BOOT_SETTLE_TIMEOUT`](#boot_settle_timeout), [`STUCK_SELF_TEST_POLLS`](#stuck_self_test_polls), [`FUSION_START_TIMEOUT`](#fusion_start_timeout), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
+- **BNO086 (IMU)**: [`Bno086Cmd`](#bno086cmd), [`RPT_DATA`](#rpt_data), [`BUSY_BACKOFF_MS`](#busy_backoff_ms), [`Bno086Data`](#bno086data), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`EXECUTABLE_RESET_COMPLETE`](#executable_reset_complete), [`CMD_ERRORS`](#cmd_errors), [`CMD_COUNTER`](#cmd_counter), [`CMD_TARE`](#cmd_tare), [`CMD_INITIALIZE`](#cmd_initialize), [`CMD_SAVE_DCD`](#cmd_save_dcd), [`CMD_ME_CALIBRATE`](#cmd_me_calibrate), [`CMD_PERIODIC_DCD_CONFIG`](#cmd_periodic_dcd_config), [`CMD_GET_OSCILLATOR_TYPE`](#cmd_get_oscillator_type), [`CMD_CLEAR_DCD_AND_RESET`](#cmd_clear_dcd_and_reset), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`OSC_INTERNAL`](#osc_internal), [`OSC_EXT_CRYSTAL`](#osc_ext_crystal), [`OSC_EXT_CLOCK`](#osc_ext_clock), [`ERROR_SOURCE_NO_MORE_ERRORS`](#error_source_no_more_errors), [`TARE_X`](#tare_x), [`TARE_Y`](#tare_y), [`TARE_Z`](#tare_z), [`TARE_ALL`](#tare_all), [`TareBasis`](#tarebasis), [`MotionIntent`](#motionintent), [`FRS_STATIC_CALIBRATION_AGM`](#frs_static_calibration_agm), [`FRS_NOMINAL_CALIBRATION`](#frs_nominal_calibration), [`FRS_DYNAMIC_CALIBRATION`](#frs_dynamic_calibration), [`FRS_ME_POWER_MGMT`](#frs_me_power_mgmt), [`FRS_SYSTEM_ORIENTATION`](#frs_system_orientation), [`FRS_ACCEL_ORIENTATION`](#frs_accel_orientation), [`FRS_GYROSCOPE_ORIENTATION`](#frs_gyroscope_orientation), [`FRS_MAGNETOMETER_ORIENTATION`](#frs_magnetometer_orientation), [`FRS_ARVR_STABILIZATION_RV`](#frs_arvr_stabilization_rv), [`FRS_ARVR_STABILIZATION_GRV`](#frs_arvr_stabilization_grv), [`FRS_SERIAL_NUMBER`](#frs_serial_number), [`FRS_USER_RECORD`](#frs_user_record), [`FRS_SIG_MOTION_DETECT_CONFIG`](#frs_sig_motion_detect_config), [`FRS_SHAKE_DETECT_CONFIG`](#frs_shake_detect_config), [`FRS_STABILITY_DETECTOR_CONFIG`](#frs_stability_detector_config), [`FRS_ACTIVITY_TRACKER_CONFIG`](#frs_activity_tracker_config), [`FRS_GYRO_INTEGRATED_RV_CONFIG`](#frs_gyro_integrated_rv_config), [`METADATA_RECORDS`](#metadata_records), [`FRS_NO_ERROR`](#frs_no_error), [`FRS_UNRECOGNIZED_FRS_TYPE`](#frs_unrecognized_frs_type), [`FRS_BUSY`](#frs_busy), [`FRS_READ_COMPLETED`](#frs_read_completed), [`FRS_OFFSET_OUT_OF_RANGE`](#frs_offset_out_of_range), [`FRS_RECORD_EMPTY`](#frs_record_empty), [`FRS_BLOCK_COMPLETED`](#frs_block_completed), [`FRS_BLOCK_AND_READ_COMPLETED`](#frs_block_and_read_completed), [`FRS_DEVICE_ERROR`](#frs_device_error), [`FRS_WRITE_WORDS_RECEIVED`](#frs_write_words_received), [`FRS_WRITE_UNRECOGNIZED_FRS_TYPE`](#frs_write_unrecognized_frs_type), [`FRS_WRITE_BUSY`](#frs_write_busy), [`FRS_WRITE_COMPLETED`](#frs_write_completed), [`FRS_WRITE_MODE_READY`](#frs_write_mode_ready), [`FRS_WRITE_FAILED`](#frs_write_failed), [`FRS_WRITE_NOT_IN_WRITE_MODE`](#frs_write_not_in_write_mode), [`FRS_WRITE_INVALID_LENGTH`](#frs_write_invalid_length), [`FRS_WRITE_RECORD_VALID`](#frs_write_record_valid), [`FRS_WRITE_RECORD_INVALID`](#frs_write_record_invalid), [`Sh2HubError`](#sh2huberror), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`COUNTS_GET`](#counts_get), [`COUNTS_CLEAR`](#counts_clear), [`ME_CAL_GET`](#me_cal_get), [`split_control_cargo`](#split_control_cargo), [`counts_get_params`](#counts_get_params), [`counts_clear_params`](#counts_clear_params), [`errors_params`](#errors_params), [`tare_now_params`](#tare_now_params), [`persist_tare_params`](#persist_tare_params), [`set_reorientation_params`](#set_reorientation_params), [`me_calibration_params`](#me_calibration_params), [`interactive_calibration_params`](#interactive_calibration_params), [`force_flush`](#force_flush), [`periodic_dcd_params`](#periodic_dcd_params), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`q_point`](#q_point), [`report_length`](#report_length), [`Report`](#report), [`Vector3Kind`](#vector3kind), [`try_parse_input_cargo`](#try_parse_input_cargo), [`try_parse_gyro_rv_cargo`](#try_parse_gyro_rv_cargo), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo), [`REPORT_COMMAND_RESPONSE`](#report_command_response), [`REPORT_COMMAND_REQUEST`](#report_command_request), [`REPORT_FRS_READ_RESPONSE`](#report_frs_read_response), [`REPORT_FRS_READ_REQUEST`](#report_frs_read_request), [`REPORT_FRS_WRITE_RESPONSE`](#report_frs_write_response), [`REPORT_FRS_WRITE_DATA`](#report_frs_write_data), [`REPORT_FRS_WRITE_REQUEST`](#report_frs_write_request), [`REPORT_PRODUCT_ID_RESPONSE`](#report_product_id_response), [`REPORT_PRODUCT_ID_REQUEST`](#report_product_id_request), [`REPORT_GET_FEATURE_RESPONSE`](#report_get_feature_response), [`REPORT_SET_FEATURE_COMMAND`](#report_set_feature_command), [`REPORT_GET_FEATURE_REQUEST`](#report_get_feature_request), [`Sh2Error`](#sh2error), [`FEATURE_FLAG_WAKEUP`](#feature_flag_wakeup), [`FEATURE_FLAG_ALWAYS_ON`](#feature_flag_always_on), [`build_set_feature`](#build_set_feature), [`build_get_feature_request`](#build_get_feature_request), [`build_product_id_request`](#build_product_id_request), [`build_command_request`](#build_command_request), [`build_frs_read_request`](#build_frs_read_request), [`build_frs_write_request`](#build_frs_write_request), [`build_frs_write_data`](#build_frs_write_data), [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`build_sleep`](#build_sleep), [`build_power_on`](#build_power_on), [`ShtpHeader`](#shtpheader), [`ShtpError`](#shtperror), [`try_pack_shtp_header`](#try_pack_shtp_header), [`try_unpack_shtp_header`](#try_unpack_shtp_header), [`ShtpCargo`](#shtpcargo), [`try_build_frame`](#try_build_frame), [`ShtpLayer`](#shtplayer), [`RATE_LOW_FACTOR`](#rate_low_factor), [`RATE_HIGH_FACTOR`](#rate_high_factor), [`Bno086Device`](#bno086device)
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`XFER_MAX`](#xfer_max), [`TRIGGER_TIMER`](#trigger_timer), [`TRIGGER_INT`](#trigger_int), [`INFO_SIZE`](#info_size), [`I2C_ADDR`](#i2c_addr), [`EXPECTED_CHIP_ID`](#expected_chip_id), [`EXPECTED_ACC_ID`](#expected_acc_id), [`EXPECTED_MAG_ID`](#expected_mag_id), [`EXPECTED_GYR_ID`](#expected_gyr_id), [`TIMER_PERIOD_MIN_MS`](#timer_period_min_ms), [`TIMER_PERIOD_MAX_MS`](#timer_period_max_ms), [`try_pack_read_reg`](#try_pack_read_reg), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_reset`](#pack_reset), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`try_pack_start_stream`](#try_pack_start_stream), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`StreamData`](#streamdata), [`Bno055Info`](#bno055info), [`REG_CHIP_ID`](#reg_chip_id), [`REG_PAGE_ID`](#reg_page_id), [`REG_ACC_DATA`](#reg_acc_data), [`REG_MAG_DATA`](#reg_mag_data), [`REG_GYR_DATA`](#reg_gyr_data), [`REG_EUL_DATA`](#reg_eul_data), [`REG_QUA_DATA`](#reg_qua_data), [`REG_LIA_DATA`](#reg_lia_data), [`REG_GRV_DATA`](#reg_grv_data), [`REG_TEMP`](#reg_temp), [`REG_CALIB_STAT`](#reg_calib_stat), [`REG_ST_RESULT`](#reg_st_result), [`REG_INT_STA`](#reg_int_sta), [`REG_SYS_CLK_STATUS`](#reg_sys_clk_status), [`REG_SYS_STATUS`](#reg_sys_status), [`REG_SYS_ERR`](#reg_sys_err), [`REG_UNIT_SEL`](#reg_unit_sel), [`REG_OPR_MODE`](#reg_opr_mode), [`REG_PWR_MODE`](#reg_pwr_mode), [`REG_SYS_TRIGGER`](#reg_sys_trigger), [`REG_TEMP_SOURCE`](#reg_temp_source), [`REG_AXIS_MAP_CONFIG`](#reg_axis_map_config), [`REG_AXIS_MAP_SIGN`](#reg_axis_map_sign), [`REG_SIC_MATRIX`](#reg_sic_matrix), [`REG_CALIB_PROFILE`](#reg_calib_profile), [`CALIB_PROFILE_LEN`](#calib_profile_len), [`REG1_ACC_CONFIG`](#reg1_acc_config), [`REG1_MAG_CONFIG`](#reg1_mag_config), [`REG1_GYR_CONFIG_0`](#reg1_gyr_config_0), [`REG1_GYR_CONFIG_1`](#reg1_gyr_config_1), [`REG1_ACC_SLEEP_CONFIG`](#reg1_acc_sleep_config), [`REG1_GYR_SLEEP_CONFIG`](#reg1_gyr_sleep_config), [`REG1_INT_MSK`](#reg1_int_msk), [`REG1_INT_EN`](#reg1_int_en), [`REG1_ACC_AM_THRES`](#reg1_acc_am_thres), [`REG1_GYR_AM_SET`](#reg1_gyr_am_set), [`REG1_UNIQUE_ID`](#reg1_unique_id), [`UNIQUE_ID_LEN`](#unique_id_len), [`FULL_BLOCK`](#full_block), [`QUAT_BLOCK`](#quat_block), [`SYS_TRIGGER_SELF_TEST`](#sys_trigger_self_test), [`SYS_TRIGGER_RST_SYS`](#sys_trigger_rst_sys), [`SYS_TRIGGER_RST_INT`](#sys_trigger_rst_int), [`SYS_TRIGGER_CLK_SEL`](#sys_trigger_clk_sel), [`INT_ACC_BSX_DRDY`](#int_acc_bsx_drdy), [`INT_MAG_DRDY`](#int_mag_drdy), [`INT_GYR_AM`](#int_gyr_am), [`INT_GYR_HIGH_RATE`](#int_gyr_high_rate), [`INT_GYR_DRDY`](#int_gyr_drdy), [`INT_ACC_HIGH_G`](#int_acc_high_g), [`INT_ACC_AM`](#int_acc_am), [`INT_ACC_NM`](#int_acc_nm), [`ST_ACC`](#st_acc), [`ST_MAG`](#st_mag), [`ST_GYR`](#st_gyr), [`ST_MCU`](#st_mcu), [`EXPECTED_SELF_TEST`](#expected_self_test), [`SYS_STATUS_BOOTING`](#sys_status_booting), [`OprMode`](#oprmode), [`PwrMode`](#pwrmode), [`TempSource`](#tempsource), [`UNIT_ACC_MG`](#unit_acc_mg), [`UNIT_GYR_RPS`](#unit_gyr_rps), [`UNIT_EUL_RAD`](#unit_eul_rad), [`UNIT_TEMP_F`](#unit_temp_f), [`UNIT_ORI_ANDROID`](#unit_ori_android), [`Units`](#units), [`MAG_LSB`](#mag_lsb), [`QUAT_LSB`](#quat_lsb), [`FUSION_ACCEL_LSB`](#fusion_accel_lsb), [`CalibStatus`](#calibstatus), [`CalibrationProfile`](#calibrationprofile), [`pack_sic_matrix`](#pack_sic_matrix), [`unpack_sic_matrix`](#unpack_sic_matrix), [`SIC_IDENTITY`](#sic_identity), [`AXIS_X`](#axis_x), [`AXIS_Y`](#axis_y), [`AXIS_Z`](#axis_z), [`AxisRemap`](#axisremap), [`PLACEMENTS`](#placements), [`ACC_RANGE_G`](#acc_range_g), [`ACC_BANDWIDTH_HZ`](#acc_bandwidth_hz), [`ACC_POWER_NAMES`](#acc_power_names), [`GYR_RANGE_DPS`](#gyr_range_dps), [`GYR_BANDWIDTH_HZ`](#gyr_bandwidth_hz), [`GYR_POWER_NAMES`](#gyr_power_names), [`MAG_RATE_HZ`](#mag_rate_hz), [`MAG_OPR_NAMES`](#mag_opr_names), [`MAG_POWER_NAMES`](#mag_power_names), [`AccelConfig`](#accelconfig), [`GyroConfig`](#gyroconfig), [`MagConfig`](#magconfig), [`RawBlock`](#rawblock), [`decode_block`](#decode_block), [`MODE_SWITCH_FROM_CONFIG`](#mode_switch_from_config), [`MODE_SWITCH_TO_CONFIG`](#mode_switch_to_config), [`SELF_TEST_TIME`](#self_test_time), [`BOOT_SETTLE_TIMEOUT`](#boot_settle_timeout), [`STUCK_SELF_TEST_POLLS`](#stuck_self_test_polls), [`FUSION_START_TIMEOUT`](#fusion_start_timeout), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
 - **TMF8829 (dToF)**: [`Tmf8829InitResult`](#tmf8829initresult), [`Tmf8829AppliedConfig`](#tmf8829appliedconfig), [`Tmf8829Options`](#tmf8829options), [`Tmf8829Device`](#tmf8829device), [`Tmf8829Measurement`](#tmf8829measurement), [`distance_mm`](#distance_mm), [`MeasurementBuilder`](#measurementbuilder), [`NOMINAL_Q16`](#nominal_q16), [`CLOCK_WINDOW_MIN_US`](#clock_window_min_us), [`CLOCK_WINDOW_SLIDE_US`](#clock_window_slide_us), [`EDGE_LATE_US`](#edge_late_us), [`FT_NOMINAL`](#ft_nominal), [`FT_CLOCK_RESET`](#ft_clock_reset), [`FT_EDGE_LATE`](#ft_edge_late), [`FT_STALLED`](#ft_stalled), [`FT_T1_UNSURE`](#ft_t1_unsure), [`FT_NAMES`](#ft_names), [`flag_names`](#flag_names), [`fp_subints`](#fp_subints), [`SensorClock`](#sensorclock), [`FrameTime`](#frametime), [`CaptureTimer`](#capturetimer), [`Tmf8829Cmd`](#tmf8829cmd), [`Tmf8829Rpt`](#tmf8829rpt), [`EV_INT`](#ev_int), [`EV_BAD_HEADER`](#ev_bad_header), [`READ_MAX`](#read_max), [`WRITE_MAX`](#write_max), [`CHUNK_MAX`](#chunk_max), [`INT_RESULTS`](#int_results), [`INT_MOTION`](#int_motion), [`INT_PROXIMITY`](#int_proximity), [`INT_HISTOGRAMS`](#int_histograms), [`INT_MASK_ALL`](#int_mask_all), [`SF_REF_FRAME`](#sf_ref_frame), [`REG_DATA_HEADER_SIZE`](#reg_data_header_size), [`FRAME_CHUNK_HEADER_SIZE`](#frame_chunk_header_size), [`EVENT_SIZE`](#event_size), [`INFO_SIZE`](#info_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`pack_stop_stream`](#pack_stop_stream), [`pack_get_info`](#pack_get_info), [`RegData`](#regdata), [`Tmf8829Info`](#tmf8829info), [`FrameChunk`](#framechunk), [`Tmf8829Event`](#tmf8829event), [`RawFrame`](#rawframe), [`FrameReassembler`](#framereassembler), [`REG_CFG`](#reg_cfg), [`CFG_SIZE`](#cfg_size), [`PRESETS`](#presets), [`PRESET_KILO_ITERATIONS`](#preset_kilo_iterations), [`DEFAULT_PERIOD_MS`](#default_period_ms), [`preset_cmd`](#preset_cmd), [`preset_kilo_iterations`](#preset_kilo_iterations), [`CfgField`](#cfgfield), [`CFG_FIELDS`](#cfg_fields), [`cfg_field`](#cfg_field), [`cfg_get`](#cfg_get), [`cfg_set`](#cfg_set), [`config_fields`](#config_fields), [`FIRMWARE_LOAD_ADDR`](#firmware_load_addr), [`FIRMWARE_IMAGE`](#firmware_image), [`FIRMWARE_LICENSE`](#firmware_license), [`firmware_image`](#firmware_image), [`firmware_words`](#firmware_words), [`PRE_HEADER_SIZE`](#pre_header_size), [`HEADER_SIZE`](#header_size), [`FOOTER_SIZE`](#footer_size), [`FRAME_HEAD`](#frame_head), [`FRAME_EOF`](#frame_eof), [`FID_MASK`](#fid_mask), [`FID_RESULTS`](#fid_results), [`FID_HISTOGRAMS`](#fid_histograms), [`FID_REF_SPAD`](#fid_ref_spad), [`LAYOUT_PEAKS`](#layout_peaks), [`LAYOUT_SIGNAL`](#layout_signal), [`LAYOUT_NOISE`](#layout_noise), [`LAYOUT_XTALK`](#layout_xtalk), [`LAYOUT_SUBFRAME`](#layout_subframe), [`FRAME_VALID`](#frame_valid), [`FRAME_ABORTED`](#frame_aborted), [`FRAME_WARNINGS`](#frame_warnings), [`FOOTER_DIST_IN_MM`](#footer_dist_in_mm), [`FIFO_TX_UNDERRUN`](#fifo_tx_underrun), [`FIFO_RX_OVERRUN`](#fifo_rx_overrun), [`fp_grid`](#fp_grid), [`fp_name`](#fp_name), [`frame_rows`](#frame_rows), [`FrameError`](#frameerror), [`FrameInfo`](#frameinfo), [`frame_size`](#frame_size), [`parse_frame`](#parse_frame), [`PixelResults`](#pixelresults), [`pixel_size`](#pixel_size), [`parse_results`](#parse_results), [`parse_results_info`](#parse_results_info), [`merge_halves`](#merge_halves), [`HistogramFrame`](#histogramframe)
 - **Bootloader / firmware update**: [`HEADER_SIZE`](#header_size), [`MAGIC`](#magic), [`FwdepzHeader`](#fwdepzheader), [`FwdepzError`](#fwdepzerror), [`parse`](#parse)
 - **Datasets (record & replay)**: [`THREAD_NAME`](#thread_name), [`PlayerState`](#playerstate), [`DatasetPlayer`](#datasetplayer), [`RecordSink`](#recordsink), [`Recordable`](#recordable), [`SessionRecorder`](#sessionrecorder), [`sr04`](#sr04), [`vl53l4`](#vl53l4), [`vl53l8`](#vl53l8), [`vl53l8_cnh`](#vl53l8_cnh), [`vl53lx`](#vl53lx), [`bno055`](#bno055), [`tmf8829`](#tmf8829), [`bno086_type`](#bno086_type), [`bno086`](#bno086), [`round1`](#round1), [`SCHEMA`](#schema), [`DatasetWriter`](#datasetwriter), [`DatasetError`](#dataseterror), [`Device`](#device), [`RecordValue`](#recordvalue), [`Record`](#record), [`Dataset`](#dataset)
 - **Transport**: [`crc8_maxim`](#crc8_maxim), [`crc16_modbus`](#crc16_modbus), [`crc32_iso_hdlc`](#crc32_iso_hdlc), [`crc16_ccitt_false`](#crc16_ccitt_false), [`MAGIC`](#magic), [`HEADER_SIZE`](#header_size), [`MAX_PAYLOAD`](#max_payload), [`CrcType`](#crctype), [`FramingError`](#framingerror), [`payload_crc_bytes`](#payload_crc_bytes), [`build_packet`](#build_packet), [`Packet`](#packet), [`Event`](#event), [`PacketParser`](#packetparser)
-- **Protocol codecs**: [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`UNSOLICITED`](#unsolicited), [`CodecError`](#codecerror), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`SyncPinConfig`](#syncpinconfig), [`SYNC_PIN_MIN`](#sync_pin_min), [`SYNC_PIN_MAX`](#sync_pin_max), [`pack_sync_time`](#pack_sync_time), [`pack_set_payload_crc_type`](#pack_set_payload_crc_type), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string)
+- **Protocol codecs**: [`Cmd`](#cmd), [`Rpt`](#rpt), [`Status`](#status), [`SyncPinMode`](#syncpinmode), [`SyncPinPolarity`](#syncpinpolarity), [`UNSOLICITED`](#unsolicited), [`CodecError`](#codecerror), [`StatusReport`](#statusreport), [`TextReport`](#textreport), [`SyncTimeReport`](#synctimereport), [`TemperatureReport`](#temperaturereport), [`SequenceErrorReport`](#sequenceerrorreport), [`SyncPinConfig`](#syncpinconfig), [`SYNC_PIN_MIN`](#sync_pin_min), [`SYNC_PIN_MAX`](#sync_pin_max), [`pack_sync_time`](#pack_sync_time), [`PAYLOAD_CRC_TYPE_MAX`](#payload_crc_type_max), [`try_pack_set_payload_crc_type`](#try_pack_set_payload_crc_type), [`pack_set_payload_crc_type`](#pack_set_payload_crc_type), [`sync_time_offset_rtt`](#sync_time_offset_rtt), [`strip_device_string`](#strip_device_string)
 - **JSON**: [`Value`](#value), [`JsonError`](#jsonerror), [`object_map`](#object_map)
 
 ## Discovery
@@ -32,9 +32,24 @@ Each sensor also has a focused reference with just its own symbols:
 
 ```rust
 pub const SENSOR_CLASS_NAMES: [&str; 18] = [
-    "sr04", "vl53l4cd", "vl53l8cx", "vl53l8ch", "vl53l5cx", "vl53l7cx", "vl53l7ch", "vl53l0x",
-    "vl53l1cx", "vl53l1cb", "vl53l3cx", "vl53l4cx", "vl53lx", "bno086", "bno055", "tmf8829",
-    "device", "bootloader",
+    "sr04",
+    "vl53l4cd",
+    "vl53l8cx",
+    "vl53l8ch",
+    "vl53l5cx",
+    "vl53l7cx",
+    "vl53l7ch",
+    "vl53l0x",
+    "vl53l1cx",
+    "vl53l1cb",
+    "vl53l3cx",
+    "vl53l4cx",
+    "vl53lx",
+    "bno086",
+    "bno055",
+    "tmf8829",
+    "device",
+    "bootloader",
 ];
 ```
 
@@ -255,9 +270,19 @@ The default request timeout, 200 ms (contract 07 §3).
 
 ```rust
 pub enum DeviceEvent {
-    /// A gap in packet sequence numbers; `reported_by_device`: the board saw a gap in host TX
-    /// (RPT_SEQUENCE_ERROR), else the host saw one in the board's packets.
-    SequenceError { expected_seq: u8, received_seq: u8, reported_by_device: bool },
+    /// The board saw a gap in host TX (RPT_SEQUENCE_ERROR); `reported_by_device` is always true.
+    SequenceError {
+        expected_seq: u8,
+        received_seq: u8,
+        reported_by_device: bool,
+    },
+    /// The host saw a gap in the board's packets (contract 01 §5 step 5): the packet still
+    /// arrives, `missed` = (received − expected) mod 256 did not. Counted in `seq_gaps`.
+    SeqGap {
+        expected_seq: u8,
+        received_seq: u8,
+        missed: u8,
+    },
     /// A frame whose payload CRC failed (dropped).
     LinkCrcError { cmd: u8, seq: u8 },
     /// Bytes discarded while hunting for a frame.
@@ -271,7 +296,11 @@ pub enum DeviceEvent {
     /// The link dropped or the reader stopped.
     Disconnected(String),
     /// A sensor class's own event: `kind` names it, `payload` is the report's payload.
-    Sensor { kind: &'static str, code: u8, payload: Vec<u8> },
+    Sensor {
+        kind: &'static str,
+        code: u8,
+        payload: Vec<u8>,
+    },
 }
 ```
 
@@ -290,6 +319,8 @@ pub struct LinkStats {
     pub trash_bytes: u64,
     pub seq_gaps: u64,
     pub device_seq_errors: u64,
+    /// Callbacks that panicked on the reader thread (contract 07 §3).
+    pub callback_errors: u64,
 }
 ```
 
@@ -351,6 +382,16 @@ pub fn new(link: impl Link + 'static, timeout: Option<Duration>) -> DepzDevice
 ```
 
 Open a connection on any link; the device owns it and closes it. `timeout` `None`: 200 ms.
+
+#### DepzDevice::open
+
+```rust
+pub fn open(port: &str, timeout: Option<Duration>) -> Result<DepzDevice>
+```
+
+Open a plain connection on the serial port `port` ([`SerialPortLink::open`]): the common
+commands, no sensor class. `timeout` `None`: 200 ms. [`DepzError::DeviceLost`] when the port
+does not open.
 
 #### DepzDevice::set_report_handler
 
@@ -706,7 +747,8 @@ pub struct ReplayLink {
 
 Replays the rx side of a `.depzrec` capture causally (contract 08): an rx chunk is served only
 after the host has written as many tx bytes as preceded it in the capture. With `strict_tx` every
-written byte must also equal the recorded tx stream ([`DepzError::ReplayMismatch`]).
+written byte must also equal the recorded tx stream ([`DepzError::ReplayMismatch`]). A damaged
+capture is refused by [`ReplayLink::open`] with [`DepzError::InvalidArgument`] naming the line.
 
 #### ReplayLink::open
 
@@ -715,7 +757,11 @@ pub fn open(path: impl AsRef<Path>, strict_tx: bool, realtime: bool) -> Result<R
 ```
 
 Load `path`; `strict_tx` fails a write that differs from the recorded tx stream, `realtime`
-paces rx chunks by their recorded timestamps.
+paces rx chunks by their recorded timestamps. A damaged capture (contract 08: an empty file,
+a header that is not a JSON object, an event line that is not one or whose `t` / `dir` /
+`data` are not a non-negative integer / a string / hex digit pairs) is
+[`DepzError::InvalidArgument`] naming the line; blank lines are skipped, any `dir` other
+than `"rx"` counts as tx.
 
 #### ReplayLink::header
 
@@ -766,7 +812,11 @@ ahead of its own request, which breaks the causal rx gating replay relies on.
 #### RecordingLink::create
 
 ```rust
-pub fn create(inner: L, path: impl AsRef<Path>, header_extra: Vec<(String, Value)>) -> Result<RecordingLink<L>>
+pub fn create(
+    inner: L,
+    path: impl AsRef<Path>,
+    header_extra: Vec<(String, Value)>,
+) -> Result<RecordingLink<L>>
 ```
 
 Record `inner` into `path` (overwritten); `header_extra` adds header fields (contract 08),
@@ -791,6 +841,37 @@ pub struct ProbeResult {
 ```
 
 The probe's answers: software name, device name, serial number.
+
+### DeviceInfo
+
+```rust
+pub struct DeviceInfo {
+    pub port: String,
+    pub mode: Mode,
+    /// `None` in bootloader / unknown mode.
+    pub sensor_type: Option<SensorType>,
+    pub software_name: String,
+    pub fw_version: String,
+    pub device_name: String,
+    /// The device's protocol serial (GET_SERIAL).
+    pub serial_number: String,
+    /// The port's USB id, informative only — never filtered on.
+    pub usb_vid: Option<u16>,
+    pub usb_pid: Option<u16>,
+    /// The USB iSerial, the ordering / selection key (contract 02 §4.3).
+    pub usb_serial: Option<String>,
+}
+```
+
+What the contract 02 §4.4 probe learned about one port ([`probe_port`], [`list_depz_devices`]).
+
+#### DeviceInfo::usb_model_hint
+
+```rust
+pub fn usb_model_hint(&self) -> Option<&'static str>
+```
+
+The model the USB-id table gives the port (contract 02 §4.2), or `None`.
 
 ### AnyDevice
 
@@ -958,6 +1039,204 @@ Open a device on a connection that cannot be reopened — a replay or recording 
 host opened (contract 02 §4.4). Runs the probe on `link`, resolves the class from the answers and
 the port's USB id (`None`: unknown; a link knows none) and continues as that class on the same
 connection. The device owns the link; on failure it is closed.
+
+### probe_port
+
+```rust
+pub fn probe_port(port: &str, timeout: Option<Duration>) -> Option<DeviceInfo>
+```
+
+Probe one port: open it, run [`probe`], close. `None` when the port does not open or nothing
+DEPZ-shaped answers. Probing opens the port: leave ports other software owns alone.
+
+### list_depz_devices
+
+```rust
+pub fn list_depz_devices(
+    ports: Option<&[&str]>,
+    match_usb: bool,
+    timeout: Option<Duration>,
+) -> Result<Vec<DeviceInfo>>
+```
+
+Probe the candidate ports and return every DEPZ device found, ordered by USB serial. With
+`match_usb` only ports with a known DEPZ USB id are probed; `ports` (`None`: enumerate)
+replaces enumeration with an explicit list (still USB-annotated when the OS knows the port).
+[`DepzError::Io`] when the OS refuses to enumerate.
+
+### open_device
+
+```rust
+pub fn open_device(port: &str, timeout: Option<Duration>) -> Result<AnyDevice>
+```
+
+Open exactly `port` as its sensor class (contract 02 §4.3, §4.4): the probe runs on a connection
+of its own, which is closed; the class the answers and the port's USB id resolve to then opens
+the port afresh (host sequence numbers restart at 0). The USB id is that of the enumerated port
+`port` names under any alias (`/dev/serial/by-id/…`, a symlink, another name of the same device
+node). A port whose USB id is not a DEPZ one — or that the OS does not list — is opened too,
+with a warning on stderr (an unprogrammed unit, a custom setup). `timeout` `None`: 200 ms.
+
+[`DepzError::DeviceLost`]: the port does not open; [`DepzError::NoDevice`]: nothing DEPZ
+answered; [`DepzError::BootloaderMode`]: use the contract 06 client.
+
+### open_first_device
+
+```rust
+pub fn open_first_device(timeout: Option<Duration>) -> Result<AnyDevice>
+```
+
+Open the DEPZ candidate with the alphabetically smallest USB serial as its sensor class
+(contract 02 §4.3): the first of [`list_depz_ports`]. [`DepzError::NoDevice`] when no serial
+port has a known DEPZ USB id — never "the first port the OS lists".
+
+### open_device_by_serial
+
+```rust
+pub fn open_device_by_serial(serial: &str, timeout: Option<Duration>) -> Result<AnyDevice>
+```
+
+Open the DEPZ candidate whose USB serial is `serial` as its sensor class (contract 02 §4.3).
+[`DepzError::NoDevice`] when none has it.
+
+### open_device_at
+
+```rust
+pub fn open_device_at(index: usize, timeout: Option<Duration>) -> Result<AnyDevice>
+```
+
+Open the `index`-th DEPZ candidate (0-based, candidates sorted by USB serial) as its sensor
+class (contract 02 §4.3). [`DepzError::NoDevice`] when out of range.
+
+### open_device_info
+
+```rust
+pub fn open_device_info(info: &DeviceInfo, timeout: Option<Duration>) -> Result<AnyDevice>
+```
+
+Open the port of a [`list_depz_devices`] result as the class its probe answers resolve to —
+no second probe.
+
+### DEFAULT_BAUD_RATE
+
+```rust
+pub const DEFAULT_BAUD_RATE: u32 = 115_200;
+```
+
+The nominal baud rate the port opens with (115200 8N1, as the other SDKs); the USB CDC boards
+ignore it.
+
+### SerialPortInfo
+
+```rust
+pub struct SerialPortInfo {
+    /// The path (`/dev/ttyACM0`, `COM5`, `/dev/cu.usbmodem…`).
+    pub port: String,
+    pub vid: Option<u16>,
+    pub pid: Option<u16>,
+    /// The USB iSerial — the flashed serial on production units (contract 02 §4.3).
+    pub usb_serial: Option<String>,
+}
+```
+
+One serial port the OS lists: its path, and its USB ids and iSerial when it is a USB device
+(else `None`).
+
+#### SerialPortInfo::is_depz
+
+```rust
+pub fn is_depz(&self) -> bool
+```
+
+The port's USB id is a known DEPZ (or dev-default) one (contract 02 §4.2).
+
+#### SerialPortInfo::usb_model_hint
+
+```rust
+pub fn usb_model_hint(&self) -> Option<&'static str>
+```
+
+The model the USB-id table gives the port, or `None`. Informational: the probe decides.
+
+### list_serial_ports
+
+```rust
+pub fn list_serial_ports() -> Result<Vec<SerialPortInfo>>
+```
+
+Every serial port the OS lists, with its USB identity where known. [`DepzError::Io`] when the
+OS refuses to enumerate.
+
+### find_port
+
+```rust
+pub fn find_port<'a>(ports: &'a [SerialPortInfo], path: &str) -> Option<&'a SerialPortInfo>
+```
+
+The enumerated port `path` names, under any alias (contract 02 §4.3, ERRATA A5): the one whose
+path is the same string, else — on POSIX — the one whose resolved path is the same
+(`/dev/serial/by-id/…` is a symlink to the node), else the one that is the same character
+device under another name. On Windows a COM name is matched by string only: a COM port is not
+a file, and resolving one (canonicalize, metadata) opens it — a DTR pulse on every board of the
+bench. `None` when the OS does not list the port.
+
+### by_serial
+
+```rust
+pub fn by_serial(mut ports: Vec<SerialPortInfo>) -> Vec<SerialPortInfo>
+```
+
+Ports by USB iSerial ascending, those without one last, ties by path (contract 02 §4.3).
+
+### list_depz_ports
+
+```rust
+pub fn list_depz_ports() -> Result<Vec<SerialPortInfo>>
+```
+
+The DEPZ candidates: every port with a known DEPZ USB id, by USB serial (contract 02 §4.3).
+
+### SerialPortLink
+
+```rust
+pub struct SerialPortLink {
+    reader: Mutex<Option<Box<dyn SerialPort>>>,
+    writer: Mutex<Option<Box<dyn SerialPort>>>,
+    name: String,
+    closed: AtomicBool,
+    read_timeout: Mutex<Option<Duration>>,
+}
+```
+
+A serial port as a [`Link`]: 115200 8N1 with DTR and RTS raised, opened exclusively (a second
+opener of a CDC-ACM tty would silently share the byte stream). Reads block up to their timeout,
+so [`Link::close`] returns within one read slice; a lost port fails the next read or write with
+[`DepzError::DeviceLost`].
+
+#### SerialPortLink::open
+
+```rust
+pub fn open(port: &str) -> Result<SerialPortLink>
+```
+
+Open `port` at [`DEFAULT_BAUD_RATE`]. [`DepzError::DeviceLost`] when it does not open (no
+such port, busy, no permission).
+
+#### SerialPortLink::open_with_baud_rate
+
+```rust
+pub fn open_with_baud_rate(port: &str, baud_rate: u32) -> Result<SerialPortLink>
+```
+
+[`SerialPortLink::open`] at `baud_rate`.
+
+#### SerialPortLink::port
+
+```rust
+pub fn port(&self) -> &str
+```
+
+The port path.
 
 ### Subscription
 
@@ -1182,7 +1461,10 @@ Stop the measurement loop (idempotent).
 #### Sr04Device::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Sr04Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Sr04Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every measurement (reader thread). Drop the hook to stop.
@@ -1447,7 +1729,7 @@ Drive XSHUT: off (0) / on (1) / reset (2). Off and reset stop a stream; init aga
 pub fn reset_sensor(&self) -> Result<()>
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); init again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); init again.
 
 #### Vl53l4cdDevice::bridge_info
 
@@ -1455,7 +1737,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); init again.
 pub fn bridge_info(&self) -> Result<Vl53l4Info>
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2c_errors` is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice::set_i2c_speed_khz
 
@@ -1517,7 +1799,12 @@ pub fn get_detection_thresholds(&self) -> Result<DetectionThresholds>
 #### Vl53l4cdDevice::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt: INT only fires while the window holds.
@@ -1602,7 +1889,10 @@ One polled measurement: start, wait for data ready, read, stop. Not while stream
 #### Vl53l4cdDevice::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every streamed measurement (reader thread).
@@ -1726,13 +2016,24 @@ pub fn i2c_error_name(code: u8) -> &'static str
 
 `last_i2c_error` code in [`Vl53l4Info`] → human-readable name.
 
+### try_pack_read_reg
+
+```rust
+pub fn try_pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError>
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` with the transfer limit of
+contract 10 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x10000` —
+refused before anything is written (contract 07 §3).
+
 ### pack_read_reg
 
 ```rust
 pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
 ```
 
-`VL53_READ_REG` payload: `addr u16, len u16` (little-endian).
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian), unchecked —
+prefer [`try_pack_read_reg`].
 
 ### try_pack_write_reg
 
@@ -1741,7 +2042,8 @@ pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
 ```
 
 `VL53_WRITE_REG` payload: `addr u16` followed by 1..=[`XFER_MAX`] raw
-register bytes; any other data length is refused (contract 07 §3).
+register bytes with `addr + N <= 0x10000`; anything else is refused
+(contract 07 §3).
 
 ### pack_write_reg
 
@@ -1811,7 +2113,7 @@ pub struct Vl53l4Info {
     pub model_id: u16,
     /// 0x00E5 — expected 0x03 (booted).
     pub fw_status: u8,
-    /// 1 = MODEL_ID matched on this read.
+    /// 1 = MODEL_ID read back as 0xEBAA on this GET_INFO.
     pub initialized: u8,
     pub xshut_level: u8,
     pub int_level: u8,
@@ -1819,8 +2121,10 @@ pub struct Vl53l4Info {
 }
 ```
 
-A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters are
-free-running and wrap silently; watch increments, not absolute values.
+A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters wrap
+silently; watch increments, not absolute values. `i2c_errors` counts since
+the last successful XSHUT reset (the bridge clears it there), not since
+power-up.
 
 #### Vl53l4Info::unpack
 
@@ -2047,7 +2351,12 @@ pub fn get_xtalk(&self) -> Result<u16>
 #### Vl53l4cdDriver::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt; `window` is one of [`uld::WINDOW_BELOW`] … [`uld::WINDOW_IN`].
@@ -2454,7 +2763,7 @@ description"). Unknown codes map to `"unknown"`.
 
 ```rust
 pub enum Vl53l4Error {
-    /// Result block shorter than the 15 bytes the decode reads.
+    /// Result block shorter than `RESULT_BLOCK_LEN` (17) bytes (contract 10 §5).
     ShortResultBlock,
     /// `osc_frequency` register reads 0.
     OscFrequencyZero,
@@ -2479,6 +2788,15 @@ pub enum Vl53l4Error {
 ```
 
 VL53L4 codec/math failure.
+
+#### Vl53l4Error::is_argument
+
+```rust
+pub fn is_argument(&self) -> bool
+```
+
+A refused argument (contract 07 §3 `invalid_argument`), not a value the
+sensor produced: the budget, the period, the tuning values.
 
 ### Vl53l4Results
 
@@ -2520,6 +2838,21 @@ Decode the streamed 0x0089..0x0099 block exactly as `VL53L4CD_GetResult()`
 decodes the same registers read one by one. Register contents are
 big-endian words (the bridge passes them through untouched).
 
+### check_range_timing
+
+```rust
+pub fn check_range_timing(
+    timing_budget_ms: u32,
+    inter_measurement_ms: u32,
+) -> Result<(), Vl53l4Error>
+```
+
+`SetRangeTiming`'s own argument checks (ST's `VL53L4CD_ERROR_INVALID_ARGUMENT`),
+which need no register: budget 10..=200 ms
+([`Vl53l4Error::TimingBudgetOutOfRange`]), period 0 (continuous) or above
+the budget (autonomous; [`Vl53l4Error::InterMeasurementInvalid`]) —
+contract 10 §5.
+
 ### range_timing_registers
 
 ```rust
@@ -2539,7 +2872,8 @@ from `RESULT__OSC_CALIBRATE_VAL` (used only in autonomous mode, i.e. when
 `inter_measurement_ms > 0`). `inter_measurement_ms == 0` selects continuous
 mode; a value greater than the budget selects autonomous low power.
 
-Rejected (contract 07 §3, never wrapped): an `osc_frequency` of 0 or so
+Rejected (contract 07 §3, never wrapped): the arguments
+[`check_range_timing`] refuses, an `osc_frequency` of 0 or so
 small that the macro period truncates to 0
 ([`Vl53l4Error::MacroPeriodZero`]), and an autonomous period whose
 register value overflows u32 ([`Vl53l4Error::InterMeasurementOverflow`]).
@@ -2641,6 +2975,15 @@ pub const MIN_RANGING_FREQUENCY_HZ: i32 = 2;
 
 Below this the VL53L8 never enters its ranging loop and streams nothing (contract 04).
 
+### max_ranging_frequency_hz
+
+```rust
+pub fn max_ranging_frequency_hz(resolution: usize) -> i32
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same
+silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+
 ### BridgeUld
 
 ```rust
@@ -2728,7 +3071,11 @@ Download the sensor firmware and the default configuration.
 #### Vl53l8cxDevice::init_with_progress
 
 ```rust
-pub fn init_with_progress(&self, progress: &mut dyn FnMut(&str), write_progress: Option<WriteProgress>) -> Result<()>
+pub fn init_with_progress(
+    &self,
+    progress: &mut dyn FnMut(&str),
+    write_progress: Option<WriteProgress>,
+) -> Result<()>
 ```
 
 [`Vl53l8cxDevice::init`] reporting its phases to `progress` and the big firmware writes to
@@ -2843,19 +3190,28 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice::get_xtalk_margin
 
 ```rust
-pub fn get_xtalk_margin(&self) -> Result<f64>
+pub fn get_xtalk_margin(&self) -> Result<u32>
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice::set_xtalk_margin
 
 ```rust
-pub fn set_xtalk_margin(&self, margin_kcps: f64) -> Result<()>
+pub fn set_xtalk_margin(&self, margin_kcps: u32) -> Result<()>
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is refused.
 
 #### Vl53l8cxDevice::calibrate_xtalk
 
 ```rust
-pub fn calibrate_xtalk(&self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> Result<()>
+pub fn calibrate_xtalk(
+    &self,
+    reflectance_percent: i32,
+    nb_samples: i32,
+    distance_mm: i32,
+) -> Result<()>
 ```
 
 On-device crosstalk calibration against a flat target; read the result with
@@ -2910,11 +3266,17 @@ pub fn set_detection_thresholds_auto_stop(&self, auto_stop: bool) -> Result<()>
 #### Vl53l8cxDevice::configure_motion_indicator
 
 ```rust
-pub fn configure_motion_indicator(&self, distance_mm: Option<(i32, i32)>) -> Result<MotionConfig>
+pub fn configure_motion_indicator(
+    &self,
+    distance_mm: Option<(i32, i32)>,
+) -> Result<MotionConfig>
 ```
 
 Enable the motion indicator over [min, max] mm (`None`: 400–1500); every frame then carries
 [`Vl53l8Frame::motion`]. Returns the configuration for further tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH
+(`cnh_setup()` → `None`, no [`Vl53l8Frame::cnh_raw`]).
 
 #### Vl53l8cxDevice::start_ranging
 
@@ -3011,7 +3373,8 @@ pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
 
 Arm CNH for the next [`Vl53l8cxDevice::start_ranging`]: every frame then carries
 [`Vl53l8Frame::cnh_raw`], decoded with [`crate::vl53l8::decode_cnh`] and
-[`Vl53l8CnhSetup::decode_config`].
+[`Vl53l8CnhSetup::decode_config`]. CNH and the motion indicator share one DCI struct
+(0xBFAC): this disarms the motion indicator (frames carry no [`Vl53l8Frame::motion`]).
 
 ### DIST_MM
 
@@ -3095,7 +3458,7 @@ pub const POWER_MODE_DEEP_SLEEP: u8 = 2;
 pub enum AdvancedError {
     /// Motion indicator resolution other than 16 (4×4) or 64 (8×8).
     InvalidResolution(usize),
-    /// Xtalk margin outside 0..=10000 kcps (or not a number).
+    /// Xtalk margin above 10000 kcps.
     XtalkMarginOutOfRange,
     /// Threshold `index`: low/high × its measurement scale does not fit i32.
     ThresholdOverflow(usize),
@@ -3111,20 +3474,28 @@ anything is written — the ULD's `VL53L8CX_STATUS_INVALID_PARAM`).
 ### XTALK_MARGIN_MAX_KCPS
 
 ```rust
-pub const XTALK_MARGIN_MAX_KCPS: f64 = 10000.0;
+pub const XTALK_MARGIN_MAX_KCPS: u32 = 10000;
 ```
 
-Largest xtalk margin `set_xtalk_margin` accepts, kcps/SPAD.
+Largest xtalk margin `set_xtalk_margin` accepts, whole kcps/SPAD (as ST).
 
 ### try_xtalk_margin_to_raw
 
 ```rust
-pub fn try_xtalk_margin_to_raw(margin_kcps: f64) -> Result<u32, AdvancedError>
+pub fn try_xtalk_margin_to_raw(margin_kcps: u32) -> Result<u32, AdvancedError>
 ```
 
-Xtalk margin (kcps/SPAD) → raw DCI value `round(kcps * 2048)`, as
-`set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`], else
-[`AdvancedError::XtalkMarginOutOfRange`].
+Xtalk margin, a whole number of kcps/SPAD (as ST) → raw DCI value
+`kcps * 2048`, as `set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`],
+else [`AdvancedError::XtalkMarginOutOfRange`].
+
+### xtalk_margin_from_raw
+
+```rust
+pub fn xtalk_margin_from_raw(raw: u32) -> u32
+```
+
+Inverse: raw DCI value → whole kcps/SPAD (`raw / 2048`, integer division as ST).
 
 ### MotionConfig
 
@@ -3275,8 +3646,6 @@ Result of [`decode_cnh`].
 pub enum CnhError {
     /// `raw` is too short for the header or the computed block extends past it.
     Truncated,
-    /// `nb_of_aggregates` or `feature_length` is zero.
-    EmptyConfig,
 }
 ```
 
@@ -3295,7 +3664,8 @@ into per-aggregate integer histograms plus the reference-residual word.
 Faithful port of the Python `cnh.decode` / `_decode_aggregate` for the fixed
 DEPZ `cnh_cfg` (ping-pong + variance disabled). With ping-pong disabled the
 device reports a single buffer and the ping/pong selection resolves to the
-sole buffer.
+sole buffer. As the reference, an empty configuration (no aggregates or no
+bins) decodes to empty histograms rather than an error.
 
 ### Vl53l8Cmd
 
@@ -3366,10 +3736,12 @@ data byte).
 ### pack_start_stream
 
 ```rust
-pub fn pack_start_stream(frame_size: u16) -> [u8; 2]
+pub fn pack_start_stream(frame_size: u16) -> Result<[u8; 2], CodecError>
 ```
 
-`VL53_START_STREAM` payload: `frame_size u16`.
+`VL53_START_STREAM` payload: `frame_size u16`, which must be
+1..=[`STREAM_TOTAL_MAX`] (contract 04 §4 rule 4 — the firmware refuses
+anything else too).
 
 ### RegData
 
@@ -4120,7 +4492,13 @@ pub fn dci_write_data(&self, index: u16, data: &[u8]) -> UldResult<()>
 #### Vl53l8Driver::dci_replace_data
 
 ```rust
-pub fn dci_replace_data(&self, index: u16, data_size: usize, new_data: &[u8], new_data_pos: usize) -> UldResult<()>
+pub fn dci_replace_data(
+    &self,
+    index: u16,
+    data_size: usize,
+    new_data: &[u8],
+    new_data_pos: usize,
+) -> UldResult<()>
 ```
 
 `vl53l8cx_dci_replace_data`: read `data_size` bytes of DCI `index`, put `new_data` at
@@ -4322,19 +4700,19 @@ Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs
 #### Vl53l8Driver::get_xtalk_margin
 
 ```rust
-pub fn get_xtalk_margin(&self) -> UldResult<f64>
+pub fn get_xtalk_margin(&self) -> UldResult<u32>
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver::set_xtalk_margin
 
 ```rust
-pub fn set_xtalk_margin(&mut self, margin_kcps: f64) -> UldResult<()>
+pub fn set_xtalk_margin(&mut self, margin_kcps: u32) -> UldResult<()>
 ```
 
-Xtalk margin, kcps/SPAD: 0..10000 (NaN and anything else is [`status::INVALID_PARAM`],
-nothing written).
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+[`status::INVALID_PARAM`], nothing written.
 
 #### Vl53l8Driver::get_caldata_xtalk
 
@@ -4404,10 +4782,23 @@ pub fn motion_indicator_init(&mut self, res: usize) -> UldResult<MotionConfig>
 A default motion-indicator configuration for `res`, written to the sensor; frames carry
 motion output from here on.
 
+#### Vl53l8Driver::motion_indicator_disarm
+
+```rust
+pub fn motion_indicator_disarm(&mut self)
+```
+
+Stop surfacing the motion block: frames parse with `motion` `None`. Called when the VL53LMZ
+CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+
 #### Vl53l8Driver::motion_indicator_set_resolution
 
 ```rust
-pub fn motion_indicator_set_resolution(&mut self, cfg: &mut MotionConfig, res: usize) -> UldResult<()>
+pub fn motion_indicator_set_resolution(
+    &mut self,
+    cfg: &mut MotionConfig,
+    res: usize,
+) -> UldResult<()>
 ```
 
 Set `cfg`'s zone map for `res` (16 or 64, else [`status::INVALID_PARAM`]) and write it.
@@ -4429,7 +4820,12 @@ Set `cfg`'s distance window (400..4000 mm, at most 1500 mm wide, else
 #### Vl53l8Driver::calibrate_xtalk
 
 ```rust
-pub fn calibrate_xtalk(&mut self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> UldResult<()>
+pub fn calibrate_xtalk(
+    &mut self,
+    reflectance_percent: i32,
+    nb_samples: i32,
+    distance_mm: i32,
+) -> UldResult<()>
 ```
 
 `vl53l8cx_calibrate_xtalk`: on-device crosstalk calibration against a flat target at
@@ -4494,6 +4890,7 @@ A completed sensor frame with its capture timestamp.
 pub struct FrameReassembler {
     pub completed: u64,
     pub discarded: u64,
+    chunk_max: usize,
     buf: Vec<u8>,
     full_size: usize,
     timestamp_us: u64,
@@ -4507,6 +4904,17 @@ Rebuilds full sensor frames from chunked `RPT_VL53_FRAME` reports.
 ```rust
 pub fn new() -> Self
 ```
+
+A reassembler for the VL53L8 board's [`STREAM_CHUNK_MAX`] chunks.
+
+#### FrameReassembler::with_chunk_max
+
+```rust
+pub fn with_chunk_max(chunk_max: usize) -> Self
+```
+
+A reassembler for a board whose `VL53_STREAM_FRAME_MAX` is `chunk_max`
+(`vl53l7::STREAM_CHUNK_MAX` = 1536 on the I2C board, contract 11 §3).
 
 #### FrameReassembler::feed
 
@@ -4630,7 +5038,8 @@ The CNH setup armed by [`Vl53l7chDevice::configure_cnh`], or `None`.
 pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
 ```
 
-Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]).
+Arm CNH for the next start (as [`super::Vl53l8chDevice::configure_cnh`]); disarms the motion
+indicator (one DCI block).
 
 ### Vl53l7Cmd
 
@@ -5228,7 +5637,12 @@ pub fn get_detection_thresholds(&self) -> Result<Thresholds>
 #### Vl53lxDevice::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt; stays armed until the next init / configure.
@@ -5326,7 +5740,10 @@ streaming. `timeout` `None`: 1 s.
 #### Vl53lxDevice::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Vl53lxMeasurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every streamed measurement (reader thread, or the thread of a call that
@@ -6518,7 +6935,12 @@ pub fn rate_maths(events: i64, time_us: i64) -> i64
 ### rate_per_spad_maths
 
 ```rust
-pub fn rate_per_spad_maths(frac_bits: u32, peak_count_rate: i64, num_spads: i64, max_output_value: i64) -> i64
+pub fn rate_per_spad_maths(
+    frac_bits: u32,
+    peak_count_rate: i64,
+    num_spads: i64,
+    max_output_value: i64,
+) -> i64
 ```
 
 `VL53LX_rate_per_spad_maths()`.
@@ -6566,7 +6988,10 @@ pub fn calc_zero_distance_phase(bins: &mut HistogramBinData)
 ### estimate_ambient_from_thresholded_bins
 
 ```rust
-pub fn estimate_ambient_from_thresholded_bins(ambient_threshold_sigma: i64, bins: &mut HistogramBinData)
+pub fn estimate_ambient_from_thresholded_bins(
+    ambient_threshold_sigma: i64,
+    bins: &mut HistogramBinData,
+)
 ```
 
 `VL53LX_hist_estimate_ambient_from_thresholded_bins()`: the floor from every bin near the
@@ -6592,7 +7017,10 @@ zero.
 ### process_data
 
 ```rust
-pub fn process_data(bins_input: &HistogramBinData, hpp: &HistPostProcessConfig) -> Result<RangeResults>
+pub fn process_data(
+    bins_input: &HistogramBinData,
+    hpp: &HistPostProcessConfig,
+) -> Result<RangeResults>
 ```
 
 `VL53LX_hist_process_data()` + `VL53LX_f_025`, crosstalk off, one merged frame.
@@ -7251,7 +7679,12 @@ A timeout in µs → its register encoding.
 ### duration_maths
 
 ```rust
-pub fn duration_maths(pll_period_us: i64, vcsel_parm_pclks: i64, window_vclks: i64, elapsed_mclks: i64) -> i64
+pub fn duration_maths(
+    pll_period_us: i64,
+    vcsel_parm_pclks: i64,
+    window_vclks: i64,
+    elapsed_mclks: i64,
+) -> i64
 ```
 
 `VL53LX_duration_maths()`: a window duration, µs.
@@ -7384,7 +7817,11 @@ NVM region of the FMT range results at 140 mm, dark.
 ### read_region
 
 ```rust
-pub fn read_region(p: &dyn Vl53lxPlatform, img: &mut DeviceImage, region: (usize, usize)) -> Result<Vec<u8>>
+pub fn read_region(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+    region: (usize, usize),
+) -> Result<Vec<u8>>
 ```
 
 `VL53LX_read_nvm_raw_data()`: (byte index, byte size), both word-aligned → the bytes. The image
@@ -7401,7 +7838,10 @@ The optical centre (zeroed on a never-programmed part).
 ### read_cal_peak_rate_map
 
 ```rust
-pub fn read_cal_peak_rate_map(p: &dyn Vl53lxPlatform, img: &mut DeviceImage) -> Result<CalPeakRateMap>
+pub fn read_cal_peak_rate_map(
+    p: &dyn Vl53lxPlatform,
+    img: &mut DeviceImage,
+) -> Result<CalPeakRateMap>
 ```
 
 The 5x5 calibration peak-rate map.
@@ -7552,7 +7992,8 @@ pub const RESULT_HISTOGRAM_BIN_23_0_LSB: u16 = 0x00DA;
 ### HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES
 
 ```rust
-pub const HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES: u16 = RESULT_HISTOGRAM_BIN_23_0_LSB - HISTOGRAM_BIN_DATA_I2C_INDEX + 1;
+pub const HISTOGRAM_BIN_DATA_I2C_SIZE_BYTES: u16 =
+    RESULT_HISTOGRAM_BIN_23_0_LSB - HISTOGRAM_BIN_DATA_I2C_INDEX + 1;
 ```
 
 Bytes in one histogram frame (83).
@@ -7784,7 +8225,8 @@ VCSEL periods of the ranging window.
 ### MACRO_PERIOD_VCSEL_PERIODS
 
 ```rust
-pub const MACRO_PERIOD_VCSEL_PERIODS: i64 = AMBIENT_WINDOW_VCSEL_PERIODS + RANGING_WINDOW_VCSEL_PERIODS;
+pub const MACRO_PERIOD_VCSEL_PERIODS: i64 =
+    AMBIENT_WINDOW_VCSEL_PERIODS + RANGING_WINDOW_VCSEL_PERIODS;
 ```
 
 VCSEL periods of one macro period.
@@ -9059,7 +9501,9 @@ pub trait Vl53lxDriver: Send {
         Vec::new()
     }
 
-    fn set_mode(&mut self, _name: &str) -> Result<()> {
+    /// Apply one of the modes. → the timing budget in effect after the change, ms, on a driver
+    /// whose mode change can move it (VL53L1: contract 12 §5), else `None`.
+    fn set_mode(&mut self, _name: &str) -> Result<Option<u32>> {
         Err(unsupported(self.product(), self.driver_name(), "mode"))
     }
 
@@ -9097,35 +9541,72 @@ pub trait Vl53lxDriver: Send {
 
     /// `nb_samples` `None`: the driver's default.
     fn calibrate_offset(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_offset"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_offset",
+        ))
     }
 
     fn calibrate_xtalk(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_xtalk"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_xtalk",
+        ))
     }
 
     fn get_detection_thresholds(&mut self) -> Result<Thresholds> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
-    fn set_detection_thresholds(&mut self, _distance_low_mm: u16, _distance_high_mm: u16, _window: u8) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+    fn set_detection_thresholds(
+        &mut self,
+        _distance_low_mm: u16,
+        _distance_high_mm: u16,
+        _window: u8,
+    ) -> Result<()> {
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
     fn get_signal_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn set_signal_threshold(&mut self, _signal_kcps: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn get_sigma_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     fn set_sigma_threshold(&mut self, _sigma_mm: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     /// (x, y) SPADs.
@@ -9146,7 +9627,11 @@ pub trait Vl53lxDriver: Send {
     }
 
     fn start_temperature_update(&mut self) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "temp_update"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "temp_update",
+        ))
     }
 
     /// VL53L0X: re-measure the reference SPADs → (count, is_aperture).
@@ -9158,12 +9643,18 @@ pub trait Vl53lxDriver: Send {
 
     /// The raw histogram of a frame (read from the sensor when `raw` is `None`).
     fn bin_data(&mut self, _raw: Option<&[u8]>) -> Result<BinData> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 
     /// A histogram frame → a range (the host-side ranging of the histogram driver).
     fn to_measurement(&mut self, _bins: &BinData) -> Result<Vl53lxRange> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 }
 ```
@@ -9305,7 +9796,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 4000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L1CB",
@@ -9313,7 +9807,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEACC,
         reach_mm: 8000,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L1)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L1)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L3CX",
@@ -9321,7 +9818,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEAAA,
         reach_mm: 3000,
         default_driver: DriverKind::Ulp,
-        drivers: &[(DriverKind::Ulp, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Ulp, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CD",
@@ -9329,7 +9829,10 @@ pub const PRODUCTS: [Product; 6] = [
         model_id: 0xEBAA,
         reach_mm: 1300,
         default_driver: DriverKind::Uld,
-        drivers: &[(DriverKind::Uld, die(DieVariant::L4)), (DriverKind::Histogram, HISTOGRAM)],
+        drivers: &[
+            (DriverKind::Uld, die(DieVariant::L4)),
+            (DriverKind::Histogram, HISTOGRAM),
+        ],
     },
     Product {
         name: "VL53L4CX",
@@ -9964,7 +10467,12 @@ Read off the loaded configuration: 1388 mm for the 0x38 window, 4563 mm for 0xB8
 #### Die::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The L4CD ULD thresholds: the window byte written whole.
@@ -10142,6 +10650,9 @@ pub struct Vl53l0xUldDriver {
     pre_range_timeout_us: i64,
     final_range_timeout_us: i64,
     target_ref_rate: i32,
+    sigma_est_ref_array: i32,
+    sigma_est_eff_pulse_width: i32,
+    sigma_est_eff_amb_width: i32,
     limit_checks_enable: [i32; CHECK_NUMBER_OF_CHECKS],
     limit_checks_value: [i64; CHECK_NUMBER_OF_CHECKS],
     mode: String,
@@ -10234,6 +10745,36 @@ pub fn part2part_offset_adjustment_nvm_um(&self) -> i64
 
 Factory part-to-part offset, µm.
 
+#### Vl53l0xUldDriver::target_ref_rate
+
+```rust
+pub fn target_ref_rate(&self) -> i32
+```
+
+The reference-SPAD target rate (9.7 Mcps) a tuning buffer's `{0xFF, 3, msb, lsb}` record
+sets; the SPAD management converges on it.
+
+#### Vl53l0xUldDriver::sigma_est_ref_array
+
+```rust
+pub fn sigma_est_ref_array(&self) -> i32
+```
+
+The three sigma-estimate constants a tuning buffer's `{0xFF, 0..2, msb, lsb}` records set
+(stored only: the 1.0.4 sigma estimate has them as constants).
+
+#### Vl53l0xUldDriver::sigma_est_eff_pulse_width
+
+```rust
+pub fn sigma_est_eff_pulse_width(&self) -> i32
+```
+
+#### Vl53l0xUldDriver::sigma_est_eff_amb_width
+
+```rust
+pub fn sigma_est_eff_amb_width(&self) -> i32
+```
+
 #### Vl53l0xUldDriver::osc_frequency_mhz
 
 ```rust
@@ -10283,6 +10824,15 @@ pub fn get_info_from_device(&mut self, option: i32) -> Result<()>
 VL53L0X_get_info_from_device(): the reference SPAD record (option 1), the product
 identification (2), the part UID and factory offset (4).
 
+#### Vl53l0xUldDriver::load_tuning_settings
+
+```rust
+pub fn load_tuning_settings(&mut self, buffer: &[u8]) -> Result<()>
+```
+
+VL53L0X_load_tuning_settings(): `{count, address, bytes...}` records, with count 0xFF
+carrying a host-side parameter instead; a zero count ends the buffer.
+
 #### Vl53l0xUldDriver::set_offset_um
 
 ```rust
@@ -10302,7 +10852,11 @@ The part-to-part offset, µm.
 #### Vl53l0xUldDriver::perform_offset_calibration
 
 ```rust
-pub fn perform_offset_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+pub fn perform_offset_calibration(
+    &mut self,
+    cal_distance_mm: i32,
+    nb_samples: i32,
+) -> Result<i64>
 ```
 
 VL53L0X_perform_offset_calibration() → µm (the contract's default is 50 samples). TCC and the
@@ -10311,7 +10865,11 @@ range-ignore threshold are off for the run.
 #### Vl53l0xUldDriver::perform_xtalk_calibration
 
 ```rust
-pub fn perform_xtalk_calibration(&mut self, cal_distance_mm: i32, nb_samples: i32) -> Result<i64>
+pub fn perform_xtalk_calibration(
+    &mut self,
+    cal_distance_mm: i32,
+    nb_samples: i32,
+) -> Result<i64>
 ```
 
 VL53L0X_perform_xtalk_calibration() → the rate, Mcps 16.16 (the contract's default is 50
@@ -10773,14 +11331,42 @@ pub const FRS_STABILITY_DETECTOR_CONFIG: u16 = 0xED85;
 pub const FRS_ACTIVITY_TRACKER_CONFIG: u16 = 0xED88;
 ```
 
+### FRS_GYRO_INTEGRATED_RV_CONFIG
+
+```rust
+pub const FRS_GYRO_INTEGRATED_RV_CONFIG: u16 = 0xA1A2;
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 ### METADATA_RECORDS
 
 ```rust
 pub const METADATA_RECORDS: [(u8, u16); 24] = [
-    (0x14, 0xE301), (0x01, 0xE302), (0x04, 0xE303), (0x06, 0xE304), (0x15, 0xE305), (0x02, 0xE306),
-    (0x07, 0xE307), (0x16, 0xE308), (0x03, 0xE309), (0x0F, 0xE30A), (0x05, 0xE30B), (0x08, 0xE30C),
-    (0x09, 0xE30D), (0x10, 0xE313), (0x18, 0xE314), (0x11, 0xE315), (0x12, 0xE316), (0x13, 0xE317),
-    (0x19, 0xE318), (0x1E, 0xE31C), (0x28, 0xE322), (0x29, 0xE323), (0x2A, 0xE324), (0x2B, 0xE325),
+    (0x14, 0xE301),
+    (0x01, 0xE302),
+    (0x04, 0xE303),
+    (0x06, 0xE304),
+    (0x15, 0xE305),
+    (0x02, 0xE306),
+    (0x07, 0xE307),
+    (0x16, 0xE308),
+    (0x03, 0xE309),
+    (0x0F, 0xE30A),
+    (0x05, 0xE30B),
+    (0x08, 0xE30C),
+    (0x09, 0xE30D),
+    (0x10, 0xE313),
+    (0x18, 0xE314),
+    (0x11, 0xE315),
+    (0x12, 0xE316),
+    (0x13, 0xE317),
+    (0x19, 0xE318),
+    (0x1E, 0xE31C),
+    (0x28, 0xE322),
+    (0x29, 0xE323),
+    (0x2A, 0xE324),
+    (0x2B, 0xE325),
 ];
 ```
 
@@ -11181,7 +11767,13 @@ out of the Q14 int16 range is refused.
 ### me_calibration_params
 
 ```rust
-pub fn me_calibration_params(accel: bool, gyro: bool, mag: bool, planar: bool, subcommand: u8) -> [u8; 5]
+pub fn me_calibration_params(
+    accel: bool,
+    gyro: bool,
+    mag: bool,
+    planar: bool,
+    subcommand: u8,
+) -> [u8; 5]
 ```
 
 ME Calibration (0x07): subcommand 0 configures, 1 ([`ME_CAL_GET`]) reads back.
@@ -11548,7 +12140,10 @@ Which of the plain 3-vector reports.
 ### try_parse_input_cargo
 
 ```rust
-pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Vec<Report>, CodecError>
+pub fn try_parse_input_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Vec<Report>, CodecError>
 ```
 
 [`parse_input_cargo`] that refuses a negative `capture_timestamp_us`: the
@@ -11557,7 +12152,10 @@ capture time is the MCU uptime, a u64 (contract 07 §3).
 ### try_parse_gyro_rv_cargo
 
 ```rust
-pub fn try_parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Option<Report>, CodecError>
+pub fn try_parse_gyro_rv_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Option<Report>, CodecError>
 ```
 
 [`parse_gyro_rv_cargo`] that refuses a negative `capture_timestamp_us`
@@ -11929,7 +12527,7 @@ Single-fragment frame: length = header + payload. A frame longer than the
 
 ```rust
 pub struct ShtpLayer {
-    /// Incomplete cargos thrown away.
+    /// Incomplete cargos and junk-channel (≥ 6) frames thrown away.
     pub discarded: u64,
     tx_seqs: [u8; NUM_CHANNELS],
     rx: Vec<ChannelRx>,
@@ -12115,7 +12713,11 @@ The SH-2 application's Product ID — the first of [`Bno086Device::product_ids`]
 #### Bno086Device::product_ids
 
 ```rust
-pub fn product_ids(&self, timeout: Option<Duration>, settle: Option<Duration>) -> Result<Vec<ProductId>>
+pub fn product_ids(
+    &self,
+    timeout: Option<Duration>,
+    settle: Option<Duration>,
+) -> Result<Vec<ProductId>>
 ```
 
 Every component's Product ID Response, the SH-2 application first. Collects until no response
@@ -12293,7 +12895,12 @@ Read a whole FRS record: its 32-bit words.
 #### Bno086Device::frs_write
 
 ```rust
-pub fn frs_write(&self, record_id: u16, words: &[u32], timeout: Option<Duration>) -> Result<()>
+pub fn frs_write(
+    &self,
+    record_id: u16,
+    words: &[u32],
+    timeout: Option<Duration>,
+) -> Result<()>
 ```
 
 Write a whole FRS record.
@@ -12446,13 +13053,38 @@ pub const EXPECTED_MAG_ID: u8 = 0x32;
 pub const EXPECTED_GYR_ID: u8 = 0x0F;
 ```
 
+### TIMER_PERIOD_MIN_MS
+
+```rust
+pub const TIMER_PERIOD_MIN_MS: u16 = 1;
+```
+
+`BNO_START_STREAM` TIMER period limits, ms (contract 13 §2).
+
+### TIMER_PERIOD_MAX_MS
+
+```rust
+pub const TIMER_PERIOD_MAX_MS: u16 = 60000;
+```
+
+### try_pack_read_reg
+
+```rust
+pub fn try_pack_read_reg(addr: u8, len: u8) -> Result<[u8; 2], CodecError>
+```
+
+`BNO_READ_REG` payload: `addr u8, len u8` with the transfer limit of
+contract 13 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x100` —
+refused before anything is written (contract 07 §3).
+
 ### pack_read_reg
 
 ```rust
 pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2]
 ```
 
-`BNO_READ_REG` payload: `addr u8, len u8`.
+`BNO_READ_REG` payload: `addr u8, len u8`, unchecked — prefer
+[`try_pack_read_reg`].
 
 ### try_pack_write_reg
 
@@ -12460,8 +13092,8 @@ pub fn pack_read_reg(addr: u8, len: u8) -> [u8; 2]
 pub fn try_pack_write_reg(addr: u8, data: &[u8]) -> Result<Vec<u8>, CodecError>
 ```
 
-`BNO_WRITE_REG` payload: `addr u8, data[1..128]`; a data length outside
-1..=[`XFER_MAX`] is refused (contract 07 §3), never sent.
+`BNO_WRITE_REG` payload: `addr u8, data[1..128]` with `addr + N <= 0x100`;
+anything else is refused (contract 07 §3), never sent.
 
 ### pack_write_reg
 
@@ -12496,6 +13128,21 @@ pub fn pack_get_info() -> [u8; 0]
 
 `BNO_GET_INFO` payload (empty).
 
+### try_pack_start_stream
+
+```rust
+pub fn try_pack_start_stream(
+    trigger: u8,
+    addr: u8,
+    len: u8,
+    period_ms: u16,
+) -> Result<[u8; 5], CodecError>
+```
+
+`BNO_START_STREAM` payload with the TIMER rule of contract 13 §2: with
+[`TRIGGER_TIMER`] the period is 1..=60000 ms, else refused before anything
+is written; with [`TRIGGER_INT`] it is the missed-edge watchdog (0 = none).
+
 ### pack_start_stream
 
 ```rust
@@ -12503,7 +13150,8 @@ pub fn pack_start_stream(trigger: u8, addr: u8, len: u8, period_ms: u16) -> [u8;
 ```
 
 `BNO_START_STREAM` payload: `trigger u8, addr u8, len u8, period_ms u16 LE`
-— 5 bytes. Replaces any running stream.
+— 5 bytes, unchecked — prefer [`try_pack_start_stream`]. Replaces any
+running stream.
 
 ### RegData
 
@@ -12574,6 +13222,7 @@ pub struct Bno055Info {
     pub read_avg_us: u16,
     /// Packets refused by a full USB TX ring.
     pub tx_dropped: u32,
+    /// Failed transfers since the last successful reset handshake.
     pub i2c_errors: u32,
     /// Stream slots dropped because the bus was still busy (since START_STREAM).
     pub slots_skipped: u32,
@@ -12589,8 +13238,9 @@ pub struct Bno055Info {
 ```
 
 A decoded `RPT_BNO_INFO` report (38 bytes) — sensor identity (registers
-0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap
-silently: watch increments. A rising `sensor_resets` means the bridge
+0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch
+increments. `i2c_errors` is cleared by every successful reset handshake.
+A rising `sensor_resets` means the bridge
 pulsed nRESET to recover the bus — the sensor is back in CONFIG and the
 host must re-apply its configuration.
 
@@ -13375,8 +14025,14 @@ Accelerometer bandwidth per `AccelConfig::bandwidth` code, Hz.
 ### ACC_POWER_NAMES
 
 ```rust
-pub const ACC_POWER_NAMES: [&str; 6] =
-    ["normal", "suspend", "low power 1", "standby", "low power 2", "deep suspend"];
+pub const ACC_POWER_NAMES: [&str; 6] = [
+    "normal",
+    "suspend",
+    "low power 1",
+    "standby",
+    "low power 2",
+    "deep suspend",
+];
 ```
 
 Accelerometer power mode per `AccelConfig::power` code.
@@ -13400,8 +14056,13 @@ Gyroscope bandwidth per `GyroConfig::bandwidth` code, Hz.
 ### GYR_POWER_NAMES
 
 ```rust
-pub const GYR_POWER_NAMES: [&str; 5] =
-    ["normal", "fast power up", "deep suspend", "suspend", "advanced powersave"];
+pub const GYR_POWER_NAMES: [&str; 5] = [
+    "normal",
+    "fast power up",
+    "deep suspend",
+    "suspend",
+    "advanced powersave",
+];
 ```
 
 Gyroscope power mode per `GyroConfig::power` code.
@@ -14013,7 +14674,12 @@ pub fn read_quaternion(&self) -> Result<[f64; 4]>
 #### Bno055Device::start_stream
 
 ```rust
-pub fn start_stream(&self, period_ms: u16, block: Option<(u8, u8)>, int_trigger: bool) -> Result<()>
+pub fn start_stream(
+    &self,
+    period_ms: u16,
+    block: Option<(u8, u8)>,
+    int_trigger: bool,
+) -> Result<()>
 ```
 
 Arm the bridge to read `block` (`None`: the full block) every `period_ms` and push it. Fusion
@@ -14228,7 +14894,12 @@ pub fn read_register(&self, addr: u8) -> Result<u8>
 #### Tmf8829Device::write_registers
 
 ```rust
-pub fn write_registers(&self, addr: u8, data: &[u8], progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<()>
+pub fn write_registers(
+    &self,
+    addr: u8,
+    data: &[u8],
+    progress: Option<&mut dyn FnMut(usize, usize)>,
+) -> Result<()>
 ```
 
 Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF); `progress` gets
@@ -14261,7 +14932,10 @@ Bridge counters (never touches the sensor, safe mid-stream).
 #### Tmf8829Device::init
 
 ```rust
-pub fn init(&self, progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<Tmf8829InitResult>
+pub fn init(
+    &self,
+    progress: Option<&mut dyn FnMut(usize, usize)>,
+) -> Result<Tmf8829InitResult>
 ```
 
 Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware
@@ -14318,7 +14992,10 @@ Stop a running stream (a failing stop is ignored), then close the link.
 #### Tmf8829Device::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every measurement (reader thread; don't block).
@@ -15646,6 +16323,9 @@ pub enum FwdepzError {
     HeaderCrc,
     /// `fw_size` != payload length.
     Size,
+    /// The header is not section 0 of 1 (sections are 0-based; multi-section
+    /// files are not supported).
+    Section,
 }
 ```
 
@@ -15658,7 +16338,7 @@ pub fn parse(file: &[u8]) -> Result<FwdepzHeader, FwdepzError>
 ```
 
 Parse and validate a `.fwdepz` blob. Validation order: magic → header CRC →
-`fw_size == len(payload)` (contract 06 §2).
+`fw_size == len(payload)` → section 0 of 1 (contract 06 §2).
 
 ## Datasets (record & replay)
 
@@ -15930,7 +16610,12 @@ offset. It never reconfigures a device — start and stop streaming yourself.
 #### SessionRecorder::new
 
 ```rust
-pub fn new(path: impl AsRef<Path>, note: Option<&str>, vl53l8_layers: bool, temperature_hz: Option<f64>) -> Self
+pub fn new(
+    path: impl AsRef<Path>,
+    note: Option<&str>,
+    vl53l8_layers: bool,
+    temperature_hz: Option<f64>,
+) -> Self
 ```
 
 A recorder writing `path` (`.depzdata`, or `.depzdata.gz`). `vl53l8_layers`: VL53L8 records
@@ -15941,7 +16626,12 @@ frames carry one); `None` for none.
 #### SessionRecorder::add
 
 ```rust
-pub fn add(&mut self, device: &dyn Recordable, device_id: Option<&str>, sync_samples: usize) -> Result<String>
+pub fn add(
+    &mut self,
+    device: &dyn Recordable,
+    device_id: Option<&str>,
+    sync_samples: usize,
+) -> Result<String>
 ```
 
 Register a device before recording starts: runs [`DepzDevice::sync_time`] with
@@ -16075,7 +16765,11 @@ stored uncompressed: the crate has no compression dependency). Prefer
 #### DatasetWriter::create
 
 ```rust
-pub fn create(path: impl AsRef<Path>, devices: Vec<(String, Value)>, note: Option<&str>) -> io::Result<DatasetWriter>
+pub fn create(
+    path: impl AsRef<Path>,
+    devices: Vec<(String, Value)>,
+    note: Option<&str>,
+) -> io::Result<DatasetWriter>
 ```
 
 Create `path` (overwritten) and write the header: `devices` are the header device entries by
@@ -16090,10 +16784,11 @@ pub fn records_written(&self) -> u64
 #### DatasetWriter::write
 
 ```rust
-pub fn write(&self, device_id: &str, t_host_us: i64, kind: &str, value: Value) -> io::Result<()>
+pub fn write(&self, device_id: &str, t_host_us: i64, kind: &str, value: Value) -> Result<()>
 ```
 
-One record: device id, host µs, kind, value. Fails once the writer is closed.
+One record: device id, host µs, kind, value. Once the writer is closed:
+[`DepzError::InvalidState`].
 
 #### DatasetWriter::close
 
@@ -16109,16 +16804,17 @@ Flush and close the file (a gzip file gets its trailer). Idempotent.
 pub enum DatasetError {
     /// The file has no header line.
     Empty,
-    /// A line was not valid JSON.
-    Json(JsonError),
-    /// A structural expectation failed (missing field, wrong type, …).
-    Structure(String),
+    /// Line `line` (1-based) was not valid JSON.
+    Json { line: usize, error: JsonError },
+    /// A structural expectation failed on line `line` (not an object, missing field, wrong type, …).
+    Structure { line: usize, what: String },
     /// The file could not be read (or its gzip content inflated).
     Io(String),
 }
 ```
 
-Dataset parse failure.
+Dataset parse failure: a damaged file is the caller's bad argument (contract 09, 07 §3), named
+by its line.
 
 ### Device
 
@@ -16150,7 +16846,8 @@ pub enum RecordValue {
 }
 ```
 
-A decoded record value; unknown kinds keep their raw JSON (`Other`).
+A decoded record value; unknown kinds, and known ones without their typed field, keep their
+raw JSON (`Other`).
 
 ### Record
 
@@ -16205,7 +16902,11 @@ Span of the timeline: the last record's `t` minus the first's (0 with fewer than
 pub fn parse(text: &str) -> Result<Dataset, DatasetError>
 ```
 
-Parse a `.depzdata` document from its UTF-8 text.
+Parse a `.depzdata` document from its UTF-8 text. A damaged document (contract 09: an empty
+one, a header that is not a JSON object or whose `schema` is not `depz.dataset/*`, a record
+line that is not an object or whose `d` / `k` are not strings, `t` not an integer, `v` not
+an object) is a [`DatasetError`] naming the line; blank lines are skipped; a record of an
+unknown `k` (or a known one without its typed field) is kept as [`RecordValue::Other`].
 
 #### Dataset::records_for
 
@@ -16660,13 +17361,33 @@ pub fn pack_sync_time(pc_timestamp_us: u64) -> [u8; 8]
 
 Encode the `SYNC_TIME` request payload (T1, µs, u64 LE).
 
+### PAYLOAD_CRC_TYPE_MAX
+
+```rust
+pub const PAYLOAD_CRC_TYPE_MAX: u8 = 3;
+```
+
+`SET_PAYLOAD_CRC_TYPE` takes 0..3 (contract 02 §2).
+
+### try_pack_set_payload_crc_type
+
+```rust
+pub fn try_pack_set_payload_crc_type(crc_type: u8) -> Result<[u8; 1], CodecError>
+```
+
+Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte); a value
+outside 0..=[`PAYLOAD_CRC_TYPE_MAX`] is refused before anything is written
+(contract 07 §3).
+
 ### pack_set_payload_crc_type
 
 ```rust
 pub fn pack_set_payload_crc_type(crc_type: u8) -> [u8; 1]
 ```
 
-Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte).
+Encode the `SET_PAYLOAD_CRC_TYPE` request payload (single byte), unchecked
+— prefer [`try_pack_set_payload_crc_type`] for an untyped value (the
+device layer passes a [`crate::framing::CrcType`], always 0..3).
 
 ### sync_time_offset_rtt
 

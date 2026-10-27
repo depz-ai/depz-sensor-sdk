@@ -8,6 +8,7 @@ import {
   Bno086,
   BusyError,
   DepzTimeoutError,
+  InvalidStateError,
   LoopbackTransport,
   Sr04,
   StatusError,
@@ -19,6 +20,8 @@ import {
   type DeviceEvent,
   type Sr04Measurement,
 } from "../src/index.js";
+import { HAND_OVER } from "../src/device/device.js";
+import type { DepzLink } from "../src/device/link.js";
 import { FakeBno086 } from "./fake-bno086.js";
 import { FakeSr04 } from "./fake-sr04.js";
 import { FakeTof } from "./fake-tof.js";
@@ -53,6 +56,23 @@ describe("DepzDevice core", () => {
 
   it("temperature", async () => {
     expect(await dev.readMcuTemperature()).toBeCloseTo(27.3);
+  });
+
+  it("toHostTimeUs before syncTime is the invalid-state error", () => {
+    // Contract 07 §3 (ERRATA A14): a conversion needs a prior syncTime.
+    expect(dev.timeSync).toBeNull();
+    expect(() => dev.toHostTimeUs(0n)).toThrow(InvalidStateError);
+    expect(() => dev.toHostTimeUs(0n)).toThrow(/syncTime/);
+  });
+
+  it("hand-over of an unopened device and a second link start are invalid-state errors", async () => {
+    // Contract 07 §3 (ERRATA A17).
+    const idle = new FakeSr04();
+    const unopened = new Sr04(idle.transport, { timeoutMs: 1000 });
+    expect(() => unopened[HAND_OVER]()).toThrow(InvalidStateError);
+    await idle.close();
+    const link = (dev as unknown as { link: DepzLink }).link;
+    expect(() => link.start()).toThrow(InvalidStateError);
   });
 
   it("syncTime produces an offset", async () => {
@@ -146,6 +166,37 @@ describe("DepzDevice core", () => {
       await expect(silent.getSoftwareName()).rejects.toThrow(DepzTimeoutError);
     } finally {
       await silent.close();
+    }
+  });
+
+  it("a throwing callback never stops the read pump (contract 07 §3)", async () => {
+    const seen: DeviceEvent[] = [];
+    dev.onEvent(() => {
+      throw new Error("consumer bug");
+    });
+    dev.onEvent((ev) => seen.push(ev));
+    const errors: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      await fake.sendText("one");
+      await new Promise((r) => setTimeout(r, 10));
+      expect(seen).toEqual([{ type: "text", cmd: 0x04, text: "one" }]);
+      expect(dev.stats.callbackErrors).toBe(1);
+      expect(String(errors[0]?.[1])).toContain("consumer bug");
+      // the pump goes on: a request completes, the next report arrives
+      expect(await dev.getSoftwareName()).toBe(FakeSr04.SOFTWARE_NAME);
+      dev.onMeasurement(() => {
+        throw new Error("consumer bug");
+      });
+      await dev.start();
+      const it = dev.measurements(4);
+      await fake.sendMeasurement(0x37);
+      expect(((await it.next()).value as Sr04Measurement).source).toBe("loop");
+      expect(dev.stats.callbackErrors).toBe(2);
+      await dev.stop();
+    } finally {
+      console.error = orig;
     }
   });
 

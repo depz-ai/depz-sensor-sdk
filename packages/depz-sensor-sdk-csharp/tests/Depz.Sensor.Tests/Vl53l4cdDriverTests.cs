@@ -133,8 +133,9 @@ public class Vl53l4cdDriverTests
     [InlineData(50, 30)] // 0 < inter-measurement <= budget
     public void RangeTimingBounds(int budget, int inter)
     {
+        // ERRATA A16: a refused argument is invalid_argument, not the driver's Vl53l4Exception
         var (drv, _) = Make();
-        Assert.Throws<Vl53l4Exception>(() => drv.SetRangeTiming(budget, inter));
+        Assert.Throws<ArgumentOutOfRangeException>(() => drv.SetRangeTiming(budget, inter));
     }
 
     [Fact]
@@ -154,7 +155,7 @@ public class Vl53l4cdDriverTests
         Assert.Equal(1024, drv.GetSignalThreshold());
         drv.SetSigmaThreshold(15);
         Assert.Equal(15, drv.GetSigmaThreshold());
-        Assert.Throws<Vl53l4Exception>(() => drv.SetSigmaThreshold(0x4000));
+        Assert.Throws<ArgumentOutOfRangeException>(() => drv.SetSigmaThreshold(0x4000));
     }
 
     [Fact]
@@ -183,8 +184,8 @@ public class Vl53l4cdDriverTests
         p.SeedResult(distanceMm: 93, signalRaw: 200, spadsRaw: 256 * 40);
         Assert.Equal(7, drv.CalibrateOffset(100, nbSamples: 5));
         Assert.Equal(Vl53l4Uld.OffsetRaw(7), Word(p.WrittenTo(Vl53l4Uld.RangeOffsetMm)[^1]));
-        Assert.Throws<Vl53l4Exception>(() => drv.CalibrateOffset(5));
-        Assert.Throws<Vl53l4Exception>(() => drv.CalibrateOffset(100, nbSamples: 4));
+        Assert.Throws<ArgumentException>(() => drv.CalibrateOffset(5));
+        Assert.Throws<ArgumentException>(() => drv.CalibrateOffset(100, nbSamples: 4));
     }
 
     [Fact]
@@ -218,9 +219,9 @@ public class Vl53l4cdDriverTests
         using var dev = new Vl53l4cdDevice(board, TimeSpan.FromMilliseconds(500));
         dev.StartRanging();
         Assert.True(dev.Ranging);
-        Assert.Throws<InvalidOperationException>(() => dev.SetOffsetMm(3));
-        Assert.Throws<InvalidOperationException>(() => dev.Init());
-        Assert.Throws<InvalidOperationException>(() => dev.MeasureOnce());
+        Assert.Throws<InvalidStateException>(() => dev.SetOffsetMm(3));
+        Assert.Throws<InvalidStateException>(() => dev.Init());
+        Assert.Throws<InvalidStateException>(() => dev.MeasureOnce());
         dev.StopRanging();
         Assert.False(dev.Ranging);
         dev.StopRanging(); // a no-op once stopped
@@ -250,7 +251,7 @@ public class Vl53l4cdDriverTests
         var m = q.Take(TimeSpan.FromSeconds(1));
         Assert.Equal((123456UL, 258, 0), (m.TimestampUs, m.DistanceMm, m.RangeStatus));
         Assert.True(m.Valid);
-        SpinWait.SpinUntil(() => dev.StreamParseErrors == 1, 1000);
+        SpinWait.SpinUntil(() => dev.StreamParseErrors == 1, 10_000);
         Assert.Equal(1, dev.StreamParseErrors);
         Assert.Equal(0, q.Count);
     }

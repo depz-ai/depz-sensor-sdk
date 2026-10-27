@@ -28,6 +28,9 @@ class FakeSr04:
         self.echo_time_us = 5831  # ~1 m
         self.mcu_time_us = 1_000_000
         self.temperature_raw = 273  # 27.3 °C
+        self.payload_crc_type = 0
+        self.reset_count = 0
+        self.received: list[int] = []  # every host command opcode, in order
         self._tx_seq = 0
         self._parser = PacketParser()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -74,6 +77,7 @@ class FakeSr04:
 
     def _handle(self, pkt: Packet) -> None:
         cmd, payload = pkt.cmd, pkt.payload
+        self.received.append(cmd)
         if cmd == 0x03:
             self._text(cmd, self.DEVICE_NAME)
         elif cmd == 0x04:
@@ -91,6 +95,20 @@ class FakeSr04:
             self._send(0x82, struct.pack("<QQQ", t1, t2, t3))
         elif cmd == 0x07:
             self._send(0x83, struct.pack("<Qh", self.mcu_time_us, self.temperature_raw))
+        elif cmd == 0x08:  # GET_PAYLOAD_CRC_TYPE
+            self._send(0x87, bytes((self.payload_crc_type,)))
+        elif cmd == 0x09:  # SET_PAYLOAD_CRC_TYPE: 0..3 else ERR_INVALID_PARAM
+            if len(payload) != 1:
+                self._status(cmd, 0x03)
+            elif payload[0] > 3:
+                self._status(cmd, 0x04)
+            else:
+                self.payload_crc_type = payload[0]
+                self._status(cmd, 0x00)
+        elif cmd == 0x02:  # DEVICE_RESET: RPT_STATUS, then NVIC reset (contract 02)
+            self._status(cmd, 0x00)
+            self.reset_count += 1
+            self._side.close()  # the USB CDC link drops with the reboot
         elif cmd == 0x31:  # SET_SYNC_PIN_CONFIG
             pin, mode, pol = struct.unpack("<BBB", payload)
             if not (1 <= pin <= 5) or mode > 4 or pol > 1:

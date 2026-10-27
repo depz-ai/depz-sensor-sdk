@@ -13,6 +13,10 @@ INT polarity bit of 0x0030 is set by the blob.
 Every packet the host sends is logged (`rx`), so tests assert the exact wire
 bytes. `fail_next(cmd, status)` answers the next `cmd` with an error status
 (or ``"silent"``: no reply), `stream()` pushes an RPT_VL53_STREAM.
+
+A `die` model (fake_vl53l0x.py) can take over the register file: the bridge
+hands it every READ_REG / WRITE_REG, and a `DieNack` it raises goes back as
+ERR_HARDWARE_FAULT, the status a NACKing sensor produces.
 """
 
 from __future__ import annotations
@@ -33,6 +37,11 @@ READ_REG, WRITE_REG, XSHUT, START_STREAM, STOP_STREAM = 0x32, 0x33, 0x34, 0x35, 
 GET_INFO, SET_I2C_SPEED, SET_ADDR_WIDTH, CLEAR_I2C_ERRORS = 0x37, 0x38, 0x39, 0x3A
 GET_DEVICE_NAME = 0x03
 ERR_INVALID_CMD = 0x02
+ERR_HARDWARE_FAULT = 0x09
+
+
+class DieNack(Exception):
+    """Raised by a die model: the sensor did not ACK the register access."""
 
 
 class FakeVl53lxBridge:
@@ -47,7 +56,9 @@ class FakeVl53lxBridge:
         self.rx: list[tuple[int, bytes]] = []  # every packet the host sent, in order
         self.mcu_time_us = 5_000_000
         self.info = bytes(23)  # RPT_VL53_INFO payload served on GET_INFO
+        self.die = None  # optional register-behaviour model (read / write)
         self._failures: dict[int, deque] = defaultdict(deque)
+        self.truncate_next_read = 0  # bytes to drop from the next READ_REG answer
         # A booted die.
         self.regs[0x00E5] = 0x03
         self.set_word(0x0006, DIE_OSC)
@@ -76,6 +87,17 @@ class FakeVl53lxBridge:
     def set_result_block(self, raw: bytes) -> None:
         """Put a 17-byte result block at 0x0089 (what the next poll reads)."""
         self.regs[0x0089:0x0089 + len(raw)] = raw
+
+    def _read_regs(self, addr: int, n: int) -> bytes:
+        if self.die is not None:
+            return bytes(self.die.read(addr, n))
+        return bytes(self.regs[addr:addr + n])
+
+    def _write_regs(self, addr: int, data: bytes) -> None:
+        if self.die is not None:
+            self.die.write(addr, data)
+            return
+        self.regs[addr:addr + len(data)] = data
 
     # ── traffic ──
     def fail_next(self, cmd: int, status: int | str) -> None:
@@ -135,12 +157,22 @@ class FakeVl53lxBridge:
         elif cmd == READ_REG:
             # READ_REG → RPT_VL53_REG_DATA: echoed opcode, ts u64, data
             addr, n = struct.unpack("<HH", p)
-            data = bytes(self.regs[addr:addr + n])  # short past 0xFFFF
+            try:
+                data = self._read_regs(addr, n)
+            except DieNack:
+                self._status(cmd, ERR_HARDWARE_FAULT)
+                return
+            if self.truncate_next_read:
+                data, self.truncate_next_read = data[: len(data) - self.truncate_next_read], 0
             self.send(0x91, struct.pack("<BQ", cmd, self.mcu_time_us) + data)
             self.mcu_time_us += 100
         elif cmd == WRITE_REG:
             (addr,) = struct.unpack_from("<H", p)
-            self.regs[addr:addr + len(p) - 2] = p[2:]
+            try:
+                self._write_regs(addr, p[2:])
+            except DieNack:
+                self._status(cmd, ERR_HARDWARE_FAULT)
+                return
             self._status(cmd, 0)
         elif cmd == GET_INFO:
             self.send(0x92, self.info)

@@ -15,7 +15,8 @@ public class Vl53lxException : DepzException
 /// sensor legitimately NACKs for a while (right after a soft reset).</summary>
 public sealed class Vl53lxProtocolException : DepzException
 {
-    public Vl53lxProtocolException(string message, Exception? inner = null) : base(message, inner ?? new Exception(message)) { }
+    public Vl53lxProtocolException(string message) : base(message) { }
+    public Vl53lxProtocolException(string message, Exception inner) : base(message, inner) { }
 }
 
 /// <summary>
@@ -163,7 +164,9 @@ public abstract class Vl53lxDriver
     /// <see cref="BudgetMs"/> will do.</summary>
     public virtual IReadOnlyList<int> BudgetChoices() => Array.Empty<int>();
 
-    public virtual void SetMode(string name) => throw Unsupported("mode");
+    /// <summary>Apply one of the modes. Returns the timing budget in effect after the change, ms, on a driver
+    /// whose mode change can move it (VL53L1: contract 12 §5), else null.</summary>
+    public virtual int? SetMode(string name) => throw Unsupported("mode");
 
     public virtual string GetMode() => throw Unsupported("mode");
 

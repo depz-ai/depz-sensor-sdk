@@ -35,7 +35,7 @@ public class Vl53l7chDevice extends Vl53l7cxDevice {
         return armedCnh();
     }
 
-    /** Arm CNH for the next start (as {@link Vl53l8chDevice#configureCnh}). */
+    /** Arm CNH for the next start (as {@link Vl53l8chDevice#configureCnh}); disarms the motion indicator. */
     public void configureCnh(Vl53l8CnhSetup setup) {
         armCnh(setup);
     }

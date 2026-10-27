@@ -38,7 +38,9 @@ public void configureCnh(Vl53l8CnhSetup setup)
 ```
 
 Arm CNH for the next `startRanging()`: every frame then carries
-`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`.
+`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`. CNH and the motion
+indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+`Vl53l8Frame#motion()`).
 
 ### Vl53l8cxDevice
 
@@ -50,7 +52,7 @@ VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD
 (`uld()`). `init()` downloads the ~84 KB sensor firmware (about a second), then
 configure and `startRanging()`: the board pushes one frame per INT edge in chunks,
 reassembled and parsed into `frames`. Configuration needs `init()` and throws
-`IllegalStateException` while ranging — the stream owns the register bank. The VL53L8CH
+`InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH
 superset is `Vl53l8chDevice`.
 
 #### Vl53l8cxDevice.MIN_RANGING_FREQUENCY_HZ *(field)*
@@ -60,6 +62,15 @@ public static final int MIN_RANGING_FREQUENCY_HZ = 2
 ```
 
 Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.maxRangingFrequencyHz
+
+```java
+public static int maxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon
+limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
 
 #### Vl53l8cxDevice.firmwareSet
 
@@ -85,6 +96,14 @@ protected int writeChunk()
 
 Register bytes per WRITE_REG.
 
+#### Vl53l8cxDevice.streamChunk
+
+```java
+protected int streamChunk()
+```
+
+Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4).
+
 #### Vl53l8cxDevice.minRangingHz
 
 ```java
@@ -99,7 +118,7 @@ The lowest ranging frequency that streams on this sensor.
 public Vl53l8Driver uld()
 ```
 
-The ULD driver (escape hatch for DCI access). @throws IllegalStateException before `init()`
+The ULD driver (escape hatch for DCI access). @throws InvalidStateException before `init()`
 
 #### Vl53l8cxDevice.uldOrNull
 
@@ -174,7 +193,9 @@ public int getRangingFrequencyHz()
 public void setRangingFrequencyHz(int hz)
 ```
 
-At least 2 Hz; at most 60 Hz at 4×4 and 15 Hz at 8×8.
+At least 2 Hz (1 Hz on L5/L7); at most `maxRangingFrequencyHz` of the resolution last
+set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11
+§3). Refused host-side, nothing reaches the bus.
 
 #### Vl53l8cxDevice.getRangingMode
 
@@ -251,14 +272,18 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice.getXtalkMargin
 
 ```java
-public double getXtalkMargin()
+public int getXtalkMargin()
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice.setXtalkMargin
 
 ```java
-public void setXtalkMargin(double marginKcps)
+public void setXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
 
 #### Vl53l8cxDevice.calibrateXtalk
 
@@ -322,6 +347,9 @@ public Vl53l8Uld.MotionConfig configureMotionIndicator(int distanceMinMm, int di
 
 Enable the motion indicator over [min, max] mm; every frame then carries
 `Vl53l8Frame#motion()`. Returns the configuration for further tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms
+CNH (`cnhSetup()` null, no `Vl53l8Frame#cnhRaw()`).
 
 #### Vl53l8cxDevice.configureMotionIndicator
 
@@ -547,7 +575,11 @@ chunk transport is identical across the two parts.
 
 Rules: reset on `offset == 0`; chunks must be contiguous — a gap
 discards the frame in progress; a frame completes when the accumulated bytes
-equal `fullSize`. Mirror of the TS/Python `FrameReassembler`.
+equal `fullSize`. A chunk out of the rule-4 bounds (more than
+`chunkMax` bytes, `fullSize` over `STREAM_TOTAL_MAX`, or
+running past `fullSize`) is damaged: dropped and counted as a lost
+frame like the other damaged input, never thrown. Mirror of the TS/Python
+`FrameReassembler`.
 
 #### FrameReassembler.STREAM_CHUNK_MAX *(field)*
 
@@ -556,6 +588,14 @@ public static final int STREAM_CHUNK_MAX = 1528
 ```
 
 Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### FrameReassembler.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Largest frame_size START_STREAM accepts (contract 04 §4 rule 4).
 
 #### FrameReassembler.completed *(field)*
 
@@ -1090,16 +1130,18 @@ the sensor firmware is lost.
 #### Vl53l8Driver.getXtalkMargin
 
 ```java
-public double getXtalkMargin()
+public int getXtalkMargin()
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver.setXtalkMargin
 
 ```java
-public void setXtalkMargin(double marginKcps)
+public void setXtalkMargin(int marginKcps)
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
 
 #### Vl53l8Driver.getCaldataXtalk
 
@@ -1158,6 +1200,15 @@ public Vl53l8Uld.MotionConfig motionIndicatorInit(int res)
 ```
 
 A default motion-indicator configuration for `res`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.motionIndicatorDisarm
+
+```java
+public void motionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `motion` null. Called when the
+VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
 
 #### Vl53l8Driver.motionIndicatorSetResolution
 
@@ -1543,16 +1594,32 @@ keep their declared 64-entry size even in 4x4, the sensor fills the first
 `0` = no trim (VL53L8 behaviour), `16`/`64` = explicit,
 `RESOLUTION_FROM_FRAME` = the size of the zone-scaled ambient block.
 
+#### Vl53l8Uld.XTALK_MARGIN_MAX_KCPS *(field)*
+
+```java
+public static final int XTALK_MARGIN_MAX_KCPS = 10000
+```
+
+Largest xtalk margin `setXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
 #### Vl53l8Uld.xtalkMarginToRaw
 
 ```java
-public static long xtalkMarginToRaw(double marginKcps)
+public static long xtalkMarginToRaw(int marginKcps)
 ```
 
-Xtalk margin (kcps/spad) -> raw DCI value (round(kcps * 2048)). The margin
-is 0..10000 kcps (set_xtalk_margin's own limit); anything else, NaN
-included, throws `Vl53l8Error` (INVALID_PARAM) — never wrapped
-(contract 07 §3).
+Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+(kcps * 2048). The margin is 0..`XTALK_MARGIN_MAX_KCPS`; a negative
+or a bigger value throws `Vl53l8Error` (INVALID_PARAM) — never
+wrapped (contract 07 §3).
+
+#### Vl53l8Uld.xtalkMarginFromRaw
+
+```java
+public static int xtalkMarginFromRaw(long raw)
+```
+
+Inverse: raw DCI value -> whole kcps/SPAD (raw / 2048, integer division as ST).
 
 #### Vl53l8Uld.packDetectionThresholds
 

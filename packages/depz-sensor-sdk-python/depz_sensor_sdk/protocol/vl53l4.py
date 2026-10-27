@@ -32,7 +32,7 @@ XFER_MAX = 253
 # VL53_XSHUT actions.
 XSHUT_OFF = 0
 XSHUT_ON = 1
-XSHUT_RESET = 2  # blocking on the MCU (~3 ms); answered after the boot handshake
+XSHUT_RESET = 2  # blocking on the MCU; the VL53L4 bridge answers after its boot handshake, ≤ 20 ms (contract 10 §2), the VL53LX v2.01 bridge does none (12 §1)
 
 # VL53_START_STREAM flags: interrupt polarity, mirroring bit 4 of
 # GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
@@ -43,17 +43,27 @@ SF_INT_ACT_HIGH = 0x02
 I2C_KHZ_STEPS = (100, 200, 400, 500, 600, 700, 800, 900, 1000)
 
 
+_REG_SPACE = 0x10000  # a bridge transfer never runs past register 0xFFFF
+
+
 def pack_read_reg(addr: int, length: int) -> bytes:
-    return checked_pack("<HH", addr=addr, length=length)
+    """VL53_READ_REG payload `addr u16, len u16` with the transfer limit of
+    contract 10 §1: `len` 1..253 and `addr + len <= 0x10000`, else ValueError."""
+    payload = checked_pack("<HH", addr=addr, length=length)
+    if not 1 <= length <= XFER_MAX or addr + length > _REG_SPACE:
+        raise ValueError(f"READ_REG length must be 1..{XFER_MAX} and addr+length <= 0x10000")
+    return payload
 
 
-WRITE_MAX_LEN = 253  # VL53_WRITE_REG data length limit (contracts 10/12 §2: 1..253 bytes)
+WRITE_MAX_LEN = XFER_MAX  # VL53_WRITE_REG data length limit (contracts 10/12 §2: 1..253 bytes)
 
 
 def pack_write_reg(addr: int, data: bytes) -> bytes:
+    """VL53_WRITE_REG payload `addr u16, data[N]` with the same limit:
+    N 1..253 and `addr + N <= 0x10000`, else ValueError."""
     head = checked_pack("<H", addr=addr)
-    if not 1 <= len(data) <= WRITE_MAX_LEN:
-        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX_LEN} bytes")
+    if not 1 <= len(data) <= WRITE_MAX_LEN or addr + len(data) > _REG_SPACE:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX_LEN} bytes and addr+N <= 0x10000")
     return head + bytes(data)
 
 
@@ -89,8 +99,9 @@ I2C_ERROR_NAMES = {0: "none", 1: "NACK", 2: "TIMEOUT", 3: "BUS_ERROR"}
 
 @dataclass(frozen=True)
 class Vl53l4Info:
-    """RPT_VL53_INFO — bridge diagnostics. Counters are free-running and wrap
-    silently; watch increments, not absolute values."""
+    """RPT_VL53_INFO — bridge diagnostics. Counters wrap silently; watch
+    increments, not absolute values. `i2c_errors` counts since the last
+    successful XSHUT reset (the bridge clears it there), not since power-up."""
 
     int_edges: int
     slots_skipped: int
@@ -98,7 +109,7 @@ class Vl53l4Info:
     last_i2c_error: int
     model_id: int  # 0x010F..0x0110 — expected 0xEBAA
     fw_status: int  # 0x00E5 — expected 0x03 (booted)
-    initialized: int  # 1 = MODEL_ID matched on this read
+    initialized: int  # 1 = MODEL_ID read back as 0xEBAA on this GET_INFO
     xshut_level: int
     int_level: int
     i2c_khz: int

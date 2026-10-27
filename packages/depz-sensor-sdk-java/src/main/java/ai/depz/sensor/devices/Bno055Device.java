@@ -295,7 +295,7 @@ public final class Bno055Device extends DepzDevice {
     public void restoreConfiguration() {
         Configured c = configured;
         if (c == null) {
-            throw new IllegalStateException("configure() has not been called");
+            throw new InvalidStateException("configure() has not been called");
         }
         configure(c.mode(), c.units(), c.remap(), c.calibration());
     }
@@ -496,10 +496,13 @@ public final class Bno055Device extends DepzDevice {
         if (trigger != Bno055.TRIGGER_TIMER && trigger != Bno055.TRIGGER_INT) {
             throw new IllegalArgumentException("trigger must be TRIGGER_TIMER (0) or TRIGGER_INT (1), got " + trigger);
         }
+        // Encoded (and so range-checked: TIMER period 1..60000) before the units read below —
+        // a refused argument puts nothing on the wire.
+        byte[] payload = Bno055.packStartStream(trigger, addr, length, periodMs);
         synchronized (regLock) {
             // Units first: the reader may decode the first sample before the request returns.
             streamUnits = currentUnits();
-            requestOk(Bno055.Bno055Cmd.START_STREAM.value, Bno055.packStartStream(trigger, addr, length, periodMs));
+            requestOk(Bno055.Bno055Cmd.START_STREAM.value, payload);
             streaming = true;
         }
     }
@@ -773,7 +776,7 @@ public final class Bno055Device extends DepzDevice {
 
     private void requireNotStreaming() {
         if (streaming) {
-            throw new IllegalStateException("stopStream() first — the stream reads page 0");
+            throw new InvalidStateException("stopStream() first — the stream reads page 0");
         }
     }
 
@@ -794,7 +797,7 @@ public final class Bno055Device extends DepzDevice {
             streamParseErrors.incrementAndGet();
             return true;
         }
-        samples.emit(sample);
+        samples.emit(sample, stats());
         return true;
     }
 

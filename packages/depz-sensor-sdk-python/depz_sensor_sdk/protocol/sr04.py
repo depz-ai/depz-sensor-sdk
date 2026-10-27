@@ -59,7 +59,7 @@ def pack_sample_period(period_us: int) -> bytes:
 
 def unpack_sample_period(payload: bytes) -> int:
     need_bytes("RPT_SAMPLE_PERIOD", payload, 4)
-    return struct.unpack_from("<I", payload)[0]
+    return int(struct.unpack_from("<I", payload)[0])
 
 
 def pack_echo_decay(decay_us: int) -> bytes:
@@ -68,7 +68,7 @@ def pack_echo_decay(decay_us: int) -> bytes:
 
 def unpack_echo_decay(payload: bytes) -> int:
     need_bytes("RPT_ECHO_DECAY", payload, 2)
-    return struct.unpack_from("<H", payload)[0]
+    return int(struct.unpack_from("<H", payload)[0])
 
 
 def distance_mm_from_echo(echo_time_us: int, air_temp_c: float | None = None) -> float | None:

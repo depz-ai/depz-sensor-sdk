@@ -31,7 +31,8 @@ request for request as the Python SDK does. One class serves both chips.
   m/s², rad/s, µT and unit quaternions.
 - **Calibration** — which sensors the hub may calibrate, saving the
   calibration to the chip's flash, clearing it; tare (make the current
-  orientation the zero) and a fixed mounting rotation.
+  orientation the zero) and a fixed mounting rotation; the motion intent of
+  the BNO085's interactive calibration and its motion requests.
 - **FRS records** — read and write the chip's configuration records; sensor
   metadata (supply current, fastest rate, range, resolution).
 - **Diagnostics** — the hub's error queue, per-sensor event counts, the

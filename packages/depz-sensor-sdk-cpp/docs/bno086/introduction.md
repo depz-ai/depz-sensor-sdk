@@ -28,7 +28,8 @@ same order as the Python SDK. One class serves both chips. Under it,
   a time, as `Bno086Report` with methods that scale the raw integers to m/s²,
   rad/s, µT and unit quaternions.
 - **Calibration** — which sensors the hub may calibrate, saving and clearing
-  the calibration, tare and a fixed mounting rotation.
+  the calibration, tare and a fixed mounting rotation; the motion intent of
+  the BNO086's interactive calibration and its motion requests.
 - **FRS records** — read and write the chip's configuration records; sensor
   metadata (supply current, fastest rate, range, resolution).
 - **Diagnostics** — the error queue, per-sensor event counts, the oscillator

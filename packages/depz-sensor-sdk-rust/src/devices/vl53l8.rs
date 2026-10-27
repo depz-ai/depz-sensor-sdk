@@ -12,14 +12,26 @@ use super::error::{DepzError, Result};
 use super::stream::{Fanout, Hook, Subscription};
 use crate::framing::Packet;
 use crate::vl53l8::advanced::{DetectionThreshold, MotionConfig};
-use crate::vl53l8::driver::{UldResult, Vl53l8CnhSetup, Vl53l8Driver, Vl53l8Firmware, Vl53l8Frame, Vl53l8Platform};
+use crate::vl53l8::driver::{
+    UldResult, Vl53l8CnhSetup, Vl53l8Driver, Vl53l8Firmware, Vl53l8Frame, Vl53l8Platform,
+};
 use crate::vl53l8::{
-    pack_read_reg, pack_start_stream, pack_write_reg, unpack_frame_chunk, FrameReassembler, RegData, Vl53l8Cmd,
-    Vl53l8Rpt, RESOLUTION_4X4, RESOLUTION_8X8,
+    pack_read_reg, pack_start_stream, pack_write_reg, unpack_frame_chunk, FrameReassembler,
+    RegData, Vl53l8Cmd, Vl53l8Rpt, RESOLUTION_4X4, RESOLUTION_8X8,
 };
 
 /// Below this the VL53L8 never enters its ranging loop and streams nothing (contract 04).
 pub const MIN_RANGING_FREQUENCY_HZ: i32 = 2;
+
+/// Highest ranging frequency at `resolution` zones (contract 11 §3; the same
+/// silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+pub fn max_ranging_frequency_hz(resolution: usize) -> i32 {
+    if resolution == RESOLUTION_8X8 {
+        15
+    } else {
+        60
+    }
+}
 
 const REG_TIMEOUT: Duration = Duration::from_secs(2);
 const STREAM_MIN_BYTES: usize = 12;
@@ -33,6 +45,8 @@ pub(crate) struct Profile {
     pub(crate) firmware: Vl53l8Firmware,
     pub(crate) read_chunk: usize,
     pub(crate) write_chunk: usize,
+    /// Largest `RPT_VL53_FRAME` chunk the board emits (contract 04 §4 rule 4).
+    pub(crate) stream_chunk: usize,
     pub(crate) min_hz: i32,
     pub(crate) expected_module: Option<u8>,
     pub(crate) class: &'static str,
@@ -42,12 +56,17 @@ const CX: Profile = Profile {
     firmware: Vl53l8Firmware::Cx,
     read_chunk: crate::vl53l8::codecs::CHUNK_SIZE,
     write_chunk: crate::vl53l8::codecs::CHUNK_SIZE,
+    stream_chunk: crate::vl53l8::framing::STREAM_CHUNK_MAX,
     min_hz: MIN_RANGING_FREQUENCY_HZ,
     expected_module: None,
     class: "Vl53l8cxDevice",
 };
 
-const CH: Profile = Profile { firmware: Vl53l8Firmware::Ch, class: "Vl53l8chDevice", ..CX };
+const CH: Profile = Profile {
+    firmware: Vl53l8Firmware::Ch,
+    class: "Vl53l8chDevice",
+    ..CX
+};
 
 type WriteProgress = Box<dyn FnMut(usize, usize) + Send>;
 
@@ -64,8 +83,12 @@ impl ReportHandler for Shared {
         if packet.cmd != Vl53l8Rpt::Vl53Frame as u8 || packet.payload.len() < STREAM_MIN_BYTES {
             return false;
         }
-        let Some(chunk) = unpack_frame_chunk(&packet.payload) else { return true };
-        let Some(done) = self.reassembler.lock().unwrap().feed(chunk) else { return true };
+        let Some(chunk) = unpack_frame_chunk(&packet.payload) else {
+            return true;
+        };
+        let Some(done) = self.reassembler.lock().unwrap().feed(chunk) else {
+            return true;
+        };
         // The reader thread never waits for the driver: a caller holding it may be waiting for a
         // reply only this thread delivers. A frame that meets a busy driver is dropped as unparsed.
         let parsed = match self.uld.try_lock() {
@@ -76,7 +99,9 @@ impl ReportHandler for Shared {
             Err(_) => None,
         };
         match parsed {
-            Some(f) => self.frames.emit(f.with_resolution(self.resolution.load(Ordering::Relaxed))),
+            Some(f) => self
+                .frames
+                .emit(f.with_resolution(self.resolution.load(Ordering::Relaxed))),
             None => {
                 self.parse_errors.fetch_add(1, Ordering::Relaxed);
             }
@@ -110,7 +135,10 @@ impl Vl53l8Platform for BridgePlatform {
                 Some(REG_TIMEOUT),
             )?;
             if rep.data.len() != n {
-                return Err(DepzError::Protocol(format!("READ_REG 0x{addr:04X}: expected {n}, got {}", rep.data.len())));
+                return Err(DepzError::Protocol(format!(
+                    "READ_REG 0x{addr:04X}: expected {n}, got {}",
+                    rep.data.len()
+                )));
             }
             out.extend_from_slice(&rep.data);
             addr = addr.wrapping_add(n as u16);
@@ -122,7 +150,11 @@ impl Vl53l8Platform for BridgePlatform {
         let mut addr = addr;
         let mut done = 0;
         for chunk in data.chunks(self.write_chunk) {
-            self.dev.request_ok(Vl53l8Cmd::WriteReg as u8, &pack_write_reg(addr, chunk), Some(REG_TIMEOUT))?;
+            self.dev.request_ok(
+                Vl53l8Cmd::WriteReg as u8,
+                &pack_write_reg(addr, chunk),
+                Some(REG_TIMEOUT),
+            )?;
             addr = addr.wrapping_add(chunk.len() as u16);
             done += chunk.len();
             if data.len() > self.write_chunk {
@@ -167,7 +199,7 @@ impl Vl53l8cxDevice {
 
     pub(crate) fn with_profile(dev: DepzDevice, profile: &'static Profile) -> Vl53l8cxDevice {
         let shared = Arc::new(Shared {
-            frames: Fanout::new(),
+            frames: Fanout::new(dev.callback_errors_counter()),
             uld: Mutex::new(None),
             reassembler: Mutex::new(FrameReassembler::new()),
             resolution: AtomicUsize::new(RESOLUTION_4X4), // the ULD default after init
@@ -194,7 +226,9 @@ impl Vl53l8cxDevice {
     /// [`Vl53l8cxDevice::init`].
     pub fn with_uld<R>(&self, f: impl FnOnce(&mut BridgeUld) -> UldResult<R>) -> Result<R> {
         let mut g = self.shared.uld.lock().unwrap();
-        let d = g.as_mut().ok_or_else(|| DepzError::InvalidState("call init() first".into()))?;
+        let d = g
+            .as_mut()
+            .ok_or_else(|| DepzError::InvalidState("call init() first".into()))?;
         Ok(f(d)?)
     }
 
@@ -214,9 +248,18 @@ impl Vl53l8cxDevice {
 
     /// True when the sensor answers with its own silicon ids (a bus error or a foreign id: false).
     pub fn is_alive(&self) -> bool {
-        let driver = Vl53l8Driver::new(self.platform() as Arc<dyn Vl53l8Platform>, self.profile.firmware);
-        let i2c = matches!(self.profile.firmware, Vl53l8Firmware::L7cx | Vl53l8Firmware::L7ch);
-        driver.is_alive().map(|(id, rev)| BridgeUld::silicon_id_matches(id, rev, i2c)).unwrap_or(false)
+        let driver = Vl53l8Driver::new(
+            self.platform() as Arc<dyn Vl53l8Platform>,
+            self.profile.firmware,
+        );
+        let i2c = matches!(
+            self.profile.firmware,
+            Vl53l8Firmware::L7cx | Vl53l8Firmware::L7ch
+        );
+        driver
+            .is_alive()
+            .map(|(id, rev)| BridgeUld::silicon_id_matches(id, rev, i2c))
+            .unwrap_or(false)
     }
 
     /// Download the sensor firmware and the default configuration.
@@ -228,11 +271,18 @@ impl Vl53l8cxDevice {
     /// `write_progress` (done, total bytes). On L5/L7, a module type other than the class expects
     /// (a board labelled L7 carrying an L5, or the reverse) is a warning on stderr: ranging still
     /// works, the firmware is shared.
-    pub fn init_with_progress(&self, progress: &mut dyn FnMut(&str), write_progress: Option<WriteProgress>) -> Result<()> {
+    pub fn init_with_progress(
+        &self,
+        progress: &mut dyn FnMut(&str),
+        write_progress: Option<WriteProgress>,
+    ) -> Result<()> {
         self.require_not_ranging()?;
         let mut g = self.shared.uld.lock().unwrap();
         *self.platform.write_progress.lock().unwrap() = write_progress;
-        let mut driver = Vl53l8Driver::new(self.platform() as Arc<dyn Vl53l8Platform>, self.profile.firmware);
+        let mut driver = Vl53l8Driver::new(
+            self.platform() as Arc<dyn Vl53l8Platform>,
+            self.profile.firmware,
+        );
         let r = driver.init_with_progress(progress);
         *self.platform.write_progress.lock().unwrap() = None;
         r?;
@@ -247,6 +297,9 @@ impl Vl53l8cxDevice {
             }
         }
         *g = Some(driver);
+        // A fresh driver has no motion indicator armed; the CNH setup is gone from the sensor too
+        // (ERRATA B4).
+        *self.armed_cnh.lock().unwrap() = None;
         Ok(())
     }
 
@@ -266,7 +319,9 @@ impl Vl53l8cxDevice {
     /// 16 (4×4) or 64 (8×8) zones.
     pub fn set_resolution(&self, zones: usize) -> Result<()> {
         if zones != RESOLUTION_4X4 && zones != RESOLUTION_8X8 {
-            return Err(DepzError::InvalidArgument(format!("resolution is 16 (4x4) or 64 (8x8) zones, got {zones}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "resolution is 16 (4x4) or 64 (8x8) zones, got {zones}"
+            )));
         }
         self.require_not_ranging()?;
         self.with_uld(|u| u.set_resolution(zones))?;
@@ -284,6 +339,15 @@ impl Vl53l8cxDevice {
             return Err(DepzError::InvalidArgument(format!(
                 "ranging frequency must be >= {} Hz: below that the sensor never enters its ranging loop and streams nothing (contract 04), got {hz}",
                 self.profile.min_hz
+            )));
+        }
+        // contract 11 §3: judged by the resolution last set or read through this
+        // device (4×4 after init); refused host-side, nothing reaches the bus.
+        let zones = self.shared.resolution.load(Ordering::Relaxed);
+        let max_hz = max_ranging_frequency_hz(zones);
+        if hz > max_hz {
+            return Err(DepzError::InvalidArgument(format!(
+                "ranging frequency must be <= {max_hz} Hz at {zones} zones (60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3), got {hz}"
             )));
         }
         self.require_not_ranging()?;
@@ -345,18 +409,25 @@ impl Vl53l8cxDevice {
         self.with_uld(|u| u.set_power_mode(mode))
     }
 
-    pub fn get_xtalk_margin(&self) -> Result<f64> {
+    /// Xtalk margin, whole kcps/SPAD (as ST).
+    pub fn get_xtalk_margin(&self) -> Result<u32> {
         self.with_uld(|u| u.get_xtalk_margin())
     }
 
-    pub fn set_xtalk_margin(&self, margin_kcps: f64) -> Result<()> {
+    /// Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is refused.
+    pub fn set_xtalk_margin(&self, margin_kcps: u32) -> Result<()> {
         self.require_not_ranging()?;
         self.with_uld(|u| u.set_xtalk_margin(margin_kcps))
     }
 
     /// On-device crosstalk calibration against a flat target; read the result with
     /// [`Vl53l8cxDevice::get_caldata_xtalk`].
-    pub fn calibrate_xtalk(&self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> Result<()> {
+    pub fn calibrate_xtalk(
+        &self,
+        reflectance_percent: i32,
+        nb_samples: i32,
+        distance_mm: i32,
+    ) -> Result<()> {
         self.require_not_ranging()?;
         self.with_uld(|u| u.calibrate_xtalk(reflectance_percent, nb_samples, distance_mm))
     }
@@ -398,12 +469,19 @@ impl Vl53l8cxDevice {
 
     /// Enable the motion indicator over [min, max] mm (`None`: 400–1500); every frame then carries
     /// [`Vl53l8Frame::motion`]. Returns the configuration for further tuning.
-    pub fn configure_motion_indicator(&self, distance_mm: Option<(i32, i32)>) -> Result<MotionConfig> {
+    ///
+    /// On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH
+    /// (`cnh_setup()` → `None`, no [`Vl53l8Frame::cnh_raw`]).
+    pub fn configure_motion_indicator(
+        &self,
+        distance_mm: Option<(i32, i32)>,
+    ) -> Result<MotionConfig> {
         self.require_not_ranging()?;
         let (min, max) = distance_mm.unwrap_or((400, 1500));
         let zones = self.get_resolution()?;
         self.with_uld(|u| {
             let mut cfg = u.motion_indicator_init(zones)?;
+            *self.armed_cnh.lock().unwrap() = None;
             u.motion_indicator_set_distance_motion(&mut cfg, min, max)?;
             Ok(cfg)
         })
@@ -425,7 +503,11 @@ impl Vl53l8cxDevice {
     pub(crate) fn arm_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()> {
         self.require_not_ranging()?;
         setup.required_memory()?; // a blank or oversized setup is refused before anything is sent
-        self.with_uld(|u| u.dci_write_data(Vl53l8CnhSetup::MI_CFG_DEV_IDX, &setup.pack()))?;
+        self.with_uld(|u| {
+            u.dci_write_data(Vl53l8CnhSetup::MI_CFG_DEV_IDX, &setup.pack())?;
+            u.motion_indicator_disarm(); // one DCI block (ERRATA B4)
+            Ok(())
+        })?;
         *self.armed_cnh.lock().unwrap() = Some(setup.clone());
         Ok(())
     }
@@ -450,8 +532,15 @@ impl Vl53l8cxDevice {
             u.start_ranging(cnh_size)?;
             Ok(u.data_read_size())
         })?;
-        *self.shared.reassembler.lock().unwrap() = FrameReassembler::new();
-        self.request_ok(Vl53l8Cmd::StartStream as u8, &pack_start_stream(frame_size as u16), None)?;
+        *self.shared.reassembler.lock().unwrap() =
+            FrameReassembler::with_chunk_max(self.profile.stream_chunk);
+        let payload = u16::try_from(frame_size)
+            .ok()
+            .and_then(|n| pack_start_stream(n).ok())
+            .ok_or_else(|| {
+                DepzError::InvalidArgument(format!("frame_size {frame_size} outside 1..8192"))
+            })?;
+        self.request_ok(Vl53l8Cmd::StartStream as u8, &payload, None)?;
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }
@@ -479,7 +568,11 @@ impl Vl53l8cxDevice {
 
     /// The next frame (contract 07 §3); `timeout` `None`: 2 s.
     pub fn get_frame(&self, timeout: Option<Duration>) -> Result<Vl53l8Frame> {
-        self.shared.frames.next(timeout.unwrap_or(Duration::from_secs(2)), Vl53l8Rpt::Vl53Frame as u8, self.is_closed())
+        self.shared.frames.next(
+            timeout.unwrap_or(Duration::from_secs(2)),
+            Vl53l8Rpt::Vl53Frame as u8,
+            self.is_closed(),
+        )
     }
 
     /// Frames dropped because they did not parse (corrupt frame, bad size) — not reassembly gaps.
@@ -498,7 +591,9 @@ impl Vl53l8cxDevice {
 
     pub(crate) fn require_not_ranging(&self) -> Result<()> {
         if self.ranging() {
-            return Err(DepzError::InvalidState("stop_ranging() first — the stream owns the register bank".into()));
+            return Err(DepzError::InvalidState(
+                "stop_ranging() first — the stream owns the register bank".into(),
+            ));
         }
         Ok(())
     }
@@ -541,7 +636,8 @@ impl Vl53l8chDevice {
 
     /// Arm CNH for the next [`Vl53l8cxDevice::start_ranging`]: every frame then carries
     /// [`Vl53l8Frame::cnh_raw`], decoded with [`crate::vl53l8::decode_cnh`] and
-    /// [`Vl53l8CnhSetup::decode_config`].
+    /// [`Vl53l8CnhSetup::decode_config`]. CNH and the motion indicator share one DCI struct
+    /// (0xBFAC): this disarms the motion indicator (frames carry no [`Vl53l8Frame::motion`]).
     pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()> {
         self.0.arm_cnh(setup)
     }

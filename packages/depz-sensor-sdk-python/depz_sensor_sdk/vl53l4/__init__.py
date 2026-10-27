@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from ..device import DeviceBase, StreamIterator, StreamQueue
-from ..errors import DepzError, DepzTimeoutError, LinkClosedError, StatusError
+from ..errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError
 from ..protocol.vl53l4 import (
     I2C_KHZ_STEPS,
     XFER_MAX,
@@ -172,7 +172,7 @@ class Vl53l4cd(DeviceBase):
         self._platform = _BridgePlatform(self)
         self._uld = VL53L4CD(self._platform)
         self._measure_cbs: list[Callable[[Vl53l4Measurement], None]] = []
-        self._measure_queues: list[StreamQueue] = []
+        self._measure_queues: list[StreamQueue[Vl53l4Measurement]] = []
         self._ranging = False
         self._initialized = False
         self._stream_parse_errors = 0
@@ -217,7 +217,8 @@ class Vl53l4cd(DeviceBase):
         self._initialized = False
 
     def reset_sensor(self) -> None:
-        """Hardware sensor reset via XSHUT (blocks ~3 ms on the MCU). The ULD
+        """Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ.
+        ~2 ms; the reply is awaited up to 2 s). The ULD
         configuration is wiped — call init() again."""
         self.xshut(XSHUT_RESET)
 
@@ -225,8 +226,8 @@ class Vl53l4cd(DeviceBase):
 
     def bridge_info(self) -> Vl53l4Info:
         """RPT_VL53_INFO: sensor identity, pin levels and bridge counters.
-        Counters are free-running (wrap silently) — watch increments. Safe to
-        call while streaming."""
+        Counters wrap silently — watch increments; `i2c_errors` is cleared by
+        a successful XSHUT reset. Safe to call while streaming."""
         return self.request(
             Vl53l4Cmd.GET_INFO,
             matcher=DeviceBase.expect_report(Vl53l4Rpt.INFO, Vl53l4Info.unpack),
@@ -369,7 +370,7 @@ class Vl53l4cd(DeviceBase):
         self._measure_cbs.append(cb)
         return lambda: self._measure_cbs.remove(cb)
 
-    def measurements(self, maxsize: int = 64) -> StreamIterator:
+    def measurements(self, maxsize: int = 64) -> StreamIterator[Vl53l4Measurement]:
         """Blocking iterator over measurements (bounded, drop-oldest;
         `dropped_count` on the returned iterator). Subscribes immediately."""
         return StreamIterator(self._measure_queues, maxsize, lambda: self.closed)
@@ -381,7 +382,7 @@ class Vl53l4cd(DeviceBase):
         `LinkClosedError` as soon as the device is closed while waiting."""
         if self.closed:
             raise LinkClosedError("device is closed")
-        q = StreamQueue(1)
+        q: StreamQueue[Vl53l4Measurement] = StreamQueue(1)
         self._measure_queues.append(q)
         try:
             deadline = time.monotonic() + timeout
@@ -415,7 +416,7 @@ class Vl53l4cd(DeviceBase):
 
     def _require_not_ranging(self) -> None:
         if self._ranging:
-            raise DepzError("stop_ranging() first — the stream owns the register bank")
+            raise InvalidStateError("stop_ranging() first — the stream owns the register bank")
 
     def _handle_report(self, pkt: Packet) -> bool:
         if pkt.cmd != Vl53l4Rpt.STREAM or len(pkt.payload) < 12:
@@ -430,8 +431,5 @@ class Vl53l4cd(DeviceBase):
             self._stream_parse_errors += 1
             return True
         m = Vl53l4Measurement._from_results(sample.timestamp_us, result)
-        for cb in list(self._measure_cbs):
-            cb(m)
-        for q in list(self._measure_queues):
-            q.put(m)
+        self._deliver(self._measure_cbs, self._measure_queues, m)
         return True

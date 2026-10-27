@@ -25,10 +25,11 @@ pub mod nvm;
 pub mod regs;
 pub mod tables;
 
-pub use bare_driver::BareDriver;
 pub use self::core::{
-    BareDeviceState, HistConfig, HistPostProcessConfig, HistogramBinData, LlState, RangeData, RangeResults,
+    BareDeviceState, HistConfig, HistPostProcessConfig, HistogramBinData, LlState, RangeData,
+    RangeResults,
 };
+pub use bare_driver::BareDriver;
 pub use histogram_driver::Vl53lxHistogramDriver;
 pub use history::FrameHistory;
 pub use image::{DeviceImage, RegBlock, RegBlockDef, RegField};

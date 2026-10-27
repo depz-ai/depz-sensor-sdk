@@ -17,6 +17,12 @@ export function u32(value: number): number {
   return r < 0 ? r + TWO32 : r;
 }
 
+/** C int16 truncation (an assignment to an int16_t). */
+export function i16(value: number): number {
+  const r = u32(value) & 0xffff;
+  return r & 0x8000 ? r - 0x10000 : r;
+}
+
 /** Python `a // b` (floor division). */
 export function floorDiv(a: number, b: number): number {
   return Math.floor(a / b);

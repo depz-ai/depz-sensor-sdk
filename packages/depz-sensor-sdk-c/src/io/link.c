@@ -230,37 +230,28 @@ static int hexval(int c)
     return -1;
 }
 
-/* Value of string field `key` in a one-line JSON object: `start` and
- * `len` point inside `line`. The format has no escapes in these fields (contract 08). */
-static bool json_str_field(const char *line, const char *key, const char **start, size_t *len)
+/* Only JSON whitespace (space, tab, CR) in [p, p + n): a line the capture
+ * reader skips (contract 08 «Line rules»; NUL, FF, VT are not blank). */
+static bool line_blank(const char *p, size_t n)
 {
-    char pat[32];
-    const char *p, *q;
-    snprintf(pat, sizeof pat, "\"%s\"", key);
-    p = strstr(line, pat);
-    if (!p) return false;
-    p += strlen(pat);
-    while (*p == ' ' || *p == ':') p++;
-    if (*p != '"') return false;
-    q = strchr(++p, '"');
-    if (!q) return false;
-    *start = p;
-    *len = (size_t)(q - p);
+    size_t i;
+    for (i = 0; i < n; i++)
+        if (p[i] != ' ' && p[i] != '\t' && p[i] != '\r') return false;
     return true;
 }
 
-static bool json_uint_field(const char *line, const char *key, uint64_t *out)
+/* Room for `need` more bytes in *buf (capacity *cap, *len used). */
+static int reserve(uint8_t **buf, size_t *cap, size_t len, size_t need)
 {
-    char pat[32];
-    const char *p;
-    snprintf(pat, sizeof pat, "\"%s\"", key);
-    p = strstr(line, pat);
-    if (!p) return false;
-    p += strlen(pat);
-    while (*p == ' ' || *p == ':') p++;
-    if (*p < '0' || *p > '9') return false;
-    *out = strtoull(p, NULL, 10);
-    return true;
+    size_t nc = *cap ? *cap : 4096;
+    uint8_t *nb;
+    if (len + need <= *cap) return 0;
+    while (nc < len + need) nc *= 2;
+    nb = (uint8_t *)realloc(*buf, nc);
+    if (!nb) return -1;
+    *buf = nb;
+    *cap = nc;
+    return 0;
 }
 
 /* ── replay ───────────────────────────────────────────────────────────── */
@@ -423,44 +414,86 @@ static char *read_file(const char *path, size_t *len)
     return buf;
 }
 
+/* A damaged capture is the caller's bad argument (contract 07 §3): the file
+ * is refused whole, the message names the line — never skipped or coerced. */
+static int bad_line(const char *path, size_t lineno, const char *what)
+{
+    return depz_fail(DEPZ_E_ARG, "replay: %s:%zu: %s", path, lineno, what);
+}
+
 int depz_link_open_replay(const char *path, bool strict_tx, bool realtime, depz_link **out)
 {
-    size_t flen, rx_cap = 0, tx_cap = 0, rx_len = 0, ev_cap = 0;
-    char *text, *line, *save;
+    size_t flen, pos = 0, lineno = 0, rx_cap = 0, tx_cap = 0, rx_len = 0, ev_cap = 0;
+    char *text;
     replay *r;
-    bool header = true;
-    int rc;
+    int rc = DEPZ_OK;
 
     if (!path || !out) return depz_fail(DEPZ_E_ARG, "replay: NULL argument");
     text = read_file(path, &flen);
     if (!text) return depz_fail(DEPZ_E_IO, "replay: cannot read %s", path);
     r = (replay *)calloc(1, sizeof *r);
     if (!r) { free(text); return depz_fail(DEPZ_E_NOMEM, "replay: out of memory"); }
+    if (depz_mutex_init(&r->lock)) {
+        free(text);
+        free(r);
+        return depz_fail(DEPZ_E_NOMEM, "replay: mutex");
+    }
+    if (depz_cond_init(&r->cond)) {
+        depz_mutex_destroy(&r->lock);
+        free(text);
+        free(r);
+        return depz_fail(DEPZ_E_NOMEM, "replay: condition variable");
+    }
+    /* from here on rp_destroy(r) releases everything */
 
-    for (line = text; line && *line; line = save) {
-        const char *dir, *hex;
-        size_t dlen, hlen, i, nbytes;
-        uint64_t t = 0;
+    if (flen == 0) rc = depz_fail(DEPZ_E_ARG, "replay: %s is empty (no header line)", path);
+    /* Line 1 is the header: a JSON object, its fields ignored. Every later
+     * non-blank line is an event object: `t` a non-negative integer, `dir` a
+     * string ("rx" is served, anything else counts as tx), `data` an
+     * even-length hex string (contract 08). */
+    while (rc == DEPZ_OK && pos < flen) {
+        const char *line = text + pos;
+        size_t llen = 0, nbytes, i;
+        depz_json *doc;
+        const depz_json *t, *dir, *data;
+        const char *hex;
         uint8_t **dst;
         size_t *dst_len, *dst_cap;
 
-        save = strchr(line, '\n');
-        if (save) *save++ = '\0';
-        if (header) { header = false; continue; }
-        if (!json_str_field(line, "dir", &dir, &dlen) || !json_str_field(line, "data", &hex, &hlen))
-            continue; /* blank line or an unknown event kind */
-        json_uint_field(line, "t", &t);
-        nbytes = hlen / 2;
-        if (dlen == 2 && !memcmp(dir, "rx", 2)) {
+        while (pos + llen < flen && text[pos + llen] != '\n') llen++;
+        pos += llen + 1;
+        lineno++;
+        if (lineno > 1 && line_blank(line, llen)) continue;
+        doc = depz_json_parse(line, llen);
+        if (!doc) { rc = bad_line(path, lineno, "not JSON"); break; }
+        if (depz_json_kind_of(doc) != DEPZ_JSON_OBJECT) {
+            depz_json_free(doc);
+            rc = bad_line(path, lineno, "not a JSON object");
+            break;
+        }
+        if (lineno == 1) { depz_json_free(doc); continue; }
+        t = depz_json_get(doc, "t");
+        dir = depz_json_get(doc, "dir");
+        data = depz_json_get(doc, "data");
+        if (depz_json_kind_of(t) != DEPZ_JSON_INT || depz_json_int_value(t) < 0)
+            rc = bad_line(path, lineno, "\"t\" must be a non-negative integer");
+        else if (depz_json_kind_of(dir) != DEPZ_JSON_STRING)
+            rc = bad_line(path, lineno, "\"dir\" must be a string");
+        else if (depz_json_kind_of(data) != DEPZ_JSON_STRING || depz_json_string_len(data) % 2)
+            rc = bad_line(path, lineno, "\"data\" must be an even-length hex string");
+        if (rc) { depz_json_free(doc); break; }
+        hex = depz_json_string_value(data);
+        nbytes = depz_json_string_len(data) / 2;
+        if (depz_json_string_len(dir) == 2 && memcmp(depz_json_string_value(dir), "rx", 2) == 0) {
             dst = &r->rx_bytes; dst_len = &rx_len; dst_cap = &rx_cap;
             if (r->n_ev == ev_cap) {
                 size_t nc = ev_cap ? ev_cap * 2 : 256;
                 rp_event *ne = (rp_event *)realloc(r->ev, nc * sizeof *ne);
-                if (!ne) goto nomem;
+                if (!ne) { depz_json_free(doc); rc = depz_fail(DEPZ_E_NOMEM, "replay: out of memory"); break; }
                 r->ev = ne;
                 ev_cap = nc;
             }
-            r->ev[r->n_ev].t_us = t;
+            r->ev[r->n_ev].t_us = (uint64_t)depz_json_int_value(t);
             r->ev[r->n_ev].off = rx_len;
             r->ev[r->n_ev].len = nbytes;
             r->ev[r->n_ev].tx_prefix = r->tx_len;
@@ -468,29 +501,22 @@ int depz_link_open_replay(const char *path, bool strict_tx, bool realtime, depz_
         } else {
             dst = &r->tx_bytes; dst_len = &r->tx_len; dst_cap = &tx_cap;
         }
-        if (*dst_len + nbytes > *dst_cap) {
-            size_t nc = (*dst_cap ? *dst_cap : 4096);
-            uint8_t *nb;
-            while (nc < *dst_len + nbytes) nc *= 2;
-            nb = (uint8_t *)realloc(*dst, nc);
-            if (!nb) goto nomem;
-            *dst = nb;
-            *dst_cap = nc;
+        if (reserve(dst, dst_cap, *dst_len, nbytes)) {
+            depz_json_free(doc);
+            rc = depz_fail(DEPZ_E_NOMEM, "replay: out of memory");
+            break;
         }
         for (i = 0; i < nbytes; i++) {
             int hi = hexval(hex[2 * i]), lo = hexval(hex[2 * i + 1]);
-            if (hi < 0 || lo < 0) {
-                free(text);
-                rp_destroy(r);
-                return depz_fail(DEPZ_E_PROTOCOL, "replay: bad hex in %s", path);
-            }
+            if (hi < 0 || lo < 0) { rc = bad_line(path, lineno, "\"data\" is not hex"); break; }
             (*dst)[*dst_len + i] = (uint8_t)(hi << 4 | lo);
         }
+        depz_json_free(doc);
+        if (rc) break;
         *dst_len += nbytes;
     }
     free(text);
-    depz_mutex_init(&r->lock);
-    depz_cond_init(&r->cond);
+    if (rc) { rp_destroy(r); return rc; }
     r->strict = strict_tx;
     r->realtime = realtime;
     r->t0 = depz_now_us();
@@ -498,14 +524,6 @@ int depz_link_open_replay(const char *path, bool strict_tx, bool realtime, depz_
     if (rc) { rp_destroy(r); return rc; }
     (*out)->is_replay = true;
     return DEPZ_OK;
-
-nomem:
-    free(text);
-    free(r->rx_bytes);
-    free(r->tx_bytes);
-    free(r->ev);
-    free(r);
-    return depz_fail(DEPZ_E_NOMEM, "replay: out of memory");
 }
 
 /* ── recording ────────────────────────────────────────────────────────── */

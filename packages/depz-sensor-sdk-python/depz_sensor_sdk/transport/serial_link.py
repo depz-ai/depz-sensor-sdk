@@ -9,6 +9,11 @@ try:  # POSIX only; Windows CDC ports don't share persisted termios state.
 except ImportError:  # pragma: no cover - Windows
     termios = None  # type: ignore[assignment]
 
+# A runtime flag rather than `termios is None` at each use: the type checker
+# runs on POSIX, where the import always succeeds and the None branch would be
+# flagged as unreachable.
+_HAVE_TERMIOS: bool = termios is not None
+
 from ..errors import DeviceLostError, LinkClosedError
 from .link import Link
 
@@ -18,7 +23,7 @@ from .link import Link
 # subclass, so it must be named explicitly or it escapes the reader thread).
 _LINK_IO_ERRORS: tuple[type[BaseException], ...] = (
     (serial.SerialException, OSError, TypeError)
-    + ((termios.error,) if termios is not None else ())
+    + ((termios.error,) if _HAVE_TERMIOS else ())
 )
 
 
@@ -38,7 +43,7 @@ def _restore_tty_sane(fd: int) -> None:
     (Only in-process, graceful closes run this — a SIGKILL/segfault can't; the
     recovery there is still ``stty -F <port> sane`` or an unplug/replug.)
     """
-    if termios is None:
+    if not _HAVE_TERMIOS:  # pragma: no cover - Windows
         return
     try:
         attr = termios.tcgetattr(fd)  # [iflag, oflag, cflag, lflag, isp, osp, cc]

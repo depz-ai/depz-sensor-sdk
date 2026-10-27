@@ -48,10 +48,15 @@ public static class Vl53l8Wire
         return b;
     }
 
-    /// <summary>VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE.</summary>
+    /// <summary>
+    /// VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE,
+    /// 1..<see cref="StreamTotalMax"/> (contract 04 §4 rule 4 — the firmware refuses anything else too).
+    /// </summary>
     public static byte[] PackStartStream(int frameSize)
     {
         Protocol.Wire.CheckUint("frameSize", frameSize, 16);
+        if (frameSize < 1 || frameSize > StreamTotalMax)
+            throw new ArgumentOutOfRangeException(nameof(frameSize), frameSize, $"frame_size must be 1..{StreamTotalMax}");
         var b = new byte[2];
         BinaryPrimitives.WriteUInt16LittleEndian(b, (ushort)frameSize);
         return b;
@@ -83,6 +88,7 @@ public sealed record FrameChunk(ulong TimestampUs, int FullSize, int Offset, byt
     /// <summary>Parse a RPT_VL53_FRAME payload: ts u64 LE, full u16 LE, off u16 LE, then data.</summary>
     public static FrameChunk Unpack(ReadOnlySpan<byte> payload)
     {
+        Protocol.Wire.NeedBytes("RPT_VL53_FRAME", payload, 12);
         ulong ts = BinaryPrimitives.ReadUInt64LittleEndian(payload);
         int full = BinaryPrimitives.ReadUInt16LittleEndian(payload[8..]);
         int off = BinaryPrimitives.ReadUInt16LittleEndian(payload[10..]);
@@ -93,13 +99,17 @@ public sealed record FrameChunk(ulong TimestampUs, int FullSize, int Offset, byt
 /// <summary>
 /// Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
 ///
-/// Rules (contract 04): reset on offset==0; chunks must be contiguous — a gap
-/// discards the frame in progress; a frame completes when the accumulated
-/// bytes equal <c>FullSize</c>. Byte-exact with the reference Python
-/// <c>FrameReassembler</c>.
+/// Rules (contract 04 §4): reset on offset==0; chunks must be contiguous — a
+/// gap discards the frame in progress; a frame completes when the accumulated
+/// bytes equal <c>FullSize</c>. A chunk out of the rule-4 bounds (more than
+/// <c>chunkMax</c> bytes, <c>FullSize</c> over <see cref="Vl53l8Wire.StreamTotalMax"/>,
+/// or running past <c>FullSize</c>) is damaged: dropped and counted as a lost
+/// frame like the other damaged input, never thrown. Byte-exact with the
+/// reference Python <c>FrameReassembler</c>.
 /// </summary>
 public sealed class FrameReassembler
 {
+    private readonly int _chunkMax;
     private byte[] _buf = Array.Empty<byte>();
     private int _fullSize;
     private ulong _timestampUs;
@@ -107,9 +117,31 @@ public sealed class FrameReassembler
     public int Completed { get; private set; }
     public int Discarded { get; private set; }
 
+    /// <param name="chunkMax">The device's VL53_STREAM_FRAME_MAX:
+    /// <see cref="Vl53l8Wire.StreamChunkMax"/>, or <c>Vl53l7Wire.StreamChunkMax</c> (1536)
+    /// on the I2C board (contract 11 §3).</param>
+    public FrameReassembler(int chunkMax = Vl53l8Wire.StreamChunkMax)
+    {
+        _chunkMax = chunkMax;
+    }
+
     /// <summary>Feed one chunk; returns (timestampUs, frameBytes) when a frame completes, else null.</summary>
     public (ulong TimestampUs, byte[] Frame)? Feed(FrameChunk chunk)
     {
+        if (chunk.Data.Length > _chunkMax || chunk.FullSize > Vl53l8Wire.StreamTotalMax ||
+            chunk.Offset + chunk.Data.Length > chunk.FullSize)
+        {
+            // rule 4: damaged — the frame in progress is lost (counted, rules
+            // 1–2) and so is the frame an offset-0 chunk starts (counted); a
+            // damaged orphan with nothing in progress is dropped like any orphan
+            if (_buf.Length != 0)
+                Discarded++;
+            if (chunk.Offset == 0)
+                Discarded++;
+            _buf = Array.Empty<byte>();
+            _fullSize = 0;
+            return null;
+        }
         if (chunk.Offset == 0)
         {
             if (_buf.Length != 0 && _buf.Length != _fullSize)
@@ -141,12 +173,6 @@ public sealed class FrameReassembler
             _fullSize = 0;
             Completed++;
             return (_timestampUs, frame);
-        }
-        if (_buf.Length > _fullSize)
-        {
-            Discarded++;
-            _buf = Array.Empty<byte>();
-            _fullSize = 0;
         }
         return null;
     }

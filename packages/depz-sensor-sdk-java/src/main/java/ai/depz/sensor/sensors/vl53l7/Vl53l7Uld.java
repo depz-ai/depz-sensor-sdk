@@ -1,5 +1,6 @@
 package ai.depz.sensor.sensors.vl53l7;
 
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -75,7 +76,7 @@ public final class Vl53l7Uld {
         }
         Matcher m = PART_RE.matcher(deviceName == null ? "" : deviceName);
         if (m.find()) {
-            Model byName = Model.fromLabel(("vl53l" + m.group(1) + m.group(2)).toLowerCase());
+            Model byName = Model.fromLabel(("vl53l" + m.group(1) + m.group(2)).toLowerCase(Locale.ROOT));
             return byName != null ? byName : Model.VL53L7CX;
         }
         return Model.VL53L7CX;

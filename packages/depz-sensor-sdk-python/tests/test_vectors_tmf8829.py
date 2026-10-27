@@ -16,6 +16,7 @@ from depz_sensor_sdk.tmf8829 import (
     cfg_set,
     firmware_image,
 )
+from depz_sensor_sdk.tmf8829.frames import FrameError
 from vector_shapes import (
     tmf8829_decode,
     tmf8829_frame,
@@ -68,6 +69,11 @@ def test_reassembly(vectors, seen):
 
 def test_frames(vectors, seen):
     for c in vectors("tmf8829.json")["frames"]:
+        if "error" in c:  # a results frame whose pixel decode must fail
+            with pytest.raises(FrameError):
+                tmf8829_frame(bytes.fromhex(c["raw"]))
+            seen(c)
+            continue
         want = {"header": c["header"], "problems": c["problems"]}
         want.update({"results": c["results"]} if "results" in c else {"data_sha256": c["data_sha256"]})
         assert tmf8829_frame(bytes.fromhex(c["raw"])) == want, c["name"]

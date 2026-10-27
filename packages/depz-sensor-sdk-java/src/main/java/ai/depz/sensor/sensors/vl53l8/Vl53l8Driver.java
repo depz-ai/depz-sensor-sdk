@@ -1,5 +1,6 @@
 package ai.depz.sensor.sensors.vl53l8;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld.Vl53l8Error;
 import java.io.IOException;
 import java.io.InputStream;
@@ -120,7 +121,7 @@ public final class Vl53l8Driver {
         defaultXtalk = blob("cx", "default_xtalk"); // identical in every set
         getNvmCmd = blob("cx", "get_nvm_cmd");
         if (fwImage.length != 0x15000) {
-            throw new IllegalStateException("firmware.bin (" + set + ") has the wrong size: " + fwImage.length);
+            throw new InvalidStateException("firmware.bin (" + set + ") has the wrong size: " + fwImage.length);
         }
     }
 
@@ -171,7 +172,7 @@ public final class Vl53l8Driver {
         String res = "data/" + set + "/" + name + ".bin";
         try (InputStream s = Vl53l8Driver.class.getResourceAsStream(res)) {
             if (s == null) {
-                throw new IllegalStateException("classpath resource " + res + " is missing");
+                throw new InvalidStateException("classpath resource " + res + " is missing");
             }
             return s.readAllBytes();
         } catch (IOException e) {
@@ -913,12 +914,13 @@ public final class Vl53l8Driver {
 
     // ── xtalk ────────────────────────────────────────────────────────────────
 
-    /** Xtalk margin, kcps/SPAD. */
-    public double getXtalkMargin() {
-        return u32le(dciReadData(DCI_XTALK_CFG, 16), 0) / 2048.0;
+    /** Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST). */
+    public int getXtalkMargin() {
+        return Vl53l8Uld.xtalkMarginFromRaw(u32le(dciReadData(DCI_XTALK_CFG, 16), 0));
     }
 
-    public void setXtalkMargin(double marginKcps) {
+    /** Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written. */
+    public void setXtalkMargin(int marginKcps) {
         dciReplaceData(DCI_XTALK_CFG, 16, u32(Vl53l8Uld.xtalkMarginToRaw(marginKcps)), 0x00);
     }
 
@@ -1002,6 +1004,14 @@ public final class Vl53l8Driver {
         return cfg;
     }
 
+    /**
+     * Stop surfacing the motion block: frames parse with {@code motion} null. Called when the
+     * VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+     */
+    public void motionIndicatorDisarm() {
+        motionPresent = false;
+    }
+
     public void motionIndicatorSetResolution(Vl53l8Uld.MotionConfig cfg, int res) {
         if (res != RESOLUTION_4X4 && res != RESOLUTION_8X8) {
             throw new Vl53l8Error(Vl53l8Error.STATUS_INVALID_PARAM, "motion set_resolution");
@@ -1073,7 +1083,7 @@ public final class Vl53l8Driver {
         int savedIntegration = getIntegrationTimeMs();
         int savedSharpener = getSharpenerPercent();
         int savedTargetOrder = getTargetOrder();
-        double savedMargin = getXtalkMargin();
+        int savedMargin = getXtalkMargin();
         int savedMode = getRangingMode();
 
         setResolution(RESOLUTION_8X8);

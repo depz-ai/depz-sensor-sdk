@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from depz_sensor_sdk import Tmf8829
-from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, LinkClosedError, StatusError
+from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError
 from depz_sensor_sdk.protocol.tmf8829 import EventCode, Tmf8829Event, Tmf8829Rpt
 from depz_sensor_sdk.tmf8829 import Tmf8829Error, Tmf8829InterruptEvent, firmware_image
 from depz_sensor_sdk.tmf8829.clock import NOMINAL_Q16
@@ -33,6 +33,7 @@ VECTORS = Path(__file__).resolve().parents[3] / "contracts" / "vectors" / "tmf88
 V = json.loads(VECTORS.read_text(encoding="utf-8"))
 RAW = {c["name"]: bytes.fromhex(c["raw"]) for c in V["frames"]}
 MEAS = {m["name"]: m for m in V["measurements"]}
+CORRUPT = {c["name"] for c in V["frames"] if "error" in c}  # results frames whose decode fails
 CHUNK = 1000  # bytes of frame data per RPT_TMF_FRAME
 
 
@@ -309,7 +310,7 @@ def test_configure_refuses_bad_arguments_before_sending(fake, dev, kwargs):
 def test_configure_refuses_while_streaming(fake, dev):
     dev.start()
     n = len(fake.log)
-    with pytest.raises(DepzError, match="while streaming"):
+    with pytest.raises(InvalidStateError):
         dev.configure()
     assert len(fake.log) == n
 
@@ -477,7 +478,8 @@ def test_streamed_frames_match_the_golden_measurements(fake, dev, name):
         # distance_mm = raw × ratio (/4 in 0.25 mm units), ratio = q16 / (8 << 16)
         d0 = e["distance"][0] * e["ratio_q16"] / (8 << 16)
         assert m.distance_mm.ravel()[0] == pytest.approx(d0 if e["distance_in_mm"] else d0 / 4)
-    assert (dev.frames_dropped, dev.frames_discarded, dev.frame_parse_errors) == (0, 0, 0)
+    n_corrupt = sum(f["raw_case"] in CORRUPT for f in MEAS[name]["frames"])
+    assert (dev.frames_dropped, dev.frames_discarded, dev.frame_parse_errors) == (0, 0, n_corrupt)
     assert dev.clock_ratio_q16 == want[-1]["ratio_q16"]
 
 

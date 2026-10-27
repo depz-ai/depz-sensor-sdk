@@ -21,8 +21,8 @@ Reference C driver: ../../temp/STSW-IMG026/VL53L4CD_ULD_Driver/
 from depz_sensor_sdk.vl53lx._link import Vl53Error
 from depz_sensor_sdk.vl53lx.uld.vl53l1_die import (CONFIG_ADDR, CONFIG_END, INNER_OFFSET_MM,
                             OUTER_OFFSET_MM, RANGE_OFFSET_MM,
-                            XTALK_PLANE_OFFSET_KCPS, VL53L1Die,
-                            round_half_away)
+                            XTALK_PLANE_OFFSET_KCPS, ResultsData,
+                            VL53L1Die, round_half_away)
 
 # ── ULD driver (VL53L4CD_api.c / VL53L4CD_calibration.c, 2.2.3) ──────────────
 ULD_VERSION = (2, 2, 3, 0)
@@ -55,7 +55,7 @@ class VL53L4(VL53L1Die):
                                'signal_thresh', 'sigma_thresh', 'temp_update',
                                'calib_offset', 'calib_xtalk'})
 
-    def init_extra(self):
+    def init_extra(self) -> None:
         """The one write VL53L4CD_SensorInit() adds at the end of init:
         ALGO__RANGE_IGNORE_THRESHOLD_MCPS."""
         self.p.wr_word(0x0024, 0x0500)
@@ -71,7 +71,7 @@ class VL53L4(VL53L1Die):
 
         self._collect(10, lambda i, r: None)            # device heat loop
 
-        distances = []
+        distances: list[int] = []
         self._collect(nb_samples, lambda i, r: distances.append(r.distance_mm))
 
         offset_mm = target_dist_mm - sum(distances) // nb_samples
@@ -86,9 +86,9 @@ class VL53L4(VL53L1Die):
 
         self._collect(10, lambda i, r: None)            # device heat loop
 
-        samples = []
+        samples: list[ResultsData] = []
 
-        def keep(i, r):
+        def keep(i: int, r: ResultsData) -> None:
             # Discard invalid measurements and the first frame.
             if r.range_status == 0 and i > 0:
                 samples.append(r)

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -23,6 +24,7 @@
 #include "depz/bno055.hpp"
 #include "depz/bno086.hpp"
 #include "depz/common.hpp"
+#include "depz/errors.hpp"
 #include "depz/framing.hpp"
 #include "depz/identity.hpp"
 #include "depz/span.hpp"
@@ -43,17 +45,8 @@ namespace depz {
 
 // ── errors ──────────────────────────────────────────────────────────────────
 
-// Base of every live-layer error; `code()` is the C SDK's depz_err value.
-class Error : public std::runtime_error {
-public:
-    Error(int code, const std::string& what) : std::runtime_error(what), code_(code) {}
-    int code() const noexcept { return code_; }
+// Error and ArgumentError live in depz/errors.hpp (shared with the dataset layer).
 
-private:
-    int code_;
-};
-
-class ArgumentError : public Error { using Error::Error; };
 class IoError : public Error { using Error::Error; };             // the OS refused
 class DeviceLostError : public Error { using Error::Error; };    // closed / unplugged
 class TimeoutError : public Error { using Error::Error; };
@@ -130,6 +123,8 @@ namespace detail {
 // reader may still be running it right after an unsubscribe).
 struct CallbackHolder {
     virtual ~CallbackHolder() = default;
+    // The device's count of callbacks that threw (LinkStats::callback_errors).
+    std::shared_ptr<std::atomic<std::uint64_t>> errors;
 };
 
 struct StreamHandle {
@@ -168,6 +163,7 @@ struct LinkStats {
     std::uint64_t tx_packets, rx_packets, tx_bytes, rx_bytes;
     std::uint64_t crc_errors, header_errors, trash_bytes;
     std::uint64_t seq_gaps, device_seq_errors;
+    std::uint64_t callback_errors;  // callbacks that threw on the reader (contract 07 §3)
 };
 
 struct TimeSync {
@@ -177,10 +173,11 @@ struct TimeSync {
 };
 
 struct DeviceEvent {
-    enum class Type { SequenceError, CrcError, Trash, UnsolicitedStatus, Text, Temperature, Disconnected };
+    enum class Type { SequenceError, SeqGap, CrcError, Trash, UnsolicitedStatus, Text, Temperature, Disconnected };
     Type type;
     std::uint8_t cmd = 0, seq = 0;
-    std::uint8_t expected_seq = 0, received_seq = 0;
+    std::uint8_t expected_seq = 0, received_seq = 0;  // SequenceError (RPT 0x84); SeqGap (host-observed)
+    std::uint8_t missed = 0;              // SeqGap: (received_seq - expected_seq) mod 256
     bool by_device = false;               // SequenceError reported by the device
     std::uint8_t status = 0;              // UnsolicitedStatus (ERR_HARDWARE_FAULT = a fault)
     std::uint64_t timestamp_us = 0;       // Temperature
@@ -267,9 +264,21 @@ protected:
     void keep(std::unique_ptr<detail::CallbackHolder> h);
     depz_device* d_;
 
+    // Register a callback holder: it shares the device's callback_errors count.
+    template <class H>
+    H* hold(std::unique_ptr<H> h)
+    {
+        h->errors = callback_errors_;
+        H* raw = h.get();
+        keep(std::move(h));
+        return raw;
+    }
+
 private:
     std::mutex held_lock_;
     std::vector<std::unique_ptr<detail::CallbackHolder>> held_;
+    std::shared_ptr<std::atomic<std::uint64_t>> callback_errors_ =
+        std::make_shared<std::atomic<std::uint64_t>>(0);
     // The wrapper of the class now attached to `dev`'s handle; `dev` is spent.
     static std::unique_ptr<Device> rewrap(std::unique_ptr<Device> dev);
     friend std::unique_ptr<Device> wrap_device(depz_device* d);
@@ -476,7 +485,7 @@ public:
     bool is_alive();  // id 0xF0 / rev 0x0C over SPI; rev 0x02 (or 0xF0 / 0x01) on L5/L7
     // Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
     // (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
-    // sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH.
+    // sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
     void init(Vl53l8Progress progress = {});
     bool initialized() const;
     bool ranging() const;  // between start_ranging() and stop_ranging()
@@ -495,8 +504,8 @@ public:
     void set_target_order(std::uint8_t order);  // 1 closest, 2 strongest
     std::uint8_t power_mode();                 // 0 sleep, 1 wakeup, 2 deep sleep
     void set_power_mode(std::uint8_t mode);    // no deep sleep on L5CX/L7CX; waking from it re-runs init()
-    double xtalk_margin();                     // kcps/SPAD
-    void set_xtalk_margin(double kcps_per_spad);  // <= 10000
+    std::uint32_t xtalk_margin();              // whole kcps/SPAD (raw / 2048, as ST)
+    void set_xtalk_margin(std::uint32_t kcps_per_spad);  // whole kcps/SPAD 0..10000 (as ST); above is refused
     // Crosstalk calibration (reflectance 1..99 %, samples 1..16, 600..3000 mm);
     // returns false when the firmware found nothing to calibrate (no cover glass).
     bool calibrate_xtalk(std::uint8_t reflectance_percent, std::uint8_t nb_samples, std::uint16_t distance_mm);
@@ -511,11 +520,15 @@ public:
     void set_detection_thresholds(const std::vector<vl53l8::DetectionThreshold>& thresholds);
     void set_detection_thresholds_auto_stop(bool auto_stop);  // stop ranging on a hit; not on L5CX/L7CX
     // Motion indicator over [min_mm, max_mm] (400..4000, span <= 1500) for the
-    // current resolution; frames then carry `motion`.
+    // current resolution; frames then carry `motion`. It shares DCI 0xBFAC
+    // with CNH: this disarms CNH (cnh_setup() nullopt, no frame.cnh_raw).
     void configure_motion_indicator(std::uint16_t min_mm = 400, std::uint16_t max_mm = 1500);
     // L8CH / L7CH only (WrongTypeError otherwise): arm CNH for the next
-    // start_ranging(); frames then carry frame.cnh_raw. init() disarms it.
+    // start_ranging(); frames then carry frame.cnh_raw and no `motion` (the
+    // motion indicator is disarmed: one DCI block). init() disarms both.
     void configure_cnh(const CnhSetup& setup);
+    // The CNH setup configure_cnh() armed; nullopt when none is.
+    std::optional<CnhSetup> cnh_setup() const;
 
     void start_ranging();  // start the sensor and the MCU's frame stream
     void stop_ranging();  // idempotent
@@ -752,7 +765,10 @@ public:
                    std::optional<std::int32_t> xtalk_kcps = std::nullopt,
                    std::optional<int> signal_kcps = std::nullopt);
     std::pair<int, int> range_timing();         // (budget ms, inter-measurement ms)
-    void set_mode(const std::string& mode);
+    // -> the budget in effect after the change, ms, where the change can move
+    // it (VL53L1: one the new mode does not tabulate goes to the nearest one
+    // it does, contract 12 §5), else nullopt.
+    std::optional<int> set_mode(const std::string& mode);
     std::optional<std::string> mode();          // nullopt on a product without modes
 
     std::int32_t offset_mm();
@@ -827,14 +843,8 @@ inline constexpr std::uint8_t TARE_X = 1, TARE_Y = 2, TARE_Z = 4, TARE_ALL = 7;
 // (SH-2 3.12.6, 2026-10-16), while every other report stopped.
 inline constexpr std::uint8_t FEATURE_WAKEUP = 0x04, FEATURE_ALWAYS_ON = 0x08;
 
-// Get Feature Response: the rates in effect.
-struct Feature {
-    std::uint8_t sensor_id = 0, flags = 0;
-    std::uint16_t sensitivity = 0;
-    std::uint32_t interval_us = 0;  // granted interval; 0 = disabled
-    std::uint32_t batch_us = 0;
-    std::uint32_t cfg_word = 0;
-};
+// Feature (the Get Feature Response), ProductId and CommandResponse — the
+// decoded control answers — are in depz/bno086.hpp with their unpack().
 
 // Everything Set Feature carries.
 struct FeatureRequest {
@@ -845,21 +855,9 @@ struct FeatureRequest {
     std::uint32_t cfg_word = 0;
 };
 
-struct ProductId {
-    std::uint8_t reset_cause = 0, sw_version_major = 0, sw_version_minor = 0;
-    std::uint32_t sw_part_number = 0;  // 10004148 = BNO085, 10004563 = BNO086
-    std::uint32_t sw_build_number = 0;
-    std::uint16_t sw_version_patch = 0;
-};
-
 struct CalibrationConfig { bool accel = false, gyro = false, mag = false, planar = false; };
 struct ErrorRecord { std::uint8_t severity, seq, source, error, module, code; };
 struct Counts { std::uint8_t sensor_id; std::uint32_t offered, accepted, on, attempted; };
-
-struct CommandResponse {
-    std::uint8_t seq = 0, command = 0, command_seq = 0, response_seq = 0;
-    std::array<std::uint8_t, 11> r{};  // r[0]: status for most commands
-};
 
 // A sensor's metadata FRS record; revision-gated fields are 0 when older.
 struct SensorMetadata {
@@ -944,6 +942,23 @@ public:
     bno086::CalibrationConfig calibration();
     void save_dcd();
     void configure_periodic_dcd(bool enable);
+
+    // Interactive calibration (BNO086 only; a BNO085 ignores it): tell the hub
+    // how the device is about to move (command 0x0E), so it can refine the gyro
+    // zero-rate offset while the device is still. No SH-2 answer. The hub's own
+    // request — hold still, or go on — arrives as a MotionRequest report once
+    // SensorId::MotionRequest is enabled.
+    void set_motion_intent(bno086::MotionIntent intent);
+    // Enable MotionRequest (0x2B) reports. The hub sends one when its request
+    // changes, not at `hz`, and reads the rate back late: no read-back.
+    void enable_motion_request(double hz = 1);
+
+    // Batching: Force Sensor Flush (0xF0) — the hub sends `sensor`'s batched
+    // reports now instead of when its batch interval runs out. Returns once the
+    // hub's Flush Completed (0xEF, ReportType::FlushCompleted) for `sensor`
+    // arrived — every report batched before the call has been emitted by then;
+    // TimeoutError after the device timeout (at least 1 s).
+    void flush(bno086::SensorId sensor);
 
     std::vector<std::uint32_t> frs_read(std::uint16_t record);
     void frs_write(std::uint16_t record, const std::vector<std::uint32_t>& words);

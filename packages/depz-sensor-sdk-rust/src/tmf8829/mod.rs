@@ -32,10 +32,10 @@ pub use clock::{
     FT_NOMINAL, FT_STALLED, FT_T1_UNSURE, NOMINAL_Q16,
 };
 pub use codecs::{
-    pack_get_info, pack_read_reg, pack_start_stream, pack_stop_stream, pack_write_reg,
-    FrameChunk, FrameReassembler, RawFrame, RegData, Tmf8829Cmd, Tmf8829Event, Tmf8829Info,
-    Tmf8829Rpt, EV_BAD_HEADER, EV_INT, INT_HISTOGRAMS, INT_MASK_ALL, INT_MOTION, INT_PROXIMITY,
-    INT_RESULTS, READ_MAX, SF_REF_FRAME, WRITE_MAX,
+    pack_get_info, pack_read_reg, pack_start_stream, pack_stop_stream, pack_write_reg, FrameChunk,
+    FrameReassembler, RawFrame, RegData, Tmf8829Cmd, Tmf8829Event, Tmf8829Info, Tmf8829Rpt,
+    EV_BAD_HEADER, EV_INT, INT_HISTOGRAMS, INT_MASK_ALL, INT_MOTION, INT_PROXIMITY, INT_RESULTS,
+    READ_MAX, SF_REF_FRAME, WRITE_MAX,
 };
 pub use config::{
     cfg_field, cfg_get, cfg_set, config_fields, preset_cmd, preset_kilo_iterations, CfgField,

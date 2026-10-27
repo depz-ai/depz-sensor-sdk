@@ -4,6 +4,7 @@ import ai.depz.sensor.devices.DepzDevice;
 import ai.depz.sensor.devices.DepzDevices;
 import ai.depz.sensor.devices.DepzException;
 import ai.depz.sensor.devices.DepzTimeoutException;
+import ai.depz.sensor.devices.InvalidReplyException;
 import ai.depz.sensor.devices.ReplayLink;
 import ai.depz.sensor.devices.Sr04Device;
 import ai.depz.sensor.devices.StatusException;
@@ -256,7 +257,7 @@ public final class Scenarios {
                     item = sub.take(TAKE_TIMEOUT);
                 } catch (DepzTimeoutException e) {
                     throw new AssertionError("got " + i + " of " + want.size() + " items, then nothing for "
-                            + TAKE_TIMEOUT.getSeconds() + " s");
+                            + TAKE_TIMEOUT.toSeconds() + " s");
                 }
                 checkMatch(mismatch(canon(item), want.get(i), "item[" + i + "]"));
             }
@@ -278,7 +279,8 @@ public final class Scenarios {
     static String camel(String canonical) {
         StringBuilder sb = new StringBuilder();
         boolean up = false;
-        for (char c : canonical.toCharArray()) {
+        for (int k = 0; k < canonical.length(); k++) {
+            char c = canonical.charAt(k);
             if (c == '_') {
                 up = sb.length() > 0;
             } else {
@@ -365,7 +367,8 @@ public final class Scenarios {
         throw new AssertionError(canonical + ": no overload takes " + JsonText.serialize(args) + " (" + last.getMessage() + ")");
     }
 
-    @SuppressWarnings("unchecked")
+    // An enum without a `value` field is numbered on the wire by declaration order (contract 15).
+    @SuppressWarnings({"unchecked", "EnumOrdinal"})
     private static Object arg(Object a, Class<?> t, String call, int pos) {
         if (a instanceof Map<?, ?> rec) {
             Function<Map<String, Object>, Object> build = RECORD_ARGS.get(t);
@@ -472,6 +475,9 @@ public final class Scenarios {
         if (e instanceof StatusException s) {
             return s.status() == Common.Status.ERR_CMD_NOT_SUPPORTED.value ? "not_supported" : "device_error";
         }
+        if (e instanceof InvalidReplyException) {
+            return "invalid_reply";
+        }
         if (e instanceof IllegalArgumentException) {
             return "invalid_argument";
         }
@@ -542,7 +548,8 @@ public final class Scenarios {
         return canon(v, true);
     }
 
-    @SuppressWarnings("unchecked")
+    // An enum without a `value` field is numbered on the wire by declaration order (contract 15).
+    @SuppressWarnings({"unchecked", "EnumOrdinal"})
     private static Object canon(Object v, boolean bytesAsHex) {
         if (v == null || v instanceof Boolean || v instanceof String) {
             return v;
@@ -555,7 +562,7 @@ public final class Scenarios {
         }
         if (v instanceof Enum<?> e) {
             try {
-                return ((Number) e.getClass().getField("value").get(e)).longValue();
+                return ((Number) e.getDeclaringClass().getField("value").get(e)).longValue();
             } catch (ReflectiveOperationException x) {
                 return (long) e.ordinal();
             }

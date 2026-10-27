@@ -9,7 +9,7 @@
  */
 
 import { DepzError } from "../../errors.js";
-import { checkUint } from "../../protocol/wire.js";
+import { checkUint, needBytes } from "../../protocol/wire.js";
 
 /** SH-2 level failure (bad response status, FRS error, ...). */
 export class Sh2Error extends DepzError {}
@@ -231,6 +231,7 @@ export interface FeatureResponse {
 }
 
 export function unpackFeatureResponse(payload: Uint8Array): FeatureResponse {
+  needBytes("Get Feature Response", payload, 17);
   const v = view(payload);
   const rid = v.getUint8(0);
   if (rid !== ControlReport.GetFeatureResponse) {
@@ -270,6 +271,7 @@ export interface ProductId {
 }
 
 export function unpackProductId(payload: Uint8Array): ProductId {
+  needBytes("Product ID Response", payload, 16);
   const v = view(payload);
   const rid = v.getUint8(0);
   if (rid !== ControlReport.ProductIdResponse) {
@@ -327,6 +329,7 @@ export interface CommandResponse {
 }
 
 export function unpackCommandResponse(payload: Uint8Array): CommandResponse {
+  needBytes("Command Response", payload, 16);
   if (payload[0] !== ControlReport.CommandResponse) {
     throw new Sh2Error(`not a command response: 0x${hex2(payload[0]!)}`);
   }
@@ -453,6 +456,8 @@ export enum FrsRecordId {
   StabilityDetectorConfig = 0xed85,
   /** Personal-activity-classifier config. */
   ActivityTrackerConfig = 0xed88,
+  /** Reference, sync interval, max error, prediction (SH-2 §4.3.24). */
+  GyroIntegratedRvConfig = 0xa1a2,
 }
 
 /** Per-sensor metadata FRS record IDs (subset used by getMetadata()). */
@@ -534,6 +539,7 @@ export interface FrsReadResponse {
 }
 
 export function unpackFrsReadResponse(payload: Uint8Array): FrsReadResponse {
+  needBytes("FRS Read Response", payload, 16);
   const v = view(payload);
   const rid = v.getUint8(0);
   if (rid !== ControlReport.FrsReadResponse) {
@@ -584,6 +590,7 @@ export interface FrsWriteResponse {
 }
 
 export function unpackFrsWriteResponse(payload: Uint8Array): FrsWriteResponse {
+  needBytes("FRS Write Response", payload, 4);
   const v = view(payload);
   const rid = v.getUint8(0);
   if (rid !== ControlReport.FrsWriteResponse) {

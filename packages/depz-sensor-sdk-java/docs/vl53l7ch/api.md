@@ -53,7 +53,7 @@ The CNH setup armed by `configureCnh`, or null.
 public void configureCnh(Vl53l8CnhSetup setup)
 ```
 
-Arm CNH for the next start (as `Vl53l8chDevice#configureCnh`).
+Arm CNH for the next start (as `Vl53l8chDevice#configureCnh`); disarms the motion indicator.
 
 ### Vl53l7cxDevice
 
@@ -227,7 +227,7 @@ VL53_WRITE_REG payload: `addr u16, data[1..2048]` with
 public static byte[] packStartStream(int frameSize)
 ```
 
-VL53_START_STREAM payload: `frame_size u16`.
+VL53_START_STREAM payload: `frame_size u16`, 1..8192 (the VL53L8 command, contract 04 §2).
 
 #### Vl53l7.packPinCtrl
 
@@ -446,7 +446,11 @@ chunk transport is identical across the two parts.
 
 Rules: reset on `offset == 0`; chunks must be contiguous — a gap
 discards the frame in progress; a frame completes when the accumulated bytes
-equal `fullSize`. Mirror of the TS/Python `FrameReassembler`.
+equal `fullSize`. A chunk out of the rule-4 bounds (more than
+`chunkMax` bytes, `fullSize` over `STREAM_TOTAL_MAX`, or
+running past `fullSize`) is damaged: dropped and counted as a lost
+frame like the other damaged input, never thrown. Mirror of the TS/Python
+`FrameReassembler`.
 
 #### FrameReassembler.STREAM_CHUNK_MAX *(field)*
 
@@ -455,6 +459,14 @@ public static final int STREAM_CHUNK_MAX = 1528
 ```
 
 Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### FrameReassembler.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Largest frame_size START_STREAM accepts (contract 04 §4 rule 4).
 
 #### FrameReassembler.completed *(field)*
 

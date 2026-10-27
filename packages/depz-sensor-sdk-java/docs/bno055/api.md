@@ -591,13 +591,28 @@ public static final String[] I2C_ERROR_NAMES
 
 `last_i2c_error` values in RPT_BNO_INFO, indexed by code.
 
+#### Bno055.TIMER_PERIOD_MIN_MS *(field)*
+
+```java
+public static final int TIMER_PERIOD_MIN_MS = 1
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+#### Bno055.TIMER_PERIOD_MAX_MS *(field)*
+
+```java
+public static final int TIMER_PERIOD_MAX_MS = 60000
+```
+
 #### Bno055.packReadReg
 
 ```java
 public static byte[] packReadReg(int addr, int len)
 ```
 
-BNO_READ_REG payload: `addr u8, len u8`.
+BNO_READ_REG payload `addr u8, len u8` with the transfer limit of contract 13 §1:
+`len` 1..128 and `addr + len <= 0x100`, else IllegalArgumentException.
 
 #### Bno055.packWriteReg
 
@@ -605,7 +620,7 @@ BNO_READ_REG payload: `addr u8, len u8`.
 public static byte[] packWriteReg(int addr, byte[] data)
 ```
 
-BNO_WRITE_REG payload: `addr u8, data[1..128]`, else IllegalArgumentException.
+BNO_WRITE_REG payload: `addr u8, data[1..128]` with `addr + N <= 0x100`, else IllegalArgumentException.
 
 #### Bno055.packStartStream
 
@@ -613,8 +628,9 @@ BNO_WRITE_REG payload: `addr u8, data[1..128]`, else IllegalArgumentException.
 public static byte[] packStartStream(int trigger, int addr, int len, int periodMs)
 ```
 
-BNO_START_STREAM payload, 5 bytes: `trigger u8, addr u8, len u8,
-period_ms u16 LE`. Replaces any running stream.
+BNO_START_STREAM payload `trigger u8, addr u8, len u8, period_ms u16`. With the TIMER
+trigger the period is 1..60000 ms (contract 13 §2), else IllegalArgumentException; with INT it
+is the missed-edge watchdog and 0 disables it. Replaces any running stream.
 
 ### Bno055.Bno055Cmd
 
@@ -687,11 +703,12 @@ public record Bno055Info(int i2cAddr, int chipId, int accId, int magId, int gyrI
 ```
 
 RPT_BNO_INFO (38-byte LE payload `<BBBBBHBBBIHHHIIIHBBH`) — sensor
-identity (registers 0x00..0x06) plus bridge diagnostics. Counters are
-free-running and wrap silently; watch increments. `read*Us`,
-`slotsSkipped` and `loopMaxUs` reset at START_STREAM. A rising
-`sensorResets` means the bridge pulsed nRESET to recover the bus: the
-sensor is back in CONFIG and the host must restore its configuration.
+identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap
+silently; watch increments. `read*Us`, `slotsSkipped` and
+`loopMaxUs` reset at START_STREAM, `i2cErrors` at every
+successful reset handshake. A rising `sensorResets` means the bridge
+pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host
+must restore its configuration.
 `swRev` is BCD (`0x0311` = 03.11).
 
 #### Bno055.Bno055Info.unpack

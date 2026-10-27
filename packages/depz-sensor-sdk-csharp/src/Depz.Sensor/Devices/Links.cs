@@ -35,7 +35,7 @@ public interface ILink
 /// could otherwise reach the reader and be journaled ahead of its own request,
 /// which breaks the causal rx gating replay relies on.
 /// </summary>
-public sealed class RecordingLink : ILink
+public sealed class RecordingLink : ILink, IDisposable
 {
     public const string Schema = "depz.rec/1";
 
@@ -98,6 +98,8 @@ public sealed class RecordingLink : ILink
         _inner.Write(data);
     }
 
+    public void Dispose() => Close();
+
     public void Close()
     {
         lock (_lock)
@@ -136,28 +138,79 @@ public sealed class ReplayLink : ILink
     /// <param name="path">A <c>.depzrec</c> file.</param>
     /// <param name="strictTx">Fail a write that differs from the recorded tx stream.</param>
     /// <param name="realtime">Pace rx chunks by their recorded timestamps.</param>
+    /// <exception cref="ArgumentException">A damaged capture (contract 08): an empty file, a line
+    /// that is not a JSON object, an event without a string <c>dir</c>, a non-hex <c>data</c>, a
+    /// <c>t</c> that is not a non-negative integer — the message names the line.</exception>
     public ReplayLink(string path, bool strictTx = false, bool realtime = false)
     {
         Name = $"replay:{Path.GetFileName(path)}";
         _strictTx = strictTx;
         _realtime = realtime;
-        string[] lines = File.ReadAllText(path, Encoding.UTF8).Split('\n');
-        Header = lines.Length > 0 && lines[0].Trim().Length > 0
-            ? (Dictionary<string, object?>)JsonText.Parse(lines[0])!
-            : new Dictionary<string, object?>();
+        // GetString keeps a BOM (ReadAllText would drop it): a BOM is no JSON, as in every SDK
+        string text = Encoding.UTF8.GetString(File.ReadAllBytes(path));
+        if (text.Length == 0)
+            throw new ArgumentException($"{path}: empty, not a .depzrec capture (no header line)");
+        string[] lines = text.Split(LineBreaks, StringSplitOptions.None);
+        Header = JsonObjectLine(path, 1, lines[0]);
         var tx = new List<byte>();
         for (int i = 1; i < lines.Length; i++)
         {
-            if (lines[i].Trim().Length == 0)
+            if (JsonText.IsBlankLine(lines[i]))
                 continue;
-            var ev = (Dictionary<string, object?>)JsonText.Parse(lines[i])!;
-            byte[] data = FromHex((string)ev["data"]!);
-            if ((string?)ev["dir"] == "rx")
-                _rx.Add((Convert.ToInt64(ev["t"], CultureInfo.InvariantCulture), data, tx.Count));
+            var (tUs, direction, data) = Event(path, i + 1, lines[i]);
+            if (direction == "rx")
+                _rx.Add((tUs, data, tx.Count));
             else
                 tx.AddRange(data);
         }
         _tx = tx.ToArray();
+    }
+
+    private static readonly string[] LineBreaks = { "\r\n", "\n" };
+
+    // `line` as the JSON object a capture line must be, else ArgumentException naming the file and
+    // line (a damaged capture is the caller's bad argument, contract 07 §3 — never a cast / key error).
+    private static Dictionary<string, object?> JsonObjectLine(string path, int lineno, string line)
+    {
+        object? obj;
+        try
+        {
+            obj = JsonText.Parse(line);
+        }
+        catch (FormatException bad)
+        {
+            throw new ArgumentException($"{path}:{lineno}: not JSON: {bad.Message}");
+        }
+        return obj as Dictionary<string, object?>
+            ?? throw new ArgumentException($"{path}:{lineno}: not a JSON object");
+    }
+
+    // One capture event line (contract 08) as (t_us, dir, data).
+    private static (long TUs, string Dir, byte[] Data) Event(string path, int lineno, string line)
+    {
+        var ev = JsonObjectLine(path, lineno, line);
+        ev.TryGetValue("t", out object? t);
+        ev.TryGetValue("dir", out object? direction);
+        ev.TryGetValue("data", out object? data);
+        if (t is not long tUs || tUs < 0)
+            throw new ArgumentException($"{path}:{lineno}: 't' must be a non-negative integer, got {JsonText.Serialize(t)}");
+        if (direction is not string dir)
+            throw new ArgumentException($"{path}:{lineno}: 'dir' must be a string, got {JsonText.Serialize(direction)}");
+        if (data is not string hex)
+            throw new ArgumentException($"{path}:{lineno}: 'data' must be a hex string, got {JsonText.Serialize(data)}");
+        if (!IsHex(hex))
+            throw new ArgumentException($"{path}:{lineno}: 'data' is not hex: {JsonText.Serialize(hex)}");
+        return (tUs, dir, FromHex(hex));
+    }
+
+    private static bool IsHex(string s)
+    {
+        if ((s.Length & 1) != 0)
+            return false;
+        foreach (char c in s)
+            if (!(c is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F'))
+                return false;
+        return true;
     }
 
     public string Name { get; }
@@ -269,7 +322,7 @@ public sealed class ReplayLink : ILink
     {
         var b = new byte[hex.Length / 2];
         for (int i = 0; i < b.Length; i++)
-            b[i] = byte.Parse(hex.Substring(2 * i, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+            b[i] = byte.Parse(hex.AsSpan(2 * i, 2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
         return b;
     }
 }

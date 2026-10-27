@@ -10,9 +10,10 @@ use std::time::Duration;
 use super::records;
 use super::writer::DatasetWriter;
 use crate::devices::{
-    host_now_us, AnyDevice, Bno055Device, Bno086Device, DepzDevice, DepzError, Hook, Result, Sr04Device,
-    Tmf8829Device, Vl53l0xDevice, Vl53l1cbDevice, Vl53l1cxDevice, Vl53l3cxDevice, Vl53l4cdDevice, Vl53l4cxDevice,
-    Vl53l5cxDevice, Vl53l7chDevice, Vl53l7cxDevice, Vl53l8chDevice, Vl53l8cxDevice, Vl53lxDevice,
+    host_now_us, AnyDevice, Bno055Device, Bno086Device, DepzDevice, DepzError, Hook, Result,
+    Sr04Device, Tmf8829Device, Vl53l0xDevice, Vl53l1cbDevice, Vl53l1cxDevice, Vl53l3cxDevice,
+    Vl53l4cdDevice, Vl53l4cxDevice, Vl53l5cxDevice, Vl53l7chDevice, Vl53l7cxDevice, Vl53l8chDevice,
+    Vl53l8cxDevice, Vl53lxDevice,
 };
 use crate::json::Value;
 use crate::protocol::identity::parse_software_name;
@@ -59,7 +60,11 @@ impl RecordSink {
 
     /// The sensor die's latest temperature, sampled into `temperature` records.
     pub fn note_sensor_temperature(&self, celsius: f64) {
-        self.shared.silicon.lock().unwrap().insert(self.id.to_string(), celsius);
+        self.shared
+            .silicon
+            .lock()
+            .unwrap()
+            .insert(self.id.to_string(), celsius);
     }
 }
 
@@ -149,7 +154,12 @@ macro_rules! recordable_via_deref {
     )*};
 }
 
-recordable_via_deref!(Vl53l8chDevice, Vl53l7cxDevice, Vl53l5cxDevice, Vl53l7chDevice);
+recordable_via_deref!(
+    Vl53l8chDevice,
+    Vl53l7cxDevice,
+    Vl53l5cxDevice,
+    Vl53l7chDevice
+);
 
 impl Recordable for Vl53lxDevice {
     fn depz_device(&self) -> &DepzDevice {
@@ -162,7 +172,11 @@ impl Recordable for Vl53lxDevice {
         vec![self.on_measurement(move |m| {
             if sink.recording() {
                 let (product, driver) = bound().unwrap_or(("", ""));
-                sink.write(m.timestamp_us as i64, "vl53lx", records::vl53lx(m, product, driver));
+                sink.write(
+                    m.timestamp_us as i64,
+                    "vl53lx",
+                    records::vl53lx(m, product, driver),
+                );
             }
         })]
     }
@@ -183,7 +197,13 @@ macro_rules! recordable_vl53lx {
     )*};
 }
 
-recordable_vl53lx!(Vl53l0xDevice, Vl53l1cxDevice, Vl53l1cbDevice, Vl53l3cxDevice, Vl53l4cxDevice);
+recordable_vl53lx!(
+    Vl53l0xDevice,
+    Vl53l1cxDevice,
+    Vl53l1cbDevice,
+    Vl53l3cxDevice,
+    Vl53l4cxDevice
+);
 
 impl Recordable for AnyDevice {
     fn depz_device(&self) -> &DepzDevice {
@@ -242,12 +262,21 @@ impl SessionRecorder {
     /// also carry signal / ambient / sigma / reflectance. `temperature_hz`: about this many
     /// `temperature` records per device and second (the MCU thermometer, and the sensor die where
     /// frames carry one); `None` for none.
-    pub fn new(path: impl AsRef<Path>, note: Option<&str>, vl53l8_layers: bool, temperature_hz: Option<f64>) -> Self {
+    pub fn new(
+        path: impl AsRef<Path>,
+        note: Option<&str>,
+        vl53l8_layers: bool,
+        temperature_hz: Option<f64>,
+    ) -> Self {
         SessionRecorder {
             path: path.as_ref().to_path_buf(),
             note: note.unwrap_or("").to_string(),
             temperature_hz,
-            shared: Arc::new(Shared { writer: Mutex::new(None), silicon: Mutex::new(HashMap::new()), vl53l8_layers }),
+            shared: Arc::new(Shared {
+                writer: Mutex::new(None),
+                silicon: Mutex::new(HashMap::new()),
+                vl53l8_layers,
+            }),
             entries: Vec::new(),
             temp_thread: None,
         }
@@ -256,9 +285,16 @@ impl SessionRecorder {
     /// Register a device before recording starts: runs [`DepzDevice::sync_time`] with
     /// `sync_samples` rounds so its timestamps land on the shared timeline, and hooks its stream.
     /// Returns its device id (`d0`, `d1`, … unless given).
-    pub fn add(&mut self, device: &dyn Recordable, device_id: Option<&str>, sync_samples: usize) -> Result<String> {
+    pub fn add(
+        &mut self,
+        device: &dyn Recordable,
+        device_id: Option<&str>,
+        sync_samples: usize,
+    ) -> Result<String> {
         if self.recording() {
-            return Err(DepzError::InvalidState("add() every device before recording starts".into()));
+            return Err(DepzError::InvalidState(
+                "add() every device before recording starts".into(),
+            ));
         }
         let dev = device.depz_device();
         let id = device_id.map_or_else(|| format!("d{}", self.entries.len()), str::to_string);
@@ -277,9 +313,18 @@ impl SessionRecorder {
             meta.push(("software_name".to_string(), Value::String(sw.clone())));
             software = sw;
         }
-        let sensor_type = parse_software_name(&software).sensor_type.map_or("unknown", |t| t.as_str());
-        meta.push(("sensor_type".to_string(), Value::String(sensor_type.to_string())));
-        let sink = RecordSink { id: Arc::from(id.as_str()), offset_us: sync.offset_us, shared: self.shared.clone() };
+        let sensor_type = parse_software_name(&software)
+            .sensor_type
+            .map_or("unknown", |t| t.as_str());
+        meta.push((
+            "sensor_type".to_string(),
+            Value::String(sensor_type.to_string()),
+        ));
+        let sink = RecordSink {
+            id: Arc::from(id.as_str()),
+            offset_us: sync.offset_us,
+            shared: self.shared.clone(),
+        };
         let requester = dev.requester();
         self.entries.push(Entry {
             id: id.clone(),
@@ -303,14 +348,26 @@ impl SessionRecorder {
         if self.recording() {
             return Ok(());
         }
-        let devices = self.entries.iter().map(|e| (e.id.clone(), e.meta.clone())).collect();
-        let writer = Arc::new(DatasetWriter::create(&self.path, devices, Some(&self.note))?);
+        let devices = self
+            .entries
+            .iter()
+            .map(|e| (e.id.clone(), e.meta.clone()))
+            .collect();
+        let writer = Arc::new(DatasetWriter::create(
+            &self.path,
+            devices,
+            Some(&self.note),
+        )?);
         *self.shared.writer.lock().unwrap() = Some(writer);
         if let Some(hz) = self.temperature_hz.filter(|&hz| hz > 0.0) {
             let (stop, rx) = mpsc::channel::<()>();
             let period = Duration::from_secs_f64(1.0 / hz);
             let shared = self.shared.clone();
-            let probes: Vec<(String, Probe)> = self.entries.iter().map(|e| (e.id.clone(), e.temperature.clone())).collect();
+            let probes: Vec<(String, Probe)> = self
+                .entries
+                .iter()
+                .map(|e| (e.id.clone(), e.temperature.clone()))
+                .collect();
             let handle = std::thread::Builder::new()
                 .name("depz-rec-temp".into())
                 .spawn(move || temperature_loop(probes, shared, period, rx))
@@ -347,7 +404,12 @@ fn temperature_record(celsius: f64, source: &str) -> Value {
     ])
 }
 
-fn temperature_loop(probes: Vec<(String, Probe)>, shared: Arc<Shared>, period: Duration, stop: mpsc::Receiver<()>) {
+fn temperature_loop(
+    probes: Vec<(String, Probe)>,
+    shared: Arc<Shared>,
+    period: Duration,
+    stop: mpsc::Receiver<()>,
+) {
     loop {
         match stop.recv_timeout(period) {
             Err(RecvTimeoutError::Timeout) => {}
@@ -357,10 +419,20 @@ fn temperature_loop(probes: Vec<(String, Probe)>, shared: Arc<Shared>, period: D
         for (id, read) in &probes {
             let silicon = shared.silicon.lock().unwrap().get(id).copied();
             if let Some(c) = silicon {
-                let _ = w.write(id, host_now_us(), "temperature", temperature_record(c, "sensor"));
+                let _ = w.write(
+                    id,
+                    host_now_us(),
+                    "temperature",
+                    temperature_record(c, "sensor"),
+                );
             }
             if let Ok(c) = read() {
-                let _ = w.write(id, host_now_us(), "temperature", temperature_record(c, "mcu"));
+                let _ = w.write(
+                    id,
+                    host_now_us(),
+                    "temperature",
+                    temperature_record(c, "mcu"),
+                );
             }
         }
     }

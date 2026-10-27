@@ -47,10 +47,7 @@ const PID_MODEL: &[(u16, &str)] = &[
 pub const DEPZ_PID_MODEL: &[(u16, &str)] = PID_MODEL;
 
 fn model_for_pid(pid: u16) -> Option<&'static str> {
-    PID_MODEL
-        .iter()
-        .find(|(p, _)| *p == pid)
-        .map(|(_, m)| *m)
+    PID_MODEL.iter().find(|(p, _)| *p == pid).map(|(_, m)| *m)
 }
 
 /// True when `(vid, pid)` is a recognized DEPZ (or dev-default) USB id.
@@ -98,10 +95,18 @@ pub struct PortEntry {
 /// last, tie-broken by port path (contract 02 §4).
 pub fn order_ports(mut ports: Vec<PortEntry>) -> Vec<PortEntry> {
     ports.sort_by(|a, b| {
-        let a_missing = a.serial.as_deref().map_or(true, |s| s.is_empty());
-        let b_missing = b.serial.as_deref().map_or(true, |s| s.is_empty());
-        let a_key = if a_missing { "" } else { a.serial.as_deref().unwrap() };
-        let b_key = if b_missing { "" } else { b.serial.as_deref().unwrap() };
+        let a_missing = a.serial.as_deref().is_none_or(|s| s.is_empty());
+        let b_missing = b.serial.as_deref().is_none_or(|s| s.is_empty());
+        let a_key = if a_missing {
+            ""
+        } else {
+            a.serial.as_deref().unwrap()
+        };
+        let b_key = if b_missing {
+            ""
+        } else {
+            b.serial.as_deref().unwrap()
+        };
         (a_missing, a_key, &a.port).cmp(&(b_missing, b_key, &b.port))
     });
     ports

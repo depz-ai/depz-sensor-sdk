@@ -24,18 +24,22 @@ fn vl53l7_encode_vectors() {
         let got = match c["kind"].as_str().unwrap() {
             "read_reg" => {
                 let len = c["len"].as_u64().unwrap();
-                assert!(len as usize <= READ_MAX_LEN, "{} exceeds READ_MAX_LEN", c["name"]);
+                assert!(
+                    len as usize <= READ_MAX_LEN,
+                    "{} exceeds READ_MAX_LEN",
+                    c["name"]
+                );
                 hex_encode(&pack_read_reg(c["addr"].as_u64().unwrap() as u16, len as u16).unwrap())
             }
-            "write_reg" => hex_encode(&pack_write_reg(
-                c["addr"].as_u64().unwrap() as u16,
-                &hex_decode(c["data"].as_str().unwrap()),
-            )
-            .unwrap()),
+            "write_reg" => hex_encode(
+                &pack_write_reg(
+                    c["addr"].as_u64().unwrap() as u16,
+                    &hex_decode(c["data"].as_str().unwrap()),
+                )
+                .unwrap(),
+            ),
             "pin_ctrl" => hex_encode(&pack_pin_ctrl(c["action"].as_u64().unwrap() as u8)),
-            "set_i2c_speed" => {
-                hex_encode(&pack_set_i2c_speed(c["khz"].as_u64().unwrap() as u16))
-            }
+            "set_i2c_speed" => hex_encode(&pack_set_i2c_speed(c["khz"].as_u64().unwrap() as u16)),
             other => panic!("unknown encode kind {:?} in {}", other, c["name"]),
         };
         assert_eq!(got, want, "encode {}", c["name"]);
@@ -53,21 +57,51 @@ fn vl53l7_decode_vectors() {
     let doc = load("vl53l7.json");
     let mut n = 0;
     for c in doc["decode"].as_array().unwrap() {
-        assert_eq!(c["report"].as_u64().unwrap(), Vl53l7Rpt::Info as u64, "{}", c["name"]);
+        assert_eq!(
+            c["report"].as_u64().unwrap(),
+            Vl53l7Rpt::Info as u64,
+            "{}",
+            c["name"]
+        );
         let info = Vl53l7Info::unpack(&hex_decode(c["payload"].as_str().unwrap()))
             .unwrap_or_else(|e| panic!("{}: {}", c["name"], e));
         let e = &c["expect"];
         let name = &c["name"];
         let u = |k: &str| e[k].as_u64().unwrap_or_else(|| panic!("{}: {}", name, k));
         assert_eq!(info.int_edges as u64, u("int_edges"), "{} int_edges", name);
-        assert_eq!(info.frames_dropped as u64, u("frames_dropped"), "{} frames_dropped", name);
-        assert_eq!(info.i2c_errors as u64, u("i2c_errors"), "{} i2c_errors", name);
-        assert_eq!(info.last_i2c_error as u64, u("last_i2c_error"), "{} last_i2c_error", name);
+        assert_eq!(
+            info.frames_dropped as u64,
+            u("frames_dropped"),
+            "{} frames_dropped",
+            name
+        );
+        assert_eq!(
+            info.i2c_errors as u64,
+            u("i2c_errors"),
+            "{} i2c_errors",
+            name
+        );
+        assert_eq!(
+            info.last_i2c_error as u64,
+            u("last_i2c_error"),
+            "{} last_i2c_error",
+            name
+        );
         assert_eq!(info.lpn_level as u64, u("lpn_level"), "{} lpn_level", name);
         assert_eq!(info.int_level as u64, u("int_level"), "{} int_level", name);
         assert_eq!(info.i2c_khz as u64, u("i2c_khz"), "{} i2c_khz", name);
-        assert_eq!(info.frame_size as u64, u("frame_size"), "{} frame_size", name);
-        assert_eq!(info.streaming, e["streaming"].as_bool().unwrap(), "{} streaming", name);
+        assert_eq!(
+            info.frame_size as u64,
+            u("frame_size"),
+            "{} frame_size",
+            name
+        );
+        assert_eq!(
+            info.streaming,
+            e["streaming"].as_bool().unwrap(),
+            "{} streaming",
+            name
+        );
         seen(c);
         n += 1;
     }
@@ -89,7 +123,12 @@ fn vl53l7_model_vectors() {
     let mut n = 0;
     for c in doc["model"].as_array().unwrap() {
         let got = resolve_model(c["usb_model"].as_str(), c["device_name"].as_str().unwrap());
-        assert_eq!(got.as_str(), c["expect"].as_str().unwrap(), "model {}", c["name"]);
+        assert_eq!(
+            got.as_str(),
+            c["expect"].as_str().unwrap(),
+            "model {}",
+            c["name"]
+        );
         seen(c);
         n += 1;
     }
@@ -100,9 +139,18 @@ fn vl53l7_model_vectors() {
 #[test]
 fn vl53l7_model_first_match_only() {
     // First regex match decides; a part without its own class (L5CH) is CX.
-    assert_eq!(resolve_model(None, "VL53L5CH then VL53L7CH").as_str(), "vl53l7cx");
-    assert_eq!(resolve_model(None, "VL53L8CH VL53L5CX").as_str(), "vl53l5cx");
-    assert_eq!(resolve_model(Some("vl53l8ch"), "VL53L7CH").as_str(), "vl53l7ch");
+    assert_eq!(
+        resolve_model(None, "VL53L5CH then VL53L7CH").as_str(),
+        "vl53l7cx"
+    );
+    assert_eq!(
+        resolve_model(None, "VL53L8CH VL53L5CX").as_str(),
+        "vl53l5cx"
+    );
+    assert_eq!(
+        resolve_model(Some("vl53l8ch"), "VL53L7CH").as_str(),
+        "vl53l7ch"
+    );
 }
 
 #[test]

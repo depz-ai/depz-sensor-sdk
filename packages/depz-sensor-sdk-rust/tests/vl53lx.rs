@@ -6,9 +6,14 @@
 
 mod common;
 
+use std::sync::{Arc, Mutex};
+
+use depz_sensor_sdk::devices::{DepzError, Result};
 use depz_sensor_sdk::protocol::identity::{self, SensorType};
 use depz_sensor_sdk::usb_ids::DEPZ_USB_VID;
 use depz_sensor_sdk::usb_model_hint;
+use depz_sensor_sdk::vl53lx::driver::{Vl53lxDriver, Vl53lxPlatform};
+use depz_sensor_sdk::vl53lx::uld::{Vl53l0xUldDriver, Vl53l1UldDriver};
 use depz_sensor_sdk::vl53lx::{
     decode_die_block, decode_histogram_raw, decode_l0x_raw, pack_read_reg, pack_set_addr_width,
     pack_set_i2c_speed, pack_start_stream, pack_write_reg, pack_xshut, product,
@@ -20,7 +25,8 @@ use serde_json::Value;
 use common::{hex_decode, hex_encode, load, recorded_text, recording_packets, seen};
 
 fn u(v: &Value) -> u64 {
-    v.as_u64().unwrap_or_else(|| panic!("not an unsigned int: {}", v))
+    v.as_u64()
+        .unwrap_or_else(|| panic!("not an unsigned int: {}", v))
 }
 
 fn steps(v: &Value) -> Vec<(u16, u8)> {
@@ -42,9 +48,10 @@ fn vl53lx_encode_vectors() {
         let got: Vec<u8> = match c["kind"].as_str().unwrap() {
             "set_addr_width" => pack_set_addr_width(u(&c["width"]) as u8).unwrap().to_vec(),
             "read_reg" => pack_read_reg(u(&c["addr"]) as u16, u(&c["len"]) as u16).to_vec(),
-            "write_reg" => {
-                pack_write_reg(u(&c["addr"]) as u16, &hex_decode(c["data"].as_str().unwrap()))
-            }
+            "write_reg" => pack_write_reg(
+                u(&c["addr"]) as u16,
+                &hex_decode(c["data"].as_str().unwrap()),
+            ),
             "xshut" => pack_xshut(u(&c["action"]) as u8).to_vec(),
             "set_i2c_speed" => pack_set_i2c_speed(u(&c["khz"]) as u16).to_vec(),
             "start_stream" => {
@@ -116,7 +123,10 @@ fn vl53lx_decode_vectors() {
 fn vl53lx_product_table() {
     let doc = load("vl53lx.json");
     let rows = doc["products"].as_array().unwrap();
-    let names: Vec<&str> = rows.iter().map(|r| r["product"].as_str().unwrap()).collect();
+    let names: Vec<&str> = rows
+        .iter()
+        .map(|r| r["product"].as_str().unwrap())
+        .collect();
     let ours: Vec<&str> = PRODUCTS.iter().map(|p| p.name).collect();
     assert_eq!(names, ours);
     for r in rows {
@@ -126,14 +136,33 @@ fn vl53lx_product_table() {
         assert!(p.model_id_ok(u(&r["model_id"]) as u16), "{}", name);
         assert_eq!(p.reach_mm as u64, u(&r["reach_mm"]), "{} reach", name);
         let kinds: Vec<&str> = p.driver_kinds().iter().map(|k| k.as_str()).collect();
-        let want: Vec<&str> =
-            r["driver_kinds"].as_array().unwrap().iter().map(|k| k.as_str().unwrap()).collect();
+        let want: Vec<&str> = r["driver_kinds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|k| k.as_str().unwrap())
+            .collect();
         assert_eq!(kinds, want, "{} driver kinds", name);
-        assert_eq!(p.default_driver.as_str(), r["default_driver"].as_str().unwrap(), "{}", name);
+        assert_eq!(
+            p.default_driver.as_str(),
+            r["default_driver"].as_str().unwrap(),
+            "{}",
+            name
+        );
         let bus = p.default_bus_params();
-        assert_eq!(bus.addr_width as u64, u(&r["addr_width"]), "{} addr width", name);
+        assert_eq!(
+            bus.addr_width as u64,
+            u(&r["addr_width"]),
+            "{} addr width",
+            name
+        );
         assert_eq!(bus.max_khz as u64, u(&r["max_khz"]), "{} max khz", name);
-        assert_eq!(bus.clear_steps.to_vec(), steps(&r["clear_steps"]), "{} clear", name);
+        assert_eq!(
+            bus.clear_steps.to_vec(),
+            steps(&r["clear_steps"]),
+            "{} clear",
+            name
+        );
         // The production PID is the one the USB id table names.
         assert_eq!(
             usb_model_hint(Some(DEPZ_USB_VID), Some(p.usb_pid)),
@@ -144,9 +173,18 @@ fn vl53lx_product_table() {
         seen(r);
     }
     // A missing pair is a refusal, never a fallback.
-    assert!(product("VL53L4CX").unwrap().bus_params(DriverKind::Uld).is_none());
-    assert!(product("VL53L0X").unwrap().bus_params(DriverKind::Histogram).is_none());
-    assert!(product("VL53L3CX").unwrap().bus_params(DriverKind::Uld).is_none());
+    assert!(product("VL53L4CX")
+        .unwrap()
+        .bus_params(DriverKind::Uld)
+        .is_none());
+    assert!(product("VL53L0X")
+        .unwrap()
+        .bus_params(DriverKind::Histogram)
+        .is_none());
+    assert!(product("VL53L3CX")
+        .unwrap()
+        .bus_params(DriverKind::Uld)
+        .is_none());
     let variant = |p: &str| product(p).unwrap().default_bus_params().die_variant;
     assert_eq!(variant("VL53L1CX"), Some(DieVariant::L1));
     assert_eq!(variant("VL53L4CD"), Some(DieVariant::L4));
@@ -258,7 +296,10 @@ fn vl53lx_histogram_raw_vectors() {
             ("range_status", r.range_status as u64),
             ("report_status", r.report_status as u64),
             ("stream_count", r.stream_count as u64),
-            ("dss_actual_effective_spads", r.dss_actual_effective_spads as u64),
+            (
+                "dss_actual_effective_spads",
+                r.dss_actual_effective_spads as u64,
+            ),
             ("reference_phase", r.reference_phase as u64),
             ("vcsel_start", r.vcsel_start as u64),
         ];
@@ -305,10 +346,20 @@ fn vl53lx_die_recording(stem: &str, variant: &str) {
     let exp = load(&format!("recordings/{}.expected.json", stem));
     let pkts = recording_packets(&format!("{}.depzrec", stem));
     let sw = recorded_text(&pkts, Cmd::GetNameActiveSoftware).expect("software name");
-    assert_eq!(identity::parse_software_name(&sw).sensor_type, Some(SensorType::Vl53lx), "{}", stem);
+    assert_eq!(
+        identity::parse_software_name(&sw).sensor_type,
+        Some(SensorType::Vl53lx),
+        "{}",
+        stem
+    );
     assert_eq!(sw, exp["software_name"].as_str().unwrap(), "{}", stem);
     let dev = recorded_text(&pkts, Cmd::GetDeviceName).expect("device name");
-    assert_eq!(resolve_class(None, &dev).as_str(), exp["class"].as_str().unwrap(), "{}", stem);
+    assert_eq!(
+        resolve_class(None, &dev).as_str(),
+        exp["class"].as_str().unwrap(),
+        "{}",
+        stem
+    );
 
     let variant = DieVariant::from_name(variant).unwrap();
     let blocks: Vec<StreamData> = pkts
@@ -318,16 +369,31 @@ fn vl53lx_die_recording(stem: &str, variant: &str) {
         .collect();
     let want = exp["frames"].as_array().unwrap();
     // The stream may run past the sidecar before the stop lands; match the first N.
-    assert!(blocks.len() >= want.len(), "{}: {} < {} blocks", stem, blocks.len(), want.len());
+    assert!(
+        blocks.len() >= want.len(),
+        "{}: {} < {} blocks",
+        stem,
+        blocks.len(),
+        want.len()
+    );
     for (idx, (s, w)) in blocks.iter().zip(want).enumerate() {
         let ctx = format!("{} frame {}", stem, idx);
-        assert_eq!((s.addr, s.len as usize), (DIE_BLOCK_ADDR, DIE_BLOCK_LEN), "{}", ctx);
+        assert_eq!(
+            (s.addr, s.len as usize),
+            (DIE_BLOCK_ADDR, DIE_BLOCK_LEN),
+            "{}",
+            ctx
+        );
         assert_eq!(s.timestamp_us, u(&w["timestamp_us"]), "{}", ctx);
         assert_eq!(hex_encode(&s.data), w["raw"].as_str().unwrap(), "{}", ctx);
         let r = decode_die_block(&s.data, variant).unwrap();
         assert_eq!(r.distance_mm as u64, u(&w["distance_mm"]), "{}", ctx);
         assert_eq!(r.range_status as u64, u(&w["status"]), "{}", ctx);
-        assert!(w["targets"].as_array().unwrap().is_empty() && w.get("bins").is_none(), "{}", ctx);
+        assert!(
+            w["targets"].as_array().unwrap().is_empty() && w.get("bins").is_none(),
+            "{}",
+            ctx
+        );
     }
     seen(&format!("recordings/{}.depzrec", stem));
 }
@@ -350,4 +416,169 @@ fn vl53l3cx_ulp_recording() {
 #[test]
 fn vl53l4cx_uld_as_l4cd_recording() {
     vl53lx_die_recording("vl53l4cx_uld_as_l4cd_50ms", "l4");
+}
+
+// ---- l0x_uld: VL53L0X ULD calls over a scripted register trace -------------
+
+/// The scripted platform of the l0x_uld cases: every register op the driver issues must be
+/// the next one of the vector's trace, a read answered with its recorded bytes.
+struct Trace {
+    ops: Vec<Value>,
+    next: Mutex<usize>,
+}
+
+impl Trace {
+    fn take(&self, op: &str, addr: u16) -> Vec<u8> {
+        let mut next = self.next.lock().unwrap();
+        let want = self
+            .ops
+            .get(*next)
+            .unwrap_or_else(|| panic!("op #{} beyond the trace: {op} 0x{addr:02X}", *next));
+        *next += 1;
+        assert_eq!(
+            (want["op"].as_str().unwrap(), u(&want["addr"]) as u16),
+            (op, addr),
+            "op #{}",
+            *next - 1
+        );
+        hex_decode(want["data"].as_str().unwrap())
+    }
+
+    fn issued(&self) -> usize {
+        *self.next.lock().unwrap()
+    }
+}
+
+impl Vl53lxPlatform for Trace {
+    fn read_multi(&self, addr: u16, size: usize) -> Result<Vec<u8>> {
+        let data = self.take("r", addr);
+        assert_eq!(data.len(), size, "read 0x{addr:02X}");
+        Ok(data)
+    }
+
+    fn write_multi(&self, addr: u16, data: &[u8]) -> Result<()> {
+        assert_eq!(self.take("w", addr), data, "write 0x{addr:02X}");
+        Ok(())
+    }
+
+    fn set_i2c_speed(&self, _khz: u16) -> Result<()> {
+        panic!("SET_I2C_SPEED is not in the trace")
+    }
+
+    fn set_addr_width(&self, _width: u8) -> Result<()> {
+        panic!("SET_ADDR_WIDTH is not in the trace")
+    }
+
+    fn xshut_reset(&self) -> Result<()> {
+        panic!("XSHUT is not in the trace")
+    }
+
+    fn sleep_ms(&self, _ms: u32) {}
+}
+
+/// The VL53L0X ULD calls over the recorded register traces (the three ST divergences of
+/// 2fa4be5), on a fresh driver: the ops must come out in the recorded order, the trace must be
+/// used up, the host state / error match.
+#[test]
+fn vl53lx_l0x_uld_vectors() {
+    let doc = load("vl53lx.json");
+    let mut n = 0;
+    for c in doc["l0x_uld"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        let kind = c["kind"].as_str().unwrap();
+        let trace = Arc::new(Trace {
+            ops: c["trace"].as_array().unwrap().clone(),
+            next: Mutex::new(0),
+        });
+        let platform: Arc<dyn Vl53lxPlatform> = trace.clone();
+        let mut drv = Vl53l0xUldDriver::new(platform, "VL53L0X");
+        let result = match kind {
+            "nvm_offset" => drv.get_info_from_device(u(&c["option"]) as i32),
+            "timing_budget" => drv.set_range_timing(
+                u(&c["timing_budget_ms"]) as u32,
+                u(&c["inter_measurement_ms"]) as u32,
+            ),
+            "tuning" => drv.load_tuning_settings(&hex_decode(c["buffer"].as_str().unwrap())),
+            k => panic!("unknown l0x_uld kind {k}"),
+        };
+        match c.get("error").and_then(Value::as_str) {
+            Some(message) => {
+                let e = result.expect_err(name);
+                assert!(matches!(e, DepzError::Sensor(_)), "{name}: {e:?}");
+                assert!(e.to_string().contains(message), "{name}: {e}");
+            }
+            None => {
+                result.unwrap_or_else(|e| panic!("{name}: {e}"));
+                let expect = &c["expect"];
+                match kind {
+                    "nvm_offset" => assert_eq!(
+                        drv.part2part_offset_adjustment_nvm_um(),
+                        expect["part2part_offset_adjustment_nvm_um"]
+                            .as_i64()
+                            .unwrap(),
+                        "{name}"
+                    ),
+                    "tuning" => assert_eq!(
+                        [
+                            drv.sigma_est_ref_array() as i64,
+                            drv.sigma_est_eff_pulse_width() as i64,
+                            drv.sigma_est_eff_amb_width() as i64,
+                            drv.target_ref_rate() as i64,
+                        ],
+                        [
+                            expect["sigma_est_ref_array"].as_i64().unwrap(),
+                            expect["sigma_est_eff_pulse_width"].as_i64().unwrap(),
+                            expect["sigma_est_eff_amb_width"].as_i64().unwrap(),
+                            expect["target_ref_rate"].as_i64().unwrap(),
+                        ],
+                        "{name}"
+                    ),
+                    _ => {}
+                }
+            }
+        }
+        let ops = c["trace"].as_array().unwrap().len();
+        assert_eq!(trace.issued(), ops, "{name}: ops issued of {ops}");
+        seen(c);
+        n += 1;
+    }
+    assert!(n >= 8, "l0x_uld cases: {n}");
+}
+
+/// VL53L1X set_mode over the recorded register traces, on a fresh driver (ERRATA A9): the ops
+/// come out in the recorded order and use the trace up, and the call returns the budget in
+/// effect — one the new mode does not tabulate moved to the nearest one — or fails as the case
+/// says.
+#[test]
+fn vl53lx_l1_uld_vectors() {
+    let doc = load("vl53lx.json");
+    let mut n = 0;
+    for c in doc["l1_uld"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        assert_eq!(c["kind"].as_str(), Some("set_mode"), "{name}");
+        let trace = Arc::new(Trace {
+            ops: c["trace"].as_array().unwrap().clone(),
+            next: Mutex::new(0),
+        });
+        let platform: Arc<dyn Vl53lxPlatform> = trace.clone();
+        let mut drv = Vl53l1UldDriver::new(platform, "VL53L1CX");
+        let result = drv.set_mode(c["mode"].as_str().unwrap());
+        match c.get("error").and_then(Value::as_str) {
+            Some(message) => {
+                let e = result.expect_err(name);
+                assert!(matches!(e, DepzError::InvalidArgument(_)), "{name}: {e:?}");
+                assert!(e.to_string().contains(message), "{name}: {e}");
+            }
+            None => assert_eq!(
+                result.unwrap_or_else(|e| panic!("{name}: {e}")),
+                Some(u(&c["expect"]["timing_budget_ms"]) as u32),
+                "{name}"
+            ),
+        }
+        let ops = c["trace"].as_array().unwrap().len();
+        assert_eq!(trace.issued(), ops, "{name}: ops issued of {ops}");
+        seen(c);
+        n += 1;
+    }
+    assert!(n >= 3, "l1_uld cases: {n}");
 }

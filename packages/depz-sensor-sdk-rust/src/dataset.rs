@@ -22,17 +22,18 @@ pub use writer::{DatasetWriter, SCHEMA};
 
 use std::path::Path;
 
-use crate::json::{JsonError, Value};
+use crate::json::{is_blank_line, JsonError, Value};
 
-/// Dataset parse failure.
+/// Dataset parse failure: a damaged file is the caller's bad argument (contract 09, 07 §3), named
+/// by its line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DatasetError {
     /// The file has no header line.
     Empty,
-    /// A line was not valid JSON.
-    Json(JsonError),
-    /// A structural expectation failed (missing field, wrong type, …).
-    Structure(String),
+    /// Line `line` (1-based) was not valid JSON.
+    Json { line: usize, error: JsonError },
+    /// A structural expectation failed on line `line` (not an object, missing field, wrong type, …).
+    Structure { line: usize, what: String },
     /// The file could not be read (or its gzip content inflated).
     Io(String),
 }
@@ -41,8 +42,10 @@ impl std::fmt::Display for DatasetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DatasetError::Empty => write!(f, "empty dataset (no header line)"),
-            DatasetError::Json(e) => write!(f, "{}", e),
-            DatasetError::Structure(s) => write!(f, "dataset structure error: {}", s),
+            DatasetError::Json { line, error } => write!(f, "line {}: {}", line, error),
+            DatasetError::Structure { line, what } => {
+                write!(f, "line {}: dataset structure error: {}", line, what)
+            }
             DatasetError::Io(s) => write!(f, "dataset read error: {}", s),
         }
     }
@@ -50,10 +53,32 @@ impl std::fmt::Display for DatasetError {
 
 impl std::error::Error for DatasetError {}
 
-impl From<JsonError> for DatasetError {
-    fn from(e: JsonError) -> Self {
-        DatasetError::Json(e)
+/// `line` (1-based `lineno`) as the JSON object every dataset line must be.
+fn json_object(lineno: usize, line: &str) -> Result<Value, DatasetError> {
+    let v = Value::parse(line).map_err(|error| DatasetError::Json {
+        line: lineno,
+        error,
+    })?;
+    if v.entries().is_none() {
+        return Err(structure(lineno, "not a JSON object"));
     }
+    Ok(v)
+}
+
+fn structure(line: usize, what: &str) -> DatasetError {
+    DatasetError::Structure {
+        line,
+        what: what.to_string(),
+    }
+}
+
+/// `v`'s field `k` as the integer it must be (`None` when missing, a fraction, null, …).
+fn field_i64(v: &Value, k: &str) -> Option<i64> {
+    v.get(k).and_then(Value::as_i64)
+}
+
+fn field_str<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
+    v.get(k).and_then(Value::as_str)
 }
 
 /// A device declared in the dataset header, in `d0`, `d1`, … assignment order.
@@ -69,7 +94,8 @@ pub struct Device {
     pub rtt_us: Option<i64>,
 }
 
-/// A decoded record value; unknown kinds keep their raw JSON (`Other`).
+/// A decoded record value; unknown kinds, and known ones without their typed field, keep their
+/// raw JSON (`Other`).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecordValue {
     /// `sr04`: `echo_us` (0xFFFF = timeout), `source` = "once" | "loop".
@@ -107,8 +133,13 @@ impl Dataset {
     /// Read the `.depzdata` file at `path`; gzip content (by its magic bytes) is inflated.
     pub fn read(path: impl AsRef<Path>) -> Result<Dataset, DatasetError> {
         let raw = std::fs::read(path).map_err(|e| DatasetError::Io(e.to_string()))?;
-        let raw = if gzip::is_gzip(&raw) { gzip::gunzip(&raw).map_err(DatasetError::Io)? } else { raw };
-        let text = String::from_utf8(raw).map_err(|e| DatasetError::Io(format!("not UTF-8: {e}")))?;
+        let raw = if gzip::is_gzip(&raw) {
+            gzip::gunzip(&raw).map_err(DatasetError::Io)?
+        } else {
+            raw
+        };
+        let text =
+            String::from_utf8(raw).map_err(|e| DatasetError::Io(format!("not UTF-8: {e}")))?;
         Dataset::parse(&text)
     }
 
@@ -120,32 +151,41 @@ impl Dataset {
         }
     }
 
-    /// Parse a `.depzdata` document from its UTF-8 text.
+    /// Parse a `.depzdata` document from its UTF-8 text. A damaged document (contract 09: an empty
+    /// one, a header that is not a JSON object or whose `schema` is not `depz.dataset/*`, a record
+    /// line that is not an object or whose `d` / `k` are not strings, `t` not an integer, `v` not
+    /// an object) is a [`DatasetError`] naming the line; blank lines are skipped; a record of an
+    /// unknown `k` (or a known one without its typed field) is kept as [`RecordValue::Other`].
     pub fn parse(text: &str) -> Result<Dataset, DatasetError> {
-        let mut lines = text
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty());
+        let mut lines = text.lines().enumerate();
 
-        let header_line = lines.next().ok_or(DatasetError::Empty)?;
-        let header = Value::parse(header_line)?;
+        let (_, header_line) = lines.next().ok_or(DatasetError::Empty)?;
+        let header = json_object(1, header_line)?;
 
-        let schema = header
-            .get("schema")
-            .and_then(Value::as_str)
-            .ok_or_else(|| DatasetError::Structure("header missing schema".into()))?
-            .to_string();
+        let schema = match field_str(&header, "schema") {
+            Some(s) if s.starts_with("depz.dataset/") => s.to_string(),
+            Some(s) => {
+                return Err(structure(
+                    1,
+                    &format!("not a depz.dataset file: schema {s:?}"),
+                ))
+            }
+            None => return Err(structure(1, "header missing schema")),
+        };
         let created_utc = header
             .get("created_utc")
             .and_then(Value::as_str)
             .map(str::to_string);
-        let note = header.get("note").and_then(Value::as_str).map(str::to_string);
+        let note = header
+            .get("note")
+            .and_then(Value::as_str)
+            .map(str::to_string);
 
         let mut devices = Vec::new();
         if let Some(dev_obj) = header.get("devices") {
             let entries = dev_obj
                 .entries()
-                .ok_or_else(|| DatasetError::Structure("devices is not an object".into()))?;
+                .ok_or_else(|| structure(1, "devices is not an object"))?;
             for (id, dv) in entries {
                 let time_sync = dv.get("time_sync");
                 devices.push(Device {
@@ -162,51 +202,47 @@ impl Dataset {
                     offset_us: time_sync
                         .and_then(|ts| ts.get("offset_us"))
                         .and_then(Value::as_i64),
-                    rtt_us: time_sync.and_then(|ts| ts.get("rtt_us")).and_then(Value::as_i64),
+                    rtt_us: time_sync
+                        .and_then(|ts| ts.get("rtt_us"))
+                        .and_then(Value::as_i64),
                 });
             }
         }
 
         let mut records = Vec::new();
-        for line in lines {
-            let rec = Value::parse(line)?;
-            let device = rec
-                .get("d")
-                .and_then(Value::as_str)
-                .ok_or_else(|| DatasetError::Structure("record missing 'd'".into()))?
+        for (idx, line) in lines {
+            if is_blank_line(line) {
+                continue;
+            }
+            let lineno = idx + 1;
+            let rec = json_object(lineno, line)?;
+            let device = field_str(&rec, "d")
+                .ok_or_else(|| structure(lineno, "'d' must be a device id string"))?
                 .to_string();
-            let t = rec
-                .get("t")
-                .and_then(Value::as_i64)
-                .ok_or_else(|| DatasetError::Structure("record missing 't'".into()))?;
-            let kind = rec
-                .get("k")
-                .and_then(Value::as_str)
-                .ok_or_else(|| DatasetError::Structure("record missing 'k'".into()))?
+            let t = field_i64(&rec, "t")
+                .ok_or_else(|| structure(lineno, "'t' must be an integer (host µs)"))?;
+            let kind = field_str(&rec, "k")
+                .ok_or_else(|| structure(lineno, "'k' must be a record kind string"))?
                 .to_string();
-            let v = rec
-                .get("v")
-                .cloned()
-                .ok_or_else(|| DatasetError::Structure("record missing 'v'".into()))?;
+            let v = match rec.get("v") {
+                Some(v) if v.entries().is_some() => v.clone(),
+                _ => return Err(structure(lineno, "'v' must be an object")),
+            };
 
+            // The reader checks only that `v` is an object (contract 09); a known kind whose `v`
+            // lacks its typed field is kept like an unknown one, as Other.
             let value = match kind.as_str() {
-                "sr04" => {
-                    let echo_us = v.get("echo_us").and_then(Value::as_i64).ok_or_else(|| {
-                        DatasetError::Structure("sr04 record missing echo_us".into())
-                    })?;
-                    let source = v
-                        .get("source")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .to_string();
-                    RecordValue::Sr04 { echo_us, source }
-                }
-                "temperature" => {
-                    let celsius = v.get("celsius").and_then(Value::as_f64).ok_or_else(|| {
-                        DatasetError::Structure("temperature record missing celsius".into())
-                    })?;
-                    RecordValue::Temperature { celsius }
-                }
+                "sr04" => match field_i64(&v, "echo_us") {
+                    Some(echo_us) => RecordValue::Sr04 {
+                        echo_us,
+                        source: field_str(&v, "source").unwrap_or("").to_string(),
+                    },
+                    None => RecordValue::Other(v),
+                },
+                "temperature" => match v.get("celsius").and_then(Value::as_f64) {
+                    Some(celsius) => RecordValue::Temperature { celsius },
+                    None => RecordValue::Other(v),
+                },
                 _ => RecordValue::Other(v),
             };
 

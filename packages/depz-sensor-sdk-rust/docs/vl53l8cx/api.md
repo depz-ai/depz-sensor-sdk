@@ -9,7 +9,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L8CX (ToF)**: [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`BridgeUld`](#bridgeuld), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8chDevice`](#vl53l8chdevice), [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`AdvancedError`](#advancederror), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`try_xtalk_margin_to_raw`](#try_xtalk_margin_to_raw), [`MotionConfig`](#motionconfig), [`try_default_motion_config`](#try_default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`try_pack_detection_thresholds`](#try_pack_detection_thresholds), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8UldError`](#vl53l8ulderror), [`UldResult`](#uldresult), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Platform`](#vl53l8platform), [`get_xtalk_cmd`](#get_xtalk_cmd), [`calibrate_xtalk_cx`](#calibrate_xtalk_cx), [`calibrate_xtalk_lmz`](#calibrate_xtalk_lmz), [`calibrate_xtalk_l7cx`](#calibrate_xtalk_l7cx), [`xtalk_cal_output`](#xtalk_cal_output), [`xtalk_cal_output_enable`](#xtalk_cal_output_enable), [`RANGING_MODE_CONTINUOUS`](#ranging_mode_continuous), [`RANGING_MODE_AUTONOMOUS`](#ranging_mode_autonomous), [`TARGET_ORDER_CLOSEST`](#target_order_closest), [`TARGET_ORDER_STRONGEST`](#target_order_strongest), [`MODULE_TYPE_MZ`](#module_type_mz), [`MODULE_TYPE_MZEVO`](#module_type_mzevo), [`MODULE_TYPE_MZPLUS`](#module_type_mzplus), [`NVM_DATA_SIZE`](#nvm_data_size), [`OFFSET_BUFFER_SIZE`](#offset_buffer_size), [`XTALK_BUFFER_SIZE`](#xtalk_buffer_size), [`Vl53l8Driver`](#vl53l8driver), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
+- **VL53L8CX (ToF)**: [`MIN_RANGING_FREQUENCY_HZ`](#min_ranging_frequency_hz), [`max_ranging_frequency_hz`](#max_ranging_frequency_hz), [`BridgeUld`](#bridgeuld), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8chDevice`](#vl53l8chdevice), [`DIST_MM`](#dist_mm), [`SIGNAL_PER_SPAD_KCPS`](#signal_per_spad_kcps), [`RANGE_SIGMA_MM`](#range_sigma_mm), [`AMBIENT_PER_SPAD_KCPS`](#ambient_per_spad_kcps), [`NB_TARGET_DETECTED`](#nb_target_detected), [`TAR_STATUS`](#tar_status), [`NB_SPADS_ENABLED`](#nb_spads_enabled), [`MOTION_INDICATOR`](#motion_indicator), [`NB_THRESHOLDS`](#nb_thresholds), [`POWER_MODE_SLEEP`](#power_mode_sleep), [`POWER_MODE_WAKEUP`](#power_mode_wakeup), [`POWER_MODE_DEEP_SLEEP`](#power_mode_deep_sleep), [`AdvancedError`](#advancederror), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`try_xtalk_margin_to_raw`](#try_xtalk_margin_to_raw), [`xtalk_margin_from_raw`](#xtalk_margin_from_raw), [`MotionConfig`](#motionconfig), [`try_default_motion_config`](#try_default_motion_config), [`DetectionThreshold`](#detectionthreshold), [`DetectionThresholdBlocks`](#detectionthresholdblocks), [`try_pack_detection_thresholds`](#try_pack_detection_thresholds), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`READ_MAX_LEN`](#read_max_len), [`CHUNK_SIZE`](#chunk_size), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_start_stream`](#pack_start_stream), [`RegData`](#regdata), [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`NB_TARGET_PER_ZONE`](#nb_target_per_zone), [`Variant`](#variant), [`Vl53l8Error`](#vl53l8error), [`Vl53l8Results`](#vl53l8results), [`swap_buffer`](#swap_buffer), [`parse_frame`](#parse_frame), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8UldError`](#vl53l8ulderror), [`UldResult`](#uldresult), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Platform`](#vl53l8platform), [`get_xtalk_cmd`](#get_xtalk_cmd), [`calibrate_xtalk_cx`](#calibrate_xtalk_cx), [`calibrate_xtalk_lmz`](#calibrate_xtalk_lmz), [`calibrate_xtalk_l7cx`](#calibrate_xtalk_l7cx), [`xtalk_cal_output`](#xtalk_cal_output), [`xtalk_cal_output_enable`](#xtalk_cal_output_enable), [`RANGING_MODE_CONTINUOUS`](#ranging_mode_continuous), [`RANGING_MODE_AUTONOMOUS`](#ranging_mode_autonomous), [`TARGET_ORDER_CLOSEST`](#target_order_closest), [`TARGET_ORDER_STRONGEST`](#target_order_strongest), [`MODULE_TYPE_MZ`](#module_type_mz), [`MODULE_TYPE_MZEVO`](#module_type_mzevo), [`MODULE_TYPE_MZPLUS`](#module_type_mzplus), [`NVM_DATA_SIZE`](#nvm_data_size), [`OFFSET_BUFFER_SIZE`](#offset_buffer_size), [`XTALK_BUFFER_SIZE`](#xtalk_buffer_size), [`Vl53l8Driver`](#vl53l8driver), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`FrameChunk`](#framechunk), [`unpack_frame_chunk`](#unpack_frame_chunk), [`CompletedFrame`](#completedframe), [`FrameReassembler`](#framereassembler)
 
 ## VL53L8CX (ToF)
 
@@ -20,6 +20,15 @@ pub const MIN_RANGING_FREQUENCY_HZ: i32 = 2;
 ```
 
 Below this the VL53L8 never enters its ranging loop and streams nothing (contract 04).
+
+### max_ranging_frequency_hz
+
+```rust
+pub fn max_ranging_frequency_hz(resolution: usize) -> i32
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same
+silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
 
 ### BridgeUld
 
@@ -108,7 +117,11 @@ Download the sensor firmware and the default configuration.
 #### Vl53l8cxDevice::init_with_progress
 
 ```rust
-pub fn init_with_progress(&self, progress: &mut dyn FnMut(&str), write_progress: Option<WriteProgress>) -> Result<()>
+pub fn init_with_progress(
+    &self,
+    progress: &mut dyn FnMut(&str),
+    write_progress: Option<WriteProgress>,
+) -> Result<()>
 ```
 
 [`Vl53l8cxDevice::init`] reporting its phases to `progress` and the big firmware writes to
@@ -223,19 +236,28 @@ Waking from deep sleep downloads the firmware again.
 #### Vl53l8cxDevice::get_xtalk_margin
 
 ```rust
-pub fn get_xtalk_margin(&self) -> Result<f64>
+pub fn get_xtalk_margin(&self) -> Result<u32>
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8cxDevice::set_xtalk_margin
 
 ```rust
-pub fn set_xtalk_margin(&self, margin_kcps: f64) -> Result<()>
+pub fn set_xtalk_margin(&self, margin_kcps: u32) -> Result<()>
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is refused.
 
 #### Vl53l8cxDevice::calibrate_xtalk
 
 ```rust
-pub fn calibrate_xtalk(&self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> Result<()>
+pub fn calibrate_xtalk(
+    &self,
+    reflectance_percent: i32,
+    nb_samples: i32,
+    distance_mm: i32,
+) -> Result<()>
 ```
 
 On-device crosstalk calibration against a flat target; read the result with
@@ -290,11 +312,17 @@ pub fn set_detection_thresholds_auto_stop(&self, auto_stop: bool) -> Result<()>
 #### Vl53l8cxDevice::configure_motion_indicator
 
 ```rust
-pub fn configure_motion_indicator(&self, distance_mm: Option<(i32, i32)>) -> Result<MotionConfig>
+pub fn configure_motion_indicator(
+    &self,
+    distance_mm: Option<(i32, i32)>,
+) -> Result<MotionConfig>
 ```
 
 Enable the motion indicator over [min, max] mm (`None`: 400–1500); every frame then carries
 [`Vl53l8Frame::motion`]. Returns the configuration for further tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH
+(`cnh_setup()` → `None`, no [`Vl53l8Frame::cnh_raw`]).
 
 #### Vl53l8cxDevice::start_ranging
 
@@ -391,7 +419,8 @@ pub fn configure_cnh(&self, setup: &Vl53l8CnhSetup) -> Result<()>
 
 Arm CNH for the next [`Vl53l8cxDevice::start_ranging`]: every frame then carries
 [`Vl53l8Frame::cnh_raw`], decoded with [`crate::vl53l8::decode_cnh`] and
-[`Vl53l8CnhSetup::decode_config`].
+[`Vl53l8CnhSetup::decode_config`]. CNH and the motion indicator share one DCI struct
+(0xBFAC): this disarms the motion indicator (frames carry no [`Vl53l8Frame::motion`]).
 
 ### DIST_MM
 
@@ -475,7 +504,7 @@ pub const POWER_MODE_DEEP_SLEEP: u8 = 2;
 pub enum AdvancedError {
     /// Motion indicator resolution other than 16 (4×4) or 64 (8×8).
     InvalidResolution(usize),
-    /// Xtalk margin outside 0..=10000 kcps (or not a number).
+    /// Xtalk margin above 10000 kcps.
     XtalkMarginOutOfRange,
     /// Threshold `index`: low/high × its measurement scale does not fit i32.
     ThresholdOverflow(usize),
@@ -491,20 +520,28 @@ anything is written — the ULD's `VL53L8CX_STATUS_INVALID_PARAM`).
 ### XTALK_MARGIN_MAX_KCPS
 
 ```rust
-pub const XTALK_MARGIN_MAX_KCPS: f64 = 10000.0;
+pub const XTALK_MARGIN_MAX_KCPS: u32 = 10000;
 ```
 
-Largest xtalk margin `set_xtalk_margin` accepts, kcps/SPAD.
+Largest xtalk margin `set_xtalk_margin` accepts, whole kcps/SPAD (as ST).
 
 ### try_xtalk_margin_to_raw
 
 ```rust
-pub fn try_xtalk_margin_to_raw(margin_kcps: f64) -> Result<u32, AdvancedError>
+pub fn try_xtalk_margin_to_raw(margin_kcps: u32) -> Result<u32, AdvancedError>
 ```
 
-Xtalk margin (kcps/SPAD) → raw DCI value `round(kcps * 2048)`, as
-`set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`], else
-[`AdvancedError::XtalkMarginOutOfRange`].
+Xtalk margin, a whole number of kcps/SPAD (as ST) → raw DCI value
+`kcps * 2048`, as `set_xtalk_margin` writes it: 0..=[`XTALK_MARGIN_MAX_KCPS`],
+else [`AdvancedError::XtalkMarginOutOfRange`].
+
+### xtalk_margin_from_raw
+
+```rust
+pub fn xtalk_margin_from_raw(raw: u32) -> u32
+```
+
+Inverse: raw DCI value → whole kcps/SPAD (`raw / 2048`, integer division as ST).
 
 ### MotionConfig
 
@@ -674,10 +711,12 @@ data byte).
 ### pack_start_stream
 
 ```rust
-pub fn pack_start_stream(frame_size: u16) -> [u8; 2]
+pub fn pack_start_stream(frame_size: u16) -> Result<[u8; 2], CodecError>
 ```
 
-`VL53_START_STREAM` payload: `frame_size u16`.
+`VL53_START_STREAM` payload: `frame_size u16`, which must be
+1..=[`STREAM_TOTAL_MAX`] (contract 04 §4 rule 4 — the firmware refuses
+anything else too).
 
 ### RegData
 
@@ -1418,7 +1457,13 @@ pub fn dci_write_data(&self, index: u16, data: &[u8]) -> UldResult<()>
 #### Vl53l8Driver::dci_replace_data
 
 ```rust
-pub fn dci_replace_data(&self, index: u16, data_size: usize, new_data: &[u8], new_data_pos: usize) -> UldResult<()>
+pub fn dci_replace_data(
+    &self,
+    index: u16,
+    data_size: usize,
+    new_data: &[u8],
+    new_data_pos: usize,
+) -> UldResult<()>
 ```
 
 `vl53l8cx_dci_replace_data`: read `data_size` bytes of DCI `index`, put `new_data` at
@@ -1620,19 +1665,19 @@ Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs
 #### Vl53l8Driver::get_xtalk_margin
 
 ```rust
-pub fn get_xtalk_margin(&self) -> UldResult<f64>
+pub fn get_xtalk_margin(&self) -> UldResult<u32>
 ```
 
-Xtalk margin, kcps/SPAD.
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
 
 #### Vl53l8Driver::set_xtalk_margin
 
 ```rust
-pub fn set_xtalk_margin(&mut self, margin_kcps: f64) -> UldResult<()>
+pub fn set_xtalk_margin(&mut self, margin_kcps: u32) -> UldResult<()>
 ```
 
-Xtalk margin, kcps/SPAD: 0..10000 (NaN and anything else is [`status::INVALID_PARAM`],
-nothing written).
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+[`status::INVALID_PARAM`], nothing written.
 
 #### Vl53l8Driver::get_caldata_xtalk
 
@@ -1702,10 +1747,23 @@ pub fn motion_indicator_init(&mut self, res: usize) -> UldResult<MotionConfig>
 A default motion-indicator configuration for `res`, written to the sensor; frames carry
 motion output from here on.
 
+#### Vl53l8Driver::motion_indicator_disarm
+
+```rust
+pub fn motion_indicator_disarm(&mut self)
+```
+
+Stop surfacing the motion block: frames parse with `motion` `None`. Called when the VL53LMZ
+CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+
 #### Vl53l8Driver::motion_indicator_set_resolution
 
 ```rust
-pub fn motion_indicator_set_resolution(&mut self, cfg: &mut MotionConfig, res: usize) -> UldResult<()>
+pub fn motion_indicator_set_resolution(
+    &mut self,
+    cfg: &mut MotionConfig,
+    res: usize,
+) -> UldResult<()>
 ```
 
 Set `cfg`'s zone map for `res` (16 or 64, else [`status::INVALID_PARAM`]) and write it.
@@ -1727,7 +1785,12 @@ Set `cfg`'s distance window (400..4000 mm, at most 1500 mm wide, else
 #### Vl53l8Driver::calibrate_xtalk
 
 ```rust
-pub fn calibrate_xtalk(&mut self, reflectance_percent: i32, nb_samples: i32, distance_mm: i32) -> UldResult<()>
+pub fn calibrate_xtalk(
+    &mut self,
+    reflectance_percent: i32,
+    nb_samples: i32,
+    distance_mm: i32,
+) -> UldResult<()>
 ```
 
 `vl53l8cx_calibrate_xtalk`: on-device crosstalk calibration against a flat target at
@@ -1792,6 +1855,7 @@ A completed sensor frame with its capture timestamp.
 pub struct FrameReassembler {
     pub completed: u64,
     pub discarded: u64,
+    chunk_max: usize,
     buf: Vec<u8>,
     full_size: usize,
     timestamp_us: u64,
@@ -1805,6 +1869,17 @@ Rebuilds full sensor frames from chunked `RPT_VL53_FRAME` reports.
 ```rust
 pub fn new() -> Self
 ```
+
+A reassembler for the VL53L8 board's [`STREAM_CHUNK_MAX`] chunks.
+
+#### FrameReassembler::with_chunk_max
+
+```rust
+pub fn with_chunk_max(chunk_max: usize) -> Self
+```
+
+A reassembler for a board whose `VL53_STREAM_FRAME_MAX` is `chunk_max`
+(`vl53l7::STREAM_CHUNK_MAX` = 1536 on the I2C board, contract 11 §3).
 
 #### FrameReassembler::feed
 

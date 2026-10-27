@@ -112,7 +112,8 @@ const I2C_KHZ_BOOT: u16 = 400;
 
 // GetResult() raw status → ULD status (status_rtn[24]).
 const STATUS_RTN: [i32; 24] = [
-    255, 255, 255, 5, 2, 4, 1, 7, 3, 0, 255, 255, 9, 13, 255, 255, 255, 255, 10, 6, 255, 255, 11, 12,
+    255, 255, 255, 5, 2, 4, 1, 7, 3, 0, 255, 255, 9, 13, 255, 255, 255, 255, 10, 6, 255, 255, 11,
+    12,
 ];
 
 /// What differs between the drivers on the die (the overridable constants of the Java
@@ -137,17 +138,30 @@ pub(crate) fn uld_err(msg: impl Into<String>) -> DepzError {
 
 /// What the Java catches as `Vl53lxException | Vl53lxProtocolException`.
 pub(crate) fn is_uld_or_bridge_error(e: &DepzError) -> bool {
-    matches!(e, DepzError::Sensor(_) | DepzError::Status { .. } | DepzError::Timeout { .. } | DepzError::Protocol(_))
+    matches!(
+        e,
+        DepzError::Sensor(_)
+            | DepzError::Status { .. }
+            | DepzError::Timeout { .. }
+            | DepzError::Protocol(_)
+    )
 }
 
 /// What the Java catches as `Vl53lxProtocolException` alone (a bridge refusal / no answer).
 pub(crate) fn is_bridge_error(e: &DepzError) -> bool {
-    matches!(e, DepzError::Status { .. } | DepzError::Timeout { .. } | DepzError::Protocol(_))
+    matches!(
+        e,
+        DepzError::Status { .. } | DepzError::Timeout { .. } | DepzError::Protocol(_)
+    )
 }
 
 /// C's `round()`: half away from zero.
 pub(crate) fn round_half_away(v: f64) -> i64 {
-    (if v < 0.0 { -(-v + 0.5).floor() } else { (v + 0.5).floor() }) as i64
+    (if v < 0.0 {
+        -(-v + 0.5).floor()
+    } else {
+        (v + 0.5).floor()
+    }) as i64
 }
 
 fn u16be(b: &[u8], off: usize) -> i64 {
@@ -166,7 +180,9 @@ pub fn phase_window_mm(fast_osc_frequency: i64, valid_phase_high: i64) -> i64 {
 
 /// The ULD status text: `"unknown (N)"` for a code the table lacks.
 pub fn status_text(status: i32) -> String {
-    let known = u8::try_from(status).ok().map(crate::vl53l4::range_status_name);
+    let known = u8::try_from(status)
+        .ok()
+        .map(crate::vl53l4::range_status_name);
     match known {
         Some(name) if name != "unknown" => name.to_string(),
         _ => format!("unknown ({status})"),
@@ -185,7 +201,11 @@ pub struct Die {
 impl Die {
     /// The die of a driver bound for `product`.
     pub(crate) fn new(platform: Arc<dyn Vl53lxPlatform>, product: &str, cfg: DieConfig) -> Die {
-        Die { p: platform, product: product.to_string(), cfg }
+        Die {
+            p: platform,
+            product: product.to_string(),
+            cfg,
+        }
     }
 
     /// The platform the die is reached through.
@@ -208,7 +228,10 @@ impl Die {
     /// The 17-byte result block → a range.
     pub fn decode(&self, raw: &[u8]) -> Result<Vl53lxRange> {
         if raw.len() < RESULT_BLOCK_LEN {
-            return Err(uld_err(format!("result block too short: {} bytes", raw.len())));
+            return Err(uld_err(format!(
+                "result block too short: {} bytes",
+                raw.len()
+            )));
         }
         let mut status = (raw[0] & 0x1F) as i32;
         if (status as usize) < STATUS_RTN.len() {
@@ -221,11 +244,19 @@ impl Die {
         let mut extra = BTreeMap::new();
         extra.insert(
             "signal_per_spad_kcps".to_string(),
-            ExtraValue::Int(if raw_spads != 0 { signal_kcps * k / raw_spads } else { 0 }),
+            ExtraValue::Int(if raw_spads != 0 {
+                signal_kcps * k / raw_spads
+            } else {
+                0
+            }),
         );
         extra.insert(
             "ambient_per_spad_kcps".to_string(),
-            ExtraValue::Int(if raw_spads != 0 { ambient_kcps * k / raw_spads } else { 0 }),
+            ExtraValue::Int(if raw_spads != 0 {
+                ambient_kcps * k / raw_spads
+            } else {
+                0
+            }),
         );
         extra.insert("stream_count".to_string(), ExtraValue::Int(raw[2] as i64));
         Ok(Vl53lxRange {
@@ -266,7 +297,9 @@ impl Die {
                 return Ok(());
             }
             if Instant::now() > deadline {
-                return Err(uld_err("timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03"));
+                return Err(uld_err(
+                    "timeout waiting for FIRMWARE__SYSTEM_STATUS == 0x03",
+                ));
             }
             self.p.sleep_ms(1);
         }
@@ -298,7 +331,11 @@ impl Die {
 
     /// The L4CD ULD start: continuous when the period register is 0, else autonomous low power.
     pub fn start_ranging(&self) -> Result<()> {
-        let mode = if self.p.read_dword(INTERMEASUREMENT_MS)? == 0 { 0x21 } else { 0x40 };
+        let mode = if self.p.read_dword(INTERMEASUREMENT_MS)? == 0 {
+            0x21
+        } else {
+            0x40
+        };
         self.p.write_byte(SYSTEM_MODE_START, mode)
     }
 
@@ -309,7 +346,11 @@ impl Die {
 
     /// 1 = active high, 0 = active low (`GPIO_HV_MUX__CTRL` bit 4, inverted).
     pub fn get_interrupt_polarity(&self) -> Result<u8> {
-        Ok(if self.p.read_byte(GPIO_HV_MUX_CTRL)? & 0x10 != 0 { 0 } else { 1 })
+        Ok(if self.p.read_byte(GPIO_HV_MUX_CTRL)? & 0x10 != 0 {
+            0
+        } else {
+            1
+        })
     }
 
     /// Set the interrupt polarity (1 = active high), keeping the other bits.
@@ -360,14 +401,20 @@ impl Die {
             // autonomous low power
             let clock_pll = (self.p.read_word(RESULT_OSC_CALIBRATE_VAL)? & 0x3FF) as f64;
             let factor = 1.055 * inter_measurement_ms as f64 * clock_pll;
-            self.p.write_dword(INTERMEASUREMENT_MS, factor as i64 as u32)?;
+            self.p
+                .write_dword(INTERMEASUREMENT_MS, factor as i64 as u32)?;
             budget_us = (budget_us - 4300) / 2;
         } else {
-            return Err(uld_err("inter_measurement_ms must be 0 or > timing_budget_ms"));
+            return Err(uld_err(
+                "inter_measurement_ms must be 0 or > timing_budget_ms",
+            ));
         }
 
         budget_us = (budget_us << 12) & 0xFFFF_FFFF;
-        for (reg, k) in [(RANGE_CONFIG_TIMEOUT_MACROP_A_HI, 16_i64), (RANGE_CONFIG_TIMEOUT_MACROP_B_HI, 12)] {
+        for (reg, k) in [
+            (RANGE_CONFIG_TIMEOUT_MACROP_A_HI, 16_i64),
+            (RANGE_CONFIG_TIMEOUT_MACROP_B_HI, 12),
+        ] {
             let tmp = ((macro_period_us * k) & 0xFFFF_FFFF) >> 6;
             let mut ls = (budget_us + (tmp >> 1)) / tmp - 1;
             let mut ms: i64 = 0;
@@ -375,7 +422,8 @@ impl Die {
                 ls >>= 1;
                 ms += 1;
             }
-            self.p.write_word(reg, (((ms << 8) + (ls & 0xFF)) & 0xFFFF) as u16)?;
+            self.p
+                .write_word(reg, (((ms << 8) + (ls & 0xFF)) & 0xFFFF) as u16)?;
         }
         Ok(())
     }
@@ -385,7 +433,11 @@ impl Die {
         let tmp = self.p.read_dword(INTERMEASUREMENT_MS)? as i64;
         let clock_pll = (self.p.read_word(RESULT_OSC_CALIBRATE_VAL)? & 0x3FF) as f64;
         let clock_pll = ((1.065 * clock_pll) as i32 & 0xFFFF) as i64;
-        let inter_ms = if clock_pll != 0 { (tmp / clock_pll) & 0xFFFF } else { 0 };
+        let inter_ms = if clock_pll != 0 {
+            (tmp / clock_pll) & 0xFFFF
+        } else {
+            0
+        };
 
         let osc = self.p.read_word(OSC_FREQUENCY)? as i64;
         if osc == 0 {
@@ -398,11 +450,17 @@ impl Die {
         let mut ms = (macrop_high & 0xFF00) >> 8;
         ms = (0x04 - (ms - 1) - 1) & 0xFFFF_FFFF;
         macro_period_us = (macro_period_us * 16) & 0xFFFF_FFFF;
-        let mut budget = ((((ls + 1) * (macro_period_us >> 6)) - ((macro_period_us >> 6) >> 1)) & 0xFFFF_FFFF) >> 12;
+        let mut budget = ((((ls + 1) * (macro_period_us >> 6)) - ((macro_period_us >> 6) >> 1))
+            & 0xFFFF_FFFF)
+            >> 12;
         if ms < 12 {
             budget >>= ms;
         }
-        budget = if tmp == 0 { budget + 2500 } else { budget * 2 + 4300 };
+        budget = if tmp == 0 {
+            budget + 2500
+        } else {
+            budget * 2 + 4300
+        };
         Ok(((budget / 1000) as i32 as u32, inter_ms as i32 as u32))
     }
 
@@ -419,7 +477,12 @@ impl Die {
     // ── thresholds, offset, xtalk, ROI ───────────────────────────────────────
 
     /// The L4CD ULD thresholds: the window byte written whole.
-    pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()> {
+    pub fn set_detection_thresholds(
+        &self,
+        distance_low_mm: u16,
+        distance_high_mm: u16,
+        window: u8,
+    ) -> Result<()> {
         self.p.write_byte(SYSTEM_INTERRUPT_CONFIG_GPIO, window)?;
         self.p.write_word(THRESH_HIGH, distance_high_mm)?;
         self.p.write_word(THRESH_LOW, distance_low_mm)
@@ -430,12 +493,17 @@ impl Die {
         let high = self.p.read_word(THRESH_HIGH)?;
         let low = self.p.read_word(THRESH_LOW)?;
         let window = self.p.read_byte(SYSTEM_INTERRUPT_CONFIG_GPIO)? & 0x07;
-        Ok(Thresholds { distance_low_mm: low, distance_high_mm: high, window })
+        Ok(Thresholds {
+            distance_low_mm: low,
+            distance_high_mm: high,
+            window,
+        })
     }
 
     /// Minimum signal, kcps (the register keeps kcps / 8).
     pub fn set_signal_threshold(&self, signal_kcps: u32) -> Result<()> {
-        self.p.write_word(MIN_COUNT_RATE_RTN_LIMIT_MCPS, (signal_kcps >> 3) as u16)
+        self.p
+            .write_word(MIN_COUNT_RATE_RTN_LIMIT_MCPS, (signal_kcps >> 3) as u16)
     }
 
     /// Minimum signal, kcps.
@@ -448,7 +516,8 @@ impl Die {
         if sigma_mm > 0xFFFF >> 2 {
             return Err(uld_err("sigma_mm must be <= 16383"));
         }
-        self.p.write_word(RANGE_CONFIG_SIGMA_THRESH, (sigma_mm << 2) as u16)
+        self.p
+            .write_word(RANGE_CONFIG_SIGMA_THRESH, (sigma_mm << 2) as u16)
     }
 
     /// Maximum sigma, mm.
@@ -458,7 +527,8 @@ impl Die {
 
     /// The range offset, mm (the inner / outer offsets are zeroed).
     pub fn set_offset(&self, offset_mm: i32) -> Result<()> {
-        self.p.write_word(RANGE_OFFSET_MM, (offset_mm.wrapping_mul(4) & 0xFFFF) as u16)?;
+        self.p
+            .write_word(RANGE_OFFSET_MM, (offset_mm.wrapping_mul(4) & 0xFFFF) as u16)?;
         self.p.write_word(INNER_OFFSET_MM, 0)?;
         self.p.write_word(OUTER_OFFSET_MM, 0)
     }
@@ -473,7 +543,8 @@ impl Die {
     pub fn set_xtalk(&self, xtalk_kcps: i32) -> Result<()> {
         self.p.write_word(XTALK_X_PLANE_GRADIENT_KCPS, 0x0000)?;
         self.p.write_word(XTALK_Y_PLANE_GRADIENT_KCPS, 0x0000)?;
-        self.p.write_word(XTALK_PLANE_OFFSET_KCPS, ((xtalk_kcps << 9) & 0xFFFF) as u16)
+        self.p
+            .write_word(XTALK_PLANE_OFFSET_KCPS, ((xtalk_kcps << 9) & 0xFFFF) as u16)
     }
 
     /// The crosstalk plane offset, kcps.
@@ -489,8 +560,10 @@ impl Die {
         if x > 10 || y > 10 {
             optical_center = 199;
         }
-        self.p.write_byte(ROI_CONFIG_USER_ROI_CENTRE_SPAD, optical_center)?;
-        self.p.write_byte(ROI_CONFIG_USER_ROI_XY_SIZE, ((y - 1) << 4 | (x - 1)) as u8)
+        self.p
+            .write_byte(ROI_CONFIG_USER_ROI_CENTRE_SPAD, optical_center)?;
+        self.p
+            .write_byte(ROI_CONFIG_USER_ROI_XY_SIZE, ((y - 1) << 4 | (x - 1)) as u8)
     }
 
     /// (x, y) SPADs.
@@ -501,7 +574,8 @@ impl Die {
 
     /// The ROI centre SPAD.
     pub fn set_roi_center(&self, center_spad: u8) -> Result<()> {
-        self.p.write_byte(ROI_CONFIG_USER_ROI_CENTRE_SPAD, center_spad)
+        self.p
+            .write_byte(ROI_CONFIG_USER_ROI_CENTRE_SPAD, center_spad)
     }
 
     /// The ROI centre SPAD.
@@ -573,7 +647,11 @@ pub(crate) fn start_temperature_update<D: DieDriver>(d: &mut D) -> Result<()> {
 }
 
 /// The ranging loop every calibration shares: data ready, result, clear, n times.
-pub(crate) fn collect<D: DieDriver>(d: &mut D, nb_samples: u32, mut on_sample: impl FnMut(u32, Vl53lxRange)) -> Result<()> {
+pub(crate) fn collect<D: DieDriver>(
+    d: &mut D,
+    nb_samples: u32,
+    mut on_sample: impl FnMut(u32, Vl53lxRange),
+) -> Result<()> {
     d.start_ranging()?;
     for i in 0..nb_samples {
         d.die().wait_data_ready(5000)?;
@@ -634,14 +712,22 @@ macro_rules! die_common {
         }
 
         fn stream_block(&self) -> (u16, u16) {
-            ($crate::vl53lx::uld::die::RESULT_BLOCK_ADDR, $crate::vl53lx::uld::die::RESULT_BLOCK_LEN as u16)
+            (
+                $crate::vl53lx::uld::die::RESULT_BLOCK_ADDR,
+                $crate::vl53lx::uld::die::RESULT_BLOCK_LEN as u16,
+            )
         }
 
-        fn decode(&mut self, raw: &[u8]) -> $crate::devices::Result<$crate::vl53lx::driver::Vl53lxRange> {
+        fn decode(
+            &mut self,
+            raw: &[u8],
+        ) -> $crate::devices::Result<$crate::vl53lx::driver::Vl53lxRange> {
             self.die.decode(raw)
         }
 
-        fn read_measurement(&mut self) -> $crate::devices::Result<$crate::vl53lx::driver::Vl53lxRange> {
+        fn read_measurement(
+            &mut self,
+        ) -> $crate::devices::Result<$crate::vl53lx::driver::Vl53lxRange> {
             self.die.get_result()
         }
 
@@ -665,7 +751,9 @@ macro_rules! die_common {
             self.die.set_xtalk(xtalk_kcps)
         }
 
-        fn get_detection_thresholds(&mut self) -> $crate::devices::Result<$crate::vl53lx::driver::Thresholds> {
+        fn get_detection_thresholds(
+            &mut self,
+        ) -> $crate::devices::Result<$crate::vl53lx::driver::Thresholds> {
             self.die.get_detection_thresholds()
         }
 
@@ -714,8 +802,13 @@ macro_rules! die_base_timing {
             self.die.start_ranging()
         }
 
-        fn set_range_timing(&mut self, timing_budget_ms: u32, inter_measurement_ms: u32) -> $crate::devices::Result<()> {
-            self.die.set_range_timing(timing_budget_ms, inter_measurement_ms)
+        fn set_range_timing(
+            &mut self,
+            timing_budget_ms: u32,
+            inter_measurement_ms: u32,
+        ) -> $crate::devices::Result<()> {
+            self.die
+                .set_range_timing(timing_budget_ms, inter_measurement_ms)
         }
 
         fn get_range_timing(&mut self) -> $crate::devices::Result<(u32, u32)> {
@@ -728,7 +821,8 @@ macro_rules! die_base_timing {
             distance_high_mm: u16,
             window: u8,
         ) -> $crate::devices::Result<()> {
-            self.die.set_detection_thresholds(distance_low_mm, distance_high_mm, window)
+            self.die
+                .set_detection_thresholds(distance_low_mm, distance_high_mm, window)
         }
     };
 }

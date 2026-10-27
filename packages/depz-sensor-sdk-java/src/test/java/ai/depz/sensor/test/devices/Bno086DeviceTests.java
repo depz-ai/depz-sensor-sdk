@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
 /** The BNO085 / BNO086 device class over a fake SH-2 hub. */
@@ -40,7 +41,7 @@ public final class Bno086DeviceTests {
         final FakeBoardLink link = new FakeBoardLink();
         final List<Cargo> sent = new ArrayList<>();
         volatile BiFunction<Integer, byte[], List<Cargo>> onCargo;
-        volatile int busyFirst;
+        final AtomicInteger busyFirst = new AtomicInteger();
         private final int[] seq = new int[6];
 
         FakeHub() {
@@ -51,8 +52,7 @@ public final class Bno086DeviceTests {
             if (p.cmd() != Bno086.Bno086Cmd.SEND_SHTP_PACKET.value) {
                 return List.of(FakeBoardLink.status(p.cmd(), Common.Status.OK.value));
             }
-            if (busyFirst > 0) {
-                busyFirst--;
+            if (busyFirst.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
                 return List.of(FakeBoardLink.status(p.cmd(), Common.Status.ERR_BUSY.value));
             }
             int channel = p.payload()[2];
@@ -141,9 +141,9 @@ public final class Bno086DeviceTests {
         FakeHub hub = new FakeHub();
         try (Bno086Device dev = open(hub)) {
             hub.onCargo = (ch, c) -> List.of(control(feature(c[1], 10000)));
-            hub.busyFirst = 2;
+            hub.busyFirst.set(2);
             eq(10000L, dev.getFeature(5).intervalUs());
-            hub.busyFirst = 5;
+            hub.busyFirst.set(5);
             throwsType(BusyException.class, () -> dev.getFeature(5));
         }
     }

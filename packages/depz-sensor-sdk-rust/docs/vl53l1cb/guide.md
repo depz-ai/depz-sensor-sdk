@@ -24,9 +24,9 @@ driver); below it, the bridge commands and the stateless decode of what the boar
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::open_on_link;
+use depz_sensor_sdk::devices::open_first_device;
 
-let tof = open_on_link(link, None, None, None)?.into_vl53lx()?;   // a Vl53l1cbDevice underneath
+let tof = open_first_device(None)?.into_vl53lx()?;   // a Vl53l1cbDevice underneath
 tof.init(None, None)?;                                   // VL53L1CB / uld
 tof.configure(50, 0, Some("short"), None, Some(stored_xtalk_kcps), None)?;
 let frames = tof.measurements(64);

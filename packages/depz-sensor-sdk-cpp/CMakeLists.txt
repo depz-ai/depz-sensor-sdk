@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(depz_sensor_sdk_cpp VERSION 0.7.0 LANGUAGES CXX)
+project(depz_sensor_sdk_cpp VERSION 0.8.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,11 +49,30 @@ target_include_directories(depz_sensor_sdk PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(depz_sensor_sdk PUBLIC cxx_std_17)
-if(MSVC)
-  target_compile_options(depz_sensor_sdk PRIVATE /W3)
-else()
-  target_compile_options(depz_sensor_sdk PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+# Warnings: the full set whenever we own the build (never forced on consumers
+# who embed us); as errors in our own builds — tests on, i.e. development and
+# CI — but not for packagers (vcpkg / Conan build with tests off), whose newer
+# compiler may know warnings this code has never met.
+option(DEPZ_SENSOR_SDK_CPP_WERROR "Treat compiler warnings as errors"
+       ${DEPZ_SENSOR_SDK_CPP_BUILD_TESTS})
+function(depz_cpp_warnings target)
+  if(NOT _depz_is_top_level)
+    return()
+  endif()
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 $<$<BOOL:${DEPZ_SENSOR_SDK_CPP_WERROR}>:/WX>)
+    # getenv / strcat are standard C++; MSVC's _s variants are not portable (C4996)
+    target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
+  else()
+    # gcc's maybe-uninitialized stays a warning: at -O2 newer gcc (15 on CI) reports it inside
+    # libstdc++ for an std::optional<std::vector> member (Vl53l8Frame::cnh_raw) that is always
+    # constructed — a known false positive of the optimiser, nothing this code can initialise.
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic
+                           $<$<BOOL:${DEPZ_SENSOR_SDK_CPP_WERROR}>:-Werror>
+                           $<$<CXX_COMPILER_ID:GNU>:-Wno-error=maybe-uninitialized>)
+  endif()
+endfunction()
+depz_cpp_warnings(depz_sensor_sdk)
 
 # ---- live hardware (depz/device.hpp) ---------------------------------------
 # A C++ wrapper over the C SDK's depz_sensor_io.h: the C library comes from an
@@ -74,7 +93,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
     set(DEPZ_SENSOR_SDK_C_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     add_subdirectory("${_depz_c_dir}" "${CMAKE_CURRENT_BINARY_DIR}/depz-sensor-sdk-c")
   endif()
-  target_sources(depz_sensor_sdk PRIVATE src/device.cpp)
+  target_sources(depz_sensor_sdk PRIVATE src/device.cpp src/recorder.cpp)
   target_link_libraries(depz_sensor_sdk PUBLIC depz::sensor_sdk_c)
 endif()
 set_target_properties(depz_sensor_sdk PROPERTIES
@@ -178,9 +197,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
     target_compile_definitions(depz_test_vectors PRIVATE DEPZ_TEST_HAS_IO=1)
   endif()
-  if(NOT MSVC)
-    target_compile_options(depz_test_vectors PRIVATE -Wall -Wextra)
-  endif()
+  depz_cpp_warnings(depz_test_vectors)
 
   # The foundation parity suite (crc/framing/usb/common/identity/sr04/fwdepz).
   add_test(NAME vectors COMMAND depz_test_vectors)
@@ -193,23 +210,32 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   if(DEPZ_SENSOR_SDK_CPP_BUILD_IO)
     target_compile_definitions(depz_difftest_adapter PRIVATE DEPZ_DIFFTEST_HAS_IO=1)
   endif()
-  if(NOT MSVC)
-    target_compile_options(depz_difftest_adapter PRIVATE -Wall -Wextra)
-  endif()
+  depz_cpp_warnings(depz_difftest_adapter)
 
-  # The live-hardware wrapper against the C SDK's fake SR04 over loopback.
+  # The live-hardware wrapper against the C SDK's fakes over loopback.
   if(DEPZ_SENSOR_SDK_CPP_BUILD_IO AND EXISTS "${_depz_c_tests}/fake_sr04.c")
     enable_language(C)
     add_executable(depz_test_device tests/test_device.cpp "${_depz_c_tests}/fake_sr04.c"
                    "${_depz_c_tests}/fake_vl53l4.c" "${_depz_c_tests}/fake_bno086.c"
-                   "${_depz_c_tests}/fake_tmf8829.c")
+                   "${_depz_c_tests}/fake_tmf8829.c" "${_depz_c_tests}/fake_vl53l8.c"
+                   "${_depz_c_tests}/fake_vl53lx.c" "${_depz_c_tests}/fake_bno055.c")
     target_link_libraries(depz_test_device PRIVATE depz_sensor_sdk)
+    depz_cpp_warnings(depz_test_device)
     target_include_directories(depz_test_device PRIVATE "${_depz_c_tests}" tests)
     target_compile_definitions(depz_test_device PRIVATE DEPZ_VECTORS_DIR="${DEPZ_VECTORS_DIR}")
-    foreach(t identity_and_types errors_are_typed timeout_when_silent
-              measure_stream_and_callbacks disconnect_ends_streams promote_and_record_replay
+    foreach(t identity_and_types errors_are_typed short_reply_fails_its_request_and_the_reader_goes_on
+              timeout_when_silent measure_stream_and_callbacks a_throwing_callback_never_stops_the_reader disconnect_ends_streams host_seq_gap_is_an_event
+              promote_and_record_replay replay_refuses_a_gzipped_capture
               l4_fake_roundtrips_and_guards bno086_fake_errors_and_reports
-              cnh_required_memory vlx_refusal_before_traffic tmf8829_fake_session)
+              cnh_required_memory vl53l8ch_cnh_and_motion_exclusive vlx_refusal_before_traffic tmf8829_fake_session
+              vlx_set_mode_hands_back_the_budget
+              dataset_recorder_two_sr04 dataset_recorder_temperature_gz dataset_recorder_bno086
+              device_core_extras dataset_live_records
+              vl53l8_fake_init_and_configuration vl53l8_fake_thresholds_calibration_and_ranging
+              vl53l8ch_fake_cnh vl53lx_fake_l1cx_uld vl53lx_fake_l4cd_and_l3cx
+              bno055_fake_registers_modes_and_config bno055_fake_samples_and_stream
+              bno086_fake_commands l4_fake_tuning_stream_and_registers
+              dataset_recorder_skips_a_failing_thermometer)
       add_test(NAME device_${t} COMMAND depz_test_device ${t})
     endforeach()
   endif()
@@ -228,9 +254,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
       target_include_directories(depz_test_scenarios PRIVATE "${_depz_c_tests}")
       target_compile_definitions(depz_test_scenarios PRIVATE DEPZ_TEST_VECTOR_SEEN=1)
     endif()
-    if(NOT MSVC)
-      target_compile_options(depz_test_scenarios PRIVATE -Wall -Wextra)
-    endif()
+    depz_cpp_warnings(depz_test_scenarios)
     file(GLOB _depz_scenarios CONFIGURE_DEPENDS "${DEPZ_SCENARIOS_DIR}/*.json")
     foreach(_sc ${_depz_scenarios})
       get_filename_component(_id "${_sc}" NAME_WE)
@@ -243,6 +267,7 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   add_test(NAME vl53l8_frame    COMMAND depz_test_vectors vl53l8_frame)
   add_test(NAME vl53l8_advanced COMMAND depz_test_vectors vl53l8_advanced)
   add_test(NAME vl53l8_cnh       COMMAND depz_test_vectors vl53l8_cnh)
+  add_test(NAME vl53l8_wire     COMMAND depz_test_vectors vl53l8_wire)
   add_test(NAME vl53l7_codecs   COMMAND depz_test_vectors vl53l7_codecs)
   add_test(NAME vl53l7_frame    COMMAND depz_test_vectors vl53l7_frame)
   add_test(NAME vl53l4          COMMAND depz_test_vectors vl53l4)
@@ -253,5 +278,6 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
   add_test(NAME bno086_shtp     COMMAND depz_test_vectors bno086_shtp)
   add_test(NAME bno086_reports  COMMAND depz_test_vectors bno086_reports)
   add_test(NAME dataset         COMMAND depz_test_vectors dataset)
+  add_test(NAME dataset_player  COMMAND depz_test_vectors dataset_player)
   add_test(NAME input_rules     COMMAND depz_test_vectors input_rules)
 endif()

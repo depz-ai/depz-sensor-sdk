@@ -35,22 +35,44 @@ TRIGGER_INT = 1  # read on the INT rising edge; period_ms is a missed-edge watch
 RESET_TIMEOUT_S = 3.0
 
 
+_REG_SPACE = 0x100  # 8-bit register addresses: a transfer never runs past 0xFF
+
+#: BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+TIMER_PERIOD_MIN_MS = 1
+TIMER_PERIOD_MAX_MS = 60000
+
+
 def pack_read_reg(addr: int, length: int) -> bytes:
-    return checked_pack("<BB", addr=addr, length=length)
+    """BNO_READ_REG payload `addr u8, len u8` with the transfer limit of
+    contract 13 §1: `len` 1..128 and `addr + len <= 0x100`, else ValueError."""
+    payload = checked_pack("<BB", addr=addr, length=length)
+    if not 1 <= length <= XFER_MAX or addr + length > _REG_SPACE:
+        raise ValueError(f"READ_REG length must be 1..{XFER_MAX} and addr+length <= 0x100")
+    return payload
 
 
-WRITE_MAX = 128  # BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes)
+WRITE_MAX = XFER_MAX  # BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes)
 
 
 def pack_write_reg(addr: int, data: bytes) -> bytes:
+    """BNO_WRITE_REG payload `addr u8, data[N]` with the same limit:
+    N 1..128 and `addr + N <= 0x100`, else ValueError."""
     head = checked_pack("<B", addr=addr)
-    if not 1 <= len(data) <= WRITE_MAX:
-        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX} bytes")
+    if not 1 <= len(data) <= WRITE_MAX or addr + len(data) > _REG_SPACE:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX} bytes and addr+N <= 0x100")
     return head + bytes(data)
 
 
 def pack_start_stream(trigger: int, addr: int, length: int, period_ms: int) -> bytes:
-    return checked_pack("<BBBH", trigger=trigger, addr=addr, length=length, period_ms=period_ms)
+    """BNO_START_STREAM payload `trigger u8, addr u8, len u8, period_ms u16`.
+    With `trigger` TIMER the period is 1..60000 ms (contract 13 §2), else
+    ValueError; with INT it is the missed-edge watchdog and 0 disables it."""
+    payload = checked_pack("<BBBH", trigger=trigger, addr=addr, length=length, period_ms=period_ms)
+    if trigger == TRIGGER_TIMER and not TIMER_PERIOD_MIN_MS <= period_ms <= TIMER_PERIOD_MAX_MS:
+        raise ValueError(
+            f"period_ms: {period_ms} outside {TIMER_PERIOD_MIN_MS}..{TIMER_PERIOD_MAX_MS} for the TIMER trigger"
+        )
+    return payload
 
 
 @dataclass(frozen=True)
@@ -80,8 +102,9 @@ EXPECTED_GYR_ID = 0x0F
 @dataclass(frozen=True)
 class Bno055Info:
     """RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
-    diagnostics. Counters are free-running and wrap silently; watch
-    increments, not absolute values. A rising `sensor_resets` means the
+    diagnostics. Counters wrap silently; watch increments, not absolute
+    values. `i2c_errors` is cleared by every successful reset handshake, the
+    read timings and `slots_skipped` at START_STREAM. A rising `sensor_resets` means the
     bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG
     mode and the host must restore its configuration."""
 

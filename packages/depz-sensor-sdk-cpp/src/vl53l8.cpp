@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <string>
 #include "depz/vl53l8.hpp"
 
 #include <cmath>
@@ -61,6 +62,15 @@ std::int16_t s16(std::uint16_t v) { return static_cast<std::int16_t>(v); }
 
 // ── FrameChunk / reassembler ────────────────────────────────────────────────
 
+bytes pack_start_stream(std::uint16_t frame_size) {
+    // contract 04 §4 rule 4: the firmware refuses 0 and > 8192; so does the host
+    if (frame_size < 1 || frame_size > STREAM_TOTAL_MAX)
+        throw std::invalid_argument("frame_size " + std::to_string(frame_size) + " outside 1..8192");
+    bytes out;
+    detail::wr_le(out, frame_size, 2);
+    return out;
+}
+
 FrameChunk FrameChunk::unpack(byte_span payload) {
     detail::require(payload, 12, "FrameChunk: short payload");
     FrameChunk c;
@@ -72,6 +82,17 @@ FrameChunk FrameChunk::unpack(byte_span payload) {
 }
 
 std::optional<std::pair<std::uint64_t, bytes>> FrameReassembler::feed(const FrameChunk& chunk) {
+    if (chunk.data.size() > chunk_max_ || chunk.full_size > STREAM_TOTAL_MAX ||
+        std::size_t{chunk.offset} + chunk.data.size() > chunk.full_size) {
+        // rule 4: damaged — the frame in progress is lost (counted, rules 1-2)
+        // and so is the frame an offset-0 chunk starts (counted); a damaged
+        // orphan with nothing in progress is dropped like any orphan
+        if (!buf_.empty()) ++discarded;
+        if (chunk.offset == 0) ++discarded;
+        buf_.clear();
+        full_size_ = 0;
+        return std::nullopt;
+    }
     if (chunk.offset == 0) {
         if (!buf_.empty() && buf_.size() != full_size_) ++discarded;
         buf_ = chunk.data;
@@ -91,11 +112,6 @@ std::optional<std::pair<std::uint64_t, bytes>> FrameReassembler::feed(const Fram
         full_size_ = 0;
         ++completed;
         return std::make_pair(timestamp_us_, std::move(frame));
-    }
-    if (buf_.size() > full_size_) {
-        ++discarded;
-        buf_.clear();
-        full_size_ = 0;
     }
     return std::nullopt;
 }
@@ -218,14 +234,14 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off) {
 
 // ── advanced-feature DCI codecs ─────────────────────────────────────────────
 
-std::uint32_t xtalk_margin_raw(double margin_kcps) {
-    // 0..10000 kcps: below 0, NaN or above is refused, never wrapped (contract 07 §3)
-    if (!(margin_kcps >= 0.0 && margin_kcps <= 10000.0))
-        throw std::out_of_range("xtalk margin outside 0..10000 kcps");
-    return static_cast<std::uint32_t>(std::llround(margin_kcps * 2048.0));
+std::uint32_t xtalk_margin_raw(std::uint32_t margin_kcps) {
+    // as ST: a whole number of kcps, at most 10000; above is refused, never wrapped (contract 07 §3)
+    if (margin_kcps > XTALK_MARGIN_MAX_KCPS)
+        throw std::out_of_range("xtalk margin above 10000 kcps");
+    return margin_kcps * 2048u;
 }
 
-double xtalk_margin_kcps(std::uint32_t raw) { return raw / 2048.0; }
+std::uint32_t xtalk_margin_kcps(std::uint32_t raw) { return raw / 2048u; }
 
 namespace {
 std::int32_t thresh_scale(std::uint8_t meas) {

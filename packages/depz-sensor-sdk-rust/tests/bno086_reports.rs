@@ -4,8 +4,7 @@
 mod common;
 
 use depz_sensor_sdk::bno086::reports::{
-    parse_gyro_rv_cargo, parse_input_cargo, q_point, Report, GYRO_RV_ANGVEL_Q,
-    RV_ACCURACY_Q,
+    parse_gyro_rv_cargo, parse_input_cargo, q_point, Report, GYRO_RV_ANGVEL_Q, RV_ACCURACY_Q,
 };
 use serde_json::Value;
 
@@ -72,7 +71,10 @@ fn bno086_reports_vectors() {
     }
 
     assert!(cargos > 0 && gyro > 0);
-    eprintln!("bno086_reports.json: {} input cargos + {} gyro_rv", cargos, gyro);
+    eprintln!(
+        "bno086_reports.json: {} input cargos + {} gyro_rv",
+        cargos, gyro
+    );
 }
 
 #[test]
@@ -87,13 +89,20 @@ fn bno086_q_point_vectors() {
     }
     for id in 0..=255u8 {
         if q_point(id) != 0 {
-            assert!(table.contains_key(&format!("0x{:02X}", id)), "q_point 0x{:02X} not in vector", id);
+            assert!(
+                table.contains_key(&format!("0x{:02X}", id)),
+                "q_point 0x{:02X} not in vector",
+                id
+            );
         }
     }
     seen("bno086_reports/q_points");
     assert_eq!(doc["rv_accuracy_q"].as_u64().unwrap(), RV_ACCURACY_Q as u64);
     seen("bno086_reports/rv_accuracy_q");
-    assert_eq!(doc["gyro_rv_angvel_q"].as_u64().unwrap(), GYRO_RV_ANGVEL_Q as u64);
+    assert_eq!(
+        doc["gyro_rv_angvel_q"].as_u64().unwrap(),
+        GYRO_RV_ANGVEL_Q as u64
+    );
     seen("bno086_reports/gyro_rv_angvel_q");
 }
 
@@ -116,7 +125,9 @@ fn bno086_session_recording() {
             continue;
         }
         let capture = u64::from_le_bytes(p.payload[1..9].try_into().unwrap());
-        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else { continue };
+        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else {
+            continue;
+        };
         match cargo.channel {
             c if c == ShtpChannel::InputNormal as u8 || c == ShtpChannel::InputWake as u8 => {
                 got.extend(parse_input_cargo(&cargo.payload, cargo.capture_us as i64))
@@ -128,7 +139,12 @@ fn bno086_session_recording() {
         }
     }
     let want = exp["reports"].as_array().unwrap();
-    assert!(got.len() >= want.len(), "decoded {} reports, need >= {}", got.len(), want.len());
+    assert!(
+        got.len() >= want.len(),
+        "decoded {} reports, need >= {}",
+        got.len(),
+        want.len()
+    );
     for (i, (g, w)) in got.iter().zip(want).enumerate() {
         let mut fields = w.as_object().unwrap().clone();
         let ty = fields.remove("type").unwrap();
@@ -155,9 +171,7 @@ fn bno086_canonical_recording() {
     let exp = load("recordings/bno086_canonical.expected.json");
     let pkts = recording_packets("bno086_canonical.depzrec");
     // The probe (contract 02 §4.4): its two text answers, then the class.
-    let text = |cmd| {
-        recorded_text(&pkts, cmd).map(|t| t.trim_end_matches('\0').trim().to_string())
-    };
+    let text = |cmd| recorded_text(&pkts, cmd).map(|t| t.trim_end_matches('\0').trim().to_string());
     let sw = text(Cmd::GetNameActiveSoftware).expect("GET_NAME_ACTIVE_SOFTWARE answer");
     let name = text(Cmd::GetDeviceName).unwrap_or_default();
     assert_eq!(sw, exp["software_name"].as_str().unwrap());
@@ -165,7 +179,10 @@ fn bno086_canonical_recording() {
     let vid = exp["usb_vid"].as_u64().map(|v| v as u16);
     let pid = exp["usb_pid"].as_u64().map(|v| v as u16);
     assert_eq!(usb_model_hint(vid, pid), exp["usb_model"].as_str());
-    assert_eq!(resolve_sensor_class(&sw, &name, vid, pid), exp["class"].as_str().unwrap());
+    assert_eq!(
+        resolve_sensor_class(&sw, &name, vid, pid),
+        exp["class"].as_str().unwrap()
+    );
 
     let mut layer = ShtpLayer::new();
     let mut got = Vec::new();
@@ -174,7 +191,9 @@ fn bno086_canonical_recording() {
             continue;
         }
         let capture = u64::from_le_bytes(p.payload[1..9].try_into().unwrap());
-        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else { continue };
+        let Some(cargo) = layer.feed_at(&p.payload[9..], capture) else {
+            continue;
+        };
         match cargo.channel {
             c if c == ShtpChannel::InputNormal as u8 || c == ShtpChannel::InputWake as u8 => {
                 got.extend(parse_input_cargo(&cargo.payload, cargo.capture_us as i64))
@@ -191,7 +210,12 @@ fn bno086_canonical_recording() {
         .iter()
         .find_map(|r| r.as_array().filter(|a| !a.is_empty()))
         .expect("a non-empty reports result");
-    assert!(got.len() >= want.len(), "decoded {} reports, need >= {}", got.len(), want.len());
+    assert!(
+        got.len() >= want.len(),
+        "decoded {} reports, need >= {}",
+        got.len(),
+        want.len()
+    );
     for (i, (g, w)) in got.iter().zip(want).enumerate() {
         let (_, got_map) = report_repr(g);
         assert_eq!(&got_map, w.as_object().unwrap(), "report {}", i);

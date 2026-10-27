@@ -581,8 +581,10 @@ public sealed class Vl53l1UldDriver : Vl53l1Die
     /// <summary>Timed mode only: this part has no free-running mode under the ULD configuration.</summary>
     public override void StartRanging() => P.WriteByte(SystemModeStart, 0x40);
 
-    /// <summary>"short" or "long"; the budget is re-applied (the VCSEL periods change what it means).</summary>
-    public override void SetMode(string name)
+    /// <summary>"short" or "long"; the budget is re-applied (the VCSEL periods change what it means). Returns the
+    /// budget in effect after the change, ms: one the new mode does not tabulate moves to the nearest one it does
+    /// (contract 12 §5, the one exception to "refuse, don't round"), so the caller sees it.</summary>
+    public override int? SetMode(string name)
     {
         int mode = Code(name);
         if (mode == 0)
@@ -611,6 +613,7 @@ public sealed class Vl53l1UldDriver : Vl53l1Die
         if (!table.ContainsKey(budgetMs)) // 15 ms exists in short mode only
             budgetMs = table.Keys.OrderBy(ms => Math.Abs(ms - budgetMs)).First();
         SetRangeTiming(budgetMs, interMs);
+        return budgetMs;
     }
 
     public override string GetMode() => ModeCode() == DistanceShort ? "short" : "long";

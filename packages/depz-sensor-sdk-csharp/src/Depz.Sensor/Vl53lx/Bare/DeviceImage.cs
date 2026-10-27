@@ -1,3 +1,5 @@
+using Depz.Sensor.Devices;
+
 namespace Depz.Sensor.Vl53lx.Bare;
 
 /// <summary>One field of a register block: byte offset, width in bytes, signedness and the mask the C codec
@@ -140,7 +142,7 @@ public sealed class DeviceImage
     {
         var blk = _blocks[name];
         if (!blk.Def.Writable)
-            throw new InvalidOperationException($"{name} is read-only");
+            throw new InvalidStateException($"{name} is read-only");
         _p.WriteMulti(blk.Base, blk.Encode());
     }
 
@@ -172,7 +174,7 @@ public sealed class DeviceImage
         {
             var blk = _blocks[name];
             if (!blk.Def.Writable)
-                throw new InvalidOperationException($"{name} is read-only");
+                throw new InvalidStateException($"{name} is read-only");
             blk.Encode().CopyTo(buf, blk.Base - b);
         }
         _p.WriteMulti(b, buf);

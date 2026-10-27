@@ -437,15 +437,26 @@ pub const ACC_RANGE_G: [u8; 4] = [2, 4, 8, 16];
 /// Accelerometer bandwidth per `AccelConfig::bandwidth` code, Hz.
 pub const ACC_BANDWIDTH_HZ: [f64; 8] = [7.81, 15.63, 31.25, 62.5, 125.0, 250.0, 500.0, 1000.0];
 /// Accelerometer power mode per `AccelConfig::power` code.
-pub const ACC_POWER_NAMES: [&str; 6] =
-    ["normal", "suspend", "low power 1", "standby", "low power 2", "deep suspend"];
+pub const ACC_POWER_NAMES: [&str; 6] = [
+    "normal",
+    "suspend",
+    "low power 1",
+    "standby",
+    "low power 2",
+    "deep suspend",
+];
 /// Gyroscope range per `GyroConfig::range` code, dps.
 pub const GYR_RANGE_DPS: [u16; 5] = [2000, 1000, 500, 250, 125];
 /// Gyroscope bandwidth per `GyroConfig::bandwidth` code, Hz.
 pub const GYR_BANDWIDTH_HZ: [u16; 8] = [523, 230, 116, 47, 23, 12, 64, 32];
 /// Gyroscope power mode per `GyroConfig::power` code.
-pub const GYR_POWER_NAMES: [&str; 5] =
-    ["normal", "fast power up", "deep suspend", "suspend", "advanced powersave"];
+pub const GYR_POWER_NAMES: [&str; 5] = [
+    "normal",
+    "fast power up",
+    "deep suspend",
+    "suspend",
+    "advanced powersave",
+];
 /// Magnetometer output rate per `MagConfig::rate` code, Hz.
 pub const MAG_RATE_HZ: [u8; 8] = [2, 6, 8, 10, 15, 20, 25, 30];
 /// Magnetometer operation mode per `MagConfig::mode` code.
@@ -465,7 +476,11 @@ pub struct AccelConfig {
 
 impl Default for AccelConfig {
     fn default() -> AccelConfig {
-        AccelConfig { range: 1, bandwidth: 3, power: 0 }
+        AccelConfig {
+            range: 1,
+            bandwidth: 3,
+            power: 0,
+        }
     }
 }
 
@@ -475,7 +490,11 @@ impl AccelConfig {
     }
 
     pub fn unpack(value: u8) -> AccelConfig {
-        AccelConfig { range: value & 3, bandwidth: value >> 2 & 7, power: value >> 5 & 7 }
+        AccelConfig {
+            range: value & 3,
+            bandwidth: value >> 2 & 7,
+            power: value >> 5 & 7,
+        }
     }
 }
 
@@ -491,7 +510,11 @@ pub struct GyroConfig {
 
 impl Default for GyroConfig {
     fn default() -> GyroConfig {
-        GyroConfig { range: 0, bandwidth: 7, power: 0 }
+        GyroConfig {
+            range: 0,
+            bandwidth: 7,
+            power: 0,
+        }
     }
 }
 
@@ -505,7 +528,11 @@ impl GyroConfig {
         if data.len() < 2 {
             return Err(CodecError("gyro config is 2 bytes"));
         }
-        Ok(GyroConfig { range: data[0] & 7, bandwidth: data[0] >> 3 & 7, power: data[1] & 7 })
+        Ok(GyroConfig {
+            range: data[0] & 7,
+            bandwidth: data[0] >> 3 & 7,
+            power: data[1] & 7,
+        })
     }
 }
 
@@ -521,7 +548,11 @@ pub struct MagConfig {
 
 impl Default for MagConfig {
     fn default() -> MagConfig {
-        MagConfig { rate: 3, mode: 1, power: 0 }
+        MagConfig {
+            rate: 3,
+            mode: 1,
+            power: 0,
+        }
     }
 }
 
@@ -531,7 +562,11 @@ impl MagConfig {
     }
 
     pub fn unpack(value: u8) -> MagConfig {
-        MagConfig { rate: value & 7, mode: value >> 3 & 3, power: value >> 5 & 3 }
+        MagConfig {
+            rate: value & 7,
+            mode: value >> 3 & 3,
+            power: value >> 5 & 3,
+        }
     }
 }
 
@@ -572,7 +607,10 @@ fn words<const N: usize>(addr: usize, data: &[u8], reg: u8) -> Option<[i16; N]> 
 
 /// One byte at register `reg`, if the window covers it.
 fn byte(addr: usize, data: &[u8], reg: u8) -> Option<u8> {
-    (reg as usize).checked_sub(addr).and_then(|at| data.get(at)).copied()
+    (reg as usize)
+        .checked_sub(addr)
+        .and_then(|at| data.get(at))
+        .copied()
 }
 
 /// Unpack whatever channels the register window starting at `addr` holds

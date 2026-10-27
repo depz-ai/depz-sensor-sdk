@@ -59,7 +59,7 @@ static void send_locked(fake_bno086 *f, uint8_t cmd, const uint8_t *payload, siz
     size_t n;
     if (depz_build_packet(cmd, payload, len, f->tx_seq, DEPZ_CRC_NONE, frame, sizeof frame, &n) == 0 &&
         depz_link_write(f->side, frame, n) == DEPZ_OK)
-        f->tx_seq++;
+        f->tx_seq = (uint8_t)(f->tx_seq + 1); /* wraps mod 256 (contract 01 §5) */
 }
 
 static void status(fake_bno086 *f, uint8_t cmd, uint8_t st)
@@ -290,6 +290,13 @@ static void sh2_control(fake_bno086 *f, const uint8_t *c, size_t len)
     case 0xF2:
         if (len >= 12) sh2_command(f, c);
         break;
+    case 0xF0: /* force flush: the bare `ef <sensor>` on the input channel, as the lab BNO086 */
+        if (len >= 2) {
+            out[0] = 0xEF;
+            out[1] = c[1];
+            shtp_out(f, 3, f->mcu_time_us, out, 2);
+        }
+        break;
     case 0xF4: { /* FRS read: two words per answer */
         uint16_t type = rd_u16(c + 4);
         record *r = find_record(f, type, false);
@@ -365,6 +372,21 @@ static void handle(fake_bno086 *f, uint8_t cmd, const uint8_t *p, size_t len)
         out[0] = cmd;
         memcpy(out + 1, name, sizeof name);
         send_locked(f, DEPZ_RPT_TEXT, out, 1 + sizeof name);
+        break;
+    }
+    case 0x05: { /* GET_SERIAL: what a session recorder's header carries */
+        static const char serial[] = "SN0086";
+        out[0] = cmd;
+        memcpy(out + 1, serial, sizeof serial);
+        send_locked(f, DEPZ_RPT_TEXT, out, 1 + sizeof serial);
+        break;
+    }
+    case 0x06: { /* SYNC_TIME: zero device-processing gap, so rtt >= 0 */
+        if (len != 8) { status(f, cmd, 0x03); break; }
+        memcpy(out, p, 8);
+        put_u64le(out + 8, f->mcu_time_us);
+        put_u64le(out + 16, f->mcu_time_us);
+        send_locked(f, DEPZ_RPT_SYNC_TIME, out, 24);
         break;
     }
     case 0x32: { /* SENSOR_RESET */

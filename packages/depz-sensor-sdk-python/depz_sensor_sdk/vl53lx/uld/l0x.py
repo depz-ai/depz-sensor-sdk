@@ -24,6 +24,7 @@ Reference C driver: ../../temp/VL53L0X_1.0.4/Api/core/
 """
 
 import time
+from typing import Any, Literal, TypedDict
 
 from depz_sensor_sdk.vl53lx._link import I2C_KHZ_BOOT, ProtocolError, Vl53Error
 from depz_sensor_sdk.vl53lx.uld.base import BridgePlatform, Measurement, SensorDriver
@@ -115,6 +116,15 @@ CHECK_NUMBER_OF_CHECKS        = 6
 
 DEFAULT_MAX_LOOP     = 2000
 TARGET_REF_RATE      = 0x0A00   # 20 Mcps in 9.7 format, the ref-SPAD target
+MIN_TIMING_BUDGET_US = 20000    # cMinTimingBudgetMicroSeconds
+
+# The host-side parameters a tuning buffer may carry in a {0xFF, select, msb,
+# lsb} record, by select value (VL53L0X_load_tuning_settings()).
+_TuningParam = Literal['SigmaEstRefArray', 'SigmaEstEffPulseWidth',
+                       'SigmaEstEffAmbWidth', 'TargetRefRate']
+_TUNING_PARAMS: tuple[_TuningParam, ...] = (
+    'SigmaEstRefArray', 'SigmaEstEffPulseWidth',
+    'SigmaEstEffAmbWidth', 'TargetRefRate')
 SPEED_OF_LIGHT_IN_AIR = 2997
 REF_SPAD_BUFFER_SIZE = 6
 
@@ -280,6 +290,12 @@ def _u32(value: int) -> int:
     return value & 0xFFFFFFFF
 
 
+def _i16(value: int) -> int:
+    """C int16 truncation (an assignment to an int16_t)."""
+    value &= 0xFFFF
+    return value - 0x10000 if value & 0x8000 else value
+
+
 def isqrt(num: int) -> int:
     """VL53L0X_isqrt() — the bit-by-bit integer square root of the C driver."""
     res = 0
@@ -341,7 +357,7 @@ def is_aperture(spad_index: int) -> bool:
     return REF_ARRAY_QUADRANTS[spad_index >> 6] != REF_ARRAY_SPAD_0
 
 
-def get_next_good_spad(good_spad_array: list, size: int, curr: int) -> int:
+def get_next_good_spad(good_spad_array: list[int], size: int, curr: int) -> int:
     """-> index of the next enabled bit at or after `curr`, or -1."""
     start_index = curr // 8
     fine_offset = curr % 8
@@ -359,6 +375,47 @@ def get_next_good_spad(good_spad_array: list, size: int, curr: int) -> int:
     return -1
 
 
+class PalDevData(TypedDict):
+    """VL53L0X_DevData_t: PALDevData and DeviceSpecificParameters, the state
+    the C driver keeps beside the sensor, under the C field names so a test
+    can read `drv.d['StopVariable']` the way the C code reads
+    `PALDevDataGet(Dev, StopVariable)`."""
+
+    ReadDataFromDeviceDone: int
+    LinearityCorrectiveGain: int
+    OscFrequencyMHz: int
+    XTalkCompensationRateMegaCps: int
+    XTalkCompensationEnable: int
+    StopVariable: int
+    SequenceConfig: int
+    RangeFractionalEnable: int
+    DeviceMode: int
+    ContinuousMode: int | None
+    MeasurementTimingBudgetMicroSeconds: int
+    Pin0GpioFunctionality: int
+    ReferenceSpadCount: int
+    ReferenceSpadType: int
+    RefGoodSpadMap: list[int]
+    RefSpadEnables: list[int]
+    PreRangeVcselPulsePeriod: int
+    FinalRangeVcselPulsePeriod: int
+    PreRangeTimeoutMicroSecs: int
+    FinalRangeTimeoutMicroSecs: int
+    TargetRefRate: int
+    SigmaEstRefArray: int
+    SigmaEstEffPulseWidth: int
+    SigmaEstEffAmbWidth: int
+    LimitChecksEnable: list[int]
+    LimitChecksValue: list[int]
+    Part2PartOffsetAdjustmentNVMMicroMeter: int
+    SignalRateMeasFixed400mm: int
+    ModuleId: int
+    Revision: int
+    ProductId: str
+    PartUIDUpper: int
+    PartUIDLower: int
+
+
 class RangingMeasurementData:
     """VL53L0X_RangingMeasurementData_t, the fields this port fills."""
 
@@ -367,7 +424,17 @@ class RangingMeasurementData:
                  'effective_spad_rtn_count', 'dmax_mm', 'sigma_mm',
                  'device_range_status')
 
-    def __init__(self, **kw):
+    range_status: int
+    distance_mm: int
+    range_fractional_part: int
+    signal_rate_mcps: int
+    ambient_rate_mcps: int
+    effective_spad_rtn_count: int
+    dmax_mm: int
+    sigma_mm: int
+    device_range_status: int
+
+    def __init__(self, **kw: int) -> None:
         for name in self.__slots__:
             setattr(self, name, kw.get(name, 0))
 
@@ -386,15 +453,15 @@ class VL53L0X(SensorDriver):
     SUPPORTS    = frozenset({'mode', 'timing', 'offset', 'xtalk',
                              'calib_offset', 'calib_xtalk', 'refspad'})
     MODES       = tuple(MODE_SETTINGS)
-    # Below ~20 ms the enabled sequence steps no longer fit in the budget and
-    # set_measurement_timing_budget() refuses it.
+    # The C driver refuses anything under 20 ms outright
+    # (cMinTimingBudgetMicroSeconds), whatever the sequence steps.
     BUDGET_MS   = (20, 200)
 
-    def __init__(self, platform: BridgePlatform, part: str):
+    def __init__(self, platform: BridgePlatform, part: str) -> None:
         super().__init__(platform, part)
         # PALDevData / DeviceSpecificParameters, the state the C driver keeps
         # beside the sensor. Every field is written before it is read.
-        self.d = {
+        self.d: PalDevData = {
             'ReadDataFromDeviceDone': 0,
             'LinearityCorrectiveGain': 1000,
             'OscFrequencyMHz': 618660,
@@ -419,6 +486,11 @@ class VL53L0X(SensorDriver):
             'PreRangeTimeoutMicroSecs': 0,
             'FinalRangeTimeoutMicroSecs': 0,
             'TargetRefRate': TARGET_REF_RATE,
+            # Stored for the tuning loader; the 1.0.4 sigma estimate has
+            # these three as constants.
+            'SigmaEstRefArray': 100,
+            'SigmaEstEffPulseWidth': 900,
+            'SigmaEstEffAmbWidth': 500,
             'LimitChecksEnable': [0] * CHECK_NUMBER_OF_CHECKS,
             'LimitChecksValue': [0] * CHECK_NUMBER_OF_CHECKS,
             'Part2PartOffsetAdjustmentNVMMicroMeter': 0,
@@ -439,7 +511,7 @@ class VL53L0X(SensorDriver):
         self._mode = MODES_DEFAULT
 
     # ── SensorDriver contract ──
-    def stream_block(self) -> tuple:
+    def stream_block(self) -> tuple[int, int]:
         return RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN
 
     def decode(self, raw: bytes) -> Measurement:
@@ -452,7 +524,7 @@ class VL53L0X(SensorDriver):
     def model_id(self) -> int:
         return self.p.rd_byte(IDENTIFICATION_MODEL_ID)
 
-    def wait_boot(self, timeout_s: float = 1.0):
+    def wait_boot(self, timeout_s: float = 1.0) -> None:
         """The VL53L0X has no firmware-status register; the model ID answering
         is what says the die is up after an XSHUT pulse."""
         deadline = time.monotonic() + timeout_s
@@ -467,7 +539,7 @@ class VL53L0X(SensorDriver):
             self.p.sleep_ms(1)
 
     # ── init ──
-    def sensor_init(self):
+    def sensor_init(self) -> None:
         """DataInit + StaticInit, and leave the sensor in continuous mode.
 
         The bus stays at I2C_KHZ_BOOT throughout: this die has no Fast Mode
@@ -489,7 +561,7 @@ class VL53L0X(SensorDriver):
         if self.MAX_KHZ != I2C_KHZ_BOOT:
             self.p.set_i2c_speed(self.MAX_KHZ)
 
-    def reset_device(self, timeout_s: float = 1.0):
+    def reset_device(self, timeout_s: float = 1.0) -> None:
         """VL53L0X_ResetDevice(): pull the die through its soft reset.
 
         Not optional here, and not in the C driver either — DataInit and
@@ -502,7 +574,7 @@ class VL53L0X(SensorDriver):
         """
         deadline = time.monotonic() + timeout_s
 
-        def poll_model_id(want_zero: bool):
+        def poll_model_id(want_zero: bool) -> None:
             # While the die reboots it NACKs its own address for a moment, and
             # the bridge reports that as ERR_HARDWARE_FAULT. The C driver reads
             # in a loop and ignores the status until MODEL_ID comes back, so a
@@ -512,7 +584,7 @@ class VL53L0X(SensorDriver):
             # to miss the window, which is why COM7 never showed it.
             while True:
                 try:
-                    byte = self.p.rd_byte(IDENTIFICATION_MODEL_ID)
+                    byte: int | None = self.p.rd_byte(IDENTIFICATION_MODEL_ID)
                 except ProtocolError:
                     byte = None
                 if byte is not None and (byte == 0x00) == want_zero:
@@ -527,7 +599,7 @@ class VL53L0X(SensorDriver):
         poll_model_id(False)
         self.p.sleep_ms(1)
 
-    def data_init(self):
+    def data_init(self) -> None:
         """VL53L0X_DataInit().
 
         The C function also calls GetDeviceParameters() to prime its parameter
@@ -570,7 +642,7 @@ class VL53L0X(SensorDriver):
         d['SequenceConfig'] = 0xFF
         self.p.wr_byte(SYSTEM_SEQUENCE_CONFIG, 0xFF)
 
-    def static_init(self):
+    def static_init(self) -> None:
         """VL53L0X_StaticInit(): reference SPADs, tuning settings, GPIO."""
         d = self.d
         self.get_info_from_device(1)
@@ -617,13 +689,13 @@ class VL53L0X(SensorDriver):
             self.get_sequence_step_timeout(SEQUENCESTEP_FINAL_RANGE)
 
     # ── reference calibration (VHV / phase) ──
-    def perform_single_ref_calibration(self, vhv_init_byte: int):
+    def perform_single_ref_calibration(self, vhv_init_byte: int) -> None:
         self.p.wr_byte(SYSRANGE_START, SYSRANGE_MODE_START_STOP | vhv_init_byte)
         self.wait_data_ready()          # measurement_poll_for_completion()
         self.clear_interrupt()
         self.p.wr_byte(SYSRANGE_START, 0x00)
 
-    def ref_calibration_io_read(self, vhv_enable: bool, phase_enable: bool) -> tuple:
+    def ref_calibration_io_read(self, vhv_enable: bool, phase_enable: bool) -> tuple[int, int]:
         """VL53L0X_ref_calibration_io() in its read direction -> (vhv, phase)."""
         self.p.wr_byte(0xFF, 0x01)
         self.p.wr_byte(0x00, 0x00)
@@ -635,7 +707,7 @@ class VL53L0X(SensorDriver):
         self.p.wr_byte(0xFF, 0x00)
         return vhv, phase & 0xEF
 
-    def perform_ref_calibration(self) -> tuple:
+    def perform_ref_calibration(self) -> tuple[int, int]:
         """VL53L0X_PerformRefCalibration(): VHV, then phase -> (vhv, phase).
 
         Not optional in practice: without it the VCSEL bias is wrong and every
@@ -658,7 +730,7 @@ class VL53L0X(SensorDriver):
         return vhv, phase
 
     # ── NVM ──
-    def device_read_strobe(self):
+    def device_read_strobe(self) -> None:
         self.p.wr_byte(0x83, 0x00)
         for _ in range(DEFAULT_MAX_LOOP):
             if self.p.rd_byte(0x83) != 0x00:
@@ -667,7 +739,7 @@ class VL53L0X(SensorDriver):
             raise Vl53Error('timeout waiting for the NVM read strobe')
         self.p.wr_byte(0x83, 0x01)
 
-    def get_info_from_device(self, option: int):
+    def get_info_from_device(self, option: int) -> None:
         """VL53L0X_get_info_from_device(): reads the fuse copy of the reference
         SPAD record (option 1), the product identification (option 2) and the
         part UID plus the factory offset (option 4)."""
@@ -724,7 +796,7 @@ class VL53L0X(SensorDriver):
             self.device_read_strobe()
             revision = p.rd_byte(0x90)
 
-            chars = []
+            chars: list[int] = []
             tmp = nvm_dword(0x77)
             chars += [(tmp >> 25) & 0x7F, (tmp >> 18) & 0x7F,
                       (tmp >> 11) & 0x7F, (tmp >> 4) & 0x7F]
@@ -778,14 +850,20 @@ class VL53L0X(SensorDriver):
             d['SignalRateMeasFixed400mm'] = signal_rate_meas_1104_400mm << 9
             offset_um = 0
             if dist_meas_1104_400mm != 0:
+                # uint32 difference, uint32 product, then an int16_t: the C
+                # driver's types, kept because they are what makes the sign
+                # come out right. A target measured nearer than 400 mm wraps
+                # the uint32 difference, and only the int16 truncation turns
+                # that back into the positive offset it stands for.
                 offset_1104_mm = _u32(dist_meas_1104_400mm - (400 << 4))
-                offset_um = -((offset_1104_mm * 1000) >> 4)
+                offset_um = _i16(_u32(offset_1104_mm * 1000) >> 4)
+                offset_um = _i16(-offset_um)
             d['Part2PartOffsetAdjustmentNVMMicroMeter'] = offset_um
 
         d['ReadDataFromDeviceDone'] = done | option
 
     # ── reference SPADs ──
-    def set_reference_spads(self, count: int, is_aperture_spads: int):
+    def set_reference_spads(self, count: int, is_aperture_spads: int) -> None:
         """VL53L0X_set_reference_spads(): apply the NVM record through the good
         SPAD map and verify it read back."""
         start_select = 0xB4
@@ -826,7 +904,7 @@ class VL53L0X(SensorDriver):
         self.d['ReferenceSpadType'] = is_aperture_spads
 
     # ── tuning settings ──
-    def load_tuning_settings(self, buffer: bytes):
+    def load_tuning_settings(self, buffer: bytes) -> None:
         """VL53L0X_load_tuning_settings(): {count, address, bytes...} records,
         with count 0xFF carrying a host-side sigma parameter instead."""
         index = 0
@@ -834,9 +912,16 @@ class VL53L0X(SensorDriver):
             number_of_writes = buffer[index]
             index += 1
             if number_of_writes == 0xFF:
-                # SigmaEstRefArray / EffPulseWidth / EffAmbWidth / targetRefRate:
-                # host-side sigma parameters this port does not use (the sigma
-                # estimate of the 1.0.4 driver has them as constants).
+                # A host-side parameter: {0xFF, select, msb, lsb}. The three
+                # sigma parameters are constants in the 1.0.4 sigma estimate
+                # and only get stored; the fourth is the rate the reference
+                # SPAD management converges on.
+                select = buffer[index]
+                if select >= len(_TUNING_PARAMS):
+                    raise Vl53Error(f'bad tuning parameter {select} at offset '
+                                    f'{index - 1}')
+                self.d[_TUNING_PARAMS[select]] = \
+                    (buffer[index + 1] << 8) | buffer[index + 2]
                 index += 3
             elif number_of_writes <= 4:
                 address = buffer[index]
@@ -847,7 +932,7 @@ class VL53L0X(SensorDriver):
                 raise Vl53Error(f'bad tuning record at offset {index}')
 
     # ── GPIO / interrupt ──
-    def set_gpio_config(self, functionality: int, polarity_low: bool = True):
+    def set_gpio_config(self, functionality: int, polarity_low: bool = True) -> None:
         """VL53L0X_SetGpioConfig() for pin 0 in its ranging-interrupt role."""
         self.p.wr_byte(SYSTEM_INTERRUPT_CONFIG_GPIO, functionality)
         data = 0x00 if polarity_low else 0x10
@@ -856,7 +941,7 @@ class VL53L0X(SensorDriver):
         self.d['Pin0GpioFunctionality'] = functionality
         self.clear_interrupt()
 
-    def clear_interrupt(self):
+    def clear_interrupt(self) -> None:
         """VL53L0X_ClearInterruptMask(): two writes, then confirm — up to three
         rounds. The streamed slot plays the two writes only; this is the polled
         path and the arming/teardown path."""
@@ -881,11 +966,11 @@ class VL53L0X(SensorDriver):
         return bool(self.p.rd_byte(RESULT_RANGE_STATUS) & 0x01)
 
     # ── sequence steps ──
-    def get_sequence_step_enables(self) -> dict:
+    def get_sequence_step_enables(self) -> dict[int, bool]:
         config = self.p.rd_byte(SYSTEM_SEQUENCE_CONFIG)
         return {step: bool(config & mask) for step, mask in _SEQ_TEST.items()}
 
-    def set_sequence_step_enable(self, step: int, enabled: int):
+    def set_sequence_step_enable(self, step: int, enabled: int) -> None:
         config = self.p.rd_byte(SYSTEM_SEQUENCE_CONFIG)
         new = (config | _SEQ_SET[step]) if enabled else (config & _SEQ_CLEAR[step])
         if new == config:
@@ -927,7 +1012,7 @@ class VL53L0X(SensorDriver):
 
         raise Vl53Error(f'no timeout for sequence step {step}')
 
-    def set_sequence_step_timeout(self, step: int, timeout_us: int):
+    def set_sequence_step_timeout(self, step: int, timeout_us: int) -> None:
         if step in (SEQUENCESTEP_TCC, SEQUENCESTEP_DSS, SEQUENCESTEP_MSRC):
             vcsel = self.get_vcsel_pulse_period(VCSEL_PERIOD_PRE_RANGE)
             mclks = calc_timeout_mclks(timeout_us, vcsel)
@@ -967,12 +1052,15 @@ class VL53L0X(SensorDriver):
     _PRE_RANGE_OVERHEAD_US   = 660
     _FINAL_RANGE_OVERHEAD_US = 550
 
-    def set_measurement_timing_budget(self, budget_us: int):
+    def set_measurement_timing_budget(self, budget_us: int) -> None:
+        if budget_us < MIN_TIMING_BUDGET_US:
+            raise Vl53Error(f'timing budget {budget_us} us is below the '
+                            f'{MIN_TIMING_BUDGET_US} us minimum')
         steps = self.get_sequence_step_enables()
         final_budget_us = budget_us - (self._START_OVERHEAD_US
                                        + self._END_OVERHEAD_US)
 
-        def take(sub_timeout):
+        def take(sub_timeout: int) -> None:
             nonlocal final_budget_us
             if sub_timeout >= final_budget_us:
                 raise Vl53Error(f'timing budget {budget_us} us is too small for '
@@ -1023,7 +1111,7 @@ class VL53L0X(SensorDriver):
         self.d['MeasurementTimingBudgetMicroSeconds'] = budget_us
         return budget_us
 
-    def set_inter_measurement_period(self, period_ms: int):
+    def set_inter_measurement_period(self, period_ms: int) -> None:
         osc_calibrate_val = self.p.rd_word(OSC_CALIBRATE_VAL)
         value = period_ms * osc_calibrate_val if osc_calibrate_val else period_ms
         self.p.wr_dword(SYSTEM_INTERMEASUREMENT_PERIOD, value)
@@ -1034,7 +1122,7 @@ class VL53L0X(SensorDriver):
         return value // osc_calibrate_val if osc_calibrate_val else value
 
     # ── the family-wide timing entry point ──
-    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int):
+    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
         """Timing budget and inter-measurement period, the way the CLI and GUI
         of this family ask for them: inter-measurement 0 means back-to-back
         continuous ranging, anything else the timed continuous mode."""
@@ -1044,13 +1132,13 @@ class VL53L0X(SensorDriver):
                              if inter_measurement_ms == 0
                              else DEVICEMODE_CONTINUOUS_TIMED)
 
-    def get_range_timing(self) -> tuple:
+    def get_range_timing(self) -> tuple[int, int]:
         """-> (timing_budget_ms, inter_measurement_ms)."""
         return (self.get_measurement_timing_budget() // 1000,
                 self.get_inter_measurement_period())
 
     # ── ranging ──
-    def set_device_mode(self, mode: int):
+    def set_device_mode(self, mode: int) -> None:
         if mode not in (DEVICEMODE_SINGLE_RANGING, DEVICEMODE_CONTINUOUS_RANGING,
                         DEVICEMODE_CONTINUOUS_TIMED):
             raise Vl53Error(f'device mode {mode} is not supported')
@@ -1058,7 +1146,7 @@ class VL53L0X(SensorDriver):
         if mode != DEVICEMODE_SINGLE_RANGING:
             self.d['ContinuousMode'] = mode
 
-    def arm_stop_variable(self):
+    def arm_stop_variable(self) -> None:
         """The undocumented prologue every VL53L0X_StartMeasurement() opens
         with: hand the stop variable read by DataInit back to the device."""
         self.p.wr_byte(0x80, 0x01)
@@ -1069,7 +1157,7 @@ class VL53L0X(SensorDriver):
         self.p.wr_byte(0xFF, 0x00)
         self.p.wr_byte(0x80, 0x00)
 
-    def start_ranging(self):
+    def start_ranging(self) -> None:
         """VL53L0X_StartMeasurement() for the two continuous modes.
 
         A single shot (a calibration, a poll) leaves the device mode on single
@@ -1088,7 +1176,7 @@ class VL53L0X(SensorDriver):
         else:
             raise Vl53Error('start_ranging() needs a continuous device mode')
 
-    def stop_ranging(self):
+    def stop_ranging(self) -> None:
         """VL53L0X_StopMeasurement()."""
         self.p.wr_byte(SYSRANGE_START, SYSRANGE_MODE_SINGLESHOT)
         self.p.wr_byte(0xFF, 0x01)
@@ -1286,7 +1374,7 @@ class VL53L0X(SensorDriver):
         linear_slope = _u32(dmax0 - dmax1) // ((amb1 - amb0) >> 8)
         return (((amb1 - amb_rate_meas) >> 8) * linear_slope + dmax1) >> 16
 
-    def get_pal_range_status(self, data: RangingMeasurementData):
+    def get_pal_range_status(self, data: RangingMeasurementData) -> None:
         """VL53L0X_get_pal_range_status(): device status plus the enabled limit
         checks, mapped onto the PAL range status the whole family reports.
 
@@ -1327,7 +1415,7 @@ class VL53L0X(SensorDriver):
         data.range_status = status
 
     # ── VCSEL pulse period and the ranging profiles ──
-    def set_vcsel_pulse_period(self, period_type: int, pclks: int):
+    def set_vcsel_pulse_period(self, period_type: int, pclks: int) -> None:
         """VL53L0X_set_vcsel_pulse_period(): phase limits for the new period,
         then the period itself with its timeouts re-encoded around it.
 
@@ -1382,7 +1470,7 @@ class VL53L0X(SensorDriver):
             self.d['MeasurementTimingBudgetMicroSeconds'])
         self.perform_phase_calibration()
 
-    def perform_phase_calibration(self):
+    def perform_phase_calibration(self) -> None:
         """VL53L0X_perform_phase_calibration() with restore_config = 1: what a
         VCSEL period change needs, without reading the result back."""
         sequence_config = self.d['SequenceConfig']
@@ -1391,7 +1479,7 @@ class VL53L0X(SensorDriver):
         self.p.wr_byte(SYSTEM_SEQUENCE_CONFIG, sequence_config)
         self.d['SequenceConfig'] = sequence_config
 
-    def set_mode(self, name: str):
+    def set_mode(self, name: str) -> None:
         """Apply one of MODES: the sigma and signal limits, the timing budget
         and both VCSEL periods, in the order the ST examples use them."""
         try:
@@ -1414,14 +1502,14 @@ class VL53L0X(SensorDriver):
     def get_mode(self) -> str:
         return self._mode
 
-    def reach_mm(self):
+    def reach_mm(self) -> int | None:
         """Looked up by the final-range VCSEL period read from the sensor, so
         it follows the configuration, not the profile name. None for a period
         no profile here sets."""
         return REACH_BY_FINAL_PCLKS_MM.get(
             self.get_vcsel_pulse_period(VCSEL_PERIOD_FINAL_RANGE))
 
-    def driver_info(self) -> dict:
+    def driver_info(self) -> dict[str, Any]:
         """What the five registers a mode writes currently read back as."""
         return {
             'signal_mcps': self.get_limit_check_value(
@@ -1434,7 +1522,7 @@ class VL53L0X(SensorDriver):
         }
 
     # ── offset ──
-    def set_offset_um(self, offset_um: int):
+    def set_offset_um(self, offset_um: int) -> None:
         """VL53L0X_set_offset_calibration_data_micro_meter(): the register is
         10.2 format in mm, so the value is stored in steps of 250 um."""
         offset_um = max(-512000, min(511000, offset_um))
@@ -1446,7 +1534,7 @@ class VL53L0X(SensorDriver):
         register = self.p.rd_word(ALGO_PART_TO_PART_RANGE_OFFSET_MM) & 0x0FFF
         return (register - 4096) * 250 if register > 2047 else register * 250
 
-    def set_offset(self, offset_mm: int):
+    def set_offset(self, offset_mm: int) -> None:
         """The family-wide contract speaks whole millimetres; the register
         holds 250 um steps, so nothing is lost either way."""
         self.set_offset_um(offset_mm * 1000)
@@ -1502,7 +1590,7 @@ class VL53L0X(SensorDriver):
                                                      nb_samples) / 1000.0)
 
     # ── crosstalk ──
-    def set_xtalk_enable(self, enable: int):
+    def set_xtalk_enable(self, enable: int) -> None:
         """VL53L0X_SetXTalkCompensationEnable(): switching it off zeroes the
         register but keeps the rate in the host-side copy."""
         rate = self.d['XTalkCompensationRateMegaCps'] if enable else 0
@@ -1510,7 +1598,7 @@ class VL53L0X(SensorDriver):
                        (rate >> 3) & 0xFFFF)            # 16.16 -> 3.13
         self.d['XTalkCompensationEnable'] = 1 if enable else 0
 
-    def set_xtalk_rate_mcps(self, rate_mcps: int):
+    def set_xtalk_rate_mcps(self, rate_mcps: int) -> None:
         """VL53L0X_SetXTalkCompensationRateMegaCps(), FixPoint16.16 in."""
         if self.d['XTalkCompensationEnable']:
             self.p.wr_word(CROSSTALK_COMPENSATION_PEAK_RATE_MCPS,
@@ -1520,7 +1608,7 @@ class VL53L0X(SensorDriver):
     def get_xtalk_rate_mcps(self) -> int:
         return self.p.rd_word(CROSSTALK_COMPENSATION_PEAK_RATE_MCPS) << 3
 
-    def set_xtalk(self, xtalk_kcps: int):
+    def set_xtalk(self, xtalk_kcps: int) -> None:
         """The family-wide contract speaks kcps; the ULD speaks Mcps 16.16."""
         self.set_xtalk_enable(1)
         self.set_xtalk_rate_mcps((xtalk_kcps << 16) // 1000)
@@ -1581,17 +1669,17 @@ class VL53L0X(SensorDriver):
                                                nb_samples) * 1000) >> 16
 
     # ── reference SPAD management ──
-    def get_reference_spads(self) -> tuple:
+    def get_reference_spads(self) -> tuple[int, int]:
         return self.d['ReferenceSpadCount'], self.d['ReferenceSpadType']
 
-    def _set_ref_spad_map(self, spad_array: list):
+    def _set_ref_spad_map(self, spad_array: list[int]) -> None:
         self.p.wr_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, bytes(spad_array))
 
-    def _get_ref_spad_map(self) -> list:
+    def _get_ref_spad_map(self) -> list[int]:
         return list(self.p.rd_multi(GLOBAL_CONFIG_SPAD_ENABLES_REF_0,
                                     REF_SPAD_BUFFER_SIZE))
 
-    def _enable_ref_spads(self, aperture_spads: int, spad_array: list,
+    def _enable_ref_spads(self, aperture_spads: int, spad_array: list[int],
                           start: int, offset: int, spad_count: int) -> int:
         """enable_ref_spads(): append @p spad_count good SPADs of the requested
         kind to @p spad_array, apply it and read it back -> the next index."""
@@ -1626,7 +1714,7 @@ class VL53L0X(SensorDriver):
         self.d['SequenceConfig'] = sequence_config
         return peak
 
-    def perform_ref_spad_management(self) -> tuple:
+    def perform_ref_spad_management(self) -> tuple[int, int]:
         """Re-measure the reference SPADs on a live session -> (count,
         is_aperture). Not in the C driver: the stop variable goes back first.
 
@@ -1641,7 +1729,7 @@ class VL53L0X(SensorDriver):
         self.arm_stop_variable()
         return self._ref_spad_management()
 
-    def _ref_spad_management(self) -> tuple:
+    def _ref_spad_management(self) -> tuple[int, int]:
         """VL53L0X_perform_ref_spad_management() -> (count, is_aperture).
 
         What StaticInit normally takes from the NVM, measured instead: enable
@@ -1722,13 +1810,13 @@ class VL53L0X(SensorDriver):
         return ref_spad_count, need_apt_spads
 
     def _store_ref_spads(self, count: int, is_aperture_spads: int,
-                         spad_array: list):
+                         spad_array: list[int]) -> None:
         self.d['RefSpadEnables'] = list(spad_array)
         self.d['ReferenceSpadCount'] = count
         self.d['ReferenceSpadType'] = is_aperture_spads
 
     # ── limit checks ──
-    def set_limit_check_enable(self, check: int, enable: int):
+    def set_limit_check_enable(self, check: int, enable: int) -> None:
         d = self.d
         if check >= CHECK_NUMBER_OF_CHECKS:
             raise Vl53Error(f'no limit check {check}')
@@ -1753,7 +1841,7 @@ class VL53L0X(SensorDriver):
 
         d['LimitChecksEnable'][check] = 0 if enable == 0 else 1
 
-    def set_limit_check_value(self, check: int, value: int):
+    def set_limit_check_value(self, check: int, value: int) -> None:
         d = self.d
         if not d['LimitChecksEnable'][check]:
             d['LimitChecksValue'][check] = value        # disabled: keep it here

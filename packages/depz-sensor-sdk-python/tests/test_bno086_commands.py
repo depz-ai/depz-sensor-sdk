@@ -163,6 +163,17 @@ def test_sleep_and_power_on_send_executable_frames(rig, vectors):
     assert fake.tare_requests == []  # nothing on the control channel
 
 
+def test_enable_activity_classifier_cfg_word_selects_activities(rig):
+    """Personal Activity Classifier (SH-2 §6.5.36.1): the Set Feature config
+    word is the activity mask — bits 4, 6, 7 = still, walking, running — and
+    the sensitivity is the confidence change in percent."""
+    fake, dev = rig
+    dev.enable(SensorId.PERSONAL_ACTIVITY_CLASSIFIER, hz=2, sensitivity=10,
+               cfg_word=0x000000D0, verify=False)
+    _wait(lambda: fake.last_set_feature is not None)
+    assert fake.last_set_feature == build_set_feature(0x1E, 500_000, 0, 10, 0, 0x000000D0)
+
+
 def test_enable_with_wakeup_always_on_flags(rig):
     fake, dev = rig
     flags = FeatureFlag.WAKEUP | FeatureFlag.ALWAYS_ON

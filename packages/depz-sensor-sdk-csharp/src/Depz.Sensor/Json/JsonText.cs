@@ -14,6 +14,16 @@ namespace Depz.Sensor.Json;
 /// </summary>
 public static class JsonText
 {
+    /// <summary>Contract 08 «Line rules»: a line of nothing but JSON whitespace (space, tab, CR) is
+    /// blank — NUL, NBSP or another Unicode space is not (<see cref="string.Trim()"/> would drop them).</summary>
+    internal static bool IsBlankLine(string line)
+    {
+        foreach (char c in line)
+            if (c is not (' ' or '\t' or '\r'))
+                return false;
+        return true;
+    }
+
     /// <summary>Parse one JSON value; trailing whitespace is allowed, anything else is not.</summary>
     /// <exception cref="FormatException">The text is not valid JSON.</exception>
     public static object? Parse(string text)
@@ -224,7 +234,7 @@ public static class JsonText
                     case 't': sb.Append('\t'); break;
                     case 'u':
                         if (Pos + 4 > _s.Length
-                            || !int.TryParse(_s.Substring(Pos, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int code))
+                            || !int.TryParse(_s.AsSpan(Pos, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int code))
                             throw Error("bad \\u escape");
                         sb.Append((char)code);
                         Pos += 4;

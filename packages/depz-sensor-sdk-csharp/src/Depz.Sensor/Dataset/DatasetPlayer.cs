@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Depz.Sensor.Devices;
 
 namespace Depz.Sensor.Dataset;
 
@@ -222,7 +223,7 @@ public sealed class DatasetPlayer : IDisposable
     public bool Wait(TimeSpan? timeout = null)
     {
         if (!_threaded)
-            throw new InvalidOperationException("Wait() needs threaded: true; drive Tick() instead");
+            throw new InvalidStateException("Wait() needs threaded: true; drive Tick() instead");
         var clock = Stopwatch.StartNew();
         lock (_lock)
         {
@@ -275,7 +276,7 @@ public sealed class DatasetPlayer : IDisposable
     private void CheckOpen()
     {
         if (_closed)
-            throw new ObjectDisposedException(nameof(DatasetPlayer));
+            throw new InvalidStateException("DatasetPlayer is closed");
     }
 
     // The media clock restarts at `now` from the last delivered record's t (the first record's when none was).

@@ -8,7 +8,7 @@ import struct
 
 import pytest
 
-from depz_sensor_sdk.errors import DepzError
+from depz_sensor_sdk.errors import InvalidStateError
 from depz_sensor_sdk.protocol.vl53l4 import StreamData, Vl53l4Rpt
 from depz_sensor_sdk.transport import Packet
 from depz_sensor_sdk.transport.link import LoopbackLink
@@ -97,11 +97,11 @@ def test_start_ranging_continuous_mode_byte():
 
 def test_range_timing_bounds():
     drv, _ = make_driver()
-    with pytest.raises(uld_mod.Vl53l4cdError):
+    with pytest.raises(ValueError):
         drv.set_range_timing(9, 0)
-    with pytest.raises(uld_mod.Vl53l4cdError):
+    with pytest.raises(ValueError):
         drv.set_range_timing(201, 0)
-    with pytest.raises(uld_mod.Vl53l4cdError):
+    with pytest.raises(ValueError):
         drv.set_range_timing(50, 30)  # 0 < inter <= budget is invalid
 
 
@@ -132,7 +132,7 @@ def test_signal_and_sigma_threshold_roundtrip():
     assert drv.get_signal_threshold() == 1024
     drv.set_sigma_threshold(15)
     assert drv.get_sigma_threshold() == 15
-    with pytest.raises(uld_mod.Vl53l4cdError):
+    with pytest.raises(ValueError):
         drv.set_sigma_threshold(0x4000)  # > 16383
 
 
@@ -143,9 +143,16 @@ def test_is_alive_checks_model_id():
     assert not drv.is_alive()
 
 
-def test_parse_result_block_too_short_raises():
-    with pytest.raises(uld_mod.Vl53l4cdError):
-        uld_mod.parse_result_block(b"\x00" * 14)
+@pytest.mark.parametrize("n", [0, 14, 15, 16])
+def test_parse_result_block_shorter_than_17_bytes_raises(n):
+    """contract 10 §5 (ERRATA A8): the block is 17 bytes; 15 and 16 are short too."""
+    with pytest.raises(uld_mod.Vl53l4cdError, match="too short"):
+        uld_mod.parse_result_block(b"\x00" * n)
+
+
+def test_parse_result_block_17_bytes_decodes_and_a_tail_is_ignored():
+    block = bytes(17)
+    assert uld_mod.parse_result_block(block) == uld_mod.parse_result_block(block + b"\xff" * 3)
 
 
 # ── device wrapper (LoopbackLink; no fake firmware needed for guards) ────────
@@ -172,7 +179,7 @@ def test_config_while_ranging_raises():
             lambda: dev.measure_once(),
             dev.start_ranging,
         ):
-            with pytest.raises(DepzError):
+            with pytest.raises(InvalidStateError):
                 call()
     finally:
         dev.close()

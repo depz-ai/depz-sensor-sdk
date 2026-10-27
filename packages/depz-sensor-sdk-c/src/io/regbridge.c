@@ -38,7 +38,18 @@ int depz_rb_read(depz_regbridge *rb, uint16_t addr, uint8_t *out, size_t len)
         c.want = n;
         c.got = 0;
         c.ts = 0;
-        depz_vl53l4_pack_read_reg((uint16_t)a, (uint16_t)n, payload);
+        /* READ_REG payload: addr u16 LE, len u16 LE — the layout every register
+         * bridge shares; the length limit is the bridge's own (253 on VL53L4 /
+         * VL53LX, 1536 on L5/L7, 2048 on L8) and a transfer never runs past
+         * register 0xFFFF (contracts 10 §1, 11 §2, 12 §2). Checked before
+         * anything is written. */
+        if (n < 1 || n > chunk || a + n > 0x10000u)
+            return depz_fail(DEPZ_E_ARG, "READ_REG 0x%04X+%zu: len 1..%zu and addr+len <= 0x10000",
+                             (unsigned)a, n, chunk);
+        payload[0] = (uint8_t)a;
+        payload[1] = (uint8_t)(a >> 8);
+        payload[2] = (uint8_t)n;
+        payload[3] = (uint8_t)(n >> 8);
         rc = depz_device_request(rb->dev, rb->cmd_read, payload, 4, match_reg_data, &c, false,
                                  rb->timeout_ms);
         if (rc) return rc;
@@ -56,16 +67,20 @@ int depz_rb_read(depz_regbridge *rb, uint16_t addr, uint8_t *out, size_t len)
 /* WRITE_REG payload: addr u16 LE, then the bytes. */
 int depz_rb_write(depz_regbridge *rb, uint16_t addr, const uint8_t *data, size_t len)
 {
-    uint8_t small[2 + 256], *payload = small;
+    uint8_t stack_buf[2 + 256], *payload = stack_buf;
     size_t total = len, done = 0;
     uint32_t a = addr;
     int rc = DEPZ_OK;
-    if (rb->xfer_max + 2 > sizeof small) {
+    if (rb->xfer_max + 2 > sizeof stack_buf) {
         payload = (uint8_t *)malloc(rb->xfer_max + 2);
         if (!payload) return depz_fail(DEPZ_E_NOMEM, "WRITE_REG: out of memory");
     }
     while (done < total) {
         size_t n = total - done < rb->xfer_max ? total - done : rb->xfer_max;
+        if (a + n > 0x10000u) { /* a write never runs past register 0xFFFF either */
+            rc = depz_fail(DEPZ_E_ARG, "WRITE_REG 0x%04X+%zu: addr+len <= 0x10000", (unsigned)a, n);
+            break;
+        }
         payload[0] = (uint8_t)a;
         payload[1] = (uint8_t)(a >> 8);
         memcpy(payload + 2, data + done, n);
@@ -76,6 +91,6 @@ int depz_rb_write(depz_regbridge *rb, uint16_t addr, const uint8_t *data, size_t
         a += (uint32_t)n;
         if (rb->write_progress && total > rb->xfer_max) rb->write_progress(done, total, rb->progress_user);
     }
-    if (payload != small) free(payload);
+    if (payload != stack_buf) free(payload);
     return rc;
 }

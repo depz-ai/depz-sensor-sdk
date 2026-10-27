@@ -169,7 +169,12 @@ pub fn read_register(&self, addr: u8) -> Result<u8>
 #### Tmf8829Device::write_registers
 
 ```rust
-pub fn write_registers(&self, addr: u8, data: &[u8], progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<()>
+pub fn write_registers(
+    &self,
+    addr: u8,
+    data: &[u8],
+    progress: Option<&mut dyn FnMut(usize, usize)>,
+) -> Result<()>
 ```
 
 Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF); `progress` gets
@@ -202,7 +207,10 @@ Bridge counters (never touches the sensor, safe mid-stream).
 #### Tmf8829Device::init
 
 ```rust
-pub fn init(&self, progress: Option<&mut dyn FnMut(usize, usize)>) -> Result<Tmf8829InitResult>
+pub fn init(
+    &self,
+    progress: Option<&mut dyn FnMut(usize, usize)>,
+) -> Result<Tmf8829InitResult>
 ```
 
 Bring the sensor from any state to its running RAM application: soft reset, bootloader, firmware
@@ -259,7 +267,10 @@ Stop a running stream (a failing stop is ignored), then close the link.
 #### Tmf8829Device::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Tmf8829Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every measurement (reader thread; don't block).

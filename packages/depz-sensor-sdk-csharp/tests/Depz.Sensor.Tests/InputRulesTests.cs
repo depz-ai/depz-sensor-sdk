@@ -20,7 +20,16 @@ public class InputRulesTests
             .Select(f => new object[] { f });
 
     [Fact]
-    public void InputRules_Found() => Assert.True(FilesWithInputRules().Count() >= 10);
+    public void InputRules_Found()
+    {
+        var files = FilesWithInputRules().Select(f => (string)f[0]).ToList();
+        Assert.True(files.Count >= 10);
+        // The readers' rules (contracts 08, 09) and the SH-2 control decoders (contract 05 §4) are
+        // pinned in these files; the run above must have loaded them.
+        Assert.Contains("depzrec.json", files);
+        Assert.Contains("depzdata.json", files);
+        Assert.Contains("bno086_shtp.json", files);
+    }
 
     [Theory]
     [MemberData(nameof(FilesWithInputRules))]
@@ -63,6 +72,6 @@ public class InputRulesTests
         // Encoder arguments are range-checked, never masked (contract 07 §3).
         Assert.Throws<ArgumentOutOfRangeException>(() => new Bno086.ShtpHeader(32769, 3, 0).Pack());
         Assert.Throws<ArgumentOutOfRangeException>(() => Transport.Framing.BuildPacket(1, default, 0, (Transport.CrcType)6));
-        Assert.Throws<Vl53l4.Vl53l4Exception>(() => Vl53l4.Vl53l4Uld.XtalkRaw(128));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Vl53l4.Vl53l4Uld.XtalkRaw(128));
     }
 }

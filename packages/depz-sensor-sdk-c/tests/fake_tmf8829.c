@@ -50,7 +50,7 @@ static void send_locked(fake_tmf8829 *f, uint8_t cmd, const uint8_t *payload, si
     size_t n;
     if (depz_build_packet(cmd, payload, len, f->tx_seq, DEPZ_CRC_NONE, frame, sizeof frame, &n) == 0 &&
         depz_link_write(f->side, frame, n) == DEPZ_OK)
-        f->tx_seq++;
+        f->tx_seq = (uint8_t)(f->tx_seq + 1); /* wraps mod 256 (contract 01 §5) */
 }
 
 static void status(fake_tmf8829 *f, uint8_t cmd, uint8_t st)

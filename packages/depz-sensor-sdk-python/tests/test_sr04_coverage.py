@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from depz_sensor_sdk import BusyError, Sr04
+from depz_sensor_sdk import BusyError, Sr04, TextEvent
 from depz_sensor_sdk.protocol.sr04 import (
     ECHO_DECAY_MAX_US,
     ECHO_DECAY_MIN_US,
@@ -71,6 +71,25 @@ def test_loop_samples_are_source_loop(rig):
     dev.stop()
 
 
+def test_a_raising_measurement_callback_never_stops_the_stream(rig):
+    """Contract 07 §3 on a sensor stream: the raising callback is counted, the
+    queue and the next measurements still arrive."""
+    fake, dev = rig
+
+    def boom(m):
+        raise ValueError("consumer bug")
+
+    dev.on_measurement(boom)
+    it = dev.stream(maxsize=8)
+    dev.start()
+    fake.send_measurement(0x37)
+    fake.send_measurement(0x37)
+    assert [next(it).source for _ in range(2)] == ["loop", "loop"]
+    assert dev.stats.callback_errors == 2
+    dev.stop()
+    assert dev.get_software_name()
+
+
 def test_start_stop_idempotent(rig):
     _, dev = rig
     dev.start()
@@ -88,6 +107,48 @@ def test_measure_once_busy_during_loop(rig):
     with pytest.raises(BusyError):
         dev.measure_once()
     dev.stop()
+
+
+def test_measure_once_takes_only_a_full_once_report(rig, monkeypatch):
+    # The reply to MEASURE_ONCE is the RPT_DATA with cmd 0x36 (contract 03
+    # §2). A loop sample still in flight, or a data report too short for its
+    # 11 bytes, arriving first must not be taken for it.
+    fake, dev = rig
+    stream = dev.stream(maxsize=4)
+    real = fake._handle
+
+    def stray_reports_first(pkt):
+        if pkt.cmd == 0x36:
+            fake._send(0x91, bytes((0x36, 1, 2)))     # 3 of 11 bytes
+            fake.send_measurement(0x37, echo=1_111)   # a loop sample
+            fake.send_measurement(0x36, echo=2_222)
+        else:
+            real(pkt)
+
+    monkeypatch.setattr(fake, "_handle", stray_reports_first)
+    m = dev.measure_once()
+    assert (m.source, m.echo_time_us) == ("once", 2_222)
+    stray = next(stream)
+    assert (stray.source, stray.echo_time_us) == ("loop", 1_111)  # not lost either
+    # The reply belongs to the request, the short report to nobody: the next
+    # streamed item is the marker sent after them.
+    fake.send_measurement(0x37, echo=3_333)
+    marker = next(stream)
+    assert (marker.source, marker.echo_time_us) == ("loop", 3_333)
+
+
+@pytest.mark.parametrize("setter, bad", [
+    ("set_sample_period_us", -1),
+    ("set_sample_period_us", 0x1_0000_0000),   # past the u32 wire field
+    ("set_echo_decay_us", -1),
+    ("set_echo_decay_us", 0x1_0000),           # past the u16 wire field
+])
+def test_a_value_the_wire_field_cannot_hold_is_refused_before_the_wire(rig, setter, bad):
+    fake, dev = rig
+    before = list(fake.received)
+    with pytest.raises(ValueError, match="wire field"):
+        getattr(dev, setter)(bad)
+    assert fake.received == before
 
 
 def test_no_echo_timeout_sentinel(rig):
@@ -143,6 +204,17 @@ def test_sync_in_single_shot_reaches_stream(rig):
     it = dev.stream(maxsize=4)
     fake.send_measurement(0x36)  # unsolicited single shot (AUX SYNC_IN edge)
     assert next(it).source == "once"
+
+
+def test_unknown_source_cmd_is_a_text_event_not_a_measurement(rig):
+    # contract 03 §2 defines RPT_DATA.cmd 0x36 / 0x37 only (ERRATA B11)
+    fake, dev = rig
+    it, events = dev.stream(maxsize=4), dev.events(maxsize=4)
+    fake.send_measurement(0x38)
+    fake.send_measurement(0x37)
+    assert next(it).source == "loop"  # the 0x38 report never reached the stream
+    ev = next(events)
+    assert isinstance(ev, TextEvent) and ev.cmd == 0x91 and ev.text.startswith("38")
 
 
 # ── repeated same-type: two SR04 over two loopbacks ───────────────────────────

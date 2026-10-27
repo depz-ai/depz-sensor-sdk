@@ -9,7 +9,7 @@ the source, not this file. Regenerate with `python3 scripts/gen_api_md.py`.
 
 ## Contents
 
-- **VL53L4CD (ToF, single-zone)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps), [`i2c_error_name`](#i2c_error_name), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Platform`](#vl53l4platform), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cdDriver`](#vl53l4cddriver), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE__DEVICE_ADDRESS`](#i2c_slave__device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config__timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX__CTRL`](#gpio_hv_mux__ctrl), [`GPIO__TIO_HV_STATUS`](#gpio__tio_hv_status), [`SYSTEM__INTERRUPT`](#system__interrupt), [`RANGE_CONFIG_A`](#range_config_a), [`RANGE_CONFIG_B`](#range_config_b), [`RANGE_CONFIG__SIGMA_THRESH`](#range_config__sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SYSTEM__INTERRUPT_CLEAR`](#system__interrupt_clear), [`SYSTEM_START`](#system_start), [`RESULT__RANGE_STATUS`](#result__range_status), [`RESULT__SPAD_NB`](#result__spad_nb), [`RESULT__SIGNAL_RATE`](#result__signal_rate), [`RESULT__AMBIENT_RATE`](#result__ambient_rate), [`RESULT__SIGMA`](#result__sigma), [`RESULT__DISTANCE`](#result__distance), [`RESULT__OSC_CALIBRATE_VAL`](#result__osc_calibrate_val), [`FIRMWARE__SYSTEM_STATUS`](#firmware__system_status), [`IDENTIFICATION__MODEL_ID`](#identification__model_id), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`DEFAULT_CONFIGURATION`](#default_configuration), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`config_block`](#config_block), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`STATUS_RTN`](#status_rtn), [`range_status_name`](#range_status_name), [`Vl53l4Error`](#vl53l4error), [`Vl53l4Results`](#vl53l4results), [`parse_result_block`](#parse_result_block), [`range_timing_registers`](#range_timing_registers), [`decode_range_timing`](#decode_range_timing), [`try_offset_raw`](#try_offset_raw), [`decode_offset`](#decode_offset), [`try_xtalk_raw`](#try_xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold)
+- **VL53L4CD (ToF, single-zone)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps), [`i2c_error_name`](#i2c_error_name), [`try_pack_read_reg`](#try_pack_read_reg), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Platform`](#vl53l4platform), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cdDriver`](#vl53l4cddriver), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE__DEVICE_ADDRESS`](#i2c_slave__device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config__timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX__CTRL`](#gpio_hv_mux__ctrl), [`GPIO__TIO_HV_STATUS`](#gpio__tio_hv_status), [`SYSTEM__INTERRUPT`](#system__interrupt), [`RANGE_CONFIG_A`](#range_config_a), [`RANGE_CONFIG_B`](#range_config_b), [`RANGE_CONFIG__SIGMA_THRESH`](#range_config__sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SYSTEM__INTERRUPT_CLEAR`](#system__interrupt_clear), [`SYSTEM_START`](#system_start), [`RESULT__RANGE_STATUS`](#result__range_status), [`RESULT__SPAD_NB`](#result__spad_nb), [`RESULT__SIGNAL_RATE`](#result__signal_rate), [`RESULT__AMBIENT_RATE`](#result__ambient_rate), [`RESULT__SIGMA`](#result__sigma), [`RESULT__DISTANCE`](#result__distance), [`RESULT__OSC_CALIBRATE_VAL`](#result__osc_calibrate_val), [`FIRMWARE__SYSTEM_STATUS`](#firmware__system_status), [`IDENTIFICATION__MODEL_ID`](#identification__model_id), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`DEFAULT_CONFIGURATION`](#default_configuration), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`config_block`](#config_block), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`STATUS_RTN`](#status_rtn), [`range_status_name`](#range_status_name), [`Vl53l4Error`](#vl53l4error), [`Vl53l4Results`](#vl53l4results), [`parse_result_block`](#parse_result_block), [`check_range_timing`](#check_range_timing), [`range_timing_registers`](#range_timing_registers), [`decode_range_timing`](#decode_range_timing), [`try_offset_raw`](#try_offset_raw), [`decode_offset`](#decode_offset), [`try_xtalk_raw`](#try_xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold)
 
 ## VL53L4CD (ToF, single-zone)
 
@@ -126,7 +126,7 @@ Drive XSHUT: off (0) / on (1) / reset (2). Off and reset stop a stream; init aga
 pub fn reset_sensor(&self) -> Result<()>
 ```
 
-Hardware reset through XSHUT (~3 ms on the MCU); init again.
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); init again.
 
 #### Vl53l4cdDevice::bridge_info
 
@@ -134,7 +134,7 @@ Hardware reset through XSHUT (~3 ms on the MCU); init again.
 pub fn bridge_info(&self) -> Result<Vl53l4Info>
 ```
 
-RPT_VL53_INFO: sensor identity, pin levels and free-running bridge counters. Safe while streaming.
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2c_errors` is cleared by a successful XSHUT reset). Safe while streaming.
 
 #### Vl53l4cdDevice::set_i2c_speed_khz
 
@@ -196,7 +196,12 @@ pub fn get_detection_thresholds(&self) -> Result<DetectionThresholds>
 #### Vl53l4cdDevice::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt: INT only fires while the window holds.
@@ -281,7 +286,10 @@ One polled measurement: start, wait for data ready, read, stop. Not while stream
 #### Vl53l4cdDevice::on_measurement
 
 ```rust
-pub fn on_measurement(&self, callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static) -> Hook
+pub fn on_measurement(
+    &self,
+    callback: impl Fn(&Vl53l4Measurement) + Send + Sync + 'static,
+) -> Hook
 ```
 
 Call `callback` for every streamed measurement (reader thread).
@@ -405,13 +413,24 @@ pub fn i2c_error_name(code: u8) -> &'static str
 
 `last_i2c_error` code in [`Vl53l4Info`] → human-readable name.
 
+### try_pack_read_reg
+
+```rust
+pub fn try_pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError>
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` with the transfer limit of
+contract 10 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x10000` —
+refused before anything is written (contract 07 §3).
+
 ### pack_read_reg
 
 ```rust
 pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
 ```
 
-`VL53_READ_REG` payload: `addr u16, len u16` (little-endian).
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian), unchecked —
+prefer [`try_pack_read_reg`].
 
 ### try_pack_write_reg
 
@@ -420,7 +439,8 @@ pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
 ```
 
 `VL53_WRITE_REG` payload: `addr u16` followed by 1..=[`XFER_MAX`] raw
-register bytes; any other data length is refused (contract 07 §3).
+register bytes with `addr + N <= 0x10000`; anything else is refused
+(contract 07 §3).
 
 ### pack_write_reg
 
@@ -490,7 +510,7 @@ pub struct Vl53l4Info {
     pub model_id: u16,
     /// 0x00E5 — expected 0x03 (booted).
     pub fw_status: u8,
-    /// 1 = MODEL_ID matched on this read.
+    /// 1 = MODEL_ID read back as 0xEBAA on this GET_INFO.
     pub initialized: u8,
     pub xshut_level: u8,
     pub int_level: u8,
@@ -498,8 +518,10 @@ pub struct Vl53l4Info {
 }
 ```
 
-A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters are
-free-running and wrap silently; watch increments, not absolute values.
+A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters wrap
+silently; watch increments, not absolute values. `i2c_errors` counts since
+the last successful XSHUT reset (the bridge clears it there), not since
+power-up.
 
 #### Vl53l4Info::unpack
 
@@ -726,7 +748,12 @@ pub fn get_xtalk(&self) -> Result<u16>
 #### Vl53l4cdDriver::set_detection_thresholds
 
 ```rust
-pub fn set_detection_thresholds(&self, distance_low_mm: u16, distance_high_mm: u16, window: u8) -> Result<()>
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
 ```
 
 The distance-window interrupt; `window` is one of [`uld::WINDOW_BELOW`] … [`uld::WINDOW_IN`].
@@ -1133,7 +1160,7 @@ description"). Unknown codes map to `"unknown"`.
 
 ```rust
 pub enum Vl53l4Error {
-    /// Result block shorter than the 15 bytes the decode reads.
+    /// Result block shorter than `RESULT_BLOCK_LEN` (17) bytes (contract 10 §5).
     ShortResultBlock,
     /// `osc_frequency` register reads 0.
     OscFrequencyZero,
@@ -1158,6 +1185,15 @@ pub enum Vl53l4Error {
 ```
 
 VL53L4 codec/math failure.
+
+#### Vl53l4Error::is_argument
+
+```rust
+pub fn is_argument(&self) -> bool
+```
+
+A refused argument (contract 07 §3 `invalid_argument`), not a value the
+sensor produced: the budget, the period, the tuning values.
 
 ### Vl53l4Results
 
@@ -1199,6 +1235,21 @@ Decode the streamed 0x0089..0x0099 block exactly as `VL53L4CD_GetResult()`
 decodes the same registers read one by one. Register contents are
 big-endian words (the bridge passes them through untouched).
 
+### check_range_timing
+
+```rust
+pub fn check_range_timing(
+    timing_budget_ms: u32,
+    inter_measurement_ms: u32,
+) -> Result<(), Vl53l4Error>
+```
+
+`SetRangeTiming`'s own argument checks (ST's `VL53L4CD_ERROR_INVALID_ARGUMENT`),
+which need no register: budget 10..=200 ms
+([`Vl53l4Error::TimingBudgetOutOfRange`]), period 0 (continuous) or above
+the budget (autonomous; [`Vl53l4Error::InterMeasurementInvalid`]) —
+contract 10 §5.
+
 ### range_timing_registers
 
 ```rust
@@ -1218,7 +1269,8 @@ from `RESULT__OSC_CALIBRATE_VAL` (used only in autonomous mode, i.e. when
 `inter_measurement_ms > 0`). `inter_measurement_ms == 0` selects continuous
 mode; a value greater than the budget selects autonomous low power.
 
-Rejected (contract 07 §3, never wrapped): an `osc_frequency` of 0 or so
+Rejected (contract 07 §3, never wrapped): the arguments
+[`check_range_timing`] refuses, an `osc_frequency` of 0 or so
 small that the macro period truncates to 0
 ([`Vl53l4Error::MacroPeriodZero`]), and an autonomous period whose
 register value overflows u32 ([`Vl53l4Error::InterMeasurementOverflow`]).

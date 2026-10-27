@@ -13,7 +13,8 @@ use common::{recordings_dir, seen};
 
 #[test]
 fn dataset_dual_sr04() {
-    let text = std::fs::read_to_string(recordings_dir().join("dataset_dual_sr04.depzdata")).unwrap();
+    let text =
+        std::fs::read_to_string(recordings_dir().join("dataset_dual_sr04.depzdata")).unwrap();
     let ds = Dataset::parse(&text).expect("dataset parses");
 
     // Header.

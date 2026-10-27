@@ -6,6 +6,8 @@ import pytest
 
 from depz_sensor_sdk.bno055 import regs as R
 from depz_sensor_sdk.protocol.bno055 import (
+    TRIGGER_INT,
+    TRIGGER_TIMER,
     Bno055Info,
     RegData,
     StreamData,
@@ -34,6 +36,39 @@ def test_encode_vectors(vectors, seen):
             raise AssertionError(f"unknown encode kind {kind!r}")
         assert payload.hex() == c["payload"], c["name"]
         seen(c)
+
+
+@pytest.mark.parametrize("addr, length", [(0x00, 0), (0x00, 129), (0xFF, 2), (0x80, 129), (0x100, 1), (-1, 1)])
+def test_read_reg_refuses_len_outside_1_128_and_past_the_page(addr, length):
+    """contract 13 §1 (ERRATA A13): `len` 1..128 and addr+len <= 0x100, checked host-side."""
+    with pytest.raises(ValueError):
+        pack_read_reg(addr, length)
+
+
+def test_read_reg_accepts_the_limits():
+    assert pack_read_reg(0x00, 128) == bytes.fromhex("0080")
+    assert pack_read_reg(0x80, 128) == bytes.fromhex("8080")
+    assert pack_read_reg(0xFF, 1) == bytes.fromhex("ff01")
+
+
+def test_write_reg_refuses_a_write_past_the_page():
+    with pytest.raises(ValueError):
+        pack_write_reg(0xFF, b"\x01\x02")
+    assert pack_write_reg(0xFF, b"\x01") == bytes.fromhex("ff01")
+
+
+@pytest.mark.parametrize("period_ms", [0, 60001, 65535])
+def test_start_stream_timer_period_outside_1_60000_is_refused(period_ms):
+    """contract 13 §2 (ERRATA A13): TIMER reads every period_ms, 1..60000."""
+    with pytest.raises(ValueError, match="period_ms"):
+        pack_start_stream(TRIGGER_TIMER, 0x08, 46, period_ms)
+
+
+def test_start_stream_timer_limits_and_int_watchdog_zero_are_accepted():
+    assert pack_start_stream(TRIGGER_TIMER, 0x08, 46, 1) == bytes.fromhex("00082e0100")
+    assert pack_start_stream(TRIGGER_TIMER, 0x08, 46, 60000) == bytes.fromhex("00082e60ea")
+    # INT: period_ms is the missed-edge watchdog, 0 = none
+    assert pack_start_stream(TRIGGER_INT, 0x08, 6, 0) == bytes.fromhex("0108060000")
 
 
 def test_decode_vectors(vectors, seen):

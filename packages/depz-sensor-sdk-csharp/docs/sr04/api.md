@@ -61,7 +61,7 @@ public Sr04Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Sr04Device.Sr04Device *(constructor)*
 
 ```csharp
-#if NET public Sr04Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Sr04Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Sr04Device.GetSamplePeriodUs

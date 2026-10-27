@@ -28,14 +28,14 @@ pub const GYRO_RV_ANGVEL_Q: u32 = 10;
 /// Q point of the primary fields (value = raw / 2**Q).
 pub fn q_point(sensor_id: u8) -> u32 {
     match sensor_id {
-        0x01 | 0x04 | 0x06 => 8,       // accel / linear accel / gravity
-        0x02 | 0x07 => 9,              // gyro / uncal gyro
-        0x03 | 0x0f => 4,              // mag / uncal mag
+        0x01 | 0x04 | 0x06 => 8, // accel / linear accel / gravity
+        0x02 | 0x07 => 9,        // gyro / uncal gyro
+        0x03 | 0x0f => 4,        // mag / uncal mag
         0x05 | 0x08 | 0x09 | 0x28 | 0x29 | 0x2a => 14, // rotation vectors
-        0x0a => 20,                    // pressure
-        0x0b | 0x0c => 8,              // ambient light / humidity
-        0x0d => 4,                     // proximity
-        0x0e => 7,                     // temperature
+        0x0a => 20,              // pressure
+        0x0b | 0x0c => 8,        // ambient light / humidity
+        0x0d => 4,               // proximity
+        0x0e => 7,               // temperature
         _ => 0,
     }
 }
@@ -48,7 +48,7 @@ pub fn report_length(sensor_id: u8) -> Option<usize> {
         0x07 | 0x0f | 0x14 | 0x15 | 0x16 | 0x1e => 16,
         0x08 | 0x29 => 12,
         0x0a | 0x0b => 8,
-        0x0c | 0x0d | 0x0e => 6,
+        0x0c..=0x0e => 6,
         0x10 => 5,
         0x11 => 12,
         0x12 | 0x13 | 0x19 | 0x1a | 0x1c | 0x1f | 0x20 | 0x21 | 0x22 | 0x23 | 0x2b => 6,
@@ -316,7 +316,10 @@ fn i32_le(b: &[u8], i: usize) -> i32 {
 
 /// [`parse_input_cargo`] that refuses a negative `capture_timestamp_us`: the
 /// capture time is the MCU uptime, a u64 (contract 07 §3).
-pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Vec<Report>, CodecError> {
+pub fn try_parse_input_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Vec<Report>, CodecError> {
     if capture_timestamp_us < 0 {
         return Err(CodecError("capture_timestamp_us must not be negative"));
     }
@@ -325,7 +328,10 @@ pub fn try_parse_input_cargo(payload: &[u8], capture_timestamp_us: i64) -> Resul
 
 /// [`parse_gyro_rv_cargo`] that refuses a negative `capture_timestamp_us`
 /// (contract 07 §3).
-pub fn try_parse_gyro_rv_cargo(payload: &[u8], capture_timestamp_us: i64) -> Result<Option<Report>, CodecError> {
+pub fn try_parse_gyro_rv_cargo(
+    payload: &[u8],
+    capture_timestamp_us: i64,
+) -> Result<Option<Report>, CodecError> {
     if capture_timestamp_us < 0 {
         return Err(CodecError("capture_timestamp_us must not be negative"));
     }
@@ -434,7 +440,11 @@ fn decode_report(rid: u8, rep: &[u8], ts: i64, seq: u8, accuracy: u8, delay_us: 
                 j_raw: i16_le(rep, 6),
                 k_raw: i16_le(rep, 8),
                 real_raw: i16_le(rep, 10),
-                accuracy_raw: if has_accuracy { Some(i16_le(rep, 12)) } else { None },
+                accuracy_raw: if has_accuracy {
+                    Some(i16_le(rep, 12))
+                } else {
+                    None
+                },
             }
         }
         0x0a | 0x0b => Report::Scalar {

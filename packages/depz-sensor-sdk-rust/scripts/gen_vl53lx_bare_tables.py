@@ -38,13 +38,26 @@ def render():
         "",
         "use super::image::{RegBlockDef, RegField};",
         "",
-        "const fn f(name: &'static str, off: usize, width: usize, signed: bool, mask: Option<i64>) -> RegField {",
-        "    RegField { name, off, width, signed, mask }",
+        "const fn f(",
+        "    name: &'static str,",
+        "    off: usize,",
+        "    width: usize,",
+        "    signed: bool,",
+        "    mask: Option<i64>,",
+        ") -> RegField {",
+        "    RegField {",
+        "        name,",
+        "        off,",
+        "        width,",
+        "        signed,",
+        "        mask,",
+        "    }",
         "}",
         "",
         "/// The register blocks of the device image (one `VL53LX_*_t` struct of the C driver each), in",
         "/// address order: base, size, writable and the fields with offset, width, signedness and the mask",
         "/// the C codec applies (`None`: none).",
+        "#[rustfmt::skip] // generated table: one field per line",
         "pub static BLOCKS: &[RegBlockDef] = &[",
     ]
     for name, b in regs.BLOCKS.items():
@@ -62,12 +75,14 @@ def render():
     o.append("];")
     o.append("")
     o.append("/// `VL53LX_tuning_parm_storage_t` after initialisation, keyed by the C field name.")
+    o.append("#[rustfmt::skip] // generated table: one parameter per line")
     o.append("pub static TUNING: &[(&str, i64)] = &[")
     for k, v in tuning.TUNING.items():
         o.append(f"    (\"{k}\", {v}),")
     o.append("];")
     o.append("")
     o.append("/// The raw tuning header, for the parameters the post-processing reads without a `tp_` field.")
+    o.append("#[rustfmt::skip] // generated table: one parameter per line")
     o.append("pub static DEFAULTS: &[(&str, i64)] = &[")
     for k, v in tuning.DEFAULTS.items():
         o.append(f"    (\"{k}\", {v}),")

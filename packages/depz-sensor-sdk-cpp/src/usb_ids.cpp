@@ -9,17 +9,18 @@ namespace {
 
 // PID -> sensor-model hint. Informational; the protocol probe is authoritative.
 const std::unordered_map<std::uint16_t, std::string>& pid_model_map() {
+    using P = std::uint16_t;  // a bare 0xED41 is an int: MSVC flags its narrowing (C4244)
     static const std::unordered_map<std::uint16_t, std::string> m = {
         {PID_SR04, "sr04"},         // 0xEC78
         {PID_VL53L8, "vl53l8ch"},   // 0xED40
-        {0xED41, "vl53l0x"},   {0xED42, "vl53l1cb"}, {0xED43, "vl53l1cx"},
-        {0xED44, "vl53l3cx"},  {PID_VL53L4CD, "vl53l4cd"},  // 0xED45
-        {0xED46, "vl53l4cx"},
-        {0xED47, "vl53l4ed"},  {0xED48, "vl53l5cx"}, {0xED49, "vl53l7cx"},
-        {0xED4A, "vl53l7ch"},  {0xED4B, "vl53l8cx"},  // 0xED4B hw-verified
+        {P{0xED41}, "vl53l0x"},   {P{0xED42}, "vl53l1cb"}, {P{0xED43}, "vl53l1cx"},
+        {P{0xED44}, "vl53l3cx"},  {PID_VL53L4CD, "vl53l4cd"},  // 0xED45
+        {P{0xED46}, "vl53l4cx"},
+        {P{0xED47}, "vl53l4ed"},  {P{0xED48}, "vl53l5cx"}, {P{0xED49}, "vl53l7cx"},
+        {P{0xED4A}, "vl53l7ch"},  {P{0xED4B}, "vl53l8cx"},  // 0xED4B hw-verified
         {PID_TMF8829, "tmf8829"},   // 0xED4C
         {PID_BNO086, "bno086"},     // 0xEE08
-        {0xEE09, "bno085"},    {0xEE0A, "bno055"},
+        {P{0xEE09}, "bno085"},    {P{0xEE0A}, "bno055"},
     };
     return m;
 }

@@ -51,18 +51,22 @@ inline std::string sha256_hex(depz::byte_span msg)
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
     std::uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
                           0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-    auto ror = [](std::uint32_t x, int n) { return (x >> n) | (x << (32 - n)); };
+    // Rotate right; the wrapped half goes through 64 bits so no bit is shifted
+    // out of a uint32_t (UBSan's unsigned-shift-base).
+    auto ror = [](std::uint32_t x, int n) {
+        return static_cast<std::uint32_t>((static_cast<std::uint64_t>(x) << (32 - n)) | (x >> n));
+    };
     const std::size_t len = msg.size(), total = ((len + 9 + 63) / 64) * 64;
     for (std::size_t off = 0; off < total; off += 64) {
         std::uint32_t w[64] = {};
         for (int i = 0; i < 64; i++) {
             const std::size_t k = off + static_cast<std::size_t>(i);
-            std::uint8_t byte;
-            if (k < len) byte = std::to_integer<std::uint8_t>(msg[k]);
-            else if (k == len) byte = 0x80;
-            else if (k >= total - 8) byte = static_cast<std::uint8_t>((static_cast<std::uint64_t>(len) * 8) >> (8 * (total - 1 - k)));
-            else byte = 0;
-            w[i / 4] |= static_cast<std::uint32_t>(byte) << (8 * (3 - i % 4));
+            std::uint8_t octet;
+            if (k < len) octet = std::to_integer<std::uint8_t>(msg[k]);
+            else if (k == len) octet = 0x80;
+            else if (k >= total - 8) octet = static_cast<std::uint8_t>((static_cast<std::uint64_t>(len) * 8) >> (8 * (total - 1 - k)));
+            else octet = 0;
+            w[i / 4] |= static_cast<std::uint32_t>(octet) << (8 * (3 - i % 4));
         }
         for (int i = 16; i < 64; i++) {
             const std::uint32_t s0 = ror(w[i - 15], 7) ^ ror(w[i - 15], 18) ^ (w[i - 15] >> 3);

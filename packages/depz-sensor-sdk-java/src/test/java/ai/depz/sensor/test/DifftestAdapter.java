@@ -6,6 +6,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -13,6 +16,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import ai.depz.sensor.dataset.Dataset;
+import ai.depz.sensor.devices.DepzDevice;
+import ai.depz.sensor.devices.DeviceEvent;
+import ai.depz.sensor.devices.ReplayLink;
+import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.protocol.Bno055;
 import ai.depz.sensor.protocol.Common;
 import ai.depz.sensor.protocol.FwDepz;
@@ -25,6 +33,7 @@ import ai.depz.sensor.protocol.Vl53lx;
 import ai.depz.sensor.sensors.bno055.Bno055Regs;
 import ai.depz.sensor.sensors.bno086.Reports;
 import ai.depz.sensor.sensors.bno086.Sh2;
+import ai.depz.sensor.sensors.bno086.Sh2Hub;
 import ai.depz.sensor.sensors.bno086.Shtp;
 import ai.depz.sensor.sensors.tmf8829.CaptureTimer;
 import ai.depz.sensor.sensors.tmf8829.SensorClock;
@@ -34,6 +43,7 @@ import ai.depz.sensor.sensors.vl53l7.Vl53l7Uld;
 import ai.depz.sensor.sensors.vl53l8.Vl53l8Uld;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxDecode;
 import ai.depz.sensor.sensors.vl53lx.Vl53lxProducts;
+import ai.depz.sensor.test.devices.FakeBoardLink;
 import ai.depz.sensor.transport.Crc;
 import ai.depz.sensor.transport.CrcType;
 import ai.depz.sensor.transport.Framing;
@@ -243,12 +253,8 @@ public final class DifftestAdapter {
             switch (kind) {
                 case "sync_time_request":
                     return payload(Common.packSyncTime(U64(i.get("pc_timestamp_us"))));
-                case "set_payload_crc_type": {
-                    // No codec function: the device layer writes the byte of a
-                    // CrcType argument, so the op checks the enum like the type does.
-                    CrcType t = CrcType.fromValue(I(i.get("crc_type")));
-                    return payload(new byte[] {(byte) t.value});
-                }
+                case "set_payload_crc_type":
+                    return payload(Common.packSetPayloadCrcType(I(i.get("crc_type"))));
                 case "sync_pin_config":
                     return payload(new Common.SyncPinConfig(I(i.get("pin")),
                         Common.SyncPinMode.fromValue(I(i.get("mode"))),
@@ -278,6 +284,66 @@ public final class DifftestAdapter {
                 }
                 default:
                     throw new IllegalArgumentException("report " + i.get("report"));
+            }
+        });
+        // The event the device layer emits for an unsolicited common report —
+        // common_decode's twin through the dispatcher (contract 07 §2/§3): the
+        // packet goes in on a fake board with nothing pending, and the first
+        // event out is the answer.
+        op("common_event", i -> {
+            FakeBoardLink link = new FakeBoardLink();
+            try (DepzDevice dev = new DepzDevice(link, Duration.ofSeconds(1));
+                    Subscription<DeviceEvent> events = dev.events(8)) {
+                link.inject(link.reply(I(i.get("report")), h(i.get("payload"))));
+                DeviceEvent ev = events.take(Duration.ofSeconds(2));
+                if (ev instanceof DeviceEvent.UnsolicitedStatus s) {
+                    return map("event", "unsolicited_status", "status", s.status());
+                }
+                if (ev instanceof DeviceEvent.SequenceError e) {
+                    return map("event", "sequence_error", "expected_seq", e.expectedSeq(),
+                        "received_seq", e.receivedSeq(), "reported_by_device", e.reportedByDevice());
+                }
+                if (ev instanceof DeviceEvent.Text t) {
+                    return map("event", "text", "cmd", t.cmd(), "text", t.text());
+                }
+                if (ev instanceof DeviceEvent.Temperature r) {
+                    return map("event", "temperature", "timestamp_us", Shapes.u64(r.timestampUs()), "celsius", r.celsius());
+                }
+                throw new IllegalStateException("event " + ev);
+            }
+        });
+        // The host-observed seq gaps (contract 01 §5 step 5): one packet per
+        // seqs entry (report 0x7F, payload 00 — each becomes a hex text event)
+        // goes in; once every packet's own event is out, the seq_gap events and
+        // stats.seq_gaps are the answer. A gap is surfaced ahead of its packet.
+        op("common_seq_gap", i -> {
+            List<Integer> seqs = new ArrayList<>();
+            for (Object o : arr(i.get("seqs"))) {
+                int s = I(o);
+                if (s < 0 || s > 0xFF) {
+                    throw new IllegalArgumentException("seq " + s + " is not a byte");
+                }
+                seqs.add(s);
+            }
+            FakeBoardLink link = new FakeBoardLink();
+            try (DepzDevice dev = new DepzDevice(link, Duration.ofSeconds(1));
+                    Subscription<DeviceEvent> events = dev.events(2 * seqs.size() + 8)) {
+                for (int s : seqs) {
+                    link.inject(Framing.buildPacket(0x7F, new byte[] {0}, s, CrcType.NONE));
+                }
+                List<Object> gaps = new ArrayList<>();
+                int texts = 0;
+                while (texts < seqs.size()) {
+                    DeviceEvent ev = events.take(Duration.ofSeconds(2));
+                    if (ev instanceof DeviceEvent.SeqGap g) {
+                        gaps.add(map("expected_seq", g.expectedSeq(), "received_seq", g.receivedSeq(), "missed", g.missed()));
+                    } else if (ev instanceof DeviceEvent.Text) {
+                        texts++;
+                    } else {
+                        throw new IllegalStateException("event " + ev);
+                    }
+                }
+                return map("gaps", gaps, "seq_gaps", dev.stats().seqGaps());
             }
         });
         op("sync_time_math", i -> {
@@ -441,6 +507,45 @@ public final class DifftestAdapter {
                     throw new IllegalArgumentException(kind);
             }
         });
+        // A control-channel response (contract 05 §4 table) decoded: its fields, or invalid
+        // when shorter than them (contract 07 §3).
+        op("bno086_control_decode", i -> {
+            String kind = S(i.get("kind"));
+            byte[] p = h(i.get("payload"));
+            switch (kind) {
+                case "feature_response": {
+                    Sh2Hub.FeatureResponse r = Sh2Hub.FeatureResponse.unpack(p);
+                    return map("sensor_id", r.sensorId(), "flags", r.flags(), "sensitivity", r.sensitivity(),
+                        "interval_us", r.intervalUs(), "batch_us", r.batchUs(), "cfg_word", r.cfgWord());
+                }
+                case "product_id": {
+                    Sh2Hub.ProductId r = Sh2Hub.ProductId.unpack(p);
+                    return map("reset_cause", r.resetCause(), "sw_version_major", r.swVersionMajor(),
+                        "sw_version_minor", r.swVersionMinor(), "sw_part_number", r.swPartNumber(),
+                        "sw_build_number", r.swBuildNumber(), "sw_version_patch", r.swVersionPatch());
+                }
+                case "command_response": {
+                    Sh2Hub.CommandResponse r = Sh2Hub.CommandResponse.unpack(p);
+                    List<Object> regs = new ArrayList<>();
+                    for (int k = 0; k < r.r().length; k++) {
+                        regs.add(r.r(k));
+                    }
+                    return map("seq", r.seq(), "command", r.command(), "command_seq", r.commandSeq(),
+                        "response_seq", r.responseSeq(), "r", regs);
+                }
+                case "frs_read_response": {
+                    Sh2Hub.FrsReadResponse r = Sh2Hub.FrsReadResponse.unpack(p);
+                    return map("status", r.status(), "data_length", r.dataLength(), "offset_words", r.offsetWords(),
+                        "data0", r.data0(), "data1", r.data1(), "frs_type", r.frsType());
+                }
+                case "frs_write_response": {
+                    Sh2Hub.FrsWriteResponse r = Sh2Hub.FrsWriteResponse.unpack(p);
+                    return map("status", r.status(), "offset_words", r.offsetWords());
+                }
+                default:
+                    throw new IllegalArgumentException(kind);
+            }
+        });
         op("bno086_input_cargo", i -> {
             List<Object> reports = new ArrayList<>();
             for (Reports.Report r : Reports.parseInputCargo(h(i.get("cargo")), L(i.get("capture_timestamp_us")))) {
@@ -458,6 +563,42 @@ public final class DifftestAdapter {
         op("bno086_gyro_rv", i -> {
             Reports.Report r = Reports.parseGyroRvCargo(h(i.get("cargo")), L(i.get("capture_timestamp_us")));
             return r == null ? null : Shapes.bno086Report(r);
+        });
+
+        // ── .depzrec / .depzdata readers (contracts 08, 09) ──
+        // `text` as a capture: every rx chunk the loose replay serves once the host has written
+        // more tx bytes than any event waits for, concatenated — or invalid for a damaged file.
+        op("depzrec_read", i -> {
+            Path path = tempFile(S(i.get("text")), ".depzrec");
+            try {
+                ReplayLink link = new ReplayLink(path, false, false);
+                link.write(new byte[65536]);
+                java.io.ByteArrayOutputStream rx = new java.io.ByteArrayOutputStream();
+                while (!link.rxExhausted()) {
+                    byte[] chunk = link.read(Duration.ZERO);
+                    if (chunk.length == 0) {
+                        break; // a gate 65536 tx bytes do not open: nothing more will come
+                    }
+                    rx.writeBytes(chunk);
+                }
+                link.close();
+                return map("rx", hex(rx.toByteArray()));
+            } finally {
+                deleteQuietly(path);
+            }
+        });
+        // `text` as a dataset: its records in reader order as [d, t, k] — or invalid for a damaged file.
+        op("depzdata_read", i -> {
+            Path path = tempFile(S(i.get("text")), ".depzdata");
+            try {
+                List<Object> records = new ArrayList<>();
+                for (Dataset.Record r : Dataset.read(path).records()) {
+                    records.add(List.of(r.deviceId(), r.tHostUs(), r.kind()));
+                }
+                return map("records", records);
+            } finally {
+                deleteQuietly(path);
+            }
         });
 
         // ── TMF8829 ──
@@ -598,6 +739,16 @@ public final class DifftestAdapter {
         op("vl53l7_model", i -> map("class",
             Vl53l7Uld.resolveModel(S(i.get("usb_model")), S(i.get("device_name"))).label));
 
+        // ── VL53L8 register bridge (contract 04) ──
+        op("vl53l8_encode", i -> {
+            String kind = S(i.get("kind"));
+            if ("start_stream".equals(kind)) {
+                return payload(ai.depz.sensor.protocol.Vl53l8.packStartStream(I(i.get("frame_size"))));
+            }
+            throw new IllegalArgumentException(kind);
+        });
+        op("vl53l8_decode", i -> Shapes.vl53l8Decode(I(i.get("report")), h(i.get("payload"))));
+
         // ── VL53L 1D family ──
         op("vl53lx_encode", i -> {
             String kind = S(i.get("kind"));
@@ -644,7 +795,8 @@ public final class DifftestAdapter {
 
         // ── VL53L8 advanced ──
         // The pure DCI codecs the driver methods call.
-        // set_xtalk_margin's own check (0..10000) lives in Vl53l8Uld.xtalkMarginToRaw.
+        // set_xtalk_margin's own check (whole kcps 0..10000, as ST) lives in Vl53l8Uld.xtalkMarginToRaw;
+        // a fraction is not an int (NotRepresentable -> invalid).
         op("vl53l8_motion_config", i -> map("pack", hex(Vl53l8Uld.defaultMotionConfig(I(i.get("resolution"))).pack())));
         op("vl53l8_detection_thresholds", i -> {
             List<Vl53l8Uld.DetectionThreshold> ths = new ArrayList<>();
@@ -656,7 +808,7 @@ public final class DifftestAdapter {
             Vl53l8Uld.PackedThresholds p = Vl53l8Uld.packDetectionThresholds(ths);
             return map("start_block", hex(p.start()), "valid_status", hex(p.valid()));
         });
-        op("vl53l8_xtalk_margin", i -> map("raw", Vl53l8Uld.xtalkMarginToRaw(D(i.get("kcps")))));
+        op("vl53l8_xtalk_margin", i -> map("raw", Vl53l8Uld.xtalkMarginToRaw(I32(i.get("kcps")))));
         op("vl53l8_cnh_decode", i -> {
             Map<String, Object> c = obj(i.get("config"));
             ai.depz.sensor.sensors.vl53l8.Vl53l8CnhSetup setup = new ai.depz.sensor.sensors.vl53l8.Vl53l8CnhSetup();
@@ -762,6 +914,25 @@ public final class DifftestAdapter {
             }
         }
         sb.append('"');
+    }
+
+    /** {@code text} written verbatim (UTF-8, LF as given) to a fresh temp file. */
+    static Path tempFile(String text, String suffix) {
+        try {
+            Path path = Files.createTempFile("depz-difftest-", suffix);
+            Files.writeString(path, text, StandardCharsets.UTF_8);
+            return path;
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (java.io.IOException e) {
+            // a leftover temp file is not an op result
+        }
     }
 
     static String handle(String line) {

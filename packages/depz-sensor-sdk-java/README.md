@@ -91,12 +91,12 @@ register-bridge driver (both variants) is an extension point and intentionally
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.7.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.8.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.7.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.8.0")
 ```
 
 Maven:
@@ -105,7 +105,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.7.0</version>
+  <version>0.8.0</version>
 </dependency>
 ```
 
@@ -124,6 +124,22 @@ JDK 21):
 ```
 
 The harness prints `TOTAL: N/N vector cases passed` and `ALL VECTORS PASSED`.
+
+### Coverage
+
+`mvn test` runs the same two harness mains (`RunVectors`, `RunDeviceTests`)
+under the JaCoCo agent and writes the report to
+`target/site/jacoco/index.html` (with `jacoco.xml` and `jacoco.csv` next to
+it). The build fails when line coverage of the whole jar drops below the floor
+in `pom.xml` (`jacoco.line.floor`, the measured total rounded down — raise it
+when the tests grow, never lower it to make a change pass). What a serial
+port needs (`SerialPortLink`, `SerialPorts`) has no hardware-free test and
+stays uncovered.
+
+**On real boards:** `java -cp "out:lib/*" ai.depz.sensor.test.LiveCheck [seconds] [port ...]` opens every DEPZ board on the machine, streams 10 s and
+prints its rate and a plausibility value — the centre distance of a ToF sensor,
+|gravity| of a BNO055. The Python, Rust, Java and C# SDKs carry the same check;
+on 2026-10-26 all four agreed on ten boards.
 
 ## Notes on parity
 

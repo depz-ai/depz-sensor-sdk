@@ -20,7 +20,8 @@ export interface FwDepzImage {
   payload: Uint8Array;
 }
 
-/** Validation order (contract 06 §2): magic → header CRC → size. */
+/** Validation order (contract 06 §2): magic → header CRC → size → section
+ *  0 of 1 (sections are 0-based; multi-section files are refused). */
 export function parseFwDepz(blob: Uint8Array): FwDepzImage {
   if (blob.length < FWDEPZ_HEADER_SIZE) {
     throw new FwDepzError(`file too short: ${blob.length} < ${FWDEPZ_HEADER_SIZE}`);
@@ -45,14 +46,14 @@ export function parseFwDepz(blob: Uint8Array): FwDepzImage {
   if (fwSize !== payload.length) {
     throw new FwDepzError(`fw_size=${fwSize} but payload is ${payload.length} bytes`);
   }
-  return {
-    loadAddr,
-    fwSize,
-    fwCrc32,
-    curSec: blob[20]!,
-    totSec: blob[21]!,
-    payload,
-  };
+  const curSec = blob[20]!;
+  const totSec = blob[21]!;
+  if (curSec !== 0 || totSec !== 1) {
+    throw new FwDepzError(
+      `section ${curSec} of ${totSec}: only section 0 of 1 is supported (multi-section files are not)`,
+    );
+  }
+  return { loadAddr, fwSize, fwCrc32, curSec, totSec, payload };
 }
 
 export function fwDepzPayloadCrcOk(img: FwDepzImage): boolean {

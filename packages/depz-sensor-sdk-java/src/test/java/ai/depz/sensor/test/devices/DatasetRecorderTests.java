@@ -12,6 +12,7 @@ import ai.depz.sensor.dataset.DatasetWriter;
 import ai.depz.sensor.dataset.PlayerState;
 import ai.depz.sensor.dataset.SessionRecorder;
 import ai.depz.sensor.devices.DepzDevice;
+import ai.depz.sensor.devices.InvalidStateException;
 import ai.depz.sensor.devices.Sr04Device;
 import ai.depz.sensor.protocol.Common;
 import ai.depz.sensor.protocol.Sr04;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** The dataset recorder, writer, reader and player (contract 09) over fake SR04 boards and temp files. */
 public final class DatasetRecorderTests {
@@ -45,13 +47,13 @@ public final class DatasetRecorderTests {
      */
     static final class FakeSr04Board {
         final FakeBoardLink link = new FakeBoardLink();
-        volatile long mcuTimeUs;
+        final AtomicLong mcuTimeUs = new AtomicLong();
         // 50 ms as the Python fake (C#: 1 ms): device time steps must exceed the gap between the two
         // devices' syncs, or the merged order depends on how fast add() ran.
         long samplePeriodUs = 50_000;
 
         FakeSr04Board(long mcuTimeUs) {
-            this.mcuTimeUs = mcuTimeUs;
+            this.mcuTimeUs.set(mcuTimeUs);
             link.onPacket = this::onPacket;
         }
 
@@ -60,8 +62,9 @@ public final class DatasetRecorderTests {
             if (cmd == Common.Cmd.SYNC_TIME.value) {
                 ByteBuffer r = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN);
                 r.put(p.payload(), 0, 8);
-                r.putLong(mcuTimeUs);
-                r.putLong(mcuTimeUs);
+                long now = mcuTimeUs.get();
+                r.putLong(now);
+                r.putLong(now);
                 return List.of(link.reply(Common.Rpt.SYNC_TIME.value, r.array()));
             }
             if (cmd == Common.Cmd.GET_SERIAL.value) {
@@ -91,10 +94,10 @@ public final class DatasetRecorderTests {
         }
 
         void sendMeasurement(int source, int echoUs) {
-            mcuTimeUs += samplePeriodUs;
+            long t = mcuTimeUs.addAndGet(samplePeriodUs);
             ByteBuffer p = ByteBuffer.allocate(11).order(ByteOrder.LITTLE_ENDIAN);
             p.put((byte) source);
-            p.putLong(mcuTimeUs);
+            p.putLong(t);
             p.putShort((short) echoUs);
             link.inject(link.reply(Sr04.Sr04Rpt.DATA.value, p.array()));
         }
@@ -136,7 +139,7 @@ public final class DatasetRecorderTests {
                     SessionRecorder rec = new SessionRecorder(path, "unit test", false, null)) {
                 eq(List.of("d0", "d1"), List.of(rec.add(devA), rec.add(devB)));
                 rec.start();
-                throwsType(IllegalStateException.class, () -> rec.add(devA));
+                throwsType(InvalidStateException.class, () -> rec.add(devA));
                 a.sendMeasurement(0x37);
                 Thread.sleep(20);
                 b.sendMeasurement(0x37);
@@ -191,6 +194,50 @@ public final class DatasetRecorderTests {
         }
     }
 
+    /**
+     * A VL53L4CD bridge whose common commands are refused (ERR_CMD_NOT_SUPPORTED) except the time sync:
+     * the recorder still registers it (no serial / software name: sensor type "unknown"), the
+     * temperature sampler skips the refused MCU readings, and the stream lands as {@code vl53l4} records
+     * at the measurement's host time (contract 09; Python test_dataset.py, the mute-device case).
+     */
+    public static void aVl53l4cdWithoutIdentityOrTemperatureIsStillRecorded() throws Exception {
+        FakeVl53l4Bridge l4 = new FakeVl53l4Bridge();
+        FakeSr04Board clock = new FakeSr04Board(1_000_000);
+        java.util.function.Function<Packet, List<byte[]>> bridge = l4.link.onPacket;
+        l4.link.onPacket = p -> p.cmd() == Common.Cmd.SYNC_TIME.value ? clock.link.onPacket.apply(p)
+                : p.cmd() < FakeVl53l4Bridge.READ_REG ? List.of(FakeBoardLink.status(p.cmd(), 0x07)) : bridge.apply(p);
+        Path dir = tempDir();
+        Path path = dir.resolve("l4.depzdata");
+        try {
+            String did;
+            try (ai.depz.sensor.devices.Vl53l4cdDevice dev = new ai.depz.sensor.devices.Vl53l4cdDevice(l4.link, Duration.ofMillis(500));
+                    SessionRecorder rec = new SessionRecorder(path, "", false, 50.0)) {
+                did = rec.add(dev);
+                dev.init();
+                dev.startRanging();
+                rec.start();
+                l4.sendResult(FakeVl53l4Bridge.resultBlock(624, 9, 3, 1200, 2048, 7));
+                check(until(() -> rec.recordsWritten() == 1, 2000), "the stream record");
+                // a few sampler periods: every MCU temperature reading is refused
+                long temps = Common.Cmd.GET_MCU_TEMPERATURE.value;
+                check(until(() -> l4.link.sentSnapshot().stream().filter(x -> x.cmd() == temps).count() >= 2, 2000),
+                        "the sampler asked");
+            }
+            Dataset reader = Dataset.read(path);
+            Map<?, ?> meta = (Map<?, ?>) reader.devices().get(did);
+            eq("unknown", meta.get("sensor_type"));
+            check(!meta.containsKey("serial") && !meta.containsKey("software_name"), "no identity: " + meta);
+            long offset = ((Number) ((Map<?, ?>) meta.get("time_sync")).get("offset_us")).longValue();
+            List<Dataset.Record> recs = reader.records();
+            eq(List.of("vl53l4"), recs.stream().map(Dataset.Record::kind).toList(), "no temperature records");
+            eq(l4.mcuTimeUs - offset, recs.get(0).tHostUs());
+            eq(obj("range_status", 0L, "distance_mm", 624L, "sigma_mm", 3L, "signal_rate_kcps", 1200L,
+                    "ambient_rate_kcps", 0L, "number_of_spad", 8L, "stream_count", 7L), recs.get(0).value());
+        } finally {
+            deleteTree(dir);
+        }
+    }
+
     public static void writerAndReaderRoundTripAndSortWithinADevice() throws Exception {
         Path dir = tempDir();
         Path path = dir.resolve("rt.depzdata");
@@ -204,6 +251,8 @@ public final class DatasetRecorderTests {
                     w.write((String) e[0], (Long) e[1], "event", obj("arr", List.of(1L, 2.5)));
                 }
                 eq(5L, w.recordsWritten());
+                w.close();
+                throwsType(InvalidStateException.class, () -> w.write("d0", 400L, "event", obj()));
             }
             Dataset r = Dataset.read(path);
             eq(DatasetWriter.SCHEMA, r.header().get("schema"));
@@ -474,10 +523,10 @@ public final class DatasetRecorderTests {
             q.play();
             q.tick();
             eq(0, got[0]);
-            throwsType(IllegalStateException.class, () -> q.await(Duration.ZERO));
+            throwsType(InvalidStateException.class, () -> q.await(Duration.ZERO));
             q.close();
             q.close();
-            throwsType(IllegalStateException.class, q::play);
+            throwsType(InvalidStateException.class, q::play);
         } finally {
             deleteTree(dir);
         }

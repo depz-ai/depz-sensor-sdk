@@ -254,12 +254,15 @@ Updates the **application** firmware (not the bootloader):
 
 ```python
 from depz_sensor_sdk import update_firmware
-update_firmware("/dev/ttyACM0", "app_tof_vl53l8.fwdepz", progress=print)
+name = update_firmware("/dev/ttyACM0", "app_tof_vl53l8.fwdepz", progress=print)
 # or: depz-sensor flash /dev/ttyACM0 app_tof_vl53l8.fwdepz
 ```
 
 It enters the bootloader, re-finds the device by serial, erases, writes pages
-with per-page CRC verification, checks the app CRC, and boots.
+with per-page CRC verification, checks the app CRC, boots, and waits (≤10 s)
+until the port answers with the application's software name, which it
+returns. A board that does not come back raises `ApplicationNotBackError`
+(a `DepzTimeoutError`) naming what it last saw: no port, or the bootloader.
 
 ## Testing without hardware
 

@@ -71,6 +71,11 @@ export class FakeSr04 {
   }
 
   /** Emit an RPT_DATA as the ISR callback would. */
+  /** An unsolicited RPT_TEXT, as firmware debug output: a `text` event. */
+  sendText(text: string): Promise<void> {
+    return this.text(0x04, text);
+  }
+
   async sendMeasurement(sourceCmd: number, echo?: number): Promise<void> {
     this.mcuTimeUs += BigInt(this.samplePeriodUs);
     const payload = new Uint8Array(11);

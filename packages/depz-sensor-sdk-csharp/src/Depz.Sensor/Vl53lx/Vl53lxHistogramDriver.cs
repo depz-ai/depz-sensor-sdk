@@ -99,7 +99,7 @@ public sealed class Vl53lxHistogramDriver : Vl53lxDriver
 
     /// <summary>The device preset mode: the VCSEL period, which sets where the phase wraps (1.6 / 2.4 / 4.0 m),
     /// and the valid phase window inside it (<see cref="ReachMm"/>). The bin is 199 mm wide in all three.</summary>
-    public override void SetMode(string name)
+    public override int? SetMode(string name)
     {
         if (!_modes.Contains(name))
             throw new ArgumentException($"no such mode: {name} (have {string.Join(", ", _modes)})", nameof(name));
@@ -109,6 +109,7 @@ public sealed class Vl53lxHistogramDriver : Vl53lxDriver
         // wire: put FM+ back or that write would switch the pad off under a 1 MHz bus.
         Bare.Img.StaticConfig["pad_i2c_hv__config"] = FmpPadConfig;
         SetRangeTiming(_budgetMs, _interMs);
+        return null;
     }
 
     public override string GetMode() => _mode;

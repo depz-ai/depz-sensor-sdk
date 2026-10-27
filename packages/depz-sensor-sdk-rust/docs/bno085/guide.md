@@ -23,9 +23,9 @@ shared across sensors — see the [common guide](../guide.md).
 
 ```rust
 use std::time::Duration;
-use depz_sensor_sdk::devices::open_on_link;
+use depz_sensor_sdk::devices::open_first_device;
 
-let imu = open_on_link(link, None, None, None)?.into_bno086()?;
+let imu = open_first_device(None)?.into_bno086()?;
 imu.hardware_reset(None)?;
 println!("{}", imu.product_id(None)?.sw_part_number);   // 10004563 = BNO086, 10004148 = BNO085
 let rv = imu.reports(Some(&[0x05]), 256);               // the rotation vector only
@@ -226,6 +226,7 @@ the WAKE pin, a hardware signal. "On" is the SH-2 command that ends sleep.
 - **Host→device frames must fit one MCU slot** — keep TX frames within
   [`MAX_TX_FRAME`](api.md) = 64 bytes (ERRATA E2). `ShtpLayer::reset` clears TX
   seq counters and partial cargos on a sensor reset.
-- **One device, any link** — `Bno086Device` runs over any `devices::Link`; the
-  layers below it work on bytes you supply, see the
+- **One device, any link** — `open_first_device` / `open_device(port, …)` open
+  the board's USB serial port; `Bno086Device` also runs over any `devices::Link`
+  (`open_on_link`), and the layers below it work on bytes you supply, see the
   [common guide](../guide.md#getting-started).

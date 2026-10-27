@@ -330,12 +330,18 @@ static int uld_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t i
 {
     uint16_t pll = 0, osc, a, b;
     uint32_t inter_raw;
+    /* contract 10 §5: refused before any register traffic, reads included */
+    if (budget_ms < 10 || budget_ms > 200 || (inter_ms > 0 && inter_ms <= budget_ms))
+        return depz_fail(DEPZ_E_ARG,
+                         "vl53l4cd: budget must be 10..200 ms and inter 0 or above the budget "
+                         "(got %lu / %lu)", (unsigned long)budget_ms, (unsigned long)inter_ms);
     if (inter_ms > 0) TRY(rd_word(dev, RESULT__OSC_CALIBRATE_VAL, &pll));
     TRY(rd_word(dev, OSC_FREQUENCY, &osc));
     if (depz_vl53l4_range_timing_registers(budget_ms, inter_ms, osc, pll, &a, &b, &inter_raw))
         return depz_fail(DEPZ_E_ARG,
-                         "vl53l4cd: budget must be 10..200 ms and inter 0 or above the budget "
-                         "(got %lu / %lu)", (unsigned long)budget_ms, (unsigned long)inter_ms);
+                         "vl53l4cd: range timing refused with osc_frequency 0x%04X, "
+                         "clock_pll 0x%04X (inter %lu ms)",
+                         osc, pll, (unsigned long)inter_ms);
     TRY(wr_dword(dev, INTERMEASUREMENT_MS, inter_raw));
     TRY(wr_word(dev, RANGE_CONFIG_A, a));
     return wr_word(dev, RANGE_CONFIG_B, b);
@@ -671,7 +677,7 @@ int depz_vl53l4cd_stop_ranging(depz_device *dev)
 
 int depz_vl53l4cd_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
 {
-    depz_vl53l4_result r;
+    depz_vl53l4_result r = {0};
     int rc;
     TRY(need_idle(dev));
     TRY(uld_start(dev));

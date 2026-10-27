@@ -27,10 +27,67 @@ caldata-blob API belongs to the older L5CX driver). On the L8CX, calibration
 save/restore IS the 776-byte xtalk blob — get_caldata_xtalk / set_caldata_xtalk.
 """
 
+from __future__ import annotations
+
 import struct
 from pathlib import Path
+from typing import Callable, Protocol, TypedDict
 
+from ..errors import InvalidStateError
 from ..protocol._wire import check_int, check_uint, checked_pack
+
+
+class UldPlatform(Protocol):
+    """What the ULD needs from the caller's `platform` object (module docstring)."""
+
+    def rd_multi(self, addr: int, size: int) -> bytes: ...
+
+    def wr_multi(self, addr: int, data: bytes) -> None: ...
+
+    def sleep_ms(self, ms: int) -> None: ...
+
+
+class MotionIndicator(TypedDict):
+    """Decoded MOTION_INDICATOR results block (see `VL53L8CX._parse_motion`)."""
+
+    global_indicator_1: int
+    global_indicator_2: int
+    status: int
+    nb_of_detected_aggregates: int
+    nb_of_aggregates: int
+    motion: list[int]            # one u32 per aggregate (32)
+
+
+class _FrameResultsBase(TypedDict):
+    distance_mm: list[int]       # mm, >= 0
+    target_status: list[int]
+    nb_target_detected: list[int]
+    signal_per_spad: list[float]  # kcps/SPAD
+    ambient_per_spad: list[float]  # kcps/SPAD
+    nb_spads_enabled: list[int]
+    range_sigma_mm: list[float]  # mm
+    reflectance: list[float]     # %
+    silicon_temp_degc: int
+    cnh_raw: bytes | None        # VL53L8CH CNH data block, when configured
+
+
+class FrameResults(_FrameResultsBase, total=False):
+    """`VL53L8CX.parse_frame()` result. `motion_indicator` is present only
+    when the motion indicator is configured (None if its block is missing)."""
+
+    motion_indicator: MotionIndicator | None
+
+
+class DetectionThreshold(TypedDict, total=False):
+    """One of the 64 detection thresholds (plugin struct, real units);
+    missing keys default to 0 in `set_detection_thresholds`."""
+
+    low_thresh: int
+    high_thresh: int
+    measurement: int
+    type: int
+    zone_num: int
+    operation: int
 
 # Absorbed from depz-usb-sensor-line/tof_vl53l8/tools/vl53l8cx_uld.py
 # (blob data relocated to package data under data/{cx,ch}).
@@ -61,7 +118,7 @@ _BLOB_FALLBACK_DIR = {
     'l7cx': VL53L8CX_DATA_DIR,
     'l7ch': VL53L8CH_DATA_DIR,
 }
-FW_CHECKSUM = {
+FW_CHECKSUM: dict[str, int | None] = {
     'cx': 0xCADF7CAF,
     'ch': 0x0C0B6C9E,
     'l7cx': None,        # ULD 2.0.1 has no checksum step at all
@@ -75,7 +132,7 @@ SI_REVISION_CUT12 = 0x02        # VL53L5CX / VL53L7CX / VL53L7CH
 SI_REVISION_L8    = 0x0C        # VL53L8CX / VL53L8CH
 
 
-def silicon_id_matches(device_id, revision_id, i2c):
+def silicon_id_matches(device_id: int, revision_id: int, i2c: bool) -> bool:
     """Whether the silicon ids are the sensor's (vl53l8cx_is_alive() /
     vl53lmz_is_alive()): (0xF0, 0x0C) on L8 over SPI; revision 0x02, or 0x01
     with device_id 0xF0, on L5/L7 over I2C."""
@@ -454,7 +511,7 @@ STATUS_NAMES = {
 
 
 class Vl53l8cxError(Exception):
-    def __init__(self, code, where=''):
+    def __init__(self, code: int, where: str = '') -> None:
         self.code = code
         name = STATUS_NAMES.get(code, hex(code))
         super().__init__(f'VL53L8CX {name} (code {code}) {where}'.rstrip())
@@ -467,7 +524,7 @@ def swap_buffer(data: bytes) -> bytes:
     return body + data[n * 4:]
 
 
-def _bh_fields(bh: int):
+def _bh_fields(bh: int) -> tuple[int, int, int]:
     """union Block_header: type[3:0], size[15:4], idx[31:16]."""
     return bh & 0xF, (bh >> 4) & 0xFFF, (bh >> 16) & 0xFFFF
 
@@ -479,7 +536,7 @@ def _bh_set_size(bh: int, size: int) -> int:
 class MotionConfig:
     """Mirror of VL53L8CX_Motion_Configuration (156 bytes, plugin source)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ref_bin_offset = 0
         self.detection_threshold = 0
         self.extra_noise_sigma = 0
@@ -518,10 +575,11 @@ class MotionConfig:
 
 
 class VL53L8CX:
-    def __init__(self, platform, variant: str = 'cx', data_dir: Path = None):
+    def __init__(self, platform: UldPlatform, variant: str = 'cx',
+                 data_dir: Path | None = None) -> None:
         if variant not in VARIANT_DATA_DIR:
             raise ValueError(f'unknown variant {variant!r}')
-        self.p = platform
+        self.p: UldPlatform = platform
         self.variant = variant
         self.i2c = variant in I2C_VARIANTS
         if data_dir is None:
@@ -542,7 +600,7 @@ class VL53L8CX:
             self._frame_tail = 24
             self._footer_id_off = 4
 
-        def blob(name):
+        def blob(name: str) -> bytes:
             path = data_dir / name
             if not path.exists() and variant in _BLOB_FALLBACK_DIR:
                 path = _BLOB_FALLBACK_DIR[variant] / name
@@ -553,30 +611,31 @@ class VL53L8CX:
         self.default_xtalk = blob('default_xtalk.bin')
         self.get_nvm_cmd = blob('get_nvm_cmd.bin')
         if len(self.firmware) != 0x15000:
-            raise ValueError(f'firmware.bin ({variant}) has wrong size — '
-                             f'rerun the blob extractor')
-        self.device_id = None
-        self.revision_id = None
-        self.module_type = None          # I2C variants: read after init()
-        self.resolution = None           # zones the last start_ranging used
+            raise InvalidStateError(f'firmware.bin ({variant}) has wrong size — '
+                                    f'rerun the blob extractor')
+        self.device_id: int | None = None
+        self.revision_id: int | None = None
+        self.module_type: int | None = None     # I2C variants: read after init()
+        self.resolution: int | None = None      # zones the last start_ranging used
         self.offset_data = b''
         self.xtalk_data  = b''
         self.streamcount = 255
         self.data_read_size = 0
-        self.frame_size_mismatch = None  # (fw, host) when FW disagrees
+        self.frame_size_mismatch: tuple[int, int] | None = None  # (fw, host) when FW disagrees
         self.xtalk_calibration_failed = False  # last calibrate_xtalk: nothing to calibrate
-        self.last_blocks = []            # [(idx, type, size)] of last frame
+        self.last_blocks: list[tuple[int, int, int]] = []  # [(idx, type, size)] of last frame
         self._motion_present = False     # motion-indicator output configured?
 
     # ---------------- low-level helpers ----------------
 
-    def _rd_byte(self, addr):
+    def _rd_byte(self, addr: int) -> int:
         return self.p.rd_multi(addr, 1)[0]
 
-    def _wr_byte(self, addr, value):
+    def _wr_byte(self, addr: int, value: int) -> None:
         self.p.wr_multi(addr, bytes([value]))
 
-    def _poll_for_answer(self, size, pos, address, mask, expected, where=''):
+    def _poll_for_answer(self, size: int, pos: int, address: int, mask: int,
+                         expected: int, where: str = '') -> None:
         """_vl53l8cx_poll_for_answer(): poll `size` bytes at `address` until
         buf[pos] & mask == expected. 10 ms period, 2 s timeout."""
         timeout = 0
@@ -591,7 +650,7 @@ class VL53L8CX:
             if (buf[pos] & mask) == expected:
                 return
 
-    def _poll_for_mcu_boot(self):
+    def _poll_for_mcu_boot(self) -> None:
         timeout = 0
         while timeout < 500:
             go2_status0 = self._rd_byte(0x06)
@@ -607,7 +666,7 @@ class VL53L8CX:
 
     # ---------------- DCI access ----------------
 
-    def dci_read_data(self, index, data_size):
+    def dci_read_data(self, index: int, data_size: int) -> bytearray:
         cmd = bytearray(12)
         cmd[0] = (index >> 8) & 0xFF
         cmd[1] = index & 0xFF
@@ -622,7 +681,7 @@ class VL53L8CX:
         buf = swap_buffer(buf)
         return bytearray(buf[4:4 + data_size])
 
-    def dci_write_data(self, index, data):
+    def dci_write_data(self, index: int, data: bytes | bytearray) -> None:
         data_size = len(data)
         footer = bytes([0x00, 0x00, 0x00, 0x0F, 0x05, 0x01,
                         ((data_size + 8) >> 8) & 0xFF, (data_size + 8) & 0xFF])
@@ -633,14 +692,15 @@ class VL53L8CX:
         self.p.wr_multi(address, buf)
         self._poll_for_answer(4, 1, UI_CMD_STATUS, 0xFF, 0x03, f'dci write 0x{index:04X}')
 
-    def dci_replace_data(self, index, data_size, new_data, new_data_pos):
+    def dci_replace_data(self, index: int, data_size: int, new_data: bytes,
+                         new_data_pos: int) -> None:
         data = self.dci_read_data(index, data_size)
         data[new_data_pos:new_data_pos + len(new_data)] = new_data
         self.dci_write_data(index, data)
 
     # ---------------- offset / xtalk upload ----------------
 
-    def _send_offset_data(self, resolution):
+    def _send_offset_data(self, resolution: int) -> None:
         buf = bytearray(self.offset_data[:OFFSET_BUFFER_SIZE])
 
         if resolution == RESOLUTION_4X4:
@@ -677,7 +737,7 @@ class VL53L8CX:
         self.p.wr_multi(0x2E18, bytes(buf))
         self._poll_for_answer(4, 1, UI_CMD_STATUS, 0xFF, 0x03, 'offset data')
 
-    def _send_xtalk_data(self, resolution):
+    def _send_xtalk_data(self, resolution: int) -> None:
         buf = bytearray(self.xtalk_data[:XTALK_BUFFER_SIZE])
 
         if resolution == RESOLUTION_4X4:
@@ -707,7 +767,7 @@ class VL53L8CX:
 
     # ---------------- public API ----------------
 
-    def is_alive(self):
+    def is_alive(self) -> tuple[int, int]:
         """Returns (device_id, revision_id) and caches them;
         silicon_id_matches() tells whether they are the sensor's."""
         self._wr_byte(0x7FFF, 0x00)
@@ -717,7 +777,7 @@ class VL53L8CX:
         self.device_id, self.revision_id = device_id, revision_id
         return device_id, revision_id
 
-    def _check_i2c_silicon(self):
+    def _check_i2c_silicon(self) -> None:
         """I2C variants only: refuse to boot an L5/L7 blob on anything but
         L5/L7 silicon (vl53lmz_is_alive())."""
         device_id, revision_id = self.is_alive()
@@ -727,11 +787,11 @@ class VL53L8CX:
                 f'not a VL53L5/L7 sensor: device_id=0x{device_id:02X} '
                 f'revision_id=0x{revision_id:02X}')
 
-    def init(self, progress=None):
+    def init(self, progress: Callable[[str], None] | None = None) -> None:
         """vl53l8cx_init(): boot the sensor MCU, download the 84 KB sensor
         firmware, upload NVM offset / xtalk / default configuration.
         `progress(text)` is an optional UI callback."""
-        def note(text):
+        def note(text: str) -> None:
             if progress:
                 progress(text)
 
@@ -865,7 +925,7 @@ class VL53L8CX:
         # (see FW_CHECKSUM). cx = ULD 2.1.0 FW; ch = VL53LMZ ULD 2.0.16 FW.
         # The L5/L7 ULD 2.0.1 (l7cx) publishes no checksum and skips the step.
         if self.fw_checksum is not None:
-            crc = struct.unpack('<I', swap_buffer(self.p.rd_multi(0x2FFC, 4)))[0]
+            crc: int = struct.unpack('<I', swap_buffer(self.p.rd_multi(0x2FFC, 4)))[0]
             if crc != self.fw_checksum:
                 raise Vl53l8cxError(STATUS_FW_CHECKSUM_FAIL,
                                     f'crc=0x{crc:08X} (expected 0x{self.fw_checksum:08X} '
@@ -902,11 +962,11 @@ class VL53L8CX:
         else:
             note('Sensor init done')
 
-    def get_resolution(self):
+    def get_resolution(self) -> int:
         buf = self.dci_read_data(DCI_ZONE_CONFIG, 8)
         return buf[0] * buf[1]
 
-    def set_resolution(self, resolution):
+    def set_resolution(self, resolution: int) -> None:
         if resolution == RESOLUTION_4X4:
             buf = self.dci_read_data(DCI_DSS_CONFIG, 16)
             buf[0x04] = 64
@@ -936,13 +996,13 @@ class VL53L8CX:
         self._send_offset_data(resolution)
         self._send_xtalk_data(resolution)
 
-    def get_ranging_frequency_hz(self):
+    def get_ranging_frequency_hz(self) -> int:
         return self.dci_read_data(DCI_FREQ_HZ, 4)[1]
 
-    def set_ranging_frequency_hz(self, hz):
+    def set_ranging_frequency_hz(self, hz: int) -> None:
         self.dci_replace_data(DCI_FREQ_HZ, 4, bytes([hz]), 0x01)
 
-    def set_ranging_mode(self, mode):
+    def set_ranging_mode(self, mode: int) -> None:
         buf = self.dci_read_data(DCI_RANGING_MODE, 8)
         if mode == RANGING_MODE_CONTINUOUS:
             buf[0x01] = 0x1
@@ -957,23 +1017,24 @@ class VL53L8CX:
         self.dci_write_data(DCI_RANGING_MODE, buf)
         self.dci_write_data(DCI_SINGLE_RANGE, struct.pack('<I', single_range))
 
-    def get_ranging_mode(self):
+    def get_ranging_mode(self) -> int:
         buf = self.dci_read_data(DCI_RANGING_MODE, 8)
         return RANGING_MODE_CONTINUOUS if buf[0x01] == 0x1 \
             else RANGING_MODE_AUTONOMOUS
 
-    def get_integration_time_ms(self):
+    def get_integration_time_ms(self) -> int:
         buf = self.dci_read_data(DCI_INT_TIME, 20)
-        return struct.unpack_from('<I', buf, 0)[0] // 1000
+        us: int = struct.unpack_from('<I', buf, 0)[0]
+        return us // 1000
 
-    def set_integration_time_ms(self, time_ms):
+    def set_integration_time_ms(self, time_ms: int) -> None:
         """Integration time 2..1000 ms. No effect in continuous ranging mode."""
         if not (2 <= time_ms <= 1000):
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_integration_time_ms')
         self.dci_replace_data(DCI_INT_TIME, 20,
                               struct.pack('<I', time_ms * 1000), 0x00)
 
-    def get_sharpener_percent(self):
+    def get_sharpener_percent(self) -> int:
         """Sharpener 0..99 %. Rounds to nearest: the register holds pct scaled
         to 0..255, and truncating the way back (as ST's C ULD does) loses a
         count for 95 of the 100 legal values — set(25) read back as 24. That
@@ -982,28 +1043,27 @@ class VL53L8CX:
         this host-side interpretation is."""
         return round(self.dci_read_data(DCI_SHARPENER, 16)[0xD] * 100 / 255)
 
-    def set_sharpener_percent(self, pct):
+    def set_sharpener_percent(self, pct: int) -> None:
         """Sharpener 0..99 % (0 = disabled)."""
         if pct >= 100:
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_sharpener_percent')
         self.dci_replace_data(DCI_SHARPENER, 16,
                               bytes([pct * 255 // 100]), 0xD)
 
-    def get_target_order(self):
+    def get_target_order(self) -> int:
         return self.dci_read_data(DCI_TARGET_ORDER, 4)[0]
 
-    def set_target_order(self, order):
+    def set_target_order(self, order: int) -> None:
         if order not in (TARGET_ORDER_CLOSEST, TARGET_ORDER_STRONGEST):
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_target_order')
         self.dci_replace_data(DCI_TARGET_ORDER, 4, bytes([order]), 0x0)
 
-    def start_ranging(self, cnh_data_size=None):
+    def start_ranging(self, cnh_data_size: int | None = None) -> None:
         """Start ranging. When `cnh_data_size` is given (bytes, from
         CnhConfig.required_memory), a VL53L8CH CNH data block is appended to the
         output list so each frame also carries the compact-network-histogram
-        buffer. The CNH frame is far larger than the MCU stream cap, so the
-        caller must read it in poll-mode (check_data_ready + get_ranging_data),
-        not via the MCU INT stream."""
+        buffer. The bridge streams such frames like any other, split into
+        RPT_VL53_FRAME chunks (contract 04 §7; recordings/vl53l8ch_cnh_8x8_15hz)."""
         resolution = self.get_resolution()
         # A 0 / non-standard resolution produces a zero-sized output config and
         # faults the sensor MCU (GO2 0x9C) instead of streaming. Refuse early
@@ -1015,8 +1075,8 @@ class VL53L8CX:
         self.streamcount = 255
 
         # All outputs enabled (default platform.h): bits 0..11
-        output_bh_enable = [0x00000FFF, 0, 0, self._output_enable_w3]
-        output = [START_BH, METADATA_BH, COMMONDATA_BH, AMBIENT_RATE_BH,
+        output_bh_enable: list[int] = [0x00000FFF, 0, 0, self._output_enable_w3]
+        output: list[int] = [START_BH, METADATA_BH, COMMONDATA_BH, AMBIENT_RATE_BH,
                   SPAD_COUNT_BH, NB_TARGET_DETECTED_BH, SIGNAL_RATE_BH,
                   RANGE_SIGMA_MM_BH, DISTANCE_BH, REFLECTANCE_BH,
                   TARGET_STATUS_BH, MOTION_DETECT_BH]
@@ -1075,19 +1135,19 @@ class VL53L8CX:
         # asserts equality, but the released FW blobs consistently report
         # 4 bytes less than the api.c formula — trust the FW value.
         buf = self.dci_read_data(0x5440, 12)
-        tmp = struct.unpack_from('<H', buf, 0x8)[0]
+        fw_size: int = struct.unpack_from('<H', buf, 0x8)[0]
         self.frame_size_mismatch = None
-        if tmp != self.data_read_size:
-            self.frame_size_mismatch = (tmp, self.data_read_size)
-            self.data_read_size = tmp
+        if fw_size != self.data_read_size:
+            self.frame_size_mismatch = (fw_size, self.data_read_size)
+            self.data_read_size = fw_size
 
         # Laser safety fault check
         buf = self.dci_read_data(0xE0C4, 8)
         if buf[0x6] != 0:
             raise Vl53l8cxError(STATUS_LASER_SAFETY)
 
-    def stop_ranging(self):
-        auto_stop_flag = struct.unpack('<I', self.p.rd_multi(0x2FFC, 4))[0]
+    def stop_ranging(self) -> None:
+        auto_stop_flag: int = struct.unpack('<I', self.p.rd_multi(0x2FFC, 4))[0]
         if auto_stop_flag != 0x4FF:
             self._wr_byte(0x7FFF, 0x00)
             # Provoke MCU stop
@@ -1116,7 +1176,7 @@ class VL53L8CX:
         self._wr_byte(0x09, 0x04)
         self._wr_byte(0x7FFF, 0x02)
 
-    def check_data_ready(self):
+    def check_data_ready(self) -> bool:
         buf = self.p.rd_multi(0x0, 4)
         if (buf[0] != self.streamcount and buf[0] != 255
                 and buf[1] == 0x05
@@ -1128,39 +1188,39 @@ class VL53L8CX:
             raise Vl53l8cxError(buf[2], 'GO2 error status')
         return False
 
-    def get_ranging_data(self):
+    def get_ranging_data(self) -> FrameResults:
         """Poll-mode read: fetch one results frame from reg 0x00 and parse it."""
         raw = self.p.rd_multi(0x0, self.data_read_size)
         return self.parse_frame(raw)
 
-    def parse_frame(self, raw):
+    def parse_frame(self, raw: bytes) -> FrameResults:
         """Parse one raw results frame (data_read_size bytes read from reg 0x00).
         Used both by poll-mode get_ranging_data() and by the host when the MCU
-        pushes frames over the INT-driven stream. Returns a dict with per-zone
-        lists distance_mm[int, >= 0], target_status, nb_target_detected,
+        pushes frames over the INT-driven stream. Returns a dict (`FrameResults`)
+        with per-zone lists distance_mm[int, >= 0], target_status, nb_target_detected,
         signal_per_spad (float kcps/SPAD), ambient_per_spad (float kcps/SPAD),
         nb_spads_enabled, range_sigma_mm (float mm), reflectance (float %), plus the
         per-frame scalar silicon_temp_degc."""
         self.streamcount = raw[0]
         buf = swap_buffer(raw)
 
-        results = {
-            'distance_mm':        [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE),
-            'target_status':      [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE),
-            'nb_target_detected': [0] * RESOLUTION_8X8,
-            'signal_per_spad':    [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE),
-            'ambient_per_spad':   [0] * RESOLUTION_8X8,
-            'nb_spads_enabled':   [0] * RESOLUTION_8X8,
-            'range_sigma_mm':     [0.0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE),
-            'reflectance':        [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE),
-            'silicon_temp_degc':  0,
-            'cnh_raw':            None,
-        }
+        # Raw register values first (ints, 64 zones); trimmed and scaled to
+        # real units below, then assembled into the result dict.
+        distance_raw:    list[int] = [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE)
+        target_status:   list[int] = [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE)
+        nb_target_det:   list[int] = [0] * RESOLUTION_8X8
+        signal_raw:      list[int] = [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE)
+        ambient_raw:     list[int] = [0] * RESOLUTION_8X8
+        nb_spads:        list[int] = [0] * RESOLUTION_8X8
+        sigma_raw:       list[int] = [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE)
+        reflectance_raw: list[int] = [0] * (RESOLUTION_8X8 * NB_TARGET_PER_ZONE)
+        silicon_temp_degc = 0
+        cnh_raw: bytes | None = None
 
         self.last_blocks = []
         i = 16
         while i + 4 <= self.data_read_size:
-            bh = struct.unpack_from('<I', buf, i)[0]
+            bh: int = struct.unpack_from('<I', buf, i)[0]
             bh_type, bh_size, bh_idx = _bh_fields(bh)
             msize = bh_type * bh_size if 0x1 < bh_type < 0xD else bh_size
             # The C driver reads into an oversized temp_buffer, so it walks past
@@ -1173,31 +1233,30 @@ class VL53L8CX:
             self.last_blocks.append((bh_idx, bh_type, bh_size))
 
             if bh_idx == METADATA_IDX:
-                results['silicon_temp_degc'] = \
-                    struct.unpack_from('<b', buf, i + 12)[0]
+                silicon_temp_degc = struct.unpack_from('<b', buf, i + 12)[0]
             elif bh_idx == DISTANCE_IDX:
-                results['distance_mm'] = list(
+                distance_raw = list(
                     struct.unpack_from('<%dh' % (msize // 2), buf, i + 4))
             elif bh_idx == TARGET_STATUS_IDX:
-                results['target_status'] = list(buf[i + 4:i + 4 + msize])
+                target_status = list(buf[i + 4:i + 4 + msize])
             elif bh_idx == NB_TARGET_DETECTED_IDX:
-                results['nb_target_detected'] = list(buf[i + 4:i + 4 + msize])
+                nb_target_det = list(buf[i + 4:i + 4 + msize])
             elif bh_idx == SIGNAL_RATE_IDX:
-                results['signal_per_spad'] = list(
+                signal_raw = list(
                     struct.unpack_from('<%dI' % (msize // 4), buf, i + 4))
             elif bh_idx == AMBIENT_RATE_IDX:
-                results['ambient_per_spad'] = list(
+                ambient_raw = list(
                     struct.unpack_from('<%dI' % (msize // 4), buf, i + 4))
             elif bh_idx == SPAD_COUNT_IDX:
-                results['nb_spads_enabled'] = list(
+                nb_spads = list(
                     struct.unpack_from('<%dI' % (msize // 4), buf, i + 4))
             elif bh_idx == RANGE_SIGMA_MM_IDX:
-                results['range_sigma_mm'] = list(
+                sigma_raw = list(
                     struct.unpack_from('<%dH' % (msize // 2), buf, i + 4))
             elif bh_idx == REFLECTANCE_EST_PC_IDX:
-                results['reflectance'] = list(buf[i + 4:i + 4 + msize])
+                reflectance_raw = list(buf[i + 4:i + 4 + msize])
             elif bh_idx == CNH_DATA_IDX:
-                results['cnh_raw'] = bytes(buf[i + 4:i + 4 + msize])
+                cnh_raw = bytes(buf[i + 4:i + 4 + msize])
 
             i += msize + 4
 
@@ -1206,31 +1265,38 @@ class VL53L8CX:
         # rest with zeros. Trim to the zones that exist.
         if self.i2c and self.resolution:
             n = self.resolution
-            for key in ('ambient_per_spad', 'nb_spads_enabled', 'nb_target_detected'):
-                del results[key][n:]
-            for key in ('distance_mm', 'target_status', 'signal_per_spad',
-                        'range_sigma_mm', 'reflectance'):
-                del results[key][n * NB_TARGET_PER_ZONE:]
+            for per_zone in (ambient_raw, nb_spads, nb_target_det):
+                del per_zone[n:]
+            for per_target in (distance_raw, target_status, signal_raw,
+                               sigma_raw, reflectance_raw):
+                del per_target[n * NB_TARGET_PER_ZONE:]
 
         # Convert to real units, as ST GetRangingData: distance /4 with a
         # negative distance clamped to 0; reflectance /2 (%); signal and
         # ambient /2048 (kcps/SPAD); sigma /128 (mm). ST divides integers; the
         # scaled values here keep their fraction (contract 04 §5).
-        results['distance_mm'] = [max(0, d // 4) for d in results['distance_mm']]
-        results['range_sigma_mm'] = [s / 128.0 for s in results['range_sigma_mm']]
-        results['reflectance'] = [r / 2.0 for r in results['reflectance']]
-        results['signal_per_spad'] = [s / 2048.0 for s in results['signal_per_spad']]
-        results['ambient_per_spad'] = [a / 2048.0 for a in results['ambient_per_spad']]
+        results: FrameResults = {
+            'distance_mm':        [max(0, d // 4) for d in distance_raw],
+            'target_status':      target_status,
+            'nb_target_detected': nb_target_det,
+            'signal_per_spad':    [s / 2048.0 for s in signal_raw],
+            'ambient_per_spad':   [a / 2048.0 for a in ambient_raw],
+            'nb_spads_enabled':   nb_spads,
+            'range_sigma_mm':     [s / 128.0 for s in sigma_raw],
+            'reflectance':        [r / 2.0 for r in reflectance_raw],
+            'silicon_temp_degc':  silicon_temp_degc,
+            'cnh_raw':            cnh_raw,
+        }
 
         # No target detected -> status 255. Iterate the zones actually present
         # in this frame (16 for 4x4, 64 for 8x8), not a fixed 64.
-        nzones = len(results['nb_target_detected'])
+        nzones = len(nb_target_det)
         for z in range(nzones):
-            if results['nb_target_detected'][z] == 0:
+            if nb_target_det[z] == 0:
                 for t in range(NB_TARGET_PER_ZONE):
                     idx = NB_TARGET_PER_ZONE * z + t
-                    if idx < len(results['target_status']):
-                        results['target_status'][idx] = 255
+                    if idx < len(target_status):
+                        target_status[idx] = 255
 
         # Motion indicator block (optional): global indicator + per-zone map.
         # Present when the motion detector is configured; harmless otherwise.
@@ -1245,7 +1311,7 @@ class VL53L8CX:
 
         return results
 
-    def _parse_motion(self, buf):
+    def _parse_motion(self, buf: bytes) -> MotionIndicator | None:
         """Extract the MOTION_INDICATOR results block (index 0xD858) if it was
         walked in the last frame. The block is a VL53L8CX_ResultsData
         MotionIndicator: global_indicator_1 (u32), global_indicator_2 (u32),
@@ -1257,7 +1323,7 @@ class VL53L8CX:
             # locate the block's byte offset again
             i = 16
             while i + 4 <= self.data_read_size:
-                bh = struct.unpack_from('<I', buf, i)[0]
+                bh: int = struct.unpack_from('<I', buf, i)[0]
                 t, s, idx = _bh_fields(bh)
                 msize = t * s if 0x1 < t < 0xD else s
                 if i + 4 + msize > self.data_read_size:
@@ -1265,7 +1331,7 @@ class VL53L8CX:
                 if idx == MOTION_DETEC_IDX:
                     g1, g2 = struct.unpack_from('<II', buf, i + 4)
                     status, nb_det, nb_agg, _sp = struct.unpack_from('<4B', buf, i + 12)
-                    motion = list(struct.unpack_from('<32I', buf, i + 16))
+                    motion: list[int] = list(struct.unpack_from('<32I', buf, i + 16))
                     return {
                         'global_indicator_1': g1,
                         'global_indicator_2': g2,
@@ -1279,7 +1345,7 @@ class VL53L8CX:
 
     # ---------------- power modes (vl53l8cx_api.c) ----------------
 
-    def get_power_mode(self):
+    def get_power_mode(self) -> int:
         self._wr_byte(0x7FFF, 0x00)
         tmp = self._rd_byte(0x09)
         if tmp == 0x04:
@@ -1297,7 +1363,7 @@ class VL53L8CX:
         self._wr_byte(0x7FFF, 0x02)
         return mode
 
-    def set_power_mode(self, power_mode):
+    def set_power_mode(self, power_mode: int) -> None:
         """WAKEUP (1), SLEEP (0) or DEEP_SLEEP (2). Not allowed while ranging.
         Wake from DEEP_SLEEP re-runs init() (the FW blob is lost)."""
         if self.variant == 'l7cx' and power_mode not in (POWER_MODE_SLEEP, POWER_MODE_WAKEUP):
@@ -1338,19 +1404,23 @@ class VL53L8CX:
 
     # ---------------- xtalk (vl53l8cx_plugin_xtalk.c) ----------------
 
-    def get_xtalk_margin(self):
-        """Xtalk margin in kcps/spad."""
+    def get_xtalk_margin(self) -> int:
+        """Xtalk margin, whole kcps/SPAD (raw // 2048, as ST)."""
         buf = self.dci_read_data(DCI_XTALK_CFG, 16)
-        return struct.unpack_from('<I', buf, 0)[0] / 2048.0
+        raw: int = struct.unpack_from('<I', buf, 0)[0]
+        return raw // 2048
 
-    def set_xtalk_margin(self, margin_kcps):
-        # 0..10000 kcps; below 0 (or NaN) is refused too, never wrapped (contract 07 §3)
+    def set_xtalk_margin(self, margin_kcps: int) -> None:
+        # As ST: a whole number of kcps/SPAD, 0..10000, written ×2048. A
+        # fraction, a negative or a bigger value is refused (contract 07 §3).
+        if isinstance(margin_kcps, bool) or not isinstance(margin_kcps, int):
+            raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_xtalk_margin: whole kcps')
         if not 0 <= margin_kcps <= 10000:
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'set_xtalk_margin')
-        raw = int(round(margin_kcps * 2048))
+        raw = margin_kcps * 2048
         self.dci_replace_data(DCI_XTALK_CFG, 16, struct.pack('<I', raw), 0x00)
 
-    def get_caldata_xtalk(self):
+    def get_caldata_xtalk(self) -> bytes:
         """Read the live 776-byte xtalk calibration blob back from the sensor
         FW (as produced by calibrate_xtalk). Restores the current resolution
         afterwards."""
@@ -1367,7 +1437,7 @@ class VL53L8CX:
         self.set_resolution(resolution)
         return self.xtalk_data
 
-    def set_caldata_xtalk(self, xtalk_data):
+    def set_caldata_xtalk(self, xtalk_data: bytes) -> None:
         """Restore a previously saved 776-byte xtalk calibration blob. The blob
         is re-uploaded to the FW by the next set_resolution()/start_ranging()."""
         if len(xtalk_data) != XTALK_BUFFER_SIZE:
@@ -1379,10 +1449,10 @@ class VL53L8CX:
 
     # ---------------- detection thresholds (plugin) ----------------
 
-    def get_detection_thresholds_enable(self):
+    def get_detection_thresholds_enable(self) -> int:
         return self.dci_read_data(DCI_DET_THRESH_GLOBAL_CONFIG, 8)[1]
 
-    def set_detection_thresholds_enable(self, enabled):
+    def set_detection_thresholds_enable(self, enabled: bool) -> None:
         grp = bytearray([0x01, 0x00, 0x01, 0x00])
         if enabled:
             grp[1] = 0x01
@@ -1393,11 +1463,11 @@ class VL53L8CX:
         self.dci_replace_data(DCI_DET_THRESH_GLOBAL_CONFIG, 8, bytes(grp), 0x00)
         self.dci_replace_data(DCI_DET_THRESH_CONFIG, 20, bytes([tmp]), 0x11)
 
-    def get_detection_thresholds(self):
+    def get_detection_thresholds(self) -> list[DetectionThreshold]:
         """Return the 64 detection thresholds as a list of dicts. Low/high are
         rescaled to real units for their measurement type."""
         raw = self.dci_read_data(DCI_DET_THRESH_START, NB_THRESHOLDS * 12)
-        out = []
+        out: list[DetectionThreshold] = []
         for k in range(NB_THRESHOLDS):
             low, high, meas, typ, zone, op = struct.unpack_from('<iiBBBB', raw, k * 12)
             scale = _THRESH_SCALE.get(meas, 1)
@@ -1411,7 +1481,7 @@ class VL53L8CX:
             })
         return out
 
-    def set_detection_thresholds(self, thresholds):
+    def set_detection_thresholds(self, thresholds: list[DetectionThreshold]) -> None:
         """Program the 64 detection thresholds. `thresholds` is a list of dicts
         (see get_detection_thresholds); missing entries default to zeros, more
         than 64 is a ValueError (never silently dropped)."""
@@ -1420,7 +1490,7 @@ class VL53L8CX:
         valid = bytes([0x05] * 8)
         packed = bytearray(NB_THRESHOLDS * 12)
         for k in range(NB_THRESHOLDS):
-            t = thresholds[k] if k < len(thresholds) else {}
+            t: DetectionThreshold = thresholds[k] if k < len(thresholds) else {}
             # a fraction, or anything out of its field's range (before or after
             # the scaling), is refused, never truncated or wrapped (contract 07 §3)
             meas = check_uint(f'thresholds[{k}].measurement', t.get('measurement', 0), 8)
@@ -1437,7 +1507,7 @@ class VL53L8CX:
         self.dci_write_data(DCI_DET_THRESH_VALID_STATUS, valid)
         self.dci_write_data(DCI_DET_THRESH_START, bytes(packed))
 
-    def set_detection_thresholds_auto_stop(self, auto_stop):
+    def set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None:
         if self.variant == 'l7cx':
             # Not in the VL53L5CX/L7CX ULD 2.0.1 thresholds plugin.
             raise Vl53l8cxError(STATUS_INVALID_PARAM,
@@ -1447,7 +1517,7 @@ class VL53L8CX:
 
     # ---------------- motion indicator (plugin) ----------------
 
-    def motion_indicator_init(self, resolution):
+    def motion_indicator_init(self, resolution: int) -> MotionConfig:
         """Initialize a motion-indicator configuration (default distance
         window) and write it to the sensor. Enables the motion output block so
         subsequent frames carry motion data."""
@@ -1469,7 +1539,13 @@ class VL53L8CX:
         self._motion_present = True
         return cfg
 
-    def motion_indicator_set_resolution(self, cfg, resolution):
+    def motion_indicator_disarm(self) -> None:
+        """Stop surfacing the motion block: frames parse without
+        `motion_indicator`. Called when the VL53LMZ CNH setup overwrites the
+        shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4)."""
+        self._motion_present = False
+
+    def motion_indicator_set_resolution(self, cfg: MotionConfig, resolution: int) -> None:
         if resolution == RESOLUTION_4X4:
             for i in range(16):
                 cfg.map_id[i] = i
@@ -1482,7 +1558,8 @@ class VL53L8CX:
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'motion set_resolution')
         self.dci_write_data(DCI_MOTION_DETECTOR_CFG, cfg.pack())
 
-    def motion_indicator_set_distance_motion(self, cfg, distance_min_mm, distance_max_mm):
+    def motion_indicator_set_distance_motion(self, cfg: MotionConfig, distance_min_mm: int,
+                                             distance_max_mm: int) -> None:
         if (distance_max_mm - distance_min_mm) > 1500 \
                 or distance_min_mm < 400 or distance_max_mm > 4000:
             raise Vl53l8cxError(STATUS_INVALID_PARAM, 'motion set_distance')
@@ -1493,7 +1570,7 @@ class VL53L8CX:
 
     # ---------------- xtalk calibration run (plugin) ----------------
 
-    def _program_xtalk_output_config(self, resolution):
+    def _program_xtalk_output_config(self, resolution: int) -> int:
         """_vlxxx_program_output_config() of the ST xtalk plugin (every
         version): the dedicated 17-block calibration output list, sized with
         the classic 0x54D0+960 rule, 24-byte tail. Used by every variant."""
@@ -1522,7 +1599,8 @@ class VL53L8CX:
                             struct.pack('<4I', *XTALK_CAL_OUTPUT_ENABLE))
         return data_read_size
 
-    def calibrate_xtalk(self, reflectance_percent, nb_samples, distance_mm):
+    def calibrate_xtalk(self, reflectance_percent: int, nb_samples: int,
+                        distance_mm: int) -> None:
         """vl53l8cx_calibrate_xtalk: run on-device crosstalk calibration.
 
         As every ST version: the firmware's own calibration table, then the
@@ -1541,7 +1619,7 @@ class VL53L8CX:
         footer = bytes([0x00, 0x00, 0x00, 0x0F, 0x00, 0x01, 0x03, 0x04])
         cmd = bytes([0x00, 0x03, 0x00, 0x00])
         # save current config
-        saved = {
+        saved: dict[str, int] = {
             'resolution': self.get_resolution(),
             'frequency': self.get_ranging_frequency_hz(),
             'integration': self.get_integration_time_ms(),

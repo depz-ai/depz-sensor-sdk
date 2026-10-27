@@ -134,7 +134,7 @@ public class DepzDevice implements AutoCloseable {
 
     /** Hand an event to the event subscribers (a sensor class's own events). */
     protected void emitEvent(DeviceEvent event) {
-        core.events.emit(event);
+        core.events.emit(event, core.stats);
     }
 
     // ── events ───────────────────────────────────────────────────────────────
@@ -258,7 +258,7 @@ public class DepzDevice implements AutoCloseable {
     public long toHostTimeUs(long deviceTimestampUs) {
         TimeSyncResult s = core.timeSync;
         if (s == null) {
-            throw new IllegalStateException("call syncTime() first");
+            throw new InvalidStateException("call syncTime() first");
         }
         return deviceTimestampUs - s.offsetUs();
     }
@@ -276,7 +276,7 @@ public class DepzDevice implements AutoCloseable {
 
     /** Set the device → host payload CRC mode (host → device is per packet: {@link #setTxCrcType}). */
     public void setReportPayloadCrc(CrcType crcType) {
-        requestOk(Common.Cmd.SET_PAYLOAD_CRC_TYPE.value, new byte[] {(byte) crcType.value});
+        requestOk(Common.Cmd.SET_PAYLOAD_CRC_TYPE.value, Common.packSetPayloadCrcType(crcType.value));
     }
 
     public Common.SyncPinConfig getSyncPin(int pin) {
@@ -339,7 +339,7 @@ public class DepzDevice implements AutoCloseable {
         void close() {
             closing = true;
             link.close();
-            if (Thread.currentThread() != reader && reader.isAlive()) {
+            if (!Thread.currentThread().equals(reader) && reader.isAlive()) {
                 try {
                     reader.join(2000);
                 } catch (InterruptedException e) {
@@ -353,8 +353,8 @@ public class DepzDevice implements AutoCloseable {
                 byte[] frame = Framing.buildPacket(cmd, payload, txSeq, crcType);
                 link.write(frame);
                 txSeq = (txSeq + 1) & 0xFF;
-                stats.txPackets++;
-                stats.txBytes += frame.length;
+                stats.txPackets.incrementAndGet();
+                stats.txBytes.addAndGet(frame.length);
             }
         }
 
@@ -413,7 +413,7 @@ public class DepzDevice implements AutoCloseable {
         }
 
         private void emit(DeviceEvent e) {
-            events.emit(e);
+            events.emit(e, stats);
         }
 
         private void readerLoop() {
@@ -432,21 +432,21 @@ public class DepzDevice implements AutoCloseable {
                     if (data.length == 0) {
                         continue;
                     }
-                    stats.rxBytes += data.length;
+                    stats.rxBytes.addAndGet(data.length);
                     for (Event ev : parser.feed(data)) {
                         if (ev instanceof Packet pkt) {
-                            stats.rxPackets++;
+                            stats.rxPackets.incrementAndGet();
                             trackSeq(pkt.seq());
                             dispatch(pkt);
                         } else if (ev instanceof CrcError ce) {
-                            stats.crcErrors++;
+                            stats.crcErrors.incrementAndGet();
                             emit(new DeviceEvent.LinkCrcError(ce.cmd(), ce.seq()));
                         } else if (ev instanceof Trash tr) {
-                            stats.trashBytes += tr.data().length;
+                            stats.trashBytes.addAndGet(tr.data().length);
                             emit(new DeviceEvent.Trash(tr.data()));
                         }
                     }
-                    stats.headerErrors = parser.headerErrors;
+                    stats.headerErrors.set(parser.headerErrors);
                 }
             } catch (RuntimeException e) {
                 // A callback or handler threw: the reader is gone, as in the reference SDK.
@@ -464,8 +464,13 @@ public class DepzDevice implements AutoCloseable {
         }
 
         private void trackSeq(int seq) {
-            if (lastRxSeq >= 0 && seq != ((lastRxSeq + 1) & 0xFF)) {
-                stats.seqGaps++;
+            // The first packet after open is no gap; a gap is surfaced ahead of its packet.
+            if (lastRxSeq >= 0) {
+                int expected = (lastRxSeq + 1) & 0xFF;
+                if (seq != expected) {
+                    stats.seqGaps.incrementAndGet();
+                    emit(new DeviceEvent.SeqGap(expected, seq, (seq - expected) & 0xFF));
+                }
             }
             lastRxSeq = seq;
         }
@@ -531,17 +536,19 @@ public class DepzDevice implements AutoCloseable {
             }
             if (claimed != null) {
                 if (bad != null) {
-                    claimed.fail(new DepzException(String.format("reply to cmd 0x%02X does not decode: %s",
-                            claimed.cmd, bad.getMessage()), bad));
+                    claimed.fail(new InvalidReplyException(claimed.cmd, bad));
                 } else {
                     claimed.complete(result);
                 }
                 return;
             }
 
-            if (pkt.cmd() == Common.Rpt.SEQUENCE_ERROR.value && payload.length == 2) {
+            // Contract 07 §3: a report longer than its fields is decoded and the tail
+            // ignored (a newer firmware may append fields); a shorter one is not a
+            // report of that kind and stays visible as hex text below.
+            if (pkt.cmd() == Common.Rpt.SEQUENCE_ERROR.value && payload.length >= 2) {
                 Common.SequenceErrorReport rep = Common.SequenceErrorReport.unpack(payload);
-                stats.deviceSeqErrors++;
+                stats.deviceSeqErrors.incrementAndGet();
                 emit(new DeviceEvent.SequenceError(rep.expectedSeq(), rep.receivedSeq(), true));
                 return;
             }
@@ -550,7 +557,7 @@ public class DepzDevice implements AutoCloseable {
                 emit(new DeviceEvent.Text(rep.cmd(), rep.text()));
                 return;
             }
-            if (pkt.cmd() == Common.Rpt.TEMPERATURE.value && payload.length == 10) {
+            if (pkt.cmd() == Common.Rpt.TEMPERATURE.value && payload.length >= 10) {
                 Common.TemperatureReport rep = Common.TemperatureReport.unpack(payload);
                 emit(new DeviceEvent.Temperature(rep.timestampUs(), rep.celsius()));
                 return;

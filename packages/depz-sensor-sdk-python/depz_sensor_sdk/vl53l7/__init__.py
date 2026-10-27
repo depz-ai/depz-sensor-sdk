@@ -22,9 +22,11 @@ no deep sleep and no threshold auto-stop.
 from __future__ import annotations
 
 import warnings
+from typing import Callable
 
 from ..protocol.vl53l7 import (
     READ_MAX_LEN,
+    STREAM_CHUNK_MAX,
     WRITE_MAX_LEN,
     I2cError,
     PinAction,
@@ -82,11 +84,18 @@ class Vl53l7cx(Vl53l8cx):
     _VARIANT = "l7cx"
     _READ_CHUNK = READ_MAX_LEN
     _WRITE_CHUNK = WRITE_MAX_LEN
+    _STREAM_CHUNK = STREAM_CHUNK_MAX
     _MIN_RANGING_HZ = MIN_RANGING_FREQUENCY_HZ
     #: module_type this class expects after init() (L5 and L7 share a blob).
     _MODULE_TYPE = MODULE_TYPE_MZEVO
 
-    def init(self, variant=None, *, progress=None, write_progress=None) -> None:
+    def init(
+        self,
+        variant: str | None = None,
+        *,
+        progress: Callable[[str], None] | None = None,
+        write_progress: Callable[[int, int], None] | None = None,
+    ) -> None:
         """Initialize the sensor: firmware blob download + default config.
 
         Refuses non-L5/L7 silicon. After the sensor firmware runs, its

@@ -220,9 +220,11 @@ impl DatasetPlayer {
                 st.idx = 0;
             }
             self.inner.anchor(&mut st, (self.inner.clock)());
-            self.inner.set_state(&mut st, PlayerState::Playing, &mut changes);
+            self.inner
+                .set_state(&mut st, PlayerState::Playing, &mut changes);
             if self.inner.recs.is_empty() {
-                self.inner.set_state(&mut st, PlayerState::Done, &mut changes);
+                self.inner
+                    .set_state(&mut st, PlayerState::Done, &mut changes);
             } else if self.inner.threaded && st.thread.is_none() {
                 let inner = self.inner.clone();
                 st.thread = Some(
@@ -246,7 +248,8 @@ impl DatasetPlayer {
         if st.state != PlayerState::Playing {
             return;
         }
-        self.inner.set_state(&mut st, PlayerState::Paused, &mut changes);
+        self.inner
+            .set_state(&mut st, PlayerState::Paused, &mut changes);
         self.inner.bump(&mut st);
         // Once pause returns no record callback runs: wait out one on another thread.
         let me = std::thread::current().id();
@@ -262,7 +265,9 @@ impl DatasetPlayer {
     /// [`DepzError::InvalidArgument`].
     pub fn seek_us(&self, offset_us: f64) -> Result<()> {
         if offset_us.is_nan() {
-            return Err(DepzError::InvalidArgument("seek_us: offset must be a number".into()));
+            return Err(DepzError::InvalidArgument(
+                "seek_us: offset must be a number".into(),
+            ));
         }
         let mut changes = Vec::new();
         let mut st = self.inner.lock();
@@ -277,7 +282,8 @@ impl DatasetPlayer {
         st.idx = recs.partition_point(|r| (r.t as f64) < target);
         if st.state == PlayerState::Playing {
             if st.idx >= recs.len() {
-                self.inner.set_state(&mut st, PlayerState::Done, &mut changes);
+                self.inner
+                    .set_state(&mut st, PlayerState::Done, &mut changes);
             } else {
                 self.inner.anchor(&mut st, (self.inner.clock)());
             }
@@ -306,7 +312,9 @@ impl DatasetPlayer {
     /// [`DepzError::InvalidState`].
     pub fn wait(&self, timeout: Option<Duration>) -> Result<bool> {
         if !self.inner.threaded {
-            return Err(DepzError::InvalidState("wait() needs threaded = true; drive tick() instead".into()));
+            return Err(DepzError::InvalidState(
+                "wait() needs threaded = true; drive tick() instead".into(),
+            ));
         }
         let end = timeout.map(|t| Instant::now() + t);
         let mut st = self.inner.lock();
@@ -334,7 +342,8 @@ impl DatasetPlayer {
                 return;
             }
             if st.state == PlayerState::Playing {
-                self.inner.set_state(&mut st, PlayerState::Paused, &mut changes);
+                self.inner
+                    .set_state(&mut st, PlayerState::Paused, &mut changes);
             }
             st.closed = true;
             self.inner.bump(&mut st);
@@ -358,13 +367,18 @@ impl Drop for DatasetPlayer {
 
 fn check_speed(value: f64) -> Result<f64> {
     if !value.is_finite() || value < 0.0 {
-        return Err(DepzError::InvalidArgument(format!("speed must be a finite number >= 0, got {value}")));
+        return Err(DepzError::InvalidArgument(format!(
+            "speed must be a finite number >= 0, got {value}"
+        )));
     }
     Ok(value)
 }
 
 fn panic_text(p: &(dyn std::any::Any + Send)) -> String {
-    p.downcast_ref::<&str>().map(|s| s.to_string()).or_else(|| p.downcast_ref::<String>().cloned()).unwrap_or_else(|| "a record callback panicked".into())
+    p.downcast_ref::<&str>()
+        .map(|s| s.to_string())
+        .or_else(|| p.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "a record callback panicked".into())
 }
 
 impl Inner {
@@ -380,7 +394,10 @@ impl Inner {
     // The media clock restarts at `now` from the last delivered record's t (the first's when none was).
     fn anchor(&self, st: &mut St, now: f64) {
         st.anchor_wall = now;
-        st.anchor_t = self.recs.get(st.idx.saturating_sub(1)).map_or(0.0, |r| r.t as f64);
+        st.anchor_t = self
+            .recs
+            .get(st.idx.saturating_sub(1))
+            .map_or(0.0, |r| r.t as f64);
     }
 
     fn media_now(&self, st: &St, now: f64) -> f64 {
@@ -455,7 +472,10 @@ impl Inner {
                 Step::Failed(p)
             }
         };
-        if matches!(out, Step::Delivered) && st.state == PlayerState::Playing && st.idx >= self.recs.len() {
+        if matches!(out, Step::Delivered)
+            && st.state == PlayerState::Playing
+            && st.idx >= self.recs.len()
+        {
             self.set_state(&mut st, PlayerState::Done, &mut changes);
             self.bump(&mut st);
         }
@@ -469,7 +489,12 @@ impl Inner {
                 Step::Delivered => {}
                 Step::Failed(p) => {
                     let text = panic_text(&*p);
-                    let cbs: Vec<ErrorCb> = self.lock().error_cbs.iter().map(|(_, c)| c.clone()).collect();
+                    let cbs: Vec<ErrorCb> = self
+                        .lock()
+                        .error_cbs
+                        .iter()
+                        .map(|(_, c)| c.clone())
+                        .collect();
                     for cb in cbs {
                         cb(&text);
                     }
@@ -480,7 +505,11 @@ impl Inner {
                         return;
                     }
                     if st.generation == gen {
-                        drop(self.changed.wait_timeout(st, Duration::from_secs_f64(w)).unwrap());
+                        drop(
+                            self.changed
+                                .wait_timeout(st, Duration::from_secs_f64(w))
+                                .unwrap(),
+                        );
                     }
                 }
                 Step::Idle(gen) => {

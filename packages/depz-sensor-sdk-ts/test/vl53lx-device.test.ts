@@ -10,7 +10,7 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import { DepzError, DepzTimeoutError, StatusError } from "../src/index.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, StatusError } from "../src/index.js";
 import { SensorDriver, measurement, type Measurement } from "../src/sensors/vl53lx/uld/base.js";
 import { phaseWindowMm } from "../src/sensors/vl53lx/uld/vl53l1-die.js";
 import { NotImplementedError } from "../src/sensors/vl53lx/uld/registry.js";
@@ -128,8 +128,8 @@ describe("vl53lx init", () => {
     expect(dev.initialized).toBe(false);
     expect(dev.product).toBeNull();
     expect(dev.driverKind).toBeNull();
-    expect(() => dev.driver).toThrow(/call init\(\) first/);
-    expect(() => dev.supports("offset")).toThrow(DepzError);
+    expect(() => dev.driver).toThrow(InvalidStateError);
+    expect(() => dev.supports("offset")).toThrow(InvalidStateError);
     // every Promise-returning method rejects, it never throws at the call
     await expect(dev.getOffsetMm()).rejects.toThrow(/init/);
   });
@@ -226,7 +226,7 @@ describe("vl53lx init", () => {
     const { dev, fake } = await connect(UNSTAMPED);
     expect(await dev.detected()).toBeNull();
     expect(await dev.driverKinds()).toEqual([]);
-    await expect(dev.init()).rejects.toThrow(/carries no product number/);
+    await expect(dev.init()).rejects.toThrow(InvalidStateError);
     expect(fake.sent(CMD.setAddrWidth)).toHaveLength(0);
     await dev.init(undefined, { product: "VL53L4CD" });
     expect(dev.product).toBe("VL53L4CD");
@@ -307,9 +307,16 @@ describe("vl53lx bridge", () => {
   });
 
   it("a short register read is a ProtocolError", async () => {
-    const { dev } = await connect();
-    // the register file ends at 0xFFFF: the fake answers one byte of two
-    await expect(dev.bridge.readReg(0xffff, 2)).rejects.toThrow(ProtocolError);
+    const { dev, fake } = await connect();
+    fake.truncateNextRead = 1; // the bridge answers one byte of two
+    await expect(dev.bridge.readReg(0x0089, 2)).rejects.toThrow(ProtocolError);
+  });
+
+  it("a read past 0xFFFF is refused before the wire (contract 12 §2 / 10 §1, ERRATA A13)", async () => {
+    const { dev, fake } = await connect();
+    const reads = fake.sent(CMD.readReg).length;
+    await expect(dev.bridge.readReg(0xffff, 2)).rejects.toThrow(RangeError);
+    expect(fake.sent(CMD.readReg).length).toBe(reads);
   });
 
   it("no answer is a ProtocolError too", async () => {
@@ -714,7 +721,7 @@ describe("vl53lx ranging (stream)", () => {
       () => dev.startRanging(),
       () => dev.measureOnce(),
     ]) {
-      await expect(call()).rejects.toThrow(/stopRanging\(\) first/);
+      await expect(call()).rejects.toThrow(InvalidStateError);
     }
     expect(fake.rx).toHaveLength(0);
   });

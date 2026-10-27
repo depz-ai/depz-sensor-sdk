@@ -129,7 +129,11 @@ public final class Sr04Device extends DepzDevice {
         if (measurements == null || packet.cmd() != Sr04.Sr04Rpt.DATA.value || packet.payload().length < DATA_MIN_BYTES) {
             return false;
         }
-        measurements.emit(Sr04Measurement.from(Sr04.Sr04Data.unpack(packet.payload())));
+        Sr04Measurement m = Sr04Measurement.from(Sr04.Sr04Data.unpack(packet.payload()));
+        if (m == null) {
+            return false;
+        }
+        measurements.emit(m, stats());
         return true;
     }
 

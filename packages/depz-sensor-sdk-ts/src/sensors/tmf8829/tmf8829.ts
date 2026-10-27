@@ -10,7 +10,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   TMF8829_INT_HISTOGRAMS,
@@ -280,7 +280,7 @@ export class Tmf8829 extends DepzDevice {
     if (!(preset in TMF8829_PRESETS)) {
       return Promise.reject(new RangeError(`unknown preset ${preset}; one of ${Object.keys(TMF8829_PRESETS).join(", ")}`));
     }
-    if (this.streamingFlag) return Promise.reject(new DepzError("configure() while streaming: stop() first"));
+    if (this.streamingFlag) return Promise.reject(new InvalidStateError("configure() while streaming: stop() first"));
     const peaks = opts.nrPeaks ?? 1;
     // The 3-bit field takes 0..7, the sensor reports at most 4 peaks.
     if (!Number.isInteger(peaks) || peaks < 1 || peaks > 4) {
@@ -541,7 +541,7 @@ export class Tmf8829 extends DepzDevice {
       if (raw === null) return true;
       const m = this.builder.add(raw.data, Number(raw.timestampUs), Number(raw.edgeUs));
       if (m !== null) {
-        for (const cb of [...this.measCbs]) cb(m);
+        for (const cb of [...this.measCbs]) this.callGuarded(cb, m);
         for (const q of [...this.measQueues]) q.push(m);
       }
       return true;
@@ -550,7 +550,7 @@ export class Tmf8829 extends DepzDevice {
       if (pkt.payload.length < 12) return true;
       const ev = unpackTmf8829Event(pkt.payload);
       if (ev.code === Tmf8829EventCode.BadHeader && this.stopping) return true; // expected on STOP (contract 14 §2)
-      for (const cb of [...this.interruptCbs]) cb(ev);
+      for (const cb of [...this.interruptCbs]) this.callGuarded(cb, ev);
       return true;
     }
     return false;

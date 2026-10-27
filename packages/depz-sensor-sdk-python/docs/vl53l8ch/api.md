@@ -22,7 +22,7 @@ the source, not this file.
 ### Vl53l8ch
 
 ```python
-class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Vl53l8ch(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 VL53L8CH device: the VL53L8CX superset. Inherits every CX method and
@@ -38,6 +38,9 @@ configure_cnh(self, config: depz_sensor_sdk.vl53l8.cnh.CnhConfig) -> None
 
 Arm the CNH histogram block for the next start_ranging(). CH only —
 this method does not exist on Vl53l8cx.
+
+CNH and the motion indicator share one DCI struct (0xBFAC): this
+disarms the motion indicator (frames carry no `.motion`).
 
 #### Vl53l8ch.cnh_config *(property)*
 
@@ -106,10 +109,13 @@ Configured ranging frequency in Hz.
 set_ranging_frequency_hz(self, hz: int) -> None
 ```
 
-Set the ranging frequency in Hz (must be ≥ 2). Not while ranging.
+Set the ranging frequency in Hz. Not while ranging.
 
-Max is 60 Hz at 4×4 and 15 Hz at 8×8; below 2 Hz the sensor never
-enters its ranging loop and streams nothing (contract 04).
+At least 2 Hz on the VL53L8 (below that the sensor never enters its
+ranging loop and streams nothing, contract 04), 1 Hz on L5/L7; at
+most 60 Hz at 4×4 and 15 Hz at 8×8 (contract 11 §3) — judged by the
+resolution last set or read through this class (4×4 after init).
+Refused host-side, nothing reaches the bus.
 
 #### Vl53l8ch.get_ranging_mode
 
@@ -198,14 +204,18 @@ DEEP_SLEEP re-downloads the firmware blob (init()).
 #### Vl53l8ch.get_xtalk_margin
 
 ```python
-get_xtalk_margin(self) -> float
+get_xtalk_margin(self) -> int
 ```
+
+Xtalk margin, whole kcps/SPAD (as ST).
 
 #### Vl53l8ch.set_xtalk_margin
 
 ```python
-set_xtalk_margin(self, margin_kcps: float) -> None
+set_xtalk_margin(self, margin_kcps: int) -> None
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST).
 
 #### Vl53l8ch.calibrate_xtalk
 
@@ -249,13 +259,13 @@ set_detection_thresholds_enable(self, enabled: bool) -> None
 #### Vl53l8ch.get_detection_thresholds
 
 ```python
-get_detection_thresholds(self) -> list[dict]
+get_detection_thresholds(self) -> list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]
 ```
 
 #### Vl53l8ch.set_detection_thresholds
 
 ```python
-set_detection_thresholds(self, thresholds: list[dict]) -> None
+set_detection_thresholds(self, thresholds: list[depz_sensor_sdk.vl53l8.uld.DetectionThreshold]) -> None
 ```
 
 Program the 64 detection thresholds (interrupt-on-threshold). Each
@@ -271,12 +281,15 @@ set_detection_thresholds_auto_stop(self, auto_stop: bool) -> None
 #### Vl53l8ch.configure_motion_indicator
 
 ```python
-configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500)
+configure_motion_indicator(self, distance_min_mm: int = 400, distance_max_mm: int = 1500) -> depz_sensor_sdk.vl53l8.uld.MotionConfig
 ```
 
 Enable the motion indicator over [distance_min_mm, distance_max_mm]
 and surface motion output in each frame's `.motion`. Returns the
 underlying uld MotionConfig for advanced tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct
+(0xBFAC): this disarms CNH (`cnh_config` → None, no `cnh_raw`).
 
 #### Vl53l8ch.start_ranging
 
@@ -305,7 +318,7 @@ Subscribe to parsed frames (reader-thread context; don't block).
 #### Vl53l8ch.frames
 
 ```python
-frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator
+frames(self, maxsize: int = 8) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.vl53l8.Vl53l8Frame]
 ```
 
 Blocking iterator over parsed frames (bounded, drop-oldest).
@@ -355,7 +368,7 @@ do not block). Returns an unsubscribe function.
 #### Vl53l8ch.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -372,7 +385,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Vl53l8ch.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -382,12 +395,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Vl53l8ch.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -395,7 +410,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Vl53l8ch.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -500,7 +515,7 @@ module (contract 06).
 ### CnhConfig
 
 ```python
-class CnhConfig()
+class CnhConfig() -> None
 ```
 
 Mirror of VL53LMZ_Motion_Configuration plus the helpers that fill it.
@@ -510,7 +525,7 @@ required_memory(), then pack() the 156-byte struct for cnh_send_config.
 #### CnhConfig.init_config
 
 ```python
-init_config(self, start_bin, num_bins, sub_sample)
+init_config(self, start_bin: int, num_bins: int, sub_sample: int) -> None
 ```
 
 start_bin: first device-histogram bin; num_bins: CNH bins;
@@ -519,7 +534,7 @@ sub_sample: bins of the device histogram summed per CNH bin.
 #### CnhConfig.create_agg_map
 
 ```python
-create_agg_map(self, resolution, start_x, start_y, merge_x, merge_y, cols, rows)
+create_agg_map(self, resolution: int, start_x: int, start_y: int, merge_x: int, merge_y: int, cols: int, rows: int) -> None
 ```
 
 Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)
@@ -528,7 +543,7 @@ Map device zones to CNH aggregates. resolution: 16 (4x4) or 64 (8x8)
 #### CnhConfig.required_memory
 
 ```python
-required_memory(self)
+required_memory(self) -> int
 ```
 
 On-device CNH buffer size in bytes for this config. Raises if the
@@ -537,7 +552,7 @@ config is blank or the size exceeds CNH_MAX_DATA_BYTES.
 #### CnhConfig.min_max_distance_mm
 
 ```python
-min_max_distance_mm(self)
+min_max_distance_mm(self) -> tuple[int, int]
 ```
 
 (min, max) target distance, in mm, fully captured by the histogram.
@@ -545,7 +560,7 @@ min_max_distance_mm(self)
 #### CnhConfig.bin_center_mm
 
 ```python
-bin_center_mm(self, bin_idx)
+bin_center_mm(self, bin_idx: int) -> float
 ```
 
 Distance (mm) at the centre of CNH histogram bin `bin_idx`.
@@ -553,5 +568,5 @@ Distance (mm) at the centre of CNH histogram bin `bin_idx`.
 #### CnhConfig.pack
 
 ```python
-pack(self)
+pack(self) -> bytes
 ```

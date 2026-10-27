@@ -94,15 +94,17 @@ The sensors fall into a few firmware philosophies:
 - **BNO085 / BNO086** — the device is an SHTP pass-through; the SH-2 stack is
   decoded **on the host** ([`bno086`](bno086/api.md)).
 
-Everything is pure computation over `&[u8]` — no threads, no alloc(beyond the
-returned `Vec`s), no runtime dependencies.
+Everything is pure computation over `&[u8]` — no threads, no alloc (beyond the
+returned `Vec`s), no dependencies.
 
 ## What it is not
 
-The crate has **no serial-port dependency**: the live layer
-([`devices`](#live-devices)) runs on any byte pipe you hand it — a port opened
-with the crate of your choice, a socket, a `.depzrec` replay. It has no
-dependency at all: JSON, gzip and base64 are its own.
+The crate is not a transport of its own invention: the live layer
+([`devices`](#live-devices)) opens the board's USB serial port through the
+[`serialport`](https://crates.io/crates/serialport) crate — the way Rust
+usually does it, and the crate's only dependency — and otherwise runs on any
+byte pipe you hand it: a socket, a `.depzrec` replay. JSON, gzip and base64 are
+its own.
 
 The crate never fabricates a decode it cannot verify against a golden vector.
 
@@ -116,13 +118,17 @@ class wraps it (and derefs to it) — the **SR04**, the **VL53L4CD**, the **VL53
 L7CX / L7CH**, the **BNO055**, the **BNO085 / BNO086**, the **TMF8829** and the **VL53L 1D family**
 (VL53L0X / L1CX / L1CB / L3CX / L4CX).
 
-```rust
+```rust,no_run
 use std::time::Duration;
-use depz_sensor_sdk::devices::{open_on_link, AnyDevice, ReplayLink};
+use depz_sensor_sdk::devices::{list_depz_devices, open_first_device, AnyDevice};
 
-// Any `Link` works: here a capture, replayed; on hardware, a serial port (below).
-let link = ReplayLink::open("sr04.depzrec", true, false)?;
-let AnyDevice::Sr04(sr04) = open_on_link(link, None, None, None)? else { panic!("not an SR04") };
+// The DEPZ boards on this machine: ports with a DEPZ USB id, probed, by USB serial.
+for d in list_depz_devices(None, true, None)? {
+    println!("{}  {:?}  {}  serial {}", d.port, d.sensor_type, d.device_name, d.serial_number);
+}
+// The one with the smallest USB serial (or `open_device("/dev/ttyACM0", None)` for a port,
+// `open_device_by_serial("DEPZ-0001", None)` for a unit).
+let AnyDevice::Sr04(sr04) = open_first_device(None)? else { panic!("not an SR04") };
 println!("{}", sr04.get_device_name()?);
 let loop_ = sr04.measurements(256);         // a bounded, drop-oldest pull queue
 sr04.start()?;
@@ -132,34 +138,32 @@ sr04.stop()?;
 # Ok::<(), depz_sensor_sdk::devices::DepzError>(())
 ```
 
-`open_on_link` runs the contract 02 §4.4 probe (software name, device name,
-serial), resolves the class and continues the same connection as it. A link is
-four methods — `read` with a timeout, `write`, `close`, `is_closed` (plus a
-`name`) — so a serial port is a few lines over the port crate you already use,
-e.g. `serialport`:
+`open_device` is contract 02 §4.4: the probe (software name, device name,
+serial) runs on a connection of its own, which is closed; the class the answers
+and the port's USB id resolve to then opens the port afresh. The port is a
+[`SerialPortLink`](api.md#serialportlink) — 115200 8N1, DTR and RTS raised,
+opened exclusively; the boards ignore the baud rate. A port that does not open
+is `DepzError::DeviceLost`, a port nothing DEPZ answers on `DepzError::NoDevice`,
+a board in its bootloader `DepzError::BootloaderMode`. `list_serial_ports` is
+every port the OS lists with its USB vid / pid / iSerial; `list_depz_ports` the
+DEPZ candidates, by USB serial.
 
-```rust,ignore
-struct Port(std::sync::Mutex<Box<dyn serialport::SerialPort>>, std::sync::atomic::AtomicBool);
+Any other `Link` works the same way — a capture, replayed, here:
 
-impl depz_sensor_sdk::devices::Link for Port {
-    fn read(&self, timeout: Duration) -> depz_sensor_sdk::devices::Result<Vec<u8>> {
-        let mut p = self.0.lock().unwrap();
-        p.set_timeout(timeout)?;
-        let mut buf = [0u8; 4096];
-        match p.read(&mut buf) {
-            Ok(n) => Ok(buf[..n].to_vec()),
-            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(Vec::new()),
-            Err(e) => Err(e.into()),
-        }
-    }
-    fn write(&self, data: &[u8]) -> depz_sensor_sdk::devices::Result<()> {
-        Ok(self.0.lock().unwrap().write_all(data)?)
-    }
-    fn close(&self) { self.1.store(true, std::sync::atomic::Ordering::SeqCst) }
-    fn is_closed(&self) -> bool { self.1.load(std::sync::atomic::Ordering::SeqCst) }
-    fn name(&self) -> String { self.0.lock().unwrap().name().unwrap_or_default() }
-}
+```rust
+use std::time::Duration;
+use depz_sensor_sdk::devices::{open_on_link, AnyDevice, ReplayLink};
+
+let link = ReplayLink::open("sr04.depzrec", true, false)?;
+let AnyDevice::Sr04(sr04) = open_on_link(link, None, None, None)? else { panic!("not an SR04") };
+println!("{}", sr04.get_device_name()?);
+# Ok::<(), depz_sensor_sdk::devices::DepzError>(())
 ```
+
+`open_on_link` runs the same probe and continues the same connection as the
+class (a replay cannot be reopened). A link is four methods — `read` with a
+timeout, `write`, `close`, `is_closed` (plus a `name`) — so a socket or a pipe
+of your own is a few lines; `DepzDevice::new(link, None)` takes it.
 
 `RecordingLink` wraps any link and writes a `.depzrec` capture (contract 08);
 `ReplayLink` plays one back causally, with `strict_tx` failing any byte the host
@@ -171,7 +175,7 @@ Callbacks (`on_measurement`, `on_event`) run on the reader thread and return a
 
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.7.0):
+Published on crates.io as `depz-sensor-sdk` (0.8.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -185,8 +189,9 @@ depz-sensor-sdk = { path = "../depz-sensor-sdk-rust" }
 ```
 
 The crate name on disk is `depz-sensor-sdk`; the library imports as
-`depz_sensor_sdk`. It targets stable Rust (edition 2021) and pulls in no
-runtime dependencies.
+`depz_sensor_sdk`. It targets stable Rust (edition 2021) and pulls in one
+dependency, `serialport` (on Linux it builds against libudev:
+`sudo apt-get install libudev-dev` on Debian / Ubuntu).
 
 ## Getting started
 
@@ -218,7 +223,7 @@ From there, follow the per-sensor guide linked above.
 ## Mental model
 
 ```
-your transport (serialport / socket / file)
+SerialPortLink / your own Link (socket, file)
         │  bytes in                       bytes out  ▲
         ▼                                            │
   PacketParser.feed(&[u8]) ──► [Event]        build_packet(cmd, payload, seq, crc)

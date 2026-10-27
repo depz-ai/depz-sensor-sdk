@@ -16,21 +16,25 @@
 // answered `invalid` — the call cannot be written — rather than silently
 // wrapped into a different argument. Inside the type, the SDK decides.
 //
-// Declared gaps (`unsupported`):
-//   bno086_record     — no contract 09 dataset recorder: depz::dataset only
-//                       reads datasets, nothing builds a record value.
-//   vl53l8_cnh_decode — only when built without the live-hardware layer
-//                       (depz::CnhSetup lives in depz/device.hpp).
+// Declared gaps (`unsupported`), all only when built without the
+// live-hardware layer:
+//   bno086_record     — the contract 09 record value (depz::dataset::records::
+//                       bno086) scales the report with depz/device.hpp.
+//   vl53l8_cnh_decode — depz::CnhSetup lives in depz/device.hpp.
+//   depzrec_read      — the .depzrec replay is depz::Link::replay (device.hpp).
 //
 // The vl53l8_* advanced ops: the test tree has no fake VL53L8 DCI platform, so
 // they call the codecs the Vl53l8 methods write with — motion_config_init
 // (motion_indicator_init; the resolution check is in it),
 // pack_detection_thresholds + detection_thresholds_valid_status (what
-// set_detection_thresholds writes) and xtalk_margin_raw (its 0..10000 check is
-// the refusal Vl53l8::set_xtalk_margin applies before the write).
+// set_detection_thresholds writes) and xtalk_margin_raw (its whole-kcps
+// 0..10000 check is the refusal Vl53l8::set_xtalk_margin applies before the write).
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -46,6 +50,7 @@
 #include "depz/bno086.hpp"
 #include "depz/common.hpp"
 #include "depz/crc.hpp"
+#include "depz/dataset.hpp"
 #include "depz/framing.hpp"
 #include "depz/fwdepz.hpp"
 #include "depz/identity.hpp"
@@ -58,6 +63,7 @@
 #include "depz/vl53lx.hpp"
 #ifdef DEPZ_DIFFTEST_HAS_IO
 #include "depz/device.hpp"
+#include "depz/recorder.hpp"
 #endif
 #include "json.hpp"
 #include "vector_helpers.hpp"
@@ -83,7 +89,7 @@ public:
     void end_arr() { first_.pop_back(); s += ']'; }
     Out& key(const char* k) { sep(); str_raw(k); s += ':'; after_key_ = true; return *this; }
     void null() { sep(); s += "null"; }
-    void boolean(bool b) { sep(); s += b ? "true" : "false"; }
+    void flag(bool b) { sep(); s += b ? "true" : "false"; }
     void i64(std::int64_t v) { sep(); s += std::to_string(v); }
     void u64(std::uint64_t v) { sep(); s += std::to_string(v); }
     void str(const std::string& v) { sep(); str_raw(v); }
@@ -187,12 +193,6 @@ bool barg(const Value& in, const char* k) {
     const Value& v = field(in, k);
     if (v.type != Type::Bool) throw Invalid(std::string(k) + ": not a boolean");
     return v.b;
-}
-double darg(const Value& in, const char* k) {
-    const Value& v = field(in, k);
-    if (v.type == Type::Double) return v.d;
-    if (v.type != Type::Int) throw Invalid(std::string(k) + ": not a number");
-    return v.range == 1 ? static_cast<double>(v.u) : static_cast<double>(v.i);
 }
 const std::string& sarg(const Value& in, const char* k) {
     const Value& v = field(in, k);
@@ -332,7 +332,7 @@ void op_usb_identity(const Value& in, Out& o) {
     const auto vid = opt16(in, "vid"), pid = opt16(in, "pid");
     const auto model = depz::usb_model_hint(vid, pid);
     o.obj();
-    o.key("known").boolean(depz::is_known_depz_usb(vid, pid));
+    o.key("known").flag(depz::is_known_depz_usb(vid, pid));
     o.key("model");
     if (model) o.str(*model); else o.null();
     o.end_obj();
@@ -360,12 +360,7 @@ void op_probe_resolve(const Value& in, Out& o) {
 void op_common_encode(const Value& in, Out& o) {
     const std::string& kind = sarg(in, "kind");
     if (kind == "sync_time_request") return payload(o, depz::pack_sync_time(U64(in, "pc_timestamp_us")));
-    if (kind == "set_payload_crc_type") {
-        // no codec check of its own: CrcType is the argument's type
-        const std::uint8_t ct = U8(in, "crc_type");
-        if (ct > static_cast<std::uint8_t>(depz::CrcType::Crc32)) throw Invalid("not a CrcType");
-        return payload(o, depz::pack_set_payload_crc_type(ct));
-    }
+    if (kind == "set_payload_crc_type") return payload(o, depz::pack_set_payload_crc_type(U8(in, "crc_type")));
     if (kind == "sync_pin_config") {
         depz::SyncPinConfig c{U8(in, "pin"), static_cast<depz::SyncPinMode>(U8(in, "mode")),
                               static_cast<depz::SyncPinPolarity>(U8(in, "polarity"))};
@@ -442,7 +437,7 @@ void op_fwdepz_parse(const Value& in, Out& o) {
     o.key("fw_crc32").u64(img.fw_crc32);
     o.key("cur_sec").u64(img.cur_sec);
     o.key("tot_sec").u64(img.tot_sec);
-    o.key("payload_crc_ok").boolean(img.payload_crc_ok());
+    o.key("payload_crc_ok").flag(img.payload_crc_ok());
     o.end_obj();
 }
 
@@ -498,11 +493,11 @@ void op_bno055_decode(const Value& in, Out& o) {
 void op_bno055_units(const Value& in, Out& o) {
     const auto u = B::Units::unpack(U8(in, "unit_sel"));
     o.obj();
-    o.key("accel_mg").boolean(u.accel_mg);
-    o.key("gyro_rps").boolean(u.gyro_rps);
-    o.key("euler_rad").boolean(u.euler_rad);
-    o.key("temp_f").boolean(u.temp_f);
-    o.key("android").boolean(u.android);
+    o.key("accel_mg").flag(u.accel_mg);
+    o.key("gyro_rps").flag(u.gyro_rps);
+    o.key("euler_rad").flag(u.euler_rad);
+    o.key("temp_f").flag(u.temp_f);
+    o.key("android").flag(u.android);
     o.key("repack").u64(u.pack());
     o.end_obj();
 }
@@ -514,7 +509,7 @@ void op_bno055_calib_stat(const Value& in, Out& o) {
     o.key("gyro").u64(s.gyro);
     o.key("accel").u64(s.accel);
     o.key("mag").u64(s.mag);
-    o.key("fully_calibrated").boolean(s.fully_calibrated());
+    o.key("fully_calibrated").flag(s.fully_calibrated());
     o.key("repack").u64(s.pack());
     o.end_obj();
 }
@@ -554,9 +549,9 @@ void op_bno055_axis_remap(const Value& in, Out& o) {
     o.key("x").u64(a.x);
     o.key("y").u64(a.y);
     o.key("z").u64(a.z);
-    o.key("x_negative").boolean(a.x_negative);
-    o.key("y_negative").boolean(a.y_negative);
-    o.key("z_negative").boolean(a.z_negative);
+    o.key("x_negative").flag(a.x_negative);
+    o.key("y_negative").flag(a.y_negative);
+    o.key("z_negative").flag(a.z_negative);
     repack_pair(o, a);
     o.end_obj();
 }
@@ -640,7 +635,7 @@ void op_bno086_shtp_header_unpack(const Value& in, Out& o) {
     o.key("length").u64(h.length);
     o.key("channel").u64(h.channel);
     o.key("seq").u64(h.seq);
-    o.key("continuation").boolean(h.continuation);
+    o.key("continuation").flag(h.continuation);
     o.end_obj();
 }
 
@@ -805,6 +800,49 @@ void op_bno086_input_cargo(const Value& in, Out& o) {
     o.end_obj();
 }
 
+#ifdef DEPZ_DIFFTEST_HAS_IO
+// A depz::dataset::Value, as the SDK's serializer writes it (reals in their
+// shortest round-trip form).
+void out_value(Out& o, const depz::dataset::Value& v) {
+    using T = depz::dataset::Value::Type;
+    switch (v.type()) {
+        case T::Null: o.null(); break;
+        case T::Bool: o.flag(v.as_bool()); break;
+        case T::Int: o.i64(v.as_int()); break;
+        case T::Double: {
+            const double d = v.as_double();
+            if (std::isnan(d) || std::isinf(d)) { o.null(); break; }
+            char b[40];
+            std::snprintf(b, sizeof b, "%.17g", d);
+            o.raw(b);
+            break;
+        }
+        case T::String: o.str(v.as_string()); break;
+        case T::Array:
+            o.arr();
+            for (const auto& e : v.items()) out_value(o, e);
+            o.end_arr();
+            break;
+        case T::Object:
+            o.obj();
+            for (const auto& [k, e] : v.entries()) { o.key(k.c_str()); out_value(o, e); }
+            o.end_obj();
+            break;
+    }
+}
+
+void op_bno086_record(const Value& in, Out& o) {
+    const depz::bytes c = HEX(in, "cargo");
+    const auto reps = S::parse_input_cargo(c, I64(in, "capture_timestamp_us"));
+    o.obj();
+    o.key("records");
+    o.arr();
+    for (const auto& r : reps) out_value(o, depz::dataset::records::bno086(depz::Bno086Report{r}));
+    o.end_arr();
+    o.end_obj();
+}
+#endif
+
 void op_bno086_gyro_rv(const Value& in, Out& o) {
     const depz::bytes c = HEX(in, "cargo");
     const auto r = S::parse_gyro_rv_cargo(c, I64(in, "capture_timestamp_us"));
@@ -844,7 +882,7 @@ void op_tmf8829_decode(const Value& in, Out& o) {
         o.key("int_edges").u64(r.int_edges); o.key("frames").u64(r.frames);
         o.key("frames_aborted").u64(r.frames_aborted); o.key("frame_errors").u64(r.frame_errors);
         o.key("spi_timeouts").u64(r.spi_timeouts); o.key("int_level").u64(r.int_level);
-        o.key("streaming").boolean(r.streaming); o.key("int_mask").u64(r.int_mask);
+        o.key("streaming").flag(r.streaming); o.key("int_mask").u64(r.int_mask);
         o.key("last_int_status").u64(r.last_int_status); o.key("last_fifo_status").u64(r.last_fifo_status);
     } else if (rpt == 0x93) {
         const auto& r = need(T::FrameChunk::unpack(p), "FrameChunk::unpack");
@@ -964,7 +1002,7 @@ void op_tmf8829_measurements(const Value& in, Out& o) {
         o.key("n_histograms").u64(m->n_histograms);
         o.key("n_ref_frames").u64(m->n_ref_frames);
         o.key("n_problems").u64(m->n_problems);
-        o.key("distance_in_mm").boolean(m->distance_in_mm());
+        o.key("distance_in_mm").flag(m->distance_in_mm());
         tmf_arrays(o, m->results);
         o.end_obj();
     }
@@ -1130,6 +1168,25 @@ void op_vl53l4_tuning_decode(const Value& in, Out& o) {
 
 namespace L7 = depz::vl53l7;
 
+// ── VL53L8 register bridge (contract 04) ──
+
+void op_vl53l8_encode(const Value& in, Out& o) {
+    const std::string& kind = sarg(in, "kind");
+    if (kind == "start_stream") return payload(o, depz::vl53l8::pack_start_stream(U16(in, "frame_size")));
+    throw Invalid("kind " + kind);
+}
+
+void op_vl53l8_decode(const Value& in, Out& o) {
+    if (I64(in, "report") != 0x93) throw Invalid("report");
+    const auto c = depz::vl53l8::FrameChunk::unpack(HEX(in, "payload"));
+    o.obj();
+    o.key("timestamp_us").u64(c.timestamp_us);
+    o.key("full_size").u64(c.full_size);
+    o.key("offset").u64(c.offset);
+    o.key("data").hex(c.data);
+    o.end_obj();
+}
+
 void op_vl53l7_encode(const Value& in, Out& o) {
     const std::string& kind = sarg(in, "kind");
     if (kind == "read_reg") return payload(o, L7::pack_read_reg(U16(in, "addr"), U16(in, "len")));
@@ -1149,7 +1206,7 @@ void op_vl53l7_decode(const Value& in, Out& o) {
     o.key("int_edges").u64(i.int_edges); o.key("frames_dropped").u64(i.frames_dropped);
     o.key("i2c_errors").u64(i.i2c_errors); o.key("last_i2c_error").u64(i.last_i2c_error);
     o.key("lpn_level").u64(i.lpn_level); o.key("int_level").u64(i.int_level); o.key("i2c_khz").u64(i.i2c_khz);
-    o.key("frame_size").u64(i.frame_size); o.key("streaming").boolean(i.streaming);
+    o.key("frame_size").u64(i.frame_size); o.key("streaming").flag(i.streaming);
     o.end_obj();
 }
 
@@ -1272,13 +1329,100 @@ void op_vl53l8_detection_thresholds(const Value& in, Out& o) {
 }
 
 void op_vl53l8_xtalk_margin(const Value& in, Out& o) {
-    const double kcps = darg(in, "kcps");
+    // as ST: a whole number of kcps (the uint32_t parameter refuses a fraction or a negative)
+    const std::uint32_t kcps = U32(in, "kcps");
     o.obj();
     o.key("raw").u64(L8::xtalk_margin_raw(kcps));
     o.end_obj();
 }
 
 #ifdef DEPZ_DIFFTEST_HAS_IO
+// The event the device layer emits for an unsolicited common report —
+// common_decode's twin through the dispatcher (contract 07 §2/§3): the packet
+// goes in on a loopback pair with nothing pending, and the first event out is
+// the answer.
+void op_common_event(const Value& in, Out& o) {
+    const auto rpt = static_cast<std::uint8_t>(iarg(in, "report", 0, 0xFF));
+    const depz::bytes payload = HEX(in, "payload");
+    auto [host, side] = depz::Link::loopback_pair();
+    auto dev = depz::Device::open(std::move(host));
+    auto events = dev->events(8);
+    side.write(depz::build_packet(rpt, payload));
+    const std::optional<depz::DeviceEvent> ev = events.next(std::chrono::seconds(2));
+    dev.reset();
+    if (!ev) throw std::runtime_error("the device emitted no event");
+    using T = depz::DeviceEvent::Type;
+    o.obj();
+    switch (ev->type) {
+        case T::UnsolicitedStatus:
+            o.key("event").str("unsolicited_status");
+            o.key("status").u64(ev->status);
+            break;
+        case T::SequenceError:
+            o.key("event").str("sequence_error");
+            o.key("expected_seq").u64(ev->expected_seq);
+            o.key("received_seq").u64(ev->received_seq);
+            o.key("reported_by_device").flag(ev->by_device);
+            break;
+        case T::Text:
+            o.key("event").str("text");
+            o.key("cmd").u64(ev->cmd);
+            o.key("text").str(ev->text);
+            break;
+        case T::Temperature: {
+            char b[40];
+            std::snprintf(b, sizeof b, "%.17g", ev->celsius);
+            o.key("event").str("temperature");
+            o.key("timestamp_us").u64(ev->timestamp_us);
+            o.key("celsius").raw(b);
+            break;
+        }
+        default:
+            throw std::runtime_error("event type " + std::to_string(static_cast<int>(ev->type)));
+    }
+    o.end_obj();
+}
+
+// The host-observed seq gaps (contract 01 §5 step 5, ERRATA A1): one packet
+// per `seqs` entry (report 0x7F, payload 00 — each one a hex text event) on a
+// loopback pair; once every packet's own event is out, the seq_gap events and
+// stats.seq_gaps are the answer. A gap is emitted ahead of its packet, so
+// none can still be on the way.
+void op_common_seq_gap(const Value& in, Out& o) {
+    const Value& list = field(in, "seqs");
+    if (list.type != Type::Array) throw Invalid("seqs: an array");
+    std::vector<std::uint8_t> seqs;
+    for (const auto& v : list.arr) seqs.push_back(static_cast<std::uint8_t>(ival(v, "seqs", 0, 0xFF)));
+    auto [host, side] = depz::Link::loopback_pair();
+    auto dev = depz::Device::open(std::move(host));
+    auto events = dev->events(256);
+    const depz::bytes payload{std::byte{0x00}};
+    for (const std::uint8_t s : seqs) side.write(depz::build_packet(0x7F, payload, s));
+    std::vector<depz::DeviceEvent> gaps;
+    std::size_t texts = 0;
+    while (texts < seqs.size()) {
+        const std::optional<depz::DeviceEvent> ev = events.next(std::chrono::seconds(2));
+        if (!ev) throw std::runtime_error("not every packet produced its event");
+        if (ev->type == depz::DeviceEvent::Type::Text) ++texts;
+        if (ev->type == depz::DeviceEvent::Type::SeqGap) gaps.push_back(*ev);
+    }
+    const std::uint64_t seq_gaps = dev->stats().seq_gaps;
+    dev.reset();
+    o.obj();
+    o.key("gaps");
+    o.arr();
+    for (const auto& g : gaps) {
+        o.obj();
+        o.key("expected_seq").u64(g.expected_seq);
+        o.key("received_seq").u64(g.received_seq);
+        o.key("missed").u64(g.missed);
+        o.end_obj();
+    }
+    o.end_arr();
+    o.key("seq_gaps").u64(seq_gaps);
+    o.end_obj();
+}
+
 void op_vl53l8_cnh_decode(const Value& in, Out& o) {
     const Value& c = field(in, "config");
     const auto& am = larg(c, "agg_map");
@@ -1303,6 +1447,119 @@ void op_vl53l8_cnh_decode(const Value& in, Out& o) {
 }
 #endif
 
+// ── BNO086 control responses (contract 05 §4 table) ─────────────────────────
+
+// A control-channel response decoded: its fields, or invalid when shorter
+// than them / another report id (contract 07 §3).
+void op_bno086_control_decode(const Value& in, Out& o) {
+    namespace S = depz::bno086;
+    const std::string& kind = sarg(in, "kind");
+    const depz::bytes p = HEX(in, "payload");
+    o.obj();
+    if (kind == "feature_response") {
+        const auto f = need(S::Feature::unpack(p), "Get Feature Response: short or another report id");
+        o.key("sensor_id").u64(f.sensor_id);
+        o.key("flags").u64(f.flags);
+        o.key("sensitivity").u64(f.sensitivity);
+        o.key("interval_us").u64(f.interval_us);
+        o.key("batch_us").u64(f.batch_us);
+        o.key("cfg_word").u64(f.cfg_word);
+    } else if (kind == "product_id") {
+        const auto r = need(S::ProductId::unpack(p), "Product ID Response: short or another report id");
+        o.key("reset_cause").u64(r.reset_cause);
+        o.key("sw_version_major").u64(r.sw_version_major);
+        o.key("sw_version_minor").u64(r.sw_version_minor);
+        o.key("sw_part_number").u64(r.sw_part_number);
+        o.key("sw_build_number").u64(r.sw_build_number);
+        o.key("sw_version_patch").u64(r.sw_version_patch);
+    } else if (kind == "command_response") {
+        const auto r = need(S::CommandResponse::unpack(p), "Command Response: short or another report id");
+        o.key("seq").u64(r.seq);
+        o.key("command").u64(r.command);
+        o.key("command_seq").u64(r.command_seq);
+        o.key("response_seq").u64(r.response_seq);
+        o.key("r").arr();
+        for (const std::uint8_t b : r.r) o.u64(b);
+        o.end_arr();
+    } else if (kind == "frs_read_response") {
+        const auto r = need(S::FrsReadResponse::unpack(p), "FRS Read Response: short or another report id");
+        o.key("status").u64(r.status);
+        o.key("data_length").u64(r.data_length);
+        o.key("offset_words").u64(r.offset_words);
+        o.key("data0").u64(r.data0);
+        o.key("data1").u64(r.data1);
+        o.key("frs_type").u64(r.frs_type);
+    } else if (kind == "frs_write_response") {
+        const auto r = need(S::FrsWriteResponse::unpack(p), "FRS Write Response: short or another report id");
+        o.key("status").u64(r.status);
+        o.key("offset_words").u64(r.offset_words);
+    } else {
+        throw Invalid("kind " + kind);
+    }
+    o.end_obj();
+}
+
+// ── .depzrec / .depzdata readers (contracts 08, 09) ─────────────────────────
+
+// `text` as a dataset: its records in reader order as [d, t, k] — or invalid
+// for a damaged file (std::invalid_argument naming the line).
+void op_depzdata_read(const Value& in, Out& o) {
+    const depz::dataset::Reader r(sarg(in, "text"));
+    o.obj();
+    o.key("records").arr();
+    for (const auto& rec : r.records) {
+        o.arr();
+        o.str(rec.device_id);
+        o.i64(rec.t_host_us);
+        o.str(rec.kind);
+        o.end_arr();
+    }
+    o.end_arr();
+    o.end_obj();
+}
+
+#ifdef DEPZ_DIFFTEST_HAS_IO
+// `text` as a capture: every rx chunk the loose replay serves once the host
+// has written more tx bytes than any event waits for, concatenated — or
+// invalid for a damaged file (ArgumentError naming the line). The replay
+// link opens a path, so the text goes through a temporary file.
+void op_depzrec_read(const Value& in, Out& o) {
+    static int n = 0;
+    const char* dir = std::getenv("TMPDIR");
+#ifdef _WIN32
+    if (!dir) dir = std::getenv("TEMP");
+#endif
+    if (!dir) dir = "/tmp";
+    const std::string path = std::string(dir) + "/depz_cpp_difftest_" +
+                             std::to_string(static_cast<long long>(std::chrono::steady_clock::now().time_since_epoch().count())) +
+                             "_" + std::to_string(n++) + ".depzrec";
+    {
+        std::ofstream f(path, std::ios::binary);
+        if (!f) throw std::runtime_error("cannot create a temporary file");
+        f << sarg(in, "text");
+    }
+    std::optional<depz::Link> link;
+    try {
+        link.emplace(depz::Link::replay(path, false, false));
+    } catch (...) {
+        std::remove(path.c_str());
+        throw;
+    }
+    std::remove(path.c_str());
+    const depz::bytes zeros(65536, std::byte{0});
+    link->write(zeros);
+    depz::bytes rx;
+    while (!link->replay_exhausted()) {
+        const depz::bytes chunk = link->read(std::chrono::milliseconds(0));
+        if (chunk.empty()) throw std::runtime_error("an rx event stays gated after 64 KiB of tx");
+        rx.insert(rx.end(), chunk.begin(), chunk.end());
+    }
+    o.obj();
+    o.key("rx").hex(rx);
+    o.end_obj();
+}
+#endif
+
 const std::map<std::string, OpFn>& ops() {
     static const std::map<std::string, OpFn> m = {
         {"crc", op_crc}, {"framing_encode", op_framing_encode}, {"framing_decode", op_framing_decode},
@@ -1320,7 +1577,8 @@ const std::map<std::string, OpFn>& ops() {
         {"bno086_shtp_header_unpack", op_bno086_shtp_header_unpack},
         {"bno086_shtp_tx_seq", op_bno086_shtp_tx_seq}, {"bno086_shtp_reassembly", op_bno086_shtp_reassembly},
         {"bno086_control_encode", op_bno086_control_encode}, {"bno086_input_cargo", op_bno086_input_cargo},
-        {"bno086_gyro_rv", op_bno086_gyro_rv},
+        {"bno086_gyro_rv", op_bno086_gyro_rv}, {"bno086_control_decode", op_bno086_control_decode},
+        {"depzdata_read", op_depzdata_read},
         {"tmf8829_encode", op_tmf8829_encode}, {"tmf8829_decode", op_tmf8829_decode},
         {"tmf8829_reassembly", op_tmf8829_reassembly}, {"tmf8829_frame", op_tmf8829_frame},
         {"tmf8829_measurements", op_tmf8829_measurements}, {"tmf8829_config_get", op_tmf8829_config_get},
@@ -1329,6 +1587,7 @@ const std::map<std::string, OpFn>& ops() {
         {"vl53l4_result_block", op_vl53l4_result_block}, {"vl53l4_timing_encode", op_vl53l4_timing_encode},
         {"vl53l4_timing_decode", op_vl53l4_timing_decode}, {"vl53l4_tuning_encode", op_vl53l4_tuning_encode},
         {"vl53l4_tuning_decode", op_vl53l4_tuning_decode},
+        {"vl53l8_encode", op_vl53l8_encode}, {"vl53l8_decode", op_vl53l8_decode},
         {"vl53l7_encode", op_vl53l7_encode}, {"vl53l7_decode", op_vl53l7_decode},
         {"vl53l7_model", op_vl53l7_model},
         {"vl53lx_encode", op_vl53lx_encode}, {"vl53lx_decode", op_vl53lx_decode}, {"vl53lx_model", op_vl53lx_model},
@@ -1338,7 +1597,11 @@ const std::map<std::string, OpFn>& ops() {
         {"vl53l8_detection_thresholds", op_vl53l8_detection_thresholds},
         {"vl53l8_xtalk_margin", op_vl53l8_xtalk_margin},
 #ifdef DEPZ_DIFFTEST_HAS_IO
+        {"common_event", op_common_event},
+        {"common_seq_gap", op_common_seq_gap},
         {"vl53l8_cnh_decode", op_vl53l8_cnh_decode},
+        {"bno086_record", op_bno086_record},
+        {"depzrec_read", op_depzrec_read},
 #endif
     };
     return m;
@@ -1347,9 +1610,12 @@ const std::map<std::string, OpFn>& ops() {
 // Declared gaps: op -> reason (see the header comment).
 const std::map<std::string, std::string>& unsupported() {
     static const std::map<std::string, std::string> m = {
-        {"bno086_record", "no contract 09 dataset recorder in the C++ SDK (depz::dataset reads only)"},
 #ifndef DEPZ_DIFFTEST_HAS_IO
+        {"common_event", "built without the live-hardware layer (the device dispatcher is in depz/device.hpp)"},
+        {"common_seq_gap", "built without the live-hardware layer (the device dispatcher is in depz/device.hpp)"},
+        {"bno086_record", "built without the live-hardware layer (the record scales with depz/device.hpp)"},
         {"vl53l8_cnh_decode", "built without the live-hardware layer (depz::CnhSetup is in depz/device.hpp)"},
+        {"depzrec_read", "built without the live-hardware layer (depz::Link::replay is in depz/device.hpp)"},
 #endif
     };
     return m;

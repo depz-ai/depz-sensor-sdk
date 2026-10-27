@@ -10,6 +10,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import Any, Mapping, Sequence
 
 from ..protocol._wire import check_uint
 
@@ -284,6 +285,12 @@ class CalibStatus:
         return (self.system, self.gyro, self.accel, self.mag) == (3, 3, 3, 3)
 
 
+def _vec3(v: Sequence[int]) -> tuple[int, int, int]:
+    if len(v) != 3:
+        raise ValueError(f"expected 3 components, got {len(v)}")
+    return int(v[0]), int(v[1]), int(v[2])
+
+
 @dataclass(frozen=True)
 class CalibrationProfile:
     """Sensor offsets and radii, registers 0x55..0x6A (22 bytes, all i16 LE).
@@ -313,10 +320,12 @@ class CalibrationProfile:
     def unpack(cls, data: bytes) -> "CalibrationProfile":
         if len(data) != CALIB_PROFILE_LEN:
             raise ValueError(f"calibration profile is {CALIB_PROFILE_LEN} bytes, got {len(data)}")
-        v = struct.unpack("<11h", data)
-        return cls(v[0:3], v[3:6], v[6:9], v[9], v[10])  # type: ignore[arg-type]
+        v: tuple[int, ...] = struct.unpack("<11h", data)
+        return cls(
+            (v[0], v[1], v[2]), (v[3], v[4], v[5]), (v[6], v[7], v[8]), v[9], v[10]
+        )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "accel_offset": list(self.accel_offset),
             "mag_offset": list(self.mag_offset),
@@ -326,11 +335,11 @@ class CalibrationProfile:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "CalibrationProfile":
+    def from_dict(cls, d: Mapping[str, Any]) -> "CalibrationProfile":
         return cls(
-            tuple(d["accel_offset"]),  # type: ignore[arg-type]
-            tuple(d["mag_offset"]),  # type: ignore[arg-type]
-            tuple(d["gyro_offset"]),  # type: ignore[arg-type]
+            _vec3(d["accel_offset"]),
+            _vec3(d["mag_offset"]),
+            _vec3(d["gyro_offset"]),
             int(d["accel_radius"]),
             int(d["mag_radius"]),
         )
@@ -548,7 +557,7 @@ def decode_block(addr: int, data: bytes) -> RawBlock:
     """Unpack whatever channels the register window starting at `addr` holds."""
     check_uint("addr", addr, 8)
     end = addr + len(data)
-    out: dict = {}
+    out: dict[str, Any] = {}
     for name, (reg, n) in CHANNELS.items():
         if addr <= reg and reg + 2 * n <= end:
             out[name] = struct.unpack_from(f"<{n}h", data, reg - addr)

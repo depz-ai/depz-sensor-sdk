@@ -17,7 +17,7 @@ the source, not this file.
 ### Bno086
 
 ```python
-class Bno086(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Bno086(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 BNO085 device: enable SH-2 sensors, stream typed reports.
@@ -148,49 +148,49 @@ Get Feature Request/Response round trip for `sensor`.
 #### Bno086.enable_rotation_vector
 
 ```python
-enable_rotation_vector(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_rotation_vector(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_game_rotation_vector
 
 ```python
-enable_game_rotation_vector(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_game_rotation_vector(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_accelerometer
 
 ```python
-enable_accelerometer(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_accelerometer(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gyroscope
 
 ```python
-enable_gyroscope(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gyroscope(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_magnetometer
 
 ```python
-enable_magnetometer(self, hz: float = 50, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_magnetometer(self, hz: float = 50, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_linear_acceleration
 
 ```python
-enable_linear_acceleration(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_linear_acceleration(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gravity
 
 ```python
-enable_gravity(self, hz: float = 100, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gravity(self, hz: float = 100, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.enable_gyro_integrated_rv
 
 ```python
-enable_gyro_integrated_rv(self, hz: float = 400, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_gyro_integrated_rv(self, hz: float = 400, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 #### Bno086.on_report
@@ -205,7 +205,7 @@ block). `sensors` filters by SensorId. Returns an unsubscribe fn.
 #### Bno086.reports
 
 ```python
-reports(self, sensors: Union[Iterable[int], int, NoneType] = None, maxsize: int = 1024) -> depz_sensor_sdk.device.StreamIterator
+reports(self, sensors: Union[Iterable[int], int, NoneType] = None, maxsize: int = 1024) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno086.reports.Report]
 ```
 
 Blocking iterator over typed reports (bounded, drop-oldest).
@@ -291,7 +291,7 @@ stop, arrives as a MotionRequest report (enable SensorId.MOTION_REQUEST).
 #### Bno086.enable_motion_request
 
 ```python
-enable_motion_request(self, hz: float = 1, **kw) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
+enable_motion_request(self, hz: float = 1, **kw: Any) -> depz_sensor_sdk.bno086.sh2.FeatureResponse | None
 ```
 
 Enable MotionRequest (0x2B) reports. The hub sends one when its
@@ -336,10 +336,11 @@ Read + parse the sensor's FRS metadata record.
 #### Bno086.get_oscillator_type
 
 ```python
-get_oscillator_type(self, timeout: float = 1.0) -> depz_sensor_sdk.bno086.sh2.OscillatorType
+get_oscillator_type(self, timeout: float = 1.0) -> depz_sensor_sdk.bno086.sh2.OscillatorType | int
 ```
 
-Get Oscillator Type (command 0x0A). r[0] is the type directly.
+Get Oscillator Type (command 0x0A). r[0] is the type directly; a
+value the enum does not know comes back as the raw int.
 
 #### Bno086.clear_dcd_and_reset
 
@@ -399,7 +400,7 @@ do not block). Returns an unsubscribe function.
 #### Bno086.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -416,7 +417,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Bno086.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -426,12 +427,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Bno086.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -439,7 +442,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Bno086.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.

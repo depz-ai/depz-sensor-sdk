@@ -98,7 +98,7 @@ public final class Shtp {
 
     /** Per-channel TX sequence counters + RX cargo reassembly. */
     public static final class ShtpLayer {
-        /** Incomplete cargos thrown away. */
+        /** Incomplete cargos and junk-channel (≥ 6) frames thrown away. */
         public int discarded = 0;
 
         private final int[] txSeqs = new int[NUM_CHANNELS];
@@ -145,13 +145,17 @@ public final class Shtp {
                 return null;
             }
             ShtpHeader hdr = unpackShtpHeader(frame);
-            if (hdr.channel() >= NUM_CHANNELS || hdr.length() < SHTP_HEADER_SIZE) {
-                return null; // empty/padding header or junk
+            if (hdr.length() < SHTP_HEADER_SIZE) {
+                return null; // empty/padding header ("no data" read)
+            }
+            if (hdr.channel() >= NUM_CHANNELS) {
+                discarded += 1; // junk channel
+                return null;
             }
             int chunkLen = frame.length - SHTP_HEADER_SIZE;
             ChannelRx r = rx[hdr.channel()];
             if (!hdr.continuation()) {
-                if (r.expected != 0 && r.received != 0) {
+                if (r.expected != 0) { // a partial, even one with no bytes yet
                     discarded += 1;
                 }
                 r.clear();

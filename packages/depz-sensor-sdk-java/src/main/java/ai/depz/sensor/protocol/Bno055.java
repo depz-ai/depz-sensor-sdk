@@ -61,16 +61,28 @@ public final class Bno055 {
     // ── command payload encoders ─────────────────────────────────────────────
     // BNO_RESET, BNO_STOP_STREAM and BNO_GET_INFO carry an empty payload.
 
-    /** BNO_READ_REG payload: {@code addr u8, len u8}. */
+    /** BNO_START_STREAM TIMER period limits, ms (contract 13 §2). */
+    public static final int TIMER_PERIOD_MIN_MS = 1;
+    public static final int TIMER_PERIOD_MAX_MS = 60000;
+
+    /**
+     * BNO_READ_REG payload {@code addr u8, len u8} with the transfer limit of contract 13 §1:
+     * {@code len} 1..128 and {@code addr + len <= 0x100}, else IllegalArgumentException.
+     */
     public static byte[] packReadReg(int addr, int len) {
-        return new byte[] {(byte) Wire.checkUintI("addr", addr, 8), (byte) Wire.checkUintI("length", len, 8)};
+        Wire.checkUint("addr", addr, 8);
+        Wire.checkUint("length", len, 8);
+        if (len < 1 || len > XFER_MAX || addr + len > 0x100) {
+            throw new IllegalArgumentException("READ_REG length must be 1.." + XFER_MAX + " and addr+length <= 0x100");
+        }
+        return new byte[] {(byte) addr, (byte) len};
     }
 
-    /** BNO_WRITE_REG payload: {@code addr u8, data[1..128]}, else IllegalArgumentException. */
+    /** BNO_WRITE_REG payload: {@code addr u8, data[1..128]} with {@code addr + N <= 0x100}, else IllegalArgumentException. */
     public static byte[] packWriteReg(int addr, byte[] data) {
         Wire.checkUint("addr", addr, 8);
-        if (data.length < 1 || data.length > XFER_MAX) {
-            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes");
+        if (data.length < 1 || data.length > XFER_MAX || addr + data.length > 0x100) {
+            throw new IllegalArgumentException("WRITE_REG data must be 1.." + XFER_MAX + " bytes and addr+N <= 0x100");
         }
         byte[] out = new byte[1 + data.length];
         out[0] = (byte) addr;
@@ -79,14 +91,19 @@ public final class Bno055 {
     }
 
     /**
-     * BNO_START_STREAM payload, 5 bytes: {@code trigger u8, addr u8, len u8,
-     * period_ms u16 LE}. Replaces any running stream.
+     * BNO_START_STREAM payload {@code trigger u8, addr u8, len u8, period_ms u16}. With the TIMER
+     * trigger the period is 1..60000 ms (contract 13 §2), else IllegalArgumentException; with INT it
+     * is the missed-edge watchdog and 0 disables it. Replaces any running stream.
      */
     public static byte[] packStartStream(int trigger, int addr, int len, int periodMs) {
         Wire.checkUint("trigger", trigger, 8);
         Wire.checkUint("addr", addr, 8);
         Wire.checkUint("length", len, 8);
         Wire.checkUint("periodMs", periodMs, 16);
+        if (trigger == TRIGGER_TIMER && (periodMs < TIMER_PERIOD_MIN_MS || periodMs > TIMER_PERIOD_MAX_MS)) {
+            throw new IllegalArgumentException("periodMs: " + periodMs + " outside " + TIMER_PERIOD_MIN_MS + ".."
+                + TIMER_PERIOD_MAX_MS + " for the TIMER trigger");
+        }
         return new byte[] {
             (byte) trigger, (byte) addr, (byte) len, (byte) periodMs, (byte) (periodMs >>> 8)};
     }
@@ -121,11 +138,12 @@ public final class Bno055 {
 
     /**
      * RPT_BNO_INFO (38-byte LE payload {@code <BBBBBHBBBIHHHIIIHBBH}) — sensor
-     * identity (registers 0x00..0x06) plus bridge diagnostics. Counters are
-     * free-running and wrap silently; watch increments. {@code read*Us},
-     * {@code slotsSkipped} and {@code loopMaxUs} reset at START_STREAM. A rising
-     * {@code sensorResets} means the bridge pulsed nRESET to recover the bus: the
-     * sensor is back in CONFIG and the host must restore its configuration.
+     * identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap
+     * silently; watch increments. {@code read*Us}, {@code slotsSkipped} and
+     * {@code loopMaxUs} reset at START_STREAM, {@code i2cErrors} at every
+     * successful reset handshake. A rising {@code sensorResets} means the bridge
+     * pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host
+     * must restore its configuration.
      * {@code swRev} is BCD ({@code 0x0311} = 03.11).
      */
     public record Bno055Info(

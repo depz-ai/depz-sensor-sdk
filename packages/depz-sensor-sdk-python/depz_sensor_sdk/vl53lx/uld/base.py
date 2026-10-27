@@ -16,23 +16,25 @@ things are deliberately NOT in it:
 """
 
 import time
-from collections import namedtuple
+from typing import Any, NamedTuple, Sequence
 
-from depz_sensor_sdk.vl53lx._link import (Vl53Device, Vl53Error,   # noqa: F401  (re-exported)
-                       VL53_XSHUT_RESET)
+from depz_sensor_sdk.vl53lx._link import VL53_XSHUT_RESET, Vl53Device, Vl53Error
+
+__all__ = ['BridgePlatform', 'Measurement', 'SensorDriver', 'Target',
+           'Vl53Device', 'Vl53Error']
 
 # ── ULD platform layer (Platform/platform.h) ─────────────────────────────────
 class BridgePlatform:
     """VL53L4CD_RdByte/RdWord/RdDWord/WrByte/WrWord/WrDWord/WaitMs over the
     bridge. Register values are big-endian, exactly as the C driver assumes."""
 
-    def __init__(self, dev: Vl53Device):
+    def __init__(self, dev: Vl53Device) -> None:
         self.dev = dev
 
     def rd_multi(self, addr: int, size: int) -> bytes:
         return self.dev.read_reg(addr, size)
 
-    def wr_multi(self, addr: int, data: bytes):
+    def wr_multi(self, addr: int, data: bytes) -> None:
         self.dev.write_reg(addr, data)
 
     def rd_byte(self, addr: int) -> int:
@@ -44,45 +46,52 @@ class BridgePlatform:
     def rd_dword(self, addr: int) -> int:
         return int.from_bytes(self.dev.read_reg(addr, 4), 'big')
 
-    def wr_byte(self, addr: int, value: int):
+    def wr_byte(self, addr: int, value: int) -> None:
         self.dev.write_reg(addr, bytes([value & 0xFF]))
 
-    def wr_word(self, addr: int, value: int):
+    def wr_word(self, addr: int, value: int) -> None:
         self.dev.write_reg(addr, (value & 0xFFFF).to_bytes(2, 'big'))
 
-    def wr_dword(self, addr: int, value: int):
+    def wr_dword(self, addr: int, value: int) -> None:
         self.dev.write_reg(addr, (value & 0xFFFFFFFF).to_bytes(4, 'big'))
 
-    def set_i2c_speed(self, speed: int):
+    def set_i2c_speed(self, speed: int) -> None:
         """Not part of the C platform layer: the bridge owns the bus timing.
         Only a driver calls this — it runs its init at the speed an
         unconfigured sensor is specified for and raises the bus to its own
         ceiling afterwards. Nothing above the driver picks a bus speed."""
         self.dev.set_i2c_speed(speed)
 
-    def set_addr_width(self, width: int):
+    def set_addr_width(self, width: int) -> None:
         """Also outside the C platform layer: how wide a register address the
         bridge puts on the wire. Sticky, so it is set once per init."""
         self.dev.set_addr_width(width)
 
-    def xshut_reset(self):
+    def xshut_reset(self) -> None:
         """Also outside the C platform layer: the bridge owns XSHUT. A driver
         needs it when the sensor stops answering altogether — a soft reset
         cannot be written to a part that no longer ACKs."""
         self.dev.xshut(VL53_XSHUT_RESET)
 
     @staticmethod
-    def sleep_ms(ms: int):
+    def sleep_ms(ms: float) -> None:
         time.sleep(ms / 1000.0)
 
 # ── Driver contract ──────────────────────────────────────────────────────────
-Target = namedtuple(
-    'Target', 'distance_mm status status_text signal_kcps ambient_kcps '
-              'sigma_mm min_range_mm max_range_mm')
-Target.__doc__ = """One return of a multi-target frame, in the terms the CLI
-and the GUI already print. `min_range_mm`/`max_range_mm` are the edges of the
-target's own pulse, which only the histogram parts know; the others repeat them
-from `distance_mm`."""
+class Target(NamedTuple):
+    """One return of a multi-target frame, in the terms the CLI and the GUI
+    already print. `min_range_mm`/`max_range_mm` are the edges of the target's
+    own pulse, which only the histogram parts know; the others repeat them from
+    `distance_mm`."""
+
+    distance_mm: float
+    status: int
+    status_text: str
+    signal_kcps: float
+    ambient_kcps: float
+    sigma_mm: float
+    min_range_mm: float
+    max_range_mm: float
 
 
 class Measurement:
@@ -99,8 +108,10 @@ class Measurement:
     __slots__ = ('distance_mm', 'status', 'status_text', 'signal_kcps',
                  'ambient_kcps', 'sigma_mm', 'spads', 'targets', 'extra')
 
-    def __init__(self, distance_mm=0, status=0, status_text='', signal_kcps=0,
-                 ambient_kcps=0, sigma_mm=0, spads=0, targets=(), extra=None):
+    def __init__(self, distance_mm: float = 0, status: int = 0, status_text: str = '',
+                 signal_kcps: float = 0, ambient_kcps: float = 0, sigma_mm: float = 0,
+                 spads: float = 0, targets: Sequence[Target] = (),
+                 extra: dict[str, Any] | None = None) -> None:
         self.distance_mm  = distance_mm
         self.status       = status
         self.status_text  = status_text
@@ -108,14 +119,14 @@ class Measurement:
         self.ambient_kcps = ambient_kcps
         self.sigma_mm     = sigma_mm
         self.spads        = spads
-        self.targets      = targets
-        self.extra        = extra or {}
+        self.targets: Sequence[Target] = targets
+        self.extra: dict[str, Any] = extra or {}
 
     @property
     def valid(self) -> bool:
         return self.status == 0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f'<Measurement {self.distance_mm} mm status {self.status} '
                 f'({self.status_text})>')
 
@@ -131,9 +142,9 @@ class SensorDriver:
     """
 
     # ── what this product is, as far as the bridge is concerned ──
-    ADDR_WIDTH  = 2         # bytes of register address on the wire
-    CLEAR_STEPS = ()        # ((addr, value), ...) handed to START_STREAM
-    MAX_KHZ     = 400       # bus ceiling; the driver runs the bus there itself
+    ADDR_WIDTH: int = 2     # bytes of register address on the wire
+    CLEAR_STEPS: tuple[tuple[int, int], ...] = ()  # ((addr, value), ...) handed to START_STREAM
+    MAX_KHZ: int = 400      # bus ceiling; the driver runs the bus there itself
 
     # Optional capability groups this driver serves. The vocabulary:
     #   'mode'          — named ranging modes, see MODES below
@@ -142,7 +153,7 @@ class SensorDriver:
     #   'calib_offset'  — calibrate_offset          'calib_xtalk'
     #   'thresholds'    — detection windows         'roi'
     #   'signal_thresh' 'sigma_thresh' 'temp_update' 'refspad'
-    SUPPORTS = frozenset()
+    SUPPORTS: frozenset[str] = frozenset()
 
     # The named ranging modes this product has, in the order a UI should list
     # them, first one being what init leaves behind. One axis for the whole
@@ -150,19 +161,19 @@ class SensorDriver:
     # histogram preset modes are all "a name that reconfigures how this part
     # ranges", and every product has at most one of those axes. Empty when the
     # product has none, and then 'mode' is not in SUPPORTS.
-    MODES = ()
+    MODES: tuple[str, ...] = ()
 
     # What set_range_timing() will accept as a budget, in ms: the inclusive
     # (min, max) a UI should offer. Some products take any integer in there,
     # some only a handful of values — see budget_choices() below.
-    BUDGET_MS = (10, 200)
+    BUDGET_MS: tuple[int, int] = (10, 200)
 
     # True when the frame the driver decodes is a raw histogram the caller can
     # ask for as well, through bin_data(). Only the histogram parts have one,
     # and the GUI shows its bin panel on that.
-    HISTOGRAM = False
+    HISTOGRAM: bool = False
 
-    def __init__(self, platform: BridgePlatform, product: str):
+    def __init__(self, platform: BridgePlatform, product: str) -> None:
         self.p = platform
         # The product the board reports, e.g. 'VL53L4CX'. It is passed in
         # rather than held as a class attribute because one driver serves
@@ -180,29 +191,29 @@ class SensorDriver:
         raise NotImplementedError
 
     # ── lifecycle ──
-    def sensor_init(self):
+    def sensor_init(self) -> None:
         """Reset and configure the sensor, and leave the bus at the highest
         speed this product runs at. Safe to re-run: it is the only way to know
         what the configuration registers hold after a previous session."""
         raise NotImplementedError
 
-    def start_ranging(self):  raise NotImplementedError
-    def stop_ranging(self):   raise NotImplementedError
+    def start_ranging(self) -> None:  raise NotImplementedError
+    def stop_ranging(self) -> None:   raise NotImplementedError
 
     # ── interrupt ──
     def check_for_data_ready(self) -> bool: raise NotImplementedError
 
-    def wait_data_ready(self, timeout_s: float = 1.0):
+    def wait_data_ready(self, timeout_s: float = 1.0) -> None:
         deadline = time.monotonic() + timeout_s
         while not self.check_for_data_ready():
             if time.monotonic() > deadline:
                 raise Vl53Error('timeout waiting for data ready')
             self.p.sleep_ms(1)
 
-    def clear_interrupt(self): raise NotImplementedError
+    def clear_interrupt(self) -> None: raise NotImplementedError
 
     # ── data ──
-    def stream_block(self) -> tuple:
+    def stream_block(self) -> tuple[int, int]:
         """(addr, len) — the register block the bridge streams on each INT."""
         raise NotImplementedError
 
@@ -215,17 +226,30 @@ class SensorDriver:
         addr, length = self.stream_block()
         return self.decode(self.p.rd_multi(addr, length))
 
+    # ── histogram frame (only when HISTOGRAM) ──
+    def bin_data(self, raw: bytes | None = None) -> Any:
+        """The raw histogram frame, for callers that want the bins themselves.
+        `raw` is the streamed block when the bridge read it; None reads it
+        here. Only the histogram parts have one — the session layer asks
+        HISTOGRAM first."""
+        raise NotImplementedError
+
+    def to_measurement(self, bins: Any) -> Measurement:
+        """A frame from bin_data() -> Measurement. Decode each frame exactly
+        once: the histogram driver steps its frame history here."""
+        raise NotImplementedError
+
     # ── timing ──
-    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int):
+    def set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int) -> None:
         """Budget of one measurement, and the period between two. An
         inter-measurement of 0 means continuous on every product."""
         raise NotImplementedError
 
-    def get_range_timing(self) -> tuple:
+    def get_range_timing(self) -> tuple[int, int]:
         """-> (timing_budget_ms, inter_measurement_ms)."""
         raise NotImplementedError
 
-    def budget_choices(self) -> tuple:
+    def budget_choices(self) -> tuple[int, ...]:
         """The only budgets this product accepts right now, ascending, or ()
         when any integer inside BUDGET_MS will do.
 
@@ -238,15 +262,18 @@ class SensorDriver:
         return ()
 
     # ── ranging mode ──
-    def set_mode(self, name: str):
-        """Apply one of MODES. Only when 'mode' is in SUPPORTS."""
+    def set_mode(self, name: str) -> int | None:
+        """Apply one of MODES. Only when 'mode' is in SUPPORTS.
+
+        -> the timing budget in effect after the change, ms, on a driver
+        whose mode change can move it (VL53L1: contract 12 §5), else None."""
         raise NotImplementedError
 
     def get_mode(self) -> str:
         """The mode currently applied, one of MODES."""
         raise NotImplementedError
 
-    def reach_mm(self):
+    def reach_mm(self) -> int | None:
         """How far this driver's configuration can actually measure, mm, or
         None when it has not been characterised.
 
@@ -259,7 +286,7 @@ class SensorDriver:
         return None
 
     # ── driver-specific readout ──
-    def driver_info(self) -> dict:
+    def driver_info(self) -> dict[str, Any]:
         """Numbers this driver can show that the contract has no field for —
         a UI prints `name: value` and nothing branches on it. Empty by
         default; it is how a driver says something without growing the

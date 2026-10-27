@@ -11,7 +11,11 @@ const CRC_TABLE: [u32; 256] = {
         let mut c = n as u32;
         let mut k = 0;
         while k < 8 {
-            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xEDB8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
             k += 1;
         }
         t[n] = c;
@@ -57,13 +61,18 @@ pub(crate) fn gunzip(data: &[u8]) -> Result<Vec<u8>, String> {
         let flags = h[3];
         pos += 10;
         if flags & 0x04 != 0 {
-            let x = data.get(pos..pos + 2).ok_or("gzip: truncated extra field")?;
+            let x = data
+                .get(pos..pos + 2)
+                .ok_or("gzip: truncated extra field")?;
             pos += 2 + u16::from_le_bytes([x[0], x[1]]) as usize;
         }
         for bit in [0x08, 0x10] {
             // file name, comment: zero-terminated
             if flags & bit != 0 {
-                let end = data.get(pos..).and_then(|r| r.iter().position(|&b| b == 0)).ok_or("gzip: truncated name")?;
+                let end = data
+                    .get(pos..)
+                    .and_then(|r| r.iter().position(|&b| b == 0))
+                    .ok_or("gzip: truncated name")?;
                 pos += end + 1;
             }
         }
@@ -71,7 +80,13 @@ pub(crate) fn gunzip(data: &[u8]) -> Result<Vec<u8>, String> {
             pos += 2; // header CRC
         }
         let start = out.len();
-        let mut inf = Inflate { src: data, pos, bit_buf: 0, bit_cnt: 0, out: &mut out };
+        let mut inf = Inflate {
+            src: data,
+            pos,
+            bit_buf: 0,
+            bit_cnt: 0,
+            out: &mut out,
+        };
         inf.run()?;
         pos = inf.pos;
         let t = data.get(pos..pos + 8).ok_or("gzip: truncated trailer")?;
@@ -123,15 +138,24 @@ impl Huffman {
     }
 }
 
-const LEN_BASE: [u16; 29] =
-    [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
-const LEN_EXTRA: [u8; 29] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
-const DIST_BASE: [u16; 30] = [
-    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
-    8193, 12289, 16385, 24577,
+const LEN_BASE: [u16; 29] = [
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,
+    163, 195, 227, 258,
 ];
-const DIST_EXTRA: [u8; 30] = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
-const CL_ORDER: [usize; 19] = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+const LEN_EXTRA: [u8; 29] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
+];
+const DIST_BASE: [u16; 30] = [
+    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
+    2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
+];
+const DIST_EXTRA: [u8; 30] = [
+    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13,
+    13,
+];
+const CL_ORDER: [usize; 19] = [
+    16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15,
+];
 
 struct Inflate<'a> {
     src: &'a [u8],
@@ -144,7 +168,10 @@ struct Inflate<'a> {
 impl Inflate<'_> {
     fn bits(&mut self, need: u32) -> Result<u32, String> {
         while self.bit_cnt < need {
-            let b = *self.src.get(self.pos).ok_or("inflate: unexpected end of data")?;
+            let b = *self
+                .src
+                .get(self.pos)
+                .ok_or("inflate: unexpected end of data")?;
             self.pos += 1;
             self.bit_buf |= (b as u32) << self.bit_cnt;
             self.bit_cnt += 8;
@@ -181,13 +208,19 @@ impl Inflate<'_> {
     fn stored(&mut self) -> Result<(), String> {
         self.bit_buf = 0; // to the byte boundary
         self.bit_cnt = 0;
-        let h = self.src.get(self.pos..self.pos + 4).ok_or("inflate: truncated stored block")?;
+        let h = self
+            .src
+            .get(self.pos..self.pos + 4)
+            .ok_or("inflate: truncated stored block")?;
         let len = u16::from_le_bytes([h[0], h[1]]);
         if len != !u16::from_le_bytes([h[2], h[3]]) {
             return Err("inflate: stored length check failed".into());
         }
         self.pos += 4;
-        let data = self.src.get(self.pos..self.pos + len as usize).ok_or("inflate: truncated stored block")?;
+        let data = self
+            .src
+            .get(self.pos..self.pos + len as usize)
+            .ok_or("inflate: truncated stored block")?;
         self.out.extend_from_slice(data);
         self.pos += len as usize;
         Ok(())
@@ -257,7 +290,9 @@ impl Inflate<'_> {
             let (value, repeat) = match sym {
                 0..=15 => (sym as u8, 1),
                 16 => {
-                    let prev = *lengths.get(i.wrapping_sub(1)).ok_or("inflate: repeat with no length")?;
+                    let prev = *lengths
+                        .get(i.wrapping_sub(1))
+                        .ok_or("inflate: repeat with no length")?;
                     (prev, 3 + self.bits(2)? as usize)
                 }
                 17 => (0, 3 + self.bits(3)? as usize),
@@ -293,7 +328,12 @@ impl<W: Write> GzWriter<W> {
     pub(crate) fn new(mut out: W) -> io::Result<GzWriter<W>> {
         // magic, deflate, no flags, no mtime, no extra flags, OS unknown
         out.write_all(&[0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 0xFF])?;
-        Ok(GzWriter { out, buf: Vec::with_capacity(STORED_MAX), crc: Crc32::new(), size: 0 })
+        Ok(GzWriter {
+            out,
+            buf: Vec::with_capacity(STORED_MAX),
+            crc: Crc32::new(),
+            size: 0,
+        })
     }
 
     fn block(&mut self, last: bool) -> io::Result<()> {
@@ -356,8 +396,9 @@ mod tests {
     fn a_fixed_huffman_member_inflates() {
         // Python `gzip.compress(b"hello hello hello\n", mtime=0)`: fixed codes, a back-reference.
         let gz = [
-            0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0xc8, 0x40,
-            0x90, 0x5c, 0x00, 0x3b, 0x7c, 0x8a, 0xdf, 0x12, 0x00, 0x00, 0x00,
+            0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0xcb, 0x48, 0xcd, 0xc9,
+            0xc9, 0x57, 0xc8, 0x40, 0x90, 0x5c, 0x00, 0x3b, 0x7c, 0x8a, 0xdf, 0x12, 0x00, 0x00,
+            0x00,
         ];
         assert_eq!(gunzip(&gz).unwrap(), b"hello hello hello\n");
     }
@@ -373,9 +414,18 @@ mod tests {
             "226740e20c489c01993320730614ce803268c01bbba45af17e080000",
         ]
         .concat();
-        let gz: Vec<u8> = (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+        let gz: Vec<u8> = (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect();
         let text: String = (0..40)
-            .map(|i| format!("{{\"d\":\"d0\",\"t\":{},\"k\":\"sr04\",\"v\":{{\"echo_us\":{}}}}}\n", i * 50000, 5000 + i % 7))
+            .map(|i| {
+                format!(
+                    "{{\"d\":\"d0\",\"t\":{},\"k\":\"sr04\",\"v\":{{\"echo_us\":{}}}}}\n",
+                    i * 50000,
+                    5000 + i % 7
+                )
+            })
             .collect();
         assert_eq!(gunzip(&gz).unwrap(), text.as_bytes());
     }

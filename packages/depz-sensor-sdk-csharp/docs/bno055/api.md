@@ -119,7 +119,21 @@ public const byte ExpectedGyrId = 0x0F
 public static byte[] PackReadReg(byte addr, byte len)
 ```
 
-BNO_READ_REG payload: addr u8, len u8.
+BNO_READ_REG payload: addr u8, len u8, with the transfer limit of contract 13 §1 — len 1..`XferMax` and addr + len ≤ 0x100.
+
+#### Bno055Wire.TimerPeriodMinMs *(constant)*
+
+```csharp
+public const int TimerPeriodMinMs = 1
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+#### Bno055Wire.TimerPeriodMaxMs *(constant)*
+
+```csharp
+public const int TimerPeriodMaxMs = 60000
+```
 
 #### Bno055Wire.PackWriteReg
 
@@ -127,7 +141,7 @@ BNO_READ_REG payload: addr u8, len u8.
 public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
 ```
 
-BNO_WRITE_REG payload: addr u8, then data[1..`XferMax`].
+BNO_WRITE_REG payload: addr u8, then data[1..`XferMax`] with addr + N ≤ 0x100.
 
 #### Bno055Wire.PackStartStream
 
@@ -175,7 +189,7 @@ Parse a RPT_BNO_REG_STREAM payload: timestamp u64 LE, addr u8, len u8, data[len]
 public sealed record Bno055Info(byte I2cAddr, byte ChipId, byte AccId, byte MagId, byte GyrId, ushort SwRev, byte BlRev, byte Initialized, byte IntLevel, uint IntEdges, ushort ReadMinUs, ushort ReadMaxUs, ushort ReadAvgUs, uint TxDropped, uint I2cErrors, uint SlotsSkipped, ushort BusRecoveries, byte LastI2cError, byte SensorResets, ushort LoopMaxUs)
 ```
 
-RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters are free-running and wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM, `I2cErrors` at every successful reset handshake. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
 #### Bno055Info.Unpack
 
@@ -1169,7 +1183,7 @@ public Bno055Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
 #### Bno055Device.Bno055Device *(constructor)*
 
 ```csharp
-#if NET public Bno055Device(string port, TimeSpan? timeout = null) : base(port, timeout)
+public Bno055Device(string port, TimeSpan? timeout = null) : base(port, timeout)
 ```
 
 #### Bno055Device.BridgeInfo

@@ -23,19 +23,21 @@ static void sha256_hex(const uint8_t *msg, size_t len, char out[65])
     uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
                      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
     size_t total = ((len + 9 + 63) / 64) * 64, off;
-#define ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+/* Rotate right; the wrapped half goes through 64 bits so no bit is shifted
+ * out of a uint32_t (UBSan's unsigned-shift-base). */
+#define ROR(x, n) ((uint32_t)(((uint64_t)(x) << (32 - (n))) | ((x) >> (n))))
     for (off = 0; off < total; off += 64) {
         uint32_t w[64], a, b, c, d, e, f, g, hh;
         int i;
         for (i = 0; i < 64; i++) {
             size_t k = off + (size_t)i;
-            uint8_t byte;
-            if (k < len) byte = msg[k];
-            else if (k == len) byte = 0x80;
-            else if (k >= total - 8) byte = (uint8_t)(((uint64_t)len * 8) >> (8 * (total - 1 - k)));
-            else byte = 0;
+            uint8_t octet;
+            if (k < len) octet = msg[k];
+            else if (k == len) octet = 0x80;
+            else if (k >= total - 8) octet = (uint8_t)(((uint64_t)len * 8) >> (8 * (total - 1 - k)));
+            else octet = 0;
             if (i % 4 == 0) w[i / 4] = 0;
-            w[i / 4] |= (uint32_t)byte << (8 * (3 - i % 4));
+            w[i / 4] |= (uint32_t)octet << (8 * (3 - i % 4));
         }
         for (i = 16; i < 64; i++) {
             uint32_t s0 = ROR(w[i - 15], 7) ^ ROR(w[i - 15], 18) ^ (w[i - 15] >> 3);

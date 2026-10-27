@@ -206,7 +206,9 @@ pub trait Vl53lxDriver: Send {
         Vec::new()
     }
 
-    fn set_mode(&mut self, _name: &str) -> Result<()> {
+    /// Apply one of the modes. → the timing budget in effect after the change, ms, on a driver
+    /// whose mode change can move it (VL53L1: contract 12 §5), else `None`.
+    fn set_mode(&mut self, _name: &str) -> Result<Option<u32>> {
         Err(unsupported(self.product(), self.driver_name(), "mode"))
     }
 
@@ -244,35 +246,72 @@ pub trait Vl53lxDriver: Send {
 
     /// `nb_samples` `None`: the driver's default.
     fn calibrate_offset(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_offset"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_offset",
+        ))
     }
 
     fn calibrate_xtalk(&mut self, _target_dist_mm: i32, _nb_samples: Option<u32>) -> Result<i32> {
-        Err(unsupported(self.product(), self.driver_name(), "calib_xtalk"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "calib_xtalk",
+        ))
     }
 
     fn get_detection_thresholds(&mut self) -> Result<Thresholds> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
-    fn set_detection_thresholds(&mut self, _distance_low_mm: u16, _distance_high_mm: u16, _window: u8) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "thresholds"))
+    fn set_detection_thresholds(
+        &mut self,
+        _distance_low_mm: u16,
+        _distance_high_mm: u16,
+        _window: u8,
+    ) -> Result<()> {
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "thresholds",
+        ))
     }
 
     fn get_signal_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn set_signal_threshold(&mut self, _signal_kcps: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "signal_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "signal_thresh",
+        ))
     }
 
     fn get_sigma_threshold(&mut self) -> Result<u32> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     fn set_sigma_threshold(&mut self, _sigma_mm: u32) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "sigma_thresh"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "sigma_thresh",
+        ))
     }
 
     /// (x, y) SPADs.
@@ -293,7 +332,11 @@ pub trait Vl53lxDriver: Send {
     }
 
     fn start_temperature_update(&mut self) -> Result<()> {
-        Err(unsupported(self.product(), self.driver_name(), "temp_update"))
+        Err(unsupported(
+            self.product(),
+            self.driver_name(),
+            "temp_update",
+        ))
     }
 
     /// VL53L0X: re-measure the reference SPADs → (count, is_aperture).
@@ -305,11 +348,17 @@ pub trait Vl53lxDriver: Send {
 
     /// The raw histogram of a frame (read from the sensor when `raw` is `None`).
     fn bin_data(&mut self, _raw: Option<&[u8]>) -> Result<BinData> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 
     /// A histogram frame → a range (the host-side ranging of the histogram driver).
     fn to_measurement(&mut self, _bins: &BinData) -> Result<Vl53lxRange> {
-        Err(DepzError::Unsupported(format!("{} has no histogram", self.driver_name())))
+        Err(DepzError::Unsupported(format!(
+            "{} has no histogram",
+            self.driver_name()
+        )))
     }
 }

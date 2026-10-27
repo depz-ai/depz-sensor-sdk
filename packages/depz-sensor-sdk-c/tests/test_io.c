@@ -4,12 +4,19 @@
 #include "depz_sensor_io.h"
 #include "fake_sr04.h"
 #include "fake_vl53l4.h"
+#include "fake_vl53l8.h"
 #include "fake_bno086.h"
 #include "fake_tmf8829.h"
+#include "fake_vl53lx.h"
+#include "fake_bno055.h"
+#include "fake_vl53l8.h"
 #include "json.h"
 #include "scenarios.h"
 
+#include "../src/io/io_internal.h"
 #include "../src/io/platform.h"
+#include "../src/io/vl53lx_bare_tables.h"
+#include "../src/io/vl53l8_blobs.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -68,6 +75,24 @@ static void identity_roundtrip(rig *r)
 static void temperature(rig *r)
 {
     double c = 0;
+    CHECK_RC(depz_device_read_mcu_temperature(r->dev, &c), DEPZ_OK);
+    CHECK(fabs(c - 27.3) < 1e-9);
+}
+
+/* Contract 07 §3 (ERRATA A4): a reply shorter than its fields fails that one
+ * request with DEPZ_E_PROTOCOL; the reader goes on and the next request is
+ * answered — the device is not dead. */
+static void short_reply_fails_its_request_and_the_reader_goes_on(rig *r)
+{
+    char s[128];
+    double c = 0;
+    fake_sr04_set_short_temperature(r->fake, true);
+    CHECK_RC(depz_device_read_mcu_temperature(r->dev, &c), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "report 0x83: 3 bytes, expected 10") != NULL);
+    CHECK_RC(depz_device_read_mcu_temperature(r->dev, &c), DEPZ_E_PROTOCOL);
+    fake_sr04_set_short_temperature(r->fake, false);
+    CHECK_RC(depz_device_get_device_name(r->dev, s, sizeof s), DEPZ_OK);
+    CHECK(strcmp(s, FAKE_SR04_NAME) == 0);
     CHECK_RC(depz_device_read_mcu_temperature(r->dev, &c), DEPZ_OK);
     CHECK(fabs(c - 27.3) < 1e-9);
 }
@@ -374,6 +399,45 @@ static void events_and_disconnect(void)
     depz_mutex_destroy(&c.lock);
 }
 
+/* Contract 01 §5 step 5 (ERRATA A1): a gap the host sees in the device->host
+ * seq is a SEQ_GAP event of its own, ahead of the packet it was seen on, and
+ * counts in stats.seq_gaps; the first packet after open is no gap, and the
+ * device-reported RPT 0x84 stays a SEQUENCE_ERROR. */
+static void host_seq_gap_is_an_event(void)
+{
+    static const uint8_t seqs[3] = {5, 9, 10};
+    static const uint8_t payload[1] = {0x00};
+    depz_link *a, *b;
+    depz_device *dev;
+    depz_stream *evs;
+    depz_device_event ev;
+    depz_link_stats st;
+    uint8_t frame[16];
+    size_t i, frame_len;
+    CHECK_RC(depz_link_loopback_pair(&a, &b), DEPZ_OK);
+    CHECK_RC(depz_device_open_link(a, &dev), DEPZ_OK);
+    evs = depz_device_events(dev, 16);
+    CHECK(evs);
+    for (i = 0; i < 3; i++) {
+        CHECK_RC(depz_build_packet(0x7F, payload, 1, seqs[i], DEPZ_CRC_NONE, frame, sizeof frame, &frame_len), 0);
+        CHECK_RC(depz_link_write(b, frame, frame_len), DEPZ_OK);
+    }
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK); /* seq 5: the first packet, no gap */
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_SEQ_GAP && ev.expected_seq == 6 && ev.received_seq == 9 && ev.missed == 3);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK); /* the packet is still delivered */
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK); /* seq 10 follows 9: no gap */
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT);
+    depz_device_stats(dev, &st);
+    CHECK(st.seq_gaps == 1 && st.device_seq_errors == 0 && st.rx_packets == 3);
+    CHECK(st.callback_errors == 0); /* contract 07 §3: a C callback cannot raise */
+    depz_stream_close(evs);
+    depz_device_close(dev);
+    depz_link_free(b);
+}
+
 typedef struct { depz_device *dev; int rc; } inflight_arg;
 
 static void inflight_first(void *a)
@@ -454,6 +518,40 @@ static void record_then_replay(void)
     CHECK_RC(depz_sr04_open_link(rp, &dev), DEPZ_OK);
     CHECK_RC(depz_device_get_device_name(dev, s, sizeof s), DEPZ_E_REPLAY_MISMATCH);
     depz_device_close(dev);
+    remove(path);
+}
+
+/* ERRATA A6: there is no `.depzrec.gz` — a capture is plain text, a gzip
+ * container is not inflated but refused like any damaged file. The gzipped
+ * bytes (mtime 0) are the same 70 in every SDK's test; `plain` is what they
+ * inflate to, a valid capture. */
+static void replay_refuses_a_gzipped_capture(void)
+{
+    static const char plain[] = "{\"schema\": \"depz.rec/1\"}\n{\"t\": 0, \"dir\": \"rx\", \"data\": \"aa\"}\n";
+    static const uint8_t gzipped[70] = {
+        0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0xab, 0x56, 0x2a, 0x4e,
+        0xce, 0x48, 0xcd, 0x4d, 0x54, 0xb2, 0x52, 0x50, 0x4a, 0x49, 0x2d, 0xa8, 0xd2, 0x2b,
+        0x4a, 0x4d, 0xd6, 0x37, 0x54, 0xaa, 0xe5, 0xaa, 0x56, 0x2a, 0x01, 0x8a, 0x19, 0xe8,
+        0x00, 0x85, 0x33, 0x8b, 0x40, 0xb2, 0x45, 0x15, 0x4a, 0x20, 0x4e, 0x62, 0x09, 0x58,
+        0x6d, 0x62, 0x22, 0x50, 0x0d, 0x00, 0x7e, 0x3b, 0xc0, 0x0b, 0x3d, 0x00, 0x00, 0x00,
+    };
+    const char *path = "test_io_gzipped.depzrec";
+    depz_link *rp = NULL;
+    FILE *f = fopen(path, "wb");
+    CHECK(f);
+    if (!f) return;
+    fwrite(plain, 1, sizeof plain - 1, f);
+    fclose(f);
+    CHECK_RC(depz_link_open_replay(path, false, false, &rp), DEPZ_OK);
+    depz_link_free(rp);
+    rp = NULL;
+    f = fopen(path, "wb");
+    CHECK(f);
+    if (!f) return;
+    fwrite(gzipped, 1, sizeof gzipped, f);
+    fclose(f);
+    CHECK_RC(depz_link_open_replay(path, false, false, &rp), DEPZ_E_ARG);
+    CHECK(rp == NULL);
     remove(path);
 }
 
@@ -673,6 +771,10 @@ static void l8_guards_and_cnh_math(void)
     CHECK_RC(depz_vl53l8_get_resolution(dev, &zones), DEPZ_E_ARG);      /* init() first */
     CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_E_ARG);
     CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(dev, 1), DEPZ_E_ARG); /* L8 needs >= 2 Hz */
+    /* contract 11 §3 (ERRATA A13): at most 60 Hz at 4x4 (the resolution after open), 15 Hz at 8x8 */
+    CHECK(depz_vl53l8_max_ranging_frequency_hz(DEPZ_VL53L8_RES_4X4) == 60 &&
+          depz_vl53l8_max_ranging_frequency_hz(DEPZ_VL53L8_RES_8X8) == 15);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(dev, 61), DEPZ_E_ARG);
     CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);                   /* idempotent */
     CHECK_RC(depz_sr04_start(dev), DEPZ_E_WRONG_TYPE);
     /* 16 aggregates x 20 bins -> 1708 B, the size the L8CH capture streams. */
@@ -700,6 +802,76 @@ static void l8_guards_and_cnh_math(void)
     CHECK(packed[0] == 0x00 && packed[1] == 0x50 && packed[18] == 2 && packed[19] == 20 && packed[25] == 0x3F);
     depz_device_close(dev);
     depz_link_free(b);
+}
+
+/* One frame of the running stream: subscribe, push it from the fake, take it. */
+static int l8_take_frame(depz_device *dev, fake_vl53l8 *f, depz_vl53l8_live_frame *out)
+{
+    depz_stream *s = depz_vl53l8_frames(dev, 2);
+    int rc;
+    if (!s) return DEPZ_E_NOMEM;
+    rc = fake_vl53l8_send_frame(f) ? depz_stream_next(s, out, 2000) : DEPZ_E_ARG;
+    depz_stream_close(s);
+    return rc;
+}
+
+/* VL53L8CH: CNH and the motion indicator share DCI 0xBFAC (contract 04 §7,
+ * ERRATA B4) — configuring one disarms the other, init() disarms both. */
+static void l8ch_cnh_and_motion_exclusive(void)
+{
+    static depz_vl53l8_live_frame fr;
+    depz_link *link;
+    depz_device *dev = NULL;
+    depz_vl53l8_cnh_setup cnh, armed;
+    uint8_t mi[156], packed[156];
+    fake_vl53l8 *f = fake_vl53l8_start(0x0C0B6C9Eu, &link); /* the CH blob's checksum */
+    CHECK(f != NULL);
+    if (!f) return;
+    CHECK_RC(depz_vl53l8_open_link(link, DEPZ_VL53L8_MODEL_L8CH, &dev), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_init(dev, NULL, NULL), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_resolution(dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    depz_vl53l8_cnh_init_config(&cnh, 10, 20, 2);
+    CHECK_RC(depz_vl53l8_cnh_create_agg_map(&cnh, 64, 0, 0, 2, 2, 4, 4), DEPZ_OK);
+    depz_vl53l8_cnh_pack(&cnh, packed);
+
+    /* motion, then CNH: 0xBFAC holds the CNH setup, frames carry no motion */
+    CHECK_RC(depz_vl53l8_configure_motion_indicator(dev, 400, 1500), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_configure_cnh(dev, &cnh), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(f, 0xBFAC, mi, sizeof mi) == sizeof mi && memcmp(mi, packed, sizeof mi) == 0);
+    CHECK(depz_vl53l8_cnh_armed(dev, &armed) && armed.nb_of_aggregates == 16);
+    CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_OK);
+    CHECK(fake_vl53l8_frame_size(f) == 3156); /* 8x8 + the 16x20 CNH block, as the lab capture */
+    CHECK_RC(l8_take_frame(dev, f, &fr), DEPZ_OK);
+    CHECK(!fr.has_motion && fr.cnh_len == 1708);
+    CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);
+
+    /* CNH, then motion: 0xBFAC holds the motion config, the CNH block is gone */
+    CHECK_RC(depz_vl53l8_configure_motion_indicator(dev, 400, 1500), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(f, 0xBFAC, mi, sizeof mi) == sizeof mi && mi[25] == 0);
+    CHECK(!depz_vl53l8_cnh_armed(dev, NULL));
+    CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_OK);
+    CHECK(fake_vl53l8_frame_size(f) == 1444); /* 8x8 CH without CNH */
+    CHECK_RC(l8_take_frame(dev, f, &fr), DEPZ_OK);
+    CHECK(fr.has_motion && fr.cnh_len == 0);
+    CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);
+
+    /* init() disarms both: the motion armed above, then a CNH setup */
+    CHECK_RC(depz_vl53l8_init(dev, NULL, NULL), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_resolution(dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_OK);
+    CHECK_RC(l8_take_frame(dev, f, &fr), DEPZ_OK);
+    CHECK(!fr.has_motion && fr.cnh_len == 0);
+    CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_configure_cnh(dev, &cnh), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_init(dev, NULL, NULL), DEPZ_OK);
+    CHECK(!depz_vl53l8_cnh_armed(dev, NULL));
+    CHECK_RC(depz_vl53l8_set_resolution(dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_start_ranging(dev), DEPZ_OK);
+    CHECK(fake_vl53l8_frame_size(f) == 1444);
+    CHECK_RC(depz_vl53l8_stop_ranging(dev), DEPZ_OK);
+    CHECK(depz_vl53l8_frame_parse_errors(dev) == 0);
+    depz_device_close(dev);
+    fake_vl53l8_stop(f);
 }
 
 /* ── BNO085 / BNO086 against the fake hub ────────────────────────────── */
@@ -777,6 +949,26 @@ static void bno086_features(void)
     CHECK_RC(depz_bno086_disable(dev, DEPZ_BNO_SENSOR_ROTATION_VECTOR), DEPZ_OK);
     CHECK_RC(depz_bno086_enable(dev, DEPZ_BNO_SENSOR_ROTATION_VECTOR, 50, &g), DEPZ_OK);
     CHECK(g.interval_us == 16000);
+    {   /* interactive calibration (0x0E, no answer) and the MotionRequest enable without read-back */
+        uint8_t params[9];
+        CHECK_RC(depz_bno086_set_motion_intent(dev, DEPZ_BNO_MOTION_INTENT_IN_MOTION), DEPZ_OK);
+        CHECK(fake_bno086_last_command(f, DEPZ_SH2_CMD_INTERACTIVE_CALIBRATION, params) && params[0] == 3 &&
+              params[1] == 0);
+        CHECK_RC(depz_bno086_enable_motion_request(dev, 1), DEPZ_OK);
+        /* no read-back of its own: a Get Feature queued behind it sees the fake's grid value */
+        CHECK_RC(depz_bno086_get_feature(dev, DEPZ_BNO_SENSOR_MOTION_REQUEST, &g), DEPZ_OK);
+        CHECK(g.interval_us == 512000 && fake_bno086_interval(f, DEPZ_BNO_SENSOR_MOTION_REQUEST) == 512000);
+        CHECK_RC(depz_bno086_enable_motion_request(dev, 0), DEPZ_E_ARG);
+    }
+    {   /* force flush (0xF0): returns once the fake's `ef <sensor>` input report arrived */
+        depz_stream *s = depz_bno086_reports(dev, 8);
+        depz_bno_report r;
+        CHECK_RC(depz_bno086_flush(dev, DEPZ_BNO_SENSOR_ACCELEROMETER), DEPZ_OK);
+        CHECK_RC(depz_stream_next(s, &r, 1000), DEPZ_OK);
+        CHECK(r.type == DEPZ_BNO_FLUSH_COMPLETED_REPORT && r.flushed_sensor == DEPZ_BNO_SENSOR_ACCELEROMETER &&
+              r.sensor_id == DEPZ_BNO_FLUSH_COMPLETED);
+        depz_stream_close(s);
+    }
     depz_device_close(dev);
     fake_bno086_stop(f);
 }
@@ -1060,6 +1252,43 @@ static void vlx_unsupported_group_refused(void)
         depz_device_close(dev);
     }
     CHECK(refused > 0);
+}
+
+/* The public depz_vl53lx_set_mode over the L1X ULD on the fake register file
+ * (ERRATA A9; the vectors' l1_uld cases drive the bare driver op): 15 ms is
+ * short-only, so going to long hands back the nearest long budget, 20 ms —
+ * the one get_range_timing then reads; a NULL out-pointer still changes mode.
+ * The histogram driver's mode change never moves the budget: 0. */
+static void vlx_l1_set_mode_hands_back_the_budget(void)
+{
+    fake_vl53l4 *fake;
+    depz_link *link;
+    depz_device *dev;
+    const char *mode = NULL;
+    int b = -1, im = -1;
+    fake = fake_vl53l4_start(&link);
+    if (!fake) { g_failed++; return; }
+    CHECK_RC(depz_vl53lx_open_link(link, &dev), DEPZ_OK);
+    depz_device_set_timeout_ms(dev, 1000);
+    CHECK_RC(depz_vl53lx_init(dev, DEPZ_VL53LX_DRIVER_ULD, DEPZ_VL53LX_PRODUCT_L1CX), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_configure(dev, 15, 0, "short", NULL, NULL), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_set_mode(dev, "long", &b), DEPZ_OK);
+    CHECK(b == 20);
+    CHECK_RC(depz_vl53lx_get_range_timing(dev, &b, &im), DEPZ_OK);
+    CHECK(b == 20);
+    CHECK_RC(depz_vl53lx_get_mode(dev, &mode), DEPZ_OK);
+    CHECK(mode && !strcmp(mode, "long"));
+    CHECK_RC(depz_vl53lx_set_mode(dev, "short", NULL), DEPZ_OK); /* 20 ms is tabulated in short */
+    CHECK_RC(depz_vl53lx_get_mode(dev, &mode), DEPZ_OK);
+    CHECK(mode && !strcmp(mode, "short"));
+    b = -1;
+    CHECK_RC(depz_vl53lx_set_mode(dev, "medium", &b), DEPZ_E_ARG);
+    CHECK(b == -1); /* a refused mode leaves the output alone */
+    CHECK_RC(depz_vl53lx_init(dev, DEPZ_VL53LX_DRIVER_HISTOGRAM, DEPZ_VL53LX_PRODUCT_L1CX), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_set_mode(dev, "long", &b), DEPZ_OK);
+    CHECK(b == 0);
+    depz_device_close(dev);
+    fake_vl53l4_stop(fake);
 }
 
 /* ── TMF8829 against the fake bridge (contracts/vectors/tmf8829.json) ────── */
@@ -1352,17 +1581,2173 @@ static void tmf8829_fake_session(void)
     json_free(root);
 }
 
+/* ── VL53L 1D family against the fake APP_VL53L0_4 bridge ────────────── */
+
+/* The C side of test_vl53lx_device.py and test_vl53l1_uld.py: the die ULDs
+ * (L4CD, L3CX ULP, L1X) over fake_vl53lx, the same register file and the same
+ * numbers as the Python fake. Blocks are vectors/vl53lx.json die_block. */
+
+#define VLX_L4CD_BOARD "DEPZ ToF Sensor VL53L4CD USB v2.1 TESTSERIAL"
+#define VLX_L1CX_BOARD "DEPZ ToF Sensor VL53L1CX USB v2.1 SER"
+#define VLX_L3CX_BOARD "DEPZ ToF Sensor VL53L3CX USB v2.1 SER"
+
+/* die_block vl53l4cx_uld_as_l4cd_50ms_f2: 624 mm, 5160 kcps, 211 SPADs */
+static const uint8_t VLX_L4_BLOCK[17] = {0x09, 0x09, 0x01, 0xd3, 0x20, 0x02, 0x85, 0x00, 0x89,
+                                         0x00, 0x08, 0x2b, 0xa7, 0x02, 0x70, 0x02, 0x85};
+/* die_block vl53l1cx_uld_long_33ms_f2: 576 mm, 16072 kcps, 67 SPADs */
+static const uint8_t VLX_L1_BLOCK[17] = {0x09, 0x09, 0x01, 0x43, 0x90, 0x07, 0xd9, 0x01, 0x3f,
+                                         0x00, 0x0d, 0x22, 0x34, 0x02, 0x40, 0x07, 0xd9};
+
+typedef struct {
+    fake_vl53lx *fake;
+    depz_device *dev;
+} vlxrig;
+
+/* The board, opened and init()-ed with the defaults (the product from the
+ * board name), the packet log cleared — Python's `ready` fixture. */
+static bool vlx_up(vlxrig *r, const char *board)
+{
+    depz_link *link;
+    r->dev = NULL;
+    r->fake = fake_vl53lx_start(board, &link);
+    if (!r->fake) return false;
+    if (depz_vl53lx_open_link(link, &r->dev) != DEPZ_OK) return false;
+    depz_device_set_timeout_ms(r->dev, 500);
+    if (depz_vl53lx_init(r->dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_NONE) != DEPZ_OK) {
+        fprintf(stderr, "  FAIL vl53lx init: %s\n", depz_last_error());
+        return false;
+    }
+    fake_vl53lx_clear(r->fake);
+    return true;
+}
+
+static void vlx_down(vlxrig *r)
+{
+    depz_device_close(r->dev);
+    fake_vl53lx_stop(r->fake);
+}
+
+#define VLX_RIG(name, board)                           \
+    static void name##_body(vlxrig *r);                \
+    static void name(void)                             \
+    {                                                  \
+        vlxrig r;                                      \
+        if (!vlx_up(&r, board)) g_failed++;            \
+        else name##_body(&r);                          \
+        vlx_down(&r);                                  \
+    }                                                  \
+    static void name##_body(vlxrig *r)
+
+typedef struct { uint16_t addr; size_t n; uint8_t d[4]; } vlx_w;
+
+/* The WRITE_REG payloads first .. first+n of the log are exactly `want`. */
+static bool vlx_writes_are(fake_vl53lx *f, size_t first, const vlx_w *want, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n; i++) {
+        uint8_t p[300];
+        size_t len = fake_vl53lx_sent(f, 0x33, first + i, p, sizeof p);
+        if (len != 2 + want[i].n || (uint16_t)(p[0] | p[1] << 8) != want[i].addr ||
+            memcmp(p + 2, want[i].d, want[i].n) != 0) {
+            fprintf(stderr, "  write %zu: 0x%04X+%zu, want 0x%04X+%zu\n", first + i,
+                    len >= 2 ? (unsigned)(p[0] | p[1] << 8) : 0u, len >= 2 ? len - 2 : 0,
+                    (unsigned)want[i].addr, want[i].n);
+            return false;
+        }
+    }
+    return true;
+}
+
+/* How many WRITE_REGs of the log started at `addr`. */
+static size_t vlx_writes_to(fake_vl53lx *f, uint16_t addr)
+{
+    size_t i, n = 0, total = fake_vl53lx_count(f, 0x33);
+    for (i = 0; i < total; i++) {
+        uint8_t p[300];
+        if (fake_vl53lx_sent(f, 0x33, i, p, sizeof p) >= 2 && (uint16_t)(p[0] | p[1] << 8) == addr) n++;
+    }
+    return n;
+}
+
+/* VL53L1X ULD: 15 ms exists in short mode only — going back to long keeps
+ * the period and takes the nearest budget long has, 20 ms. */
+VLX_RIG(vlx_l1_mode_change_moves_the_budget, VLX_L1CX_BOARD)
+{
+    static const vlx_w want[8] = {
+        {0x004B, 1, {0x0A}}, {0x0060, 1, {0x0F}}, {0x0063, 1, {0x0D}}, {0x0069, 1, {0xB8}},
+        {0x0078, 2, {0x0F, 0x0D}}, {0x007A, 2, {0x0E, 0x0E}},
+        {0x005E, 2, {0x00, 0x1E}}, {0x0061, 2, {0x00, 0x22}}};
+    static const int long_budgets[6] = {20, 33, 50, 100, 200, 500};
+    const char *names[4], *mode = NULL;
+    int choices[8], b = 0, i = 0, lo = 0, hi = 0;
+    size_t n = 0, k;
+    CHECK(depz_vl53lx_product_bound(r->dev) == DEPZ_VL53LX_PRODUCT_L1CX);
+    CHECK(depz_vl53lx_driver_bound(r->dev) == DEPZ_VL53LX_DRIVER_ULD);
+    CHECK(depz_vl53lx_modes(r->dev, names, 4) == 2 && !strcmp(names[0], "long") && !strcmp(names[1], "short"));
+    CHECK_RC(depz_vl53lx_budget_range(r->dev, &lo, &hi), DEPZ_OK);
+    CHECK(lo == 15 && hi == 500);
+    CHECK_RC(depz_vl53lx_get_mode(r->dev, &mode), DEPZ_OK);
+    CHECK(mode && !strcmp(mode, "long"));
+    /* the 0xB8 phase window of the long blob at the die's 0xBCCC oscillator */
+    CHECK(depz_vl53lx_driver_reach_mm(r->dev) == 4563);
+    CHECK_RC(depz_vl53lx_configure(r->dev, 15, 0, "short", NULL, NULL), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_get_range_timing(r->dev, &b, &i), DEPZ_OK);
+    CHECK(b == 15 && i == 15);
+    CHECK_RC(depz_vl53lx_budget_choices(r->dev, choices, 8, &n), DEPZ_OK);
+    CHECK(n == 7 && choices[0] == 15);
+    CHECK(depz_vl53lx_driver_reach_mm(r->dev) == 1388); /* short: the 0x38 window */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_set_mode(r->dev, "long", NULL), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_get_mode(r->dev, &mode), DEPZ_OK);
+    CHECK(!strcmp(mode, "long"));
+    CHECK_RC(depz_vl53lx_budget_choices(r->dev, choices, 8, &n), DEPZ_OK);
+    CHECK(n == 6);
+    for (k = 0; k < 6; k++) CHECK(choices[k] == long_budgets[k]);
+    CHECK_RC(depz_vl53lx_get_range_timing(r->dev, &b, &i), DEPZ_OK);
+    CHECK(b == 20 && i == 15);
+    CHECK(vlx_writes_are(r->fake, 0, want, 8));
+    CHECK_RC(depz_vl53lx_set_mode(r->dev, "medium", NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "no such mode") != NULL);
+    /* a budget the mode does not have is refused, not rounded */
+    CHECK_RC(depz_vl53lx_configure(r->dev, 40, 0, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "40 ms is not one the long mode has") != NULL);
+}
+
+VLX_RIG(vlx_l1_unreadable_mode_byte_is_an_error, VLX_L1CX_BOARD)
+{
+    const char *mode = NULL;
+    fake_vl53lx_set_reg(r->fake, 0x004B, 0x00); /* a part fresh out of reset */
+    CHECK_RC(depz_vl53lx_get_mode(r->dev, &mode), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "reads 0x00, which is neither distance mode") != NULL);
+}
+
+/* VL53L1X_SetDistanceThreshold: the window bits rewritten, the others kept. */
+VLX_RIG(vlx_l1_thresholds_keep_the_other_bits, VLX_L1CX_BOARD)
+{
+    static const vlx_w want[3] = {{0x0046, 1, {0x93}}, {0x0072, 2, {0x01, 0x2C}}, {0x0074, 2, {0x00, 0x64}}};
+    int lo = 0, hi = 0, w = 0;
+    CHECK(fake_vl53lx_reg(r->fake, 0x0046) == 0x20); /* the blob's byte */
+    fake_vl53lx_set_reg(r->fake, 0x0046, 0x90);
+    CHECK_RC(depz_vl53lx_set_detection_thresholds(r->dev, 100, 300, 3), DEPZ_OK);
+    CHECK(fake_vl53lx_count(r->fake, 0x33) == 3 && vlx_writes_are(r->fake, 0, want, 3));
+    CHECK_RC(depz_vl53lx_get_detection_thresholds(r->dev, &lo, &hi, &w), DEPZ_OK);
+    CHECK(lo == 100 && hi == 300 && w == 3);
+}
+
+/* VL53L1X_calibration.c on the L1 block (576 mm): no heat loop, the three
+ * offsets zeroed, timed start, 5 frames each released, the L1X stop code. */
+VLX_RIG(vlx_l1_offset_calibration, VLX_L1CX_BOARD)
+{
+    static const vlx_w head[4] = {{0x001E, 2, {0, 0}}, {0x0020, 2, {0, 0}}, {0x0022, 2, {0, 0}}, {0x0087, 1, {0x40}}};
+    static const vlx_w tail[2] = {{0x0087, 1, {0x00}}, {0x001E, 2, {0x00, 0x60}}};
+    static const vlx_w clr = {0x0086, 1, {0x01}};
+    int32_t off = 0;
+    size_t k;
+    fake_vl53lx_set_block(r->fake, VLX_L1_BLOCK, sizeof VLX_L1_BLOCK);
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 600, 5, &off), DEPZ_OK);
+    CHECK(off == 24 && fake_vl53lx_word(r->fake, 0x001E) == 96);
+    CHECK(fake_vl53lx_count(r->fake, 0x33) == 11 && vlx_writes_are(r->fake, 0, head, 4));
+    for (k = 0; k < 5; k++) CHECK(vlx_writes_are(r->fake, 4 + k, &clr, 1));
+    CHECK(vlx_writes_are(r->fake, 9, tail, 2));
+    CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &off), DEPZ_OK);
+    CHECK(off == 24);
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 500, 5, &off), DEPZ_OK);
+    CHECK(off == -76 && fake_vl53lx_word(r->fake, 0x001E) == ((-76 * 4) & 0xFFFF));
+    CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &off), DEPZ_OK);
+    CHECK(off == -76);
+}
+
+/* 512 x 16072 x (1 - 576/650) / 67 = 13982.6 -> 13982, 27 kcps rounded. */
+VLX_RIG(vlx_l1_xtalk_calibration, VLX_L1CX_BOARD)
+{
+    static const vlx_w head[2] = {{0x0016, 2, {0, 0}}, {0x0087, 1, {0x40}}};
+    static const vlx_w tail[2] = {{0x0087, 1, {0x00}}, {0x0016, 2, {0x36, 0x9E}}};
+    uint8_t no_spads[17];
+    int32_t x = -1;
+    size_t n;
+    fake_vl53lx_set_block(r->fake, VLX_L1_BLOCK, sizeof VLX_L1_BLOCK);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 650, 5, &x), DEPZ_OK);
+    CHECK(x == 27 && fake_vl53lx_word(r->fake, 0x0016) == 13982);
+    n = fake_vl53lx_count(r->fake, 0x33);
+    CHECK(vlx_writes_are(r->fake, 0, head, 2) && vlx_writes_are(r->fake, n - 2, tail, 2));
+    CHECK(vlx_writes_to(r->fake, 0x0086) == 5);
+    CHECK_RC(depz_vl53lx_get_xtalk_kcps(r->dev, &x), DEPZ_OK);
+    CHECK(x == 27);
+    /* a target nearer than the reading: 0, no compensation */
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 500, 5, &x), DEPZ_OK);
+    CHECK(x == 0 && fake_vl53lx_word(r->fake, 0x0016) == 0);
+    memcpy(no_spads, VLX_L1_BLOCK, sizeof no_spads);
+    no_spads[3] = no_spads[4] = 0; /* RESULT__DSS_ACTUAL_EFFECTIVE_SPADS_SD0 = 0 */
+    fake_vl53lx_set_block(r->fake, no_spads, sizeof no_spads);
+    fake_vl53lx_set_reg(r->fake, 0x0016, 0x12);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 650, 5, &x), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "no SPADs enabled") != NULL);
+    CHECK(fake_vl53lx_word(r->fake, 0x0016) == 0); /* left disabled */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 600, 4, &x), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "at least 5") != NULL);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 600, 4, &x), DEPZ_E_ARG);
+    CHECK(fake_vl53lx_rx_count(r->fake) == 0);
+}
+
+VLX_RIG(vlx_l1_roi_size_and_centre, VLX_L1CX_BOARD)
+{
+    int x = 0, y = 0, c = 0;
+    CHECK_RC(depz_vl53lx_set_roi(r->dev, 8, 6), DEPZ_OK);
+    CHECK(fake_vl53lx_reg(r->fake, 0x007F) == 0x91); /* the optical centre the die reports */
+    CHECK(fake_vl53lx_reg(r->fake, 0x0080) == 0x57);
+    CHECK_RC(depz_vl53lx_get_roi(r->dev, &x, &y), DEPZ_OK);
+    CHECK(x == 8 && y == 6);
+    CHECK_RC(depz_vl53lx_set_roi(r->dev, 16, 16), DEPZ_OK); /* over 10: the centre moves to 199 */
+    CHECK_RC(depz_vl53lx_get_roi_center(r->dev, &c), DEPZ_OK);
+    CHECK(c == 199);
+    CHECK_RC(depz_vl53lx_set_roi_center(r->dev, 0x88), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_get_roi_center(r->dev, &c), DEPZ_OK);
+    CHECK(c == 0x88);
+}
+
+/* Streamed die blocks decode with the L1 variant; a report shorter than its
+ * own length field and a block the driver cannot decode are counted and the
+ * reader goes on. */
+VLX_RIG(vlx_l1_stream_decodes_and_counts_bad_blocks, VLX_L1CX_BOARD)
+{
+    static const uint8_t start_die[9] = {0x89, 0x00, 0x11, 0x00, 0x00, 0x01, 0x86, 0x00, 0x01};
+    depz_vl53lx_measurement m;
+    depz_vl53lx_info info;
+    depz_stream *s;
+    uint8_t p[16];
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_OK);
+    CHECK(depz_vl53lx_ranging(r->dev));
+    CHECK(fake_vl53lx_sent(r->fake, 0x35, 0, p, sizeof p) == 9 && memcmp(p, start_die, 9) == 0);
+    s = depz_vl53lx_measurements(r->dev, 4);
+    CHECK(s);
+    fake_vl53lx_stream(r->fake, 1, 17, VLX_L1_BLOCK, sizeof VLX_L1_BLOCK);
+    CHECK_RC(depz_stream_next(s, &m, 1000), DEPZ_OK);
+    depz_stream_close(s);
+    CHECK(m.timestamp_us == 1 && m.distance_mm == 576 && m.status == 0 && !strcmp(m.status_text, "valid"));
+    CHECK(m.sigma_mm == 3 && m.signal_kcps == 16072 && m.ambient_kcps == 2552 && m.spads == 67);
+    CHECK(m.signal_per_spad_kcps == 23 && m.ambient_per_spad_kcps == 3 && m.stream_count == 1);
+    CHECK(depz_vl53lx_plottable(&m));
+    fake_vl53lx_stream(r->fake, 2, 17, VLX_L1_BLOCK, 4); /* shorter than its length field */
+    fake_vl53lx_stream(r->fake, 3, 4, VLX_L1_BLOCK, 4);  /* 4 B: no die block */
+    CHECK_RC(depz_vl53lx_bridge_info(r->dev, &info), DEPZ_OK); /* behind the reports */
+    CHECK(depz_vl53lx_stream_parse_errors(r->dev) == 2);
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK);
+    CHECK(!depz_vl53lx_ranging(r->dev));
+    CHECK(fake_vl53lx_count(r->fake, 0x36) == 1);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x00); /* the L1X stop code */
+    CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK); /* idempotent */
+    CHECK(fake_vl53lx_count(r->fake, 0x36) == 1);
+}
+
+/* configure() re-inits, then timing, offset, xtalk, signal threshold
+ * (vectors/vl53l4.json tuning: -10 -> 65496, 20 -> 10240, 1024 -> 128). */
+VLX_RIG(vlx_l4_configure_reinits_then_tunes, VLX_L4CD_BOARD)
+{
+    static const vlx_w tail[7] = {
+        {0x001E, 2, {0xFF, 0xD8}}, {0x0020, 2, {0, 0}}, {0x0022, 2, {0, 0}}, {0x0018, 2, {0, 0}},
+        {0x001A, 2, {0, 0}}, {0x0016, 2, {0x28, 0x00}}, {0x0066, 2, {0x00, 0x80}}};
+    const int32_t off = -10, xt = 20;
+    const int sig = 1024;
+    int32_t v = 0;
+    int b = 0, i = -1, k = 0, lo = 0, hi = 0;
+    const char *mode = "x";
+    uint16_t id = 0;
+    size_t n;
+    CHECK(depz_vl53lx_detected_product(r->dev) == DEPZ_VL53LX_PRODUCT_L4CD);
+    CHECK_RC(depz_vl53lx_model_id(r->dev, &id), DEPZ_OK);
+    CHECK(id == 0xEBAA);
+    CHECK_RC(depz_vl53lx_budget_range(r->dev, &lo, &hi), DEPZ_OK);
+    CHECK(lo == 10 && hi == 200);
+    CHECK(depz_vl53lx_driver_reach_mm(r->dev) == 1388); /* the L4CD blob's 0x38 window */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_configure_ex(r->dev, 33, 0, NULL, &off, &xt, &sig), DEPZ_OK);
+    CHECK(fake_vl53lx_count(r->fake, 0x3A) == 1); /* the re-init clears the I2C errors */
+    n = fake_vl53lx_count(r->fake, 0x33);
+    CHECK(n >= 7 && vlx_writes_are(r->fake, n - 7, tail, 7));
+    CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &v), DEPZ_OK);
+    CHECK(v == -10);
+    CHECK_RC(depz_vl53lx_get_xtalk_kcps(r->dev, &v), DEPZ_OK);
+    CHECK(v == 20);
+    CHECK_RC(depz_vl53lx_get_signal_threshold_kcps(r->dev, &k), DEPZ_OK);
+    CHECK(k == 1024);
+    CHECK_RC(depz_vl53lx_get_range_timing(r->dev, &b, &i), DEPZ_OK);
+    CHECK(i == 0 && abs(b - 33) <= 1);
+    CHECK_RC(depz_vl53lx_get_mode(r->dev, &mode), DEPZ_OK);
+    CHECK(mode == NULL);
+    CHECK_RC(depz_vl53lx_configure(r->dev, 50, 20, NULL, NULL, NULL), DEPZ_E_ARG); /* period <= budget */
+    CHECK_RC(depz_vl53lx_configure(r->dev, 300, 0, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "10..200") != NULL);
+    /* a mode on a product without modes is refused before the re-init */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_configure(r->dev, 50, 0, "long", NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53lx_set_mode(r->dev, "long", NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "VL53L4CD/uld does not support 'mode'") != NULL);
+    CHECK(fake_vl53lx_rx_count(r->fake) == 0);
+}
+
+/* A period selects autonomous mode: INTERMEASUREMENT_MS = 1.055 x period x PLL. */
+VLX_RIG(vlx_l4_period_selects_autonomous_mode, VLX_L4CD_BOARD)
+{
+    static const vlx_w start = {0x0087, 1, {0x40}};
+    static const uint8_t start_die[9] = {0x89, 0x00, 0x11, 0x00, 0x00, 0x01, 0x86, 0x00, 0x01};
+    uint8_t p[16];
+    int b = 0, i = 0;
+    CHECK_RC(depz_vl53lx_configure(r->dev, 50, 100, NULL, NULL, NULL), DEPZ_OK);
+    CHECK(fake_vl53lx_dword(r->fake, 0x006C) == (uint32_t)(1.055 * 100 * (FAKE_VLX_DIE_PLL & 0x3FF)));
+    CHECK_RC(depz_vl53lx_get_range_timing(r->dev, &b, &i), DEPZ_OK);
+    CHECK(i == 99 && abs(b - 50) <= 1); /* ST's 1.055 / 1.065 pair reads one ms short */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_OK);
+    CHECK(fake_vl53lx_count(r->fake, 0x33) == 1 && vlx_writes_are(r->fake, 0, &start, 1));
+    CHECK(fake_vl53lx_sent(r->fake, 0x35, 0, p, sizeof p) == 9 && memcmp(p, start_die, 9) == 0);
+    /* the stream owns the bus: configuration and register writes are refused */
+    {
+        int32_t v = 0;
+        uint8_t reg = 0;
+        depz_vl53lx_measurement m;
+        CHECK_RC(depz_vl53lx_set_offset_mm(r->dev, 5), DEPZ_E_ARG);
+        CHECK(strstr(depz_last_error(), "stop ranging first") != NULL);
+        CHECK_RC(depz_vl53lx_configure(r->dev, 50, 0, NULL, NULL, NULL), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_init(r->dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_NONE), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 100, 5, &v), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_write_reg(r->dev, 0x0087, &reg, 1), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_measure_once(r->dev, -1, &m), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_read_reg(r->dev, 0x0087, &reg, 1), DEPZ_OK); /* reads are fine */
+        CHECK(reg == 0x40);
+        CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &v), DEPZ_OK);
+    }
+    CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x80); /* the L4CD stop code */
+}
+
+VLX_RIG(vlx_l4_tuning_round_trips, VLX_L4CD_BOARD)
+{
+    int32_t v = 0;
+    int lo = 0, hi = 0, w = 0, k = 0, x = 0, y = 0;
+    uint32_t cnt = 0;
+    bool ap = false;
+    CHECK_RC(depz_vl53lx_set_offset_mm(r->dev, 10), DEPZ_OK);
+    CHECK(fake_vl53lx_word(r->fake, 0x001E) == 40);
+    CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &v), DEPZ_OK);
+    CHECK(v == 10);
+    CHECK_RC(depz_vl53lx_set_xtalk_kcps(r->dev, 3), DEPZ_OK);
+    CHECK(fake_vl53lx_word(r->fake, 0x0016) == 1536);
+    CHECK_RC(depz_vl53lx_get_xtalk_kcps(r->dev, &v), DEPZ_OK);
+    CHECK(v == 3);
+    CHECK_RC(depz_vl53lx_set_detection_thresholds(r->dev, 100, 300, 3), DEPZ_OK);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0046) == 3);
+    CHECK(fake_vl53lx_word(r->fake, 0x0072) == 300 && fake_vl53lx_word(r->fake, 0x0074) == 100);
+    CHECK_RC(depz_vl53lx_get_detection_thresholds(r->dev, &lo, &hi, &w), DEPZ_OK);
+    CHECK(lo == 100 && hi == 300 && w == 3);
+    CHECK_RC(depz_vl53lx_set_signal_threshold_kcps(r->dev, 2048), DEPZ_OK);
+    CHECK(fake_vl53lx_word(r->fake, 0x0066) == 256);
+    CHECK_RC(depz_vl53lx_get_signal_threshold_kcps(r->dev, &k), DEPZ_OK);
+    CHECK(k == 2048);
+    CHECK_RC(depz_vl53lx_set_sigma_threshold_mm(r->dev, 15), DEPZ_OK);
+    CHECK(fake_vl53lx_word(r->fake, 0x0064) == 60);
+    CHECK_RC(depz_vl53lx_get_sigma_threshold_mm(r->dev, &k), DEPZ_OK);
+    CHECK(k == 15);
+    CHECK_RC(depz_vl53lx_set_sigma_threshold_mm(r->dev, 16384), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "16383") != NULL);
+    /* the groups the L4CD ULD lacks are refused with no traffic */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_get_roi(r->dev, &x, &y), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "VL53L4CD/uld does not support 'roi'") != NULL);
+    CHECK_RC(depz_vl53lx_set_roi(r->dev, 4, 4), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53lx_get_roi_center(r->dev, &k), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53lx_set_roi_center(r->dev, 199), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53lx_perform_ref_spad_management(r->dev, &cnt, &ap), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "'refspad'") != NULL);
+    CHECK(fake_vl53lx_rx_count(r->fake) == 0);
+}
+
+VLX_RIG(vlx_l4_temperature_update_reruns_vhv, VLX_L4CD_BOARD)
+{
+    static const vlx_w want[7] = {
+        {0x0008, 1, {0x81}}, {0x000B, 1, {0x92}}, {0x0087, 1, {0x21}}, {0x0086, 1, {0x01}},
+        {0x0087, 1, {0x80}}, {0x0008, 1, {0x09}}, {0x000B, 1, {0x00}}};
+    CHECK_RC(depz_vl53lx_start_temperature_update(r->dev), DEPZ_OK);
+    CHECK(fake_vl53lx_count(r->fake, 0x33) == 7 && vlx_writes_are(r->fake, 0, want, 7));
+}
+
+/* VL53L4CD_calibration.c on the L4 block (624 mm, 5160 kcps, 211 SPADs):
+ * 10 heat-loop frames, then the samples. */
+VLX_RIG(vlx_l4_calibrations, VLX_L4CD_BOARD)
+{
+    static const vlx_w head[3] = {{0x001E, 2, {0, 0}}, {0x0020, 2, {0, 0}}, {0x0022, 2, {0, 0}}};
+    uint8_t bad[17];
+    int32_t v = 0;
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 600, 4, &v), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "5..255") != NULL);
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 1001, 0, &v), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "10..1000") != NULL);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 5001, 0, &v), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "10..5000") != NULL);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 600, 256, &v), DEPZ_E_ARG);
+    CHECK(fake_vl53lx_rx_count(r->fake) == 0);
+    fake_vl53lx_set_block(r->fake, VLX_L4_BLOCK, sizeof VLX_L4_BLOCK);
+    CHECK_RC(depz_vl53lx_calibrate_offset(r->dev, 600, 5, &v), DEPZ_OK);
+    CHECK(v == -24 && fake_vl53lx_word(r->fake, 0x001E) == (-96 & 0xFFFF));
+    CHECK(vlx_writes_are(r->fake, 0, head, 3) && vlx_writes_to(r->fake, 0x0086) == 15);
+    CHECK_RC(depz_vl53lx_get_offset_mm(r->dev, &v), DEPZ_OK);
+    CHECK(v == -24);
+    /* (1 - 624/650) x 5160/211 = 0.978 kcps -> x512 */
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 650, 5, &v), DEPZ_OK);
+    CHECK(v == 1 && fake_vl53lx_word(r->fake, 0x0016) == 500);
+    memcpy(bad, VLX_L4_BLOCK, sizeof bad);
+    bad[0] = 0x04; /* raw 4 -> status 2, signal below threshold */
+    fake_vl53lx_set_block(r->fake, bad, sizeof bad);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 650, 5, &v), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "no valid samples") != NULL);
+    memcpy(bad, VLX_L4_BLOCK, sizeof bad);
+    bad[3] = 0x01; bad[4] = 0x00; bad[5] = 0xFF; bad[6] = 0xFF; /* 1 SPAD, 524280 kcps */
+    fake_vl53lx_set_block(r->fake, bad, sizeof bad);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 5000, 5, &v), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "> 127") != NULL);
+}
+
+/* measure_once: start, wait for data ready, read the block, release, stop. */
+VLX_RIG(vlx_l4_measure_once_polls_the_block, VLX_L4CD_BOARD)
+{
+    static const vlx_w want[3] = {{0x0087, 1, {0x21}}, {0x0086, 1, {0x01}}, {0x0087, 1, {0x80}}};
+    depz_vl53lx_measurement m;
+    int32_t d = 0;
+    fake_vl53lx_set_block(r->fake, VLX_L4_BLOCK, sizeof VLX_L4_BLOCK);
+    CHECK_RC(depz_vl53lx_measure_once(r->dev, -1, &m), DEPZ_OK);
+    CHECK(m.distance_mm == 624 && m.status == 0 && !strcmp(m.status_text, "valid"));
+    CHECK(m.signal_kcps == 5160 && m.spads == 211 && m.stream_count == 1 && m.n_targets == 0);
+    CHECK(m.timestamp_us >= 5000000); /* the MCU time of the block read */
+    CHECK(depz_vl53lx_primary_distance(&m, &d) && d == 624);
+    CHECK(fake_vl53lx_count(r->fake, 0x33) == 3 && vlx_writes_are(r->fake, 0, want, 3));
+    /* data ready never comes: still stopped */
+    fake_vl53lx_set_reg(r->fake, 0x0031, 0x01); /* INT active low, never asserted */
+    fake_vl53lx_clear(r->fake);
+    CHECK_RC(depz_vl53lx_measure_once(r->dev, 5, &m), DEPZ_E_TIMEOUT);
+    CHECK(strstr(depz_last_error(), "data ready") != NULL);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x80);
+}
+
+/* The L3CX ULP: no offset / calibrations (the caveat names why), ROI yes. */
+VLX_RIG(vlx_l3_refusals_name_the_caveat, VLX_L3CX_BOARD)
+{
+    const int32_t off = 5;
+    int32_t v = 0;
+    int x = 0, y = 0;
+    CHECK(depz_vl53lx_driver_bound(r->dev) == DEPZ_VL53LX_DRIVER_ULP);
+    CHECK(strstr(depz_vl53lx_caveat(r->dev), "single-target ranging only") != NULL);
+    CHECK(depz_vl53lx_supports(r->dev, DEPZ_VL53LX_CAP_ROI | DEPZ_VL53LX_CAP_SIGMA_THRESH));
+    CHECK(!depz_vl53lx_supports(r->dev, DEPZ_VL53LX_CAP_OFFSET));
+    CHECK_RC(depz_vl53lx_configure(r->dev, 33, 0, NULL, &off, NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "VL53L3CX/ulp does not support 'offset' (single-target ranging only") != NULL);
+    CHECK_RC(depz_vl53lx_calibrate_xtalk(r->dev, 600, 0, &v), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "'calib_xtalk'") != NULL);
+    CHECK_RC(depz_vl53lx_start_temperature_update(r->dev), DEPZ_E_ARG);
+    CHECK(fake_vl53lx_rx_count(r->fake) == 0);
+    CHECK(fake_vl53lx_reg(r->fake, 0x004B) == 0x03); /* init_extra: PHASECAL_CONFIG__TIMEOUT_MACROP */
+    CHECK_RC(depz_vl53lx_set_roi(r->dev, 4, 4), DEPZ_OK);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0080) == 0x33);
+    CHECK_RC(depz_vl53lx_get_roi(r->dev, &x, &y), DEPZ_OK);
+    CHECK(x == 4 && y == 4);
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_OK);
+    CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK);
+    CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x00); /* the ULP stop code */
+}
+
+/* The (product, driver) table and the bridge's refusals at init (contract
+ * 12 §3): a pair without a row and an unstamped board are refused before any
+ * traffic; a v2.00 bridge is told to reflash; a soft reset the die does not
+ * ACK falls back to XSHUT; xshut() drops the driver. */
+static void vlx_init_binding_and_bridge_refusals(void)
+{
+    depz_link *link;
+    depz_device *dev = NULL;
+    fake_vl53lx *f;
+    uint8_t p[8];
+    uint16_t id = 0;
+    CHECK(depz_vl53lx_driver_kinds(DEPZ_VL53LX_PRODUCT_L3CX) == (DEPZ_VL53LX_DRIVER_ULP | DEPZ_VL53LX_DRIVER_HISTOGRAM));
+    CHECK(depz_vl53lx_driver_kinds(DEPZ_VL53LX_PRODUCT_L4CX) == DEPZ_VL53LX_DRIVER_HISTOGRAM);
+    CHECK(depz_vl53lx_driver_kinds(DEPZ_VL53LX_PRODUCT_L0X) == DEPZ_VL53LX_DRIVER_ULD);
+    CHECK(depz_vl53lx_status_plottable(0) && depz_vl53lx_status_plottable(6) && depz_vl53lx_status_plottable(11));
+    CHECK(!depz_vl53lx_status_plottable(4) && !depz_vl53lx_primary_distance(NULL, NULL));
+    {
+        /* the first plottable target in driver order, or nothing */
+        depz_vl53lx_measurement m;
+        int32_t d = 0;
+        memset(&m, 0, sizeof m);
+        m.n_targets = 2;
+        m.targets[0].distance_mm = 100; m.targets[0].status = 4;
+        m.targets[1].distance_mm = 250; m.targets[1].status = 11;
+        CHECK(depz_vl53lx_primary_distance(&m, &d) && d == 250);
+        m.targets[1].status = 7;
+        CHECK(!depz_vl53lx_primary_distance(&m, &d));
+        m.n_targets = 0;
+        m.status = 4;
+        CHECK(!depz_vl53lx_primary_distance(&m, &d));
+    }
+
+    f = fake_vl53lx_start("DEPZ ToF Sensor USB v2.1", &link); /* unstamped */
+    CHECK(f);
+    CHECK_RC(depz_vl53lx_open_link(link, &dev), DEPZ_OK);
+    depz_device_set_timeout_ms(dev, 500);
+    CHECK(depz_is_vl53lx(dev) && !depz_vl53lx_initialized(dev));
+    CHECK(depz_vl53lx_get_class(dev) == DEPZ_VL53LX_CLASS_GENERIC);
+    CHECK_RC(depz_vl53lx_model_id(dev, &id), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "init") != NULL);
+    CHECK_RC(depz_vl53lx_start_ranging(dev), DEPZ_E_ARG);
+    CHECK(fake_vl53lx_rx_count(f) == 0);
+    CHECK_RC(depz_vl53lx_init(dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_NONE), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "carries no product number") != NULL);
+    CHECK(fake_vl53lx_count(f, 0x03) == 1 && fake_vl53lx_count(f, 0x33) == 0);
+    fake_vl53lx_clear(f);
+    CHECK_RC(depz_vl53lx_init(dev, DEPZ_VL53LX_DRIVER_ULD, DEPZ_VL53LX_PRODUCT_L4CX), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "VL53L4CX has no 'uld' driver - it has histogram") != NULL);
+    CHECK(fake_vl53lx_rx_count(f) == 0);
+    /* a v2.00 bridge does not know CLEAR_I2C_ERRORS */
+    fake_vl53lx_fail_next(f, 0x3A, 0x02);
+    CHECK_RC(depz_vl53lx_init(dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_L4CD), DEPZ_E_STATUS);
+    CHECK(strstr(depz_last_error(), "predates APP_VL53L0_4_v0.24") != NULL);
+    CHECK(!depz_vl53lx_initialized(dev));
+    /* SET_ADDR_WIDTH goes first, with 2 for the die */
+    fake_vl53lx_clear(f);
+    fake_vl53lx_fail_next(f, 0x39, 0x04);
+    CHECK_RC(depz_vl53lx_init(dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_L4CD), DEPZ_E_STATUS);
+    CHECK(fake_vl53lx_rx_count(f) == 1 && fake_vl53lx_sent(f, 0x39, 0, p, sizeof p) == 1 && p[0] == 2);
+    /* the L1X ULD resets first; a soft reset the die NACKs falls back to XSHUT */
+    fake_vl53lx_clear(f);
+    fake_vl53lx_fail_next(f, 0x33, 0x09);
+    CHECK_RC(depz_vl53lx_init(dev, DEPZ_VL53LX_DRIVER_ULD, DEPZ_VL53LX_PRODUCT_L1CX), DEPZ_OK);
+    CHECK(fake_vl53lx_count(f, 0x34) == 1 && fake_vl53lx_sent(f, 0x34, 0, p, sizeof p) == 1 && p[0] == 2);
+    CHECK(depz_vl53lx_product_bound(dev) == DEPZ_VL53LX_PRODUCT_L1CX);
+    CHECK_RC(depz_vl53lx_start_ranging(dev), DEPZ_OK);
+    fake_vl53lx_clear(f);
+    CHECK_RC(depz_vl53lx_xshut(dev, DEPZ_VL53L4_XSHUT_OFF), DEPZ_OK);
+    CHECK(fake_vl53lx_sent(f, 0x34, 0, p, sizeof p) == 1 && p[0] == 0);
+    CHECK(!depz_vl53lx_ranging(dev) && !depz_vl53lx_initialized(dev));
+    CHECK_RC(depz_vl53lx_model_id(dev, &id), DEPZ_E_ARG);
+    /* a die that never boots: FIRMWARE__SYSTEM_STATUS stays 0 */
+    fake_vl53lx_set_reg(f, 0x00E5, 0x00);
+    CHECK_RC(depz_vl53lx_init(dev, (depz_vl53lx_driver)0, DEPZ_VL53LX_PRODUCT_L4CD), DEPZ_E_TIMEOUT);
+    CHECK(strstr(depz_last_error(), "FIRMWARE__SYSTEM_STATUS") != NULL);
+    CHECK_RC(depz_sr04_start(dev), DEPZ_E_WRONG_TYPE);
+    depz_device_close(dev);
+    fake_vl53lx_stop(f);
+}
+
+/* ── BNO055 against the fake register bridge + sensor model ──────────── */
+
+/* The C side of test_bno055_device.py over fake_bno055 (the twin of
+ * fake_bno055.py): the request sequences, as "page:addr=hex" writes. */
+
+typedef struct {
+    fake_bno055 *fake;
+    depz_device *dev;
+    char w[2048];   /* the last fake_bno055_writes() */
+} b055rig;
+
+static bool b055_up(b055rig *r)
+{
+    depz_link *link;
+    r->dev = NULL;
+    r->fake = fake_bno055_start(&link);
+    if (!r->fake) return false;
+    if (depz_bno055_open_link(link, &r->dev) != DEPZ_OK) return false;
+    depz_device_set_timeout_ms(r->dev, 300);
+    return true;
+}
+
+static void b055_down(b055rig *r)
+{
+    depz_device_close(r->dev);
+    fake_bno055_stop(r->fake);
+}
+
+#define B055_RIG(name)                                 \
+    static void name##_body(b055rig *r);               \
+    static void name(void)                             \
+    {                                                  \
+        static b055rig r;                              \
+        if (!b055_up(&r)) g_failed++;                  \
+        else name##_body(&r);                          \
+        b055_down(&r);                                 \
+    }                                                  \
+    static void name##_body(b055rig *r)
+
+/* The writes since the last clear are exactly `want`. */
+static bool b055_writes_are(b055rig *r, const char *want)
+{
+    fake_bno055_writes(r->fake, r->w, sizeof r->w);
+    if (strcmp(r->w, want) == 0) return true;
+    fprintf(stderr, "  writes: \"%s\"\n  want:   \"%s\"\n", r->w, want);
+    return false;
+}
+
+static bool near3(const double *v, double a, double b, double c)
+{
+    return fabs(v[0] - a) < 1e-9 && fabs(v[1] - b) < 1e-9 && fabs(v[2] - c) < 1e-9;
+}
+
+static const depz_bno055_units B055_ALL_UNITS = {true, true, true, true, true}; /* UNIT_SEL 0x97 */
+/* vectors/bno055.json calibration_profile extremes / typical */
+static const char *const B055_EXTREMES = "0cfef4010000001900e70100d00730f8ffff00080005";
+static const char *const B055_TYPICAL = "eaff0d00e1ff45ff9201a0fffffffeff0000e8036f02";
+
+static void b055_profile(const char *hex, depz_bno055_calib_profile *out)
+{
+    uint8_t b[DEPZ_BNO055_CALIB_PROFILE_LEN];
+    size_t k;
+    for (k = 0; k < sizeof b; k++) {
+        unsigned v = 0;
+        if (sscanf(hex + 2 * k, "%2x", &v) != 1) v = 0;
+        b[k] = (uint8_t)v;
+    }
+    depz_bno055_unpack_calib_profile(b, sizeof b, out);
+}
+
+B055_RIG(b055_identity_and_raw_registers)
+{
+    static const uint8_t live_info[38] = {
+        0x28, 0xa0, 0xfb, 0x32, 0x0f, 0x11, 0x03, 0x15, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6f, 0x01, 0x2b, 0x09, 0xd1,
+        0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7d, 0x00};
+    depz_bno055_info info;
+    uint8_t b[200], p[8], info2[38];
+    bool alive = false;
+    size_t k;
+    CHECK(depz_is_bno055(r->dev) && !depz_is_bno086(r->dev));
+    CHECK_RC(depz_bno055_bridge_info(r->dev, &info), DEPZ_OK);
+    CHECK(info.chip_id == 0xA0 && info.sw_rev == 0x0311 && info.initialized == 1);
+    CHECK(fake_bno055_sent(r->fake, 0x37) == 1 && fake_bno055_sent(r->fake, 0x32) == 0);
+    CHECK_RC(depz_bno055_is_alive(r->dev, &alive), DEPZ_OK);
+    CHECK(alive);
+    memcpy(info2, live_info, sizeof info2);
+    info2[8] = 0; /* initialized = 0 */
+    fake_bno055_set_info(r->fake, info2, sizeof info2);
+    CHECK_RC(depz_bno055_is_alive(r->dev, &alive), DEPZ_OK);
+    CHECK(!alive);
+    info2[8] = 1;
+    info2[1] = 0xA1; /* wrong chip id */
+    fake_bno055_set_info(r->fake, info2, sizeof info2);
+    CHECK_RC(depz_bno055_is_alive(r->dev, &alive), DEPZ_OK);
+    CHECK(!alive);
+    fake_bno055_set_info(r->fake, live_info, sizeof live_info);
+    fake_bno055_fail_next(r->fake, 0x37, 0x08); /* an error is "not alive", not a throw */
+    CHECK_RC(depz_bno055_is_alive(r->dev, &alive), DEPZ_OK);
+    CHECK(!alive);
+
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 4, 0), DEPZ_OK);
+    CHECK(b[0] == 0xA0 && b[1] == 0xFB && b[2] == 0x32 && b[3] == 0x0F);
+    CHECK(fake_bno055_payload(r->fake, 0x32, 0, p, sizeof p) == 2 && p[0] == 0x00 && p[1] == 0x04);
+    b[0] = 1; b[1] = 2;
+    CHECK_RC(depz_bno055_write_registers(r->dev, 0x55, b, 2, 0), DEPZ_OK);
+    CHECK(fake_bno055_reg(r->fake, 0, 0x55) == 1 && fake_bno055_reg(r->fake, 0, 0x56) == 2);
+    /* transfers over 128 bytes are split */
+    for (k = 0; k < 200; k++) fake_bno055_set_reg(r->fake, 1, (uint8_t)(0x10 + k), (uint8_t)k);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x10, b, 200, 1), DEPZ_OK);
+    for (k = 0; k < 200; k++) CHECK(b[k] == (uint8_t)k);
+    CHECK(fake_bno055_sent(r->fake, 0x32) == 2);
+    CHECK(fake_bno055_payload(r->fake, 0x32, 0, p, sizeof p) == 2 && p[0] == 0x10 && p[1] == 128);
+    CHECK(fake_bno055_payload(r->fake, 0x32, 1, p, sizeof p) == 2 && p[0] == 0x90 && p[1] == 72);
+    CHECK(fake_bno055_page(r->fake) == 0);
+    /* page 1 is wrapped in PAGE_ID writes, also when the access fails */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x50, b, 1, 1), DEPZ_OK);
+    CHECK(b[0] == 0x40); /* page 1 0x50, written by the split transfer above */
+    CHECK(b055_writes_are(r, "0:07=01 1:07=00"));
+    fake_bno055_clear(r->fake);
+    fake_bno055_fail_next(r->fake, 0x32, 0x09);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x50, b, 1, 1), DEPZ_E_STATUS);
+    CHECK(b055_writes_are(r, "0:07=01 1:07=00") && fake_bno055_page(r->fake) == 0);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 1, 0), DEPZ_OK); /* not wedged */
+    CHECK(b[0] == 0xA0);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 1, 2), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "pages 0 and 1") != NULL);
+    CHECK(fake_bno055_sent(r->fake, 0x33) + fake_bno055_sent(r->fake, 0x32) == 0);
+    fake_bno055_short_read(r->fake, 1);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 4, 0), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "expected 4, got 3") != NULL);
+    fake_bno055_silent(r->fake, 0x32, true);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 1, 0), DEPZ_E_TIMEOUT);
+    fake_bno055_silent(r->fake, 0x32, false);
+    CHECK_RC(depz_sr04_start(r->dev), DEPZ_E_WRONG_TYPE);
+}
+
+B055_RIG(b055_operation_and_power_modes)
+{
+    uint8_t mode = 0xFF;
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x1C);
+    CHECK_RC(depz_bno055_get_operation_mode(r->dev, &mode), DEPZ_OK);
+    CHECK(mode == DEPZ_BNO055_MODE_NDOF); /* bits 7:4 masked */
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    /* CONFIG -> NDOF waits for a nonzero quaternion: two zero reads, then the live one */
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, DEPZ_BNO055_MODE_NDOF), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=0c") && fake_bno055_reads(r->fake, 0x20) == 3);
+    CHECK(fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    /* mode -> mode goes through CONFIG */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, DEPZ_BNO055_MODE_AMG), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3d=07") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_AMG);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, DEPZ_BNO055_MODE_AMG), DEPZ_OK); /* the same mode */
+    CHECK(b055_writes_are(r, ""));
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, DEPZ_BNO055_MODE_CONFIG), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00") && fake_bno055_reads(r->fake, 0x3D) == 0);
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, 0x0D), DEPZ_E_ARG);
+
+    /* power (§4.6): suspend from NDOF, wake into NDOF */
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_SUSPEND), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3e=02") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_CONFIG);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_NORMAL), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3e=00 0:3d=0c") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    CHECK_RC(depz_bno055_get_power_mode(r->dev, &mode), DEPZ_OK);
+    CHECK(mode == DEPZ_BNO055_POWER_NORMAL);
+    /* from AMG: wakes into AMG */
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_AMG);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_SUSPEND), DEPZ_OK);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_LOW), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3e=01 0:3d=07"));
+    /* low power keeps the operating mode */
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_IMU);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_LOW), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3e=01 0:3d=08") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_IMU);
+    /* CONFIG and awake stays in CONFIG */
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_NORMAL), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3e=00") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_CONFIG);
+}
+
+/* A chip found asleep in CONFIG wakes into NDOF; a plain switch into a
+ * fusion that never starts gives up waiting quietly (after its 1 s). */
+B055_RIG(b055_found_asleep_and_stuck_fusion)
+{
+    uint64_t t0;
+    fake_bno055_set_reg(r->fake, 0, 0x3E, DEPZ_BNO055_POWER_SUSPEND);
+    CHECK_RC(depz_bno055_set_power_mode(r->dev, DEPZ_BNO055_POWER_NORMAL), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3e=00 0:3d=0c") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_fusion_stuck(r->fake, true);
+    fake_bno055_clear(r->fake);
+    t0 = depz_host_now_us();
+    CHECK_RC(depz_bno055_set_operation_mode(r->dev, DEPZ_BNO055_MODE_IMU), DEPZ_OK);
+    CHECK(fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_IMU);
+    /* polled until the deadline, not once: the time, not a read count a slow
+     * runner cannot reach in 10 ms steps */
+    CHECK(depz_host_now_us() - t0 >= 900000 && fake_bno055_reads(r->fake, 0x20) >= 2);
+    /* configure() is strict about it */
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_NDOF, NULL, NULL, NULL), DEPZ_E_TIMEOUT);
+    CHECK(strstr(depz_last_error(), "fusion did not start") != NULL);
+}
+
+B055_RIG(b055_units_axes_temperature_source)
+{
+    depz_bno055_units u;
+    depz_bno055_axis_remap ax, p0;
+    uint8_t src = 0;
+    CHECK_RC(depz_bno055_get_units(r->dev, &u), DEPZ_OK);
+    CHECK(u.android && !u.accel_mg && !u.gyro_rps && !u.euler_rad && !u.temp_f); /* power-on 0x80 */
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_units(r->dev, &B055_ALL_UNITS), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3b=97 0:3d=0c"));
+    CHECK_RC(depz_bno055_get_units(r->dev, &u), DEPZ_OK);
+    CHECK(u.accel_mg && u.gyro_rps && u.euler_rad && u.temp_f && u.android);
+    /* the previous mode comes back when the CONFIG-side write fails */
+    fake_bno055_clear(r->fake);
+    fake_bno055_fail_write_reg(r->fake, 0x3B, 0x09);
+    memset(&u, 0, sizeof u);
+    CHECK_RC(depz_bno055_set_units(r->dev, &u), DEPZ_E_STATUS);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3d=0c") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    /* axis remap by placement name: the write_reg_axis_map_p0 payload 41 21 04 */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_axis_placement(r->dev, "p0"), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:41=2104 0:3d=0c"));
+    {
+        uint8_t p[8];
+        size_t k, n = fake_bno055_sent(r->fake, 0x33);
+        bool seen = false;
+        for (k = 0; k < n; k++)
+            if (fake_bno055_payload(r->fake, 0x33, k, p, sizeof p) == 3 && p[0] == 0x41 && p[1] == 0x21 && p[2] == 0x04)
+                seen = true;
+        CHECK(seen);
+    }
+    CHECK_RC(depz_bno055_get_axis_remap(r->dev, &ax), DEPZ_OK);
+    CHECK(depz_bno055_placement("P0", &p0) == 0);
+    CHECK(ax.x == p0.x && ax.y == p0.y && ax.z == p0.z && ax.x_negative == p0.x_negative &&
+          ax.y_negative == p0.y_negative && ax.z_negative == p0.z_negative);
+    /* a non-permutation and an unknown placement are refused before any traffic */
+    fake_bno055_clear(r->fake);
+    memset(&ax, 0, sizeof ax);
+    ax.z = 1;
+    CHECK_RC(depz_bno055_set_axis_remap(r->dev, &ax), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "permutation") != NULL);
+    CHECK_RC(depz_bno055_set_axis_placement(r->dev, "P9"), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "P0") != NULL);
+    CHECK(fake_bno055_sent(r->fake, 0x33) + fake_bno055_sent(r->fake, 0x32) == 0);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_temperature_source(r->dev, 1), DEPZ_OK); /* gyro */
+    CHECK(b055_writes_are(r, "0:3d=00 0:40=01 0:3d=0c"));
+    CHECK_RC(depz_bno055_get_temperature_source(r->dev, &src), DEPZ_OK);
+    CHECK(src == 1);
+}
+
+B055_RIG(b055_configure_restore_and_reset)
+{
+    depz_bno055_calib_profile prof;
+    depz_bno055_axis_remap p2;
+    char want[256], first[256];
+    uint8_t cal[DEPZ_BNO055_CALIB_PROFILE_LEN];
+    size_t k;
+    b055_profile(B055_EXTREMES, &prof);
+    CHECK(depz_bno055_placement("P2", &p2) == 0);
+    CHECK_RC(depz_bno055_restore_configuration(r->dev), DEPZ_E_ARG); /* configure() first */
+    fake_bno055_sys_status(r->fake, 3, 2); /* still booting for two polls */
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_NDOF, &B055_ALL_UNITS, &p2, &prof), DEPZ_OK);
+    depz_bno055_pack_calib_profile(&prof, cal);
+    snprintf(want, sizeof want, "0:3d=00 0:3b=97 0:41=2406 0:55=%s 0:3d=0c", B055_EXTREMES);
+    CHECK(b055_writes_are(r, want));
+    for (k = 0; k < sizeof cal; k++) CHECK(fake_bno055_reg(r->fake, 0, (uint8_t)(0x55 + k)) == cal[k]);
+    CHECK(fake_bno055_sys_status_left(r->fake) == 0);
+    CHECK(fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF && fake_bno055_reg(r->fake, 0, 0x3B) == 0x97);
+    strcpy(first, r->w);
+    /* reset_sensor: back to the power-on registers, the stream off */
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN,
+                                      DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    CHECK(depz_bno055_streaming(r->dev) && fake_bno055_streaming(r->fake));
+    fake_bno055_sys_status(r->fake, 2, 2);
+    CHECK_RC(depz_bno055_reset_sensor(r->dev), DEPZ_OK);
+    CHECK(fake_bno055_sent(r->fake, 0x34) == 1 && fake_bno055_reset_count(r->fake) == 1);
+    CHECK(!fake_bno055_streaming(r->fake) && !depz_bno055_streaming(r->dev));
+    CHECK(fake_bno055_sys_status_left(r->fake) == 0 && fake_bno055_reg(r->fake, 0, 0x3B) == 0x80);
+    {
+        /* the units cache was dropped: power-on 0x80 is read back */
+        depz_bno055_sample s;
+        CHECK_RC(depz_bno055_read_sample(r->dev, 0x34, 1, &s), DEPZ_OK);
+        CHECK(s.units.android && !s.units.accel_mg);
+    }
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_restore_configuration(r->dev), DEPZ_OK);
+    CHECK(b055_writes_are(r, first) && fake_bno055_reg(r->fake, 0, 0x3B) == 0x97);
+    fake_bno055_fail_next(r->fake, 0x34, 0x09);
+    CHECK_RC(depz_bno055_reset_sensor(r->dev), DEPZ_E_STATUS);
+    /* defaults from NDOF */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_NDOF, NULL, NULL, NULL), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3b=00 0:3d=0c"));
+    /* a non-fusion mode does not wait for the quaternion */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_AMG, NULL, NULL, NULL), DEPZ_OK);
+    CHECK(fake_bno055_reads(r->fake, 0x20) == 0 && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_AMG);
+    CHECK_RC(depz_bno055_configure(r->dev, 0x0D, NULL, NULL, NULL), DEPZ_E_ARG);
+}
+
+B055_RIG(b055_configure_boot_states)
+{
+    /* SYS_STATUS 4 for 20 polls is a self-test leftover: out of CONFIG and back */
+    fake_bno055_sys_status(r->fake, 4, 20);
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_AMG, NULL, NULL, NULL), DEPZ_OK);
+    fake_bno055_writes(r->fake, r->w, sizeof r->w);
+    CHECK(strncmp(r->w, "0:3d=01 0:3d=00 ", 16) == 0);
+    CHECK(fake_bno055_reads(r->fake, 0x39) == 21);
+    /* a sensor that never leaves boot: refused, nothing written */
+    fake_bno055_clear(r->fake);
+    fake_bno055_sys_status(r->fake, 3, 100000);
+    CHECK_RC(depz_bno055_configure(r->dev, DEPZ_BNO055_MODE_NDOF, NULL, NULL, NULL), DEPZ_E_TIMEOUT);
+    CHECK(strstr(depz_last_error(), "did not finish booting") != NULL);
+    CHECK(b055_writes_are(r, ""));
+}
+
+B055_RIG(b055_status_self_test_calibration)
+{
+    depz_bno055_status_regs st;
+    depz_bno055_calib_status cs;
+    depz_bno055_calib_profile prof, typ;
+    int16_t sic[9];
+    char want[160];
+    size_t k;
+    fake_bno055_set_reg(r->fake, 0, 0x37, 0x40);
+    fake_bno055_set_reg(r->fake, 0, 0x38, 1);
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+    CHECK_RC(depz_bno055_system_status(r->dev, &st), DEPZ_OK);
+    CHECK(st.self_test == 0x0F && st.clk_status == 1 && st.status == 5 && st.error == 0);
+    CHECK(fake_bno055_reg(r->fake, 0, 0x37) == 0x40); /* INT_STA never read */
+    CHECK(fake_bno055_reads(r->fake, 0x36) == 1 && fake_bno055_reads(r->fake, 0x38) == 1 &&
+          fake_bno055_reads(r->fake, 0x37) == 0);
+    /* self-test from NDOF keeps CLK_SEL and comes back to NDOF */
+    fake_bno055_set_reg(r->fake, 0, 0x3F, 0x80);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_self_test(r->dev, &st), DEPZ_OK);
+    CHECK(st.self_test == 0x0F && st.error == 0);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3f=81 0:3d=0c"));
+    CHECK(fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF && fake_bno055_reg(r->fake, 0, 0x3F) == 0x80);
+    /* the trigger write fails: the mode is still restored */
+    fake_bno055_clear(r->fake);
+    fake_bno055_fail_write_reg(r->fake, 0x3F, 0x09);
+    CHECK_RC(depz_bno055_self_test(r->dev, &st), DEPZ_E_STATUS);
+    CHECK(b055_writes_are(r, "0:3d=00 0:3d=0c") && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    /* in CONFIG: the leftover SYS_STATUS 4 is cleared through ACCONLY */
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_set_reg(r->fake, 0, 0x3F, 0x00);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_self_test(r->dev, &st), DEPZ_OK);
+    CHECK(st.status == 4); /* as the sensor reports it right after the test */
+    CHECK(b055_writes_are(r, "0:3f=01 0:3d=01 0:3d=00"));
+    CHECK_RC(depz_bno055_system_status(r->dev, &st), DEPZ_OK);
+    CHECK(st.status == 0);
+    /* calibration status */
+    fake_bno055_set_reg(r->fake, 0, 0x35, 0xFF);
+    CHECK_RC(depz_bno055_calibration_status(r->dev, &cs), DEPZ_OK);
+    CHECK(depz_bno055_fully_calibrated(&cs));
+    fake_bno055_set_reg(r->fake, 0, 0x35, 0xC4);
+    CHECK_RC(depz_bno055_calibration_status(r->dev, &cs), DEPZ_OK);
+    CHECK(cs.system == 3 && cs.gyro == 0 && cs.accel == 1 && cs.mag == 0);
+    /* the calibration profile round trip, in CONFIG */
+    b055_profile(B055_EXTREMES, &prof);
+    {
+        uint8_t b[DEPZ_BNO055_CALIB_PROFILE_LEN];
+        depz_bno055_calib_profile got;
+        depz_bno055_pack_calib_profile(&prof, b);
+        for (k = 0; k < sizeof b; k++) fake_bno055_set_reg(r->fake, 0, (uint8_t)(0x55 + k), b[k]);
+        fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+        fake_bno055_clear(r->fake);
+        CHECK_RC(depz_bno055_read_calibration_profile(r->dev, &got), DEPZ_OK);
+        CHECK(memcmp(&got, &prof, sizeof got) == 0);
+        CHECK(b055_writes_are(r, "0:3d=00 0:3d=0c") && fake_bno055_reads(r->fake, 0x55) == 1);
+    }
+    b055_profile(B055_TYPICAL, &typ);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_write_calibration_profile(r->dev, &typ), DEPZ_OK);
+    snprintf(want, sizeof want, "0:3d=00 0:55=%s 0:3d=0c", B055_TYPICAL);
+    CHECK(b055_writes_are(r, want));
+    /* the soft-iron matrix: identity is 1.0 = 16384 on the diagonal */
+    for (k = 0; k < 9; k++) sic[k] = (int16_t)(k % 4 == 0 ? 16384 : 0);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_sic_matrix(r->dev, sic), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:43=004000000000000000400000000000000040 0:3d=0c"));
+    memset(sic, 0, sizeof sic);
+    CHECK_RC(depz_bno055_get_sic_matrix(r->dev, sic), DEPZ_OK);
+    CHECK(sic[0] == 16384 && sic[4] == 16384 && sic[8] == 16384 && sic[1] == 0 && sic[7] == 0);
+    /* refused while streaming, nothing sent */
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN,
+                                      DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_self_test(r->dev, &st), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "stop the stream first") != NULL);
+    CHECK(fake_bno055_sent(r->fake, 0x32) + fake_bno055_sent(r->fake, 0x33) == 0);
+}
+
+B055_RIG(b055_page1_configs_and_interrupts)
+{
+    depz_bno055_accel_config ac;
+    depz_bno055_gyro_config gc;
+    depz_bno055_mag_config mc;
+    uint8_t uid[16], v = 0;
+    size_t k;
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+    CHECK_RC(depz_bno055_get_accel_config(r->dev, &ac), DEPZ_OK);
+    CHECK(ac.range == 1 && ac.bandwidth == 3 && ac.power == 0);
+    fake_bno055_clear(r->fake);
+    ac.range = 3; ac.bandwidth = 7; ac.power = 0;
+    CHECK_RC(depz_bno055_set_accel_config(r->dev, &ac), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:07=01 1:08=1f 1:07=00 0:3d=0c"));
+    CHECK(fake_bno055_page(r->fake) == 0 && fake_bno055_opr_mode(r->fake) == DEPZ_BNO055_MODE_NDOF);
+    CHECK_RC(depz_bno055_get_gyro_config(r->dev, &gc), DEPZ_OK);
+    CHECK(gc.range == 0 && gc.bandwidth == 7 && gc.power == 0);
+    CHECK_RC(depz_bno055_get_mag_config(r->dev, &mc), DEPZ_OK);
+    CHECK(mc.rate == 5 && mc.mode == 1 && mc.power == 3);
+    gc.range = 2; gc.bandwidth = 3; gc.power = 1;
+    mc.rate = 7; mc.mode = 3; mc.power = 0;
+    CHECK_RC(depz_bno055_set_gyro_config(r->dev, &gc), DEPZ_OK);
+    CHECK_RC(depz_bno055_set_mag_config(r->dev, &mc), DEPZ_OK);
+    CHECK(fake_bno055_reg(r->fake, 1, 0x0A) == 0x1A && fake_bno055_reg(r->fake, 1, 0x0B) == 0x01 &&
+          fake_bno055_reg(r->fake, 1, 0x09) == 0x1F);
+    memset(&gc, 0, sizeof gc);
+    memset(&mc, 0, sizeof mc);
+    CHECK_RC(depz_bno055_get_gyro_config(r->dev, &gc), DEPZ_OK);
+    CHECK(gc.range == 2 && gc.bandwidth == 3 && gc.power == 1);
+    CHECK_RC(depz_bno055_get_mag_config(r->dev, &mc), DEPZ_OK);
+    CHECK(mc.rate == 7 && mc.mode == 3 && mc.power == 0);
+    CHECK_RC(depz_bno055_unique_id(r->dev, uid), DEPZ_OK);
+    for (k = 0; k < 16; k++) CHECK(uid[k] == (uint8_t)(0xC0 + k));
+    /* INT_EN / INT_MSK skip the CONFIG round trip */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_interrupt_enable(r->dev, 0x40), DEPZ_OK);
+    CHECK_RC(depz_bno055_set_interrupt_mask(r->dev, 0xC0), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:07=01 1:10=40 1:07=00 0:07=01 1:0f=c0 1:07=00"));
+    CHECK_RC(depz_bno055_get_interrupt_enable(r->dev, &v), DEPZ_OK);
+    CHECK(v == 0x40);
+    CHECK_RC(depz_bno055_get_interrupt_mask(r->dev, &v), DEPZ_OK);
+    CHECK(v == 0xC0);
+    /* interrupt settings: page 1 0x11..0x1F only */
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_set_interrupt_setting(r->dev, 0x10, 1), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_set_interrupt_setting(r->dev, 0x20, 1), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "interrupt setting") != NULL);
+    CHECK(fake_bno055_sent(r->fake, 0x33) + fake_bno055_sent(r->fake, 0x32) == 0);
+    fake_bno055_set_reg(r->fake, 0, 0x3D, 0x00);
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_AMG);
+    CHECK_RC(depz_bno055_set_interrupt_setting(r->dev, 0x11, 0x0A), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3d=00 0:07=01 1:11=0a 1:07=00 0:3d=07"));
+    /* INT_STA clears on read; clear_interrupt keeps CLK_SEL */
+    fake_bno055_set_reg(r->fake, 0, 0x37, 0x40);
+    fake_bno055_set_reg(r->fake, 0, 0x3F, 0x80);
+    CHECK_RC(depz_bno055_read_interrupt_status(r->dev, &v), DEPZ_OK);
+    CHECK(v == 0x40);
+    CHECK_RC(depz_bno055_read_interrupt_status(r->dev, &v), DEPZ_OK);
+    CHECK(v == 0);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_clear_interrupt(r->dev), DEPZ_OK);
+    CHECK(b055_writes_are(r, "0:3f=c0") && fake_bno055_reg(r->fake, 0, 0x3F) == 0x80);
+    /* page 1 is refused while streaming, nothing sent */
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN,
+                                      DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_unique_id(r->dev, uid), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_set_accel_config(r->dev, &ac), DEPZ_E_ARG);
+    CHECK(fake_bno055_sent(r->fake, 0x33) + fake_bno055_sent(r->fake, 0x32) == 0);
+    CHECK_RC(depz_bno055_stop_stream(r->dev), DEPZ_OK);
+    CHECK_RC(depz_bno055_unique_id(r->dev, uid), DEPZ_OK);
+    CHECK(uid[0] == 0xC0);
+}
+
+/* vectors/bno055.json blocks full_block_live. */
+static const char *const B055_FULL_LIVE =
+    "a2037fff73ff17ff4e01d100fffffcff00009f05e50464f7ba2952f9efcf0000e2ff03000400c0037bff6eff1a00";
+
+static void b055_seed_full_block(fake_bno055 *f)
+{
+    size_t k;
+    for (k = 0; k < DEPZ_BNO055_FULL_BLOCK_LEN; k++) {
+        unsigned v = 0;
+        if (sscanf(B055_FULL_LIVE + 2 * k, "%2x", &v) != 1) v = 0;
+        fake_bno055_set_reg(f, 0, (uint8_t)(0x08 + k), (uint8_t)v);
+    }
+}
+
+B055_RIG(b055_polling_scales_by_the_units)
+{
+    depz_bno055_sample s;
+    double q[4];
+    b055_seed_full_block(r->fake);
+    CHECK_RC(depz_bno055_read_sample(r->dev, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN, &s), DEPZ_OK);
+    CHECK(s.units.android && s.addr == 0x08 && s.len == 46 && s.timestamp_us > 5000000);
+    CHECK(near3(s.accel, 9.30, -1.29, -1.41));
+    CHECK(near3(s.mag, -233 / 16.0, 334 / 16.0, 209 / 16.0));
+    CHECK(near3(s.gyro, -1 / 16.0, -4 / 16.0, 0));
+    CHECK(near3(s.euler, 1439 / 16.0, 1253 / 16.0, -2204 / 16.0));
+    CHECK(fabs(s.quaternion[0] - 10682 / 16384.0) < 1e-12 && fabs(s.quaternion[1] + 1710 / 16384.0) < 1e-12);
+    CHECK(near3(s.linear_accel, -0.30, 0.03, 0.04) && near3(s.gravity, 9.60, -1.33, -1.46));
+    CHECK(s.temperature == 26 && s.calibration.system == 0 && s.present == 0x1FF);
+    CHECK_RC(depz_bno055_read_sample(r->dev, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN, &s), DEPZ_OK);
+    CHECK(fake_bno055_reads(r->fake, 0x3B) == 1); /* UNIT_SEL read once, then cached */
+    /* a window leaves the channels it does not cover out */
+    fake_bno055_set_reg(r->fake, 0, 0x34, 0xE7); /* -25 C */
+    fake_bno055_set_reg(r->fake, 0, 0x35, 0xFF);
+    CHECK_RC(depz_bno055_read_sample(r->dev, 0x34, 2, &s), DEPZ_OK);
+    CHECK(s.temperature == -25 && depz_bno055_fully_calibrated(&s.calibration));
+    CHECK(s.present == (DEPZ_BNO055_HAS_TEMPERATURE | DEPZ_BNO055_HAS_CALIBRATION));
+    CHECK_RC(depz_bno055_read_sample(r->dev, 0xF9, 8, &s), DEPZ_E_ARG);
+    /* every unit bit (set_units updates the cache) */
+    CHECK_RC(depz_bno055_set_units(r->dev, &B055_ALL_UNITS), DEPZ_OK);
+    b055_seed_full_block(r->fake);
+    CHECK_RC(depz_bno055_read_sample(r->dev, DEPZ_BNO055_FULL_BLOCK_ADDR, DEPZ_BNO055_FULL_BLOCK_LEN, &s), DEPZ_OK);
+    CHECK(s.units.accel_mg && near3(s.accel, 930, -129, -141));
+    CHECK(near3(s.gyro, -1 / 900.0, -4 / 900.0, 0) && near3(s.euler, 1439 / 900.0, 1253 / 900.0, -2204 / 900.0));
+    CHECK(s.temperature == 52); /* F: 1 LSB = 2 F */
+    CHECK(near3(s.linear_accel, -0.30, 0.03, 0.04)); /* always m/s^2 */
+    /* read_quaternion reads only the 8-byte block */
+    fake_bno055_set_mode(r->fake, DEPZ_BNO055_MODE_NDOF);
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_read_quaternion(r->dev, q), DEPZ_OK);
+    CHECK(fabs(q[0] - 10685 / 16384.0) < 1e-12 && fabs(q[1] + 1693 / 16384.0) < 1e-12 &&
+          fabs(q[2] + 12305 / 16384.0) < 1e-12 && q[3] == 0);
+    CHECK(fake_bno055_sent(r->fake, 0x32) == 1 && fake_bno055_reads(r->fake, 0x20) == 1);
+}
+
+static void b055_count_cb(const depz_bno055_sample *s, void *user)
+{
+    (void)s;
+    (*(int *)user)++;
+}
+
+B055_RIG(b055_stream_wire_units_and_bad_reports)
+{
+    static const uint8_t want[3][5] = {{0x00, 0x08, 0x2e, 0x0a, 0x00}, {0x00, 0x20, 0x08, 0x14, 0x00},
+                                       {0x01, 0x35, 0x01, 0xe8, 0x03}};
+    static const uint8_t accel[6] = {0xa2, 0x03, 0x7f, 0xff, 0x73, 0xff};
+    depz_bno055_sample s;
+    depz_bno055_info info;
+    depz_stream *it;
+    uint8_t p[8], b[1];
+    int got = 0, token = -1, k;
+    CHECK(!depz_bno055_streaming(r->dev));
+    /* refused before any traffic: blocks outside 1..128 / the page, TIMER period 0 / 60001 */
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0x08, 0, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0x08, 129, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0xF9, 8, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 0, 0x08, 46, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_ARG);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 60001, 0x08, 46, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_ARG);
+    CHECK(fake_bno055_sent(r->fake, 0x32) + fake_bno055_sent(r->fake, 0x35) == 0 && !depz_bno055_streaming(r->dev));
+    /* the vectors' start_stream payloads */
+    fake_bno055_set_reg(r->fake, 0, 0x3B, 0x97);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0x08, 46, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    CHECK(fake_bno055_sent(r->fake, 0x32) == 1); /* UNIT_SEL read before START_STREAM */
+    CHECK_RC(depz_bno055_start_stream(r->dev, 20, 0x20, 8, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 1000, 0x35, 1, DEPZ_BNO055_TRIGGER_INT), DEPZ_OK);
+    for (k = 0; k < 3; k++) CHECK(fake_bno055_payload(r->fake, 0x35, (size_t)k, p, sizeof p) == 5 && !memcmp(p, want[k], 5));
+    CHECK(depz_bno055_streaming(r->dev) && fake_bno055_streaming(r->fake));
+    /* the stream scales by the units latched before START_STREAM */
+    CHECK_RC(depz_bno055_on_sample(r->dev, b055_count_cb, &got, &token), DEPZ_OK);
+    it = depz_bno055_samples(r->dev, 4);
+    CHECK(it);
+    fake_bno055_push_stream(r->fake, 1, 0x08, 6, accel, 6);
+    CHECK_RC(depz_stream_next(it, &s, 1000), DEPZ_OK);
+    CHECK(s.timestamp_us == 1 && s.units.accel_mg && near3(s.accel, 930, -129, -141) && s.present == DEPZ_BNO055_HAS_ACCEL);
+    /* shorter than the header, a truncated block: counted, dropped */
+    fake_bno055_push_stream(r->fake, 2, 0x08, 46, accel, 6);
+    fake_bno055_push_stream(r->fake, 3, 0x08, 6, accel, 0);
+    CHECK_RC(depz_bno055_bridge_info(r->dev, &info), DEPZ_OK); /* behind the reports */
+    CHECK(depz_bno055_stream_parse_errors(r->dev) == 2 && got == 1);
+    CHECK_RC(depz_stream_next(it, &s, 20), DEPZ_E_TIMEOUT);
+    depz_bno055_off_sample(r->dev, token);
+    fake_bno055_push_stream(r->fake, 4, 0x08, 6, accel, 6);
+    CHECK_RC(depz_stream_next(it, &s, 1000), DEPZ_OK);
+    CHECK(s.timestamp_us == 4 && got == 1); /* unsubscribed */
+    depz_stream_close(it);
+    CHECK_RC(depz_bno055_get_sample(r->dev, 20, &s), DEPZ_E_TIMEOUT);
+    CHECK_RC(depz_bno055_read_registers(r->dev, 0x00, b, 1, 0), DEPZ_OK); /* the link keeps working */
+    CHECK(b[0] == 0xA0);
+    /* stop: idle sends nothing; a failure still clears the flag */
+    CHECK_RC(depz_bno055_stop_stream(r->dev), DEPZ_OK);
+    CHECK(!depz_bno055_streaming(r->dev) && !fake_bno055_streaming(r->fake));
+    fake_bno055_clear(r->fake);
+    CHECK_RC(depz_bno055_stop_stream(r->dev), DEPZ_OK);
+    CHECK(fake_bno055_sent(r->fake, 0x36) == 0);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0x08, 46, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_OK);
+    fake_bno055_fail_next(r->fake, 0x36, 0x01);
+    CHECK_RC(depz_bno055_stop_stream(r->dev), DEPZ_E_STATUS);
+    CHECK(!depz_bno055_streaming(r->dev));
+    fake_bno055_fail_next(r->fake, 0x35, 0x08);
+    CHECK_RC(depz_bno055_start_stream(r->dev, 10, 0x08, 46, DEPZ_BNO055_TRIGGER_TIMER), DEPZ_E_STATUS);
+    CHECK(!depz_bno055_streaming(r->dev));
+}
+
+/* depz_open_on_link (contract 02 §4.4) over the fakes, the C side of
+ * test_discovery.py's open_on_link tests: exactly the three probe requests
+ * (name, device name, serial), then the class attached on the same
+ * connection; an unknown APP_* stays a base device; a bootloader, a silent
+ * board and a NULL output are refused. */
+static void discovery_open_on_link_attaches_in_place(void)
+{
+    static const uint8_t probe[3] = {0x04, 0x03, 0x05};
+    depz_link *link;
+    depz_device *dev = NULL;
+    fake_sr04 *fake;
+    fake_vl53lx *vlx;
+    uint8_t cmds[16];
+    uint32_t period = 0;
+
+    fake = fake_sr04_start(&link);
+    CHECK(fake);
+    CHECK_RC(depz_open_on_link(link, (int)DEPZ_USB_VID, -1, 1000, &dev), DEPZ_OK);
+    CHECK(depz_is_sr04(dev) && depz_device_sensor_type(dev) == DEPZ_SENSOR_SR04);
+    CHECK(fake_sr04_commands(fake, cmds, sizeof cmds) == 3 && memcmp(cmds, probe, 3) == 0);
+    CHECK_RC(depz_sr04_get_sample_period_us(dev, &period), DEPZ_OK); /* the same connection goes on */
+    CHECK(period == fake_sr04_sample_period(fake));
+    depz_device_close(dev);
+    fake_sr04_stop(fake);
+
+    fake = fake_sr04_start(&link);
+    CHECK(fake);
+    fake_sr04_set_software(fake, "APP_NEWSENSOR_v1.2");
+    CHECK_RC(depz_open_on_link(link, -1, -1, 1000, &dev), DEPZ_OK);
+    CHECK(!depz_is_sr04(dev) && depz_device_sensor_type(dev) == DEPZ_SENSOR_UNKNOWN);
+    CHECK(fake_sr04_commands(fake, cmds, sizeof cmds) == 3 && memcmp(cmds, probe, 3) == 0);
+    depz_device_close(dev);
+    fake_sr04_stop(fake);
+
+    fake = fake_sr04_start(&link);
+    CHECK(fake);
+    fake_sr04_set_software(fake, "BOOTDEPZ_v1.1");
+    dev = (depz_device *)&period; /* overwritten with NULL on failure */
+    CHECK_RC(depz_open_on_link(link, -1, -1, 1000, &dev), DEPZ_E_BOOTLOADER);
+    CHECK(dev == NULL && strstr(depz_last_error(), "bootloader") != NULL);
+    fake_sr04_stop(fake);
+
+    fake = fake_silent_start(&link);
+    CHECK(fake);
+    CHECK_RC(depz_open_on_link(link, -1, -1, 50, &dev), DEPZ_E_NO_DEVICE);
+    CHECK(dev == NULL && strstr(depz_last_error(), "no DEPZ device answered on") != NULL);
+    fake_sr04_stop(fake);
+
+    fake = fake_sr04_start(&link);
+    CHECK(fake);
+    CHECK_RC(depz_open_on_link(link, -1, -1, 1000, NULL), DEPZ_E_ARG); /* takes the link anyway */
+    fake_sr04_stop(fake);
+
+    /* The 1D family: the board stamp names the class, the product follows it. */
+    vlx = fake_vl53lx_start("DEPZ ToF Sensor VL53L1CX USB v2.1 SER", &link);
+    CHECK(vlx);
+    CHECK_RC(depz_open_on_link(link, -1, -1, 1000, &dev), DEPZ_OK);
+    CHECK(depz_is_vl53lx(dev) && depz_device_sensor_type(dev) == DEPZ_SENSOR_VL53LX);
+    CHECK(fake_vl53lx_count(vlx, 0x04) == 1 && fake_vl53lx_count(vlx, 0x03) == 1 && fake_vl53lx_rx_count(vlx) == 3);
+    CHECK(depz_vl53lx_detected_product(dev) == DEPZ_VL53LX_PRODUCT_L1CX);
+    depz_device_close(dev);
+    fake_vl53lx_stop(vlx);
+
+    depz_free_device_list(NULL);
+}
+
+/* ── VL53L8 against the fake SPI bridge + chip model ─────────────────── */
+
+/* The C side of test_vl53l8_device.py over fake_vl53l8 (the chip half of
+ * fake_vl53l8.py): init, the DCI round trips, power modes, thresholds,
+ * motion, the xtalk calibration and the start / stop rules. Frames are left
+ * to the contract 15 scenarios. */
+
+#define L8_CRC_CX 0xCADF7CAFu /* the checksum the VL53L8CX 2.1.0 blob boots with */
+#define L8_CRC_CH 0x0C0B6C9Eu /* the LMZ blob (VL53L8CH) */
+
+typedef struct {
+    fake_vl53l8 *fake;
+    depz_device *dev;
+} l8rig;
+
+typedef struct { int notes, downloads; bool saw_checksum, done; size_t last_done, last_total; } l8_progress;
+
+static void l8_on_progress(const char *text, size_t done, size_t total, void *user)
+{
+    l8_progress *p = (l8_progress *)user;
+    if (!strcmp(text, "download")) {
+        p->downloads++;
+        p->last_done = done;
+        p->last_total = total;
+        return;
+    }
+    p->notes++;
+    if (!strcmp(text, "Sensor FW checksum OK")) p->saw_checksum = true;
+    if (!strcmp(text, "Sensor init done")) p->done = true;
+}
+
+static bool l8_up(l8rig *r, depz_vl53l8_model model, uint32_t crc, bool init)
+{
+    depz_link *link;
+    r->dev = NULL;
+    r->fake = fake_vl53l8_start(crc, &link);
+    if (!r->fake) return false;
+    if (depz_vl53l8_open_link(link, model, &r->dev) != DEPZ_OK) return false;
+    depz_device_set_timeout_ms(r->dev, 1000);
+    if (init && depz_vl53l8_init(r->dev, NULL, NULL) != DEPZ_OK) {
+        fprintf(stderr, "  FAIL vl53l8 init: %s\n", depz_last_error());
+        return false;
+    }
+    return true;
+}
+
+static void l8_down(l8rig *r)
+{
+    depz_device_close(r->dev);
+    fake_vl53l8_stop(r->fake);
+}
+
+#define L8_RIG(name, model, crc)                       \
+    static void name##_body(l8rig *r);                 \
+    static void name(void)                             \
+    {                                                  \
+        l8rig r;                                       \
+        if (!l8_up(&r, model, crc, true)) g_failed++;  \
+        else name##_body(&r);                          \
+        l8_down(&r);                                   \
+    }                                                  \
+    static void name##_body(l8rig *r)
+
+static void l8_swap(uint8_t *d, size_t n)
+{
+    size_t i;
+    for (i = 0; i + 4 <= n; i += 4) {
+        uint8_t a = d[i], b = d[i + 1];
+        d[i] = d[i + 3];
+        d[i + 1] = d[i + 2];
+        d[i + 2] = b;
+        d[i + 3] = a;
+    }
+}
+
+static uint32_t l8_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+/* init downloads the blob in 2 KB steps, boots it (checksum checked), uploads
+ * the 4x4 offsets, the default xtalk and configuration; the ULD defaults
+ * read back: 4x4, 1 Hz, continuous, 5 ms, 5 %, closest, awake, margin 0. */
+static void l8_init_downloads_and_reads_the_defaults(void)
+{
+    l8rig r;
+    l8_progress pr;
+    bool alive = false;
+    uint8_t id = 0, rev = 0, b[8], u8 = 0;
+    int zones = 0;
+    uint32_t u32 = 1;
+    memset(&pr, 0, sizeof pr);
+    if (!l8_up(&r, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX, false)) { g_failed++; l8_down(&r); return; }
+    CHECK_RC(depz_vl53l8_is_alive(r.dev, &alive, &id, &rev), DEPZ_OK);
+    CHECK(alive && id == 0xF0 && rev == 0x0C);
+    CHECK(fake_vl53l8_page(r.fake) == 0x02); /* the ids on page 0, the sensor left on page 2 */
+    CHECK_RC(depz_vl53l8_dci_read(r.dev, 0x5450, b, 8), DEPZ_E_ARG); /* init() first */
+    CHECK_RC(depz_vl53l8_init(r.dev, l8_on_progress, &pr), DEPZ_OK);
+    CHECK(depz_vl53l8_initialized(r.dev) && !depz_vl53l8_ranging(r.dev));
+    CHECK(fake_vl53l8_boots(r.fake) == 1 && fake_vl53l8_config_uploads(r.fake) == 1);
+    CHECK(fake_vl53l8_offset_uploads(r.fake) == 1 && fake_vl53l8_xtalk_uploads(r.fake) == 1);
+    CHECK(pr.saw_checksum && pr.done && pr.notes > 3);
+    CHECK(pr.downloads > 0 && pr.last_done == 0x5000 && pr.last_total == 0x5000); /* bank 3 */
+    CHECK(fake_vl53l8_dci(r.fake, 0xDB80, b, sizeof b) == 4 && b[0] == 1 && b[1] == 0 && b[2] == 1 && b[3] == 0);
+    CHECK(fake_vl53l8_dci(r.fake, 0xD964, b, sizeof b) == 4 && l8_u32(b) == 1);
+    CHECK(depz_vl53l8_module_type(r.dev) == -1); /* read on the L5/L7 only */
+    CHECK_RC(depz_vl53l8_get_resolution(r.dev, &zones), DEPZ_OK);
+    CHECK(zones == 16);
+    CHECK_RC(depz_vl53l8_get_ranging_frequency_hz(r.dev, &u8), DEPZ_OK);
+    CHECK(u8 == 1);
+    CHECK_RC(depz_vl53l8_get_ranging_mode(r.dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_RANGING_MODE_CONTINUOUS);
+    CHECK_RC(depz_vl53l8_get_integration_time_ms(r.dev, &u32), DEPZ_OK);
+    CHECK(u32 == 5);
+    CHECK_RC(depz_vl53l8_get_sharpener_percent(r.dev, &u8), DEPZ_OK);
+    CHECK(u8 == 5);
+    CHECK_RC(depz_vl53l8_get_target_order(r.dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_TARGET_ORDER_CLOSEST);
+    CHECK_RC(depz_vl53l8_get_power_mode(r.dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_POWER_MODE_WAKEUP);
+    CHECK_RC(depz_vl53l8_get_xtalk_margin(r.dev, &u32), DEPZ_OK);
+    CHECK(u32 == 0);
+    /* foreign silicon is not alive */
+    fake_vl53l8_set_reg(r.fake, 0, 0x00, 0xEB);
+    CHECK_RC(depz_vl53l8_is_alive(r.dev, &alive, &id, &rev), DEPZ_OK);
+    CHECK(!alive && id == 0xEB);
+    l8_down(&r);
+
+    /* the booted firmware reports another checksum: refused, not initialised */
+    if (!l8_up(&r, DEPZ_VL53L8_MODEL_L8CX, 0x12345678u, false)) { g_failed++; l8_down(&r); return; }
+    CHECK_RC(depz_vl53l8_init(r.dev, NULL, NULL), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "FW_CHECKSUM_FAIL") != NULL);
+    CHECK(!depz_vl53l8_initialized(r.dev));
+    CHECK_RC(depz_vl53l8_get_resolution(r.dev, &zones), DEPZ_E_ARG);
+    l8_down(&r);
+}
+
+L8_RIG(l8_configuration_round_trips, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
+{
+    uint8_t b[32], u8 = 0;
+    uint8_t xt[DEPZ_VL53L8_XTALK_BUFFER_SIZE];
+    uint32_t u32 = 0;
+    int zones = 0, pct;
+    size_t writes;
+    /* resolution: re-uploads offset + xtalk shaped for that grid */
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_resolution(r->dev, &zones), DEPZ_OK);
+    CHECK(zones == 64);
+    CHECK(fake_vl53l8_dci(r->fake, 0x5450, b, sizeof b) == 8 && b[0] == 8 && b[1] == 8);
+    CHECK(fake_vl53l8_dci(r->fake, 0xAD38, b, sizeof b) == 16 && b[4] == 16 && b[9] == 1);
+    CHECK(fake_vl53l8_offset_uploads(r->fake) == 2 && fake_vl53l8_xtalk_uploads(r->fake) == 2);
+    CHECK(fake_vl53l8_last_xtalk(r->fake, xt) && memcmp(xt, depz_vl53l8_default_xtalk, sizeof xt) == 0); /* 8x8: verbatim */
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_4X4), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(r->fake, 0xAD38, b, sizeof b) == 16 && b[4] == 64 && b[9] == 4);
+    CHECK(fake_vl53l8_last_xtalk(r->fake, xt) && memcmp(xt, depz_vl53l8_default_xtalk, sizeof xt) != 0); /* folded */
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, 32), DEPZ_E_ARG);
+    /* frequency: the floor and the ceiling are refused host-side */
+    writes = fake_vl53l8_write_count(r->fake);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 1), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 61), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "<= 60 Hz") != NULL);
+    CHECK(fake_vl53l8_write_count(r->fake) == writes);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 60), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_ranging_frequency_hz(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == 60 && fake_vl53l8_dci(r->fake, 0x5458, b, sizeof b) == 4 && b[0] == 0 && b[1] == 60 && b[2] == 0);
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 16), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "<= 15 Hz") != NULL);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 15), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_4X4), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 16), DEPZ_OK); /* the ceiling moved back */
+    /* ranging mode */
+    CHECK_RC(depz_vl53l8_set_ranging_mode(r->dev, DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_ranging_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS);
+    CHECK(fake_vl53l8_dci(r->fake, 0xAD30, b, sizeof b) == 8 && b[1] == 0x3 && b[3] == 0x2);
+    CHECK(fake_vl53l8_dci(r->fake, 0xD964, b, sizeof b) == 4 && l8_u32(b) == 1);
+    CHECK_RC(depz_vl53l8_set_ranging_mode(r->dev, DEPZ_VL53L8_RANGING_MODE_CONTINUOUS), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_ranging_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_RANGING_MODE_CONTINUOUS);
+    CHECK(fake_vl53l8_dci(r->fake, 0xAD30, b, sizeof b) == 8 && b[1] == 0x1 && b[3] == 0x3);
+    CHECK(fake_vl53l8_dci(r->fake, 0xD964, b, sizeof b) == 4 && l8_u32(b) == 0);
+    CHECK_RC(depz_vl53l8_set_ranging_mode(r->dev, 2), DEPZ_E_ARG);
+    /* integration time */
+    CHECK_RC(depz_vl53l8_set_integration_time_ms(r->dev, 20), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_integration_time_ms(r->dev, &u32), DEPZ_OK);
+    CHECK(u32 == 20 && fake_vl53l8_dci(r->fake, 0x545C, b, sizeof b) == 20 && l8_u32(b) == 20000);
+    CHECK_RC(depz_vl53l8_set_integration_time_ms(r->dev, 1), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_integration_time_ms(r->dev, 1001), DEPZ_E_ARG);
+    /* sharpener reads back what was set */
+    for (pct = 0; pct < 100; pct += 25) {
+        uint8_t want = (uint8_t)(pct == 75 ? 99 : pct);
+        CHECK_RC(depz_vl53l8_set_sharpener_percent(r->dev, want), DEPZ_OK);
+        CHECK_RC(depz_vl53l8_get_sharpener_percent(r->dev, &u8), DEPZ_OK);
+        CHECK(u8 == want);
+    }
+    CHECK(fake_vl53l8_dci(r->fake, 0xAED8, b, sizeof b) == 16 && b[0xD] == 99 * 255 / 100);
+    CHECK_RC(depz_vl53l8_set_sharpener_percent(r->dev, 100), DEPZ_E_ARG);
+    /* target order */
+    CHECK_RC(depz_vl53l8_set_target_order(r->dev, DEPZ_VL53L8_TARGET_ORDER_STRONGEST), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_target_order(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_TARGET_ORDER_STRONGEST && fake_vl53l8_dci(r->fake, 0xAE64, b, sizeof b) == 4 && b[0] == 2);
+    CHECK_RC(depz_vl53l8_set_target_order(r->dev, 3), DEPZ_E_ARG);
+    /* xtalk margin: 3 kcps -> 3 x 2048 on the wire */
+    CHECK_RC(depz_vl53l8_set_xtalk_margin(r->dev, 3), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_xtalk_margin(r->dev, &u32), DEPZ_OK);
+    CHECK(u32 == 3 && fake_vl53l8_dci(r->fake, 0xAD94, b, sizeof b) == 16 && l8_u32(b) == 3 * 2048);
+    CHECK_RC(depz_vl53l8_set_xtalk_margin(r->dev, 10001), DEPZ_E_ARG);
+    /* raw DCI access */
+    CHECK_RC(depz_vl53l8_dci_read(r->dev, 0x5458, b, 4), DEPZ_OK);
+    CHECK(b[1] == 16);
+    b[1] = 20;
+    CHECK_RC(depz_vl53l8_dci_write(r->dev, 0x5458, b, 4), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_ranging_frequency_hz(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == 20);
+}
+
+L8_RIG(l8_thresholds_motion_and_power, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
+{
+    static const uint8_t motion_head[32] = { /* the Python SDK's DCI_MOTION_DETECTOR_CFG for 400..1500 mm at 8x8 */
+        0x44, 0x35, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x06, 0x02, 0x04, 0x09, 0x10, 0x10, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01};
+    static depz_vl53l8_threshold th[2], got[64], many[65];
+    uint8_t raw[DEPZ_VL53L8_THRESH_START_SIZE], b[160], u8 = 0;
+    bool en = true;
+    memset(th, 0, sizeof th);
+    CHECK_RC(depz_vl53l8_get_detection_thresholds_enable(r->dev, &en), DEPZ_OK);
+    CHECK(!en);
+    th[0].low_thresh = 200; th[0].high_thresh = 600; th[0].measurement = DEPZ_VL53L8_DIST_MM;
+    th[0].type = DEPZ_VL53L8_THRESH_IN_WINDOW; th[0].zone_num = 5; th[0].operation = DEPZ_VL53L8_THRESH_OP_OR;
+    th[1].low_thresh = 1; th[1].high_thresh = 3; th[1].measurement = DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS;
+    th[1].type = DEPZ_VL53L8_THRESH_GREATER_THAN_MAX; th[1].zone_num = 6; th[1].operation = DEPZ_VL53L8_THRESH_OP_AND;
+    CHECK_RC(depz_vl53l8_set_detection_thresholds(r->dev, th, 2), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_detection_thresholds(r->dev, got), DEPZ_OK);
+    CHECK(memcmp(&got[0], &th[0], sizeof th[0]) == 0 && memcmp(&got[1], &th[1], sizeof th[1]) == 0);
+    CHECK(got[2].low_thresh == 0 && got[2].high_thresh == 0 && got[2].measurement == 0 && got[2].zone_num == 0);
+    /* on the wire the distance is x4 and the signal x2048 (plugin scaling) */
+    CHECK(fake_vl53l8_dci(r->fake, 0xB6E8, raw, sizeof raw) == sizeof raw);
+    CHECK((int32_t)l8_u32(raw) == 800 && (int32_t)l8_u32(raw + 4) == 2400);
+    CHECK((int32_t)l8_u32(raw + 12) == 2048 && (int32_t)l8_u32(raw + 16) == 3 * 2048);
+    CHECK(fake_vl53l8_dci(r->fake, 0xB9F0, b, sizeof b) == 8 && b[0] == 5 && b[7] == 5);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_enable(r->dev, true), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_detection_thresholds_enable(r->dev, &en), DEPZ_OK);
+    CHECK(en && fake_vl53l8_dci(r->fake, 0x5488, b, sizeof b) == 20 && b[0x11] == 0x04);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_enable(r->dev, false), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_detection_thresholds_enable(r->dev, &en), DEPZ_OK);
+    CHECK(!en && fake_vl53l8_dci(r->fake, 0x5488, b, sizeof b) == 20 && b[0x11] == 0x0C);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_auto_stop(r->dev, true), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(r->fake, 0xDB80, b, sizeof b) == 4 && b[3] == 1);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_auto_stop(r->dev, false), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(r->fake, 0xDB80, b, sizeof b) == 4 && b[3] == 0);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds(r->dev, many, 65), DEPZ_E_ARG); /* more than 64 */
+
+    /* the motion indicator: the plugin config, then the distance window */
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_configure_motion_indicator(r->dev, 400, 1500), DEPZ_OK);
+    CHECK(fake_vl53l8_dci(r->fake, 0xBFAC, b, sizeof b) == DEPZ_VL53L8_MOTION_CFG_SIZE);
+    CHECK(memcmp(b, motion_head, sizeof motion_head) == 0);
+    CHECK(l8_u32(b) == 13636 && b[19] == 9);
+    CHECK_RC(depz_vl53l8_configure_motion_indicator(r->dev, 400, 2000), DEPZ_E_ARG); /* span > 1500 mm */
+
+    /* power: sleep, wake (the firmware kept), deep sleep, wake (init again) */
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_SLEEP), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_power_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_POWER_MODE_SLEEP && fake_vl53l8_reg(r->fake, 0, 0x09) == 0x02);
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_SLEEP), DEPZ_OK); /* already there */
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_WAKEUP), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_power_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_POWER_MODE_WAKEUP && fake_vl53l8_boots(r->fake) == 1);
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_power_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP && fake_vl53l8_reg(r->fake, 0, 0x0F) == 0x43);
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_WAKEUP), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_get_power_mode(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == DEPZ_VL53L8_POWER_MODE_WAKEUP);
+    CHECK(fake_vl53l8_boots(r->fake) == 2 && fake_vl53l8_config_uploads(r->fake) == 2);
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, 7), DEPZ_E_ARG);
+    /* a register value the ULD does not know: an error, the page restored */
+    fake_vl53l8_set_reg(r->fake, 0, 0x09, 0x07);
+    CHECK_RC(depz_vl53l8_get_power_mode(r->dev, &u8), DEPZ_E_PROTOCOL);
+    CHECK(fake_vl53l8_page(r->fake) == 0x02);
+}
+
+/* The xtalk calibration: the FW's own table, the target as the FW wants it
+ * (x4 mm, x16 %), the grid it computed captured, the settings around the run
+ * restored; get / set_caldata_xtalk round-trip the blob. */
+L8_RIG(l8_xtalk_calibration_round_trip, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
+{
+    static const uint8_t footer[8] = {0x00, 0x00, 0x00, 0x0F, 0x00, 0x01, 0x03, 0x04};
+    uint8_t blob[DEPZ_VL53L8_XTALK_BUFFER_SIZE], again[DEPZ_VL53L8_XTALK_BUFFER_SIZE], u8 = 0;
+    size_t table_len = 0, writes;
+    uint16_t d4 = 0, r16 = 0;
+    uint8_t nb = 0;
+    unsigned z;
+    int zones = 0;
+    bool failed = true;
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 15), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_sharpener_percent(r->dev, 25), DEPZ_OK);
+    /* argument checks stay off the bus */
+    writes = fake_vl53l8_write_count(r->fake);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 0, 4, 600, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 100, 4, 600, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 0, 600, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 17, 600, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 4, 599, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 4, 3001, &failed), DEPZ_E_ARG);
+    CHECK(fake_vl53l8_write_count(r->fake) == writes);
+
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 4, 600, &failed), DEPZ_OK);
+    CHECK(!failed);
+    CHECK(fake_vl53l8_calibrations(r->fake, &table_len, &d4, &r16, &nb) == 1);
+    CHECK(table_len == depz_vl53l8_calibrate_xtalk_cx_len && d4 == 600 * 4 && r16 == 50 * 16 && nb == 4);
+    {
+        /* the dedicated 17-block output list went out whole (68 B; the Python
+         * SDK's: data_read_size 1204, 18 = blocks + 1, last 0xA28C0402) */
+        uint8_t list[80], cfg[8];
+        CHECK(fake_vl53l8_dci(r->fake, 0xD980, list, sizeof list) == 68 && l8_u32(list + 64) == 0xA28C0402u);
+        CHECK(fake_vl53l8_dci(r->fake, 0xD968, cfg, sizeof cfg) == 8 && l8_u32(cfg) == 1204 && l8_u32(cfg + 4) == 18);
+    }
+    CHECK(fake_vl53l8_config_uploads(r->fake) == 2); /* the default config restored */
+    CHECK_RC(depz_vl53l8_get_resolution(r->dev, &zones), DEPZ_OK);
+    CHECK(zones == 16);
+    CHECK_RC(depz_vl53l8_get_ranging_frequency_hz(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == 15);
+    CHECK_RC(depz_vl53l8_get_sharpener_percent(r->dev, &u8), DEPZ_OK);
+    CHECK(u8 == 25);
+    /* save: re-reads the FW buffer at 8x8, restores 4x4 */
+    CHECK_RC(depz_vl53l8_get_caldata_xtalk(r->dev, blob), DEPZ_OK);
+    CHECK(memcmp(blob + sizeof blob - 8, footer, 8) == 0);
+    CHECK(memcmp(blob, depz_vl53l8_default_xtalk, sizeof blob) != 0);
+    CHECK_RC(depz_vl53l8_get_resolution(r->dev, &zones), DEPZ_OK);
+    CHECK(zones == 16);
+    memcpy(again, blob, sizeof again);
+    l8_swap(again, sizeof again);
+    for (z = 0; z < 64; z++) CHECK(l8_u32(again + 0x34 + 4 * z) == fake_vl53l8_xtalk_grid_value(600, 50, 4, z));
+    /* load: the blob reaches the FW verbatim on the next 8x8 upload */
+    CHECK_RC(depz_vl53l8_set_caldata_xtalk(r->dev, blob), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_8X8), DEPZ_OK);
+    CHECK(fake_vl53l8_last_xtalk(r->fake, again) && memcmp(again, blob, sizeof blob) == 0);
+    /* "coverglass too good": reported, the default xtalk kept */
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_4X4), DEPZ_OK);
+    fake_vl53l8_xtalk_cal_fails(r->fake, true);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 20, 1, 3000, &failed), DEPZ_OK);
+    CHECK(failed);
+    CHECK(fake_vl53l8_calibrations(r->fake, NULL, &d4, &r16, &nb) == 2 && d4 == 3000 * 4 && r16 == 20 * 16 && nb == 1);
+    CHECK_RC(depz_vl53l8_get_resolution(r->dev, &zones), DEPZ_OK);
+    CHECK(zones == 16);
+}
+
+/* start_ranging arms the stream with the frame size the FW reports (540 B
+ * for the CX at 4x4, as the Python SDK computes); the stream owns the bank:
+ * configuration is refused with nothing on the bus; stop clears the state
+ * even when STOP_STREAM fails; a laser-safety fault refuses the start. */
+L8_RIG(l8_start_stop_and_refusals, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
+{
+    depz_vl53l8_threshold th;
+    depz_vl53l8_cnh_setup cnh;
+    uint8_t xt[DEPZ_VL53L8_XTALK_BUFFER_SIZE], b[8];
+    size_t writes;
+    bool failed;
+    memset(&th, 0, sizeof th);
+    memset(xt, 0, sizeof xt);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 15), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_start_ranging(r->dev), DEPZ_OK);
+    CHECK(depz_vl53l8_ranging(r->dev) && fake_vl53l8_ranging(r->fake));
+    CHECK(fake_vl53l8_dci(r->fake, 0xD968, b, sizeof b) == 8 && l8_u32(b) == 540);
+    CHECK(fake_vl53l8_reg(r->fake, 0, 0x09) == 0x05 && fake_vl53l8_page(r->fake) == 0x02); /* xshut bypass on */
+    writes = fake_vl53l8_write_count(r->fake);
+    CHECK_RC(depz_vl53l8_set_resolution(r->dev, DEPZ_VL53L8_RES_8X8), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "stop ranging first") != NULL);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 10), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_ranging_mode(r->dev, DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_integration_time_ms(r->dev, 20), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_sharpener_percent(r->dev, 10), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_target_order(r->dev, DEPZ_VL53L8_TARGET_ORDER_STRONGEST), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_power_mode(r->dev, DEPZ_VL53L8_POWER_MODE_SLEEP), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_xtalk_margin(r->dev, 1), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 4, 600, &failed), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_get_caldata_xtalk(r->dev, xt), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_caldata_xtalk(r->dev, xt), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_enable(r->dev, true), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds(r->dev, &th, 1), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_set_detection_thresholds_auto_stop(r->dev, true), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_configure_motion_indicator(r->dev, 400, 1500), DEPZ_E_ARG);
+    depz_vl53l8_cnh_init_config(&cnh, 10, 20, 2);
+    CHECK_RC(depz_vl53l8_configure_cnh(r->dev, &cnh), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_start_ranging(r->dev), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l8_init(r->dev, NULL, NULL), DEPZ_E_ARG);
+    CHECK(fake_vl53l8_write_count(r->fake) == writes);
+    /* stop: STOP_STREAM refused, the ULD stop still runs, the flag clears */
+    fake_vl53l8_fail_next(r->fake, 0x36, 0x01);
+    CHECK_RC(depz_vl53l8_stop_ranging(r->dev), DEPZ_E_STATUS);
+    CHECK(!depz_vl53l8_ranging(r->dev) && !fake_vl53l8_ranging(r->fake));
+    CHECK(fake_vl53l8_reg(r->fake, 0, 0x09) == 0x04 && fake_vl53l8_reg(r->fake, 0, 0x14) == 0x00);
+    writes = fake_vl53l8_write_count(r->fake);
+    CHECK_RC(depz_vl53l8_stop_ranging(r->dev), DEPZ_OK); /* idempotent, nothing on the bus */
+    CHECK(fake_vl53l8_write_count(r->fake) == writes);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 30), DEPZ_OK); /* not wedged */
+    /* the CX firmware has no CNH */
+    CHECK_RC(depz_vl53l8_configure_cnh(r->dev, &cnh), DEPZ_E_WRONG_TYPE);
+    CHECK(!depz_vl53l8_cnh_armed(r->dev, NULL));
+    /* laser safety */
+    fake_vl53l8_laser_safety_fault(r->fake, true);
+    CHECK_RC(depz_vl53l8_start_ranging(r->dev), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "LASER_SAFETY") != NULL);
+    CHECK(!depz_vl53l8_ranging(r->dev));
+    /* the L5/L7 board commands are refused on an L8 */
+    CHECK_RC(depz_vl53l7_pin_ctrl(r->dev, 0), DEPZ_E_WRONG_TYPE);
+}
+
+/* The VL53L8CH: the LMZ calibration table, CNH armed on its firmware. */
+L8_RIG(l8ch_cnh_and_lmz_calibration_table, DEPZ_VL53L8_MODEL_L8CH, L8_CRC_CH)
+{
+    depz_vl53l8_cnh_setup cnh, armed;
+    uint8_t packed[156], b[160];
+    size_t table_len = 0;
+    bool failed = true;
+    depz_vl53l8_cnh_init_config(&cnh, 10, 20, 2);
+    CHECK_RC(depz_vl53l8_configure_cnh(r->dev, &cnh), DEPZ_E_ARG); /* no aggregate map yet */
+    CHECK_RC(depz_vl53l8_cnh_create_agg_map(&cnh, 64, 0, 0, 2, 2, 4, 4), DEPZ_OK);
+    CHECK_RC(depz_vl53l8_configure_cnh(r->dev, &cnh), DEPZ_OK);
+    CHECK(depz_vl53l8_cnh_armed(r->dev, &armed) && armed.nb_of_aggregates == 16);
+    depz_vl53l8_cnh_pack(&cnh, packed);
+    CHECK(fake_vl53l8_dci(r->fake, 0xBFAC, b, sizeof b) == 156 && memcmp(b, packed, 156) == 0);
+    CHECK_RC(depz_vl53l8_calibrate_xtalk(r->dev, 50, 4, 600, &failed), DEPZ_OK);
+    CHECK(!failed && fake_vl53l8_calibrations(r->fake, &table_len, NULL, NULL, NULL) == 1);
+    CHECK(table_len == depz_vl53l8_calibrate_xtalk_lmz_len);
+    CHECK_RC(depz_vl53l8_init(r->dev, NULL, NULL), DEPZ_OK); /* a fresh sensor: CNH disarmed */
+    CHECK(!depz_vl53l8_cnh_armed(r->dev, NULL) && fake_vl53l8_boots(r->fake) == 2);
+}
+
 /* ── runner ──────────────────────────────────────────────────────────── */
 
 typedef struct { const char *name; void (*rig_fn)(rig *); void (*plain_fn)(void); } test_case;
 
+
+/* ── datasets: the session recorder (contract 09) ────────────────────── */
+
+static void tmp_dataset_path(char *out, size_t cap, const char *name)
+{
+    static int n;
+    const char *dir = getenv("TMPDIR");
+#ifdef _WIN32
+    if (!dir) dir = getenv("TEMP");
+#endif
+    if (!dir) dir = "/tmp";
+    snprintf(out, cap, "%s/depz_c_io_%ld_%d_%s", dir, (long)depz_host_now_us(), n++, name);
+}
+
+/* Two fake SR04 boards on device clocks hours apart land on one host
+ * timeline, ordered by capture time: t = device time − offset. */
+static void dataset_recorder_two_sr04(void)
+{
+    rig a, b;
+    char path[512], id[32];
+    depz_session_recorder_options opt = DEPZ_SESSION_RECORDER_OPTIONS_INIT;
+    depz_session_recorder *rec;
+    depz_dataset *ds;
+    size_t i;
+    tmp_dataset_path(path, sizeof path, "two.depzdata");
+    CHECK(rig_up(&a));
+    CHECK(rig_up(&b));
+    opt.note = "unit test";
+    opt.temperature_hz = 0;
+    rec = depz_session_recorder_new(path, &opt);
+    CHECK(rec != NULL);
+    CHECK_RC(depz_session_recorder_add(rec, a.dev, NULL, 5, id, sizeof id), DEPZ_OK);
+    CHECK(strcmp(id, "d0") == 0);
+    CHECK_RC(depz_session_recorder_add(rec, b.dev, NULL, 5, id, sizeof id), DEPZ_OK);
+    CHECK(strcmp(id, "d1") == 0);
+    CHECK(depz_session_recorder_records_written(rec) == 0);
+    CHECK_RC(depz_session_recorder_start(rec), DEPZ_OK);
+    CHECK_RC(depz_session_recorder_start(rec), DEPZ_OK); /* idempotent */
+    CHECK_RC(depz_session_recorder_add(rec, a.dev, NULL, 5, NULL, 0), DEPZ_E_ARG);
+    /* 50 ms device steps per sample: the step exceeds the gap between the two
+     * syncs, so the merged order does not depend on how fast add() ran */
+    fake_sr04_send_measurement(a.fake, 0x37);
+    depz_sleep_ms(20);
+    fake_sr04_send_measurement(b.fake, 0x37);
+    depz_sleep_ms(20);
+    fake_sr04_send_measurement(a.fake, 0x37);
+    depz_sleep_ms(20);
+    fake_sr04_send_measurement(b.fake, 0x36);
+    for (i = 0; i < 100 && depz_session_recorder_records_written(rec) < 4; i++) depz_sleep_ms(10);
+    CHECK(depz_session_recorder_records_written(rec) == 4);
+    CHECK_RC(depz_session_recorder_stop(rec), DEPZ_OK);
+    CHECK(depz_session_recorder_records_written(rec) == 0); /* closed: nothing counts */
+    fake_sr04_send_measurement(a.fake, 0x37);              /* unhooked: dropped */
+    depz_sleep_ms(20);
+    depz_session_recorder_free(rec);
+    rig_down(&a);
+    rig_down(&b);
+
+    ds = depz_dataset_read_file(path);
+    remove(path);
+    CHECK(ds != NULL);
+    CHECK(strcmp(depz_dataset_note(ds), "unit test") == 0);
+    CHECK(depz_dataset_device_count(ds) == 2);
+    for (i = 0; i < depz_dataset_device_count(ds); i++) {
+        depz_dataset_device d;
+        depz_dataset_get_device(ds, i, &d);
+        CHECK(strcmp(d.id, i ? "d1" : "d0") == 0);
+        CHECK(strcmp(d.sensor_type, "sr04") == 0);
+        CHECK(strcmp(d.serial, FAKE_SR04_SERIAL) == 0);
+        CHECK(strcmp(d.software_name, FAKE_SR04_SOFTWARE) == 0);
+    }
+    CHECK(depz_dataset_record_count(ds) == 4);
+    {
+        static const char *const ORDER[] = {"d0", "d1", "d0", "d1"};
+        int64_t prev = 0;
+        for (i = 0; i < 4; i++) {
+            depz_dataset_record r;
+            char src[8] = "";
+            int64_t echo = 0;
+            depz_dataset_get_record(ds, i, &r);
+            CHECK(strcmp(r.device_id, ORDER[i]) == 0);
+            CHECK(strcmp(r.kind, "sr04") == 0);
+            CHECK(i == 0 || r.t_host_us >= prev);
+            prev = r.t_host_us;
+            /* t on the host clock: the device clocks (1 s and 2.5 h) are gone */
+            CHECK(llabs(r.t_host_us - (int64_t)depz_host_now_us()) < 10000000LL);
+            CHECK(depz_dataset_value_int(&r, "echo_us", &echo) == 0 && echo == 5831);
+            CHECK(depz_dataset_value_str(&r, "source", src, sizeof src) == 0 &&
+                  strcmp(src, i == 3 ? "once" : "loop") == 0);
+        }
+    }
+    depz_dataset_free(ds);
+}
+
+/* The temperature sampler writes `temperature` records (the MCU
+ * thermometer) to a gzip file the reader opens. */
+static void dataset_recorder_temperature_gz(void)
+{
+    rig a;
+    char path[512];
+    depz_session_recorder_options opt = DEPZ_SESSION_RECORDER_OPTIONS_INIT;
+    depz_session_recorder *rec;
+    depz_dataset *ds;
+    FILE *f;
+    unsigned char magic[2] = {0, 0};
+    size_t i, temps = 0;
+    tmp_dataset_path(path, sizeof path, "temp.depzdata.gz");
+    CHECK(rig_up(&a));
+    opt.temperature_hz = 50.0;
+    rec = depz_session_recorder_new(path, &opt);
+    CHECK(rec != NULL);
+    CHECK_RC(depz_session_recorder_add(rec, a.dev, "imu", 3, NULL, 0), DEPZ_OK);
+    CHECK_RC(depz_session_recorder_start(rec), DEPZ_OK);
+    /* Wait for the samples rather than a fixed 150 ms: a loaded CI runner
+     * (macOS) took longer than that for two MCU round trips. */
+    for (i = 0; i < 300 && depz_session_recorder_records_written(rec) < 2; i++) depz_sleep_ms(10);
+    depz_session_recorder_free(rec); /* stops: the file gets its gzip trailer */
+    rig_down(&a);
+    f = fopen(path, "rb");
+    CHECK(f != NULL);
+    CHECK(fread(magic, 1, 2, f) == 2 && magic[0] == 0x1F && magic[1] == 0x8B);
+    fclose(f);
+    ds = depz_dataset_read_file(path);
+    remove(path);
+    CHECK(ds != NULL);
+    for (i = 0; i < depz_dataset_record_count(ds); i++) {
+        depz_dataset_record r;
+        char src[8] = "";
+        depz_dataset_get_record(ds, i, &r);
+        if (strcmp(r.kind, "temperature") != 0) continue;
+        temps++;
+        CHECK(strcmp(r.device_id, "imu") == 0);
+        CHECK(depz_json_double_value(depz_json_get(r.value, "celsius")) == 27.3);
+        CHECK(depz_dataset_value_str(&r, "source", src, sizeof src) == 0 && strcmp(src, "mcu") == 0);
+    }
+    CHECK(temps >= 2);
+    depz_dataset_free(ds);
+}
+
+/* Contract 09 `bno086`: every report at its measurement time on the host
+ * timeline (device timestamp − offset), not its arrival time; one cargo's
+ * reports come back sorted by t. */
+static void dataset_recorder_bno086(void)
+{
+    /* 0xFB base delta 20 ticks, a rotation vector (delay 3 ticks) and an
+     * accelerometer — the reports of bno086_reports() */
+    static const uint8_t cargo[] = {
+        0xFB, 20, 0, 0, 0,
+        0x05, 9, 0x03, 3, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08,
+        0x01, 10, 0x02, 0, 0x00, 0x01, 0x00, 0xFF, 0x80, 0x09};
+    fake_bno086 *f;
+    depz_device *dev = bno086_fake_open(&f);
+    char path[512];
+    depz_session_recorder *rec;
+    depz_dataset *ds;
+    depz_dataset_device d;
+    size_t i;
+    CHECK(dev);
+    tmp_dataset_path(path, sizeof path, "imu.depzdata");
+    rec = depz_session_recorder_new(path, NULL);
+    CHECK(rec != NULL);
+    CHECK_RC(depz_session_recorder_add(rec, dev, NULL, 3, NULL, 0), DEPZ_OK);
+    CHECK_RC(depz_session_recorder_start(rec), DEPZ_OK);
+    fake_bno086_send_input(f, DEPZ_SHTP_CH_INPUT_NORMAL, 5000000, cargo, sizeof cargo);
+    for (i = 0; i < 100 && depz_session_recorder_records_written(rec) < 2; i++) depz_sleep_ms(10);
+    CHECK(depz_session_recorder_records_written(rec) == 2);
+    depz_session_recorder_free(rec);
+    depz_device_close(dev);
+    fake_bno086_stop(f);
+
+    ds = depz_dataset_read_file(path);
+    remove(path);
+    CHECK(ds != NULL);
+    CHECK(depz_dataset_get_device(ds, 0, &d) == 0 && strcmp(d.sensor_type, "bno086") == 0 &&
+          strcmp(d.serial, "SN0086") == 0);
+    CHECK(depz_dataset_record_count(ds) == 2);
+    {
+        depz_dataset_record r0, r1;
+        char type[32];
+        depz_dataset_get_record(ds, 0, &r0);
+        depz_dataset_get_record(ds, 1, &r1);
+        /* the accelerometer (delay 0) comes before the rotation vector (delay 3 ticks) */
+        CHECK(strcmp(r0.kind, "bno086") == 0 && strcmp(r1.kind, "bno086") == 0);
+        CHECK(depz_dataset_value_str(&r0, "type", type, sizeof type) == 0 && strcmp(type, "Acceleration") == 0);
+        CHECK(depz_dataset_value_str(&r1, "type", type, sizeof type) == 0 && strcmp(type, "RotationVector") == 0);
+        CHECK(r0.t_host_us == 5000000 - 2000 - d.offset_us);
+        CHECK(r1.t_host_us == 5000000 - 2000 + 300 - d.offset_us);
+        CHECK(depz_json_int_value(depz_json_get(r0.value, "timestamp_us")) == 5000000 - 2000);
+        CHECK(depz_json_double_value(depz_json_get(r1.value, "i")) == 0.5 &&
+              depz_json_double_value(depz_json_get(r1.value, "real")) == 0.0);
+        CHECK(depz_json_get(r0.value, "i") == NULL && depz_json_get(r1.value, "x") == NULL);
+    }
+    depz_dataset_free(ds);
+}
+
+/* ── discovery: an explicit path names its port under any alias (02 §4.3, A5) ── */
+
+#ifndef _WIN32
+#include <unistd.h>
+
+static void explicit_port_alias_names_its_port(void)
+{
+    /* A /dev/serial/by-id/… symlink names the port it points at: a regular
+     * file stands in for the node, the resolved path matches either way. */
+    char dir[] = "/tmp/depz-a5-XXXXXX", node[64], alias[64], other[64];
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(node, sizeof node, "%s/ttyACM0", dir);
+    snprintf(alias, sizeof alias, "%s/usb-DEPZ_ToF-if00", dir);
+    snprintf(other, sizeof other, "%s/other", dir);
+    {
+        FILE *f = fopen(node, "wb");
+        CHECK(f != NULL);
+        fclose(f);
+    }
+    CHECK(symlink(node, alias) == 0);
+    CHECK(depz_same_port(alias, node));
+    CHECK(depz_same_port(node, alias));
+    CHECK(!depz_same_port(other, node));     /* nothing there */
+    CHECK(!depz_same_port(dir, node));       /* a directory is not a port */
+    CHECK(depz_same_port("/dev/null", "/dev/null")); /* one device node, one name */
+    CHECK(!depz_same_port("/dev/null", node));       /* a device and a file */
+    unlink(alias);
+    unlink(node);
+    rmdir(dir);
+}
+#else
+static void explicit_port_alias_names_its_port(void)
+{
+    /* COM ports are not files: nothing but the exact name matches. */
+    CHECK(!depz_same_port("COM5", "COM6"));
+    CHECK(!depz_same_port("COM5", "com5"));
+}
+#endif
+
+/* ── contract 09 record values of the live layer ─────────────────────── */
+
+/* `got` (consumed) equals the JSON text `want`, structurally. */
+static bool record_is(depz_json *got, const char *want)
+{
+    depz_json *w = depz_json_parse(want, strlen(want));
+    bool ok = got && w && depz_json_equal(got, w);
+    if (!ok) {
+        char *t = got ? depz_json_dumps(got) : NULL;
+        fprintf(stderr, "  record: got  %s\n          want %s\n", t ? t : "(null)", want);
+        free(t);
+    }
+    depz_json_free(w);
+    depz_json_free(got);
+    return ok;
+}
+
+/* The record value (`v`) of every result type that only exists in this layer,
+ * key for key the Python SessionRecorder (contract 09): sr04, vl53l8 with and
+ * without the motion block, vl53l8_cnh (base64, start_bin = floor(offset /
+ * 2048)), vl53lx with and without targets, bno055 with every channel and with
+ * one. A NULL input is a NULL record. */
+static void dataset_live_records(void)
+{
+    static depz_vl53l8_live_frame f;
+    static const uint8_t RAW[3] = {1, 2, 3};
+    depz_sr04_measurement m = {1000, 5831, true};
+    depz_vl53l8_cnh_setup setup;
+    depz_vl53lx_measurement lx;
+    depz_bno055_sample s;
+    size_t i;
+
+    CHECK(record_is(depz_dataset_sr04_record(&m), "{\"echo_us\": 5831, \"source\": \"loop\"}"));
+    m.from_loop = false;
+    m.echo_time_us = DEPZ_SR04_ECHO_TIMEOUT;
+    CHECK(record_is(depz_dataset_sr04_record(&m), "{\"echo_us\": 65535, \"source\": \"once\"}"));
+    CHECK(depz_dataset_sr04_record(NULL) == NULL);
+
+    memset(&f, 0, sizeof f);
+    f.f.resolution = 16;
+    f.f.silicon_temp_degc = 31;
+    for (i = 0; i < 16; i++) {
+        f.f.distance_mm[i] = (int32_t)(100 + 10 * i);
+        f.f.target_status[i] = 5;
+        f.f.nb_target_detected[i] = i < 8;
+    }
+    CHECK(record_is(depz_dataset_vl53l8_live_record(&f, false), "{\"resolution\": 16, \"silicon_temp_degc\": 31, \"distance_mm\": [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250], \"target_status\": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], \"nb_target_detected\": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]}"));
+    f.has_motion = true;
+    f.motion.global_indicator_1 = 7;
+    f.motion.global_indicator_2 = 9;
+    f.motion.status = 0;
+    f.motion.nb_of_detected_aggregates = 2;
+    f.motion.nb_of_aggregates = 4;
+    for (i = 0; i < 32; i++) f.motion.motion[i] = (uint32_t)(3 * i);
+    CHECK(record_is(depz_dataset_vl53l8_live_record(&f, false), "{\"resolution\": 16, \"silicon_temp_degc\": 31, \"distance_mm\": [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250], \"target_status\": [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], \"nb_target_detected\": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], \"motion\": {\"global_indicator_1\": 7, \"global_indicator_2\": 9, \"status\": 0, \"nb_of_detected_aggregates\": 2, \"nb_of_aggregates\": 4, \"motion\": [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 87, 90, 93]}}"));
+    CHECK(depz_dataset_vl53l8_live_record(NULL, false) == NULL);
+
+    memset(&setup, 0, sizeof setup);
+    setup.nb_of_aggregates = 8;
+    setup.feature_length = 6;
+    setup.sum_span = 2;
+    setup.ref_bin_offset = -6143; /* -6143 // 2048 == -3 (floor, not truncation) */
+    CHECK(record_is(depz_dataset_vl53l8_cnh_record(RAW, 3, &setup),
+                    "{\"nb_aggregates\": 8, \"feature_length\": 6, \"sum_span\": 2, \"start_bin\": -3, \"cnh_raw_b64\": \"AQID\"}"));
+    setup.ref_bin_offset = 4096;
+    CHECK(record_is(depz_dataset_vl53l8_cnh_record(RAW, 2, &setup),
+                    "{\"nb_aggregates\": 8, \"feature_length\": 6, \"sum_span\": 2, \"start_bin\": 2, \"cnh_raw_b64\": \"AQI=\"}"));
+    CHECK(record_is(depz_dataset_vl53l8_cnh_record(RAW, 1, &setup),
+                    "{\"nb_aggregates\": 8, \"feature_length\": 6, \"sum_span\": 2, \"start_bin\": 2, \"cnh_raw_b64\": \"AQ==\"}"));
+    CHECK(record_is(depz_dataset_vl53l8_cnh_record(NULL, 0, &setup),
+                    "{\"nb_aggregates\": 8, \"feature_length\": 6, \"sum_span\": 2, \"start_bin\": 2, \"cnh_raw_b64\": \"\"}"));
+    CHECK(depz_dataset_vl53l8_cnh_record(NULL, 3, &setup) == NULL);
+    CHECK(depz_dataset_vl53l8_cnh_record(RAW, 3, NULL) == NULL);
+
+    memset(&lx, 0, sizeof lx);
+    lx.distance_mm = 1234;
+    lx.sigma_mm = 2.5;
+    lx.signal_kcps = 120.25;
+    lx.ambient_kcps = 3.5;
+    lx.spads = 180.0;
+    CHECK(record_is(depz_dataset_vl53lx_record(&lx, "vl53l1cb", "uld"),
+                    "{\"product\": \"vl53l1cb\", \"driver\": \"uld\", \"status\": 0, \"distance_mm\": 1234, "
+                    "\"sigma_mm\": 2.5, \"signal_kcps\": 120.25, \"ambient_kcps\": 3.5, \"spads\": 180.0}"));
+    lx.n_targets = 2;
+    lx.targets[0].distance_mm = 1234;
+    lx.targets[0].status = 0;
+    lx.targets[0].signal_kcps = 120.25;
+    lx.targets[1].distance_mm = 2100;
+    lx.targets[1].status = 6;
+    lx.targets[1].signal_kcps = 8.5;
+    CHECK(record_is(depz_dataset_vl53lx_record(&lx, NULL, NULL),
+                    "{\"product\": \"\", \"driver\": \"\", \"status\": 0, \"distance_mm\": 1234, "
+                    "\"sigma_mm\": 2.5, \"signal_kcps\": 120.25, \"ambient_kcps\": 3.5, \"spads\": 180.0, "
+                    "\"targets\": [{\"distance_mm\": 1234, \"status\": 0, \"signal_kcps\": 120.25}, "
+                    "{\"distance_mm\": 2100, \"status\": 6, \"signal_kcps\": 8.5}]}"));
+    CHECK(depz_dataset_vl53lx_record(NULL, "vl53l1cb", "uld") == NULL);
+
+    memset(&s, 0, sizeof s);
+    s.units.accel_mg = true;  /* 0x01 */
+    s.units.euler_rad = true; /* 0x04 */
+    s.units.android = true;   /* 0x80 */
+    s.present = DEPZ_BNO055_HAS_ACCEL | DEPZ_BNO055_HAS_MAG | DEPZ_BNO055_HAS_GYRO | DEPZ_BNO055_HAS_EULER |
+                DEPZ_BNO055_HAS_QUATERNION | DEPZ_BNO055_HAS_LINEAR_ACCEL | DEPZ_BNO055_HAS_GRAVITY |
+                DEPZ_BNO055_HAS_TEMPERATURE | DEPZ_BNO055_HAS_CALIBRATION;
+    s.quaternion[0] = 1.0;
+    s.euler[0] = 0.5; s.euler[1] = -0.25; s.euler[2] = 1.75;
+    s.accel[2] = 9.81;
+    s.gyro[0] = 0.1; s.gyro[1] = 0.2; s.gyro[2] = 0.3;
+    s.mag[0] = 10.5; s.mag[1] = -20.25; s.mag[2] = 30.0;
+    s.linear_accel[0] = 0.01; s.linear_accel[1] = 0.02; s.linear_accel[2] = 0.03;
+    s.gravity[2] = 9.8;
+    s.temperature = 24.0;
+    s.calibration.system = 3; s.calibration.gyro = 3; s.calibration.accel = 2; s.calibration.mag = 1;
+    CHECK(record_is(depz_dataset_bno055_record(&s),
+                    "{\"unit_sel\": 133, \"quaternion\": [1.0, 0.0, 0.0, 0.0], \"euler\": [0.5, -0.25, 1.75], "
+                    "\"accel\": [0.0, 0.0, 9.81], \"gyro\": [0.1, 0.2, 0.3], \"mag\": [10.5, -20.25, 30.0], "
+                    "\"linear_accel\": [0.01, 0.02, 0.03], \"gravity\": [0.0, 0.0, 9.8], \"temperature\": 24.0, "
+                    "\"calib\": [3, 3, 2, 1]}"));
+    memset(&s.units, 0, sizeof s.units);
+    s.present = DEPZ_BNO055_HAS_ACCEL;
+    CHECK(record_is(depz_dataset_bno055_record(&s), "{\"unit_sel\": 0, \"accel\": [0.0, 0.0, 9.81]}"));
+    CHECK(depz_dataset_bno055_record(NULL) == NULL);
+}
+
+/* ── VL53LX bare-driver register tables ──────────────────────────────── */
+
+/* The generated block codecs (vl53lx_bare_tables.c, from the Python SDK's
+ * regs.py) round-trip like ST's VL53LX_i2c_encode_* / decode_*: encoding the
+ * decoded fields of a block's bytes — all zero, all one, random — gives the
+ * same bytes except the reserved bits of a fielded byte, which the codec
+ * drops (a hole byte no field covers rides through `raw` untouched); that
+ * output is a fixed point: it decodes and encodes to itself. All-zero bytes
+ * round-trip exactly. The block map itself is ascending and non-overlapping. */
+static void vlx_bare_tables_roundtrip(void)
+{
+    static vlxb_image a, b;
+    uint8_t raw[64], back[64], again[64];
+    uint32_t lcg = 0x2545F491u;
+    int id, pass;
+    size_t i;
+    for (id = 0; id < VLXB_BLK_COUNT; id++) {
+        const vlxb_block_geom *g = &vlxb_blocks[id];
+        CHECK(g->size > 0 && g->size < sizeof raw);
+        CHECK(id == 0 || g->base >= vlxb_blocks[id - 1].base + vlxb_blocks[id - 1].size);
+        for (pass = 0; pass < 4; pass++) {
+            for (i = 0; i < g->size; i++) {
+                lcg = lcg * 1664525u + 1013904223u;
+                raw[i] = pass == 0 ? 0x00 : pass == 1 ? 0xFF : (uint8_t)(lcg >> 24);
+            }
+            memset(&a, 0, sizeof a);
+            memset(&b, 0, sizeof b);
+            memset(back, 0x5A, sizeof back);
+            memset(again, 0xA5, sizeof again);
+            vlxb_decode(&a, (vlxb_block_id)id, raw);
+            vlxb_encode(&a, (vlxb_block_id)id, back);
+            for (i = 0; i < g->size; i++) {
+                if ((back[i] & raw[i]) != back[i]) {
+                    fprintf(stderr, "  block %d pass %d byte %zu: encode set a bit the input lacked\n", id, pass, i);
+                    CHECK(false);
+                }
+            }
+            if (pass == 0) CHECK(memcmp(back, raw, g->size) == 0);
+            vlxb_decode(&b, (vlxb_block_id)id, back);
+            vlxb_encode(&b, (vlxb_block_id)id, again);
+            if (memcmp(again, back, g->size) != 0) {
+                fprintf(stderr, "  block %d pass %d: encode(decode(x)) != x for x = encode(decode(raw))\n", id, pass);
+                CHECK(false);
+            }
+            CHECK(back[g->size] == 0x5A && again[g->size] == 0xA5); /* writes the block's size only */
+        }
+    }
+}
+
+/* ── discovery without a port ────────────────────────────────────────── */
+
+/* Contract 02 §4 / 07 §3 on this machine's port list without opening any
+ * port: the argument checks, the candidate ordering, a path that is not a
+ * port, a USB serial / an index no candidate has (nothing is probed), and the
+ * class attach rules on a plain device over the fake SR04. */
+static void discovery_without_a_port(void)
+{
+    depz_port_info *ports = NULL;
+    size_t n = 0;
+    depz_device *dev = NULL;
+    depz_device_info info;
+    depz_open_options o = DEPZ_OPEN_OPTIONS_INIT;
+    depz_link *link;
+    fake_sr04 *fake;
+    depz_identity ident;
+#ifdef _WIN32
+    const char *no_port = "\\\\.\\DEPZ_NO_SUCH_PORT";
+#else
+    const char *no_port = "/nonexistent/depz-no-such-port";
+#endif
+
+    CHECK_RC(depz_list_serial_ports(NULL, &n), DEPZ_E_ARG);
+    CHECK_RC(depz_list_serial_ports(&ports, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_list_serial_ports(&ports, &n), DEPZ_OK); /* enumerates; opens nothing */
+    depz_free_port_list(ports);
+
+    {
+        /* USB serial ascending, unknown serials last, then the port path. */
+        depz_port_info p[4];
+        memset(p, 0, sizeof p);
+        strcpy(p[0].port, "/dev/ttyACM3"); strcpy(p[0].usb_serial, "SN0200");
+        strcpy(p[1].port, "/dev/ttyACM1");
+        strcpy(p[2].port, "/dev/ttyACM2"); strcpy(p[2].usb_serial, "SN0100");
+        strcpy(p[3].port, "/dev/ttyACM0");
+        depz_sort_ports_by_serial(p, 4);
+        CHECK(strcmp(p[0].port, "/dev/ttyACM2") == 0 && strcmp(p[0].usb_serial, "SN0100") == 0);
+        CHECK(strcmp(p[1].port, "/dev/ttyACM3") == 0 && strcmp(p[1].usb_serial, "SN0200") == 0);
+        CHECK(strcmp(p[2].port, "/dev/ttyACM0") == 0 && p[2].usb_serial[0] == '\0');
+        CHECK(strcmp(p[3].port, "/dev/ttyACM1") == 0 && p[3].usb_serial[0] == '\0');
+        depz_sort_ports_by_serial(NULL, 4); /* no-ops */
+        depz_sort_ports_by_serial(p, 1);
+        CHECK(strcmp(p[0].port, "/dev/ttyACM2") == 0);
+    }
+
+    CHECK_RC(depz_probe_port(NULL, 100, &info), DEPZ_E_ARG);
+    CHECK_RC(depz_probe_port(no_port, 100, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_probe_port(no_port, 100, &info), DEPZ_E_NO_DEVICE);
+    CHECK(strstr(depz_last_error(), "no DEPZ device answered") != NULL);
+    CHECK(info.sensor_type == DEPZ_SENSOR_NONE && info.software_name[0] == '\0');
+
+    CHECK_RC(depz_open_device(&o, NULL), DEPZ_E_ARG);
+    o.port = no_port;
+    CHECK_RC(depz_open_device(&o, &dev), DEPZ_E_NO_DEVICE);
+    CHECK(dev == NULL);
+    o.port = NULL;
+    o.serial = "depz-test-no-such-serial"; /* no candidate matches: nothing is probed */
+    CHECK_RC(depz_open_device(&o, &dev), DEPZ_E_NO_DEVICE);
+    CHECK(strstr(depz_last_error(), "depz-test-no-such-serial") != NULL);
+    o.serial = NULL;
+    o.index = 100000;
+    CHECK_RC(depz_open_device(&o, &dev), DEPZ_E_NO_DEVICE);
+    CHECK(strstr(depz_last_error(), "index 100000") != NULL);
+    CHECK(dev == NULL);
+
+    CHECK_RC(depz_list_depz_devices(false, 100, NULL, &n), DEPZ_E_ARG);
+    CHECK_RC(depz_open_on_link(NULL, -1, -1, 100, &dev), DEPZ_E_ARG);
+
+    /* The class attach rules on a plain device over the fake SR04. */
+    fake = fake_sr04_start(&link);
+    CHECK(fake != NULL);
+    CHECK_RC(depz_device_open_link(link, &dev), DEPZ_OK);
+    depz_device_set_timeout_ms(dev, 1000);
+    CHECK_RC(depz_attach_sensor_class(NULL, "sr04"), DEPZ_E_ARG);
+    CHECK_RC(depz_attach_sensor_class(dev, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_attach_sensor_class(dev, "bootloader"), DEPZ_E_BOOTLOADER);
+    CHECK(strstr(depz_last_error(), "bootloader mode") != NULL);
+    CHECK_RC(depz_attach_sensor_class(dev, "no_such_class"), DEPZ_E_ARG);
+    CHECK_RC(depz_attach_sensor_class(dev, "device"), DEPZ_OK); /* stays the base device */
+    CHECK_RC(depz_device_promote_ex(dev, -1, -1, &ident), DEPZ_OK);
+    CHECK(ident.sensor_type == DEPZ_SENSOR_SR04 && strcmp(ident.mode, "app") == 0);
+    CHECK_RC(depz_attach_sensor_class(dev, "sr04"), DEPZ_E_ARG); /* already has a class */
+    CHECK(strstr(depz_last_error(), "already has a sensor class") != NULL);
+    depz_device_close(dev);
+    fake_sr04_stop(fake);
+}
+
 static const test_case k_tests[] = {
     {"identity_roundtrip", identity_roundtrip, NULL},
     {"temperature", temperature, NULL},
+    {"short_reply_fails_its_request_and_the_reader_goes_on", short_reply_fails_its_request_and_the_reader_goes_on, NULL},
     {"sync_time_produces_offset", sync_time_produces_offset, NULL},
     {"unknown_cmd_raises_status_error", unknown_cmd_raises_status_error, NULL},
     {"sync_pin_validation", sync_pin_validation, NULL},
     {"timeout_when_device_silent", NULL, timeout_when_device_silent},
+    {"explicit_port_alias_names_its_port", NULL, explicit_port_alias_names_its_port},
     {"wrong_type_is_refused", NULL, wrong_type_is_refused},
     {"sample_period_readback_is_stored", sample_period_readback_is_stored, NULL},
     {"echo_decay_clamps_both_ends", echo_decay_clamps_both_ends, NULL},
@@ -1376,8 +3761,10 @@ static const test_case k_tests[] = {
     {"two_independent_streams", two_independent_streams, NULL},
     {"sync_in_single_shot_reaches_stream", sync_in_single_shot_reaches_stream, NULL},
     {"events_and_disconnect", NULL, events_and_disconnect},
+    {"host_seq_gap_is_an_event", NULL, host_seq_gap_is_an_event},
     {"same_opcode_in_flight_is_busy", NULL, same_opcode_in_flight_is_busy},
     {"record_then_replay", NULL, record_then_replay},
+    {"replay_refuses_a_gzipped_capture", NULL, replay_refuses_a_gzipped_capture},
     {"l4_init_boot_speed_then_retimes", NULL, l4_init_boot_speed_then_retimes},
     {"l4_init_at_400_never_retimes", NULL, l4_init_at_400_never_retimes},
     {"l4_init_config_block_and_vhv", NULL, l4_init_config_block_and_vhv},
@@ -1388,6 +3775,13 @@ static const test_case k_tests[] = {
     {"l4_stream_decodes_and_counts_short_blocks", NULL, l4_stream_decodes_and_counts_short_blocks},
     {"l4_measure_once_polls_and_stops", NULL, l4_measure_once_polls_and_stops},
     {"l8_guards_and_cnh_math", NULL, l8_guards_and_cnh_math},
+    {"l8_init_downloads_and_reads_the_defaults", NULL, l8_init_downloads_and_reads_the_defaults},
+    {"l8_configuration_round_trips", NULL, l8_configuration_round_trips},
+    {"l8_thresholds_motion_and_power", NULL, l8_thresholds_motion_and_power},
+    {"l8_xtalk_calibration_round_trip", NULL, l8_xtalk_calibration_round_trip},
+    {"l8_start_stop_and_refusals", NULL, l8_start_stop_and_refusals},
+    {"l8ch_cnh_and_lmz_calibration_table", NULL, l8ch_cnh_and_lmz_calibration_table},
+    {"l8ch_cnh_and_motion_exclusive", NULL, l8ch_cnh_and_motion_exclusive},
     {"bno086_features", NULL, bno086_features},
     {"bno086_busy_retry", NULL, bno086_busy_retry},
     {"bno086_reports", NULL, bno086_reports},
@@ -1397,6 +3791,39 @@ static const test_case k_tests[] = {
     {"bno086_codecs", NULL, bno086_codecs},
     {"tmf8829_fake_session", NULL, tmf8829_fake_session},
     {"vlx_unsupported_group_refused", NULL, vlx_unsupported_group_refused},
+    {"vlx_l1_set_mode_hands_back_the_budget", NULL, vlx_l1_set_mode_hands_back_the_budget},
+    {"dataset_recorder_two_sr04", NULL, dataset_recorder_two_sr04},
+    {"dataset_recorder_temperature_gz", NULL, dataset_recorder_temperature_gz},
+    {"dataset_recorder_bno086", NULL, dataset_recorder_bno086},
+    {"dataset_live_records", NULL, dataset_live_records},
+    {"vlx_bare_tables_roundtrip", NULL, vlx_bare_tables_roundtrip},
+    {"discovery_without_a_port", NULL, discovery_without_a_port},
+    {"discovery_open_on_link_attaches_in_place", NULL, discovery_open_on_link_attaches_in_place},
+    {"vlx_l1_mode_change_moves_the_budget", NULL, vlx_l1_mode_change_moves_the_budget},
+    {"vlx_l1_unreadable_mode_byte_is_an_error", NULL, vlx_l1_unreadable_mode_byte_is_an_error},
+    {"vlx_l1_thresholds_keep_the_other_bits", NULL, vlx_l1_thresholds_keep_the_other_bits},
+    {"vlx_l1_offset_calibration", NULL, vlx_l1_offset_calibration},
+    {"vlx_l1_xtalk_calibration", NULL, vlx_l1_xtalk_calibration},
+    {"vlx_l1_roi_size_and_centre", NULL, vlx_l1_roi_size_and_centre},
+    {"vlx_l1_stream_decodes_and_counts_bad_blocks", NULL, vlx_l1_stream_decodes_and_counts_bad_blocks},
+    {"vlx_l4_configure_reinits_then_tunes", NULL, vlx_l4_configure_reinits_then_tunes},
+    {"vlx_l4_period_selects_autonomous_mode", NULL, vlx_l4_period_selects_autonomous_mode},
+    {"vlx_l4_tuning_round_trips", NULL, vlx_l4_tuning_round_trips},
+    {"vlx_l4_temperature_update_reruns_vhv", NULL, vlx_l4_temperature_update_reruns_vhv},
+    {"vlx_l4_calibrations", NULL, vlx_l4_calibrations},
+    {"vlx_l4_measure_once_polls_the_block", NULL, vlx_l4_measure_once_polls_the_block},
+    {"vlx_l3_refusals_name_the_caveat", NULL, vlx_l3_refusals_name_the_caveat},
+    {"vlx_init_binding_and_bridge_refusals", NULL, vlx_init_binding_and_bridge_refusals},
+    {"b055_identity_and_raw_registers", NULL, b055_identity_and_raw_registers},
+    {"b055_operation_and_power_modes", NULL, b055_operation_and_power_modes},
+    {"b055_found_asleep_and_stuck_fusion", NULL, b055_found_asleep_and_stuck_fusion},
+    {"b055_units_axes_temperature_source", NULL, b055_units_axes_temperature_source},
+    {"b055_configure_restore_and_reset", NULL, b055_configure_restore_and_reset},
+    {"b055_configure_boot_states", NULL, b055_configure_boot_states},
+    {"b055_status_self_test_calibration", NULL, b055_status_self_test_calibration},
+    {"b055_page1_configs_and_interrupts", NULL, b055_page1_configs_and_interrupts},
+    {"b055_polling_scales_by_the_units", NULL, b055_polling_scales_by_the_units},
+    {"b055_stream_wire_units_and_bad_reports", NULL, b055_stream_wire_units_and_bad_reports},
 };
 
 int main(int argc, char **argv)

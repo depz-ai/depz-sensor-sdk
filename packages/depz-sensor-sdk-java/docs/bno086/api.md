@@ -1359,6 +1359,14 @@ public static final int FRS_STABILITY_DETECTOR_CONFIG = 0xED85
 public static final int FRS_ACTIVITY_TRACKER_CONFIG = 0xED88
 ```
 
+#### Sh2Hub.FRS_GYRO_INTEGRATED_RV_CONFIG *(field)*
+
+```java
+public static final int FRS_GYRO_INTEGRATED_RV_CONFIG = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
 #### Sh2Hub.METADATA_RECORDS *(field)*
 
 ```java
@@ -1987,7 +1995,7 @@ Per-channel TX sequence counters + RX cargo reassembly.
 public int discarded = 0
 ```
 
-Incomplete cargos thrown away.
+Incomplete cargos and junk-channel (≥ 6) frames thrown away.
 
 #### Shtp.ShtpLayer.nextFrame
 

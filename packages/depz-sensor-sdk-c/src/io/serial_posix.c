@@ -12,10 +12,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -161,6 +163,17 @@ int depz_serial_link_open(const char *port, depz_link **out)
     rc = depz_link_new(&sp_vt, p, port, out);
     if (rc) sp_destroy(p);
     return rc;
+}
+
+/* The same resolved path, or the same character device under two names (a zero device number is
+ * no node: a platform that stats every port as an empty character device must not make them one). */
+bool depz_same_port(const char *a, const char *b)
+{
+    char ra[PATH_MAX], rb[PATH_MAX];
+    struct stat sa, sb;
+    if (realpath(a, ra) && realpath(b, rb) && strcmp(ra, rb) == 0) return true;
+    if (stat(a, &sa) != 0 || stat(b, &sb) != 0) return false;
+    return S_ISCHR(sa.st_mode) && S_ISCHR(sb.st_mode) && sa.st_rdev != 0 && sa.st_rdev == sb.st_rdev;
 }
 
 #endif /* !_WIN32 */

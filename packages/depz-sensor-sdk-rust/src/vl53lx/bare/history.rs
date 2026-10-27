@@ -71,7 +71,7 @@ impl FrameHistory {
     // the previous frame, within the phase tolerance and with consistent events.
     fn phase_consistency_check(&self, results: &mut RangeResults, hpp: &HistPostProcessConfig) {
         let phase_tolerance = hpp.consistency_phase_tolerance << 8; // a whole phase unit; phases are 8.8
-        // C also admits RANGING_GATHER_DATA, the multizone path.
+                                                                    // C also admits RANGING_GATHER_DATA, the multizone path.
         if self.rd_device_state != Some(BareDeviceState::RangingOutputData) {
             return;
         }

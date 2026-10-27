@@ -8,13 +8,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- the .NET code-quality analyzers at the recommended set, every finding fails the build;
+         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and CI's
+         newer one then fails a build that passes here -->
+    <AnalysisLevel>8.0-recommended</AnalysisLevel>
     <!-- Ship XML docs for IntelliSense; don't fail the build on undocumented members. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Off, with the reason: CA1051 — the decoded results are plain field structs, as in the other
+         six SDKs; CA1707 / CA1720 — names follow the contracts (I2C_ERR_OK, Int, Signed);
+         CA1510 / CA1513 — ArgumentNullException.ThrowIfNull and ObjectDisposedException.ThrowIf
+         are not in netstandard2.1, which this builds for too; CA1859 — read-only interfaces
+         say the lookup tables are not to be changed, and they are a few entries each. -->
+    <NoWarn>$(NoWarn);CA1051;CA1707;CA1720;CA1510;CA1513;CA1859</NoWarn>
 
     <!-- NuGet package metadata -->
     <PackageId>Depz.Sensor</PackageId>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <Authors>DEPZ</Authors>
     <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU, TMF8829 dToF) — transport, protocol codecs, and sensor decode.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

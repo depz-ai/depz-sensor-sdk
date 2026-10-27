@@ -68,7 +68,9 @@ pub fn i2c_error_name(code: u8) -> &'static str {
 /// `addr + len <= 0x10000`.
 pub fn pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError> {
     if len == 0 || len as usize > READ_MAX_LEN || addr as usize + len as usize > 0x10000 {
-        return Err(CodecError("VL53_READ_REG: len must be 1..1536 and addr+len <= 0x10000"));
+        return Err(CodecError(
+            "VL53_READ_REG: len must be 1..1536 and addr+len <= 0x10000",
+        ));
     }
     let a = addr.to_le_bytes();
     let l = len.to_le_bytes();
@@ -80,7 +82,9 @@ pub fn pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError> {
 /// `addr + N <= 0x10000`.
 pub fn pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError> {
     if data.is_empty() || data.len() > WRITE_MAX_LEN || addr as usize + data.len() > 0x10000 {
-        return Err(CodecError("VL53_WRITE_REG: data must be 1..2048 bytes and addr+N <= 0x10000"));
+        return Err(CodecError(
+            "VL53_WRITE_REG: data must be 1..2048 bytes and addr+N <= 0x10000",
+        ));
     }
     let mut out = Vec::with_capacity(2 + data.len());
     out.extend_from_slice(&addr.to_le_bytes());

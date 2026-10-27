@@ -148,7 +148,7 @@ public final class Vl53lxHistogramDriver extends Vl53lxDriver {
      * and the valid phase window inside it ({@link #reachMm}). The bin is 199 mm wide in all three.
      */
     @Override
-    public void setMode(String name) {
+    public Integer setMode(String name) {
         if (!modes.contains(name)) {
             throw new IllegalArgumentException("no such mode: " + name + " (have " + String.join(", ", modes) + ")");
         }
@@ -158,6 +158,7 @@ public final class Vl53lxHistogramDriver extends Vl53lxDriver {
         // wire: put FM+ back or that write would switch the pad off under a 1 MHz bus.
         bare.img().staticConfig().set("pad_i2c_hv__config", FMP_PAD_CONFIG);
         setRangeTiming(budgetMs, interMs);
+        return null;
     }
 
     @Override
@@ -171,14 +172,8 @@ public final class Vl53lxHistogramDriver extends Vl53lxDriver {
      */
     @Override
     public Integer reachMm() {
-        return (int) phaseWindowMm(bare.img().staticNvm().get("osc_measured__fast_osc__frequency"),
+        return (int) Vl53l1Die.phaseWindowMm(bare.img().staticNvm().get("osc_measured__fast_osc__frequency"),
                 bare.hpp().validPhaseHigh);
-    }
-
-    // Vl53l1Die.PhaseWindowMm of the C# port: the distance a valid-phase-high register value stands for.
-    private static long phaseWindowMm(long fastOscFrequency, long validPhaseHigh) {
-        long pllPeriod = (1L << 30) / fastOscFrequency;
-        return validPhaseHigh * pllPeriod * (299704 >> 3) >> 25;
     }
 
     /** How long one range actually runs, and the MM1/MM2 offset the post-processing applies. */

@@ -29,7 +29,17 @@ public final class RunDeviceTests {
             ai.depz.sensor.test.devices.Bno086DeviceTests.class,
             ai.depz.sensor.test.devices.Vl53lxHistogramTests.class,
             ai.depz.sensor.test.devices.Tmf8829DeviceTests.class,
-            ai.depz.sensor.test.devices.DatasetRecorderTests.class);
+            ai.depz.sensor.test.devices.DatasetRecorderTests.class,
+            ai.depz.sensor.test.devices.Vl53lxDeviceTests.class,
+            ai.depz.sensor.test.devices.Vl53lxDriverTests.class,
+            ai.depz.sensor.test.devices.Vl53l7DeviceTests.class,
+            ai.depz.sensor.test.devices.DepzDevicesTests.class,
+            ai.depz.sensor.test.devices.DatasetRecordsTests.class,
+            ai.depz.sensor.test.devices.Vl53lxBareImageTests.class,
+            ai.depz.sensor.test.devices.ShtpTests.class,
+            ai.depz.sensor.test.devices.Vl53l0xUldTests.class,
+            ai.depz.sensor.test.devices.Vl53l4cdDeviceTests.class,
+            ai.depz.sensor.test.devices.Bno055ModelTests.class);
 
     private RunDeviceTests() {}
 

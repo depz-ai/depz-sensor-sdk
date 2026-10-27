@@ -63,7 +63,7 @@ class VL53L3(VL53L1Die):
     SUPPORTS      = frozenset({'timing', 'thresholds', 'signal_thresh',
                                'sigma_thresh', 'roi'})
 
-    def init_extra(self):
+    def init_extra(self) -> None:
         """The writes that close VL53L3CX_ULP_SensorInit(): the same
         ALGO__RANGE_IGNORE_THRESHOLD_MCPS the L4CD ULD sets, plus two of the
         ULP's own.

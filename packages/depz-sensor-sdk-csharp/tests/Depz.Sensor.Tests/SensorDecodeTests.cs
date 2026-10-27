@@ -168,8 +168,10 @@ public class Vl53l8AdvancedTests
         foreach (var c in root.GetProperty("xtalk_margin").EnumerateArray())
         {
             string name = c.GetProperty("name").GetString()!;
-            double kcps = c.GetProperty("kcps").GetDouble();
-            Assert.True(c.GetProperty("raw").GetUInt32() == Vl53l8Advanced.XtalkMarginRaw(kcps), $"{name}: raw mismatch");
+            int kcps = c.GetProperty("kcps").GetInt32();
+            uint raw = Vl53l8Advanced.XtalkMarginRaw(kcps);
+            Assert.True(c.GetProperty("raw").GetUInt32() == raw, $"{name}: raw mismatch");
+            Assert.True(Vl53l8Advanced.XtalkMarginKcps(raw) == kcps, $"{name}: kcps back");
             Vectors.Seen(c);
         }
     }
@@ -284,6 +286,90 @@ public class Bno086ShtpTests
             Assert.True(expect.GetProperty("discarded").GetInt32() == layer.Discarded, $"{name}: discarded {layer.Discarded}");
             Vectors.Seen(c);
         }
+    }
+
+    [Fact]
+    public void FragmentCargo_SingleFrameRoundTrips()
+    {
+        var layer = new ShtpLayer();
+        var frames = ShtpLayer.FragmentCargo((int)ShtpChannel.Control, "hello"u8.ToArray(), 0, maxFrame: 64);
+        var frame = Assert.Single(frames);
+        Assert.Equal(new byte[] { 9, 0, 2, 0 }, frame[..4]); // length 4 + 5, channel 2, seq 0, no continuation
+        ShtpCargo? cargo = layer.Feed(frame);
+        Assert.NotNull(cargo);
+        Assert.Equal("hello"u8.ToArray(), cargo!.Payload);
+        Assert.Equal(2, cargo.Channel);
+    }
+
+    [Fact]
+    public void FragmentCargo_MultiFragmentReassemblesOnTheLastFrame()
+    {
+        var layer = new ShtpLayer();
+        byte[] payload = Enumerable.Range(0, 100).Select(i => (byte)i).ToArray();
+        var frames = ShtpLayer.FragmentCargo((int)ShtpChannel.Control, payload, 254, maxFrame: 32);
+        // 28 payload bytes per frame: 100 → 28 + 28 + 28 + 16
+        Assert.Equal(new[] { 32, 32, 32, 20 }, frames.Select(f => f.Length));
+        // the first fragment advertises the whole cargo, each continuation what is left, bit 15 set
+        Assert.Equal(new[] { 104, 76 | 0x8000, 48 | 0x8000, 20 | 0x8000 }, frames.Select(f => f[0] | f[1] << 8));
+        Assert.Equal(new[] { 254, 255, 0, 1 }, frames.Select(f => (int)f[3])); // seq wraps at 0xFF
+        var out_ = frames.Select(f => layer.Feed(f)).ToList();
+        Assert.All(out_.Take(3), Assert.Null); // completes only on the last frame
+        Assert.Equal(payload, out_[^1]!.Payload);
+        Assert.Equal(254, out_[^1]!.Seq); // the first fragment's seq
+        Assert.Equal(0, layer.Discarded);
+        Assert.Throws<ArgumentException>(() => ShtpLayer.FragmentCargo(2, payload, 0, maxFrame: ShtpHeader.Size));
+    }
+
+    [Fact]
+    public void Feed_LoneContinuationShortFramesOverrunsAndJunkChannelsAreDropped()
+    {
+        var layer = new ShtpLayer();
+        var frames = ShtpLayer.FragmentCargo((int)ShtpChannel.Control, new byte[50], 0, maxFrame: 16);
+        Assert.Null(layer.Feed(frames[1])); // a continuation with no cargo in progress
+        Assert.Equal(1, layer.Discarded);
+        Assert.Null(layer.Feed(new byte[] { 0x08, 0x00, 0x02 })); // shorter than a header: not a frame, not counted
+        Assert.Null(layer.Feed(new byte[] { 0x00, 0x00, 0x02, 0x00 })); // a "no data" header
+        Assert.Equal(1, layer.Discarded);
+        // a header that promises 3 cargo bytes followed by 5: junk framing, thrown away
+        Assert.Null(layer.Feed(new byte[] { 0x07, 0x00, 0x02, 0x00, 1, 2, 3, 4, 5 }));
+        Assert.Equal(2, layer.Discarded);
+        Assert.Null(layer.Feed(new byte[] { 0x05, 0x00, 0x06, 0x00, 0xAA })); // channel 6 does not exist
+        Assert.Equal(3, layer.Discarded);
+        // the overrun left the channel clean: the next cargo goes through
+        Assert.Equal(new byte[] { 0xAB }, layer.Feed(ShtpLayer.BuildFrame(2, new byte[] { 0xAB }, 1))!.Payload);
+        Assert.Throws<ArgumentOutOfRangeException>(() => layer.Feed(frames[0], captureUs: -1));
+    }
+
+    [Fact]
+    public void Feed_ANewStartDiscardsThePartial()
+    {
+        var layer = new ShtpLayer();
+        var frames = ShtpLayer.FragmentCargo((int)ShtpChannel.Control, new byte[50], 0, maxFrame: 16);
+        Assert.Null(layer.Feed(frames[0], captureUs: 100)); // start a partial cargo
+        byte[] fresh = ShtpLayer.FragmentCargo((int)ShtpChannel.Control, "x"u8.ToArray(), 5, maxFrame: 64)[0];
+        ShtpCargo? cargo = layer.Feed(fresh, captureUs: 200); // a non-continuation frame preempts the partial
+        Assert.Equal("x"u8.ToArray(), cargo!.Payload);
+        Assert.Equal((5, 200L), (cargo.Seq, cargo.CaptureUs));
+        Assert.Equal(1, layer.Discarded);
+    }
+
+    [Fact]
+    public void NextFrame_RefusesAnOversizeCargoOrAnUnknownChannelAndResetClearsTxAndRx()
+    {
+        var layer = new ShtpLayer();
+        Assert.Throws<ArgumentException>(() => layer.NextFrame(2, new byte[ShtpLayer.MaxTxFrame - ShtpHeader.Size + 1]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => layer.NextFrame(ShtpLayer.NumChannels, new byte[1]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => layer.NextFrame(-1, new byte[1]));
+        Assert.Equal(0, layer.TxSeq(2)); // the refusals consumed no seq
+        Assert.Equal(ShtpLayer.MaxTxFrame, layer.NextFrame(2, new byte[ShtpLayer.MaxTxFrame - ShtpHeader.Size]).Length);
+        Assert.Equal(1, layer.TxSeq(2));
+        Assert.Equal(0, layer.TxSeq(3)); // per channel
+        var frames = ShtpLayer.FragmentCargo(2, new byte[50], 0, maxFrame: 16);
+        layer.Feed(frames[0]);
+        layer.Reset();
+        Assert.Equal(0, layer.TxSeq(2));
+        Assert.Null(layer.Feed(frames[1])); // the partial is gone: its continuation is an orphan
+        Assert.Equal(1, layer.Discarded);
     }
 
     [Fact]

@@ -15,6 +15,7 @@ import json
 import math
 import struct
 import sys
+import threading
 from dataclasses import asdict
 from pathlib import Path
 
@@ -42,6 +43,7 @@ from depz_sensor_sdk.protocol import (  # noqa: E402
     SyncPinConfig,
     TemperatureReport,
     TextReport,
+    pack_set_payload_crc_type,
     pack_sync_time,
     parse_software_name,
     strip_device_string,
@@ -132,7 +134,7 @@ def op_common_encode(i):
     if kind == "sync_time_request":
         p = pack_sync_time(i["pc_timestamp_us"])
     elif kind == "set_payload_crc_type":
-        p = bytes([CrcType(i["crc_type"])])
+        p = pack_set_payload_crc_type(i["crc_type"])
     elif kind == "sync_pin_config":
         p = SyncPinConfig(i["pin"], i["mode"], i["polarity"]).pack()
     else:
@@ -155,6 +157,87 @@ def op_common_decode(i):
         r = SequenceErrorReport.unpack(p)
         return {"expected_seq": r.expected_seq, "received_seq": r.received_seq}
     raise ValueError(rpt)
+
+
+def op_common_event(i):
+    """The event the device layer emits for an unsolicited common report —
+    `common_decode`'s twin through the dispatcher (contract 07 §2/§3): the
+    packet goes in on a loopback link with nothing pending, and the first
+    event out is the answer. A report longer than its fields decodes with the
+    tail ignored; one nobody decodes stays visible as hex text."""
+    from depz_sensor_sdk.device import (
+        DeviceBase,
+        DeviceEvent,
+        SequenceErrorEvent,
+        TemperatureEvent,
+        TextEvent,
+        UnsolicitedStatusEvent,
+    )
+    from depz_sensor_sdk.transport import CrcType, build_packet
+    from depz_sensor_sdk.transport.link import LoopbackLink
+
+    host, side = LoopbackLink.pair()
+    got: list[DeviceEvent] = []
+    arrived = threading.Event()
+    dev = DeviceBase(host, timeout=1.0)
+    try:
+        dev.on_event(lambda ev: (got.append(ev), arrived.set()))
+        side.write(build_packet(i["report"], h(i["payload"]), 0, CrcType.NONE))
+        if not arrived.wait(2.0):
+            raise TimeoutError("the device emitted no event")
+    finally:
+        dev.close()
+        side.close()
+    ev = got[0]
+    if isinstance(ev, UnsolicitedStatusEvent):
+        return {"event": "unsolicited_status", "status": ev.status}
+    if isinstance(ev, SequenceErrorEvent):
+        return {"event": "sequence_error", "expected_seq": ev.expected_seq,
+                "received_seq": ev.received_seq, "reported_by_device": ev.reported_by_device}
+    if isinstance(ev, TextEvent):
+        return {"event": "text", "cmd": ev.cmd, "text": ev.text}
+    if isinstance(ev, TemperatureEvent):
+        return {"event": "temperature", "timestamp_us": ev.timestamp_us, "celsius": ev.celsius}
+    raise TypeError(type(ev).__name__)
+
+
+def op_common_seq_gap(i):
+    """The host-observed seq gaps (contract 01 §5 step 5, ERRATA A1): one
+    packet per `seqs` entry (an unknown report 0x7F, payload 00 — each becomes
+    a hex `text` event) goes in on a loopback link; once every packet's own
+    event is out, the `seq_gap` events and `stats.seq_gaps` are the answer.
+    A gap is surfaced before its packet, so none can still be on the way."""
+    from depz_sensor_sdk.device import DeviceBase, DeviceEvent, SeqGapEvent, TextEvent
+    from depz_sensor_sdk.transport import CrcType, build_packet
+    from depz_sensor_sdk.transport.link import LoopbackLink
+
+    seqs = i["seqs"]
+    if any(not isinstance(s, int) or isinstance(s, bool) or not 0 <= s <= 0xFF for s in seqs):
+        raise ValueError("a seq is a byte")
+    host, side = LoopbackLink.pair()
+    got: list[DeviceEvent] = []
+    texts = threading.Semaphore(0)
+
+    def on_event(ev: DeviceEvent) -> None:
+        got.append(ev)
+        if isinstance(ev, TextEvent):
+            texts.release()
+
+    dev = DeviceBase(host, timeout=1.0)
+    try:
+        dev.on_event(on_event)
+        for s in seqs:
+            side.write(build_packet(0x7F, b"\x00", s, CrcType.NONE))
+        for _ in seqs:
+            if not texts.acquire(timeout=2.0):
+                raise TimeoutError("a packet produced no event")
+        seq_gaps = dev.stats.seq_gaps
+    finally:
+        dev.close()
+        side.close()
+    return {"gaps": [{"expected_seq": e.expected_seq, "received_seq": e.received_seq,
+                      "missed": e.missed} for e in got if isinstance(e, SeqGapEvent)],
+            "seq_gaps": seq_gaps}
 
 
 def op_sync_time_math(i):
@@ -318,6 +401,21 @@ def op_bno086_control_encode(i):
     return {"payload": p.hex()}
 
 
+_CONTROL_DECODERS = {
+    "feature_response": sh2.FeatureResponse.unpack,
+    "product_id": sh2.ProductId.unpack,
+    "command_response": sh2.CommandResponse.unpack,
+    "frs_read_response": sh2.FrsReadResponse.unpack,
+    "frs_write_response": sh2.FrsWriteResponse.unpack,
+}
+
+
+def op_bno086_control_decode(i):
+    """A control-channel response (contract 05 §4 table) decoded: its fields,
+    or invalid when shorter than them (contract 07 §3)."""
+    return S.lists(asdict(_CONTROL_DECODERS[i["kind"]](h(i["payload"]))))
+
+
 def op_bno086_input_cargo(i):
     reps = parse_input_cargo(h(i["cargo"]), i["capture_timestamp_us"])
     return {"reports": [{"type": type(r).__name__, "fields": S.bno086_fields(r)} for r in reps]}
@@ -331,6 +429,50 @@ def op_bno086_record(i):
 def op_bno086_gyro_rv(i):
     r = parse_gyro_rv_cargo(h(i["cargo"]), i["capture_timestamp_us"])
     return None if r is None else {"type": type(r).__name__, "fields": S.bno086_fields(r)}
+
+
+# ── .depzrec / .depzdata readers (contracts 08, 09) ──
+
+
+def _temp_file(text: str, suffix: str) -> Path:
+    import tempfile
+
+    fd, name = tempfile.mkstemp(suffix=suffix)
+    with open(fd, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    return Path(name)
+
+
+def op_depzrec_read(i):
+    """`text` as a capture: every rx chunk the loose replay serves once the
+    host has written more tx bytes than any event waits for, concatenated —
+    or invalid for a damaged file."""
+    from depz_sensor_sdk.transport.record_replay import ReplayLink
+
+    path = _temp_file(i["text"], ".depzrec")
+    try:
+        link = ReplayLink(path)
+        link.write(b"\x00" * 65536)
+        rx = bytearray()
+        while not link.exhausted:
+            rx.extend(link.read(0))
+        link.close()
+    finally:
+        path.unlink()
+    return {"rx": bytes(rx).hex()}
+
+
+def op_depzdata_read(i):
+    """`text` as a dataset: its records in reader order as [d, t, k] — or
+    invalid for a damaged file."""
+    from depz_sensor_sdk.dataset import DatasetReader
+
+    path = _temp_file(i["text"], ".depzdata")
+    try:
+        records = DatasetReader(path).records
+    finally:
+        path.unlink()
+    return {"records": [[r.device_id, r.t_host_us, r.kind] for r in records]}
 
 
 # ── TMF8829 ──
@@ -504,6 +646,22 @@ def op_vl53l7_decode(i):
 
 def op_vl53l7_model(i):
     return {"class": _vl53l7_class(i["usb_model"], i["device_name"]).__name__.lower()}
+
+
+# ── VL53L8 register bridge (contract 04) ──
+
+
+def op_vl53l8_encode(i):
+    kind = i["kind"]
+    if kind == "start_stream":
+        p = L8P.pack_start_stream(i["frame_size"])
+    else:
+        raise ValueError(kind)
+    return {"payload": p.hex()}
+
+
+def op_vl53l8_decode(i):
+    return S.vl53l8_decode(i["report"], h(i["payload"]))
 
 
 # ── VL53L 1D family ──

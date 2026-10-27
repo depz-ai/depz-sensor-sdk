@@ -8,7 +8,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { InvalidStateError } from "../src/errors.js";
 import { loadAssets, type Vl53l8Assets } from "../src/sensors/vl53l8/assets/index.js";
+import { VL53L8CX } from "../src/sensors/vl53l8/uld.js";
+import { FakeUldPlatform } from "./fake-vl53l8.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DATA_ROOT = path.resolve(
@@ -37,4 +40,11 @@ describe("vl53l8 blob assets", () => {
       }
     });
   }
+
+  it("a firmware blob of the wrong size is an invalid-state error", async () => {
+    // Contract 07 §3 (ERRATA A17).
+    const assets = await loadAssets("cx");
+    const short = { ...assets, firmware: assets.firmware.subarray(1) };
+    expect(() => new VL53L8CX(new FakeUldPlatform(), short, "cx")).toThrow(InvalidStateError);
+  });
 });

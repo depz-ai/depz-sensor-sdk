@@ -14,8 +14,8 @@ in the header, not this file.
 
 ## Contents
 
-- **VL53L8CX (ToF)**: [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_read_reg`](#depz_vl53l8_pack_read_reg), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reg_data`](#depz_vl53l8_reg_data), [`depz_vl53l8_unpack_reg_data`](#depz_vl53l8_unpack_reg_data), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_to_raw_checked`](#depz_vl53l8_xtalk_margin_to_raw_checked), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_pack_thresholds_checked`](#depz_vl53l8_pack_thresholds_checked), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
-- **VL53L8 multizone sensor class (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_RANGING_MODE_CONTINUOUS`](#depz_vl53l8_ranging_mode_continuous), [`DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS`](#depz_vl53l8_ranging_mode_autonomous), [`DEPZ_VL53L8_TARGET_ORDER_CLOSEST`](#depz_vl53l8_target_order_closest), [`DEPZ_VL53L8_TARGET_ORDER_STRONGEST`](#depz_vl53l8_target_order_strongest), [`DEPZ_VL53L8_XTALK_BUFFER_SIZE`](#depz_vl53l8_xtalk_buffer_size), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`DEPZ_VL53L8_THRESH_IN_WINDOW`](#depz_vl53l8_thresh_in_window), [`DEPZ_VL53L8_THRESH_OUT_OF_WINDOW`](#depz_vl53l8_thresh_out_of_window), [`DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN`](#depz_vl53l8_thresh_less_than_equal_min), [`DEPZ_VL53L8_THRESH_GREATER_THAN_MAX`](#depz_vl53l8_thresh_greater_than_max), [`DEPZ_VL53L8_THRESH_EQUAL_MIN`](#depz_vl53l8_thresh_equal_min), [`DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN`](#depz_vl53l8_thresh_not_equal_min), [`DEPZ_VL53L8_THRESH_OP_OR`](#depz_vl53l8_thresh_op_or), [`DEPZ_VL53L8_THRESH_OP_AND`](#depz_vl53l8_thresh_op_and), [`DEPZ_VL53L8_THRESH_LAST`](#depz_vl53l8_thresh_last), [`depz_vl53l8_motion`](#depz_vl53l8_motion), [`depz_vl53l8_live_frame`](#depz_vl53l8_live_frame), [`depz_vl53l8_frame_cb`](#depz_vl53l8_frame_cb), [`depz_vl53l8_progress_cb`](#depz_vl53l8_progress_cb), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_init_config_checked`](#depz_vl53l8_cnh_init_config_checked), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_open_link`](#depz_vl53l8_open_link), [`depz_is_vl53l8`](#depz_is_vl53l8), [`depz_vl53l8_get_model`](#depz_vl53l8_get_model), [`depz_vl53l8_is_alive`](#depz_vl53l8_is_alive), [`depz_vl53l8_init`](#depz_vl53l8_init), [`depz_vl53l8_initialized`](#depz_vl53l8_initialized), [`depz_vl53l8_ranging`](#depz_vl53l8_ranging), [`depz_vl53l8_get_resolution`](#depz_vl53l8_get_resolution), [`depz_vl53l8_set_resolution`](#depz_vl53l8_set_resolution), [`depz_vl53l8_get_ranging_frequency_hz`](#depz_vl53l8_get_ranging_frequency_hz), [`depz_vl53l8_set_ranging_frequency_hz`](#depz_vl53l8_set_ranging_frequency_hz), [`depz_vl53l8_get_ranging_mode`](#depz_vl53l8_get_ranging_mode), [`depz_vl53l8_set_ranging_mode`](#depz_vl53l8_set_ranging_mode), [`depz_vl53l8_get_integration_time_ms`](#depz_vl53l8_get_integration_time_ms), [`depz_vl53l8_set_integration_time_ms`](#depz_vl53l8_set_integration_time_ms), [`depz_vl53l8_get_sharpener_percent`](#depz_vl53l8_get_sharpener_percent), [`depz_vl53l8_set_sharpener_percent`](#depz_vl53l8_set_sharpener_percent), [`depz_vl53l8_get_target_order`](#depz_vl53l8_get_target_order), [`depz_vl53l8_set_target_order`](#depz_vl53l8_set_target_order), [`depz_vl53l8_get_power_mode`](#depz_vl53l8_get_power_mode), [`depz_vl53l8_set_power_mode`](#depz_vl53l8_set_power_mode), [`depz_vl53l8_get_xtalk_margin`](#depz_vl53l8_get_xtalk_margin), [`depz_vl53l8_set_xtalk_margin`](#depz_vl53l8_set_xtalk_margin), [`depz_vl53l8_calibrate_xtalk`](#depz_vl53l8_calibrate_xtalk), [`depz_vl53l8_get_caldata_xtalk`](#depz_vl53l8_get_caldata_xtalk), [`depz_vl53l8_set_caldata_xtalk`](#depz_vl53l8_set_caldata_xtalk), [`depz_vl53l8_get_detection_thresholds_enable`](#depz_vl53l8_get_detection_thresholds_enable), [`depz_vl53l8_set_detection_thresholds_enable`](#depz_vl53l8_set_detection_thresholds_enable), [`depz_vl53l8_get_detection_thresholds`](#depz_vl53l8_get_detection_thresholds), [`depz_vl53l8_set_detection_thresholds`](#depz_vl53l8_set_detection_thresholds), [`depz_vl53l8_set_detection_thresholds_auto_stop`](#depz_vl53l8_set_detection_thresholds_auto_stop), [`depz_vl53l8_configure_motion_indicator`](#depz_vl53l8_configure_motion_indicator), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_start_ranging`](#depz_vl53l8_start_ranging), [`depz_vl53l8_stop_ranging`](#depz_vl53l8_stop_ranging), [`depz_vl53l8_on_frame`](#depz_vl53l8_on_frame), [`depz_vl53l8_off_frame`](#depz_vl53l8_off_frame), [`depz_vl53l8_frames`](#depz_vl53l8_frames), [`depz_vl53l8_get_frame`](#depz_vl53l8_get_frame), [`depz_vl53l8_frame_parse_errors`](#depz_vl53l8_frame_parse_errors), [`depz_vl53l8_reassembler_discards`](#depz_vl53l8_reassembler_discards), [`depz_vl53l8_read_reg`](#depz_vl53l8_read_reg), [`depz_vl53l8_write_reg`](#depz_vl53l8_write_reg), [`depz_vl53l8_dci_read`](#depz_vl53l8_dci_read), [`depz_vl53l8_dci_write`](#depz_vl53l8_dci_write)
+- **VL53L8CX (ToF)**: [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_read_reg`](#depz_vl53l8_pack_read_reg), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reg_data`](#depz_vl53l8_reg_data), [`depz_vl53l8_unpack_reg_data`](#depz_vl53l8_unpack_reg_data), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS`](#depz_vl53l8_xtalk_margin_max_kcps), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_pack_thresholds_checked`](#depz_vl53l8_pack_thresholds_checked), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
+- **VL53L8 multizone sensor class (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_RANGING_MODE_CONTINUOUS`](#depz_vl53l8_ranging_mode_continuous), [`DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS`](#depz_vl53l8_ranging_mode_autonomous), [`DEPZ_VL53L8_TARGET_ORDER_CLOSEST`](#depz_vl53l8_target_order_closest), [`DEPZ_VL53L8_TARGET_ORDER_STRONGEST`](#depz_vl53l8_target_order_strongest), [`DEPZ_VL53L8_XTALK_BUFFER_SIZE`](#depz_vl53l8_xtalk_buffer_size), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`DEPZ_VL53L8_THRESH_IN_WINDOW`](#depz_vl53l8_thresh_in_window), [`DEPZ_VL53L8_THRESH_OUT_OF_WINDOW`](#depz_vl53l8_thresh_out_of_window), [`DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN`](#depz_vl53l8_thresh_less_than_equal_min), [`DEPZ_VL53L8_THRESH_GREATER_THAN_MAX`](#depz_vl53l8_thresh_greater_than_max), [`DEPZ_VL53L8_THRESH_EQUAL_MIN`](#depz_vl53l8_thresh_equal_min), [`DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN`](#depz_vl53l8_thresh_not_equal_min), [`DEPZ_VL53L8_THRESH_OP_OR`](#depz_vl53l8_thresh_op_or), [`DEPZ_VL53L8_THRESH_OP_AND`](#depz_vl53l8_thresh_op_and), [`DEPZ_VL53L8_THRESH_LAST`](#depz_vl53l8_thresh_last), [`depz_vl53l8_motion`](#depz_vl53l8_motion), [`depz_vl53l8_live_frame`](#depz_vl53l8_live_frame), [`depz_vl53l8_frame_cb`](#depz_vl53l8_frame_cb), [`depz_vl53l8_progress_cb`](#depz_vl53l8_progress_cb), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_init_config_checked`](#depz_vl53l8_cnh_init_config_checked), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_open_link`](#depz_vl53l8_open_link), [`depz_is_vl53l8`](#depz_is_vl53l8), [`depz_vl53l8_get_model`](#depz_vl53l8_get_model), [`depz_vl53l8_is_alive`](#depz_vl53l8_is_alive), [`depz_vl53l8_init`](#depz_vl53l8_init), [`depz_vl53l8_initialized`](#depz_vl53l8_initialized), [`depz_vl53l8_ranging`](#depz_vl53l8_ranging), [`depz_vl53l8_get_resolution`](#depz_vl53l8_get_resolution), [`depz_vl53l8_set_resolution`](#depz_vl53l8_set_resolution), [`depz_vl53l8_max_ranging_frequency_hz`](#depz_vl53l8_max_ranging_frequency_hz), [`depz_vl53l8_get_ranging_frequency_hz`](#depz_vl53l8_get_ranging_frequency_hz), [`depz_vl53l8_set_ranging_frequency_hz`](#depz_vl53l8_set_ranging_frequency_hz), [`depz_vl53l8_get_ranging_mode`](#depz_vl53l8_get_ranging_mode), [`depz_vl53l8_set_ranging_mode`](#depz_vl53l8_set_ranging_mode), [`depz_vl53l8_get_integration_time_ms`](#depz_vl53l8_get_integration_time_ms), [`depz_vl53l8_set_integration_time_ms`](#depz_vl53l8_set_integration_time_ms), [`depz_vl53l8_get_sharpener_percent`](#depz_vl53l8_get_sharpener_percent), [`depz_vl53l8_set_sharpener_percent`](#depz_vl53l8_set_sharpener_percent), [`depz_vl53l8_get_target_order`](#depz_vl53l8_get_target_order), [`depz_vl53l8_set_target_order`](#depz_vl53l8_set_target_order), [`depz_vl53l8_get_power_mode`](#depz_vl53l8_get_power_mode), [`depz_vl53l8_set_power_mode`](#depz_vl53l8_set_power_mode), [`depz_vl53l8_get_xtalk_margin`](#depz_vl53l8_get_xtalk_margin), [`depz_vl53l8_set_xtalk_margin`](#depz_vl53l8_set_xtalk_margin), [`depz_vl53l8_calibrate_xtalk`](#depz_vl53l8_calibrate_xtalk), [`depz_vl53l8_get_caldata_xtalk`](#depz_vl53l8_get_caldata_xtalk), [`depz_vl53l8_set_caldata_xtalk`](#depz_vl53l8_set_caldata_xtalk), [`depz_vl53l8_get_detection_thresholds_enable`](#depz_vl53l8_get_detection_thresholds_enable), [`depz_vl53l8_set_detection_thresholds_enable`](#depz_vl53l8_set_detection_thresholds_enable), [`depz_vl53l8_get_detection_thresholds`](#depz_vl53l8_get_detection_thresholds), [`depz_vl53l8_set_detection_thresholds`](#depz_vl53l8_set_detection_thresholds), [`depz_vl53l8_set_detection_thresholds_auto_stop`](#depz_vl53l8_set_detection_thresholds_auto_stop), [`depz_vl53l8_configure_motion_indicator`](#depz_vl53l8_configure_motion_indicator), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_cnh_armed`](#depz_vl53l8_cnh_armed), [`depz_vl53l8_start_ranging`](#depz_vl53l8_start_ranging), [`depz_vl53l8_stop_ranging`](#depz_vl53l8_stop_ranging), [`depz_vl53l8_on_frame`](#depz_vl53l8_on_frame), [`depz_vl53l8_off_frame`](#depz_vl53l8_off_frame), [`depz_vl53l8_frames`](#depz_vl53l8_frames), [`depz_vl53l8_get_frame`](#depz_vl53l8_get_frame), [`depz_vl53l8_frame_parse_errors`](#depz_vl53l8_frame_parse_errors), [`depz_vl53l8_reassembler_discards`](#depz_vl53l8_reassembler_discards), [`depz_vl53l8_read_reg`](#depz_vl53l8_read_reg), [`depz_vl53l8_write_reg`](#depz_vl53l8_write_reg), [`depz_vl53l8_dci_read`](#depz_vl53l8_dci_read), [`depz_vl53l8_dci_write`](#depz_vl53l8_dci_write)
 
 ## VL53L8CX (ToF)
 
@@ -111,7 +111,8 @@ Encoders (return payload length written).
 size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out);
 ```
 
-/* 2 B */
+2 B; 0 (nothing written) when frame_size is outside 1..8192 (contract 04 §4
+rule 4 — the firmware refuses it too).
 
 ### depz_vl53l8_chunk
 
@@ -161,6 +162,7 @@ int depz_vl53l8_unpack_reg_data(const uint8_t *payload, size_t len, depz_vl53l8_
 ```c
 typedef struct {
     uint8_t  buf[DEPZ_VL53L8_STREAM_TOTAL_MAX];
+    size_t   chunk_max;
     size_t   len;
     uint16_t full_size;
     uint64_t timestamp_us;
@@ -169,15 +171,21 @@ typedef struct {
 } depz_vl53l8_reassembler;
 ```
 
-Frame reassembler (contract 04): reset on offset==0; chunks must be
+Frame reassembler (contract 04 §4): reset on offset==0; chunks must be
 contiguous (offset == accumulated length) and agree on full_size; a gap
 discards the frame in progress; completes when accumulated == full_size.
+A chunk out of the rule-4 bounds (more than chunk_max bytes, full_size over
+DEPZ_VL53L8_STREAM_TOTAL_MAX, or running past full_size) is damaged: dropped
+and counted as a lost frame like the other damaged input.
 
 ### depz_vl53l8_reasm_init
 
 ```c
-void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r);
+void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r, size_t chunk_max);
 ```
+
+chunk_max: the device's VL53_STREAM_FRAME_MAX — DEPZ_VL53L8_STREAM_CHUNK_MAX,
+or DEPZ_VL53L7_STREAM_CHUNK_MAX on the I2C board (contract 11 §3).
 
 ### depz_vl53l8_reasm_feed
 
@@ -317,29 +325,31 @@ Detection-threshold measurement selectors (get divides / set multiplies).
 #define DEPZ_VL53L8_MOTION_CFG_SIZE       156
 ```
 
+### DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS
+
+```c
+#define DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS 10000u
+```
+
+Largest xtalk margin depz_vl53l8_set_xtalk_margin accepts, kcps/SPAD (as ST).
+
 ### depz_vl53l8_xtalk_margin_to_raw
 
 ```c
-uint32_t depz_vl53l8_xtalk_margin_to_raw(double margin_kcps);
+int depz_vl53l8_xtalk_margin_to_raw(uint32_t margin_kcps, uint32_t *raw);
 ```
 
-Xtalk margin (kcps/SPAD) -> raw DCI value = round(kcps * 2048) (a negative
-margin clamps to 0). The checked form refuses (-1, *raw untouched) a margin
-outside 0..10000 kcps (or NaN), else 0.
-
-### depz_vl53l8_xtalk_margin_to_raw_checked
-
-```c
-int depz_vl53l8_xtalk_margin_to_raw_checked(double margin_kcps, uint32_t *raw);
-```
+Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+(kcps * 2048). Refuses (-1, *raw untouched) a margin above
+DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS, else 0.
 
 ### depz_vl53l8_xtalk_margin_from_raw
 
 ```c
-double depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
+uint32_t depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
 ```
 
-Inverse: raw DCI -> kcps/SPAD (raw / 2048.0).
+Inverse: raw DCI -> whole kcps/SPAD (raw / 2048, integer division as ST).
 
 ### depz_vl53l8_threshold
 
@@ -677,14 +687,22 @@ Configuration — init() first, never while ranging.
 int depz_vl53l8_set_resolution(depz_device *dev, int zones);
 ```
 
+### depz_vl53l8_max_ranging_frequency_hz
+
+```c
+int depz_vl53l8_max_ranging_frequency_hz(int resolution);
+```
+
+>= 2 Hz on VL53L8 (below that it never ranges), >= 1 Hz on L5/L7; at most
+depz_vl53l8_max_ranging_frequency_hz() of the resolution last set or read
+through this API (16 after open) — 60 Hz at 4x4, 15 Hz at 8x8 (contract 11
+§3). Refused with DEPZ_E_ARG before anything reaches the bus.
+
 ### depz_vl53l8_get_ranging_frequency_hz
 
 ```c
 int depz_vl53l8_get_ranging_frequency_hz(depz_device *dev, uint8_t *hz);
 ```
-
->= 2 Hz on VL53L8 (below that it never ranges), >= 1 Hz on L5/L7; max 60
-at 4x4, 15 at 8x8.
 
 ### depz_vl53l8_set_ranging_frequency_hz
 
@@ -761,16 +779,17 @@ int depz_vl53l8_set_power_mode(depz_device *dev, uint8_t mode);
 ### depz_vl53l8_get_xtalk_margin
 
 ```c
-int depz_vl53l8_get_xtalk_margin(depz_device *dev, double *kcps_per_spad);
+int depz_vl53l8_get_xtalk_margin(depz_device *dev, uint32_t *kcps_per_spad);
 ```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+refused, nothing written. get: raw / 2048 rounded down.
 
 ### depz_vl53l8_set_xtalk_margin
 
 ```c
-int depz_vl53l8_set_xtalk_margin(depz_device *dev, double kcps_per_spad);
+int depz_vl53l8_set_xtalk_margin(depz_device *dev, uint32_t kcps_per_spad);
 ```
-
-/* 0..10000 */
 
 ### depz_vl53l8_calibrate_xtalk
 
@@ -836,7 +855,7 @@ int depz_vl53l8_configure_motion_indicator(depz_device *dev, uint16_t min_mm, ui
 ```
 
 Motion indicator over [min, max] mm (400..4000, span <= 1500); frames then
-carry `motion`.
+carry `motion`. It shares DCI 0xBFAC with CNH: this disarms CNH.
 
 ### depz_vl53l8_configure_cnh
 
@@ -844,8 +863,18 @@ carry `motion`.
 int depz_vl53l8_configure_cnh(depz_device *dev, const depz_vl53l8_cnh_setup *setup);
 ```
 
-CH only: arm the CNH block for the next start_ranging(). init() disarms it
-(the fresh sensor holds no CNH configuration).
+CH only: arm the CNH block for the next start_ranging(); this disarms the
+motion indicator (one DCI block: frames carry no `motion`). init() disarms
+both (the fresh sensor holds neither configuration).
+
+### depz_vl53l8_cnh_armed
+
+```c
+bool depz_vl53l8_cnh_armed(const depz_device *dev, depz_vl53l8_cnh_setup *setup);
+```
+
+The CNH setup armed by configure_cnh() (copied to *setup, which may be
+NULL); false when none is armed.
 
 ### depz_vl53l8_start_ranging
 

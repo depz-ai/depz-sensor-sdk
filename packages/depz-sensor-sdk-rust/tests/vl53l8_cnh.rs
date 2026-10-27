@@ -53,7 +53,11 @@ fn vl53l8_cnh_vector() {
             .map(|v| v.as_i64().unwrap() as i8)
             .collect();
 
-        assert_eq!(got.hist_raw.len(), cfg.feature_length, "agg {agg_id} raw len");
+        assert_eq!(
+            got.hist_raw.len(),
+            cfg.feature_length,
+            "agg {agg_id} raw len"
+        );
         assert_eq!(
             got.hist_scaler.len(),
             cfg.feature_length,
@@ -68,7 +72,10 @@ fn vl53l8_cnh_vector() {
     }
 
     assert_eq!(passed, cfg.nb_of_aggregates);
-    assert_eq!(passed as u64, doc["expected"]["nb_aggregates"].as_u64().unwrap());
+    assert_eq!(
+        passed as u64,
+        doc["expected"]["nb_aggregates"].as_u64().unwrap()
+    );
     seen("vl53l8_cnh");
     eprintln!(
         "vl53l8_cnh.json: {}/{} aggregates exact-match, ref_residual_word={}",

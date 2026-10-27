@@ -16,7 +16,7 @@ the source, not this file.
 ### Bno055
 
 ```python
-class Bno055(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>)
+class Bno055(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
 ```
 
 BNO055 absolute-orientation IMU.
@@ -409,7 +409,7 @@ Returns an unsubscribe function.
 #### Bno055.samples
 
 ```python
-samples(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+samples(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.bno055.Bno055Sample]
 ```
 
 Blocking iterator over streamed samples (bounded, drop-oldest;
@@ -453,7 +453,7 @@ do not block). Returns an unsubscribe function.
 #### Bno055.events
 
 ```python
-events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator
+events(self, maxsize: int = 256) -> depz_sensor_sdk.device.StreamIterator[depz_sensor_sdk.device.DeviceEvent]
 ```
 
 Pull-style event stream (bounded, drop-oldest). Subscribes
@@ -470,7 +470,7 @@ Fire-and-forget packet (escape hatch; prefer `request`).
 #### Bno055.request
 
 ```python
-request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Any]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
 ```
 
 Send `cmd` and wait for its correlated completion.
@@ -480,12 +480,14 @@ Exactly one of the completion paths must be configured:
 - `matcher` — first packet for which `matcher(pkt) is not
   request.NO_MATCH` finishes with the matcher's return value.
 Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
-ERR_BUSY, StatusError otherwise). One in-flight request per opcode.
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
 
 #### Bno055.expect_report
 
 ```python
-expect_report(report_id: int, unpack: Callable[[bytes], Any]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for a typed report identified by its report ID alone.
@@ -493,7 +495,7 @@ Matcher for a typed report identified by its report ID alone.
 #### Bno055.expect_text
 
 ```python
-expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Any]
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
 ```
 
 Matcher for RPT_TEXT echoing `request_cmd`.
@@ -844,13 +846,13 @@ unpack(cls, data: bytes) -> 'CalibrationProfile'
 #### CalibrationProfile.to_dict
 
 ```python
-to_dict(self) -> dict
+to_dict(self) -> dict[str, typing.Any]
 ```
 
 #### CalibrationProfile.from_dict *(classmethod)*
 
 ```python
-from_dict(cls, d: dict) -> 'CalibrationProfile'
+from_dict(cls, d: Mapping[str, Any]) -> 'CalibrationProfile'
 ```
 
 ### PwrMode
@@ -1245,8 +1247,9 @@ class Bno055Info(i2c_addr: int, chip_id: int, acc_id: int, mag_id: int, gyr_id: 
 ```
 
 RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
-diagnostics. Counters are free-running and wrap silently; watch
-increments, not absolute values. A rising `sensor_resets` means the
+diagnostics. Counters wrap silently; watch increments, not absolute
+values. `i2c_errors` is cleared by every successful reset handshake, the
+read timings and `slots_skipped` at START_STREAM. A rising `sensor_resets` means the
 bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG
 mode and the host must restore its configuration.
 

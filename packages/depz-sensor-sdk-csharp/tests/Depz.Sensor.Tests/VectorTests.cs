@@ -217,7 +217,7 @@ public class CommonCommandsTests
             string actual = kind switch
             {
                 "sync_time_request" => Vectors.ToHex(Common.PackSyncTime(c.GetProperty("pc_timestamp_us").GetUInt64())),
-                "set_payload_crc_type" => Vectors.ToHex(new[] { (byte)c.GetProperty("crc_type").GetInt32() }),
+                "set_payload_crc_type" => Vectors.ToHex(Common.PackSetPayloadCrcType(c.GetProperty("crc_type").GetInt32())),
                 "sync_pin_config" => Vectors.ToHex(new SyncPinConfig(
                     c.GetProperty("pin").GetInt32(),
                     (SyncPinMode)c.GetProperty("mode").GetInt32(),

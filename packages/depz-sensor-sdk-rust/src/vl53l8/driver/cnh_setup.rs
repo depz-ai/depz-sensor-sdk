@@ -115,10 +115,14 @@ impl Vl53l8CnhSetup {
             )));
         }
         if !(0..=0xFF).contains(&num_bins) {
-            return Err(DepzError::InvalidArgument(format!("num_bins out of range 0..255, got {num_bins}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "num_bins out of range 0..255, got {num_bins}"
+            )));
         }
         if !(0..=0xFF).contains(&sub_sample) {
-            return Err(DepzError::InvalidArgument(format!("sub_sample out of range 0..255, got {sub_sample}")));
+            return Err(DepzError::InvalidArgument(format!(
+                "sub_sample out of range 0..255, got {sub_sample}"
+            )));
         }
         self.ref_bin_offset = start_bin * 2048;
         self.feature_length = num_bins;
@@ -135,7 +139,7 @@ impl Vl53l8CnhSetup {
 
     /// `vl53lmz_cnh_create_agg_map`: aggregates of `merge_x`×`merge_y` zones, `cols`×`rows` of
     /// them from (`start_x`, `start_y`). `resolution` (16 or 64) must be the sensor's.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)] // the ULD function's parameter list, kept 1:1
     pub fn create_agg_map(
         &mut self,
         resolution: usize,
@@ -147,7 +151,9 @@ impl Vl53l8CnhSetup {
         rows: i32,
     ) -> Result<()> {
         if resolution != 16 && resolution != 64 {
-            return Err(DepzError::InvalidArgument(format!("resolution {resolution}: 16 or 64")));
+            return Err(DepzError::InvalidArgument(format!(
+                "resolution {resolution}: 16 or 64"
+            )));
         }
         let named = [
             ("start_x", start_x, 0),
@@ -169,7 +175,9 @@ impl Vl53l8CnhSetup {
         if start_x as i64 + cols as i64 * merge_x as i64 > zone_res as i64
             || start_y as i64 + rows as i64 * merge_y as i64 > zone_res as i64
         {
-            return Err(DepzError::InvalidArgument("agg map exceeds zone grid".into()));
+            return Err(DepzError::InvalidArgument(
+                "agg map exceeds zone grid".into(),
+            ));
         }
         // Validate every aggregate id before touching the map (Java checks inside the loop and
         // leaves a half-filled map; the bounds above already make this unreachable).
@@ -194,7 +202,11 @@ impl Vl53l8CnhSetup {
         if self.nb_of_aggregates == 0 {
             return Err(DepzError::InvalidArgument("agg map not created".into()));
         }
-        let size = calc_required_memory(self.cnh_cfg, self.nb_of_aggregates as i64, self.feature_length as i64);
+        let size = calc_required_memory(
+            self.cnh_cfg,
+            self.nb_of_aggregates as i64,
+            self.feature_length as i64,
+        );
         if size > Self::CNH_MAX_DATA_BYTES as i64 {
             return Err(DepzError::InvalidArgument(format!(
                 "CNH needs {size} B > max {} B — reduce aggregates or bins",
@@ -210,14 +222,16 @@ impl Vl53l8CnhSetup {
         let start = self.ref_bin_offset as f64 / 2048.0;
         let span = self.sum_span as f64;
         let first = (start + span / 2.0) * Self::BIN_WIDTH_MM;
-        let last = (start + (self.feature_length - 1) as f64 * span + span / 2.0) * Self::BIN_WIDTH_MM;
+        let last =
+            (start + (self.feature_length - 1) as f64 * span + span / 2.0) * Self::BIN_WIDTH_MM;
         ((first + pulse) as i32, (last - pulse) as i32)
     }
 
     /// Distance, mm, at the centre of CNH bin `bin_idx`.
     pub fn bin_center_mm(&self, bin_idx: i32) -> f64 {
         let span = self.sum_span as f64;
-        (self.ref_bin_offset as f64 / 2048.0 + bin_idx as f64 * span + span / 2.0) * Self::BIN_WIDTH_MM
+        (self.ref_bin_offset as f64 / 2048.0 + bin_idx as f64 * span + span / 2.0)
+            * Self::BIN_WIDTH_MM
     }
 
     /// The 156-byte `VL53LMZ_Motion_Configuration` struct for the device (DCI 0xBFAC).

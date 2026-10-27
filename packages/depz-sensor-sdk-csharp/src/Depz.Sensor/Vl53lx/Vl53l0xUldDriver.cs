@@ -72,6 +72,10 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
 
     private const int DefaultMaxLoop = 2000;
     private const int TargetRefRateDefault = 0x0A00;
+    private const long MinTimingBudgetUs = 20000; // cMinTimingBudgetMicroSeconds
+    // The host-side parameters a tuning buffer may carry in a {0xFF, select, msb, lsb}
+    // record, by select value (VL53L0X_load_tuning_settings()).
+    private const int TuningParamCount = 4;
     private const long SpeedOfLightInAir = 2997;
     private const int RefSpadBufferSize = 6;
 
@@ -151,7 +155,9 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
     private int _finalRangeVcselPulsePeriod;
     private long _preRangeTimeoutUs;
     private long _finalRangeTimeoutUs;
-    private readonly int _targetRefRate = TargetRefRateDefault;
+    private int _targetRefRate = TargetRefRateDefault;
+    // Stored for the tuning loader; the 1.0.4 sigma estimate has these three as constants.
+    private int _sigmaEstRefArray = 100, _sigmaEstEffPulseWidth = 900, _sigmaEstEffAmbWidth = 500;
     private readonly int[] _limitChecksEnable = new int[CheckNumberOfChecks];
     private readonly long[] _limitChecksValue = new long[CheckNumberOfChecks];
     private string _mode = "default";
@@ -175,11 +181,28 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
     public long PartUidLower { get; private set; }
     public long SignalRateMeasFixed400mm { get; private set; }
     public long Part2PartOffsetAdjustmentNvmUm { get; private set; }
+    /// <summary>The reference-SPAD target rate (9.7 Mcps) a tuning buffer's {0xFF, 3, msb, lsb} record sets;
+    /// the SPAD management converges on it.</summary>
+    public int TargetRefRate => _targetRefRate;
+    /// <summary>The three sigma-estimate constants a tuning buffer's {0xFF, 0..2, msb, lsb} records set
+    /// (stored only: the 1.0.4 sigma estimate has them as constants).</summary>
+    public int SigmaEstRefArray => _sigmaEstRefArray;
+    /// <inheritdoc cref="SigmaEstRefArray"/>
+    public int SigmaEstEffPulseWidth => _sigmaEstEffPulseWidth;
+    /// <inheritdoc cref="SigmaEstRefArray"/>
+    public int SigmaEstEffAmbWidth => _sigmaEstEffAmbWidth;
     public long OscFrequencyMHz { get; private set; } = 618660;
 
     // ── helpers of the C driver ──────────────────────────────────────────────
 
     private static long U32(long v) => v & 0xFFFFFFFFL;
+
+    /// <summary>C int16 truncation (an assignment to an int16_t).</summary>
+    private static long I16(long v)
+    {
+        long r = v & 0xFFFF;
+        return (r & 0x8000) != 0 ? r - 0x10000 : r;
+    }
 
     /// <summary>VL53L0X_isqrt(): the bit-by-bit integer square root.</summary>
     public static long Isqrt(long num)
@@ -572,8 +595,12 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
             long offsetUm = 0;
             if (dist400 != 0)
             {
+                // uint32 difference, uint32 product, then an int16_t: the C driver's types,
+                // kept because they are what makes the sign come out right. A target measured
+                // nearer than 400 mm wraps the uint32 difference, and only the int16
+                // truncation turns that back into the positive offset it stands for.
                 long offset1104Mm = U32(dist400 - (400 << 4));
-                offsetUm = -((offset1104Mm * 1000) >> 4);
+                offsetUm = I16(-I16(U32(offset1104Mm * 1000) >> 4));
             }
             Part2PartOffsetAdjustmentNvmUm = offsetUm;
         }
@@ -619,7 +646,9 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
 
     // ── tuning settings ──────────────────────────────────────────────────────
 
-    private void LoadTuningSettings(byte[] buffer)
+    /// <summary>VL53L0X_load_tuning_settings(): {count, address, bytes...} records, with count 0xFF carrying
+    /// a host-side parameter instead; a zero count ends the buffer.</summary>
+    public void LoadTuningSettings(byte[] buffer)
     {
         int index = 0;
         while (buffer[index] != 0)
@@ -627,7 +656,21 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
             int writes = buffer[index++];
             if (writes == 0xFF)
             {
-                index += 3; // host-side sigma parameters, constants in the 1.0.4 sigma estimate
+                // A host-side parameter: {0xFF, select, msb, lsb}. The three sigma parameters
+                // are constants in the 1.0.4 sigma estimate and only get stored; the fourth is
+                // the rate the reference SPAD management converges on.
+                int select = buffer[index];
+                if (select >= TuningParamCount)
+                    throw new Vl53lxException($"bad tuning parameter {select} at offset {index - 1}");
+                int value = (buffer[index + 1] << 8) | buffer[index + 2];
+                switch (select)
+                {
+                    case 0: _sigmaEstRefArray = value; break;
+                    case 1: _sigmaEstEffPulseWidth = value; break;
+                    case 2: _sigmaEstEffAmbWidth = value; break;
+                    default: _targetRefRate = value; break;
+                }
+                index += 3;
             }
             else if (writes <= 4)
             {
@@ -769,6 +812,8 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
 
     private void SetMeasurementTimingBudget(long budgetUs)
     {
+        if (budgetUs < MinTimingBudgetUs)
+            throw new Vl53lxException($"timing budget {budgetUs} us is below the {MinTimingBudgetUs} us minimum");
         var steps = GetSequenceStepEnables();
         long finalBudgetUs = budgetUs - (StartOverheadUs + EndOverheadUs);
         void Take(long sub)
@@ -1107,11 +1152,11 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
         var limits = type == VcselPreRange
             ? new Dictionary<int, int> { [12] = 0x18, [14] = 0x30, [16] = 0x40, [18] = 0x50 }
             : new Dictionary<int, int> { [8] = 0x10, [10] = 0x28, [12] = 0x38, [14] = 0x48 };
-        if (pclks % 2 != 0 || !limits.ContainsKey(pclks))
+        if (pclks % 2 != 0 || !limits.TryGetValue(pclks, out int phaseHigh))
             throw new Vl53lxException($"VCSEL period {pclks} PCLK is out of range for the {(type == VcselPreRange ? "pre-range" : "final range")}");
         if (type == VcselPreRange)
         {
-            P.WriteByte(PreRangeConfigValidPhaseHigh, limits[pclks]);
+            P.WriteByte(PreRangeConfigValidPhaseHigh, phaseHigh);
             P.WriteByte(PreRangeConfigValidPhaseLow, 0x08);
         }
         else
@@ -1163,7 +1208,7 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
     }
 
     /// <summary>Apply one of <see cref="Modes"/>: the sigma and signal limits, the budget and both VCSEL periods.</summary>
-    public override void SetMode(string name)
+    public override int? SetMode(string name)
     {
         var settings = ModeSettings.FirstOrDefault(m => m.Name == name);
         if (settings.Name is null)
@@ -1176,6 +1221,7 @@ public sealed class Vl53l0xUldDriver : Vl53lxDriver
         SetVcselPulsePeriod(VcselPreRange, settings.Pre);
         SetVcselPulsePeriod(VcselFinalRange, settings.Final);
         _mode = name;
+        return null;
     }
 
     public override string GetMode() => _mode;

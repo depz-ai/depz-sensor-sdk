@@ -5,7 +5,7 @@ and the API calls that produced it. The runner opens the capture as its
 `probe` field says (legacy: the old probe, then the class attached in place;
 canonical: open_on_link) over a causal, strict_tx ReplayLink, so every byte
 the SDK writes must equal the recorded tx stream, then executes the steps (§2), canonicalises each result (§3) and matches it
-against `expect`. TS, C and C++ run the same files.
+against `expect`. All seven SDKs run the same files.
 """
 
 import dataclasses
@@ -21,7 +21,7 @@ import pytest
 
 from depz_sensor_sdk.bno055 import Bno055, Units
 from depz_sensor_sdk.bno086 import Bno086
-from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, StatusError
+from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, InvalidReplyError, StatusError
 from depz_sensor_sdk.protocol.identity import parse_software_name
 from depz_sensor_sdk.sr04 import Sr04
 from depz_sensor_sdk.transport.record_replay import ReplayLink
@@ -98,6 +98,8 @@ def error_kind(exc: BaseException) -> str | None:
         return "timeout"
     if isinstance(exc, StatusError):
         return "not_supported" if exc.status == 0x07 else "device_error"  # ERR_CMD_NOT_SUPPORTED
+    if isinstance(exc, InvalidReplyError):
+        return "invalid_reply"
     if isinstance(exc, ValueError):
         return "invalid_argument"
     # The VL53Lx drivers refuse a mode they lack with Vl53Error, the same type

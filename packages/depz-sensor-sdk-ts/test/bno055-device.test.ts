@@ -13,6 +13,7 @@ import {
   Bno055TempSource,
   DepzError,
   DepzTimeoutError,
+  InvalidStateError,
   StatusError,
   type Bno055Sample,
   type Bno055Units,
@@ -379,7 +380,7 @@ describe("configure / restoreConfiguration / reset", () => {
   });
 
   it("restoreConfiguration re-applies the last configure()", async () => {
-    await expect(dev.restoreConfiguration()).rejects.toThrow(/configure\(\) has not been called/);
+    await expect(dev.restoreConfiguration()).rejects.toThrow(InvalidStateError);
     await dev.configure({ units: ALL_UNITS, axisRemap: "P2", calibration: profileOf("extremes") });
     const first = fake.writes();
     fake.ops.length = 0;
@@ -457,7 +458,7 @@ describe("status & self-test", () => {
 
   it("selfTest is refused while streaming", async () => {
     await dev.startStream();
-    await expect(dev.selfTest()).rejects.toThrow(/stopStream\(\) first/);
+    await expect(dev.selfTest()).rejects.toThrow(InvalidStateError);
   });
 
   it("calibration status decodes CALIB_STAT", async () => {
@@ -641,6 +642,14 @@ describe("streaming", () => {
     await expect(dev.startStream(10, [0x00, 129])).rejects.toThrow(RangeError);
     await expect(dev.startStream(10, [0xf0, 0x11])).rejects.toThrow(RangeError);
     expect(fake.sent.length).toBe(0);
+  });
+
+  it("refuses a TIMER period outside 1..60000 ms before any traffic (contract 13 §2, ERRATA A13)", async () => {
+    for (const periodMs of [0, 60001, 65536]) {
+      await expect(dev.startStream(periodMs)).rejects.toThrow(/periodMs/);
+    }
+    expect(fake.sent.length).toBe(0);
+    expect(dev.streaming).toBe(false);
   });
 
   it("latches units before START_STREAM and scales samples by them, not later units", async () => {

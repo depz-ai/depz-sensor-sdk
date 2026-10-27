@@ -1,5 +1,6 @@
 package ai.depz.sensor.dataset;
 
+import ai.depz.sensor.devices.InvalidStateException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -303,12 +304,12 @@ public final class DatasetPlayer implements AutoCloseable {
 
     /**
      * Block until the player is not playing (done, or paused by someone else): true, or false on timeout
-     * (null: no timeout). Needs the player thread, else {@link IllegalStateException}. (Python's
+     * (null: no timeout). Needs the player thread, else {@link InvalidStateException}. (Python's
      * {@code wait}; {@code wait} is taken by {@link Object} in Java.)
      */
     public boolean await(Duration timeout) {
         if (!threaded) {
-            throw new IllegalStateException("await() needs threaded = true; drive tick() instead");
+            throw new InvalidStateException("await() needs threaded = true; drive tick() instead");
         }
         long end = timeout == null ? 0 : System.nanoTime() + timeout.toNanos();
         lock.lock();
@@ -354,7 +355,7 @@ public final class DatasetPlayer implements AutoCloseable {
             lock.unlock();
         }
         Thread t = thread;
-        if (t != null && t != Thread.currentThread()) {
+        if (t != null && !t.equals(Thread.currentThread())) {
             try {
                 t.join(2000);
             } catch (InterruptedException e) {
@@ -375,7 +376,7 @@ public final class DatasetPlayer implements AutoCloseable {
 
     private void checkOpen() {
         if (closed) {
-            throw new IllegalStateException("DatasetPlayer is closed");
+            throw new InvalidStateException("DatasetPlayer is closed");
         }
     }
 
@@ -441,6 +442,12 @@ public final class DatasetPlayer implements AutoCloseable {
         thread.start();
     }
 
+    /** Releases and retakes the held lock, so a waiting control call gets it in between. */
+    private void letOthersIn() {
+        lock.unlock();
+        lock.lock();
+    }
+
     private void run() {
         lock.lock();
         try {
@@ -456,8 +463,7 @@ public final class DatasetPlayer implements AutoCloseable {
                 }
                 if (r.delivered()) {
                     // let control calls (pause / seek from other threads) in between records, even at speed 0
-                    lock.unlock();
-                    lock.lock();
+                    letOthersIn();
                     continue;
                 }
                 if (r.waitS() != null) {

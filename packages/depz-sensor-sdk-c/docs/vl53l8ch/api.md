@@ -19,7 +19,7 @@ in the header, not this file.
 ## Contents
 
 - **VL53L8CH (ToF + CNH)**: [`depz_vl53l8_variant`](#depz_vl53l8_variant), [`depz_vl53l8ch_decode_frame`](#depz_vl53l8ch_decode_frame), [`DEPZ_VL53L8_CNH_MAX_AGGREGATES`](#depz_vl53l8_cnh_max_aggregates), [`DEPZ_VL53L8_CNH_MAX_FEATURE`](#depz_vl53l8_cnh_max_feature), [`depz_vl53l8ch_cnh_config`](#depz_vl53l8ch_cnh_config), [`depz_vl53l8ch_cnh_frame`](#depz_vl53l8ch_cnh_frame), [`depz_vl53l8ch_decode_cnh`](#depz_vl53l8ch_decode_cnh)
-- **VL53L8CH CNH setup (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh)
+- **VL53L8CH CNH setup (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_cnh_armed`](#depz_vl53l8_cnh_armed)
 
 ## VL53L8CH (ToF + CNH)
 
@@ -201,5 +201,15 @@ The decode parameters of a setup, for depz_vl53l8ch_decode_cnh().
 int depz_vl53l8_configure_cnh(depz_device *dev, const depz_vl53l8_cnh_setup *setup);
 ```
 
-CH only: arm the CNH block for the next start_ranging(). init() disarms it
-(the fresh sensor holds no CNH configuration).
+CH only: arm the CNH block for the next start_ranging(); this disarms the
+motion indicator (one DCI block: frames carry no `motion`). init() disarms
+both (the fresh sensor holds neither configuration).
+
+### depz_vl53l8_cnh_armed
+
+```c
+bool depz_vl53l8_cnh_armed(const depz_device *dev, depz_vl53l8_cnh_setup *setup);
+```
+
+The CNH setup armed by configure_cnh() (copied to *setup, which may be
+NULL); false when none is armed.

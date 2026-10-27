@@ -292,7 +292,7 @@ public sealed class Tmf8829Device : DepzDevice
         if (preset is null || !Tmf8829Config.Presets.ContainsKey(preset))
             throw new ArgumentException($"unknown preset '{preset}'; one of {string.Join(", ", Tmf8829Config.Presets.Keys)}", nameof(preset));
         if (_streaming)
-            throw new InvalidOperationException("Configure() while streaming: Stop() first");
+            throw new InvalidStateException("Configure() while streaming: Stop() first");
         // The 3-bit field takes 0..7, the sensor reports at most 4.
         if (nrPeaks < 1 || nrPeaks > 4)
             throw new ArgumentOutOfRangeException(nameof(nrPeaks), nrPeaks, $"nr_peaks {nrPeaks}, must be 1..4");
@@ -471,7 +471,7 @@ public sealed class Tmf8829Device : DepzDevice
                 }
             }
             if (m is not null)
-                _measurements.Emit(m);
+                _measurements.Emit(m, Stats);
             return true;
         }
         if (packet.Cmd == (int)Tmf8829Rpt.Event)
@@ -487,7 +487,7 @@ public sealed class Tmf8829Device : DepzDevice
             }
             if (ev.Code == Tmf8829EventCode.BadHeader && _stopping)
                 return true; // STOP mid histogram dump: expected (contract 14 §2)
-            Connection.Events.Emit(new Tmf8829InterruptEvent(ev));
+            Connection.Events.Emit(new Tmf8829InterruptEvent(ev), Stats);
             return true;
         }
         return false;

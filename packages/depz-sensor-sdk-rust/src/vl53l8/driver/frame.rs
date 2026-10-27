@@ -57,7 +57,11 @@ pub struct Vl53l8Frame {
 }
 
 impl Vl53l8Frame {
-    pub(crate) fn from_results(timestamp_us: u64, r: Vl53l8Results, motion: Option<Vl53l8Motion>) -> Self {
+    pub(crate) fn from_results(
+        timestamp_us: u64,
+        r: Vl53l8Results,
+        motion: Option<Vl53l8Motion>,
+    ) -> Self {
         Vl53l8Frame {
             timestamp_us,
             resolution: r.resolution(),

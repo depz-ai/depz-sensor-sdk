@@ -848,6 +848,7 @@ static const char *error_kind(int rc, const char *msg)
     if (rc == DEPZ_E_TIMEOUT) return "timeout";
     if (rc == DEPZ_E_STATUS) return depz_last_status() == DEPZ_STATUS_ERR_CMD_NOT_SUPPORTED ? "not_supported" : "device_error";
     if (rc == DEPZ_E_WRONG_TYPE) return "not_supported";
+    if (rc == DEPZ_E_PROTOCOL) return "invalid_reply";
     /* DEPZ_E_ARG is both "bad argument" and "this product/driver lacks the
      * group"; only the message tells them apart (as Python's exceptions). */
     if (rc == DEPZ_E_ARG) return strstr(msg, " does not support ") ? "not_supported" : "invalid_argument";
@@ -1082,7 +1083,7 @@ static bool open_scenario(sc_ctx *c, const json_value *sc)
     const char *probe = json_as_str(json_obj_get(sc, "probe"));
     const json_value *want_id = json_obj_get(sc, "identity");
     int vid = -1, pid = -1;
-    depz_identity ident;
+    depz_identity ident = {0};
     char path[1024];
     if (!probe) probe = "canonical";
     if (strcmp(probe, "legacy") && strcmp(probe, "canonical")) { bug(c, "unknown probe %s", probe); return false; }

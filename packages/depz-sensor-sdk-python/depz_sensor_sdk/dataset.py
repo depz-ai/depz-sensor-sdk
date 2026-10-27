@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import gzip
 import heapq
+import io
 import json
 import math
 import sys
@@ -19,10 +20,20 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import IO, Any, Callable, Iterator
+from typing import IO, TYPE_CHECKING, Any, Callable, Iterator
 
+from ._jsonl import is_blank, json_object
 from .device import DeviceBase, host_now_us
+from .errors import InvalidStateError
 from .sr04 import Sr04, Sr04Measurement
+
+if TYPE_CHECKING:  # the sensor modules are imported lazily below (numpy is optional)
+    from .bno055 import Bno055Sample
+    from .bno086.reports import Report
+    from .tmf8829 import Tmf8829Measurement
+    from .vl53l4 import Vl53l4Measurement
+    from .vl53l8 import Vl53l8, Vl53l8Frame
+    from .vl53lx import Vl53lx, Vl53lxMeasurement
 
 SCHEMA = "depz.dataset/2"
 #: The schema id this SDK writes (same value as `SCHEMA`; the TS SDK's name).
@@ -76,8 +87,10 @@ def bno086_record_value(r: Any) -> dict[str, Any]:
 def _open_text(path: str | Path, mode: str) -> IO[str]:
     p = Path(path)
     if p.suffix == ".gz":
-        return gzip.open(p, mode + "t", encoding="utf-8")  # type: ignore[return-value]
-    return open(p, mode, encoding="utf-8")
+        # What gzip.open(mode + "t") does internally, spelled out for the type.
+        return io.TextIOWrapper(gzip.GzipFile(p, mode + "b"), encoding="utf-8", newline="\n")
+    # newline="\n": lines end at LF only, as in every SDK (a lone CR is not a line end)
+    return open(p, mode, encoding="utf-8", newline="\n")
 
 
 @dataclass(frozen=True)
@@ -86,6 +99,22 @@ class DatasetRecord:
     t_host_us: int
     kind: str
     value: dict[str, Any]
+
+
+def _record(path: Path, lineno: int, line: str) -> DatasetRecord:
+    """One record line (contract 09): `d` and `k` strings, `t` an integer
+    (host µs), `v` an object."""
+    ev = json_object(path, lineno, line)
+    d, t, k, v = ev.get("d"), ev.get("t"), ev.get("k"), ev.get("v")
+    if not isinstance(d, str):
+        raise ValueError(f"{path}:{lineno}: 'd' must be a device id string, got {d!r}")
+    if not isinstance(t, int) or isinstance(t, bool):
+        raise ValueError(f"{path}:{lineno}: 't' must be an integer (host µs), got {t!r}")
+    if not isinstance(k, str):
+        raise ValueError(f"{path}:{lineno}: 'k' must be a record kind string, got {k!r}")
+    if not isinstance(v, dict):
+        raise ValueError(f"{path}:{lineno}: 'v' must be an object, got {v!r}")
+    return DatasetRecord(d, t, k, v)
 
 
 @dataclass
@@ -116,6 +145,8 @@ class DatasetWriter:
             {"d": device_id, "t": t_host_us, "k": kind, "v": value}, ensure_ascii=False
         )
         with self._lock:
+            if self._file.closed:
+                raise InvalidStateError("DatasetWriter is closed")
             self._file.write(line + "\n")
             self.records_written += 1
 
@@ -166,7 +197,7 @@ class SessionRecorder:
         """Register a device (before the first record is written). Runs
         `sync_time` so its timestamps land on the shared host timeline."""
         if self._writer is not None:
-            raise RuntimeError("add() all devices before recording starts")
+            raise InvalidStateError("add() all devices before recording starts")
         did = device_id or f"d{len(self._entries)}"
         sync = device.sync_time(samples=sync_samples)
         meta: dict[str, Any] = {
@@ -229,21 +260,22 @@ class SessionRecorder:
 
         if isinstance(dev, Sr04):
 
-            def on_measure(m: Sr04Measurement, _did=did, _off=offset):
+            def on_measure(m: Sr04Measurement, _did: str = did, _off: int = offset) -> None:
                 writer.write(_did, m.timestamp_us - _off, "sr04",
                              {"echo_us": m.echo_time_us, "source": m.source})
 
             entry.unsubscribes.append(dev.on_measurement(on_measure))
             return
 
+        vl53l8_cls: type[Vl53l8] | None
         try:
-            from .vl53l8 import Vl53l8, Vl53l8Frame
+            from .vl53l8 import Vl53l8 as vl53l8_cls
         except ImportError:
-            Vl53l8 = None  # type: ignore[assignment]
-        if Vl53l8 is not None and isinstance(dev, Vl53l8):
+            vl53l8_cls = None
+        if vl53l8_cls is not None and isinstance(dev, vl53l8_cls):
             layers = self._vl53l8_layers
 
-            def on_frame(f: "Vl53l8Frame", _did=did, _off=offset, _dev=dev):
+            def on_frame(f: Vl53l8Frame, _did: str = did, _off: int = offset, _dev: Vl53l8 = dev) -> None:
                 t = f.timestamp_us - _off
                 self._last_silicon[_did] = f.silicon_temp_degc
                 v: dict[str, Any] = {
@@ -280,7 +312,7 @@ class SessionRecorder:
 
         if isinstance(dev, Vl53l4cd):
 
-            def on_result(m: "Vl53l4Measurement", _did=did, _off=offset):
+            def on_result(m: Vl53l4Measurement, _did: str = did, _off: int = offset) -> None:
                 writer.write(_did, m.timestamp_us - _off, "vl53l4", {
                     "range_status": m.range_status,
                     "distance_mm": m.distance_mm,
@@ -298,7 +330,7 @@ class SessionRecorder:
 
         if isinstance(dev, Vl53lx):
 
-            def on_lx(m: "Vl53lxMeasurement", _did=did, _off=offset, _dev=dev):
+            def on_lx(m: Vl53lxMeasurement, _did: str = did, _off: int = offset, _dev: Vl53lx = dev) -> None:
                 v: dict[str, Any] = {
                     "product": _dev.product,
                     "driver": _dev.driver_kind,
@@ -324,7 +356,7 @@ class SessionRecorder:
 
         if isinstance(dev, Bno055):
 
-            def on_sample(s: "Bno055Sample", _did=did, _off=offset):
+            def on_sample(s: Bno055Sample, _did: str = did, _off: int = offset) -> None:
                 v: dict[str, Any] = {"unit_sel": s.units.pack()}
                 for key in ("quaternion", "euler", "accel", "gyro", "mag",
                             "linear_accel", "gravity"):
@@ -346,7 +378,7 @@ class SessionRecorder:
 
         if isinstance(dev, Tmf8829):
 
-            def on_measurement(m: "Tmf8829Measurement", _did=did, _off=offset):
+            def on_measurement(m: Tmf8829Measurement, _did: str = did, _off: int = offset) -> None:
                 writer.write(_did, m.timestamp_us - _off, "tmf8829", tmf8829_record_value(m))
 
             entry.unsubscribes.append(dev.on_measurement(on_measurement))
@@ -356,7 +388,7 @@ class SessionRecorder:
 
         if isinstance(dev, Bno086):
 
-            def on_report(r: Any, _did=did, _off=offset):
+            def on_report(r: Report, _did: str = did, _off: int = offset) -> None:
                 # Contract 09 `bno086`: every enabled sensor's report, snake_case,
                 # full quaternion / vector components, at its measurement time
                 # (0xFB/0xFA + delay) like every other sensor. Reports of
@@ -404,7 +436,7 @@ class DatasetReader:
     def __init__(self, path: str | Path):
         self._path = Path(path)
         with _open_text(self._path, "r") as f:
-            self.header: dict[str, Any] = json.loads(f.readline())
+            self.header: dict[str, Any] = json_object(self._path, 1, f.readline())
         if not str(self.header.get("schema", "")).startswith("depz.dataset/"):
             raise ValueError(f"{path}: not a depz.dataset file")
 
@@ -412,7 +444,8 @@ class DatasetReader:
 
     @property
     def devices(self) -> dict[str, dict[str, Any]]:
-        return self.header.get("devices", {})
+        devices: dict[str, dict[str, Any]] = self.header.get("devices", {})
+        return devices
 
     @property
     def records(self) -> list[DatasetRecord]:
@@ -434,11 +467,10 @@ class DatasetReader:
     def _raw_iter(self) -> Iterator[DatasetRecord]:
         with _open_text(self._path, "r") as f:
             f.readline()  # header
-            for line in f:
-                if not line.strip():
+            for lineno, line in enumerate(f, 2):
+                if is_blank(line):
                     continue
-                ev = json.loads(line)
-                yield DatasetRecord(ev["d"], ev["t"], ev["k"], ev["v"])
+                yield _record(self._path, lineno, line)
 
     def __iter__(self) -> Iterator[DatasetRecord]:
         """Records merged by `t`. Per-device order is only roughly monotonic
@@ -493,7 +525,13 @@ class PlayerState(str, Enum):
     DONE = "done"        # past the last record; play() restarts from the top
 
 
-_DELIVERED = object()  # _step_locked(): one record went out, call again
+class _Delivered:
+    """_step_locked(): one record went out, call again."""
+
+    __slots__ = ()
+
+
+_DELIVERED = _Delivered()
 
 
 class DatasetPlayer:
@@ -549,7 +587,7 @@ class DatasetPlayer:
         self._idx = 0  # next record to deliver
         self._state = PlayerState.IDLE
         self._anchor_wall = 0.0
-        self._anchor_t = 0
+        self._anchor_t: float = 0
         self._cond = threading.Condition(threading.RLock())
         self._record_cbs: list[Callable[[DatasetRecord], None]] = []
         self._state_cbs: list[Callable[[PlayerState], None]] = []
@@ -680,14 +718,14 @@ class DatasetPlayer:
         with self._cond:
             while True:
                 r = self._step_locked()
-                if r is not _DELIVERED:
-                    return r  # type: ignore[return-value]
+                if not isinstance(r, _Delivered):
+                    return r
 
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the player is not playing (done, or paused by someone
         else). True if so, False on timeout. Needs the player thread."""
         if not self._threaded:
-            raise RuntimeError("wait() needs threaded=True; drive tick() instead")
+            raise InvalidStateError("wait() needs threaded=True; drive tick() instead")
         with self._cond:
             return self._cond.wait_for(lambda: self._state is not PlayerState.PLAYING, timeout)
 
@@ -721,7 +759,7 @@ class DatasetPlayer:
 
     def _check_open(self) -> None:
         if self._closed:
-            raise RuntimeError("DatasetPlayer is closed")
+            raise InvalidStateError("DatasetPlayer is closed")
 
     def _anchor(self, now: float) -> None:
         """Media clock restarts at `now` from the last delivered record's `t`
@@ -742,7 +780,7 @@ class DatasetPlayer:
         for cb in list(self._state_cbs):
             cb(state)
 
-    def _step_locked(self) -> object:
+    def _step_locked(self) -> float | None | _Delivered:
         """Deliver the next record if it is due: `_DELIVERED`, else the
         seconds to wait (float), or None when not playing."""
         if self._state is not PlayerState.PLAYING:
@@ -783,10 +821,10 @@ class DatasetPlayer:
                 try:
                     r = self._step_locked()
                 except Exception:
-                    threading.excepthook(threading.ExceptHookArgs(  # type: ignore[call-arg]
+                    threading.excepthook(threading.ExceptHookArgs(
                         (*sys.exc_info(), threading.current_thread())))
                     continue
-                if r is _DELIVERED:
+                if isinstance(r, _Delivered):
                     # let control calls (pause/seek from other threads) in
                     # between records, even at speed=0
                     cond.release()
@@ -795,4 +833,4 @@ class DatasetPlayer:
                     finally:
                         cond.acquire()
                     continue
-                cond.wait(r)  # type: ignore[arg-type]
+                cond.wait(r)
