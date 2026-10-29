@@ -57,6 +57,13 @@ static int probe(const char *port, int timeout_ms, depz_device_info *out)
     out->usb_vid = out->usb_pid = -1;
     out->sensor_type = DEPZ_SENSOR_NONE;
     rc = depz_device_open(port, &dev);
+    if (rc == DEPZ_E_IO || rc == DEPZ_E_CLOSED) {
+        /* Busy, no permission, gone: name the open failure (contract 07 §3). */
+        char cause[256];
+        depz_strlcpy(cause, depz_last_error(), sizeof cause);
+        return depz_fail(DEPZ_E_NO_DEVICE, "no DEPZ device answered on %s: could not open the port (%s)",
+                         port, cause);
+    }
     if (rc) return rc;
     depz_device_set_timeout_ms(dev, timeout_ms);
     rc = probe_requests(dev, out);

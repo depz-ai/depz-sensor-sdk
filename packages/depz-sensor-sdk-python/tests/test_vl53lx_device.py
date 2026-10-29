@@ -99,6 +99,23 @@ def _later(fn, delay: float = 0.05) -> threading.Thread:
     return t
 
 
+def _when_waiting(dev: Vl53lx, fn) -> threading.Thread:
+    """Run `fn` once the next get_measurement is waiting. It takes the *next*
+    measurement, and one sent before it subscribes is not that one: a fixed
+    delay raced it (the full suite under coverage on Windows)."""
+    n = len(dev._measure_queues)
+
+    def run() -> None:
+        deadline = time.monotonic() + 5.0
+        while len(dev._measure_queues) <= n and time.monotonic() < deadline:
+            time.sleep(0.001)
+        fn()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    return t
+
+
 # ── pure helpers ─────────────────────────────────────────────────────────────
 
 def _t(distance_mm, status):
@@ -572,7 +589,7 @@ def test_l1_roi_size_and_centre(ready):
 def test_l1_streams_decode_with_the_l1_variant(ready):
     dev, fake = ready(L1CX_BOARD)
     dev.start_ranging()
-    _later(lambda: fake.stream(L1_BLOCK, 1))
+    _when_waiting(dev, lambda: fake.stream(L1_BLOCK, 1))
     m = dev.get_measurement(timeout=1.0)
     assert (m.distance_mm, m.status, m.sigma_mm, m.signal_kcps, m.ambient_kcps, m.spads) == (
         576, 0, 3, 16072, 2552, 67)
@@ -620,7 +637,7 @@ def test_a_nonzero_status_is_not_valid_but_6_is_plottable(ready):
     dev.start_ranging()
     blk = bytearray(L4_BLOCK)
     blk[0] = 0x13  # raw 19 → status 6
-    _later(lambda: fake.stream(bytes(blk), 1))
+    _when_waiting(dev, lambda: fake.stream(bytes(blk), 1))
     m = dev.get_measurement(timeout=1.0)
     assert (m.status, m.valid, m.plottable) == (6, False, True)
 
@@ -631,7 +648,7 @@ def test_a_block_the_driver_cannot_decode_is_counted_and_the_reader_survives(rea
     fake.stream(L4_BLOCK[:5], 1)
     settle(fake, dev)
     assert dev.stream_parse_errors == 1
-    _later(lambda: fake.stream(L4_BLOCK, 2))
+    _when_waiting(dev, lambda: fake.stream(L4_BLOCK, 2))
     assert dev.get_measurement(timeout=1.0).distance_mm == 624
 
 
@@ -642,7 +659,7 @@ def test_a_malformed_stream_report_is_counted_and_dropped(ready):
     fake.stream(L4_BLOCK[:5], 1, 0x0089, 17)
     settle(fake, dev)
     assert dev.stream_parse_errors == 1
-    _later(lambda: fake.stream(L4_BLOCK, 2))
+    _when_waiting(dev, lambda: fake.stream(L4_BLOCK, 2))
     assert dev.get_measurement(timeout=1.0).distance_mm == 624
     assert dev.bridge_info().addr_width == 0  # requests still answered
 
@@ -868,7 +885,7 @@ def test_histogram_a_failing_decode_is_counted_not_raised_into_the_reader(stub):
     settle(fake, dev)
     assert dev.stream_parse_errors == 1
     drv.bin = lambda raw: {"first": raw[0]}
-    _later(lambda: fake.stream(b"\x03", 3, 0x0088))
+    _when_waiting(dev, lambda: fake.stream(b"\x03", 3, 0x0088))
     assert dev.get_measurement(timeout=1.0).distance_mm == 3
 
 

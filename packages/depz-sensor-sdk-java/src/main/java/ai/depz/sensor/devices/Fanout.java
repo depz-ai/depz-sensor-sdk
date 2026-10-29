@@ -6,13 +6,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /** The subscribers of one stream: callbacks and pull queues. */
 final class Fanout<T> {
-    private static final Logger LOG = Logger.getLogger("ai.depz.sensor");
-
     private final List<Consumer<T>> callbacks = new ArrayList<>();
     private final List<Subscription<T>> queues = new ArrayList<>();
 
@@ -82,14 +78,8 @@ final class Fanout<T> {
      * callbacks or the queues (contract 07 §3).
      */
     static <T> void call(Consumer<T> cb, T item, LinkStats stats) {
-        try {
-            cb.accept(item);
-        } catch (RuntimeException | Error e) {
-            if (e instanceof VirtualMachineError vme) {
-                throw vme;
-            }
+        if (!CallbackGuard.call(cb, item)) {
             stats.callbackErrors.incrementAndGet();
-            LOG.log(Level.SEVERE, "a callback threw on the reader thread; dropped", e);
         }
     }
 

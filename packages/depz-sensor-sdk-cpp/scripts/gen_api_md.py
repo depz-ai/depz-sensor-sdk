@@ -442,7 +442,7 @@ def render_value(name: str, sig: str, doc: str) -> list[str]:
 
 def parse_header(path: Path, domain: str) -> list[Symbol]:
     """Namespace-scope symbols of one header, in source order."""
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     lines = text.split("\n")
     symbols: list[Symbol] = []
     by_name: dict[str, Symbol] = {}
@@ -829,7 +829,7 @@ def main() -> None:
     ]
     n_syms = sum(len(m) for _, _, m in groups)
     (DOCS).mkdir(parents=True, exist_ok=True)
-    (DOCS / "api.md").write_text(render_reference(groups, root_head))
+    (DOCS / "api.md").write_text(render_reference(groups, root_head), encoding="utf-8", newline="\n")
     print(f"wrote {DOCS / 'api.md'} ({n_syms} symbols across {len(groups)} groups)")
 
     for folder, title, members, note_lines in sensor_targets(groups):
@@ -856,7 +856,7 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(render_reference(groups_out, sub_head))
+        out.write_text(render_reference(groups_out, sub_head), encoding="utf-8", newline="\n")
         print(f"wrote {out} ({n_members} symbols)")
 
 

@@ -1,5 +1,5 @@
 /**
- * One type-aware rule for the SDK sources, run by CI (viewer-build job):
+ * One type-aware rule for the SDK sources, run by scripts/gates.sh (ts-types gate):
  *
  *   bunx eslint --no-config-lookup -c packages/depz-sensor-sdk-ts/eslint.async.config.mjs packages/depz-sensor-sdk-ts/src
  *

@@ -180,18 +180,36 @@ export async function probePort(
   factory: TransportFactory,
   timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
 ): Promise<DeviceInfo | null> {
+  const probed = await probeOrOpenError(port, factory, timeoutMs);
+  return probed instanceof PortOpenFailure ? null : probed;
+}
+
+/** Why a port could not be probed at all: its open failed (busy, no permission, gone). */
+class PortOpenFailure {
+  constructor(readonly error: unknown) {}
+}
+
+/**
+ * `probePort`, except that a port that cannot be opened yields the open
+ * failure instead of null — so `openDeviceFrom` can name it (contract 07 §3).
+ */
+async function probeOrOpenError(
+  port: DepzPortInfo,
+  factory: TransportFactory,
+  timeoutMs: number,
+): Promise<DeviceInfo | PortOpenFailure | null> {
   const transport = factory(port);
   let dev: DepzDevice;
   try {
     dev = new DepzDevice(transport, { timeoutMs });
     await dev.open();
-  } catch {
+  } catch (err) {
     try {
       await transport.close();
     } catch {
       /* already gone */
     }
-    return null;
+    return new PortOpenFailure(err);
   }
   try {
     const answers = await probeDevice(dev);
@@ -487,10 +505,7 @@ export async function openDeviceFrom(
     const path = typeof target === "string" ? target : target.path;
     const enumerated = ports.find((p) => p.path === path);
     const port: DepzPortInfo = enumerated ?? { path };
-    const info = await probePort(port, factory, timeoutMs);
-    if (info === null) {
-      throw new NoDepzDeviceError(`no DEPZ device answered on ${path}`);
-    }
+    const info = await probeForOpen(port, factory, timeoutMs);
     if (!isKnownDepzUsb(port.usbVid, port.usbPid)) {
       console.warn(
         `depz: ${path} has an unrecognized USB id ` +
@@ -588,11 +603,32 @@ async function openIndexed(
   factory: TransportFactory,
   timeoutMs: number,
 ): Promise<DepzDevice> {
-  const info = await probePort(port, factory, timeoutMs);
-  if (info === null) {
+  const info = await probeForOpen(port, factory, timeoutMs);
+  return openProbed(port, info, factory, timeoutMs);
+}
+
+/** The probe answers of the port `openDeviceFrom` opens; `NoDepzDeviceError`
+ * when nothing answers — naming the open failure, as its `cause`, when the
+ * port could not be opened (contract 07 §3). */
+async function probeForOpen(
+  port: DepzPortInfo,
+  factory: TransportFactory,
+  timeoutMs: number,
+): Promise<DeviceInfo> {
+  const probed = await probeOrOpenError(port, factory, timeoutMs);
+  if (probed instanceof PortOpenFailure) {
+    const cause = probed.error;
+    const err = new NoDepzDeviceError(
+      `no DEPZ device answered on ${port.path}: could not open the port ` +
+        `(${cause instanceof Error ? cause.message : String(cause)})`,
+    );
+    err.cause = cause;
+    throw err;
+  }
+  if (probed === null) {
     throw new NoDepzDeviceError(`no DEPZ device answered on ${port.path}`);
   }
-  return openProbed(port, info, factory, timeoutMs);
+  return probed;
 }
 
 function fmtId(v: number | null | undefined): string {

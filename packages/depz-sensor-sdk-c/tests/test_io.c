@@ -476,6 +476,361 @@ static void same_opcode_in_flight_is_busy(void)
     fake_sr04_stop(f);
 }
 
+/* The device end of a bare loopback link, played by the test (Python's
+ * `peer`): frames at consecutive seqs, raw bytes, and the next host command
+ * read back with a bounded wait. */
+typedef struct {
+    depz_link  *side;
+    depz_parser parser;
+    uint8_t     seq;
+    bool        got;
+    uint8_t     cmd;
+} peer;
+
+static void peer_on_event(const depz_event *e, void *user)
+{
+    peer *p = (peer *)user;
+    if (e->type == DEPZ_EV_PACKET && !p->got) {
+        p->got = true;
+        p->cmd = e->cmd;
+    }
+}
+
+static bool peer_up(peer *p, depz_device **dev)
+{
+    depz_link *host;
+    memset(p, 0, sizeof *p);
+    *dev = NULL;
+    depz_parser_init(&p->parser);
+    if (depz_link_loopback_pair(&host, &p->side) != DEPZ_OK) return false;
+    if (depz_device_open_link(host, dev) != DEPZ_OK) return false;
+    depz_device_set_timeout_ms(*dev, 1000);
+    return true;
+}
+
+static void peer_down(peer *p, depz_device *dev)
+{
+    depz_device_close(dev);
+    depz_link_free(p->side);
+    depz_parser_free(&p->parser);
+}
+
+static void peer_send(peer *p, uint8_t cmd, const uint8_t *payload, size_t len)
+{
+    uint8_t frame[64];
+    size_t n = 0;
+    if (depz_build_packet(cmd, payload, len, p->seq, DEPZ_CRC_NONE, frame, sizeof frame, &n) == 0 &&
+        depz_link_write(p->side, frame, n) == DEPZ_OK)
+        p->seq = (uint8_t)(p->seq + 1);
+}
+
+/* The next host command is `cmd` (bounded: a second). */
+static bool peer_expect(peer *p, uint8_t cmd)
+{
+    uint64_t deadline = depz_host_now_us() + 1000000u;
+    uint8_t buf[256];
+    p->got = false;
+    while (!p->got && depz_host_now_us() < deadline) {
+        size_t got = 0;
+        if (depz_link_read(p->side, buf, sizeof buf, 50, &got) != DEPZ_OK) return false;
+        if (got) depz_parser_feed(&p->parser, buf, got, peer_on_event, p);
+    }
+    return p->got && p->cmd == cmd;
+}
+
+/* Contract 07 §3: unsolicited reports become events, the callback and the
+ * stream see the same ones; a report no class knows stays visible as hex
+ * text; after off_event the stream is still fed (test_device_events.py). */
+static void unsolicited_reports_become_events(void)
+{
+    static const uint8_t seqerr[2] = {7, 9};
+    static const uint8_t fault[2] = {0x00, DEPZ_STATUS_ERR_HARDWARE_FAULT};
+    static const uint8_t hello[7] = {0x04, 'h', 'e', 'l', 'l', 'o', 0x00};
+    static const uint8_t again[7] = {0x04, 'a', 'g', 'a', 'i', 'n', 0x00};
+    static const uint8_t unknown[2] = {0x01, 0x02};
+    /* <Qh 123456, 251: 25.1 °C */
+    static const uint8_t temp[10] = {0x40, 0xE2, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFB, 0x00};
+    peer p;
+    depz_device *dev;
+    depz_stream *evs;
+    depz_device_event ev;
+    depz_link_stats st;
+    ev_count c;
+    int tok = -1, seen;
+    CHECK(peer_up(&p, &dev));
+    memset(&c, 0, sizeof c);
+    depz_mutex_init(&c.lock);
+    CHECK_RC(depz_device_on_event(dev, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_device_on_event(dev, ev_cb, &c, &tok), DEPZ_OK);
+    evs = depz_device_events(dev, 8);
+    CHECK(evs);
+    peer_send(&p, DEPZ_RPT_SEQUENCE_ERROR, seqerr, sizeof seqerr);
+    peer_send(&p, DEPZ_RPT_STATUS, fault, sizeof fault);
+    peer_send(&p, DEPZ_RPT_TEXT, hello, sizeof hello);
+    peer_send(&p, DEPZ_RPT_TEMPERATURE, temp, sizeof temp);
+    peer_send(&p, 0x7F, unknown, sizeof unknown);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_SEQUENCE_ERROR && ev.expected_seq == 7 && ev.received_seq == 9 && ev.by_device);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_UNSOLICITED_STATUS && ev.status == DEPZ_STATUS_ERR_HARDWARE_FAULT);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT && ev.cmd == 0x04 && strcmp(ev.text, "hello") == 0);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_TEMPERATURE && ev.timestamp_us == 123456u && fabs(ev.celsius - 25.1) < 1e-9);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT && ev.cmd == 0x7F && strcmp(ev.text, "0102") == 0);
+    /* the callback ran before each push, so it has seen all five */
+    depz_mutex_lock(&c.lock);
+    seen = c.unsolicited == 1 && c.text == 2 && c.temperature == 1;
+    depz_mutex_unlock(&c.lock);
+    CHECK(seen);
+    depz_device_stats(dev, &st);
+    CHECK(st.device_seq_errors == 1 && st.rx_packets == 5 && st.seq_gaps == 0);
+    depz_device_off_event(dev, tok);
+    depz_device_off_event(NULL, tok); /* no device: a no-op */
+    peer_send(&p, DEPZ_RPT_TEXT, again, sizeof again);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT && strcmp(ev.text, "again") == 0);
+    depz_mutex_lock(&c.lock);
+    seen = c.text;
+    depz_mutex_unlock(&c.lock);
+    CHECK(seen == 2); /* callback unsubscribed, the stream still fed */
+    depz_stream_close(evs);
+    peer_down(&p, dev);
+    depz_mutex_destroy(&c.lock);
+}
+
+/* Contract 01 §5: bytes before any magic are TRASH, a frame whose payload CRC
+ * trailer is damaged is a CRC_ERROR event, not a packet; both are counted. */
+static void link_damage_is_counted_and_reported(void)
+{
+    static const uint8_t garbage[9] = {0x00, 'g', 'a', 'r', 'b', 'a', 'g', 'e', 0x00};
+    static const uint8_t ok[4] = {0x04, 'o', 'k', 0x00};
+    static const uint8_t fine[6] = {0x04, 'f', 'i', 'n', 'e', 0x00};
+    peer p;
+    depz_device *dev;
+    depz_stream *evs;
+    depz_device_event ev;
+    depz_link_stats st;
+    uint8_t frame[32], trash[16];
+    size_t n = 0, ntrash = 0;
+    bool crc_seen = false;
+    CHECK(peer_up(&p, &dev));
+    evs = depz_device_events(dev, 16);
+    CHECK(evs);
+    CHECK_RC(depz_link_write(p.side, garbage, sizeof garbage), DEPZ_OK);
+    CHECK_RC(depz_build_packet(DEPZ_RPT_TEXT, ok, sizeof ok, 0, DEPZ_CRC8, frame, sizeof frame, &n), 0);
+    frame[n - 1] ^= 0xFF; /* the payload CRC trailer corrupted */
+    CHECK_RC(depz_link_write(p.side, frame, n), DEPZ_OK);
+    p.seq = 1;
+    peer_send(&p, DEPZ_RPT_TEXT, fine, sizeof fine);
+    /* Trash event boundaries follow read chunking: compare the bytes only. */
+    for (;;) {
+        CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+        if (ev.type == DEPZ_DEV_EV_TRASH) {
+            CHECK(ev.data_len == ev.trash_len && ntrash + ev.data_len <= sizeof trash);
+            memcpy(trash + ntrash, ev.data, ev.data_len);
+            ntrash += ev.data_len;
+        } else if (ev.type == DEPZ_DEV_EV_CRC_ERROR) {
+            CHECK(ev.cmd == DEPZ_RPT_TEXT && ev.seq == 0);
+            crc_seen = true;
+        } else {
+            CHECK(ev.type == DEPZ_DEV_EV_TEXT && strcmp(ev.text, "fine") == 0);
+            break;
+        }
+    }
+    CHECK(crc_seen && ntrash == sizeof garbage && memcmp(trash, garbage, sizeof garbage) == 0);
+    depz_device_stats(dev, &st);
+    CHECK(st.trash_bytes == 9 && st.crc_errors == 1 && st.rx_packets == 1 && st.seq_gaps == 0);
+    depz_stream_close(evs);
+    peer_down(&p, dev);
+}
+
+typedef struct { depz_device *dev; int rc; char s[32]; } call_arg;
+
+static void name_call(void *a)
+{
+    call_arg *x = (call_arg *)a;
+    x->rc = depz_device_get_device_name(x->dev, x->s, sizeof x->s);
+}
+
+static void serial_call(void *a)
+{
+    call_arg *x = (call_arg *)a;
+    x->rc = depz_device_get_serial_number(x->dev, x->s, sizeof x->s);
+}
+
+static void temperature_call(void *a)
+{
+    call_arg *x = (call_arg *)a;
+    double c = 0;
+    x->rc = depz_device_read_mcu_temperature(x->dev, &c);
+    snprintf(x->s, sizeof x->s, "%.1f", c);
+}
+
+static void bootloader_call(void *a)
+{
+    call_arg *x = (call_arg *)a;
+    x->rc = depz_device_enter_bootloader(x->dev);
+}
+
+static bool call_start(depz_thread *t, depz_thread_fn fn, call_arg *a, depz_device *dev)
+{
+    memset(a, 0, sizeof *a);
+    a->dev = dev;
+    a->rc = 1;
+    return depz_thread_start(t, fn, a) == 0;
+}
+
+/* A pending RPT_TEXT matcher claims only the text echoing its own opcode; an
+ * OK ack for a data request is swallowed, the request waits for its report
+ * (contract 02 §1); a vanished device fails the pending request as closed,
+ * fires DISCONNECTED and every later request is refused at once
+ * (test_device_events.py). */
+static void pending_requests_meet_echoes_acks_and_a_drop(void)
+{
+    static const uint8_t other[5] = {DEPZ_CMD_GET_SERIAL, 'S', 'N', '1', 0x00};
+    static const uint8_t board[7] = {DEPZ_CMD_GET_DEVICE_NAME, 'B', 'o', 'a', 'r', 'd', 0x00};
+    static const uint8_t ack[2] = {DEPZ_CMD_GET_MCU_TEMPERATURE, DEPZ_STATUS_OK};
+    /* <Qh 5, -15: -1.5 °C */
+    static const uint8_t temp[10] = {0x05, 0, 0, 0, 0, 0, 0, 0, 0xF1, 0xFF};
+    peer p;
+    depz_device *dev;
+    depz_stream *evs;
+    depz_device_event ev;
+    depz_thread t;
+    call_arg a;
+    char s[32];
+    CHECK(peer_up(&p, &dev));
+    evs = depz_device_events(dev, 16);
+    CHECK(evs);
+
+    CHECK(call_start(&t, name_call, &a, dev));
+    CHECK(peer_expect(&p, DEPZ_CMD_GET_DEVICE_NAME));
+    peer_send(&p, DEPZ_RPT_TEXT, other, sizeof other);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_TEXT && ev.cmd == DEPZ_CMD_GET_SERIAL && strcmp(ev.text, "SN1") == 0);
+    peer_send(&p, DEPZ_RPT_TEXT, board, sizeof board);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_OK && strcmp(a.s, "Board") == 0);
+
+    /* had the ack completed it, the request would fail on a 0-byte report */
+    CHECK(call_start(&t, temperature_call, &a, dev));
+    CHECK(peer_expect(&p, DEPZ_CMD_GET_MCU_TEMPERATURE));
+    peer_send(&p, DEPZ_RPT_STATUS, ack, sizeof ack);
+    peer_send(&p, DEPZ_RPT_TEMPERATURE, temp, sizeof temp);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_OK && strcmp(a.s, "-1.5") == 0);
+
+    CHECK(call_start(&t, serial_call, &a, dev));
+    CHECK(peer_expect(&p, DEPZ_CMD_GET_SERIAL));
+    depz_link_close(p.side); /* the device vanished mid-request */
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_E_CLOSED);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_DISCONNECTED);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_E_CLOSED); /* the stream ends with the device */
+    CHECK(depz_device_closed(dev));
+    CHECK_RC(depz_device_get_serial_number(dev, s, sizeof s), DEPZ_E_CLOSED);
+    depz_stream_close(evs);
+    peer_down(&p, dev);
+}
+
+/* Contract 02: the bootloader command acks OK, then the device is closed
+ * for I/O by the host itself (no DISCONNECTED: the close is intended). */
+static void bootloader_ack_closes_the_device(void)
+{
+    static const uint8_t ack[2] = {DEPZ_CMD_BOOTLOADER, DEPZ_STATUS_OK};
+    peer p;
+    depz_device *dev;
+    depz_thread t;
+    call_arg a;
+    char s[32];
+    ev_count c;
+    CHECK(peer_up(&p, &dev));
+    memset(&c, 0, sizeof c);
+    depz_mutex_init(&c.lock);
+    CHECK_RC(depz_device_on_event(dev, ev_cb, &c, NULL), DEPZ_OK);
+    CHECK(call_start(&t, bootloader_call, &a, dev));
+    CHECK(peer_expect(&p, DEPZ_CMD_BOOTLOADER));
+    peer_send(&p, DEPZ_RPT_STATUS, ack, sizeof ack);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_OK);
+    CHECK(depz_device_closed(dev));
+    CHECK_RC(depz_device_get_serial_number(dev, s, sizeof s), DEPZ_E_CLOSED);
+    peer_down(&p, dev);
+    CHECK(c.disconnected == 0);
+    depz_mutex_destroy(&c.lock);
+}
+
+/* contract 02: GET -> RPT_PAYLOAD_CRC_TYPE; SET takes 0..3, else the device
+ * answers ERR_INVALID_PARAM and keeps its setting; a value that is no
+ * depz_crc_type is refused on the host, nothing sent (ERRATA A2). */
+static void payload_crc_type_roundtrip(rig *r)
+{
+    static const int bad[5] = {4, 7, 255, 300, -1};
+    static const uint8_t seven = 7;
+    depz_crc_type t = DEPZ_CRC32;
+    uint8_t cmds[64];
+    size_t i, before;
+    CHECK_RC(depz_device_get_payload_crc_type(r->dev, &t), DEPZ_OK);
+    CHECK(t == DEPZ_CRC_NONE);
+    CHECK_RC(depz_device_set_payload_crc_type(r->dev, DEPZ_CRC16), DEPZ_OK);
+    CHECK(fake_sr04_payload_crc_type(r->fake) == 2);
+    CHECK_RC(depz_device_get_payload_crc_type(r->dev, &t), DEPZ_OK);
+    CHECK(t == DEPZ_CRC16);
+    CHECK_RC(depz_device_request(r->dev, DEPZ_CMD_SET_PAYLOAD_CRC_TYPE, &seven, 1, NULL, NULL, true, -1),
+             DEPZ_E_STATUS);
+    CHECK(depz_last_status() == DEPZ_STATUS_ERR_INVALID_PARAM);
+    CHECK_RC(depz_device_get_payload_crc_type(r->dev, &t), DEPZ_OK);
+    CHECK(t == DEPZ_CRC16);
+    before = fake_sr04_commands(r->fake, cmds, sizeof cmds);
+    for (i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        CHECK_RC(depz_device_set_payload_crc_type(r->dev, (depz_crc_type)bad[i]), DEPZ_E_ARG);
+        CHECK(strstr(depz_last_error(), "set_payload_crc_type") != NULL);
+    }
+    CHECK(fake_sr04_commands(r->fake, cmds, sizeof cmds) == before);
+    CHECK(cmds[before - 1] == DEPZ_CMD_GET_PAYLOAD_CRC_TYPE);
+    CHECK(fake_sr04_payload_crc_type(r->fake) == 2);
+}
+
+/* DEVICE_RESET acks, then the link drops with the reboot. */
+static void reset_acks_then_the_link_drops(rig *r)
+{
+    depz_device_event ev;
+    depz_stream *evs = depz_device_events(r->dev, 8);
+    CHECK(evs);
+    CHECK_RC(depz_device_reset(r->dev), DEPZ_OK);
+    CHECK(fake_sr04_reset_count(r->fake) == 1);
+    CHECK_RC(depz_stream_next(evs, &ev, 1000), DEPZ_OK);
+    CHECK(ev.type == DEPZ_DEV_EV_DISCONNECTED);
+    CHECK(depz_device_closed(r->dev));
+    depz_stream_close(evs);
+}
+
+/* Host-side refusals: a request with no completion path, a payload too big
+ * for a packet (nothing written), NULL handles. */
+static void requests_refused_on_the_host(rig *r)
+{
+    uint8_t *big = (uint8_t *)calloc(DEPZ_MAX_PAYLOAD + 1u, 1);
+    depz_link_stats before, after;
+    depz_device *dev = NULL;
+    CHECK(big);
+    CHECK_RC(depz_device_request(r->dev, DEPZ_CMD_GET_SERIAL, NULL, 0, NULL, NULL, false, -1), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "matcher or ok_completes") != NULL);
+    depz_device_stats(r->dev, &before);
+    CHECK_RC(depz_device_send(r->dev, 0x40, big, DEPZ_MAX_PAYLOAD + 1u), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "16384 bytes does not fit a packet") != NULL);
+    depz_device_stats(r->dev, &after);
+    CHECK(after.tx_packets == before.tx_packets && after.tx_bytes == before.tx_bytes);
+    free(big);
+    CHECK_RC(depz_device_send(NULL, 0x40, NULL, 0), DEPZ_E_ARG);
+    CHECK_RC(depz_device_request(NULL, 0x40, NULL, 0, NULL, NULL, true, -1), DEPZ_E_ARG);
+    CHECK_RC(depz_device_create(NULL, NULL, NULL, &dev), DEPZ_E_ARG);
+    CHECK(strcmp(depz_device_port(NULL), "") == 0);
+    CHECK(strcmp(depz_device_port(r->dev), "loopback-a") == 0);
+}
+
 /* ── record / replay ─────────────────────────────────────────────────── */
 
 static void scripted_session(depz_device *dev, uint32_t *period, depz_sr04_measurement *m)
@@ -752,6 +1107,152 @@ L4_RIG(l4_measure_once_polls_and_stops)
     CHECK(m.timestamp_us > 0);
     v = fake_vl53l4_reg(r->fake, 0x0087);
     CHECK(v == 0x80); /* stopped after the read */
+}
+
+/* A raw result block (big-endian registers 0x0089..0x0099) seeded into the
+ * fake's register file, as fake_vl53l4.py result_block(): raw status 9 is
+ * ULD status 0 "valid", 2048 raw SPADs are 8 SPADs. */
+static void l4_seed_result(fake_vl53l4 *f, uint16_t distance_mm, uint8_t status, uint16_t signal_kcps)
+{
+    uint8_t raw[17];
+    size_t i;
+    memset(raw, 0, sizeof raw);
+    raw[0] = status;
+    raw[2] = 1;
+    raw[3] = 0x08; /* spads 2048 */
+    raw[5] = (uint8_t)((signal_kcps / 8u) >> 8);
+    raw[6] = (uint8_t)(signal_kcps / 8u);
+    raw[10] = 12; /* sigma 3 mm x 4 */
+    raw[13] = (uint8_t)(distance_mm >> 8);
+    raw[14] = (uint8_t)distance_mm;
+    for (i = 0; i < sizeof raw; i++) fake_vl53l4_set_reg(f, (uint16_t)(DEPZ_VL53L4_RESULT_BLOCK_ADDR + i), raw[i]);
+}
+
+/* The last byte written exactly at `addr`, and the one before it. */
+static bool l4_last_two_writes(fake_vl53l4 *f, uint16_t addr, uint8_t first, uint8_t second)
+{
+    uint8_t a = 0, b = 0;
+    size_t n = fake_vl53l4_writes_at(f, addr);
+    if (n < 2) return false;
+    fake_vl53l4_write_at(f, addr, n - 2, &a, 1);
+    fake_vl53l4_write_at(f, addr, n - 1, &b, 1);
+    return a == first && b == second;
+}
+
+/* VL53L4CD_calibration.c over the bridge (test_vl53l4cd_device.py,
+ * test_vl53l4cd_uld.py): offset = target - mean after a heat loop, xtalk =
+ * (1 - mean/target) * signal/SPADs over the valid samples after the first;
+ * bad arguments are refused before any traffic, no valid sample is an
+ * error; the temperature update reruns VHV and restores the loop bound. */
+L4_RIG(l4_calibrations_and_temperature_update)
+{
+    int32_t off = 0;
+    uint16_t x = 0, xr = 0;
+    size_t starts;
+    CHECK_RC(depz_vl53l4cd_init(r->dev, 0), DEPZ_OK);
+    l4_seed_result(r->fake, 120, 9, 1200);
+    CHECK_RC(depz_vl53l4cd_calibrate_offset(r->dev, 150, 5, &off), DEPZ_OK);
+    CHECK(off == 30);
+    CHECK_RC(depz_vl53l4cd_get_offset_mm(r->dev, &off), DEPZ_OK);
+    CHECK(off == 30);
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 240, 5, &x), DEPZ_OK);
+    CHECK(x == 75); /* (1 - 120/240) * 1200/8 */
+    CHECK_RC(depz_vl53l4cd_get_xtalk_kcps(r->dev, &xr), DEPZ_OK);
+    CHECK(xr == 75);
+    CHECK(fake_vl53l4_reg(r->fake, 0x0087) == 0x80); /* each burst ends stopped */
+
+    starts = fake_vl53l4_writes_at(r->fake, 0x0087);
+    CHECK_RC(depz_vl53l4cd_calibrate_offset(r->dev, 9, 20, &off), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "nb_samples must be 5..255, target 10..1000 mm") != NULL);
+    CHECK_RC(depz_vl53l4cd_calibrate_offset(r->dev, 100, 4, &off), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 5001, 20, &x), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "target 10..5000 mm") != NULL);
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 100, 4, &x), DEPZ_E_ARG);
+    CHECK(fake_vl53l4_writes_at(r->fake, 0x0087) == starts); /* no burst started */
+
+    l4_seed_result(r->fake, 100, 4, 1200); /* every frame "signal below threshold" */
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 200, 5, &x), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "no valid samples") != NULL);
+    CHECK(fake_vl53l4_reg(r->fake, 0x0087) == 0x80); /* stopped before the refusal */
+    l4_seed_result(r->fake, 90, 9, 1000); /* (1 - 90/200) * 1000/8 = 68.75 */
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 200, 5, &x), DEPZ_OK);
+    CHECK(x == 69);
+
+    CHECK_RC(depz_vl53l4cd_start_temperature_update(r->dev), DEPZ_OK);
+    CHECK(l4_last_two_writes(r->fake, 0x0008, 0x81, 0x09));
+    CHECK(l4_last_two_writes(r->fake, 0x000B, 0x92, 0x00));
+    CHECK(l4_last_two_writes(r->fake, 0x0087, 0x21, 0x80));
+    CHECK(!depz_vl53l4cd_ranging(r->dev));
+
+    CHECK_RC(depz_vl53l4cd_start_ranging(r->dev), DEPZ_OK);
+    CHECK_RC(depz_vl53l4cd_start_temperature_update(r->dev), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l4cd_calibrate_offset(r->dev, 100, 0, &off), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l4cd_calibrate_xtalk(r->dev, 100, 0, &x), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "stop ranging first") != NULL);
+    CHECK_RC(depz_vl53l4cd_stop_ranging(r->dev), DEPZ_OK);
+    CHECK_RC(depz_vl53l4cd_reset_sensor(r->dev), DEPZ_OK);
+    CHECK(!depz_vl53l4cd_initialized(r->dev));
+}
+
+typedef struct { depz_mutex lock; int n; int last_mm; } l4_counter;
+
+static void l4_count_cb(const depz_vl53l4cd_measurement *m, void *user)
+{
+    l4_counter *c = (l4_counter *)user;
+    depz_mutex_lock(&c->lock);
+    c->n++;
+    c->last_mm = m->r.distance_mm;
+    depz_mutex_unlock(&c->lock);
+}
+
+/* Streamed blocks reach the callback and the stream; an unsubscribed
+ * callback is not called again; get_measurement times out when nothing
+ * streams; every ULD range status has its text (test_vl53l4cd_device.py). */
+L4_RIG(l4_callbacks_get_measurement_and_status_texts)
+{
+    static const char *const texts[13] = {
+        "valid", "sigma above threshold", "signal below threshold", "distance below detection threshold",
+        "phase out of valid limit", "hardware fail", "no wrap-around check done",
+        "wrapped target, phase mismatch", "processing fail", "crosstalk signal fail", "interrupt error",
+        "merged target", "signal too low"};
+    /* distance 0x0123 = 291 mm, raw status 9 -> 0 (valid); the second 77 mm */
+    static const uint8_t block[17] = {0x09, 0x00, 0x07, 0x0f, 0x00, 0x01, 0xf4, 0x00, 0x64,
+                                      0x00, 0x28, 0x00, 0x00, 0x01, 0x23, 0x00, 0xff};
+    uint8_t block2[17];
+    depz_vl53l4cd_measurement m;
+    depz_stream *s;
+    l4_counter c;
+    int tok = -1, n;
+    int last;
+    int i;
+    for (i = 0; i < 13; i++) CHECK(strcmp(depz_vl53l4cd_status_text(i), texts[i]) == 0);
+    CHECK(strcmp(depz_vl53l4cd_status_text(255), "other error") == 0);
+    CHECK(strcmp(depz_vl53l4cd_status_text(13), "unknown") == 0);
+
+    memset(&c, 0, sizeof c);
+    depz_mutex_init(&c.lock);
+    CHECK_RC(depz_vl53l4cd_on_measurement(r->dev, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_vl53l4cd_on_measurement(r->dev, l4_count_cb, &c, &tok), DEPZ_OK);
+    s = depz_vl53l4cd_stream(r->dev, 4);
+    CHECK(s);
+    CHECK_RC(depz_vl53l4cd_get_measurement(r->dev, 30, &m), DEPZ_E_TIMEOUT);
+    fake_vl53l4_send_stream(r->fake, 1234, block, sizeof block);
+    CHECK_RC(depz_stream_next(s, &m, 1000), DEPZ_OK);
+    CHECK(m.timestamp_us == 1234 && m.r.distance_mm == 291);
+    depz_vl53l4cd_off_measurement(r->dev, tok);
+    memcpy(block2, block, sizeof block2);
+    block2[13] = 0x00;
+    block2[14] = 77;
+    fake_vl53l4_send_stream(r->fake, 2345, block2, sizeof block2);
+    CHECK_RC(depz_stream_next(s, &m, 1000), DEPZ_OK);
+    CHECK(m.timestamp_us == 2345 && m.r.distance_mm == 77);
+    depz_mutex_lock(&c.lock);
+    n = c.n;
+    last = c.last_mm;
+    depz_mutex_unlock(&c.lock);
+    CHECK(n == 1 && last == 291); /* unsubscribed before the second block */
+    depz_stream_close(s);
+    depz_mutex_destroy(&c.lock);
 }
 
 /* ── VL53L8 / L5 / L7 ────────────────────────────────────────────────── */
@@ -1579,6 +2080,142 @@ static void tmf8829_fake_session(void)
     depz_mutex_destroy(&cnt.lock);
     free(m);
     json_free(root);
+}
+
+/* The stream counters reach chunk_errors >= want (bounded poll). */
+static uint64_t tmf_chunk_errors(depz_device *dev, uint64_t want)
+{
+    depz_tmf8829_stream_stats st;
+    int i;
+    for (i = 0; i < 200; i++) {
+        depz_tmf8829_get_stream_stats(dev, &st);
+        if (st.chunk_errors >= want) break;
+        depz_sleep_ms(5);
+    }
+    return st.chunk_errors;
+}
+
+/* Contract 14 §2 on the reader side: a frame chunk or an event shorter than
+ * its header is counted in chunk_errors and dropped; an unsubscribed event
+ * callback is not called again; NULL callbacks / outputs and a device of
+ * another class are refused (test_tmf8829_device.py). */
+static void tmf8829_damaged_reports_and_refusals(void)
+{
+    static const uint8_t ev_int[12] = {0x10, 0x27, 0, 0, 0, 0, 0, 0, DEPZ_TMF8829_INT_MOTION, DEPZ_TMF8829_EV_INT, 0, 0};
+    static const uint8_t short_chunk[20] = {0}; /* the chunk header alone is 21 bytes */
+    peer p;
+    depz_device *dev, *plain;
+    depz_link *a, *b;
+    depz_tmf8829_measurement *m = (depz_tmf8829_measurement *)malloc(sizeof *m);
+    depz_tmf8829_stream_stats st;
+    tmf_counts cnt;
+    int tok_ev = -1, tok_fr = -1, tok_ms = -1, events_seen, frames_seen;
+    CHECK(m);
+    CHECK(peer_up(&p, &dev));
+    CHECK_RC(depz_tmf8829_attach(dev), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_attach(dev), DEPZ_OK); /* already one: kept */
+    CHECK(depz_is_tmf8829(dev) && !depz_tmf8829_streaming(dev));
+    memset(&cnt, 0, sizeof cnt);
+    depz_mutex_init(&cnt.lock);
+
+    CHECK_RC(depz_tmf8829_on_measurement(dev, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_tmf8829_on_frame(dev, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_tmf8829_on_event(dev, NULL, NULL, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_tmf8829_on_measurement(dev, tmf_meas_cb, &cnt, &tok_ms), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_on_frame(dev, tmf_frame_cb, &cnt, &tok_fr), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_on_event(dev, tmf_event_cb, &cnt, &tok_ev), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_get_measurement(dev, 10, NULL), DEPZ_E_ARG);
+    CHECK_RC(depz_tmf8829_config_page(dev, NULL), DEPZ_E_ARG);
+
+    peer_send(&p, DEPZ_TMF8829_RPT_EVENT, ev_int, sizeof ev_int);
+    CHECK(tmf_count(&cnt, &cnt.events, 1) == 1);
+    depz_tmf8829_off_event(dev, tok_ev);
+    depz_tmf8829_off_frame(dev, tok_fr);
+    depz_tmf8829_off_measurement(dev, tok_ms);
+    peer_send(&p, DEPZ_TMF8829_RPT_EVENT, ev_int, sizeof ev_int);  /* nobody listens now */
+    peer_send(&p, DEPZ_TMF8829_RPT_EVENT, ev_int, 11);             /* one byte short */
+    peer_send(&p, DEPZ_TMF8829_RPT_FRAME, short_chunk, sizeof short_chunk);
+    CHECK(tmf_chunk_errors(dev, 2) == 2);
+    depz_tmf8829_get_stream_stats(dev, &st);
+    CHECK(st.frames_completed == 0 && st.measurements == 0 && st.frame_parse_errors == 0);
+    depz_mutex_lock(&cnt.lock);
+    events_seen = cnt.events;
+    frames_seen = cnt.frames;
+    depz_mutex_unlock(&cnt.lock);
+    CHECK(events_seen == 1 && frames_seen == 0); /* in order on the reader: the 2nd event came before the errors */
+    CHECK_RC(depz_tmf8829_get_measurement(dev, 20, m), DEPZ_E_TIMEOUT); /* not streaming, nothing comes */
+    peer_down(&p, dev);
+
+    /* a device of another class */
+    CHECK_RC(depz_link_loopback_pair(&a, &b), DEPZ_OK);
+    CHECK_RC(depz_device_open_link(a, &plain), DEPZ_OK);
+    CHECK(depz_tmf8829_measurements(plain, 4) == NULL);
+    CHECK_RC(depz_tmf8829_on_event(plain, tmf_event_cb, &cnt, NULL), DEPZ_E_WRONG_TYPE);
+    CHECK_RC(depz_tmf8829_get_measurement(plain, 10, m), DEPZ_E_WRONG_TYPE);
+    depz_tmf8829_off_event(plain, 0); /* no-ops on another class */
+    depz_tmf8829_off_frame(plain, 0);
+    depz_tmf8829_off_measurement(plain, 0);
+    memset(&st, 0xAB, sizeof st);
+    depz_tmf8829_get_stream_stats(plain, &st);
+    CHECK(st.chunk_errors == 0 && st.measurements == 0 && st.frames_completed == 0);
+    depz_device_close(plain);
+    depz_link_free(b);
+    depz_mutex_destroy(&cnt.lock);
+    free(m);
+}
+
+/* init() checks the sensor ID before the bootloader (no TMF8829 on the
+ * bus); configure() refuses an unnamed or too-wide field before anything is
+ * written; config_page() reads back the page LOAD_CONFIG_PAGE loaded. */
+static void tmf8829_init_and_configure_refusals(void)
+{
+    depz_link *link;
+    depz_device *dev = NULL;
+    fake_tmf8829 *f = fake_tmf8829_start(&link);
+    depz_tmf8829_options opt = DEPZ_TMF8829_OPTIONS_INIT;
+    depz_tmf8829_field_value fv[1];
+    depz_tmf8829_config cfg;
+    const depz_tmf8829_cfg_field *dual = depz_tmf8829_find_cfg_field("dual_mode");
+    uint8_t base[190], page[190];
+    char want[96];
+    size_t i;
+    CHECK(f && dual && dual->width == 2);
+    for (i = 0; i < sizeof base; i++) base[i] = (uint8_t)(i * 7u + 3u);
+    fake_tmf8829_set_base_page(f, base);
+    CHECK_RC(depz_tmf8829_open_link(link, &dev), DEPZ_OK);
+    depz_device_set_timeout_ms(dev, 1000);
+
+    fake_tmf8829_set_reg(f, DEPZ_TMF8829_REG_ID, 0x00);
+    CHECK_RC(depz_tmf8829_init(dev, NULL, NULL, NULL, 0, NULL), DEPZ_E_PROTOCOL);
+    CHECK(strstr(depz_last_error(), "sensor ID 0x00, expected 0x9E") != NULL);
+    fake_tmf8829_set_reg(f, DEPZ_TMF8829_REG_ID, DEPZ_TMF8829_DEVICE_ID);
+    CHECK_RC(depz_tmf8829_init(dev, NULL, NULL, NULL, 0, NULL), DEPZ_OK);
+
+    fv[0].name = NULL;
+    fv[0].value = 1;
+    opt.fields = fv;
+    opt.n_fields = 1;
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", &opt, NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "field 0 has no name") != NULL);
+    opt.fields = NULL; /* n_fields with no array: the same refusal */
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", &opt, NULL), DEPZ_E_ARG);
+    CHECK(strstr(depz_last_error(), "field 0 has no name") != NULL);
+    fv[0].name = "dual_mode";
+    fv[0].value = 4; /* 2 bits hold 0..3 */
+    opt.fields = fv;
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", &opt, NULL), DEPZ_E_ARG);
+    snprintf(want, sizeof want, "dual_mode: 4 out of range for %u bit", (unsigned)dual->width);
+    CHECK(strstr(depz_last_error(), want) != NULL);
+    CHECK_RC(depz_tmf8829_get_config(dev, &cfg), DEPZ_E_ARG); /* nothing configured yet */
+
+    /* "8x8" loads the base page with fp_mode / kilo_iterations of the preset */
+    CHECK_RC(depz_tmf8829_configure(dev, "8x8", NULL, NULL), DEPZ_OK);
+    CHECK_RC(depz_tmf8829_config_page(dev, page), DEPZ_OK);
+    fake_tmf8829_page(f, base);
+    CHECK(memcmp(page, base, sizeof page) == 0);
+    CHECK(fake_tmf8829_reg(f, DEPZ_TMF8829_REG_CID_RID) == DEPZ_TMF8829_CMD_LOAD_CONFIG_PAGE);
+    depz_device_close(dev);
+    fake_tmf8829_stop(f);
 }
 
 /* ── VL53L 1D family against the fake APP_VL53L0_4 bridge ────────────── */
@@ -3243,6 +3880,138 @@ L8_RIG(l8ch_cnh_and_lmz_calibration_table, DEPZ_VL53L8_MODEL_L8CH, L8_CRC_CH)
 
 /* ── runner ──────────────────────────────────────────────────────────── */
 
+/* ── codec edges the vectors do not reach ────────────────────────────── */
+
+/* depz_strip_device_string's sizing call and truncation (a character that
+ * does not fit whole is dropped with the rest), a version tail that is not
+ * `\d+(\.\d+)*`, a NULL / over-long software name (cut on a UTF-8 boundary),
+ * NULL device name and out-of-range USB ids in class resolution. */
+static void identity_strings_edge_cases(void)
+{
+    /* 'A', embedded NUL, a byte >= 0x80, 'B', then 0xFF / 0x00 filler */
+    static const uint8_t raw[6] = {'A', 0x00, 0xC3, 'B', 0xFF, 0x00};
+    static const char whole[6] = {'A', '\0', '\xEF', '\xBF', '\xBD', 'B'};
+    static const char zero8[8] = {0};
+    char out[16], longname[80];
+    depz_identity id;
+    size_t i;
+    const int good = 0x0483, bad_vid = 0x10000, bad_pid = -2;
+
+    CHECK(depz_strip_device_string(raw, sizeof raw, NULL, 0) == 6);
+    memset(out, 'x', sizeof out);
+    CHECK(depz_strip_device_string(raw, sizeof raw, out, sizeof out) == 6);
+    CHECK(memcmp(out, whole, 6) == 0 && memcmp(out + 6, zero8, 8) == 0 && out[15] == '\0');
+    memset(out, 'x', sizeof out);
+    CHECK(depz_strip_device_string(raw, sizeof raw, out, 4) == 2); /* U+FFFD needs 3 of the 1 left */
+    CHECK(out[0] == 'A' && out[1] == '\0' && out[2] == '\0' && out[3] == '\0' && out[4] == 'x');
+    memset(out, 'x', sizeof out);
+    CHECK(depz_strip_device_string(raw, sizeof raw, out, 2) == 1); /* only 'A' fits before the NUL */
+    CHECK(out[0] == 'A' && out[1] == '\0' && out[2] == 'x');
+
+    depz_parse_software_name("APP_usonic_SR04_v1.", &id); /* a dot with no digits after it */
+    CHECK(strcmp(id.mode, "app") == 0 && id.sensor_type == DEPZ_SENSOR_SR04 && id.version[0] == '\0');
+    depz_parse_software_name("APP_usonic_SR04_vx2", &id); /* no digits at all */
+    CHECK(id.sensor_type == DEPZ_SENSOR_SR04 && id.version[0] == '\0');
+    CHECK(strcmp(id.software_name, "APP_usonic_SR04_vx2") == 0);
+    depz_parse_software_name_n(NULL, 5, &id);
+    CHECK(strcmp(id.mode, "unknown") == 0 && id.sensor_type == DEPZ_SENSOR_NONE);
+    CHECK(id.software_name[0] == '\0' && id.version[0] == '\0');
+
+    /* "APP_" then 37 two-byte 'é' (C3 A9): the 63-byte cut lands on a
+     * continuation byte, so it backs off to 62 and keeps whole characters */
+    memcpy(longname, "APP_", 4);
+    for (i = 0; i < 37; i++) {
+        longname[4 + 2 * i] = '\xC3';
+        longname[5 + 2 * i] = '\xA9';
+    }
+    longname[78] = '\0';
+    depz_parse_software_name(longname, &id);
+    CHECK(strcmp(id.mode, "app") == 0 && id.sensor_type == DEPZ_SENSOR_UNKNOWN);
+    CHECK(strlen(id.software_name) == 62 && memcmp(id.software_name, longname, 62) == 0);
+    CHECK(id.software_name[61] == '\xA9');
+
+    CHECK(strcmp(depz_resolve_sensor_class_n("APP_usonic_SR04_v1", 18, NULL, 99, NULL, NULL), "sr04") == 0);
+    CHECK(strcmp(depz_resolve_sensor_class_n("APP_usonic_SR04_v1", 18, NULL, 0, &good, &good), "sr04") == 0);
+    CHECK(depz_resolve_sensor_class_n("APP_usonic_SR04_v1", 18, NULL, 0, &bad_vid, NULL) == NULL);
+    CHECK(depz_resolve_sensor_class_n("APP_usonic_SR04_v1", 18, NULL, 0, NULL, &bad_pid) == NULL);
+}
+
+/* Every depz_err code has its name; an unknown one is "DEPZ_E_?". */
+static void error_names_are_the_enum_names(void)
+{
+    static const struct { int err; const char *name; } names[] = {
+        {DEPZ_OK, "DEPZ_OK"},
+        {DEPZ_E_ARG, "DEPZ_E_ARG"},
+        {DEPZ_E_NOMEM, "DEPZ_E_NOMEM"},
+        {DEPZ_E_IO, "DEPZ_E_IO"},
+        {DEPZ_E_CLOSED, "DEPZ_E_CLOSED"},
+        {DEPZ_E_TIMEOUT, "DEPZ_E_TIMEOUT"},
+        {DEPZ_E_STATUS, "DEPZ_E_STATUS"},
+        {DEPZ_E_BUSY, "DEPZ_E_BUSY"},
+        {DEPZ_E_PROTOCOL, "DEPZ_E_PROTOCOL"},
+        {DEPZ_E_NO_DEVICE, "DEPZ_E_NO_DEVICE"},
+        {DEPZ_E_WRONG_TYPE, "DEPZ_E_WRONG_TYPE"},
+        {DEPZ_E_REPLAY_MISMATCH, "DEPZ_E_REPLAY_MISMATCH"},
+        {DEPZ_E_BOOTLOADER, "DEPZ_E_BOOTLOADER"},
+    };
+    size_t i;
+    for (i = 0; i < sizeof names / sizeof names[0]; i++)
+        CHECK(strcmp(depz_err_str(names[i].err), names[i].name) == 0);
+    CHECK(strcmp(depz_err_str(-99), "DEPZ_E_?") == 0);
+    CHECK(strcmp(depz_err_str(1), "DEPZ_E_?") == 0);
+}
+
+/* depz_usb_identity fills both outputs (or either); the port order breaks a
+ * serial tie by length, then by port path and its length; short reports and
+ * RPT_TEXT into a caller buffer. */
+static void usb_order_and_short_report_edges(void)
+{
+    static const uint8_t text[6] = {0x05, 'S', 'N', '9', 0x00, 0xFF};
+    static const uint8_t sync[23] = {0};
+    char buf[8];
+    bool known = false;
+    const char *model = "x";
+    uint8_t cmd = 0;
+    size_t n = 99;
+    depz_sync_time_report sr;
+    depz_sync_pin_config pc;
+    depz_port_key a, b;
+
+    CHECK(depz_usb_identity((int)DEPZ_DEV_USB_VID, (int)DEPZ_DEV_USB_PID, &known, &model) == 0);
+    CHECK(known && model && strcmp(model, "dev") == 0);
+    CHECK(depz_usb_identity(0x1234, 0x5678, &known, &model) == 0);
+    CHECK(!known && model == NULL);
+    CHECK(depz_usb_identity(0x1234, 0x5678, NULL, NULL) == 0);
+    CHECK(depz_usb_identity(0x1234, 0x10000, &known, &model) == -1);
+
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.serial = "AB";
+    a.serial_len = 2;
+    b.serial = "ABC";
+    b.serial_len = 3;
+    CHECK(depz_port_order_cmp(&a, &b) < 0 && depz_port_order_cmp(&b, &a) > 0); /* a prefix sorts first */
+    b.serial_len = 2;
+    a.port = "/dev/ttyACM1";
+    a.port_len = 12;
+    b.port = "/dev/ttyACM10";
+    b.port_len = 13;
+    CHECK(depz_port_order_cmp(&a, &b) < 0 && depz_port_order_cmp(&b, &a) > 0);
+    b.port = "/dev/ttyACM0";
+    b.port_len = 12;
+    CHECK(depz_port_order_cmp(&a, &b) > 0);
+    b.port = a.port;
+    CHECK(depz_port_order_cmp(&a, &b) == 0);
+
+    memset(buf, 'x', sizeof buf);
+    CHECK(depz_unpack_text_ex(text, sizeof text, &cmd, buf, sizeof buf, &n) == 0);
+    CHECK(cmd == 0x05 && n == 3 && strcmp(buf, "SN9") == 0 && buf[7] == '\0');
+    CHECK(depz_unpack_text_ex(text, sizeof text, &cmd, buf, sizeof buf, NULL) == 0);
+    CHECK(depz_unpack_text_ex(text, 0, &cmd, buf, sizeof buf, &n) == -1);
+    CHECK(depz_unpack_sync_time(sync, sizeof sync, &sr) == -1); /* 23 of its 24 bytes */
+    CHECK(depz_unpack_sync_pin_config(sync, 2, &pc) == -1);
+}
+
 typedef struct { const char *name; void (*rig_fn)(rig *); void (*plain_fn)(void); } test_case;
 
 
@@ -3707,6 +4476,14 @@ static void discovery_without_a_port(void)
     o.port = no_port;
     CHECK_RC(depz_open_device(&o, &dev), DEPZ_E_NO_DEVICE);
     CHECK(dev == NULL);
+    {
+        /* A port that does not open — as one another program holds — names the
+           open failure after the no-device text (contract 07 §3). */
+        char want[300];
+        snprintf(want, sizeof want, "no DEPZ device answered on %s: could not open the port (", no_port);
+        CHECK(strncmp(depz_last_error(), want, strlen(want)) == 0);
+        CHECK(strstr(depz_last_error() + strlen(want), "cannot open") != NULL); /* the serial layer's text */
+    }
     o.port = NULL;
     o.serial = "depz-test-no-such-serial"; /* no candidate matches: nothing is probed */
     CHECK_RC(depz_open_device(&o, &dev), DEPZ_E_NO_DEVICE);
@@ -3824,6 +4601,20 @@ static const test_case k_tests[] = {
     {"b055_page1_configs_and_interrupts", NULL, b055_page1_configs_and_interrupts},
     {"b055_polling_scales_by_the_units", NULL, b055_polling_scales_by_the_units},
     {"b055_stream_wire_units_and_bad_reports", NULL, b055_stream_wire_units_and_bad_reports},
+    {"unsolicited_reports_become_events", NULL, unsolicited_reports_become_events},
+    {"link_damage_is_counted_and_reported", NULL, link_damage_is_counted_and_reported},
+    {"pending_requests_meet_echoes_acks_and_a_drop", NULL, pending_requests_meet_echoes_acks_and_a_drop},
+    {"bootloader_ack_closes_the_device", NULL, bootloader_ack_closes_the_device},
+    {"payload_crc_type_roundtrip", payload_crc_type_roundtrip, NULL},
+    {"reset_acks_then_the_link_drops", reset_acks_then_the_link_drops, NULL},
+    {"requests_refused_on_the_host", requests_refused_on_the_host, NULL},
+    {"tmf8829_damaged_reports_and_refusals", NULL, tmf8829_damaged_reports_and_refusals},
+    {"tmf8829_init_and_configure_refusals", NULL, tmf8829_init_and_configure_refusals},
+    {"identity_strings_edge_cases", NULL, identity_strings_edge_cases},
+    {"error_names_are_the_enum_names", NULL, error_names_are_the_enum_names},
+    {"usb_order_and_short_report_edges", NULL, usb_order_and_short_report_edges},
+    {"l4_calibrations_and_temperature_update", NULL, l4_calibrations_and_temperature_update},
+    {"l4_callbacks_get_measurement_and_status_texts", NULL, l4_callbacks_get_measurement_and_status_texts},
 };
 
 int main(int argc, char **argv)

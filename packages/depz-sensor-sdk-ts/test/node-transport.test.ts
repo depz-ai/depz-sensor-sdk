@@ -312,7 +312,8 @@ describe("node discovery", () => {
     expect(await bySerial.getSerialNumber()).toBe("SN2");
   });
 
-  it("openDevice(alias) resolves the class by the USB id of the port the alias names (ERRATA A5)", async () => {
+  // POSIX only: on Windows samePort() matches COM names by string (resolving one opens the port)
+  it.skipIf(process.platform === "win32")("openDevice(alias) resolves the class by the USB id of the port the alias names (ERRATA A5)", async () => {
     // A /dev/serial/by-id/… symlink: a regular file stands in for the node (realpath resolves either).
     const dir = mkdtempSync(join(tmpdir(), "depz-a5-"));
     const node = join(dir, "ttyACM0");

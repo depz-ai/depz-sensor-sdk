@@ -12,7 +12,7 @@
 # llvm-tools-preview rustup component.
 set -euo pipefail
 
-FLOOR=88
+FLOOR=91
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -50,7 +50,7 @@ minimum = float(args[args.index("--min") + 1]) if "--min" in args else floor
 files = json.load(open(path))["data"][0]["files"]
 rows = []
 for f in files:
-    name = os.path.relpath(f["filename"], root)
+    name = os.path.relpath(f["filename"], root).replace(os.sep, "/")   # Windows: src\x.rs
     if not name.startswith("src/"):
         continue
     lines = f["summary"]["lines"]

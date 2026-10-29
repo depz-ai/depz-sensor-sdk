@@ -222,7 +222,7 @@ def _capture_semicolon(lines: list[str], i0: int) -> tuple[list[str], int]:
 def parse_file(path: Path):
     """Return a list of top-level items: dicts with name/kind/signature/doc and
     (for types) a list of method dicts."""
-    lines = (path.read_text().split("\n"))
+    lines = (path.read_text(encoding="utf-8").split("\n"))
     items: list[dict] = []
     by_name: dict[str, dict] = {}
     pending: list[str] = []
@@ -456,7 +456,7 @@ def main() -> None:
         "",
     ]
     DOCS.mkdir(parents=True, exist_ok=True)
-    (DOCS / "api.md").write_text(_render_reference(groups, root_head))
+    (DOCS / "api.md").write_text(_render_reference(groups, root_head), encoding="utf-8", newline="\n")
     n = sum(len(m) for _, _, m in groups)
     print(f"wrote {DOCS / 'api.md'} ({n} public symbols across {len(groups)} groups)")
 
@@ -477,7 +477,7 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference(groups_out, sub_head))
+        out.write_text(_render_reference(groups_out, sub_head), encoding="utf-8", newline="\n")
         n_sub = sum(len(m) for _, _, m in groups_out)
         print(f"wrote {out} ({n_sub} symbols)")
 

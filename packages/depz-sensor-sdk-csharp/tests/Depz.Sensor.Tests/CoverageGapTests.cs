@@ -56,7 +56,7 @@ public class CoverageGapTests
         Assert.Equal(3, new TrashEvent(new byte[3]).Data.Length);
         Assert.Equal(25.5, new TemperatureEvent(1, 25.5).Celsius);
         Assert.NotEqual(new TemperatureEvent(1, 25.5), new TemperatureEvent(2, 25.5));
-        Assert.Contains("Celsius = 25.5", new TemperatureEvent(1, 25.5).ToString());
+        Assert.Contains($"Celsius = {25.5}", new TemperatureEvent(1, 25.5).ToString()); // the current culture's 25.5, as ToString
     }
 
     [Fact]

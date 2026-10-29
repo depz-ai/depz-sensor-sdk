@@ -2599,27 +2599,6 @@ static void test_dataset_player() {
     t.p->play();
     check(!t.p->tick() && t.seen.size() == 2 && t.states == States{S::Playing, S::Paused}, "a callback paused the player");
 
-    // a record callback's exception pauses and propagates; the record counts as delivered
-    open_player(t, even, 0.0);
-    t.seen.clear();
-    t.states.clear();
-    t.p->on_record([](const ds::Record& r) {
-        if (r.t_host_us == 1200000) throw std::runtime_error("consumer failed");
-    });
-    t.p->play();
-    {
-        bool threw = false;
-        try {
-            t.p->tick();
-        } catch (const std::runtime_error& e) {
-            threw = std::string(e.what()) == "consumer failed";
-        }
-        check(threw && t.p->state() == S::Paused && t.p->position_us() == 200000, "callback error pauses");
-        t.p->play();
-        t.p->tick();
-        check(t.seen.size() == 5 && t.states == States{S::Playing, S::Paused, S::Playing, S::Done}, "resumes after the error");
-    }
-
     // unsubscribe is idempotent
     {
         ds::PlayerOptions o;
@@ -2684,6 +2663,29 @@ static void test_dataset_player() {
     bool in_order = t.seen.size() == fixture.records.size() && t.seen.size() == 10;
     for (std::size_t i = 0; in_order && i < t.seen.size(); ++i) in_order = t.seen[i] == fixture.records[i].t_host_us;
     check(in_order && t.p->position_us() == fixture.duration_us() && fixture.duration_us() > 0, "fixture plays in reader order");
+
+    // contract 09: a throwing record / state callback is counted and dropped;
+    // the other callbacks still get every record, playback runs to done
+    open_player(t, fixture, 0.0);
+    t.seen.clear();
+    t.states.clear();
+    {
+        const std::int64_t first = fixture.records[0].t_host_us;
+        std::size_t raised = 0;
+        t.p->on_record([&](const ds::Record& r) {
+            if (raised == 0 && r.t_host_us == first) {
+                raised++;
+                throw std::runtime_error("consumer failed");
+            }
+        });
+        t.p->on_state([](ds::PlayerState) { throw 42; });  // not a std::exception
+        t.p->play();
+        check(!t.p->tick() && t.p->state() == S::Done, "throwing callbacks: plays to done");
+        bool all = t.seen.size() == fixture.records.size() && t.seen.size() == 10;
+        for (std::size_t i = 0; all && i < t.seen.size(); ++i) all = t.seen[i] == fixture.records[i].t_host_us;
+        check(all && t.states == States{S::Playing, S::Done}, "throwing callbacks: the others get every record and state");
+        check(raised == 1 && t.p->callback_errors() == 3, "throwing callbacks: counted (the first record + two state changes)");
+    }
     t.p.reset();
 
     // the threaded driver (real time, loose bounds)
@@ -2745,24 +2747,21 @@ static void test_dataset_player() {
     {
         ds::PlayerOptions o;
         o.speed = 0;
-        ds::DatasetPlayer p(even, o);
-        std::vector<std::string> errors;
+        ds::DatasetPlayer p(fixture, o);
+        const std::int64_t first = fixture.records[0].t_host_us;
+        std::vector<std::int64_t> seen;
         std::mutex m;
-        p.on_delivery_error([&](const std::string& e) {
-            std::lock_guard<std::mutex> g(m);
-            errors.push_back(e);
+        p.on_record([first](const ds::Record& r) {
+            if (r.t_host_us == first) throw std::runtime_error("x");
         });
-        p.on_record([](const ds::Record&) { throw std::runtime_error("x"); });
-        p.play();
-        check(p.wait(std::chrono::seconds(5)) && p.state() == S::Paused, "threaded: a throwing callback pauses");
-        // the error callback runs on the player thread right after the pause
-        bool reported = false;
-        for (int i = 0; i < 500 && !reported; i++) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        p.on_record([&](const ds::Record& r) {
             std::lock_guard<std::mutex> g(m);
-            reported = errors == std::vector<std::string>{"x"};
-        }
-        check(reported, "threaded: the error reaches on_delivery_error");
+            seen.push_back(r.t_host_us);
+        });
+        p.play();
+        check(p.wait(std::chrono::seconds(5)) && p.state() == S::Done, "threaded: a throwing callback does not stop playback");
+        std::lock_guard<std::mutex> g(m);
+        check(seen.size() == 10 && seen.front() == first && p.callback_errors() == 1, "threaded: the other callback gets every record");
     }
 }
 

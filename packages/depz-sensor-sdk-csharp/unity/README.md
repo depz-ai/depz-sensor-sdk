@@ -36,14 +36,14 @@ documented in the [C# SDK guide](../docs/guide.md) and
 Window › Package Manager › **+** › *Add package from git URL…*:
 
 ```
-https://github.com/depz-ai/depz-sensor-sdk.git?path=packages/depz-sensor-sdk-csharp/unity#v0.7.0
+https://github.com/depz-ai/depz-sensor-sdk.git?path=packages/depz-sensor-sdk-csharp/unity#v0.9.0
 ```
 
 Then bring the shared library into the project, in either way:
 
 - [NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity): install
-  `Depz.Sensor` 0.7.0; or
-- take `lib/netstandard2.1/Depz.Sensor.dll` out of the `Depz.Sensor.0.7.0.nupkg`
+  `Depz.Sensor` 0.9.0; or
+- take `lib/netstandard2.1/Depz.Sensor.dll` out of the `Depz.Sensor.0.9.0.nupkg`
   (a zip file) and drop it under `Assets/Plugins/`.
 
 The module's assembly definition references `Depz.Sensor.dll` **by name**,
@@ -129,12 +129,19 @@ another class a `WrongTypeException`, a board error a `StatusException`.
 - **macOS / Linux .NET** users (outside Unity) keep the .NET 8 build's
   `SerialPortLink` and `DepzDevices`.
 - **Android, iOS, WebGL**: not covered (no serial ports in those players).
-- **Unity Editor checks**: this repository's CI runs on Linux. The module's
+- **Unity Editor checks**: this repository's .NET suite runs on Linux. The module's
   sources (minus the `MonoBehaviour`) compile and are unit-tested here as
   `netstandard2.1` (`src/Depz.Sensor.Unity`, `tests/Depz.Sensor.Unity.Tests`:
-  registry parser on a fake registry, candidate ordering, error mapping). The
-  Unity import, a live board on `COM*` and the `Close()`-under-read behaviour of
-  Mono's `SerialPort` are to be checked on a Windows machine with Unity.
+  registry parser on a fake registry, candidate ordering, error mapping). In the
+  Unity editor itself (6000.0.85f1, Windows 11, 2026-10-28, ten bench boards on
+  `COM*`): the package imports and compiles with the DLL under
+  `Runtime/Plugins/`; `ListDepzPorts` reads them from the registry in USB-serial
+  order and every board answers the probe; an SR04 streams; and `Close()` ends a
+  read blocked in Mono's `SerialPort` at once (a `DeviceLostException`, not the
+  read's own timeout). In Play mode a `DepzSensorBehaviour` subclass streams
+  the SR04 into a scene (distance label and bar, polled from `Update()`).
+  These are EditMode and PlayMode tests in a project outside this repository,
+  run with `-batchmode -runTests`.
 
 ## Replacing the communication module
 

@@ -9,8 +9,8 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- the .NET code-quality analyzers at the recommended set, every finding fails the build;
-         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and CI's
-         newer one then fails a build that passes here -->
+         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and another
+         machine's newer one then fails a build that passes here -->
     <AnalysisLevel>8.0-recommended</AnalysisLevel>
     <!-- Ship XML docs for IntelliSense; don't fail the build on undocumented members. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -24,7 +24,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Depz.Sensor</PackageId>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Authors>DEPZ</Authors>
     <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU, TMF8829 dToF) — transport, protocol codecs, and sensor decode.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

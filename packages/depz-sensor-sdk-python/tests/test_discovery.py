@@ -7,6 +7,7 @@ real hardware.
 from __future__ import annotations
 
 import stat
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +26,10 @@ from depz_sensor_sdk.usb_ids import (
     is_known_depz_usb,
     usb_model_hint,
 )
+
+
+# POSIX only: on Windows a COM name is matched by string (a COM port is not a file).
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="port aliases are POSIX")
 
 
 # ── usb_ids table ─────────────────────────────────────────────────────────────
@@ -172,7 +177,7 @@ def spy_resolve(monkeypatch):
     port's USB id can tell CH from CX."""
     calls = {"opened": []}
 
-    def fake_probe(port, *, timeout):
+    def fake_probe(port, timeout):
         return discovery.DeviceInfo(
             port=port, mode="app", sensor_type=None,
             software_name=calls.get("software", "APP_VL53L8_ToF_v1.0"), fw_version="1.0",
@@ -185,7 +190,7 @@ def spy_resolve(monkeypatch):
             return SimpleNamespace(cls=name, port=port)
         return open_
 
-    monkeypatch.setattr(discovery, "probe_port", fake_probe)
+    monkeypatch.setattr(discovery, "_probe_port", fake_probe)
     monkeypatch.setattr(discovery, "sensor_class", fake_sensor_class)
     return calls
 
@@ -202,6 +207,7 @@ def by_id_alias(tmp_path):
     return str(node), str(alias)
 
 
+@posix_only
 def test_str_port_symlink_alias_resolves_with_the_enumerated_usb_id(
     fake_ports, spy_resolve, by_id_alias, recwarn
 ):
@@ -215,6 +221,7 @@ def test_str_port_symlink_alias_resolves_with_the_enumerated_usb_id(
     assert not any(issubclass(w.category, UserWarning) for w in recwarn.list)
 
 
+@posix_only
 def test_str_port_same_device_node_resolves_with_the_enumerated_usb_id(
     fake_ports, spy_resolve, monkeypatch
 ):
@@ -234,6 +241,7 @@ def test_str_port_same_device_node_resolves_with_the_enumerated_usb_id(
     assert dev.port == "/dev/depz-tof"
 
 
+@posix_only
 def test_device_node_is_the_char_device_number_or_none(tmp_path):
     regular = tmp_path / "f"
     regular.write_bytes(b"")
@@ -282,6 +290,7 @@ def test_str_port_not_enumerated_warns_and_resolves_without_a_usb_id(
     assert dev.port == "/dev/depz-unlisted"
 
 
+@posix_only
 def test_list_depz_devices_annotates_an_aliased_port(fake_ports, spy_resolve, by_id_alias):
     node, alias = by_id_alias
     fake_ports["ports"] = [_port(node, DEPZ_USB_VID, PID_VL53L8CH, "SN1")]
@@ -337,9 +346,33 @@ def test_str_port_nobody_answers_is_no_depz_device(fake_ports, monkeypatch):
     """Probe silence on an explicit port is the same condition as on a link —
     `NoDepzDeviceError` for both, never `DeviceLostError` (ERRATA A14)."""
     fake_ports["ports"] = [_port("/dev/mute", DEPZ_USB_VID, PID_SR04, "A")]
-    monkeypatch.setattr(discovery, "probe_port", lambda port, *, timeout: None)
+    monkeypatch.setattr(discovery, "_probe_port", lambda port, timeout: None)
     with pytest.raises(NoDepzDeviceError, match="no DEPZ device answered on /dev/mute"):
         discovery.open_device("/dev/mute", timeout=0.01)
+
+
+def test_str_port_that_cannot_be_opened_names_the_open_failure(fake_ports, monkeypatch):
+    """A port another process holds stays `NoDepzDeviceError`, but the message
+    names the open failure and chains it (contract 07 §3); `probe_port` still
+    answers None for it."""
+    import serial
+
+    from depz_sensor_sdk.errors import DeviceLostError
+    from depz_sensor_sdk.transport import serial_link
+
+    fake_ports["ports"] = [_port("/dev/held", DEPZ_USB_VID, PID_SR04, "A")]
+
+    def refuse(port, *args, **kwargs):
+        raise serial.SerialException(f"[Errno 16] could not open port {port}: Device or resource busy")
+
+    monkeypatch.setattr(serial_link.serial, "Serial", refuse)
+    with pytest.raises(NoDepzDeviceError) as info:
+        discovery.open_device("/dev/held", timeout=0.01)
+    msg = str(info.value)
+    assert msg.startswith("no DEPZ device answered on /dev/held: could not open the port (")
+    assert "Device or resource busy" in msg
+    assert isinstance(info.value.__cause__, DeviceLostError)
+    assert discovery.probe_port("/dev/held", timeout=0.01) is None
 
 
 def test_open_on_link_probes_three_requests_then_attaches():

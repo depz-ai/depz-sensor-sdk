@@ -158,7 +158,7 @@ def test_frame_time_recording(seen):
     clock = SensorClock()
     timer = CaptureTimer(clock)
     checked = 0
-    lines = (RECORDINGS / "tmf8829_frame_time.jsonl").read_text().splitlines()
+    lines = (RECORDINGS / "tmf8829_frame_time.jsonl").read_text(encoding="utf-8").splitlines()
     for line in lines:
         v = json.loads(line)
         if "scenario" in v:

@@ -261,6 +261,25 @@ describe("discovery engine", () => {
       openDeviceFrom(ports(), factory, "/dev/ttyACM1", { timeoutMs: 60 }),
     ).rejects.toThrow(NoDepzDeviceError);
   });
+
+  it("a port that cannot be opened names the open failure (contract 07 §3)", async () => {
+    const busy = new Error("Error: Resource temporarily unavailable Cannot lock port");
+    const refusing = (port: DepzPortInfo): SerialTransport => {
+      const transport = factory(port);
+      if (port.path === "/dev/ttyACM1") transport.open = () => Promise.reject(busy);
+      return transport;
+    };
+    const err = await openDeviceFrom(ports(), refusing, "/dev/ttyACM1").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NoDepzDeviceError);
+    expect((err as Error).message).toBe(
+      "no DEPZ device answered on /dev/ttyACM1: could not open the port " +
+        "(Error: Resource temporarily unavailable Cannot lock port)",
+    );
+    expect((err as Error).cause).toBe(busy);
+    // The same through an index; probing alone still answers "nothing".
+    await expect(openDeviceFrom(ports(), refusing, 1)).rejects.toThrow(/could not open the port/);
+    expect(await listDepzDevicesFrom(ports(), refusing)).toHaveLength(1);
+  });
 });
 
 /**

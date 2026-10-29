@@ -42,9 +42,9 @@ class RecordingLink(Link):
         import threading
 
         self._inner = inner
-        self._file: IO[str] = open(path, "w", encoding="utf-8")
+        self._file: IO[str] = open(path, "w", encoding="utf-8", newline="\n")
         self._lock = threading.Lock()
-        self._t0 = time.monotonic_ns()
+        self._t0 = time.perf_counter_ns()  # fine-grained on Windows too (host_now_us)
         header = {
             "schema": SCHEMA,
             "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -54,7 +54,7 @@ class RecordingLink(Link):
         self._file.write(json.dumps(header, ensure_ascii=False) + "\n")
 
     def _stamp(self) -> int:
-        return (time.monotonic_ns() - self._t0) // 1000
+        return (time.perf_counter_ns() - self._t0) // 1000
 
     def _emit(self, direction: str, data: bytes) -> None:
         if data:
@@ -120,7 +120,7 @@ class ReplayLink(Link):
         self._tx_written = 0
         self._realtime = realtime
         self._strict_tx = strict_tx
-        self._t0 = time.monotonic_ns()
+        self._t0 = time.perf_counter_ns()  # fine-grained on Windows too (host_now_us)
         self._cv = threading.Condition()
         self._closed = False
 
@@ -145,7 +145,7 @@ class ReplayLink(Link):
                 self._cv.wait(remaining)
         if self._realtime:
             due_ns = self._t0 + t_ev * 1000
-            now = time.monotonic_ns()
+            now = time.perf_counter_ns()
             if now < due_ns:
                 wait_s = (due_ns - now) / 1e9
                 budget = deadline - time.monotonic()

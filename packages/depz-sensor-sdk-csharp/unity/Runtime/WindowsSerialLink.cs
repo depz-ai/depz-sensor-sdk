@@ -44,7 +44,9 @@ namespace Depz.Sensor.Unity
             {
                 _port.Open();
             }
-            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is InvalidOperationException)
+            // ArgumentException: on Windows a name that is not a COM port (/dev/tty…) fails Open() so
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is InvalidOperationException
+                                      || e is ArgumentException)
             {
                 throw new DeviceLostException($"cannot open {port}: {e.Message}", e);
             }

@@ -36,7 +36,7 @@ def test_record_then_replay(tmp_path: Path):
         dev.close()
         fake.close()
 
-    lines = rec_path.read_text().splitlines()
+    lines = rec_path.read_text(encoding="utf-8").splitlines()
     assert lines and '"schema": "depz.rec/1"' in lines[0].replace(": ", ": ") or "depz.rec/1" in lines[0]
 
     # Loose replay: same decoded results from the recorded rx stream.
@@ -60,7 +60,7 @@ def _capture(path: Path, events: list[tuple[int, str, bytes]]) -> Path:
     lines = [json.dumps({"schema": "depz.rec/1"})]
     for t, d, data in events:
         lines.append(json.dumps({"t": t, "dir": d, "data": data.hex()}))
-    path.write_text("\n".join(lines) + "\n\n", encoding="utf-8")  # trailing blank line
+    path.write_text("\n".join(lines) + "\n\n", encoding="utf-8", newline="\n")  # trailing blank line
     return path
 
 
@@ -70,7 +70,7 @@ def test_recording_link_tracks_the_inner_link(tmp_path: Path):
     assert not rec.closed
     rec.close()
     assert rec.closed and a.closed
-    assert json.loads((tmp_path / "x.depzrec").read_text().splitlines()[0])["schema"] == "depz.rec/1"
+    assert json.loads((tmp_path / "x.depzrec").read_text(encoding="utf-8").splitlines()[0])["schema"] == "depz.rec/1"
 
 
 def test_replay_gates_rx_on_tx_and_skips_blank_lines(tmp_path: Path):
@@ -139,10 +139,10 @@ def test_replay_realtime_paces_rx_by_recorded_time(tmp_path: Path):
         (5_000_000, "rx", b"\xbb"),  # 5 s in: far beyond any read budget here
     ])
     link = ReplayLink(path, realtime=True)
-    t0 = time.monotonic()
+    t0 = time.perf_counter()  # not monotonic: 15.6 ms steps on Windows before Python 3.13
     assert link.read(1.0) == b"\x00"
     assert link.read(1.0) == b"\xaa"
-    assert time.monotonic() - t0 >= 0.0015
+    assert time.perf_counter() - t0 >= 0.0015
     # the second event is not due within the read's budget: b"" and nothing
     # is consumed — a later read with budget would still get it
     t0 = time.monotonic()

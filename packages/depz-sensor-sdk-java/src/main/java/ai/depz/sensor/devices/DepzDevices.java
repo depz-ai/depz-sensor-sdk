@@ -107,12 +107,19 @@ public final class DepzDevices {
 
     /** Probe one port: open it, run {@link #probe}, close. Null when nothing DEPZ-shaped answers. */
     public static DeviceInfo probePort(String port, Duration timeout) {
-        DepzDevice dev;
         try {
-            dev = new DepzDevice(port, timeout);
+            return probeOpening(port, timeout);
         } catch (DepzException | IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * {@link #probePort}, except that a port that cannot be opened (busy, no permission, gone) throws
+     * the open failure instead of returning null — so {@link #openPort} can name it (contract 07 §3).
+     */
+    private static DeviceInfo probeOpening(String port, Duration timeout) {
+        DepzDevice dev = new DepzDevice(port, timeout);
         try {
             ProbeResult p = probe(dev);
             Identity id = Identity.parseSoftwareName(p.softwareName());
@@ -317,7 +324,13 @@ public final class DepzDevices {
     }
 
     private static DepzDevice openProbed(String port, Duration timeout) {
-        DeviceInfo info = probePort(port, timeout);
+        DeviceInfo info;
+        try {
+            info = probeOpening(port, timeout);
+        } catch (DepzException | IllegalArgumentException e) {
+            throw new NoDepzDeviceException(
+                    "no DEPZ device answered on " + port + ": could not open the port (" + e.getMessage() + ")", e);
+        }
         if (info == null) {
             throw new NoDepzDeviceException("no DEPZ device answered on " + port);
         }

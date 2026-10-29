@@ -617,13 +617,13 @@ def _collect():
             domain = {"Sr04.cs": "sr04", "FwDepz.cs": "firmware"}.get(base, "protocol")
         else:
             continue
-        syms = Parser(path.read_text()).parse()
+        syms = Parser(path.read_text(encoding="utf-8")).parse()
         by_domain.setdefault(domain, []).extend(syms)
 
     # The Unity communication module: the UPM package's sources (its MonoBehaviour included —
     # the parser does not evaluate #if, so UNITY_5_3_OR_NEWER code is documented too).
     for path in sorted(UNITY.glob("*.cs"), key=prio):
-        by_domain.setdefault("unity", []).extend(Parser(path.read_text()).parse())
+        by_domain.setdefault("unity", []).extend(Parser(path.read_text(encoding="utf-8")).parse())
 
     ordered = DOMAIN_ORDER + [d for d in by_domain if d not in DOMAIN_ORDER]
     return [(d, DOMAIN_TITLE.get(d, d.title()), by_domain[d])
@@ -723,7 +723,7 @@ def main() -> None:
     ]
     DOCS.mkdir(parents=True, exist_ok=True)
     n = sum(len(s) for _, _, s in groups)
-    (DOCS / "api.md").write_text(_render_reference(groups, root_head))
+    (DOCS / "api.md").write_text(_render_reference(groups, root_head), encoding="utf-8", newline="\n")
     print(f"wrote {DOCS / 'api.md'} ({n} public types across {len(groups)} groups)")
 
     for folder, title, syms, note, *extra in _sensor_targets(groups):
@@ -744,7 +744,7 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference(groups_out, sub_head))
+        out.write_text(_render_reference(groups_out, sub_head), encoding="utf-8", newline="\n")
         print(f"wrote {out} ({sum(len(m) for _, _, m in groups_out)} symbols)")
 
 

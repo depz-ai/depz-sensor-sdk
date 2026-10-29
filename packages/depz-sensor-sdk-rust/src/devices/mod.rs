@@ -41,6 +41,7 @@ pub use serial::{
     DEFAULT_BAUD_RATE,
 };
 pub use sr04::{Sr04Device, Sr04Measurement};
+pub(crate) use stream::call_guarded;
 pub use stream::{Hook, Subscription};
 pub use tmf8829::{Tmf8829AppliedConfig, Tmf8829Device, Tmf8829InitResult, Tmf8829Options};
 pub use vl53l4cd::{Vl53l4Measurement, Vl53l4cdDevice};

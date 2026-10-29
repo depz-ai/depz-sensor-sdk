@@ -1,7 +1,9 @@
 #include "depz/dataset.hpp"
+#include "depz/device.hpp"
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -880,7 +882,6 @@ const char* to_string(PlayerState s)
 struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
     using RecordCb = std::shared_ptr<std::function<void(const Record&)>>;
     using StateCb = std::shared_ptr<std::function<void(PlayerState)>>;
-    using ErrorCb = std::shared_ptr<std::function<void(const std::string&)>>;
 
     const std::vector<Record> recs;
     const std::function<double()> clock;
@@ -897,7 +898,7 @@ struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
     std::optional<std::thread::id> delivering;  // the thread running record callbacks now
     std::vector<RecordCb> record_cbs;
     std::vector<StateCb> state_cbs;
-    std::vector<ErrorCb> error_cbs;
+    std::atomic<std::uint64_t> callback_errors{0};
     std::thread thread;
 
     Impl(const Reader& reader, PlayerOptions o)
@@ -945,14 +946,27 @@ struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
         if (changes.empty()) return;
         std::vector<StateCb> cbs = state_cbs;
         g.unlock();
-        for (PlayerState s : changes)
-            for (const auto& cb : cbs) (*cb)(s);
+        for (PlayerState s : changes) deliver(cbs, s);
     }
 
-    enum class Step { Delivered, Failed, Wait, Idle };
+    // Hand `item` to every callback; one that throws is counted, reported and
+    // dropped — the rest still get it, playback goes on (contract 09).
+    template <class Cbs, class T>
+    void deliver(const Cbs& cbs, const T& item)
+    {
+        for (const auto& cb : cbs) {
+            try {
+                (*cb)(item);
+            } catch (...) {
+                detail::callback_threw(callback_errors);
+            }
+        }
+    }
+
+    enum class Step { Delivered, Wait, Idle };
 
     // Deliver the next record if it is due.
-    Step step(double& wait, std::uint64_t& gen, std::exception_ptr& error)
+    Step step(double& wait, std::uint64_t& gen)
     {
         std::vector<PlayerState> changes;
         std::unique_lock<std::mutex> g(lock);
@@ -978,28 +992,16 @@ struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
         delivering = std::this_thread::get_id();
         std::vector<RecordCb> cbs = record_cbs;
         g.unlock();
-        Step out = Step::Delivered;
-        try {
-            for (const auto& cb : cbs) (*cb)(rec);
-        } catch (...) {
-            error = std::current_exception();
-            out = Step::Failed;
-        }
+        deliver(cbs, rec);
         g.lock();
         delivering.reset();
         changed.notify_all();
-        if (out == Step::Failed) {
-            // A failing consumer stops playback where it failed; the error goes to whoever drove delivery.
-            if (state == PlayerState::Playing) {
-                set_state(PlayerState::Paused, changes);
-                bump();
-            }
-        } else if (state == PlayerState::Playing && idx >= recs.size()) {
+        if (state == PlayerState::Playing && idx >= recs.size()) {
             set_state(PlayerState::Done, changes);
             bump();
         }
         notify(g, changes);
-        return out;
+        return Step::Delivered;
     }
 
     void run()
@@ -1007,25 +1009,8 @@ struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
         for (;;) {
             double wait = 0;
             std::uint64_t gen = 0;
-            std::exception_ptr error;
-            switch (step(wait, gen, error)) {
+            switch (step(wait, gen)) {
                 case Step::Delivered: break;
-                case Step::Failed: {
-                    std::string text = "a record callback threw";
-                    try {
-                        std::rethrow_exception(error);
-                    } catch (const std::exception& e) {
-                        text = e.what();
-                    } catch (...) {
-                    }
-                    std::vector<ErrorCb> cbs;
-                    {
-                        std::lock_guard<std::mutex> g(lock);
-                        cbs = error_cbs;
-                    }
-                    for (const auto& cb : cbs) (*cb)(text);
-                    break;
-                }
                 case Step::Wait: {
                     std::unique_lock<std::mutex> g(lock);
                     if (closed) return;
@@ -1086,6 +1071,8 @@ void DatasetPlayer::set_speed(double speed)
     impl_->bump();
 }
 
+std::uint64_t DatasetPlayer::callback_errors() const { return impl_->callback_errors.load(std::memory_order_relaxed); }
+
 DatasetPlayer::Unsubscribe DatasetPlayer::on_record(std::function<void(const Record&)> cb)
 {
     auto holder = std::make_shared<std::function<void(const Record&)>>(std::move(cb));
@@ -1115,23 +1102,6 @@ DatasetPlayer::Unsubscribe DatasetPlayer::on_state(std::function<void(PlayerStat
         if (auto p = weak.lock()) {
             std::lock_guard<std::mutex> g(p->lock);
             auto& v = p->state_cbs;
-            v.erase(std::remove(v.begin(), v.end(), holder), v.end());
-        }
-    };
-}
-
-DatasetPlayer::Unsubscribe DatasetPlayer::on_delivery_error(std::function<void(const std::string&)> cb)
-{
-    auto holder = std::make_shared<std::function<void(const std::string&)>>(std::move(cb));
-    {
-        std::lock_guard<std::mutex> g(impl_->lock);
-        impl_->error_cbs.push_back(holder);
-    }
-    std::weak_ptr<Impl> weak = impl_;
-    return [weak, holder] {
-        if (auto p = weak.lock()) {
-            std::lock_guard<std::mutex> g(p->lock);
-            auto& v = p->error_cbs;
             v.erase(std::remove(v.begin(), v.end(), holder), v.end());
         }
     };
@@ -1194,10 +1164,8 @@ std::optional<double> DatasetPlayer::tick()
     for (;;) {
         double wait = 0;
         std::uint64_t gen = 0;
-        std::exception_ptr error;
-        switch (impl_->step(wait, gen, error)) {
+        switch (impl_->step(wait, gen)) {
             case Impl::Step::Delivered: break;
-            case Impl::Step::Failed: std::rethrow_exception(error);
             case Impl::Step::Wait: return wait;
             case Impl::Step::Idle: return std::nullopt;
         }

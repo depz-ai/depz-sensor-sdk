@@ -94,11 +94,11 @@ def render():
 def main() -> int:
     text = render()
     if "--check" in sys.argv:
-        if not OUT.exists() or OUT.read_text() != text:
+        if not OUT.exists() or OUT.read_text(encoding="utf-8") != text:
             print("stale (run scripts/gen_vl53lx_bare_tables.py): " + OUT.name)
             return 1
         return 0
-    OUT.write_text(text)
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     return 0
 
 

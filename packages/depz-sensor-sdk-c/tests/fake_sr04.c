@@ -20,6 +20,8 @@ struct fake_sr04 {
     bool        loop_running;
     uint64_t    mcu_time_us;
     int16_t     temperature_raw;
+    uint8_t     payload_crc_type;
+    int         reset_count;
     const char *software;      /* GET_NAME_ACTIVE_SOFTWARE; NULL = FAKE_SR04_SOFTWARE */
     uint8_t     cmds[64];      /* the first host commands, in order */
     size_t      n_cmds;
@@ -89,6 +91,19 @@ static void handle(fake_sr04 *f, uint8_t cmd, const uint8_t *p, size_t len)
         put_u64(out, f->mcu_time_us);
         put_u16(out + 8, (uint16_t)f->temperature_raw);
         send_locked(f, 0x83, out, f->short_temperature ? 3 : 10);
+        break;
+    case 0x08: /* GET_PAYLOAD_CRC_TYPE */
+        send_locked(f, 0x87, &f->payload_crc_type, 1);
+        break;
+    case 0x09: /* SET_PAYLOAD_CRC_TYPE: 0..3 else ERR_INVALID_PARAM */
+        if (len != 1) status(f, cmd, 0x03);
+        else if (p[0] > 3) status(f, cmd, 0x04);
+        else { f->payload_crc_type = p[0]; status(f, cmd, 0x00); }
+        break;
+    case 0x02: /* DEVICE_RESET: RPT_STATUS, then NVIC reset (contract 02) */
+        status(f, cmd, 0x00);
+        f->reset_count++;
+        depz_link_close(f->side); /* the USB CDC link drops with the reboot */
         break;
     case 0x31:
         if (len != 3 || p[0] < 1 || p[0] > 5 || p[1] > 4 || p[2] > 1) status(f, cmd, 0x04);
@@ -201,6 +216,24 @@ bool fake_sr04_loop_running(fake_sr04 *f)
     bool v;
     depz_mutex_lock(&f->lock);
     v = f->loop_running;
+    depz_mutex_unlock(&f->lock);
+    return v;
+}
+
+uint8_t fake_sr04_payload_crc_type(fake_sr04 *f)
+{
+    uint8_t v;
+    depz_mutex_lock(&f->lock);
+    v = f->payload_crc_type;
+    depz_mutex_unlock(&f->lock);
+    return v;
+}
+
+int fake_sr04_reset_count(fake_sr04 *f)
+{
+    int v;
+    depz_mutex_lock(&f->lock);
+    v = f->reset_count;
     depz_mutex_unlock(&f->lock);
     return v;
 }

@@ -1,13 +1,12 @@
 //! Timeline player over a dataset (contract 09 §Player; reference: the Python `DatasetPlayer`).
 
-use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 
 use super::{Dataset, Record};
-use crate::devices::{DepzError, Hook, Result};
+use crate::devices::{call_guarded, DepzError, Hook, Result};
 
 /// The thread name of a threaded player.
 pub const THREAD_NAME: &str = "depz-dataset-player";
@@ -27,7 +26,6 @@ pub enum PlayerState {
 
 type RecordCb = Arc<dyn Fn(&Record) + Send + Sync>;
 type StateCb = Arc<dyn Fn(PlayerState) + Send + Sync>;
-type ErrorCb = Arc<dyn Fn(&str) + Send + Sync>;
 
 struct St {
     state: PlayerState,
@@ -42,7 +40,6 @@ struct St {
     delivering: Option<ThreadId>,
     record_cbs: Vec<(u64, RecordCb)>,
     state_cbs: Vec<(u64, StateCb)>,
-    error_cbs: Vec<(u64, ErrorCb)>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -53,12 +50,12 @@ struct Inner {
     clock: Box<dyn Fn() -> f64 + Send + Sync>,
     threaded: bool,
     next_id: AtomicU64,
+    // Record / state callbacks that panicked and were dropped.
+    callback_errors: AtomicU64,
 }
 
 enum Step {
     Delivered,
-    // A record callback panicked: playback paused, the message for whoever drove delivery.
-    Failed(Box<dyn std::any::Any + Send>),
     Wait(f64, u64),
     Idle(u64),
 }
@@ -76,7 +73,9 @@ enum Step {
 /// by the first [`DatasetPlayer::play`]); a state change a call makes is reported on the calling
 /// thread before it returns. Callbacks run outside the player's lock, so they may call its
 /// methods; once [`DatasetPlayer::pause`] returns no record callback is running or will start
-/// (unless `pause` was called from that callback). They must not block. With `threaded = false`
+/// (unless `pause` was called from that callback). They must not block. A callback that panics is
+/// counted in [`DatasetPlayer::callback_errors`], reported on stderr and dropped: the other callbacks
+/// still get the record and playback goes on (contract 09). With `threaded = false`
 /// no thread starts and the owner calls [`DatasetPlayer::tick`] (a GUI timer, or a test with a
 /// fake clock). Dropping the player stops it.
 pub struct DatasetPlayer {
@@ -111,7 +110,6 @@ impl DatasetPlayer {
                     delivering: None,
                     record_cbs: Vec::new(),
                     state_cbs: Vec::new(),
-                    error_cbs: Vec::new(),
                     thread: None,
                 }),
                 changed: Condvar::new(),
@@ -119,6 +117,7 @@ impl DatasetPlayer {
                 clock,
                 threaded,
                 next_id: AtomicU64::new(0),
+                callback_errors: AtomicU64::new(0),
             }),
         })
     }
@@ -149,6 +148,11 @@ impl DatasetPlayer {
     /// Playback speed (finite, ≥ 0; 0 = as fast as possible).
     pub fn speed(&self) -> f64 {
         self.inner.lock().speed
+    }
+
+    /// Record / state callbacks that panicked and were dropped (contract 09).
+    pub fn callback_errors(&self) -> u64 {
+        self.inner.callback_errors.load(Ordering::Relaxed)
     }
 
     /// Set the playback speed (finite, ≥ 0, else [`DepzError::InvalidArgument`]). A change while
@@ -186,19 +190,6 @@ impl DatasetPlayer {
         Hook::new(move || {
             if let Some(i) = inner.upgrade() {
                 i.lock().state_cbs.retain(|(k, _)| *k != id);
-            }
-        })
-    }
-
-    /// Call `callback` with the message of a record callback that panicked on the player thread:
-    /// playback paused there (the record counts as delivered).
-    pub fn on_delivery_error(&self, callback: impl Fn(&str) + Send + Sync + 'static) -> Hook {
-        let id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
-        self.inner.lock().error_cbs.push((id, Arc::new(callback)));
-        let inner = Arc::downgrade(&self.inner);
-        Hook::new(move || {
-            if let Some(i) = inner.upgrade() {
-                i.lock().error_cbs.retain(|(k, _)| *k != id);
             }
         })
     }
@@ -294,13 +285,11 @@ impl DatasetPlayer {
     }
 
     /// Deliver every record due now, on the calling thread. Returns the seconds until the next one
-    /// is due, or `None` when not playing. For `threaded = false`; harmless with a player thread. A
-    /// record callback's panic pauses playback and propagates.
+    /// is due, or `None` when not playing. For `threaded = false`; harmless with a player thread.
     pub fn tick(&self) -> Option<f64> {
         loop {
             match self.inner.step() {
                 Step::Delivered => {}
-                Step::Failed(p) => panic::resume_unwind(p),
                 Step::Wait(w, _) => return Some(w),
                 Step::Idle(_) => return None,
             }
@@ -374,13 +363,6 @@ fn check_speed(value: f64) -> Result<f64> {
     Ok(value)
 }
 
-fn panic_text(p: &(dyn std::any::Any + Send)) -> String {
-    p.downcast_ref::<&str>()
-        .map(|s| s.to_string())
-        .or_else(|| p.downcast_ref::<String>().cloned())
-        .unwrap_or_else(|| "a record callback panicked".into())
-}
-
 impl Inner {
     fn lock(&self) -> MutexGuard<'_, St> {
         self.st.lock().unwrap_or_else(|e| e.into_inner())
@@ -422,7 +404,7 @@ impl Inner {
         drop(st);
         for s in changes {
             for cb in &cbs {
-                cb(s);
+                call_guarded(|| cb(s), &self.callback_errors);
             }
         }
     }
@@ -453,52 +435,24 @@ impl Inner {
         st.delivering = Some(std::thread::current().id());
         let cbs: Vec<RecordCb> = st.record_cbs.iter().map(|(_, c)| c.clone()).collect();
         drop(st);
-        let r = panic::catch_unwind(AssertUnwindSafe(|| {
-            for cb in &cbs {
-                cb(rec);
-            }
-        }));
+        for cb in &cbs {
+            call_guarded(|| cb(rec), &self.callback_errors);
+        }
         let mut st = self.lock();
         st.delivering = None;
         self.changed.notify_all();
-        let out = match r {
-            Ok(()) => Step::Delivered,
-            // A failing consumer stops playback where it failed; the error goes to whoever drove delivery.
-            Err(p) => {
-                if st.state == PlayerState::Playing {
-                    self.set_state(&mut st, PlayerState::Paused, &mut changes);
-                    self.bump(&mut st);
-                }
-                Step::Failed(p)
-            }
-        };
-        if matches!(out, Step::Delivered)
-            && st.state == PlayerState::Playing
-            && st.idx >= self.recs.len()
-        {
+        if st.state == PlayerState::Playing && st.idx >= self.recs.len() {
             self.set_state(&mut st, PlayerState::Done, &mut changes);
             self.bump(&mut st);
         }
         self.notify(st, changes);
-        out
+        Step::Delivered
     }
 
     fn run(&self) {
         loop {
             match self.step() {
                 Step::Delivered => {}
-                Step::Failed(p) => {
-                    let text = panic_text(&*p);
-                    let cbs: Vec<ErrorCb> = self
-                        .lock()
-                        .error_cbs
-                        .iter()
-                        .map(|(_, c)| c.clone())
-                        .collect();
-                    for cb in cbs {
-                        cb(&text);
-                    }
-                }
                 Step::Wait(w, gen) => {
                     let st = self.lock();
                     if st.closed {

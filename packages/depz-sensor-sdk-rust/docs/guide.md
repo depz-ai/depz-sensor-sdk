@@ -175,7 +175,7 @@ Callbacks (`on_measurement`, `on_event`) run on the reader thread and return a
 
 ## Add the crate
 
-Published on crates.io as `depz-sensor-sdk` (0.8.0):
+Published on crates.io as `depz-sensor-sdk` (0.9.0):
 
 ```bash
 cargo add depz-sensor-sdk

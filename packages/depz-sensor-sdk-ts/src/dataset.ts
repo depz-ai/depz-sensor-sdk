@@ -4,7 +4,7 @@
  * `depz_sensor_sdk.dataset` module; browser-safe (no Node APIs).
  */
 
-import { type DepzDevice } from "./device/device.js";
+import { callGuarded, type DepzDevice } from "./device/device.js";
 import { InvalidStateError } from "./errors.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
 import { tmf8829RecordValue } from "./sensors/tmf8829/builder.js";
@@ -439,9 +439,9 @@ const BURST_MS = 10;
  *
  * Records and the `done` state are delivered from timers, never inside
  * `play` / `seekUs` / a speed change; state changes made by those calls are
- * reported before they return. An error thrown by an `onRecord` callback
- * pauses the player (the record counts as delivered) and is rethrown from the
- * timer, i.e. it reaches the global uncaught-error handler.
+ * reported before they return. A record or state callback that throws is
+ * logged (`console.error`), counted in {@link DatasetPlayer.callbackErrors}
+ * and dropped: the other callbacks still get the record and playback goes on.
  */
 export class DatasetPlayer {
   private idx = 0; // next record to deliver
@@ -453,6 +453,7 @@ export class DatasetPlayer {
   private anchorWall = 0;
   private anchorT = 0;
   private readonly clock: () => number;
+  private _callbackErrors = 0;
 
   constructor(
     readonly reader: DatasetReader,
@@ -480,6 +481,11 @@ export class DatasetPlayer {
     const recs = this.reader.records;
     if (recs.length === 0 || this.idx === 0) return 0;
     return recs[Math.min(this.idx, recs.length) - 1]!.tHostUs - recs[0]!.tHostUs;
+  }
+
+  /** Record / state callbacks that threw and were dropped (contract 09). */
+  get callbackErrors(): number {
+    return this._callbackErrors;
   }
 
   get speed(): number {
@@ -582,7 +588,12 @@ export class DatasetPlayer {
 
   private setState(s: PlayerState): void {
     this._state = s;
-    for (const cb of [...this.stateCbs]) cb(s);
+    this.deliver(this.stateCbs, s);
+  }
+
+  /** Hand `item` to every callback; one that throws is counted and dropped. */
+  private deliver<T>(cbs: Array<(item: T) => void>, item: T): void {
+    for (const cb of [...cbs]) if (!callGuarded(cb, item)) this._callbackErrors += 1;
   }
 
   private clearTimer(): void {
@@ -637,15 +648,7 @@ export class DatasetPlayer {
         return;
       }
       this.idx += 1;
-      try {
-        for (const cb of [...this.recordCbs]) cb(rec);
-      } catch (e) {
-        if (this._state === "playing") {
-          this.clearTimer();
-          this.setState("paused");
-        }
-        throw e;
-      }
+      this.deliver(this.recordCbs, rec);
       if (this._state === "playing" && this.idx >= recs.length) {
         this.setState("done");
         return;

@@ -1,11 +1,13 @@
 package ai.depz.sensor.dataset;
 
+import ai.depz.sensor.devices.CallbackGuard;
 import ai.depz.sensor.devices.InvalidStateException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,7 +27,9 @@ import java.util.function.DoubleSupplier;
  * <p>Threads: records and the {@link PlayerState#DONE} state are delivered on a player thread (started by
  * the first {@link #play()}); a state change a call makes is reported on the calling thread before it
  * returns. Callbacks run under the player's lock — they see a consistent player and may call its methods,
- * and once {@link #pause()} returns no record callback is running or will start. They must not block. With
+ * and once {@link #pause()} returns no record callback is running or will start. They must not block. A
+ * callback that throws is logged ({@code java.util.logging} logger {@code ai.depz.sensor}), counted in
+ * {@link #callbackErrors()} and dropped: the other callbacks still get the record and playback goes on. With
  * {@code threaded = false} no thread starts and the owner calls {@link #tick()} (a GUI timer, or a test
  * with a fake clock).
  */
@@ -42,7 +46,7 @@ public final class DatasetPlayer implements AutoCloseable {
     private final boolean threaded;
     private final List<Consumer<Dataset.Record>> recordCallbacks = new ArrayList<>();
     private final List<Consumer<PlayerState>> stateCallbacks = new ArrayList<>();
-    private final List<Consumer<Exception>> errorCallbacks = new ArrayList<>();
+    private final AtomicLong callbackErrors = new AtomicLong();
     private PlayerState state = PlayerState.IDLE;
     private double speed;
     private int idx; // the next record to deliver
@@ -128,6 +132,11 @@ public final class DatasetPlayer implements AutoCloseable {
         }
     }
 
+    /** Record / state callbacks that threw and were dropped (contract 09). */
+    public long callbackErrors() {
+        return callbackErrors.get();
+    }
+
     /** Playback speed (finite, ≥ 0; 0 = as fast as possible). */
     public double speed() {
         lock.lock();
@@ -166,14 +175,6 @@ public final class DatasetPlayer implements AutoCloseable {
     /** Subscribe to state changes, called with the new state on every transition. */
     public AutoCloseable onState(Consumer<PlayerState> callback) {
         return subscribe(stateCallbacks, callback);
-    }
-
-    /**
-     * Subscribe to errors of callbacks on the player thread: playback paused there (the record counts as
-     * delivered).
-     */
-    public AutoCloseable onDeliveryError(Consumer<Exception> callback) {
-        return subscribe(errorCallbacks, callback);
     }
 
     private <T> AutoCloseable subscribe(List<Consumer<T>> list, Consumer<T> callback) {
@@ -285,8 +286,7 @@ public final class DatasetPlayer implements AutoCloseable {
 
     /**
      * Deliver every record due now, on the calling thread. Returns the seconds until the next one is due,
-     * or null when not playing. For {@code threaded = false}; harmless with a player thread. A callback's
-     * exception pauses playback and propagates.
+     * or null when not playing. For {@code threaded = false}; harmless with a player thread.
      */
     public Double tick() {
         lock.lock();
@@ -393,8 +393,15 @@ public final class DatasetPlayer implements AutoCloseable {
     private void setState(PlayerState s) {
         state = s;
         changed.signalAll();
-        for (Consumer<PlayerState> cb : new ArrayList<>(stateCallbacks)) {
-            cb.accept(s);
+        deliver(stateCallbacks, s);
+    }
+
+    // Hand `item` to every callback; one that throws is counted, logged and dropped (contract 09).
+    private <T> void deliver(List<Consumer<T>> callbacks, T item) {
+        for (Consumer<T> cb : new ArrayList<>(callbacks)) {
+            if (!CallbackGuard.call(cb, item)) {
+                callbackErrors.incrementAndGet();
+            }
         }
     }
 
@@ -416,17 +423,7 @@ public final class DatasetPlayer implements AutoCloseable {
             }
         }
         idx++;
-        try {
-            for (Consumer<Dataset.Record> cb : new ArrayList<>(recordCallbacks)) {
-                cb.accept(rec);
-            }
-        } catch (RuntimeException | Error e) {
-            // A failing consumer stops playback where it failed; the error goes to whoever drove delivery.
-            if (state == PlayerState.PLAYING) {
-                setState(PlayerState.PAUSED);
-            }
-            throw e;
-        }
+        deliver(recordCallbacks, rec);
         if (state == PlayerState.PLAYING && idx >= recs.size()) {
             setState(PlayerState.DONE);
         }
@@ -452,15 +449,7 @@ public final class DatasetPlayer implements AutoCloseable {
         lock.lock();
         try {
             while (!closed) {
-                Step r;
-                try {
-                    r = stepLocked();
-                } catch (RuntimeException e) {
-                    for (Consumer<Exception> cb : new ArrayList<>(errorCallbacks)) {
-                        cb.accept(e);
-                    }
-                    continue;
-                }
+                Step r = stepLocked();
                 if (r.delivered()) {
                     // let control calls (pause / seek from other threads) in between records, even at speed 0
                     letOthersIn();

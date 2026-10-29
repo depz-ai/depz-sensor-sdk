@@ -215,7 +215,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.8.0
+  GIT_TAG        v0.9.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -283,7 +283,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.8.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.9.0`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test
@@ -308,7 +308,7 @@ BNO085 session (reset, three enables with their read-backs, 150 reports, a
 busy retry, calibration, metadata, counts), plus five VL53L 1D-family
 captures through `depz::Vl53lx` (the VL53L0X API, the VL53L1X ULD, the
 VL53L3CX ULP, the VL53L4CD ULD borrowed by a VL53L4CX, and the VL53L4CX
-histogram driver refusing its short preset on an L4 die). CI builds and tests Linux, macOS and Windows,
+histogram driver refusing its short preset on an L4 die). It is built and tested on Linux, macOS and Windows,
 with warnings as errors on gcc, clang and MSVC `/W4` (`DEPZ_SENSOR_SDK_CPP_WERROR`,
 on with the tests; packagers build with tests off and keep warnings as
 warnings).
@@ -320,8 +320,8 @@ scripts/coverage.sh                  # line coverage (gcc --coverage + gcovr) in
 
 `scripts/coverage.sh` lists the least-covered files and fails below the floor
 in the script (`FLOOR`, the measured total rounded down — raise it when the
-tests grow, never lower it to make a change pass). CI also runs the whole
-suite under UndefinedBehaviorSanitizer, AddressSanitizer with LeakSanitizer
+tests grow, never lower it to make a change pass). Before every release the whole
+suite also runs under UndefinedBehaviorSanitizer, AddressSanitizer with LeakSanitizer
 and ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread cpp` at the
 repository root).
 

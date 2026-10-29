@@ -6,12 +6,12 @@ use std::time::Duration;
 
 use common::fake_board::{until, FakeBoard};
 use depz_sensor_sdk::devices::{
-    open_on_link, AnyDevice, DepzDevice, DepzError, DeviceEvent, RecordingLink, ReplayLink,
-    Sr04Device,
+    host_now_us, open_on_link, AnyDevice, DepzDevice, DepzError, DeviceEvent, RecordingLink,
+    ReplayLink, Sr04Device,
 };
 use depz_sensor_sdk::framing::{build_packet, CrcType};
 use depz_sensor_sdk::json::Value;
-use depz_sensor_sdk::protocol::common::{Cmd, Rpt, Status};
+use depz_sensor_sdk::protocol::common::{Cmd, Rpt, Status, SyncPinConfig};
 use depz_sensor_sdk::protocol::sr04::{Sr04Cmd, Sr04Rpt};
 
 const SHORT: Option<Duration> = Some(Duration::from_millis(100));
@@ -402,4 +402,222 @@ fn open_on_link_refuses_bootloader_and_silence() {
         Err(DepzError::NoDevice(_))
     ));
     assert!(silent.is_closed_for_test());
+}
+
+#[test]
+fn timeout_crc_and_port_settings() {
+    let board = FakeBoard::new();
+    let b = board.clone();
+    board.on_packet(move |p| vec![b.reply(Rpt::Text as u8, &text(p.cmd, "APP_usonic_SR04_v0.97"))]);
+    let dev = DepzDevice::new(board.clone(), SHORT);
+    assert_eq!(dev.port(), "fake");
+    assert_eq!(dev.timeout(), Duration::from_millis(100));
+    assert!(matches!(
+        dev.set_timeout(Duration::ZERO),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    dev.set_timeout(Duration::from_millis(250)).unwrap();
+    assert_eq!(dev.timeout(), Duration::from_millis(250));
+    assert_eq!(dev.tx_crc_type(), CrcType::None);
+    dev.set_tx_crc_type(CrcType::Crc16);
+    assert_eq!(dev.tx_crc_type(), CrcType::Crc16);
+    // the board's parser checks the CRC-16 the packet now carries
+    assert_eq!(dev.get_software_name().unwrap(), "APP_usonic_SR04_v0.97");
+}
+
+#[test]
+fn sync_time_keeps_the_round_with_the_lowest_rtt() {
+    // Contract 02 §5: offset = ((t2 − t1) + (t3 − t4)) / 2, rtt = (t4 − t1) − (t3 − t2). The board's
+    // clock runs 5 s ahead; round 1 claims 40 ms spent between rx and tx, so its rtt is the lowest
+    // and its offset reads 20 ms more.
+    let board = FakeBoard::new();
+    let b = board.clone();
+    let round = Arc::new(Mutex::new(0u64));
+    let r = round.clone();
+    board.on_packet(move |p| {
+        if p.cmd != Cmd::SyncTime as u8 {
+            return vec![];
+        }
+        let mut n = r.lock().unwrap();
+        let held: u64 = if *n == 1 { 40_000 } else { 0 };
+        *n += 1;
+        let rx = (host_now_us() + 5_000_000) as u64;
+        let mut payload = p.payload[..8].to_vec(); // the host's t1 echoed
+        payload.extend_from_slice(&rx.to_le_bytes());
+        payload.extend_from_slice(&(rx + held).to_le_bytes());
+        vec![b.reply(Rpt::SyncTime as u8, &payload)]
+    });
+    let dev = DepzDevice::new(board.clone(), Some(Duration::from_secs(1)));
+    let s = dev.sync_time(3).unwrap();
+    assert_eq!(*round.lock().unwrap(), 3);
+    assert!(s.rtt_us < 0, "the held round was not kept: {s:?}");
+    assert!((s.offset_us - 5_020_000).abs() < 20_000, "{s:?}");
+    assert_eq!(dev.last_time_sync(), Some(s));
+    assert_eq!(
+        dev.to_host_time_us(6_000_000).unwrap(),
+        6_000_000 - s.offset_us
+    );
+    assert!(s.synced_at_host_us <= host_now_us());
+    dev.sync_time(0).unwrap(); // at least one round
+    assert_eq!(*round.lock().unwrap(), 4);
+}
+
+/// The next event that is not a host-observed seq gap.
+fn next_event(events: &depz_sensor_sdk::devices::Subscription<DeviceEvent>) -> DeviceEvent {
+    loop {
+        match events.take(Duration::from_secs(1)).unwrap() {
+            DeviceEvent::SeqGap { .. } => continue,
+            e => return e,
+        }
+    }
+}
+
+#[test]
+fn unsolicited_text_temperature_crc_errors_and_trash_are_events() {
+    let board = FakeBoard::new();
+    let dev = DepzDevice::new(board.clone(), None);
+    let events = dev.events(256);
+    board.inject(board.reply(Rpt::Text as u8, &text(0x00, "boot ok")));
+    let mut temp = 1234u64.to_le_bytes().to_vec();
+    temp.extend_from_slice(&(-55i16).to_le_bytes());
+    board.inject(board.reply(Rpt::Temperature as u8, &temp));
+    let mut bad = build_packet(0xC6, &[1, 2, 3, 4], 200, CrcType::Crc16).unwrap();
+    let n = bad.len();
+    bad[n - 3] ^= 0xFF; // a payload byte: the payload CRC fails
+    board.inject(bad);
+    board.inject(vec![0x00, 0x11, 0x22]);
+    board.inject(board.reply(Rpt::Text as u8, &text(0x00, "after")));
+    assert_eq!(
+        next_event(&events),
+        DeviceEvent::Text {
+            cmd: 0,
+            text: "boot ok".into()
+        }
+    );
+    assert_eq!(
+        next_event(&events),
+        DeviceEvent::Temperature {
+            timestamp_us: 1234,
+            celsius: -5.5
+        }
+    );
+    assert_eq!(
+        next_event(&events),
+        DeviceEvent::LinkCrcError {
+            cmd: 0xC6,
+            seq: 200
+        }
+    );
+    // Trash boundaries depend on chunking (contract 01 §5): compare the bytes up to the next packet
+    let mut trash = Vec::new();
+    loop {
+        match next_event(&events) {
+            DeviceEvent::Trash(t) => trash.extend(t),
+            e => {
+                assert_eq!(
+                    e,
+                    DeviceEvent::Text {
+                        cmd: 0,
+                        text: "after".into()
+                    }
+                );
+                break;
+            }
+        }
+    }
+    assert_eq!(trash, [0x00, 0x11, 0x22]);
+    // a sensor class hands its own events to the same subscribers
+    let ev = DeviceEvent::Sensor {
+        kind: "test",
+        code: 7,
+        payload: vec![9],
+    };
+    dev.emit_event(ev.clone());
+    assert_eq!(next_event(&events), ev);
+    let st = dev.stats();
+    assert_eq!((st.crc_errors, st.trash_bytes), (1, 3));
+}
+
+#[test]
+fn sync_pins_payload_crc_reset_and_bootloader() {
+    let board = FakeBoard::new();
+    let b = board.clone();
+    board.on_packet(move |p| match p.cmd {
+        c if c == Cmd::GetSyncPinConfig as u8 => {
+            vec![b.reply(Rpt::SyncPinConfig as u8, &[p.payload[0], 2, 1])]
+        }
+        c if c == Cmd::GetPayloadCrcType as u8 => vec![b.reply(Rpt::PayloadCrcType as u8, &[2])],
+        c => vec![FakeBoard::status(c, Status::Ok as u8)],
+    });
+    let dev = DepzDevice::new(board.clone(), SHORT);
+    assert_eq!(
+        dev.get_sync_pin(3).unwrap(),
+        SyncPinConfig {
+            pin: 3,
+            mode: 2,
+            polarity: 1
+        }
+    );
+    dev.set_sync_pin(&SyncPinConfig {
+        pin: 5,
+        mode: 4,
+        polarity: 0,
+    })
+    .unwrap();
+    let sent = board.sent_count();
+    for bad in [
+        SyncPinConfig {
+            pin: 6,
+            mode: 0,
+            polarity: 0,
+        },
+        SyncPinConfig {
+            pin: 1,
+            mode: 5,
+            polarity: 0,
+        },
+        SyncPinConfig {
+            pin: 1,
+            mode: 0,
+            polarity: 2,
+        },
+    ] {
+        assert!(matches!(
+            dev.set_sync_pin(&bad),
+            Err(DepzError::InvalidArgument(_))
+        ));
+    }
+    assert_eq!(board.sent_count(), sent);
+    assert_eq!(dev.get_report_payload_crc().unwrap(), CrcType::Crc16);
+    dev.reset().unwrap();
+    assert!(!dev.is_closed());
+    dev.enter_bootloader_mode().unwrap();
+    assert!(dev.is_closed());
+    let cmds: Vec<(u8, Vec<u8>)> = board
+        .sent_snapshot()
+        .into_iter()
+        .map(|p| (p.cmd, p.payload))
+        .collect();
+    assert_eq!(
+        cmds,
+        vec![
+            (Cmd::GetSyncPinConfig as u8, vec![3]),
+            (Cmd::SetSyncPinConfig as u8, vec![5, 4, 0]),
+            (Cmd::GetPayloadCrcType as u8, vec![]),
+            (Cmd::DeviceReset as u8, vec![]),
+            (Cmd::Bootloader as u8, vec![]),
+        ]
+    );
+}
+
+#[test]
+fn a_payload_crc_type_outside_the_four_is_a_protocol_error() {
+    let board = FakeBoard::new();
+    let b = board.clone();
+    board.on_packet(move |_| vec![b.reply(Rpt::PayloadCrcType as u8, &[7])]);
+    let dev = DepzDevice::new(board.clone(), SHORT);
+    assert!(matches!(
+        dev.get_report_payload_crc(),
+        Err(DepzError::Protocol(_))
+    ));
 }

@@ -14924,7 +14924,7 @@ Timeline player over a dataset: paced delivery with play / pause / seek / speed 
 
 Timing: a media clock anchored at play / resume / seek to (now, t of the last delivered record — of the first when none was). Record i is due at `anchor_wall + (t_i − anchor_t) / speed`: the first record goes out at once, each later one after its gap to the previous one. Pacing is against the clock, so a slow consumer gets overdue records back to back and playback does not drift. Speed 0 delivers as fast as possible.
 
-Threads: records and the `Done` state are delivered on a player thread (started by the first `Play`); a state change a call makes is reported on the calling thread before it returns. Callbacks run under the player's lock — they see a consistent player and may call its methods, and once `Pause` returns no record callback is running or will start. They must not block. With `threaded: false` no thread starts and the owner calls `Tick` (a GUI timer, or a test with a fake clock).
+Threads: records and the `Done` state are delivered on a player thread (started by the first `Play`); a state change a call makes is reported on the calling thread before it returns. Callbacks run under the player's lock — they see a consistent player and may call its methods, and once `Pause` returns no record callback is running or will start. They must not block. A callback that throws is traced (`Trace`), counted in `CallbackErrors` and dropped: the other callbacks still get the record and playback goes on. With `threaded: false` no thread starts and the owner calls `Tick` (a GUI timer, or a test with a fake clock).
 
 #### DatasetPlayer.DatasetPlayer *(constructor)*
 
@@ -14952,13 +14952,13 @@ public DatasetReader Reader
 public PlayerState State
 ```
 
-#### DatasetPlayer.DeliveryError *(field)*
+#### DatasetPlayer.CallbackErrors *(property)*
 
 ```csharp
-public event Action<Exception>? DeliveryError
+public long CallbackErrors
 ```
 
-A callback on the player thread threw: playback paused there (the record counts as delivered).
+Record / state callbacks that threw and were dropped (contract 09).
 
 #### DatasetPlayer.DurationUs *(property)*
 

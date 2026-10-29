@@ -1,6 +1,6 @@
 [project]
 name = "depz-sensor-sdk"
-version = "0.8.0"
+version = "0.9.0"
 description = "Python SDK for the DEPZ USB sensor line — HC-SR04 ultrasonic, VL53L8CX/CH 8x8 ToF, BNO086 IMU."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,7 +47,9 @@ include = ["depz_sensor_sdk*"]
 
 [tool.mypy]
 # The reference SDK is typed end to end: `uv run mypy depz_sensor_sdk` from this
-# directory is a CI gate (strict; the tests are not checked).
+# directory is a gate (scripts/gates.sh) (strict; the tests are not checked).
 strict = true
 python_version = "3.10"
+# The POSIX branches (termios, st_rdev) are checked; on Windows they are runtime-guarded.
+platform = "linux"
 warn_unreachable = true

@@ -7,6 +7,8 @@ or not a DEPZ device?
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 import serial
 
@@ -54,7 +56,8 @@ def test_every_unit_has_a_stable_by_id_path(hw_inventory):
     """
     for dev in hw_inventory:
         assert dev.usb_serial, f"{dev.stable_id}: no USB iSerial — cannot be identified stably"
-        assert dev.by_id_path, f"{dev.stable_id}: no /dev/serial/by-id symlink"
+        if sys.platform.startswith("linux"):  # udev's links; Windows and macOS have none
+            assert dev.by_id_path, f"{dev.stable_id}: no /dev/serial/by-id symlink"
 
 
 def test_probe_reports_correct_sensor_type(hw_inventory):

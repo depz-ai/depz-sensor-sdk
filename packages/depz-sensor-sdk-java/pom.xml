@@ -6,7 +6,7 @@
 
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
   <packaging>jar</packaging>
 
   <name>depz-sensor-sdk</name>
@@ -70,7 +70,7 @@
     </resources>
     <plugins>
       <!-- The golden-vector harness and the device tests (test.sh runs the same two mains
-           with plain javac; CI runs test.sh). ${argLine} is the JaCoCo agent, set by
+           with plain javac; scripts/gates.sh runs test.sh). ${argLine} is the JaCoCo agent, set by
            prepare-agent at run time (not a pom property: Maven would interpolate that one
            before the agent sets it), so this plugin needs the one below. -->
       <plugin>

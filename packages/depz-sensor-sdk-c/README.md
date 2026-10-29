@@ -157,7 +157,7 @@ live in C yet.
   uploads the NVM offset, default crosstalk and configuration; then the
   configuration, the advanced features and the INT-driven frame stream. The
   firmware and configuration blobs are generated into `src/io/vl53l8_blobs.c`
-  from the Python SDK's data by `scripts/gen_vl53l8_blobs.py` (CI checks it is
+  from the Python SDK's data by `scripts/gen_vl53l8_blobs.py` (the gates check it is
   current with `--check`).
 * **Shared decode:** RPT_FRAME chunk parse, frame reassembly, the
   raw-results ranging-frame decoder (`depz_vl53l8_decode_frame` for CX;
@@ -307,7 +307,7 @@ firmware download — four VL53L5CX / VL53L7CH captures through the same
 class, two real BNO055 captures through the BNO055 class, and a real BNO085
 capture plus a fake SH-2 hub through the BNO085 / BNO086 class, and the ten
 VL53L 1D-family captures through the 1D class (`io_*`, 46), and the
-cross-SDK scenarios of contract 15 (`scenario_*`, 29). CI builds and runs it
+cross-SDK scenarios of contract 15 (`scenario_*`, 29). It is built and run
 on Linux, macOS and Windows, with warnings as errors (gcc, clang, MSVC `/W4`).
 
 ```sh
@@ -318,8 +318,8 @@ scripts/coverage.sh               # line coverage (gcc --coverage + gcovr) in bu
 `scripts/coverage.sh` lists the least-covered files and fails below the floor
 in the script (`FLOOR`, the measured total rounded down — raise it when the
 tests grow, never lower it to make a change pass); the serial-port and
-port-enumeration files need a board and are listed apart. CI also runs the
-whole suite under UndefinedBehaviorSanitizer, AddressSanitizer with
+port-enumeration files need a board and are listed apart. Before every
+release the whole suite also runs under UndefinedBehaviorSanitizer, AddressSanitizer with
 LeakSanitizer and ThreadSanitizer (`scripts/sanitize.sh
 undefined|address|thread c` at the repository root).
 
@@ -350,7 +350,7 @@ while the board was turned, tilted and shaken by hand.
 The library (`libdepz_sensor_sdk_c.a`, `depz_sensor_sdk_c.lib` with MSVC)
 exports a namespaced target **`depz::sensor_sdk_c`** and ships an
 installable CMake package (`find_package(depz-sensor-sdk-c CONFIG)`), a Conan 2
-recipe, and a vcpkg port. Version **0.8.0**, MIT.
+recipe, and a vcpkg port. Version **0.9.0**, MIT.
 
 ### CMake FetchContent
 
@@ -362,7 +362,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.8.0
+  GIT_TAG        v0.9.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -379,7 +379,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(depz-sensor-sdk-c 0.8.0 CONFIG REQUIRED)
+find_package(depz-sensor-sdk-c 0.9.0 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_c)
 ```
 
@@ -398,7 +398,7 @@ uint8_t crc = depz_crc8_maxim(data, sizeof data);
 conan create packages/depz-sensor-sdk-c            # build & test-package locally
 ```
 
-In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.8.0`.
+In your consumer's `conanfile.txt`: `[requires]` → `depz-sensor-sdk-c/0.9.0`.
 The recipe sets the CMake target name to `depz::sensor_sdk_c` for CMakeDeps
 consumers. Submission to Conan Center is in review
 ([conan-center-index#30564](https://github.com/conan-io/conan-center-index/pull/30564));
@@ -414,7 +414,7 @@ it merges, use the in-repo port (`vcpkg/`) as an overlay:
 vcpkg install depz-sensor-sdk-c --overlay-ports=packages/depz-sensor-sdk-c/vcpkg
 ```
 
-The port fetches the `v0.8.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
+The port fetches the `v0.9.0` tag; the `SHA512` in `vcpkg/portfile.cmake` is a
 `0` placeholder to be filled at release (the first `vcpkg install` prints the
 correct hash).
 

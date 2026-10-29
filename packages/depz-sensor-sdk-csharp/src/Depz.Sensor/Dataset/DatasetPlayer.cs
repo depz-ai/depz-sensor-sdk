@@ -29,7 +29,9 @@ public enum PlayerState
 /// <para>Threads: records and the <see cref="PlayerState.Done"/> state are delivered on a player thread (started
 /// by the first <see cref="Play"/>); a state change a call makes is reported on the calling thread before it
 /// returns. Callbacks run under the player's lock — they see a consistent player and may call its methods, and
-/// once <see cref="Pause"/> returns no record callback is running or will start. They must not block. With
+/// once <see cref="Pause"/> returns no record callback is running or will start. They must not block. A callback
+/// that throws is traced (<see cref="Trace"/>), counted in <see cref="CallbackErrors"/> and dropped: the other
+/// callbacks still get the record and playback goes on. With
 /// <c>threaded: false</c> no thread starts and the owner calls <see cref="Tick"/> (a GUI timer, or a test with a
 /// fake clock).</para>
 /// </summary>
@@ -47,6 +49,7 @@ public sealed class DatasetPlayer : IDisposable
     private double _anchorT;
     private Thread? _thread;
     private bool _closed;
+    private long _callbackErrors;
 
     /// <param name="reader">The dataset.</param>
     /// <param name="speed">≥ 0; 0 = as fast as possible.</param>
@@ -72,8 +75,8 @@ public sealed class DatasetPlayer : IDisposable
 
     public PlayerState State { get; private set; } = PlayerState.Idle;
 
-    /// <summary>A callback on the player thread threw: playback paused there (the record counts as delivered).</summary>
-    public event Action<Exception>? DeliveryError;
+    /// <summary>Record / state callbacks that threw and were dropped (contract 09).</summary>
+    public long CallbackErrors => Interlocked.Read(ref _callbackErrors);
 
     /// <summary>Span of the timeline: the last record's t minus the first's.</summary>
     public long DurationUs => Reader.DurationUs;
@@ -293,8 +296,15 @@ public sealed class DatasetPlayer : IDisposable
     {
         State = state;
         Monitor.PulseAll(_lock);
-        foreach (var cb in _stateCallbacks.ToArray())
-            cb(state);
+        Deliver(_stateCallbacks, state);
+    }
+
+    // Hand `item` to every callback; one that throws is counted, traced and dropped (contract 09).
+    private void Deliver<T>(List<Action<T>> callbacks, T item)
+    {
+        foreach (var cb in callbacks.ToArray())
+            if (!Fanout<T>.Call(cb, item))
+                Interlocked.Increment(ref _callbackErrors);
     }
 
     // Deliver the next record if it is due → (true, _); else (false, seconds to wait) or (false, null) when not playing.
@@ -316,18 +326,7 @@ public sealed class DatasetPlayer : IDisposable
                 return (false, due - now);
         }
         _idx++;
-        try
-        {
-            foreach (var cb in _recordCallbacks.ToArray())
-                cb(rec);
-        }
-        catch
-        {
-            // A failing consumer stops playback where it failed; the error goes to whoever drove delivery.
-            if (State == PlayerState.Playing)
-                SetState(PlayerState.Paused);
-            throw;
-        }
+        Deliver(_recordCallbacks, rec);
         if (State == PlayerState.Playing && _idx >= _recs.Count)
             SetState(PlayerState.Done);
         return (true, null);
@@ -347,16 +346,7 @@ public sealed class DatasetPlayer : IDisposable
         {
             while (!_closed)
             {
-                (bool Delivered, double? Wait) r;
-                try
-                {
-                    r = StepLocked();
-                }
-                catch (Exception e)
-                {
-                    DeliveryError?.Invoke(e);
-                    continue;
-                }
+                var r = StepLocked();
                 if (r.Delivered)
                 {
                     // let control calls (pause / seek from other threads) in between records, even at speed 0

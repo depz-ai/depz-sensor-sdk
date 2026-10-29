@@ -14,7 +14,7 @@
 # with clang set CC=clang and GCOV="llvm-cov gcov".
 set -euo pipefail
 
-FLOOR=89
+FLOOR=91
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PATH="$HOME/.local/bin:$PATH"   # where uv tool / pip --user put gcovr

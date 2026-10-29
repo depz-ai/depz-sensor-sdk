@@ -127,6 +127,11 @@ struct CallbackHolder {
     std::shared_ptr<std::atomic<std::uint64_t>> errors;
 };
 
+// Contract 07 §3 / 09 §Player: a user callback threw where it must not stop
+// the caller (a device reader, a dataset player) — count it in `errors`,
+// report it on stderr; the caller drops the exception and goes on.
+void callback_threw(std::atomic<std::uint64_t>& errors);
+
 struct StreamHandle {
     depz_stream* s = nullptr;
     ~StreamHandle();

@@ -57,7 +57,7 @@ def main() -> int:
             return 1
         print(f"{OUT.name}, {OUT_LICENSE.name} up to date")
         return 0
-    OUT.write_text(text)
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     OUT_LICENSE.parent.mkdir(parents=True, exist_ok=True)
     OUT_LICENSE.write_bytes(lic)
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes) and {OUT_LICENSE}")

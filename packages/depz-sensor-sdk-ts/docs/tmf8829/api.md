@@ -114,7 +114,7 @@ Generated from the TypeScript sources by TypeDoc — run `bun run docs` to regen
 
 # Class: Tmf8829
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L160)
+Defined in: [sensors/tmf8829/tmf8829.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L160)
 
 TMF8829 ToF device (8×8 … 48×32 zones, up to 4 peaks per zone, histograms).
 `init()` downloads the 14.4 KB sensor firmware (~0.15 s), `configure(preset,
@@ -134,7 +134,7 @@ wired high: there is no sleep, recovery from any state is `init()`.
 new Tmf8829(transport, opts?): Tmf8829;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:174](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L174)
+Defined in: [sensors/tmf8829/tmf8829.ts:174](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L174)
 
 #### Parameters
 
@@ -161,7 +161,7 @@ DepzDevice.constructor
 timeoutMs: number;
 ```
 
-Defined in: [src/device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
+Defined in: [device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
 
 #### Inherited from
 
@@ -177,7 +177,7 @@ DepzDevice.timeoutMs
 protected readonly link: DepzLink;
 ```
 
-Defined in: [src/device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
+Defined in: [device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
 
 #### Inherited from
 
@@ -193,7 +193,7 @@ DepzDevice.link
 appVersion: string | null = null;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L161)
+Defined in: [sensors/tmf8829/tmf8829.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L161)
 
 ***
 
@@ -203,7 +203,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:161](https://github.com/depz-ai/depz
 sensorSerial: number | null = null;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:162](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L162)
+Defined in: [sensors/tmf8829/tmf8829.ts:162](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L162)
 
 ## Accessors
 
@@ -215,7 +215,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:162](https://github.com/depz-ai/depz
 get stats(): LinkStats;
 ```
 
-Defined in: [src/device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
+Defined in: [device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
 
 ##### Returns
 
@@ -237,7 +237,7 @@ DepzDevice.stats
 get timeSync(): TimeSync | null;
 ```
 
-Defined in: [src/device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
+Defined in: [device/device.ts:591](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L591)
 
 ##### Returns
 
@@ -259,7 +259,7 @@ DepzDevice.timeSync
 get config(): Tmf8829Config | null;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:325](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L325)
+Defined in: [sensors/tmf8829/tmf8829.ts:325](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L325)
 
 The last `configure()` result (null after `init()`).
 
@@ -277,7 +277,7 @@ The last `configure()` result (null after `init()`).
 get streaming(): boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:331](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L331)
+Defined in: [sensors/tmf8829/tmf8829.ts:331](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L331)
 
 ##### Returns
 
@@ -293,7 +293,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:331](https://github.com/depz-ai/depz
 get framesDropped(): number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:441](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L441)
+Defined in: [sensors/tmf8829/tmf8829.ts:441](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L441)
 
 Frames the bridge dropped (frame_seq gaps) in this stream.
 
@@ -311,7 +311,7 @@ Frames the bridge dropped (frame_seq gaps) in this stream.
 get framesDiscarded(): number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L446)
+Defined in: [sensors/tmf8829/tmf8829.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L446)
 
 Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
 
@@ -329,7 +329,7 @@ Frames lost to reassembly (incomplete, out-of-order chunks) in this stream.
 get frameParseErrors(): number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L450)
+Defined in: [sensors/tmf8829/tmf8829.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L450)
 
 ##### Returns
 
@@ -345,7 +345,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:450](https://github.com/depz-ai/depz
 get clockRatioQ16(): number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:455](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L455)
+Defined in: [sensors/tmf8829/tmf8829.ts:455](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L455)
 
 Current clock ratio (Q16), for diagnostics.
 
@@ -361,7 +361,7 @@ Current clock ratio (Q16), for diagnostics.
 open(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
+Defined in: [device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
 
 Open the transport and start the read pump. A no-op on a device that
 continues an adopted connection (`attachSensorClass`) — already open.
@@ -384,7 +384,7 @@ DepzDevice.open
 protected onTeardown(error): void;
 ```
 
-Defined in: [src/device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
+Defined in: [device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
 
 Hook for sensor subclasses: reject any subclass-managed in-flight requests
 and clear per-connection state when the link closes. Runs once, after the
@@ -414,7 +414,7 @@ DepzDevice.onTeardown
 protected registerStream(stream): () => void;
 ```
 
-Defined in: [src/device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
+Defined in: [device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
 
 Register a stream to be closed on device teardown.
 
@@ -443,7 +443,7 @@ DepzDevice.registerStream
 onEvent(cb): () => void;
 ```
 
-Defined in: [src/device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
+Defined in: [device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
 
 Subscribe to unsolicited/diagnostic events (read-pump context; do not
 block). Returns an unsubscribe function.
@@ -472,7 +472,7 @@ DepzDevice.onEvent
 protected emitEvent(event): void;
 ```
 
-Defined in: [src/device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
+Defined in: [device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
 
 #### Parameters
 
@@ -498,7 +498,7 @@ DepzDevice.emitEvent
 protected callGuarded<T>(cb, item): void;
 ```
 
-Defined in: [src/device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
+Defined in: [device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
 
 Run a user callback on the read pump: one that throws is counted in
 `stats.callbackErrors`, logged and dropped — it never stops the pump, the
@@ -538,7 +538,7 @@ request<T>(
 opts?): Promise<T>;
 ```
 
-Defined in: [src/device/device.ts:487](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L487)
+Defined in: [device/device.ts:482](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L482)
 
 Send `cmd` and wait for its correlated completion (contract 02 §1).
 
@@ -581,7 +581,7 @@ DepzDevice.request
 static expectReport<T>(reportId, unpack): Matcher<T>;
 ```
 
-Defined in: [src/device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
+Defined in: [device/device.ts:526](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L526)
 
 Matcher for a typed report identified by its report ID alone.
 
@@ -616,7 +616,7 @@ DepzDevice.expectReport
 static expectText(requestCmd): Matcher<string>;
 ```
 
-Defined in: [src/device/device.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L536)
+Defined in: [device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
 
 Matcher for RPT_TEXT echoing `requestCmd`.
 
@@ -644,7 +644,7 @@ DepzDevice.expectText
 getDeviceName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:547](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L547)
+Defined in: [device/device.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L542)
 
 #### Returns
 
@@ -664,7 +664,7 @@ DepzDevice.getDeviceName
 getSoftwareName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L553)
+Defined in: [device/device.ts:548](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L548)
 
 #### Returns
 
@@ -684,7 +684,7 @@ DepzDevice.getSoftwareName
 getSerialNumber(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:559](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L559)
+Defined in: [device/device.ts:554](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L554)
 
 #### Returns
 
@@ -704,7 +704,7 @@ DepzDevice.getSerialNumber
 identify(): Promise<Identity>;
 ```
 
-Defined in: [src/device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
+Defined in: [device/device.ts:561](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L561)
 
 Classify the running firmware (contract 02 §4).
 
@@ -726,7 +726,7 @@ DepzDevice.identify
 readMcuTemperature(): Promise<number>;
 ```
 
-Defined in: [src/device/device.ts:571](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L571)
+Defined in: [device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
@@ -748,7 +748,7 @@ DepzDevice.readMcuTemperature
 syncTime(samples?): Promise<TimeSync>;
 ```
 
-Defined in: [src/device/device.ts:579](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L579)
+Defined in: [device/device.ts:574](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L574)
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
@@ -776,7 +776,7 @@ DepzDevice.syncTime
 toHostTimeUs(deviceTsUs): bigint;
 ```
 
-Defined in: [src/device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
+Defined in: [device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
 
 Device µs → host monotonic µs (requires a prior `syncTime`).
 
@@ -804,7 +804,7 @@ DepzDevice.toHostTimeUs
 getReportPayloadCrc(): Promise<CrcType>;
 ```
 
-Defined in: [src/device/device.ts:606](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L606)
+Defined in: [device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
 
 #### Returns
 
@@ -824,7 +824,7 @@ DepzDevice.getReportPayloadCrc
 setReportPayloadCrc(crcType): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L613)
+Defined in: [device/device.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L608)
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
@@ -852,7 +852,7 @@ DepzDevice.setReportPayloadCrc
 getSyncPin(pin): Promise<SyncPinConfig>;
 ```
 
-Defined in: [src/device/device.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L617)
+Defined in: [device/device.ts:612](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L612)
 
 #### Parameters
 
@@ -878,7 +878,7 @@ DepzDevice.getSyncPin
 setSyncPin(config): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
+Defined in: [device/device.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L618)
 
 #### Parameters
 
@@ -904,7 +904,7 @@ DepzDevice.setSyncPin
 reset(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:628](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L628)
+Defined in: [device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
@@ -926,7 +926,7 @@ DepzDevice.reset
 enterBootloaderMode(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:637](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L637)
+Defined in: [device/device.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L632)
 
 Ask the device to reboot into the resident bootloader and close this
 connection. Re-discovery/flash flow lives in the bootloader module
@@ -950,7 +950,7 @@ DepzDevice.enterBootloaderMode
 readRegisters(addr, length): Promise<Uint8Array<ArrayBufferLike>>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L185)
+Defined in: [sensors/tmf8829/tmf8829.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L185)
 
 Read `length` bytes from `addr` in ≤1024-byte requests; reads that reach the
 FIFO port 0xFF stay there (the sensor does not auto-increment it).
@@ -974,7 +974,7 @@ FIFO port 0xFF stay there (the sensor does not auto-increment it).
 writeRegisters(addr, data): Promise<void>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:190](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L190)
+Defined in: [sensors/tmf8829/tmf8829.ts:190](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L190)
 
 Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF).
 
@@ -997,7 +997,7 @@ Write `data` from `addr` in ≤1023-byte requests (writes to 0xFF stay at 0xFF).
 sensorState(): Promise<Record<string, number>>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:195](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L195)
+Defined in: [sensors/tmf8829/tmf8829.ts:195](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L195)
 
 Raw host-interface registers, for diagnostics.
 
@@ -1013,7 +1013,7 @@ Raw host-interface registers, for diagnostics.
 getBridgeInfo(): Promise<Tmf8829Info>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:215](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L215)
+Defined in: [sensors/tmf8829/tmf8829.ts:215](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L215)
 
 Bridge counters (never touches the sensor, safe mid-stream).
 
@@ -1029,7 +1029,7 @@ Bridge counters (never touches the sensor, safe mid-stream).
 init(progress?): Promise<[string, number]>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:229](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L229)
+Defined in: [sensors/tmf8829/tmf8829.ts:229](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L229)
 
 Bring the sensor from any state to its running RAM application: soft
 reset, bootloader, firmware download, start. Resolves [application
@@ -1054,7 +1054,7 @@ total)` tracks the image download.
 configPage(): Promise<Uint8Array<ArrayBufferLike>>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:269](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L269)
+Defined in: [sensors/tmf8829/tmf8829.ts:269](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L269)
 
 LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
 
@@ -1070,7 +1070,7 @@ LOAD_CONFIG_PAGE → the 190-byte page 0x22..0xDF now in the sensor.
 configure(preset?, opts?): Promise<Tmf8829Config>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:279](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L279)
+Defined in: [sensors/tmf8829/tmf8829.ts:279](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L279)
 
 Load `preset` and write the config page. Every field a preset does not
 reset is written (contract 14 §4), so the result never depends on an
@@ -1096,7 +1096,7 @@ page (e.g. ERR_CONFIG_RESULT_SIZE) or a written field does not read back.
 start(): Promise<void>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:336](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L336)
+Defined in: [sensors/tmf8829/tmf8829.ts:336](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L336)
 
 MEASURE with the bridge stream armed; configures the 8x8 preset first if needed.
 
@@ -1112,7 +1112,7 @@ MEASURE with the bridge stream armed; configures the 8x8 preset first if needed.
 stop(): Promise<void>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:367](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L367)
+Defined in: [sensors/tmf8829/tmf8829.ts:367](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L367)
 
 Sensor STOP, then the bridge stream (frames already queued drain). The
 bad-header event a STOP raises mid histogram dump is expected and
@@ -1130,7 +1130,7 @@ swallowed.
 close(): Promise<void>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:382](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L382)
+Defined in: [sensors/tmf8829/tmf8829.ts:382](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L382)
 
 Close the connection. A device that handed its connection over owns none.
 
@@ -1152,7 +1152,7 @@ DepzDevice.close
 onMeasurement(cb): () => void;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:388](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L388)
+Defined in: [sensors/tmf8829/tmf8829.ts:388](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L388)
 
 Subscribe to measurements (read-pump context; don't block).
 
@@ -1174,7 +1174,7 @@ Subscribe to measurements (read-pump context; don't block).
 measurements(maxsize?): StreamQueue<Tmf8829Measurement>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:396](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L396)
+Defined in: [sensors/tmf8829/tmf8829.ts:396](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L396)
 
 Async iterator over measurements — bounded, drop-oldest.
 
@@ -1196,7 +1196,7 @@ Async iterator over measurements — bounded, drop-oldest.
 getMeasurement(timeoutMs?): Promise<Tmf8829Measurement>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:407](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L407)
+Defined in: [sensors/tmf8829/tmf8829.ts:407](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L407)
 
 Wait for the next measurement.
 
@@ -1218,7 +1218,7 @@ Wait for the next measurement.
 onInterrupt(cb): () => void;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:433](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L433)
+Defined in: [sensors/tmf8829/tmf8829.ts:433](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L433)
 
 RPT_TMF_EVENT that is not an expected stop artefact: a MOTION/PROXIMITY
 interrupt (code 0) or a refused frame header (code 1 — the sensor is lost,
@@ -1242,7 +1242,7 @@ run `init()` again).
 protected handleReport(pkt): boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L537)
+Defined in: [sensors/tmf8829/tmf8829.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L537)
 
 Hook for sensor subclasses: route streaming reports here. Return true
 when the packet was consumed. Runs after status/matcher/common-report
@@ -1266,7 +1266,7 @@ DepzDevice.handleReport
 
 # Class: Tmf8829CaptureTimer
 
-Defined in: [src/sensors/tmf8829/clock.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L147)
+Defined in: [sensors/tmf8829/clock.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L147)
 
 When a results frame was captured: the centre of [t0, t1 + T1], T1 the
 stream's shortest (t1 − t0)/(N − 1).
@@ -1279,7 +1279,7 @@ stream's shortest (t1 − t0)/(N − 1).
 new Tmf8829CaptureTimer(clock): Tmf8829CaptureTimer;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L152)
+Defined in: [sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L152)
 
 #### Parameters
 
@@ -1299,7 +1299,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-s
 readonly clock: Tmf8829SensorClock;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L152)
+Defined in: [sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L152)
 
 ## Methods
 
@@ -1309,7 +1309,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:152](https://github.com/depz-ai/depz-s
 reset(): void;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L154)
+Defined in: [sensors/tmf8829/clock.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L154)
 
 #### Returns
 
@@ -1323,7 +1323,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:154](https://github.com/depz-ai/depz-s
 histograms(): void;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L161)
+Defined in: [sensors/tmf8829/clock.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L161)
 
 A histogram frame was seen in the stream.
 
@@ -1346,7 +1346,7 @@ results(
    flagsIn): Tmf8829FrameTime;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:165](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L165)
+Defined in: [sensors/tmf8829/clock.ts:165](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L165)
 
 #### Parameters
 
@@ -1366,7 +1366,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:165](https://github.com/depz-ai/depz-s
 
 # Class: Tmf8829Error
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:120](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L120)
+Defined in: [sensors/tmf8829/tmf8829.ts:120](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L120)
 
 The sensor refused or did not answer (bootloader / application status).
 
@@ -1382,7 +1382,7 @@ The sensor refused or did not answer (bootloader / application status).
 new Tmf8829Error(message?): Tmf8829Error;
 ```
 
-Defined in: [src/errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
+Defined in: [errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
 
 #### Parameters
 
@@ -1408,7 +1408,7 @@ DepzError.constructor
 static stackTraceLimit: number;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:68
+Defined in: ../node\_modules/@types/node/globals.d.ts:68
 
 The `Error.stackTraceLimit` property specifies the number of stack frames
 collected by a stack trace (whether generated by `new Error().stack` or
@@ -1434,7 +1434,7 @@ DepzError.stackTraceLimit
 optional cause?: unknown;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
+Defined in: ../node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 #### Inherited from
 
@@ -1450,7 +1450,7 @@ DepzError.cause
 name: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1076
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1076
 
 #### Inherited from
 
@@ -1466,7 +1466,7 @@ DepzError.name
 message: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1077
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1077
 
 #### Inherited from
 
@@ -1482,7 +1482,7 @@ DepzError.message
 optional stack?: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1078
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1078
 
 #### Inherited from
 
@@ -1498,7 +1498,7 @@ DepzError.stack
 static captureStackTrace(targetObject, constructorOpt?): void;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:52
+Defined in: ../node\_modules/@types/node/globals.d.ts:52
 
 Creates a `.stack` property on `targetObject`, which when accessed returns
 a string representing the location in the code at which
@@ -1569,7 +1569,7 @@ DepzError.captureStackTrace
 static prepareStackTrace(err, stackTraces): any;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:56
+Defined in: ../node\_modules/@types/node/globals.d.ts:56
 
 #### Parameters
 
@@ -1594,7 +1594,7 @@ DepzError.prepareStackTrace
 
 # Class: Tmf8829FrameReassembler
 
-Defined in: [src/protocol/tmf8829.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L184)
+Defined in: [protocol/tmf8829.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L184)
 
 Rebuilds frames from RPT_TMF_FRAME chunks (contract 14 §2): reset on offset
 0; append only a chunk of the same frame_seq at the expected offset;
@@ -1621,7 +1621,7 @@ new Tmf8829FrameReassembler(): Tmf8829FrameReassembler;
 completed: number = 0;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L185)
+Defined in: [protocol/tmf8829.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L185)
 
 ***
 
@@ -1631,7 +1631,7 @@ Defined in: [src/protocol/tmf8829.ts:185](https://github.com/depz-ai/depz-sensor
 discarded: number = 0;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:186](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L186)
+Defined in: [protocol/tmf8829.ts:186](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L186)
 
 ***
 
@@ -1641,7 +1641,7 @@ Defined in: [src/protocol/tmf8829.ts:186](https://github.com/depz-ai/depz-sensor
 seqGaps: number = 0;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L187)
+Defined in: [protocol/tmf8829.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L187)
 
 ## Methods
 
@@ -1651,7 +1651,7 @@ Defined in: [src/protocol/tmf8829.ts:187](https://github.com/depz-ai/depz-sensor
 reset(): void;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:194](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L194)
+Defined in: [protocol/tmf8829.ts:194](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L194)
 
 Forget everything — call at every stream start (frame_seq restarts at 0).
 
@@ -1667,7 +1667,7 @@ Forget everything — call at every stream start (frame_seq restarts at 0).
 feed(chunk): Tmf8829RawFrame | null;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L210)
+Defined in: [protocol/tmf8829.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L210)
 
 #### Parameters
 
@@ -1681,7 +1681,7 @@ Defined in: [src/protocol/tmf8829.ts:210](https://github.com/depz-ai/depz-sensor
 
 # Class: Tmf8829MeasurementBuilder
 
-Defined in: [src/sensors/tmf8829/builder.ts:73](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L73)
+Defined in: [sensors/tmf8829/builder.ts:73](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L73)
 
 Histogram frames between two results frames belong to the second; a
 ref-SPAD frame comes right before its results frame. Call `reset()` at
@@ -1707,7 +1707,7 @@ new Tmf8829MeasurementBuilder(): Tmf8829MeasurementBuilder;
 readonly clock: Tmf8829SensorClock;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:74](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L74)
+Defined in: [sensors/tmf8829/builder.ts:74](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L74)
 
 ***
 
@@ -1717,7 +1717,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:74](https://github.com/depz-ai/depz-
 readonly timer: Tmf8829CaptureTimer;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L75)
+Defined in: [sensors/tmf8829/builder.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L75)
 
 ***
 
@@ -1727,7 +1727,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:75](https://github.com/depz-ai/depz-
 parseErrors: number = 0;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L76)
+Defined in: [sensors/tmf8829/builder.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L76)
 
 ## Methods
 
@@ -1737,7 +1737,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:76](https://github.com/depz-ai/depz-
 reset(): void;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:83](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L83)
+Defined in: [sensors/tmf8829/builder.ts:83](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L83)
 
 #### Returns
 
@@ -1754,7 +1754,7 @@ add(
    edgeUs?): Tmf8829Measurement | null;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L98)
+Defined in: [sensors/tmf8829/builder.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L98)
 
 One frame with the MCU time of its header read and its INT edge (0 =
 none) → the measurement it completes, or null. `raw` is copied.
@@ -1773,7 +1773,7 @@ none) → the measurement it completes, or null. `raw` is copied.
 
 # Class: Tmf8829SensorClock
 
-Defined in: [src/sensors/tmf8829/clock.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L58)
+Defined in: [sensors/tmf8829/clock.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L58)
 
 Sensor SYSTICK (125 kHz) → MCU µs, fed one clock pair per frame. The ratio
 is taken over a sliding 1..2 s window, first after 200 ms; it is also the
@@ -1799,7 +1799,7 @@ new Tmf8829SensorClock(): Tmf8829SensorClock;
 ratioQ16: number = TMF8829_NOMINAL_Q16;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L59)
+Defined in: [sensors/tmf8829/clock.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L59)
 
 ***
 
@@ -1809,7 +1809,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:59](https://github.com/depz-ai/depz-se
 nominal: boolean = true;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L60)
+Defined in: [sensors/tmf8829/clock.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L60)
 
 ## Accessors
 
@@ -1821,7 +1821,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:60](https://github.com/depz-ai/depz-se
 get ratio(): number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L76)
+Defined in: [sensors/tmf8829/clock.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L76)
 
 MCU/sensor clock ratio (≈ 1.015): distances are scaled by it.
 
@@ -1837,7 +1837,7 @@ MCU/sensor clock ratio (≈ 1.015): distances are scaled by it.
 reset(): void;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L66)
+Defined in: [sensors/tmf8829/clock.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L66)
 
 #### Returns
 
@@ -1851,7 +1851,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:66](https://github.com/depz-ai/depz-se
 add(us, tick): number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:87](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L87)
+Defined in: [sensors/tmf8829/clock.ts:87](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L87)
 
 Add a pair → TMF8829_FT_CLOCK_RESET if it does not fit the model, else 0.
 
@@ -1877,7 +1877,7 @@ toUs(
    tick): number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:120](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L120)
+Defined in: [sensors/tmf8829/clock.ts:120](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L120)
 
 SYSTICK `tick` → MCU µs through the pair (pairUs, pairTick).
 
@@ -1895,7 +1895,7 @@ SYSTICK `tick` → MCU µs through the pair (pairUs, pairTick).
 
 # Enumeration: Tmf8829Cmd
 
-Defined in: [src/protocol/tmf8829.ts:9](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L9)
+Defined in: [protocol/tmf8829.ts:9](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L9)
 
 TMF8829 SPI register-bridge wire codecs (contracts/14_SENSOR_TMF8829.md §2).
 Mirrors the Python reference `depz_sensor_sdk.protocol.tmf8829`.
@@ -1911,7 +1911,7 @@ TMF8829 payloads: an 8-bit register address and self-sized frames.
 ReadReg: 50;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L10)
+Defined in: [protocol/tmf8829.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L10)
 
 ***
 
@@ -1921,7 +1921,7 @@ Defined in: [src/protocol/tmf8829.ts:10](https://github.com/depz-ai/depz-sensor-
 WriteReg: 51;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:11](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L11)
+Defined in: [protocol/tmf8829.ts:11](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L11)
 
 ***
 
@@ -1931,7 +1931,7 @@ Defined in: [src/protocol/tmf8829.ts:11](https://github.com/depz-ai/depz-sensor-
 StartStream: 53;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:12](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L12)
+Defined in: [protocol/tmf8829.ts:12](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L12)
 
 ***
 
@@ -1941,7 +1941,7 @@ Defined in: [src/protocol/tmf8829.ts:12](https://github.com/depz-ai/depz-sensor-
 StopStream: 54;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L13)
+Defined in: [protocol/tmf8829.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L13)
 
 ***
 
@@ -1951,11 +1951,11 @@ Defined in: [src/protocol/tmf8829.ts:13](https://github.com/depz-ai/depz-sensor-
 GetInfo: 55;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:14](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L14)
+Defined in: [protocol/tmf8829.ts:14](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L14)
 
 # Enumeration: Tmf8829EventCode
 
-Defined in: [src/protocol/tmf8829.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L25)
+Defined in: [protocol/tmf8829.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L25)
 
 RPT_TMF_EVENT.code
 
@@ -1967,7 +1967,7 @@ RPT_TMF_EVENT.code
 Int: 0;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L27)
+Defined in: [protocol/tmf8829.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L27)
 
 MOTION/PROXIMITY interrupt, no frame; its bits already cleared.
 
@@ -1979,13 +1979,13 @@ MOTION/PROXIMITY interrupt, no frame; its bits already cleared.
 BadHeader: 1;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L29)
+Defined in: [protocol/tmf8829.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L29)
 
 Frame header refused, frame not read (expected once on STOP mid histogram dump).
 
 # Enumeration: Tmf8829Rpt
 
-Defined in: [src/protocol/tmf8829.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L17)
+Defined in: [protocol/tmf8829.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L17)
 
 ## Enumeration Members
 
@@ -1995,7 +1995,7 @@ Defined in: [src/protocol/tmf8829.ts:17](https://github.com/depz-ai/depz-sensor-
 RegData: 145;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L18)
+Defined in: [protocol/tmf8829.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L18)
 
 ***
 
@@ -2005,7 +2005,7 @@ Defined in: [src/protocol/tmf8829.ts:18](https://github.com/depz-ai/depz-sensor-
 Info: 146;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L19)
+Defined in: [protocol/tmf8829.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L19)
 
 ***
 
@@ -2015,7 +2015,7 @@ Defined in: [src/protocol/tmf8829.ts:19](https://github.com/depz-ai/depz-sensor-
 Frame: 147;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L20)
+Defined in: [protocol/tmf8829.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L20)
 
 ***
 
@@ -2025,7 +2025,7 @@ Defined in: [src/protocol/tmf8829.ts:20](https://github.com/depz-ai/depz-sensor-
 Event: 148;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L21)
+Defined in: [protocol/tmf8829.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L21)
 
 # Function: mergeTmf8829Halves()
 
@@ -2033,7 +2033,7 @@ Defined in: [src/protocol/tmf8829.ts:21](https://github.com/depz-ai/depz-sensor-
 function mergeTmf8829Halves(first, second): Tmf8829PixelResults;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L211)
+Defined in: [sensors/tmf8829/frames.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L211)
 
 32x32/48x32: the first half-frame holds the even rows, the second the odd ones.
 
@@ -2054,7 +2054,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:211](https://github.com/depz-ai/depz-
 function packTmf8829ReadReg(addr, length): Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L44)
+Defined in: [protocol/tmf8829.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L44)
 
 ## Parameters
 
@@ -2073,7 +2073,7 @@ Defined in: [src/protocol/tmf8829.ts:44](https://github.com/depz-ai/depz-sensor-
 function packTmf8829StartStream(intMask, flags?): Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:63](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L63)
+Defined in: [protocol/tmf8829.ts:63](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L63)
 
 ## Parameters
 
@@ -2092,7 +2092,7 @@ Defined in: [src/protocol/tmf8829.ts:63](https://github.com/depz-ai/depz-sensor-
 function packTmf8829WriteReg(addr, data): Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:52](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L52)
+Defined in: [protocol/tmf8829.ts:52](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L52)
 
 ## Parameters
 
@@ -2111,7 +2111,7 @@ Defined in: [src/protocol/tmf8829.ts:52](https://github.com/depz-ai/depz-sensor-
 function parseTmf8829Frame(raw): Tmf8829FrameInfo;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:85](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L85)
+Defined in: [sensors/tmf8829/frames.ts:85](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L85)
 
 ## Parameters
 
@@ -2129,7 +2129,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:85](https://github.com/depz-ai/depz-s
 function parseTmf8829Results(raw, info?): Tmf8829PixelResults;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:157](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L157)
+Defined in: [sensors/tmf8829/frames.ts:157](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L157)
 
 Pixel results of one results frame.
 
@@ -2150,7 +2150,7 @@ Pixel results of one results frame.
 function tmf8829CfgGet(page, name): number;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L95)
+Defined in: [sensors/tmf8829/config.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L95)
 
 ## Parameters
 
@@ -2172,7 +2172,7 @@ function tmf8829CfgSet(
    value): void;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:102](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L102)
+Defined in: [sensors/tmf8829/config.ts:102](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L102)
 
 ## Parameters
 
@@ -2192,7 +2192,7 @@ Defined in: [src/sensors/tmf8829/config.ts:102](https://github.com/depz-ai/depz-
 function tmf8829ConfigFields(page): Record<Tmf8829CfgField, number>;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:118](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L118)
+Defined in: [sensors/tmf8829/config.ts:118](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L118)
 
 Every named field of a config page.
 
@@ -2215,7 +2215,7 @@ function tmf8829DistanceMm(
    inMm): Float64Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:54](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L54)
+Defined in: [sensors/tmf8829/builder.ts:54](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L54)
 
 Raw distances → mm, clock-corrected (×ratio; ÷4 for 0.25 mm units).
 
@@ -2237,7 +2237,7 @@ Raw distances → mm, clock-corrected (×ratio; ÷4 for 0.25 mm units).
 function tmf8829FirmwareImage(): Promise<Uint8Array<ArrayBufferLike>>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L112)
+Defined in: [sensors/tmf8829/tmf8829.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L112)
 
 The sensor firmware image `init()` downloads (14 444 B, MIT). Lazily decoded.
 
@@ -2251,7 +2251,7 @@ The sensor firmware image `init()` downloads (14 444 B, MIT). Lazily decoded.
 function tmf8829FlagNames(flags): string[];
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L37)
+Defined in: [sensors/tmf8829/clock.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L37)
 
 ## Parameters
 
@@ -2269,7 +2269,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:37](https://github.com/depz-ai/depz-se
 function tmf8829FrameProblems(f): string[];
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:119](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L119)
+Defined in: [sensors/tmf8829/frames.ts:119](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L119)
 
 What is wrong with a frame, human-readable; empty when fine.
 
@@ -2289,7 +2289,7 @@ What is wrong with a frame, human-readable; empty when fine.
 function tmf8829FrameRows(fpMode): [number, number];
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L150)
+Defined in: [sensors/tmf8829/frames.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L150)
 
 [rows, cols] one results frame carries: half the rows for 32x32/48x32.
 
@@ -2309,7 +2309,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:150](https://github.com/depz-ai/depz-
 function tmf8829FrameSize(head): number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:81](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L81)
+Defined in: [sensors/tmf8829/frames.ts:81](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L81)
 
 Full frame size (pre-header included) from its first 21 bytes.
 
@@ -2329,7 +2329,7 @@ Full frame size (pre-header included) from its first 21 bytes.
 function tmf8829RecordValue(m): Record<string, unknown>;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L216)
+Defined in: [sensors/tmf8829/builder.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L216)
 
 Contract 09 `tmf8829` record value of a measurement (distances rounded to 0.1 mm).
 
@@ -2349,7 +2349,7 @@ Contract 09 `tmf8829` record value of a measurement (distances rounded to 0.1 mm
 function unpackTmf8829Event(p): Tmf8829Event;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:159](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L159)
+Defined in: [protocol/tmf8829.ts:159](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L159)
 
 ## Parameters
 
@@ -2367,7 +2367,7 @@ Defined in: [src/protocol/tmf8829.ts:159](https://github.com/depz-ai/depz-sensor
 function unpackTmf8829FrameChunk(p): Tmf8829FrameChunk;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:135](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L135)
+Defined in: [protocol/tmf8829.ts:135](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L135)
 
 ## Parameters
 
@@ -2385,7 +2385,7 @@ Defined in: [src/protocol/tmf8829.ts:135](https://github.com/depz-ai/depz-sensor
 function unpackTmf8829Info(p): Tmf8829Info;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L104)
+Defined in: [protocol/tmf8829.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L104)
 
 ## Parameters
 
@@ -2403,7 +2403,7 @@ Defined in: [src/protocol/tmf8829.ts:104](https://github.com/depz-ai/depz-sensor
 function unpackTmf8829RegData(p): Tmf8829RegData;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:81](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L81)
+Defined in: [protocol/tmf8829.ts:81](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L81)
 
 ## Parameters
 
@@ -2417,7 +2417,7 @@ Defined in: [src/protocol/tmf8829.ts:81](https://github.com/depz-ai/depz-sensor-
 
 # Interface: Tmf8829Config
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:137](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L137)
+Defined in: [sensors/tmf8829/tmf8829.ts:137](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L137)
 
 The config written by `configure()`, as read back from the sensor.
 
@@ -2429,7 +2429,7 @@ The config written by `configure()`, as read back from the sensor.
 preset: Tmf8829Preset;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L138)
+Defined in: [sensors/tmf8829/tmf8829.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L138)
 
 ***
 
@@ -2439,7 +2439,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:138](https://github.com/depz-ai/depz
 page: Uint8Array;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L140)
+Defined in: [sensors/tmf8829/tmf8829.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L140)
 
 The 190-byte page 0x22..0xDF.
 
@@ -2451,7 +2451,7 @@ The 190-byte page 0x22..0xDF.
 histograms: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:141](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L141)
+Defined in: [sensors/tmf8829/tmf8829.ts:141](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L141)
 
 ***
 
@@ -2461,7 +2461,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:141](https://github.com/depz-ai/depz
 refFrame: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L142)
+Defined in: [sensors/tmf8829/tmf8829.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L142)
 
 ***
 
@@ -2471,7 +2471,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:142](https://github.com/depz-ai/depz
 fields: Record<Tmf8829CfgField, number>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L143)
+Defined in: [sensors/tmf8829/tmf8829.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L143)
 
 ***
 
@@ -2481,13 +2481,13 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:143](https://github.com/depz-ai/depz
 grid: readonly [number, number];
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L145)
+Defined in: [sensors/tmf8829/tmf8829.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L145)
 
 [rows, cols] of a measurement.
 
 # Interface: Tmf8829ConfigureOptions
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:122](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L122)
+Defined in: [sensors/tmf8829/tmf8829.ts:122](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L122)
 
 ## Properties
 
@@ -2497,7 +2497,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:122](https://github.com/depz-ai/depz
 optional periodMs?: number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:123](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L123)
+Defined in: [sensors/tmf8829/tmf8829.ts:123](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L123)
 
 ***
 
@@ -2507,7 +2507,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:123](https://github.com/depz-ai/depz
 optional kiloIterations?: number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:125](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L125)
+Defined in: [sensors/tmf8829/tmf8829.ts:125](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L125)
 
 Defaults to the preset's own value.
 
@@ -2519,7 +2519,7 @@ Defaults to the preset's own value.
 optional nrPeaks?: number;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L126)
+Defined in: [sensors/tmf8829/tmf8829.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L126)
 
 ***
 
@@ -2529,7 +2529,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:126](https://github.com/depz-ai/depz
 optional signalStrength?: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:127](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L127)
+Defined in: [sensors/tmf8829/tmf8829.ts:127](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L127)
 
 ***
 
@@ -2539,7 +2539,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:127](https://github.com/depz-ai/depz
 optional noiseStrength?: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L128)
+Defined in: [sensors/tmf8829/tmf8829.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L128)
 
 ***
 
@@ -2549,7 +2549,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:128](https://github.com/depz-ai/depz
 optional xtalk?: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:129](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L129)
+Defined in: [sensors/tmf8829/tmf8829.ts:129](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L129)
 
 ***
 
@@ -2559,7 +2559,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:129](https://github.com/depz-ai/depz
 optional histograms?: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L130)
+Defined in: [sensors/tmf8829/tmf8829.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L130)
 
 ***
 
@@ -2569,7 +2569,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:130](https://github.com/depz-ai/depz
 optional refFrame?: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:131](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L131)
+Defined in: [sensors/tmf8829/tmf8829.ts:131](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L131)
 
 ***
 
@@ -2579,13 +2579,13 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:131](https://github.com/depz-ai/depz
 optional fields?: Partial<Record<Tmf8829CfgField, number>>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:133](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L133)
+Defined in: [sensors/tmf8829/tmf8829.ts:133](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L133)
 
 Any other config-page field by name.
 
 # Interface: Tmf8829Event
 
-Defined in: [src/protocol/tmf8829.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L149)
+Defined in: [protocol/tmf8829.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L149)
 
 RPT_TMF_EVENT. `intStatus` is INT_STATUS as read (unmasked).
 
@@ -2597,7 +2597,7 @@ RPT_TMF_EVENT. `intStatus` is INT_STATUS as read (unmasked).
 timestampUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L150)
+Defined in: [protocol/tmf8829.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L150)
 
 ***
 
@@ -2607,7 +2607,7 @@ Defined in: [src/protocol/tmf8829.ts:150](https://github.com/depz-ai/depz-sensor
 intStatus: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:151](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L151)
+Defined in: [protocol/tmf8829.ts:151](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L151)
 
 ***
 
@@ -2617,7 +2617,7 @@ Defined in: [src/protocol/tmf8829.ts:151](https://github.com/depz-ai/depz-sensor
 code: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L152)
+Defined in: [protocol/tmf8829.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L152)
 
 ***
 
@@ -2627,7 +2627,7 @@ Defined in: [src/protocol/tmf8829.ts:152](https://github.com/depz-ai/depz-sensor
 frameId: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L154)
+Defined in: [protocol/tmf8829.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L154)
 
 Header id byte (BAD_HEADER), else 0.
 
@@ -2639,13 +2639,13 @@ Header id byte (BAD_HEADER), else 0.
 fifoStatus: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:156](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L156)
+Defined in: [protocol/tmf8829.ts:156](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L156)
 
 Pre-header byte (BAD_HEADER), else 0.
 
 # Interface: Tmf8829FrameChunk
 
-Defined in: [src/protocol/tmf8829.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L126)
+Defined in: [protocol/tmf8829.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L126)
 
 One RPT_TMF_FRAME chunk. `timestampUs` + the frame's pre-header SYSTICK are
 a clock pair (not the capture time); `edgeUs` is the INT edge credited to
@@ -2659,7 +2659,7 @@ the frame, 0 = none.
 timestampUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:127](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L127)
+Defined in: [protocol/tmf8829.ts:127](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L127)
 
 ***
 
@@ -2669,7 +2669,7 @@ Defined in: [src/protocol/tmf8829.ts:127](https://github.com/depz-ai/depz-sensor
 fullSize: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L128)
+Defined in: [protocol/tmf8829.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L128)
 
 ***
 
@@ -2679,7 +2679,7 @@ Defined in: [src/protocol/tmf8829.ts:128](https://github.com/depz-ai/depz-sensor
 offset: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:129](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L129)
+Defined in: [protocol/tmf8829.ts:129](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L129)
 
 ***
 
@@ -2689,7 +2689,7 @@ Defined in: [src/protocol/tmf8829.ts:129](https://github.com/depz-ai/depz-sensor
 frameSeq: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L130)
+Defined in: [protocol/tmf8829.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L130)
 
 ***
 
@@ -2699,7 +2699,7 @@ Defined in: [src/protocol/tmf8829.ts:130](https://github.com/depz-ai/depz-sensor
 edgeUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:131](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L131)
+Defined in: [protocol/tmf8829.ts:131](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L131)
 
 ***
 
@@ -2709,11 +2709,11 @@ Defined in: [src/protocol/tmf8829.ts:131](https://github.com/depz-ai/depz-sensor
 data: Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:132](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L132)
+Defined in: [protocol/tmf8829.ts:132](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L132)
 
 # Interface: Tmf8829FrameInfo
 
-Defined in: [src/sensors/tmf8829/frames.ts:57](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L57)
+Defined in: [sensors/tmf8829/frames.ts:57](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L57)
 
 Pre-header, header and footer of one frame (any kind).
 
@@ -2725,7 +2725,7 @@ Pre-header, header and footer of one frame (any kind).
 fifoStatus: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L58)
+Defined in: [sensors/tmf8829/frames.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L58)
 
 ***
 
@@ -2735,7 +2735,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:58](https://github.com/depz-ai/depz-s
 systick: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L59)
+Defined in: [sensors/tmf8829/frames.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L59)
 
 ***
 
@@ -2745,7 +2745,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:59](https://github.com/depz-ai/depz-s
 id: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L60)
+Defined in: [sensors/tmf8829/frames.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L60)
 
 ***
 
@@ -2755,7 +2755,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:60](https://github.com/depz-ai/depz-s
 kind: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:62](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L62)
+Defined in: [sensors/tmf8829/frames.ts:62](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L62)
 
 TMF8829_FID_RESULTS / _HISTOGRAMS / _REF_SPAD
 
@@ -2767,7 +2767,7 @@ TMF8829_FID_RESULTS / _HISTOGRAMS / _REF_SPAD
 fpMode: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:63](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L63)
+Defined in: [sensors/tmf8829/frames.ts:63](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L63)
 
 ***
 
@@ -2777,7 +2777,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:63](https://github.com/depz-ai/depz-s
 layout: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:64](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L64)
+Defined in: [sensors/tmf8829/frames.ts:64](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L64)
 
 ***
 
@@ -2787,7 +2787,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:64](https://github.com/depz-ai/depz-s
 payload: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:65](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L65)
+Defined in: [sensors/tmf8829/frames.ts:65](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L65)
 
 ***
 
@@ -2797,7 +2797,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:65](https://github.com/depz-ai/depz-s
 fNumber: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L66)
+Defined in: [sensors/tmf8829/frames.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L66)
 
 ***
 
@@ -2807,7 +2807,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:66](https://github.com/depz-ai/depz-s
 temperature: [number, number, number];
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:67](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L67)
+Defined in: [sensors/tmf8829/frames.ts:67](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L67)
 
 ***
 
@@ -2817,7 +2817,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:67](https://github.com/depz-ai/depz-s
 bdv: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:68](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L68)
+Defined in: [sensors/tmf8829/frames.ts:68](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L68)
 
 ***
 
@@ -2827,7 +2827,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:68](https://github.com/depz-ai/depz-s
 refPos: [number, number];
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:69](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L69)
+Defined in: [sensors/tmf8829/frames.ts:69](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L69)
 
 ***
 
@@ -2837,7 +2837,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:69](https://github.com/depz-ai/depz-s
 t0Integration: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:70](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L70)
+Defined in: [sensors/tmf8829/frames.ts:70](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L70)
 
 ***
 
@@ -2847,7 +2847,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:70](https://github.com/depz-ai/depz-s
 t1Integration: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:71](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L71)
+Defined in: [sensors/tmf8829/frames.ts:71](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L71)
 
 ***
 
@@ -2857,7 +2857,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:71](https://github.com/depz-ai/depz-s
 frameStatus: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:72](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L72)
+Defined in: [sensors/tmf8829/frames.ts:72](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L72)
 
 ***
 
@@ -2867,7 +2867,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:72](https://github.com/depz-ai/depz-s
 reserved: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:73](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L73)
+Defined in: [sensors/tmf8829/frames.ts:73](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L73)
 
 ***
 
@@ -2877,7 +2877,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:73](https://github.com/depz-ai/depz-s
 eof: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:74](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L74)
+Defined in: [sensors/tmf8829/frames.ts:74](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L74)
 
 ***
 
@@ -2887,7 +2887,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:74](https://github.com/depz-ai/depz-s
 size: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L75)
+Defined in: [sensors/tmf8829/frames.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L75)
 
 ***
 
@@ -2897,7 +2897,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:75](https://github.com/depz-ai/depz-s
 isSecondHalf: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L76)
+Defined in: [sensors/tmf8829/frames.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L76)
 
 ***
 
@@ -2907,11 +2907,11 @@ Defined in: [src/sensors/tmf8829/frames.ts:76](https://github.com/depz-ai/depz-s
 distanceInMm: boolean;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:77](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L77)
+Defined in: [sensors/tmf8829/frames.ts:77](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L77)
 
 # Interface: Tmf8829FrameTime
 
-Defined in: [src/sensors/tmf8829/clock.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L126)
+Defined in: [sensors/tmf8829/clock.ts:126](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L126)
 
 Capture time of one results frame, MCU µs.
 
@@ -2923,7 +2923,7 @@ Capture time of one results frame, MCU µs.
 timestampUs: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L128)
+Defined in: [sensors/tmf8829/clock.ts:128](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L128)
 
 Centre of the capture window.
 
@@ -2935,7 +2935,7 @@ Centre of the capture window.
 flags: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L130)
+Defined in: [sensors/tmf8829/clock.ts:130](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L130)
 
 TMF8829_FT_*
 
@@ -2947,7 +2947,7 @@ TMF8829_FT_*
 t1LenUs: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:132](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L132)
+Defined in: [sensors/tmf8829/clock.ts:132](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L132)
 
 Sub-integration length used.
 
@@ -2959,7 +2959,7 @@ Sub-integration length used.
 t0Us: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:133](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L133)
+Defined in: [sensors/tmf8829/clock.ts:133](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L133)
 
 ***
 
@@ -2969,7 +2969,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:133](https://github.com/depz-ai/depz-s
 t1Us: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:134](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L134)
+Defined in: [sensors/tmf8829/clock.ts:134](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L134)
 
 ***
 
@@ -2979,7 +2979,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:134](https://github.com/depz-ai/depz-s
 edgeUs: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:136](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L136)
+Defined in: [sensors/tmf8829/clock.ts:136](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L136)
 
 INT edge credited to the frame, 0 = none.
 
@@ -2991,7 +2991,7 @@ INT edge credited to the frame, 0 = none.
 pairUs: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L138)
+Defined in: [sensors/tmf8829/clock.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L138)
 
 MCU time of the header read (the clock pair).
 
@@ -3003,13 +3003,13 @@ MCU time of the header read (the clock pair).
 ratioQ16: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L140)
+Defined in: [sensors/tmf8829/clock.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L140)
 
 Clock ratio after this frame.
 
 # Interface: Tmf8829HistogramFrame
 
-Defined in: [src/sensors/tmf8829/frames.ts:242](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L242)
+Defined in: [sensors/tmf8829/frames.ts:242](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L242)
 
 A raw histogram frame (25 377 B); decoding the bins is left to the caller.
 
@@ -3021,7 +3021,7 @@ A raw histogram frame (25 377 B); decoding the bins is left to the caller.
 info: Tmf8829FrameInfo;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:243](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L243)
+Defined in: [sensors/tmf8829/frames.ts:243](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L243)
 
 ***
 
@@ -3031,11 +3031,11 @@ Defined in: [src/sensors/tmf8829/frames.ts:243](https://github.com/depz-ai/depz-
 raw: Uint8Array;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L244)
+Defined in: [sensors/tmf8829/frames.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L244)
 
 # Interface: Tmf8829Info
 
-Defined in: [src/protocol/tmf8829.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L90)
+Defined in: [protocol/tmf8829.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L90)
 
 RPT_TMF_INFO: bridge state only (no echoed command byte).
 
@@ -3047,7 +3047,7 @@ RPT_TMF_INFO: bridge state only (no echoed command byte).
 intEdges: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L91)
+Defined in: [protocol/tmf8829.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L91)
 
 ***
 
@@ -3057,7 +3057,7 @@ Defined in: [src/protocol/tmf8829.ts:91](https://github.com/depz-ai/depz-sensor-
 frames: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L92)
+Defined in: [protocol/tmf8829.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L92)
 
 ***
 
@@ -3067,7 +3067,7 @@ Defined in: [src/protocol/tmf8829.ts:92](https://github.com/depz-ai/depz-sensor-
 framesAborted: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L93)
+Defined in: [protocol/tmf8829.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L93)
 
 ***
 
@@ -3077,7 +3077,7 @@ Defined in: [src/protocol/tmf8829.ts:93](https://github.com/depz-ai/depz-sensor-
 frameErrors: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L94)
+Defined in: [protocol/tmf8829.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L94)
 
 ***
 
@@ -3087,7 +3087,7 @@ Defined in: [src/protocol/tmf8829.ts:94](https://github.com/depz-ai/depz-sensor-
 spiTimeouts: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L95)
+Defined in: [protocol/tmf8829.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L95)
 
 ***
 
@@ -3097,7 +3097,7 @@ Defined in: [src/protocol/tmf8829.ts:95](https://github.com/depz-ai/depz-sensor-
 intLevel: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:97](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L97)
+Defined in: [protocol/tmf8829.ts:97](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L97)
 
 PA4 level now, 0 = asserted.
 
@@ -3109,7 +3109,7 @@ PA4 level now, 0 = asserted.
 streaming: boolean;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L98)
+Defined in: [protocol/tmf8829.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L98)
 
 ***
 
@@ -3119,7 +3119,7 @@ Defined in: [src/protocol/tmf8829.ts:98](https://github.com/depz-ai/depz-sensor-
 intMask: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:99](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L99)
+Defined in: [protocol/tmf8829.ts:99](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L99)
 
 ***
 
@@ -3129,7 +3129,7 @@ Defined in: [src/protocol/tmf8829.ts:99](https://github.com/depz-ai/depz-sensor-
 lastIntStatus: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:100](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L100)
+Defined in: [protocol/tmf8829.ts:100](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L100)
 
 ***
 
@@ -3139,11 +3139,11 @@ Defined in: [src/protocol/tmf8829.ts:100](https://github.com/depz-ai/depz-sensor
 lastFifoStatus: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:101](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L101)
+Defined in: [protocol/tmf8829.ts:101](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L101)
 
 # Interface: Tmf8829Measurement
 
-Defined in: [src/sensors/tmf8829/builder.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L27)
+Defined in: [sensors/tmf8829/builder.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L27)
 
 One measurement: its results frame (8x8, 16x16) or both half-frames (32x32,
 48x32) merged, with the histogram / ref-SPAD frames before it.
@@ -3156,7 +3156,7 @@ One measurement: its results frame (8x8, 16x16) or both half-frames (32x32,
 timestampUs: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L29)
+Defined in: [sensors/tmf8829/builder.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L29)
 
 Capture time, MCU µs (floor mean of the half-frame captures).
 
@@ -3168,7 +3168,7 @@ Capture time, MCU µs (floor mean of the half-frame captures).
 flags: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:31](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L31)
+Defined in: [sensors/tmf8829/builder.ts:31](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L31)
 
 TMF8829_FT_* of all its results frames.
 
@@ -3180,7 +3180,7 @@ TMF8829_FT_* of all its results frames.
 fpMode: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L32)
+Defined in: [sensors/tmf8829/builder.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L32)
 
 ***
 
@@ -3190,7 +3190,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:32](https://github.com/depz-ai/depz-
 fNumber: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L33)
+Defined in: [sensors/tmf8829/builder.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L33)
 
 ***
 
@@ -3200,7 +3200,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:33](https://github.com/depz-ai/depz-
 rows: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L34)
+Defined in: [sensors/tmf8829/builder.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L34)
 
 ***
 
@@ -3210,7 +3210,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:34](https://github.com/depz-ai/depz-
 cols: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L35)
+Defined in: [sensors/tmf8829/builder.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L35)
 
 ***
 
@@ -3220,7 +3220,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:35](https://github.com/depz-ai/depz-
 results: Tmf8829PixelResults;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L37)
+Defined in: [sensors/tmf8829/builder.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L37)
 
 Raw sensor integers.
 
@@ -3232,7 +3232,7 @@ Raw sensor integers.
 distanceMm: Float64Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L39)
+Defined in: [sensors/tmf8829/builder.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L39)
 
 Clock-corrected mm, flat [peak][row][col] (null without peaks).
 
@@ -3244,7 +3244,7 @@ Clock-corrected mm, flat [peak][row][col] (null without peaks).
 ratioQ16: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:41](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L41)
+Defined in: [sensors/tmf8829/builder.ts:41](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L41)
 
 Clock ratio the distances were corrected with (Q16).
 
@@ -3256,7 +3256,7 @@ Clock ratio the distances were corrected with (Q16).
 frames: Tmf8829FrameInfo[];
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:42](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L42)
+Defined in: [sensors/tmf8829/builder.ts:42](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L42)
 
 ***
 
@@ -3266,7 +3266,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:42](https://github.com/depz-ai/depz-
 times: Tmf8829FrameTime[];
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:43](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L43)
+Defined in: [sensors/tmf8829/builder.ts:43](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L43)
 
 ***
 
@@ -3276,7 +3276,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:43](https://github.com/depz-ai/depz-
 histograms: Tmf8829HistogramFrame[];
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L44)
+Defined in: [sensors/tmf8829/builder.ts:44](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L44)
 
 ***
 
@@ -3286,7 +3286,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:44](https://github.com/depz-ai/depz-
 refFrames: Uint8Array<ArrayBufferLike>[];
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L46)
+Defined in: [sensors/tmf8829/builder.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L46)
 
 65 B each, zero pre-header.
 
@@ -3298,7 +3298,7 @@ Defined in: [src/sensors/tmf8829/builder.ts:46](https://github.com/depz-ai/depz-
 problems: string[];
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:48](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L48)
+Defined in: [sensors/tmf8829/builder.ts:48](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L48)
 
 What went wrong since the previous measurement, human-readable.
 
@@ -3310,13 +3310,13 @@ What went wrong since the previous measurement, human-readable.
 temperatureC: number;
 ```
 
-Defined in: [src/sensors/tmf8829/builder.ts:50](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L50)
+Defined in: [sensors/tmf8829/builder.ts:50](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/builder.ts#L50)
 
 Sensor die temperature (header byte 0 of the last frame), °C.
 
 # Interface: Tmf8829Options
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L148)
+Defined in: [sensors/tmf8829/tmf8829.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L148)
 
 ## Extends
 
@@ -3330,7 +3330,7 @@ Defined in: [src/sensors/tmf8829/tmf8829.ts:148](https://github.com/depz-ai/depz
 optional timeoutMs?: number;
 ```
 
-Defined in: [src/device/device.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L183)
+Defined in: [device/device.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L183)
 
 #### Inherited from
 
@@ -3346,7 +3346,7 @@ DeviceOptions.timeoutMs
 optional txCrcType?: CrcType;
 ```
 
-Defined in: [src/device/device.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L184)
+Defined in: [device/device.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L184)
 
 #### Inherited from
 
@@ -3362,7 +3362,7 @@ DeviceOptions.txCrcType
 optional sleepImpl?: (ms) => Promise<void>;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L150)
+Defined in: [sensors/tmf8829/tmf8829.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L150)
 
 Injectable sleep (tests).
 
@@ -3378,7 +3378,7 @@ Injectable sleep (tests).
 
 # Interface: Tmf8829PixelResults
 
-Defined in: [src/sensors/tmf8829/frames.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L138)
+Defined in: [sensors/tmf8829/frames.ts:138](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L138)
 
 Decoded results of one frame or of a merged measurement. Per-peak arrays
 are flat `[peak][row][col]` (row-major); noise / xtalk `[row][col]`. Raw
@@ -3393,7 +3393,7 @@ clock-corrected. Absent fields are null.
 peaks: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:139](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L139)
+Defined in: [sensors/tmf8829/frames.ts:139](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L139)
 
 ***
 
@@ -3403,7 +3403,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:139](https://github.com/depz-ai/depz-
 rows: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L140)
+Defined in: [sensors/tmf8829/frames.ts:140](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L140)
 
 ***
 
@@ -3413,7 +3413,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:140](https://github.com/depz-ai/depz-
 cols: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:141](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L141)
+Defined in: [sensors/tmf8829/frames.ts:141](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L141)
 
 ***
 
@@ -3423,7 +3423,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:141](https://github.com/depz-ai/depz-
 distance: Uint16Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L142)
+Defined in: [sensors/tmf8829/frames.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L142)
 
 ***
 
@@ -3433,7 +3433,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:142](https://github.com/depz-ai/depz-
 snr: Uint8Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L143)
+Defined in: [sensors/tmf8829/frames.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L143)
 
 ***
 
@@ -3443,7 +3443,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:143](https://github.com/depz-ai/depz-
 signal: Uint16Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L144)
+Defined in: [sensors/tmf8829/frames.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L144)
 
 ***
 
@@ -3453,7 +3453,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:144](https://github.com/depz-ai/depz-
 noise: Uint16Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L145)
+Defined in: [sensors/tmf8829/frames.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L145)
 
 ***
 
@@ -3463,11 +3463,11 @@ Defined in: [src/sensors/tmf8829/frames.ts:145](https://github.com/depz-ai/depz-
 xtalk: Uint16Array<ArrayBufferLike> | null;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L146)
+Defined in: [sensors/tmf8829/frames.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L146)
 
 # Interface: Tmf8829RawFrame
 
-Defined in: [src/protocol/tmf8829.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L171)
+Defined in: [protocol/tmf8829.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L171)
 
 A reassembled frame: the sensor bytes from register 0xFA on.
 
@@ -3479,7 +3479,7 @@ A reassembled frame: the sensor bytes from register 0xFA on.
 timestampUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:172](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L172)
+Defined in: [protocol/tmf8829.ts:172](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L172)
 
 ***
 
@@ -3489,7 +3489,7 @@ Defined in: [src/protocol/tmf8829.ts:172](https://github.com/depz-ai/depz-sensor
 edgeUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:173](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L173)
+Defined in: [protocol/tmf8829.ts:173](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L173)
 
 ***
 
@@ -3499,7 +3499,7 @@ Defined in: [src/protocol/tmf8829.ts:173](https://github.com/depz-ai/depz-sensor
 frameSeq: number;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:174](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L174)
+Defined in: [protocol/tmf8829.ts:174](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L174)
 
 ***
 
@@ -3509,11 +3509,11 @@ Defined in: [src/protocol/tmf8829.ts:174](https://github.com/depz-ai/depz-sensor
 data: Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L175)
+Defined in: [protocol/tmf8829.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L175)
 
 # Interface: Tmf8829RegData
 
-Defined in: [src/protocol/tmf8829.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L76)
+Defined in: [protocol/tmf8829.ts:76](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L76)
 
 RPT_TMF_REG_DATA: register bytes and the MCU time the SPI read completed.
 
@@ -3525,7 +3525,7 @@ RPT_TMF_REG_DATA: register bytes and the MCU time the SPI read completed.
 timestampUs: bigint;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:77](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L77)
+Defined in: [protocol/tmf8829.ts:77](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L77)
 
 ***
 
@@ -3535,7 +3535,7 @@ Defined in: [src/protocol/tmf8829.ts:77](https://github.com/depz-ai/depz-sensor-
 data: Uint8Array;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:78](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L78)
+Defined in: [protocol/tmf8829.ts:78](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L78)
 
 # Type Alias: Tmf8829CfgField
 
@@ -3557,7 +3557,7 @@ type Tmf8829CfgField =
   | "distance_in_mm";
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:53](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L53)
+Defined in: [sensors/tmf8829/config.ts:53](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L53)
 
 # Type Alias: Tmf8829Preset
 
@@ -3575,7 +3575,7 @@ type Tmf8829Preset =
   | "8x8-xr";
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L10)
+Defined in: [sensors/tmf8829/config.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L10)
 
 # Variable: TMF8829\_CFG\_FIELDS
 
@@ -3583,7 +3583,7 @@ Defined in: [src/sensors/tmf8829/config.ts:10](https://github.com/depz-ai/depz-s
 const TMF8829_CFG_FIELDS: Readonly<Record<Tmf8829CfgField, readonly [number, number, number]>>;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:70](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L70)
+Defined in: [sensors/tmf8829/config.ts:70](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L70)
 
 Field → [register, bit shift, width in bits]; width 16 = little-endian register pair.
 
@@ -3593,7 +3593,7 @@ Field → [register, bit shift, width in bits]; width 16 = little-endian registe
 const TMF8829_CFG_SIZE: number;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L8)
+Defined in: [sensors/tmf8829/config.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L8)
 
 # Variable: TMF8829\_CHUNK\_MAX
 
@@ -3601,7 +3601,7 @@ Defined in: [src/sensors/tmf8829/config.ts:8](https://github.com/depz-ai/depz-se
 const TMF8829_CHUNK_MAX: 1024 = 1024;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L34)
+Defined in: [protocol/tmf8829.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L34)
 
 # Variable: TMF8829\_DEFAULT\_PERIOD\_MS
 
@@ -3609,7 +3609,7 @@ Defined in: [src/protocol/tmf8829.ts:34](https://github.com/depz-ai/depz-sensor-
 const TMF8829_DEFAULT_PERIOD_MS: 33 = 33;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:51](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L51)
+Defined in: [sensors/tmf8829/config.ts:51](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L51)
 
 The sensor's own period after init().
 
@@ -3619,7 +3619,7 @@ The sensor's own period after init().
 const TMF8829_FID_HISTOGRAMS: 32 = 0x20;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L17)
+Defined in: [sensors/tmf8829/frames.ts:17](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L17)
 
 # Variable: TMF8829\_FID\_MASK
 
@@ -3627,7 +3627,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:17](https://github.com/depz-ai/depz-s
 const TMF8829_FID_MASK: 240 = 0xf0;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:15](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L15)
+Defined in: [sensors/tmf8829/frames.ts:15](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L15)
 
 # Variable: TMF8829\_FID\_REF\_SPAD
 
@@ -3635,7 +3635,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:15](https://github.com/depz-ai/depz-s
 const TMF8829_FID_REF_SPAD: 48 = 0x30;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L18)
+Defined in: [sensors/tmf8829/frames.ts:18](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L18)
 
 # Variable: TMF8829\_FID\_RESULTS
 
@@ -3643,7 +3643,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:18](https://github.com/depz-ai/depz-s
 const TMF8829_FID_RESULTS: 16 = 0x10;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:16](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L16)
+Defined in: [sensors/tmf8829/frames.ts:16](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L16)
 
 # Variable: TMF8829\_FIRMWARE\_LICENSE
 
@@ -3651,7 +3651,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:16](https://github.com/depz-ai/depz-s
 const TMF8829_FIRMWARE_LICENSE: "Copyright (C) 2025 AMS-OSRAM\n\n                        The MIT License (MIT)\n                Copyright © 2025 <copyright holders>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software\nand associated documentation files (the “Software”), to deal in the Software without\nrestriction, including without limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the\nSoftware is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or \nsubstantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING \nBUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND \nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, \nDAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING \nFROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE." = "Copyright (C) 2025 AMS-OSRAM\n\n                        The MIT License (MIT)\n                Copyright © 2025 <copyright holders>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software\nand associated documentation files (the “Software”), to deal in the Software without\nrestriction, including without limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the\nSoftware is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or \nsubstantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING \nBUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND \nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, \nDAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING \nFROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
 ```
 
-Defined in: [src/sensors/tmf8829/firmware-license.ts:5](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/firmware-license.ts#L5)
+Defined in: [sensors/tmf8829/firmware-license.ts:5](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/firmware-license.ts#L5)
 
 The MIT license (ams-OSRAM) of the TMF8829 sensor firmware the SDK embeds.
 
@@ -3661,7 +3661,7 @@ The MIT license (ams-OSRAM) of the TMF8829 sensor firmware the SDK embeds.
 const TMF8829_FIRMWARE_LOAD_ADDR: 65536 = 0x00010000;
 ```
 
-Defined in: [src/sensors/tmf8829/tmf8829.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L107)
+Defined in: [sensors/tmf8829/tmf8829.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/tmf8829.ts#L107)
 
 ams tmf8829_application.hex load address (application 2.200.0).
 
@@ -3671,7 +3671,7 @@ ams tmf8829_application.hex load address (application 2.200.0).
 const TMF8829_FOOTER_SIZE: 12 = 12;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L10)
+Defined in: [sensors/tmf8829/frames.ts:10](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L10)
 
 # Variable: TMF8829\_FP\_GRID
 
@@ -3679,7 +3679,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:10](https://github.com/depz-ai/depz-s
 const TMF8829_FP_GRID: Readonly<Record<number, readonly [number, number]>>;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L39)
+Defined in: [sensors/tmf8829/frames.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L39)
 
 fp_mode → [rows, cols] of the full focal plane.
 
@@ -3689,7 +3689,7 @@ fp_mode → [rows, cols] of the full focal plane.
 const TMF8829_FP_NAMES: Readonly<Record<number, string>>;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:47](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L47)
+Defined in: [sensors/tmf8829/frames.ts:47](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L47)
 
 # Variable: TMF8829\_FRAME\_EOF
 
@@ -3697,7 +3697,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:47](https://github.com/depz-ai/depz-s
 const TMF8829_FRAME_EOF: 57591 = 0xe0f7;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L13)
+Defined in: [sensors/tmf8829/frames.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L13)
 
 # Variable: TMF8829\_FRAME\_HEAD
 
@@ -3705,7 +3705,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:13](https://github.com/depz-ai/depz-s
 const TMF8829_FRAME_HEAD: number;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:12](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L12)
+Defined in: [sensors/tmf8829/frames.ts:12](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L12)
 
 The 21 bytes the bridge reads at 0xFA.
 
@@ -3715,7 +3715,7 @@ The 21 bytes the bridge reads at 0xFA.
 const TMF8829_FT_CLOCK_RESET: 2 = 0x02;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L21)
+Defined in: [sensors/tmf8829/clock.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L21)
 
 Clock model restarted at this frame (SYSTICK jump).
 
@@ -3725,7 +3725,7 @@ Clock model restarted at this frame (SYSTICK jump).
 const TMF8829_FT_EDGE_LATE: 4 = 0x04;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L23)
+Defined in: [sensors/tmf8829/clock.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L23)
 
 INT edge > 2 ms later after t1 than usual in this stream.
 
@@ -3735,7 +3735,7 @@ INT edge > 2 ms later after t1 than usual in this stream.
 const TMF8829_FT_NAMES: ReadonlyArray<[number, string]>;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L29)
+Defined in: [sensors/tmf8829/clock.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L29)
 
 # Variable: TMF8829\_FT\_NOMINAL
 
@@ -3743,7 +3743,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:29](https://github.com/depz-ai/depz-se
 const TMF8829_FT_NOMINAL: 1 = 0x01;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L19)
+Defined in: [sensors/tmf8829/clock.ts:19](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L19)
 
 Clock ratio not measured yet (nominal 8 µs/tick used).
 
@@ -3753,7 +3753,7 @@ Clock ratio not measured yet (nominal 8 µs/tick used).
 const TMF8829_FT_STALLED: 8 = 0x08;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L25)
+Defined in: [sensors/tmf8829/clock.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L25)
 
 Sub-integrations not back to back (histogram FIFO wait).
 
@@ -3763,7 +3763,7 @@ Sub-integrations not back to back (histogram FIFO wait).
 const TMF8829_FT_T1_UNSURE: 16 = 0x10;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L27)
+Defined in: [sensors/tmf8829/clock.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L27)
 
 Histograms + 32x32/48x32: T1 may be too long, centre late.
 
@@ -3773,7 +3773,7 @@ Histograms + 32x32/48x32: T1 may be too long, centre late.
 const TMF8829_HEADER_SIZE: 16 = 16;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:9](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L9)
+Defined in: [sensors/tmf8829/frames.ts:9](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L9)
 
 # Variable: TMF8829\_INT\_HISTOGRAMS
 
@@ -3781,7 +3781,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:9](https://github.com/depz-ai/depz-se
 const TMF8829_INT_HISTOGRAMS: 8 = 0x08;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L39)
+Defined in: [protocol/tmf8829.ts:39](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L39)
 
 # Variable: TMF8829\_INT\_MASK\_ALL
 
@@ -3789,7 +3789,7 @@ Defined in: [src/protocol/tmf8829.ts:39](https://github.com/depz-ai/depz-sensor-
 const TMF8829_INT_MASK_ALL: 15 = 0x0f;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:40](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L40)
+Defined in: [protocol/tmf8829.ts:40](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L40)
 
 # Variable: TMF8829\_INT\_MOTION
 
@@ -3797,7 +3797,7 @@ Defined in: [src/protocol/tmf8829.ts:40](https://github.com/depz-ai/depz-sensor-
 const TMF8829_INT_MOTION: 2 = 0x02;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L37)
+Defined in: [protocol/tmf8829.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L37)
 
 # Variable: TMF8829\_INT\_PROXIMITY
 
@@ -3805,7 +3805,7 @@ Defined in: [src/protocol/tmf8829.ts:37](https://github.com/depz-ai/depz-sensor-
 const TMF8829_INT_PROXIMITY: 4 = 0x04;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:38](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L38)
+Defined in: [protocol/tmf8829.ts:38](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L38)
 
 # Variable: TMF8829\_INT\_RESULTS
 
@@ -3813,7 +3813,7 @@ Defined in: [src/protocol/tmf8829.ts:38](https://github.com/depz-ai/depz-sensor-
 const TMF8829_INT_RESULTS: 1 = 0x01;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L36)
+Defined in: [protocol/tmf8829.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L36)
 
 # Variable: TMF8829\_LAYOUT\_NOISE
 
@@ -3821,7 +3821,7 @@ Defined in: [src/protocol/tmf8829.ts:36](https://github.com/depz-ai/depz-sensor-
 const TMF8829_LAYOUT_NOISE: 16 = 0x10;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:22](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L22)
+Defined in: [sensors/tmf8829/frames.ts:22](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L22)
 
 # Variable: TMF8829\_LAYOUT\_PEAKS
 
@@ -3829,7 +3829,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:22](https://github.com/depz-ai/depz-s
 const TMF8829_LAYOUT_PEAKS: 7 = 0x07;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L20)
+Defined in: [sensors/tmf8829/frames.ts:20](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L20)
 
 # Variable: TMF8829\_LAYOUT\_SIGNAL
 
@@ -3837,7 +3837,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:20](https://github.com/depz-ai/depz-s
 const TMF8829_LAYOUT_SIGNAL: 8 = 0x08;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L21)
+Defined in: [sensors/tmf8829/frames.ts:21](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L21)
 
 # Variable: TMF8829\_LAYOUT\_SUBFRAME
 
@@ -3845,7 +3845,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:21](https://github.com/depz-ai/depz-s
 const TMF8829_LAYOUT_SUBFRAME: 64 = 0x40;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L25)
+Defined in: [sensors/tmf8829/frames.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L25)
 
 32x32/48x32: set on the second (odd-row) half-frame.
 
@@ -3855,7 +3855,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:25](https://github.com/depz-ai/depz-s
 const TMF8829_LAYOUT_XTALK: 32 = 0x20;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L23)
+Defined in: [sensors/tmf8829/frames.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L23)
 
 # Variable: TMF8829\_NOMINAL\_Q16
 
@@ -3863,7 +3863,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:23](https://github.com/depz-ai/depz-s
 const TMF8829_NOMINAL_Q16: number;
 ```
 
-Defined in: [src/sensors/tmf8829/clock.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L13)
+Defined in: [sensors/tmf8829/clock.ts:13](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/clock.ts#L13)
 
 # Variable: TMF8829\_PRESETS
 
@@ -3871,7 +3871,7 @@ Defined in: [src/sensors/tmf8829/clock.ts:13](https://github.com/depz-ai/depz-se
 const TMF8829_PRESETS: Readonly<Record<Tmf8829Preset, number>>;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L23)
+Defined in: [sensors/tmf8829/config.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L23)
 
 Preset → load command (each loads its config page).
 
@@ -3881,7 +3881,7 @@ Preset → load command (each loads its config page).
 const TMF8829_PRESET_KILO_ITERATIONS: Readonly<Record<Tmf8829Preset, number>>;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L37)
+Defined in: [sensors/tmf8829/config.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L37)
 
 The preset's own kilo_iterations (a preset rescales a stale value, it does not reset it).
 
@@ -3891,7 +3891,7 @@ The preset's own kilo_iterations (a preset rescales a stale value, it does not r
 const TMF8829_PRE_HEADER_SIZE: 5 = 5;
 ```
 
-Defined in: [src/sensors/tmf8829/frames.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L8)
+Defined in: [sensors/tmf8829/frames.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/frames.ts#L8)
 
 # Variable: TMF8829\_READ\_MAX
 
@@ -3899,7 +3899,7 @@ Defined in: [src/sensors/tmf8829/frames.ts:8](https://github.com/depz-ai/depz-se
 const TMF8829_READ_MAX: 1024 = 1024;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L32)
+Defined in: [protocol/tmf8829.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L32)
 
 # Variable: TMF8829\_REG\_CFG
 
@@ -3907,7 +3907,7 @@ Defined in: [src/protocol/tmf8829.ts:32](https://github.com/depz-ai/depz-sensor-
 const TMF8829_REG_CFG: 34 = 0x22;
 ```
 
-Defined in: [src/sensors/tmf8829/config.ts:7](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L7)
+Defined in: [sensors/tmf8829/config.ts:7](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/tmf8829/config.ts#L7)
 
 Config page 0x22..0xDF.
 
@@ -3917,7 +3917,7 @@ Config page 0x22..0xDF.
 const TMF8829_SF_REF_FRAME: 1 = 0x01;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:42](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L42)
+Defined in: [protocol/tmf8829.ts:42](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L42)
 
 TMF_START_STREAM flags: emit the ref-SPAD frame before each results frame.
 
@@ -3927,5 +3927,5 @@ TMF_START_STREAM flags: emit the ref-SPAD frame before each results frame.
 const TMF8829_WRITE_MAX: 1023 = 1023;
 ```
 
-Defined in: [src/protocol/tmf8829.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L33)
+Defined in: [protocol/tmf8829.ts:33](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/tmf8829.ts#L33)
 

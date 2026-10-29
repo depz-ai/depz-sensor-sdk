@@ -325,19 +325,37 @@ describe("dataset player", () => {
     expect(states).toEqual(["playing", "paused"]);
   });
 
-  it("a record callback error pauses the player and is rethrown", () => {
-    const { player, seen, states } = setup(evenly(), 0);
+  it("a throwing callback is counted and dropped; playback goes on", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const p = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../contracts/vectors/recordings/dataset_dual_sr04.depzdata",
+    );
+    const reader = new DatasetReader(readFileSync(p, "utf8"));
+    const player = new DatasetPlayer(reader, { speed: 0, clock: () => Date.now() });
+    const first = reader.records[0];
+    const got: unknown[] = [];
+    const states: string[] = [];
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     player.onRecord((r) => {
-      if (r.tHostUs === 1_200_000) throw new Error("consumer failed");
+      if (r === first) throw new Error("consumer failed");
     });
-    player.play();
-    expect(() => run(0)).toThrow("consumer failed");
-    expect(player.state).toBe("paused");
-    expect(player.positionUs).toBe(200_000); // the failing record counts as delivered
+    player.onRecord((r) => got.push(r));
+    player.onState(() => {
+      throw new Error("state consumer failed");
+    });
+    player.onState((s) => states.push(s));
     player.play();
     run(0);
-    expect(seen).toEqual([0, 1, 2, 3, 4].map((i) => 1_000_000 + i * 100_000));
-    expect(states).toEqual(["playing", "paused", "playing", "done"]);
+    expect(got).toEqual(reader.records);
+    expect(got.length).toBe(10);
+    expect(player.state).toBe("done");
+    expect(states).toEqual(["playing", "done"]);
+    expect(player.callbackErrors).toBe(3); // the first record + two state changes
+    expect(errors).toHaveBeenCalledTimes(3);
+    errors.mockRestore();
   });
 
   it("at speed 0 a long dataset is delivered in bursts, not in one call", () => {

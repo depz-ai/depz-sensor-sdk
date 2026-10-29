@@ -14,8 +14,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- the .NET code-quality analyzers at the recommended set, every finding fails the build;
-         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and CI's
-         newer one then fails a build that passes here -->
+         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and another
+         machine's newer one then fails a build that passes here -->
     <AnalysisLevel>8.0-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>

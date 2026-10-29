@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Callable, Iterator
 
 from ._jsonl import is_blank, json_object
-from .device import DeviceBase, host_now_us
+from .device import DeviceBase, call_guarded, host_now_us
 from .errors import InvalidStateError
 from .sr04 import Sr04, Sr04Measurement
 
@@ -562,7 +562,9 @@ class DatasetPlayer:
     consistent player, may call its methods, and once `pause` returns no
     record callback is running or will start. Like device stream callbacks
     (contract 07) they must not block — never wait in one for another thread
-    that uses this player.
+    that uses this player. A callback that raises is logged (logger
+    ``depz_sensor_sdk``), counted in `callback_errors` and dropped: the other
+    callbacks still get the record and playback goes on (contract 09).
 
     ``threaded=False`` starts no thread: the owner calls `tick` from its own
     loop (a GUI timer, or a test with a fake ``clock``).
@@ -593,6 +595,7 @@ class DatasetPlayer:
         self._state_cbs: list[Callable[[PlayerState], None]] = []
         self._thread: threading.Thread | None = None
         self._closed = False
+        self._callback_errors = 0
 
     # ── read-only views ──────────────────────────────────────────────────────
 
@@ -614,6 +617,11 @@ class DatasetPlayer:
             if not self._recs or self._idx == 0:
                 return 0
             return self._recs[min(self._idx, len(self._recs)) - 1].t_host_us - self._recs[0].t_host_us
+
+    @property
+    def callback_errors(self) -> int:
+        """Record / state callbacks that raised and were dropped (contract 09)."""
+        return self._callback_errors
 
     @property
     def speed(self) -> float:
@@ -777,8 +785,14 @@ class DatasetPlayer:
     def _set_state(self, state: PlayerState) -> None:
         self._state = state
         self._cond.notify_all()
-        for cb in list(self._state_cbs):
-            cb(state)
+        self._deliver(self._state_cbs, state)
+
+    def _deliver(self, cbs: list[Any], item: Any) -> None:
+        """Hand `item` to every callback; one that raises is counted, logged
+        and dropped — the rest still get it, playback goes on (contract 09)."""
+        for cb in list(cbs):
+            if not call_guarded(cb, item):
+                self._callback_errors += 1
 
     def _step_locked(self) -> float | None | _Delivered:
         """Deliver the next record if it is due: `_DELIVERED`, else the
@@ -795,15 +809,7 @@ class DatasetPlayer:
             if due > now:
                 return due - now
         self._idx += 1
-        try:
-            for cb in list(self._record_cbs):
-                cb(rec)
-        except BaseException:
-            # A failing consumer stops playback where it failed (the record
-            # counts as delivered); the error goes to whoever drove delivery.
-            if self._state is PlayerState.PLAYING:
-                self._set_state(PlayerState.PAUSED)
-            raise
+        self._deliver(self._record_cbs, rec)
         if self._state is PlayerState.PLAYING and self._idx >= len(self._recs):
             self._set_state(PlayerState.DONE)
         return _DELIVERED

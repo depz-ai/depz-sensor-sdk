@@ -22,6 +22,10 @@ void       fake_sr04_stop(fake_sr04 *f);
 uint32_t fake_sr04_sample_period(fake_sr04 *f);
 void     fake_sr04_set_echo(fake_sr04 *f, uint16_t echo_us);
 bool     fake_sr04_loop_running(fake_sr04 *f);
+/* SET_PAYLOAD_CRC_TYPE's setting (0..3) and how many DEVICE_RESETs were acked
+ * (each one then drops the link, as the reboot does). */
+uint8_t  fake_sr04_payload_crc_type(fake_sr04 *f);
+int      fake_sr04_reset_count(fake_sr04 *f);
 /* Emit one RPT_DATA as the firmware's ISR would (source 0x36 or 0x37). */
 void     fake_sr04_send_measurement(fake_sr04 *f, uint8_t source_cmd);
 /* Answer GET_MCU_TEMPERATURE with 3 of its 10 bytes (a short reply, contract 07 §3). */

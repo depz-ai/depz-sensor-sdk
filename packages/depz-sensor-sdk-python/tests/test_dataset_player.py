@@ -332,23 +332,35 @@ def test_callback_may_control_the_player(tmp_path: Path):
     assert states == ["playing", "paused"]
 
 
-def test_record_callback_error_pauses_and_propagates(tmp_path: Path):
-    p, clock, seen, states = _player(_evenly(tmp_path), speed=0)
+def test_raising_callback_is_counted_and_playback_goes_on(caplog):
+    """Contract 09 §Player: a raising record / state callback is logged,
+    counted and dropped; the other callbacks still get every record and
+    playback runs to the end (tick() mode)."""
+    reader = DatasetReader(DUAL_SR04)
+    p = DatasetPlayer(reader, clock=FakeClock(), threaded=False, speed=0)
+    first = reader.records[0]
 
     def boom(r):
-        if r.t_host_us == 1_200_000:
+        if r is first:
             raise RuntimeError("consumer failed")
 
+    def state_boom(s):
+        raise ValueError("state consumer failed")
+
+    got: list = []
+    states: list[str] = []
     p.on_record(boom)
-    p.play()
-    with pytest.raises(RuntimeError, match="consumer failed"):
-        p.tick()
-    assert p.state is PlayerState.PAUSED
-    assert p.position_us == 200_000  # the failing record counts as delivered
-    p.play()
-    p.tick()
-    assert seen == [1_000_000 + i * 100_000 for i in range(5)]
-    assert states == ["playing", "paused", "playing", "done"]
+    p.on_record(got.append)
+    p.on_state(state_boom)
+    p.on_state(lambda s: states.append(s.value))
+    with caplog.at_level("ERROR", logger="depz_sensor_sdk"):
+        p.play()
+        assert p.tick() is None
+    assert got == list(reader) and len(got) == 10
+    assert p.state is PlayerState.DONE
+    assert states == ["playing", "done"]
+    assert p.callback_errors == 3  # the first record + two state changes
+    assert sum(r.exc_info is not None for r in caplog.records) == 3
 
 
 def test_close_and_path_constructor(tmp_path: Path):
@@ -421,15 +433,22 @@ def test_threaded_pause_from_another_thread_stops_delivery(tmp_path: Path):
         assert seen[n:] == [1_000_000 + i * 100_000 for i in range(40, 50)]
 
 
-def test_threaded_callback_error_goes_to_excepthook(tmp_path: Path, monkeypatch):
-    caught: list[BaseException] = []
-    monkeypatch.setattr(threading, "excepthook", lambda a: caught.append(a.exc_value))
-    with DatasetPlayer(_evenly(tmp_path), speed=0) as p:
-        def boom(r):
-            raise KeyError("x")
+def test_threaded_raising_callback_does_not_stop_playback():
+    """The player thread survives a raising on_record callback: the next
+    callback and the next records still play, wait() returns at `done`."""
+    reader = DatasetReader(DUAL_SR04)
+    with DatasetPlayer(reader, speed=0) as p:
+        first = reader.records[0]
 
+        def boom(r):
+            if r is first:
+                raise KeyError("x")
+
+        got: list = []
         p.on_record(boom)
+        p.on_record(got.append)
         p.play()
         assert p.wait(5.0)
-        assert p.state is PlayerState.PAUSED
-        assert len(caught) == 1 and isinstance(caught[0], KeyError)
+        assert p.state is PlayerState.DONE
+        assert got == list(reader) and len(got) == 10
+        assert p.callback_errors == 1

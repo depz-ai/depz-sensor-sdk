@@ -5347,9 +5347,11 @@ thread (started by the first play()); a state change a call makes is
 reported on the calling thread before it returns. Callbacks run outside the
 player's lock, so they may call its methods; once pause() returns no record
 callback is running or will start (unless pause was called from that
-callback). They must not block. With `threaded = false` no thread starts:
-the owner calls tick() from its own loop (a GUI timer, or a test with a
-fake clock). The destructor closes the player.
+callback). They must not block. A callback that throws is counted in
+callback_errors(), reported on stderr and dropped: the other callbacks
+still get the record and playback goes on. With `threaded = false` no
+thread starts: the owner calls tick() from its own loop (a GUI timer, or a
+test with a fake clock). The destructor closes the player.
 
 #### DatasetPlayer.DatasetPlayer
 
@@ -5398,6 +5400,14 @@ void set_speed(double speed);
 Change the speed (finite, ≥ 0, else std::invalid_argument). While
 playing it applies at once: the rest of the current wait is rescaled.
 
+#### DatasetPlayer.callback_errors
+
+```cpp
+std::uint64_t callback_errors() const;
+```
+
+Record / state callbacks that threw and were dropped (contract 09).
+
 #### DatasetPlayer.on_record
 
 ```cpp
@@ -5412,15 +5422,6 @@ state on every transition). The returned unsubscribe is idempotent.
 ```cpp
 Unsubscribe on_state(std::function<void(PlayerState)> cb);
 ```
-
-#### DatasetPlayer.on_delivery_error
-
-```cpp
-Unsubscribe on_delivery_error(std::function<void(const std::string&)> cb);
-```
-
-The message of a record callback that threw on the player thread:
-playback paused there (the record counts as delivered).
 
 #### DatasetPlayer.play
 
@@ -5461,8 +5462,7 @@ std::optional<double> tick();
 ```
 
 Deliver every record due now, on the calling thread. Returns the
-seconds until the next one is due, nullopt when not playing. A record
-callback's exception pauses playback and propagates.
+seconds until the next one is due, nullopt when not playing.
 
 #### DatasetPlayer.wait
 

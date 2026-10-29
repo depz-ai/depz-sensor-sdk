@@ -357,6 +357,11 @@ host_now_us() -> int
 
 Monotonic host clock in µs — the host side of all time-sync math.
 
+perf_counter, not monotonic: before Python 3.13 Windows' monotonic is
+GetTickCount64, in 15.6 ms steps — coarser than a sync round trip. Both
+are CLOCK_MONOTONIC on Linux; perf_counter is QueryPerformanceCounter on
+Windows, as in the C SDK.
+
 ### sync_time_all
 
 ```python
@@ -11164,7 +11169,9 @@ before it returns. Callbacks run under the player's lock, so they see a
 consistent player, may call its methods, and once `pause` returns no
 record callback is running or will start. Like device stream callbacks
 (contract 07) they must not block — never wait in one for another thread
-that uses this player.
+that uses this player. A callback that raises is logged (logger
+``depz_sensor_sdk``), counted in `callback_errors` and dropped: the other
+callbacks still get the record and playback goes on (contract 09).
 
 ``threaded=False`` starts no thread: the owner calls `tick` from its own
 loop (a GUI timer, or a test with a fake ``clock``).
@@ -11180,6 +11187,10 @@ Span of the timeline: last record's `t` minus the first's.
 Current position, µs from the first record: the `t` of the last
 delivered record (after a seek: of the record just before the
 target). 0 before anything was delivered.
+
+#### DatasetPlayer.callback_errors *(property)*
+
+Record / state callbacks that raised and were dropped (contract 09).
 
 #### DatasetPlayer.speed *(property)*
 

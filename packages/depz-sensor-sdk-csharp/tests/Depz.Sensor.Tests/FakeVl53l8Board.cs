@@ -393,12 +393,13 @@ internal sealed class Vl53l8Rig : IDisposable
         ? Vl53l8FrameDecoder.FooterIdOffsetCx
         : Vl53l8FrameDecoder.FooterIdOffsetCh;
 
-    /// <summary>Run <paramref name="action"/> after a short delay on another thread.</summary>
-    public static Task Later(Action action) => Task.Run(() =>
+    /// <summary>Run <paramref name="action"/> after a short delay on another thread — a thread of its
+    /// own: with the suite's blocking tests in parallel a pool thread came after the waiter's 2 s.</summary>
+    public static Task Later(Action action) => Task.Factory.StartNew(() =>
     {
         Thread.Sleep(50);
         action();
-    });
+    }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     public void Dispose()
     {

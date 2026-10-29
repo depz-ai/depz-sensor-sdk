@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.8.0 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.9.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -101,7 +101,7 @@ add_library(depz::sensor_sdk_c ALIAS depz_sensor_sdk_c)
 
 # Warnings: the full set whenever we own the build (never forced on consumers
 # who embed us); as errors in our own builds — tests on, i.e. development and
-# CI — but not for packagers (vcpkg / Conan build with tests off), whose newer
+# the gates — but not for packagers (vcpkg / Conan build with tests off), whose newer
 # compiler may know warnings this code has never met.
 option(DEPZ_SENSOR_SDK_C_WERROR "Treat compiler warnings as errors"
        ${DEPZ_SENSOR_SDK_C_BUILD_TESTS})
@@ -110,7 +110,8 @@ function(depz_c_warnings target)
     return()
   endif()
   if(MSVC)
-    target_compile_options(${target} PRIVATE /W4 $<$<BOOL:${DEPZ_SENSOR_SDK_C_WERROR}>:/WX>)
+    # /utf-8: the sources are UTF-8; MSVC reads them in the ANSI code page otherwise
+    target_compile_options(${target} PRIVATE /W4 /utf-8 $<$<BOOL:${DEPZ_SENSOR_SDK_C_WERROR}>:/WX>)
     target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic
@@ -308,7 +309,13 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         vlx_l4_temperature_update_reruns_vhv vlx_l4_calibrations vlx_l4_measure_once_polls_the_block vlx_l3_refusals_name_the_caveat vlx_init_binding_and_bridge_refusals
         b055_identity_and_raw_registers b055_operation_and_power_modes b055_found_asleep_and_stuck_fusion b055_units_axes_temperature_source
         b055_configure_restore_and_reset b055_configure_boot_states b055_status_self_test_calibration b055_page1_configs_and_interrupts
-        b055_polling_scales_by_the_units b055_stream_wire_units_and_bad_reports)
+        b055_polling_scales_by_the_units b055_stream_wire_units_and_bad_reports
+        short_reply_fails_its_request_and_the_reader_goes_on explicit_port_alias_names_its_port replay_refuses_a_gzipped_capture
+        unsolicited_reports_become_events link_damage_is_counted_and_reported pending_requests_meet_echoes_acks_and_a_drop
+        bootloader_ack_closes_the_device payload_crc_type_roundtrip reset_acks_then_the_link_drops requests_refused_on_the_host
+        tmf8829_damaged_reports_and_refusals tmf8829_init_and_configure_refusals
+        identity_strings_edge_cases error_names_are_the_enum_names usb_order_and_short_report_edges
+        l4_calibrations_and_temperature_update l4_callbacks_get_measurement_and_status_texts)
       add_test(NAME io_${t} COMMAND test_io ${t})
     endforeach()
   endif()

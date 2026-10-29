@@ -175,7 +175,7 @@ ctest --test-dir build          # 86/86: 26 vector/replay + 60 live-layer
 With the live layer the target links, as `PUBLIC` dependencies that reach your
 executable through `depz::sensor_sdk_c`: `Threads::Threads` on Linux and
 macOS, `-framework IOKit -framework CoreFoundation` on macOS, and `setupapi` +
-`cfgmgr32` on Windows. CI builds and tests all three.
+`cfgmgr32` on Windows. All three are built and tested.
 
 To consume it from your own CMake project, pull it in with FetchContent and link
 the namespaced target `depz::sensor_sdk_c` — this builds the library only, never
@@ -186,7 +186,7 @@ include(FetchContent)
 FetchContent_Declare(
   depz_sensor_sdk_c
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.8.0
+  GIT_TAG        v0.9.0
   SOURCE_SUBDIR  packages/depz-sensor-sdk-c
 )
 FetchContent_MakeAvailable(depz_sensor_sdk_c)
@@ -822,7 +822,7 @@ The suite is 98 CTests, no hardware required:
 ctest --test-dir build            # 86/86
 ```
 
-CI runs the suite on Linux, macOS and Windows, and the whole suite again on
+The suite runs on Linux, macOS and Windows, and before every release again on
 Linux under clang's UndefinedBehaviorSanitizer, AddressSanitizer with
 LeakSanitizer and ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread c`
 at the repository root runs one locally). The live layer was also checked by hand on

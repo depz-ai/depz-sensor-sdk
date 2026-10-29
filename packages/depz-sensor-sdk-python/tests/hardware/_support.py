@@ -9,7 +9,7 @@ Design rules this module exists to enforce:
   the kernel handed out this boot. Tests select by USB iSerial (the DEPZ line
   burns a unique one per unit) and resolve the path at use time.
 * **Exclusive port leases.** Two tests (or a test and the viewer bridge) must
-  never open the same port at once. ``port_lease`` takes an OS-level flock.
+  never open the same port at once. ``port_lease`` takes an OS-level file lock.
 * **No unbounded waits.** Every helper that blocks takes a deadline and raises
   a diagnostic-rich error instead of hanging forever.
 * **Hang forensics.** When a wait does expire, ``dump_diagnostics`` captures
@@ -21,13 +21,13 @@ from __future__ import annotations
 
 import collections
 import contextlib
-import fcntl
 import faulthandler
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -37,7 +37,10 @@ from typing import Any, Callable, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 ARTIFACTS_DIR = Path(os.environ.get("DEPZ_QA_ARTIFACTS", REPO_ROOT / "artifacts" / "qa"))
-LOCK_DIR = Path(os.environ.get("DEPZ_QA_LOCKDIR", "/tmp/depz-qa-locks"))
+LOCK_DIR = Path(os.environ.get(
+    "DEPZ_QA_LOCKDIR",
+    os.path.join(tempfile.gettempdir(), "depz-qa-locks") if sys.platform == "win32" else "/tmp/depz-qa-locks",
+))
 
 # The HC-SR04 *module* signals "no echo" by holding ECHO high for ~58.3 ms.
 # That is below the firmware's 65 535 µs timeout, so it arrives as an
@@ -273,6 +276,37 @@ def open_family(dev: HwDevice, **kw):
 
 # ── exclusive port leases ────────────────────────────────────────────────────
 
+if sys.platform == "win32":
+    import msvcrt
+
+    # Windows locks are mandatory: lock one byte far past the holder note, which stays readable.
+    _LOCK_AT = 1 << 30
+
+    def _lock(fd: int, mode: int) -> None:
+        pos = os.lseek(fd, 0, os.SEEK_CUR)
+        os.lseek(fd, _LOCK_AT, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, mode, 1)
+        finally:
+            os.lseek(fd, pos, os.SEEK_SET)
+
+    def _try_lock(fd: int) -> None:
+        try:
+            _lock(fd, msvcrt.LK_NBLCK)
+        except OSError as e:  # held elsewhere
+            raise BlockingIOError(*e.args) from e
+
+    def _unlock(fd: int) -> None:
+        _lock(fd, msvcrt.LK_UNLCK)
+else:
+    import fcntl
+
+    def _try_lock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
 
 @contextlib.contextmanager
 def port_lease(port: str, *, timeout: float = 30.0) -> Iterator[None]:
@@ -290,7 +324,7 @@ def port_lease(port: str, *, timeout: float = 30.0) -> Iterator[None]:
     try:
         while True:
             try:
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _try_lock(fd)
                 break
             except BlockingIOError:
                 if time.monotonic() >= deadline:
@@ -305,7 +339,7 @@ def port_lease(port: str, *, timeout: float = 30.0) -> Iterator[None]:
         yield
     finally:
         with contextlib.suppress(OSError):
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            _unlock(fd)
         os.close(fd)
 
 
@@ -331,7 +365,7 @@ class ResourceSample:
 
 def _proc_status_field(name: str) -> int:
     try:
-        text = Path("/proc/self/status").read_text()
+        text = Path("/proc/self/status").read_text(encoding="utf-8")
     except OSError:
         return -1
     m = re.search(rf"^{name}:\s+(\d+)", text, re.M)
@@ -506,7 +540,7 @@ def dump_diagnostics(tag: str, extra: dict[str, Any] | None = None) -> Path:
         for t, direction, payload in list(_BYTE_TRACE):
             mark = "->" if direction == "tx" else "<-"
             lines.append(f"  {t:.6f} ({t - now:+.3f}s) {mark} {payload.hex(' ')}")
-    path.write_text("\n".join(lines))
+    path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return path
 
 
@@ -536,7 +570,7 @@ def hang_guard(tag: str, seconds: float, context: dict[str, Any] | None = None):
 def enable_faulthandler(timeout: float) -> None:
     """Last-resort: let the interpreter itself dump every stack if we wedge."""
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
-    fh = open(ARTIFACTS_DIR / "faulthandler.log", "a", buffering=1)
+    fh = open(ARTIFACTS_DIR / "faulthandler.log", "a", buffering=1, encoding="utf-8", newline="\n")
     faulthandler.enable(file=fh)
     faulthandler.dump_traceback_later(timeout, repeat=False, file=fh, exit=False)
 
@@ -587,7 +621,7 @@ def write_report(name: str, payload: dict[str, Any]) -> Path:
     """Persist a machine-readable QA result next to the other artifacts."""
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     path = ARTIFACTS_DIR / name
-    path.write_text(json.dumps(payload, indent=2, default=str))
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8", newline="\n")
     return path
 
 

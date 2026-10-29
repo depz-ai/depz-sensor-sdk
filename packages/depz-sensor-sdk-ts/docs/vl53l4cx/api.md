@@ -65,7 +65,7 @@ Generated from the TypeScript sources by TypeDoc — run `bun run docs` to regen
 
 # Class: Vl53l4cx
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:855](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L855)
+Defined in: [sensors/vl53lx/vl53lx.ts:855](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L855)
 
 VL53L4CX (6 m): the histogram driver only — to run it light, borrow a
 sibling's with `init(undefined, { product: "VL53L4CD" })`.
@@ -82,7 +82,7 @@ sibling's with `init(undefined, { product: "VL53L4CD" })`.
 new Vl53l4cx(transport, opts?): Vl53l4cx;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:330](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L330)
+Defined in: [sensors/vl53lx/vl53lx.ts:330](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L330)
 
 #### Parameters
 
@@ -107,7 +107,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:330](https://github.com/depz-ai/depz-s
 timeoutMs: number;
 ```
 
-Defined in: [src/device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
+Defined in: [device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
 
 #### Inherited from
 
@@ -121,7 +121,7 @@ Defined in: [src/device/device.ts:214](https://github.com/depz-ai/depz-sensor-sd
 protected readonly link: DepzLink;
 ```
 
-Defined in: [src/device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
+Defined in: [device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
 
 #### Inherited from
 
@@ -135,7 +135,7 @@ Defined in: [src/device/device.ts:216](https://github.com/depz-ai/depz-sensor-sd
 protected driverInst: Vl53lxSensorDriver | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L210)
+Defined in: [sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L210)
 
 #### Inherited from
 
@@ -149,7 +149,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-s
 protected productName: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L211)
+Defined in: [sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L211)
 
 #### Inherited from
 
@@ -163,7 +163,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-s
 protected driverKindName: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L212)
+Defined in: [sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L212)
 
 #### Inherited from
 
@@ -177,7 +177,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-s
 protected caveat: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L213)
+Defined in: [sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L213)
 
 #### Inherited from
 
@@ -191,7 +191,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-s
 protected rangingFlag: boolean = false;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L217)
+Defined in: [sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L217)
 
 #### Inherited from
 
@@ -205,7 +205,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-s
 readonly bridge: BridgeDevice;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L231)
+Defined in: [sensors/vl53lx/vl53lx.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L231)
 
 The `BridgeDevice` the ULD ports talk to: register transfers split at the
 bridge's 253-byte limit; a non-OK status or a missing answer surfaces as
@@ -223,7 +223,7 @@ bridge's 253-byte limit; a non-OK status or a missing answer surfaces as
 readonly static PRODUCT: string | null = "VL53L4CX";
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:856](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L856)
+Defined in: [sensors/vl53lx/vl53lx.ts:856](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L856)
 
 The product this class drives; null = read it from the device name.
 
@@ -241,7 +241,7 @@ The product this class drives; null = read it from the device name.
 get stats(): LinkStats;
 ```
 
-Defined in: [src/device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
+Defined in: [device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
 
 ##### Returns
 
@@ -261,7 +261,7 @@ Defined in: [src/device/device.ts:278](https://github.com/depz-ai/depz-sensor-sd
 get timeSync(): TimeSync | null;
 ```
 
-Defined in: [src/device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
+Defined in: [device/device.ts:591](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L591)
 
 ##### Returns
 
@@ -281,7 +281,7 @@ Defined in: [src/device/device.ts:596](https://github.com/depz-ai/depz-sensor-sd
 get product(): string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:357](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L357)
+Defined in: [sensors/vl53lx/vl53lx.ts:357](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L357)
 
 The product init() bound (null before init).
 
@@ -303,7 +303,7 @@ The product init() bound (null before init).
 get driverKind(): string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L361)
+Defined in: [sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L361)
 
 ##### Returns
 
@@ -323,7 +323,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-s
 get driver(): Vl53lxSensorDriver;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:366](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L366)
+Defined in: [sensors/vl53lx/vl53lx.ts:366](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L366)
 
 The ULD port in use — escape hatch for product-specific calls.
 
@@ -345,7 +345,7 @@ The ULD port in use — escape hatch for product-specific calls.
 get initialized(): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L371)
+Defined in: [sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L371)
 
 ##### Returns
 
@@ -365,7 +365,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-s
 get modes(): readonly string[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:478](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L478)
+Defined in: [sensors/vl53lx/vl53lx.ts:478](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L478)
 
 Named ranging modes, first = what init leaves; [] if none.
 
@@ -387,7 +387,7 @@ readonly `string`[]
 get ranging(): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L684)
+Defined in: [sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L684)
 
 ##### Returns
 
@@ -407,7 +407,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-s
 get streamParseErrors(): number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:760](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L760)
+Defined in: [sensors/vl53lx/vl53lx.ts:760](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L760)
 
 Stream reports dropped because the driver failed to decode them.
 
@@ -429,7 +429,7 @@ Stream reports dropped because the driver failed to decode them.
 get streamDroppedCounts(): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:765](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L765)
+Defined in: [sensors/vl53lx/vl53lx.ts:765](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L765)
 
 Drop counters of all live measurement queues (diagnostics).
 
@@ -449,7 +449,7 @@ Drop counters of all live measurement queues (diagnostics).
 open(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
+Defined in: [device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
 
 Open the transport and start the read pump. A no-op on a device that
 continues an adopted connection (`attachSensorClass`) — already open.
@@ -470,7 +470,7 @@ continues an adopted connection (`attachSensorClass`) — already open.
 close(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L251)
+Defined in: [device/device.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L251)
 
 Close the connection. A device that handed its connection over owns none.
 
@@ -490,7 +490,7 @@ Close the connection. A device that handed its connection over owns none.
 protected onTeardown(error): void;
 ```
 
-Defined in: [src/device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
+Defined in: [device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
 
 Hook for sensor subclasses: reject any subclass-managed in-flight requests
 and clear per-connection state when the link closes. Runs once, after the
@@ -518,7 +518,7 @@ base `pending` map is failed. Default: no-op.
 protected registerStream(stream): () => void;
 ```
 
-Defined in: [src/device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
+Defined in: [device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
 
 Register a stream to be closed on device teardown.
 
@@ -545,7 +545,7 @@ Register a stream to be closed on device teardown.
 onEvent(cb): () => void;
 ```
 
-Defined in: [src/device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
+Defined in: [device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
 
 Subscribe to unsolicited/diagnostic events (read-pump context; do not
 block). Returns an unsubscribe function.
@@ -572,7 +572,7 @@ block). Returns an unsubscribe function.
 protected emitEvent(event): void;
 ```
 
-Defined in: [src/device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
+Defined in: [device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
 
 #### Parameters
 
@@ -596,7 +596,7 @@ Defined in: [src/device/device.ts:457](https://github.com/depz-ai/depz-sensor-sd
 protected callGuarded<T>(cb, item): void;
 ```
 
-Defined in: [src/device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
+Defined in: [device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
 
 Run a user callback on the read pump: one that throws is counted in
 `stats.callbackErrors`, logged and dropped — it never stops the pump, the
@@ -634,7 +634,7 @@ request<T>(
 opts?): Promise<T>;
 ```
 
-Defined in: [src/device/device.ts:487](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L487)
+Defined in: [device/device.ts:482](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L482)
 
 Send `cmd` and wait for its correlated completion (contract 02 §1).
 
@@ -675,7 +675,7 @@ StatusError otherwise). One in-flight request per opcode.
 static expectReport<T>(reportId, unpack): Matcher<T>;
 ```
 
-Defined in: [src/device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
+Defined in: [device/device.ts:526](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L526)
 
 Matcher for a typed report identified by its report ID alone.
 
@@ -708,7 +708,7 @@ Matcher for a typed report identified by its report ID alone.
 static expectText(requestCmd): Matcher<string>;
 ```
 
-Defined in: [src/device/device.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L536)
+Defined in: [device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
 
 Matcher for RPT_TEXT echoing `requestCmd`.
 
@@ -734,7 +734,7 @@ Matcher for RPT_TEXT echoing `requestCmd`.
 getDeviceName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:547](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L547)
+Defined in: [device/device.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L542)
 
 #### Returns
 
@@ -752,7 +752,7 @@ Defined in: [src/device/device.ts:547](https://github.com/depz-ai/depz-sensor-sd
 getSoftwareName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L553)
+Defined in: [device/device.ts:548](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L548)
 
 #### Returns
 
@@ -770,7 +770,7 @@ Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sd
 getSerialNumber(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:559](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L559)
+Defined in: [device/device.ts:554](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L554)
 
 #### Returns
 
@@ -788,7 +788,7 @@ Defined in: [src/device/device.ts:559](https://github.com/depz-ai/depz-sensor-sd
 identify(): Promise<Identity>;
 ```
 
-Defined in: [src/device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
+Defined in: [device/device.ts:561](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L561)
 
 Classify the running firmware (contract 02 §4).
 
@@ -808,7 +808,7 @@ Classify the running firmware (contract 02 §4).
 readMcuTemperature(): Promise<number>;
 ```
 
-Defined in: [src/device/device.ts:571](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L571)
+Defined in: [device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
@@ -828,7 +828,7 @@ Last cached MCU temperature in °C (device refreshes ~2 Hz).
 syncTime(samples?): Promise<TimeSync>;
 ```
 
-Defined in: [src/device/device.ts:579](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L579)
+Defined in: [device/device.ts:574](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L574)
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
@@ -854,7 +854,7 @@ NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 toHostTimeUs(deviceTsUs): bigint;
 ```
 
-Defined in: [src/device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
+Defined in: [device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
 
 Device µs → host monotonic µs (requires a prior `syncTime`).
 
@@ -880,7 +880,7 @@ Device µs → host monotonic µs (requires a prior `syncTime`).
 getReportPayloadCrc(): Promise<CrcType>;
 ```
 
-Defined in: [src/device/device.ts:606](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L606)
+Defined in: [device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
 
 #### Returns
 
@@ -898,7 +898,7 @@ Defined in: [src/device/device.ts:606](https://github.com/depz-ai/depz-sensor-sd
 setReportPayloadCrc(crcType): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L613)
+Defined in: [device/device.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L608)
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
@@ -924,7 +924,7 @@ Set the device→host payload CRC mode (host→device is per-packet).
 getSyncPin(pin): Promise<SyncPinConfig>;
 ```
 
-Defined in: [src/device/device.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L617)
+Defined in: [device/device.ts:612](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L612)
 
 #### Parameters
 
@@ -948,7 +948,7 @@ Defined in: [src/device/device.ts:617](https://github.com/depz-ai/depz-sensor-sd
 setSyncPin(config): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
+Defined in: [device/device.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L618)
 
 #### Parameters
 
@@ -972,7 +972,7 @@ Defined in: [src/device/device.ts:623](https://github.com/depz-ai/depz-sensor-sd
 reset(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:628](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L628)
+Defined in: [device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
@@ -992,7 +992,7 @@ DEVICE_RESET: device ACKs then reboots; the link will drop.
 enterBootloaderMode(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:637](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L637)
+Defined in: [device/device.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L632)
 
 Ask the device to reboot into the resident bootloader and close this
 connection. Re-discovery/flash flow lives in the bootloader module
@@ -1014,7 +1014,7 @@ connection. Re-discovery/flash flow lives in the bootloader module
 boardName(): Promise<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:346](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L346)
+Defined in: [sensors/vl53lx/vl53lx.ts:346](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L346)
 
 The board's device name (bootloader metablock), e.g.
 `DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523`. Read once, then cached.
@@ -1035,7 +1035,7 @@ The board's device name (bootloader metablock), e.g.
 detected(): Promise<string | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:352](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L352)
+Defined in: [sensors/vl53lx/vl53lx.ts:352](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L352)
 
 The product the device name carries, or null on an unstamped board.
 
@@ -1055,7 +1055,7 @@ The product the device name carries, or null on an unstamped board.
 driverKinds(product?): Promise<string[]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:376](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L376)
+Defined in: [sensors/vl53lx/vl53lx.ts:376](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L376)
 
 The driver kinds a product has (default: this board's).
 
@@ -1081,7 +1081,7 @@ The driver kinds a product has (default: this board's).
 init(driver?, opts?): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:391](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L391)
+Defined in: [sensors/vl53lx/vl53lx.ts:391](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L391)
 
 Bind the (product, driver kind) pair and initialise the sensor.
 
@@ -1114,7 +1114,7 @@ Bind the (product, driver kind) pair and initialise the sensor.
 identifyProduct(): Promise<Vl53lxProductInfo>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:416](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L416)
+Defined in: [sensors/vl53lx/vl53lx.ts:416](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L416)
 
 Everything about what is connected (needs init()).
 
@@ -1134,7 +1134,7 @@ Everything about what is connected (needs init()).
 notes(): Promise<string[]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L446)
+Defined in: [sensors/vl53lx/vl53lx.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L446)
 
 The lines a UI should show about the chosen pair: product named by hand,
 a borrowed driver, a pair that reaches less than the board is rated for,
@@ -1156,7 +1156,7 @@ the driver's caveat.
 supports(group): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:473](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L473)
+Defined in: [sensors/vl53lx/vl53lx.ts:473](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L473)
 
 Whether this product/driver serves an optional capability group: mode,
 timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
@@ -1184,7 +1184,7 @@ signal_thresh, sigma_thresh, roi, temp_update, refspad.
 xshut(action): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:489](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L489)
+Defined in: [sensors/vl53lx/vl53lx.ts:489](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L489)
 
 Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms wait;
 the host confirms the boot). OFF and RESET stop the stream; the sensor
@@ -1212,7 +1212,7 @@ then holds none of the configuration — init() again.
 bridgeInfo(): Promise<Vl53lxInfo>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L496)
+Defined in: [sensors/vl53lx/vl53lx.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L496)
 
 RPT_VL53_INFO — the bridge's own counters; safe while streaming.
 
@@ -1232,7 +1232,7 @@ RPT_VL53_INFO — the bridge's own counters; safe while streaming.
 configure(opts?): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:511](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L511)
+Defined in: [sensors/vl53lx/vl53lx.ts:511](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L511)
 
 Re-initialise the sensor and apply a ranging configuration. The re-init
 is deliberate (the only way to know what the configuration registers
@@ -1262,7 +1262,7 @@ group is refused before the re-init.
 getRangeTiming(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L527)
+Defined in: [sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L527)
 
 → [timingBudgetMs, interMeasurementMs]; 0 for the period = continuous.
 
@@ -1282,7 +1282,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-s
 getMode(): Promise<string | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L532)
+Defined in: [sensors/vl53lx/vl53lx.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L532)
 
 The ranging mode in use, or null on a product without modes.
 
@@ -1302,7 +1302,7 @@ The ranging mode in use, or null on a product without modes.
 budgetChoices(): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L537)
+Defined in: [sensors/vl53lx/vl53lx.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L537)
 
 The only budgets accepted right now (ascending), or [] for any in range.
 
@@ -1322,7 +1322,7 @@ The only budgets accepted right now (ascending), or [] for any in range.
 snapBudget(budgetMs): number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L542)
+Defined in: [sensors/vl53lx/vl53lx.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L542)
 
 The nearest budget this product will actually accept.
 
@@ -1348,7 +1348,7 @@ The nearest budget this product will actually accept.
 getOffsetMm(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L556)
+Defined in: [sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L556)
 
 #### Returns
 
@@ -1366,7 +1366,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-s
 setOffsetMm(offsetMm): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L560)
+Defined in: [sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L560)
 
 #### Parameters
 
@@ -1390,7 +1390,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-s
 getXtalkKcps(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L565)
+Defined in: [sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L565)
 
 #### Returns
 
@@ -1408,7 +1408,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-s
 setXtalkKcps(xtalkKcps): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L569)
+Defined in: [sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L569)
 
 #### Parameters
 
@@ -1432,7 +1432,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-s
 calibrateOffset(targetDistMm, nbSamples?): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:578](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L578)
+Defined in: [sensors/vl53lx/vl53lx.ts:578](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L578)
 
 Offset calibration against a flat target at `targetDistMm`; returns the
 offset now programmed. Store it on the host (sensor RAM, lost on reset).
@@ -1460,7 +1460,7 @@ offset now programmed. Store it on the host (sensor RAM, lost on reset).
 calibrateXtalk(targetDistMm, nbSamples?): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:584](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L584)
+Defined in: [sensors/vl53lx/vl53lx.ts:584](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L584)
 
 Crosstalk calibration; returns the xtalk now programmed (kcps).
 
@@ -1487,7 +1487,7 @@ Crosstalk calibration; returns the xtalk now programmed (kcps).
 getDetectionThresholds(): Promise<[number, number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:590](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L590)
+Defined in: [sensors/vl53lx/vl53lx.ts:590](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L590)
 
 → [distanceLowMm, distanceHighMm, window].
 
@@ -1510,7 +1510,7 @@ setDetectionThresholds(
 window): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:595](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L595)
+Defined in: [sensors/vl53lx/vl53lx.ts:595](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L595)
 
 Arm the distance-window interrupt; stays armed until the next init/configure.
 
@@ -1538,7 +1538,7 @@ Arm the distance-window interrupt; stays armed until the next init/configure.
 getSignalThresholdKcps(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L604)
+Defined in: [sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L604)
 
 #### Returns
 
@@ -1556,7 +1556,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-s
 setSignalThresholdKcps(signalKcps): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L608)
+Defined in: [sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L608)
 
 #### Parameters
 
@@ -1580,7 +1580,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-s
 getSigmaThresholdMm(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L613)
+Defined in: [sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L613)
 
 #### Returns
 
@@ -1598,7 +1598,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-s
 setSigmaThresholdMm(sigmaMm): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L617)
+Defined in: [sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L617)
 
 #### Parameters
 
@@ -1622,7 +1622,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-s
 getRoi(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L623)
+Defined in: [sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L623)
 
 → [x, y] SPAD window size.
 
@@ -1642,7 +1642,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-s
 setRoi(x, y): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L627)
+Defined in: [sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L627)
 
 #### Parameters
 
@@ -1667,7 +1667,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-s
 getRoiCenter(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L632)
+Defined in: [sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L632)
 
 #### Returns
 
@@ -1685,7 +1685,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-s
 setRoiCenter(centerSpad): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L636)
+Defined in: [sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L636)
 
 #### Parameters
 
@@ -1709,7 +1709,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-s
 startTemperatureUpdate(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:642](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L642)
+Defined in: [sensors/vl53lx/vl53lx.ts:642](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L642)
 
 Re-run VHV after an ambient change over 8 °C.
 
@@ -1729,7 +1729,7 @@ Re-run VHV after an ambient change over 8 °C.
 performRefSpadManagement(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:648](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L648)
+Defined in: [sensors/vl53lx/vl53lx.ts:648](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L648)
 
 VL53L0X: re-measure the reference SPADs → [count, isAperture].
 
@@ -1749,7 +1749,7 @@ VL53L0X: re-measure the reference SPADs → [count, isAperture].
 startRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:660](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L660)
+Defined in: [sensors/vl53lx/vl53lx.ts:660](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L660)
 
 Start the sensor's ranging loop and arm the MCU stream: one
 RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
@@ -1771,7 +1771,7 @@ interrupt-release writes.
 stopRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L673)
+Defined in: [sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L673)
 
 #### Returns
 
@@ -1789,7 +1789,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-s
 measureOnce(timeoutMs?): Promise<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:692](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L692)
+Defined in: [sensors/vl53lx/vl53lx.ts:692](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L692)
 
 Single poll-mode measurement: start ranging, wait for data-ready, read,
 release the interrupt, stop. Rejects while the stream runs.
@@ -1816,7 +1816,7 @@ release the interrupt, stop. Rejects while the stream runs.
 onMeasurement(cb): () => void;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:716](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L716)
+Defined in: [sensors/vl53lx/vl53lx.ts:716](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L716)
 
 Subscribe to streamed measurements. Returns an unsubscribe function.
 
@@ -1842,7 +1842,7 @@ Subscribe to streamed measurements. Returns an unsubscribe function.
 measurements(maxsize?): StreamQueue<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L724)
+Defined in: [sensors/vl53lx/vl53lx.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L724)
 
 Async iterator over measurements — bounded, drop-oldest (contract 07 §3).
 
@@ -1868,7 +1868,7 @@ Async iterator over measurements — bounded, drop-oldest (contract 07 §3).
 getMeasurement(timeoutMs?): Promise<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:735](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L735)
+Defined in: [sensors/vl53lx/vl53lx.ts:735](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L735)
 
 Wait for the next streamed measurement.
 
@@ -1894,7 +1894,7 @@ Wait for the next streamed measurement.
 protected need(group): Vl53lxSensorDriver & DriverExtras;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L771)
+Defined in: [sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L771)
 
 #### Parameters
 
@@ -1918,7 +1918,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-s
 protected requireNotRanging(): void;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L782)
+Defined in: [sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L782)
 
 #### Returns
 
@@ -1936,7 +1936,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-s
 protected handleReport(pkt): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:791](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L791)
+Defined in: [sensors/vl53lx/vl53lx.ts:791](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L791)
 
 Hook for sensor subclasses: route streaming reports here. Return true
 when the packet was consumed. Runs after status/matcher/common-report
@@ -1958,7 +1958,7 @@ routing, on the read-pump context.
 
 # Class: Vl53lx
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:206](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L206)
+Defined in: [sensors/vl53lx/vl53lx.ts:206](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L206)
 
 A board of the VL53L 1D family (firmware `APP_VL53L0_4`).
 
@@ -1987,7 +1987,7 @@ or `product` at init); the per-product subclasses (`Vl53l0x`...) fix it.
 new Vl53lx(transport, opts?): Vl53lx;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:330](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L330)
+Defined in: [sensors/vl53lx/vl53lx.ts:330](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L330)
 
 #### Parameters
 
@@ -2014,7 +2014,7 @@ DepzDevice.constructor
 timeoutMs: number;
 ```
 
-Defined in: [src/device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
+Defined in: [device/device.ts:214](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L214)
 
 #### Inherited from
 
@@ -2030,7 +2030,7 @@ DepzDevice.timeoutMs
 protected readonly link: DepzLink;
 ```
 
-Defined in: [src/device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
+Defined in: [device/device.ts:216](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L216)
 
 #### Inherited from
 
@@ -2046,7 +2046,7 @@ DepzDevice.link
 readonly static PRODUCT: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:208](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L208)
+Defined in: [sensors/vl53lx/vl53lx.ts:208](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L208)
 
 The product this class drives; null = read it from the device name.
 
@@ -2058,7 +2058,7 @@ The product this class drives; null = read it from the device name.
 protected driverInst: Vl53lxSensorDriver | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L210)
+Defined in: [sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L210)
 
 ***
 
@@ -2068,7 +2068,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:210](https://github.com/depz-ai/depz-s
 protected productName: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L211)
+Defined in: [sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L211)
 
 ***
 
@@ -2078,7 +2078,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:211](https://github.com/depz-ai/depz-s
 protected driverKindName: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L212)
+Defined in: [sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L212)
 
 ***
 
@@ -2088,7 +2088,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:212](https://github.com/depz-ai/depz-s
 protected caveat: string | null = null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L213)
+Defined in: [sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L213)
 
 ***
 
@@ -2098,7 +2098,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:213](https://github.com/depz-ai/depz-s
 protected rangingFlag: boolean = false;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L217)
+Defined in: [sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L217)
 
 ***
 
@@ -2108,7 +2108,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:217](https://github.com/depz-ai/depz-s
 readonly bridge: BridgeDevice;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L231)
+Defined in: [sensors/vl53lx/vl53lx.ts:231](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L231)
 
 The `BridgeDevice` the ULD ports talk to: register transfers split at the
 bridge's 253-byte limit; a non-OK status or a missing answer surfaces as
@@ -2124,7 +2124,7 @@ bridge's 253-byte limit; a non-OK status or a missing answer surfaces as
 get stats(): LinkStats;
 ```
 
-Defined in: [src/device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
+Defined in: [device/device.ts:278](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L278)
 
 ##### Returns
 
@@ -2146,7 +2146,7 @@ DepzDevice.stats
 get timeSync(): TimeSync | null;
 ```
 
-Defined in: [src/device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
+Defined in: [device/device.ts:591](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L591)
 
 ##### Returns
 
@@ -2168,7 +2168,7 @@ DepzDevice.timeSync
 get product(): string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:357](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L357)
+Defined in: [sensors/vl53lx/vl53lx.ts:357](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L357)
 
 The product init() bound (null before init).
 
@@ -2186,7 +2186,7 @@ The product init() bound (null before init).
 get driverKind(): string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L361)
+Defined in: [sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L361)
 
 ##### Returns
 
@@ -2202,7 +2202,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:361](https://github.com/depz-ai/depz-s
 get driver(): Vl53lxSensorDriver;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:366](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L366)
+Defined in: [sensors/vl53lx/vl53lx.ts:366](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L366)
 
 The ULD port in use — escape hatch for product-specific calls.
 
@@ -2220,7 +2220,7 @@ The ULD port in use — escape hatch for product-specific calls.
 get initialized(): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L371)
+Defined in: [sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L371)
 
 ##### Returns
 
@@ -2236,7 +2236,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:371](https://github.com/depz-ai/depz-s
 get modes(): readonly string[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:478](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L478)
+Defined in: [sensors/vl53lx/vl53lx.ts:478](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L478)
 
 Named ranging modes, first = what init leaves; [] if none.
 
@@ -2254,7 +2254,7 @@ readonly `string`[]
 get ranging(): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L684)
+Defined in: [sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L684)
 
 ##### Returns
 
@@ -2270,7 +2270,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:684](https://github.com/depz-ai/depz-s
 get streamParseErrors(): number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:760](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L760)
+Defined in: [sensors/vl53lx/vl53lx.ts:760](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L760)
 
 Stream reports dropped because the driver failed to decode them.
 
@@ -2288,7 +2288,7 @@ Stream reports dropped because the driver failed to decode them.
 get streamDroppedCounts(): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:765](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L765)
+Defined in: [sensors/vl53lx/vl53lx.ts:765](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L765)
 
 Drop counters of all live measurement queues (diagnostics).
 
@@ -2304,7 +2304,7 @@ Drop counters of all live measurement queues (diagnostics).
 open(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
+Defined in: [device/device.ts:244](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L244)
 
 Open the transport and start the read pump. A no-op on a device that
 continues an adopted connection (`attachSensorClass`) — already open.
@@ -2327,7 +2327,7 @@ DepzDevice.open
 close(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L251)
+Defined in: [device/device.ts:251](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L251)
 
 Close the connection. A device that handed its connection over owns none.
 
@@ -2349,7 +2349,7 @@ DepzDevice.close
 protected onTeardown(error): void;
 ```
 
-Defined in: [src/device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
+Defined in: [device/device.ts:302](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L302)
 
 Hook for sensor subclasses: reject any subclass-managed in-flight requests
 and clear per-connection state when the link closes. Runs once, after the
@@ -2379,7 +2379,7 @@ DepzDevice.onTeardown
 protected registerStream(stream): () => void;
 ```
 
-Defined in: [src/device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
+Defined in: [device/device.ts:437](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L437)
 
 Register a stream to be closed on device teardown.
 
@@ -2408,7 +2408,7 @@ DepzDevice.registerStream
 onEvent(cb): () => void;
 ```
 
-Defined in: [src/device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
+Defined in: [device/device.ts:450](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L450)
 
 Subscribe to unsolicited/diagnostic events (read-pump context; do not
 block). Returns an unsubscribe function.
@@ -2437,7 +2437,7 @@ DepzDevice.onEvent
 protected emitEvent(event): void;
 ```
 
-Defined in: [src/device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
+Defined in: [device/device.ts:457](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L457)
 
 #### Parameters
 
@@ -2463,7 +2463,7 @@ DepzDevice.emitEvent
 protected callGuarded<T>(cb, item): void;
 ```
 
-Defined in: [src/device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
+Defined in: [device/device.ts:466](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L466)
 
 Run a user callback on the read pump: one that throws is counted in
 `stats.callbackErrors`, logged and dropped — it never stops the pump, the
@@ -2503,7 +2503,7 @@ request<T>(
 opts?): Promise<T>;
 ```
 
-Defined in: [src/device/device.ts:487](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L487)
+Defined in: [device/device.ts:482](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L482)
 
 Send `cmd` and wait for its correlated completion (contract 02 §1).
 
@@ -2546,7 +2546,7 @@ DepzDevice.request
 static expectReport<T>(reportId, unpack): Matcher<T>;
 ```
 
-Defined in: [src/device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
+Defined in: [device/device.ts:526](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L526)
 
 Matcher for a typed report identified by its report ID alone.
 
@@ -2581,7 +2581,7 @@ DepzDevice.expectReport
 static expectText(requestCmd): Matcher<string>;
 ```
 
-Defined in: [src/device/device.ts:536](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L536)
+Defined in: [device/device.ts:531](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L531)
 
 Matcher for RPT_TEXT echoing `requestCmd`.
 
@@ -2609,7 +2609,7 @@ DepzDevice.expectText
 getDeviceName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:547](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L547)
+Defined in: [device/device.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L542)
 
 #### Returns
 
@@ -2629,7 +2629,7 @@ DepzDevice.getDeviceName
 getSoftwareName(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:553](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L553)
+Defined in: [device/device.ts:548](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L548)
 
 #### Returns
 
@@ -2649,7 +2649,7 @@ DepzDevice.getSoftwareName
 getSerialNumber(): Promise<string>;
 ```
 
-Defined in: [src/device/device.ts:559](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L559)
+Defined in: [device/device.ts:554](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L554)
 
 #### Returns
 
@@ -2669,7 +2669,7 @@ DepzDevice.getSerialNumber
 identify(): Promise<Identity>;
 ```
 
-Defined in: [src/device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
+Defined in: [device/device.ts:561](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L561)
 
 Classify the running firmware (contract 02 §4).
 
@@ -2691,7 +2691,7 @@ DepzDevice.identify
 readMcuTemperature(): Promise<number>;
 ```
 
-Defined in: [src/device/device.ts:571](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L571)
+Defined in: [device/device.ts:566](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L566)
 
 Last cached MCU temperature in °C (device refreshes ~2 Hz).
 
@@ -2713,7 +2713,7 @@ DepzDevice.readMcuTemperature
 syncTime(samples?): Promise<TimeSync>;
 ```
 
-Defined in: [src/device/device.ts:579](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L579)
+Defined in: [device/device.ts:574](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L574)
 
 NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
 
@@ -2741,7 +2741,7 @@ DepzDevice.syncTime
 toHostTimeUs(deviceTsUs): bigint;
 ```
 
-Defined in: [src/device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
+Defined in: [device/device.ts:596](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L596)
 
 Device µs → host monotonic µs (requires a prior `syncTime`).
 
@@ -2769,7 +2769,7 @@ DepzDevice.toHostTimeUs
 getReportPayloadCrc(): Promise<CrcType>;
 ```
 
-Defined in: [src/device/device.ts:606](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L606)
+Defined in: [device/device.ts:601](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L601)
 
 #### Returns
 
@@ -2789,7 +2789,7 @@ DepzDevice.getReportPayloadCrc
 setReportPayloadCrc(crcType): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L613)
+Defined in: [device/device.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L608)
 
 Set the device→host payload CRC mode (host→device is per-packet).
 
@@ -2817,7 +2817,7 @@ DepzDevice.setReportPayloadCrc
 getSyncPin(pin): Promise<SyncPinConfig>;
 ```
 
-Defined in: [src/device/device.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L617)
+Defined in: [device/device.ts:612](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L612)
 
 #### Parameters
 
@@ -2843,7 +2843,7 @@ DepzDevice.getSyncPin
 setSyncPin(config): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
+Defined in: [device/device.ts:618](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L618)
 
 #### Parameters
 
@@ -2869,7 +2869,7 @@ DepzDevice.setSyncPin
 reset(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:628](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L628)
+Defined in: [device/device.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L623)
 
 DEVICE_RESET: device ACKs then reboots; the link will drop.
 
@@ -2891,7 +2891,7 @@ DepzDevice.reset
 enterBootloaderMode(): Promise<void>;
 ```
 
-Defined in: [src/device/device.ts:637](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L637)
+Defined in: [device/device.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L632)
 
 Ask the device to reboot into the resident bootloader and close this
 connection. Re-discovery/flash flow lives in the bootloader module
@@ -2915,7 +2915,7 @@ DepzDevice.enterBootloaderMode
 boardName(): Promise<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:346](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L346)
+Defined in: [sensors/vl53lx/vl53lx.ts:346](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L346)
 
 The board's device name (bootloader metablock), e.g.
 `DEPZ ToF Sensor VL53L4CX USB v2.1 TOVJALN523`. Read once, then cached.
@@ -2932,7 +2932,7 @@ The board's device name (bootloader metablock), e.g.
 detected(): Promise<string | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:352](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L352)
+Defined in: [sensors/vl53lx/vl53lx.ts:352](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L352)
 
 The product the device name carries, or null on an unstamped board.
 
@@ -2948,7 +2948,7 @@ The product the device name carries, or null on an unstamped board.
 driverKinds(product?): Promise<string[]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:376](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L376)
+Defined in: [sensors/vl53lx/vl53lx.ts:376](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L376)
 
 The driver kinds a product has (default: this board's).
 
@@ -2970,7 +2970,7 @@ The driver kinds a product has (default: this board's).
 init(driver?, opts?): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:391](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L391)
+Defined in: [sensors/vl53lx/vl53lx.ts:391](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L391)
 
 Bind the (product, driver kind) pair and initialise the sensor.
 
@@ -2999,7 +2999,7 @@ Bind the (product, driver kind) pair and initialise the sensor.
 identifyProduct(): Promise<Vl53lxProductInfo>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:416](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L416)
+Defined in: [sensors/vl53lx/vl53lx.ts:416](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L416)
 
 Everything about what is connected (needs init()).
 
@@ -3015,7 +3015,7 @@ Everything about what is connected (needs init()).
 notes(): Promise<string[]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L446)
+Defined in: [sensors/vl53lx/vl53lx.ts:446](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L446)
 
 The lines a UI should show about the chosen pair: product named by hand,
 a borrowed driver, a pair that reaches less than the board is rated for,
@@ -3033,7 +3033,7 @@ the driver's caveat.
 supports(group): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:473](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L473)
+Defined in: [sensors/vl53lx/vl53lx.ts:473](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L473)
 
 Whether this product/driver serves an optional capability group: mode,
 timing, offset, calib_offset, xtalk, calib_xtalk, thresholds,
@@ -3057,7 +3057,7 @@ signal_thresh, sigma_thresh, roi, temp_update, refspad.
 xshut(action): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:489](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L489)
+Defined in: [sensors/vl53lx/vl53lx.ts:489](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L489)
 
 Drive XSHUT: XSHUT_OFF / XSHUT_ON / XSHUT_RESET (1 ms pulse + 5 ms wait;
 the host confirms the boot). OFF and RESET stop the stream; the sensor
@@ -3081,7 +3081,7 @@ then holds none of the configuration — init() again.
 bridgeInfo(): Promise<Vl53lxInfo>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L496)
+Defined in: [sensors/vl53lx/vl53lx.ts:496](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L496)
 
 RPT_VL53_INFO — the bridge's own counters; safe while streaming.
 
@@ -3097,7 +3097,7 @@ RPT_VL53_INFO — the bridge's own counters; safe while streaming.
 configure(opts?): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:511](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L511)
+Defined in: [sensors/vl53lx/vl53lx.ts:511](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L511)
 
 Re-initialise the sensor and apply a ranging configuration. The re-init
 is deliberate (the only way to know what the configuration registers
@@ -3123,7 +3123,7 @@ group is refused before the re-init.
 getRangeTiming(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L527)
+Defined in: [sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L527)
 
 → [timingBudgetMs, interMeasurementMs]; 0 for the period = continuous.
 
@@ -3139,7 +3139,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:527](https://github.com/depz-ai/depz-s
 getMode(): Promise<string | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L532)
+Defined in: [sensors/vl53lx/vl53lx.ts:532](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L532)
 
 The ranging mode in use, or null on a product without modes.
 
@@ -3155,7 +3155,7 @@ The ranging mode in use, or null on a product without modes.
 budgetChoices(): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L537)
+Defined in: [sensors/vl53lx/vl53lx.ts:537](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L537)
 
 The only budgets accepted right now (ascending), or [] for any in range.
 
@@ -3171,7 +3171,7 @@ The only budgets accepted right now (ascending), or [] for any in range.
 snapBudget(budgetMs): number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L542)
+Defined in: [sensors/vl53lx/vl53lx.ts:542](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L542)
 
 The nearest budget this product will actually accept.
 
@@ -3193,7 +3193,7 @@ The nearest budget this product will actually accept.
 getOffsetMm(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L556)
+Defined in: [sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L556)
 
 #### Returns
 
@@ -3207,7 +3207,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:556](https://github.com/depz-ai/depz-s
 setOffsetMm(offsetMm): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L560)
+Defined in: [sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L560)
 
 #### Parameters
 
@@ -3227,7 +3227,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:560](https://github.com/depz-ai/depz-s
 getXtalkKcps(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L565)
+Defined in: [sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L565)
 
 #### Returns
 
@@ -3241,7 +3241,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:565](https://github.com/depz-ai/depz-s
 setXtalkKcps(xtalkKcps): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L569)
+Defined in: [sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L569)
 
 #### Parameters
 
@@ -3261,7 +3261,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:569](https://github.com/depz-ai/depz-s
 calibrateOffset(targetDistMm, nbSamples?): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:578](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L578)
+Defined in: [sensors/vl53lx/vl53lx.ts:578](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L578)
 
 Offset calibration against a flat target at `targetDistMm`; returns the
 offset now programmed. Store it on the host (sensor RAM, lost on reset).
@@ -3285,7 +3285,7 @@ offset now programmed. Store it on the host (sensor RAM, lost on reset).
 calibrateXtalk(targetDistMm, nbSamples?): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:584](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L584)
+Defined in: [sensors/vl53lx/vl53lx.ts:584](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L584)
 
 Crosstalk calibration; returns the xtalk now programmed (kcps).
 
@@ -3308,7 +3308,7 @@ Crosstalk calibration; returns the xtalk now programmed (kcps).
 getDetectionThresholds(): Promise<[number, number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:590](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L590)
+Defined in: [sensors/vl53lx/vl53lx.ts:590](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L590)
 
 → [distanceLowMm, distanceHighMm, window].
 
@@ -3327,7 +3327,7 @@ setDetectionThresholds(
 window): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:595](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L595)
+Defined in: [sensors/vl53lx/vl53lx.ts:595](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L595)
 
 Arm the distance-window interrupt; stays armed until the next init/configure.
 
@@ -3351,7 +3351,7 @@ Arm the distance-window interrupt; stays armed until the next init/configure.
 getSignalThresholdKcps(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L604)
+Defined in: [sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L604)
 
 #### Returns
 
@@ -3365,7 +3365,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:604](https://github.com/depz-ai/depz-s
 setSignalThresholdKcps(signalKcps): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L608)
+Defined in: [sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L608)
 
 #### Parameters
 
@@ -3385,7 +3385,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:608](https://github.com/depz-ai/depz-s
 getSigmaThresholdMm(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L613)
+Defined in: [sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L613)
 
 #### Returns
 
@@ -3399,7 +3399,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:613](https://github.com/depz-ai/depz-s
 setSigmaThresholdMm(sigmaMm): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L617)
+Defined in: [sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L617)
 
 #### Parameters
 
@@ -3419,7 +3419,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:617](https://github.com/depz-ai/depz-s
 getRoi(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L623)
+Defined in: [sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L623)
 
 → [x, y] SPAD window size.
 
@@ -3435,7 +3435,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:623](https://github.com/depz-ai/depz-s
 setRoi(x, y): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L627)
+Defined in: [sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L627)
 
 #### Parameters
 
@@ -3456,7 +3456,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:627](https://github.com/depz-ai/depz-s
 getRoiCenter(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L632)
+Defined in: [sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L632)
 
 #### Returns
 
@@ -3470,7 +3470,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:632](https://github.com/depz-ai/depz-s
 setRoiCenter(centerSpad): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L636)
+Defined in: [sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L636)
 
 #### Parameters
 
@@ -3490,7 +3490,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:636](https://github.com/depz-ai/depz-s
 startTemperatureUpdate(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:642](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L642)
+Defined in: [sensors/vl53lx/vl53lx.ts:642](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L642)
 
 Re-run VHV after an ambient change over 8 °C.
 
@@ -3506,7 +3506,7 @@ Re-run VHV after an ambient change over 8 °C.
 performRefSpadManagement(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:648](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L648)
+Defined in: [sensors/vl53lx/vl53lx.ts:648](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L648)
 
 VL53L0X: re-measure the reference SPADs → [count, isAperture].
 
@@ -3522,7 +3522,7 @@ VL53L0X: re-measure the reference SPADs → [count, isAperture].
 startRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:660](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L660)
+Defined in: [sensors/vl53lx/vl53lx.ts:660](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L660)
 
 Start the sensor's ranging loop and arm the MCU stream: one
 RPT_VL53_STREAM per INT edge, followed on the MCU by the driver's
@@ -3540,7 +3540,7 @@ interrupt-release writes.
 stopRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L673)
+Defined in: [sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L673)
 
 #### Returns
 
@@ -3554,7 +3554,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:673](https://github.com/depz-ai/depz-s
 measureOnce(timeoutMs?): Promise<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:692](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L692)
+Defined in: [sensors/vl53lx/vl53lx.ts:692](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L692)
 
 Single poll-mode measurement: start ranging, wait for data-ready, read,
 release the interrupt, stop. Rejects while the stream runs.
@@ -3577,7 +3577,7 @@ release the interrupt, stop. Rejects while the stream runs.
 onMeasurement(cb): () => void;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:716](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L716)
+Defined in: [sensors/vl53lx/vl53lx.ts:716](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L716)
 
 Subscribe to streamed measurements. Returns an unsubscribe function.
 
@@ -3599,7 +3599,7 @@ Subscribe to streamed measurements. Returns an unsubscribe function.
 measurements(maxsize?): StreamQueue<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L724)
+Defined in: [sensors/vl53lx/vl53lx.ts:724](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L724)
 
 Async iterator over measurements — bounded, drop-oldest (contract 07 §3).
 
@@ -3621,7 +3621,7 @@ Async iterator over measurements — bounded, drop-oldest (contract 07 §3).
 getMeasurement(timeoutMs?): Promise<Vl53lxMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:735](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L735)
+Defined in: [sensors/vl53lx/vl53lx.ts:735](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L735)
 
 Wait for the next streamed measurement.
 
@@ -3643,7 +3643,7 @@ Wait for the next streamed measurement.
 protected need(group): Vl53lxSensorDriver & DriverExtras;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L771)
+Defined in: [sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L771)
 
 #### Parameters
 
@@ -3663,7 +3663,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:771](https://github.com/depz-ai/depz-s
 protected requireNotRanging(): void;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L782)
+Defined in: [sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L782)
 
 #### Returns
 
@@ -3677,7 +3677,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:782](https://github.com/depz-ai/depz-s
 protected handleReport(pkt): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:791](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L791)
+Defined in: [sensors/vl53lx/vl53lx.ts:791](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L791)
 
 Hook for sensor subclasses: route streaming reports here. Return true
 when the packet was consumed. Runs after status/matcher/common-report
@@ -3701,7 +3701,7 @@ DepzDevice.handleReport
 
 # Class: Vl53lxError
 
-Defined in: [src/sensors/vl53lx/uld/link.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/link.ts#L23)
+Defined in: [sensors/vl53lx/uld/link.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/link.ts#L23)
 
 A ULD-level failure: the sensor did not do what the driver needed (timeout
 waiting for data-ready or boot, a calibration that failed...).
@@ -3718,7 +3718,7 @@ waiting for data-ready or boot, a calibration that failed...).
 new Vl53lxError(message?): Vl53Error;
 ```
 
-Defined in: [src/errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
+Defined in: [errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
 
 #### Parameters
 
@@ -3744,7 +3744,7 @@ DepzError.constructor
 static stackTraceLimit: number;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:68
+Defined in: ../node\_modules/@types/node/globals.d.ts:68
 
 The `Error.stackTraceLimit` property specifies the number of stack frames
 collected by a stack trace (whether generated by `new Error().stack` or
@@ -3770,7 +3770,7 @@ DepzError.stackTraceLimit
 optional cause?: unknown;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
+Defined in: ../node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 #### Inherited from
 
@@ -3786,7 +3786,7 @@ DepzError.cause
 name: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1076
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1076
 
 #### Inherited from
 
@@ -3802,7 +3802,7 @@ DepzError.name
 message: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1077
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1077
 
 #### Inherited from
 
@@ -3818,7 +3818,7 @@ DepzError.message
 optional stack?: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1078
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1078
 
 #### Inherited from
 
@@ -3834,7 +3834,7 @@ DepzError.stack
 static captureStackTrace(targetObject, constructorOpt?): void;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:52
+Defined in: ../node\_modules/@types/node/globals.d.ts:52
 
 Creates a `.stack` property on `targetObject`, which when accessed returns
 a string representing the location in the code at which
@@ -3905,7 +3905,7 @@ DepzError.captureStackTrace
 static prepareStackTrace(err, stackTraces): any;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:56
+Defined in: ../node\_modules/@types/node/globals.d.ts:56
 
 #### Parameters
 
@@ -3930,7 +3930,7 @@ DepzError.prepareStackTrace
 
 # Class: Vl53lxProtocolError
 
-Defined in: [src/sensors/vl53lx/uld/link.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/link.ts#L30)
+Defined in: [sensors/vl53lx/uld/link.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/link.ts#L30)
 
 The bridge refused a register command or did not answer it — the firmware
 repo's single error for both. The ports catch it where the sensor
@@ -3948,7 +3948,7 @@ legitimately NACKs for a while (e.g. right after a soft reset).
 new Vl53lxProtocolError(message?): ProtocolError;
 ```
 
-Defined in: [src/errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
+Defined in: [errors.ts:8](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/errors.ts#L8)
 
 #### Parameters
 
@@ -3974,7 +3974,7 @@ DepzError.constructor
 static stackTraceLimit: number;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:68
+Defined in: ../node\_modules/@types/node/globals.d.ts:68
 
 The `Error.stackTraceLimit` property specifies the number of stack frames
 collected by a stack trace (whether generated by `new Error().stack` or
@@ -4000,7 +4000,7 @@ DepzError.stackTraceLimit
 optional cause?: unknown;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es2022.error.d.ts:26
+Defined in: ../node\_modules/typescript/lib/lib.es2022.error.d.ts:26
 
 #### Inherited from
 
@@ -4016,7 +4016,7 @@ DepzError.cause
 name: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1076
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1076
 
 #### Inherited from
 
@@ -4032,7 +4032,7 @@ DepzError.name
 message: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1077
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1077
 
 #### Inherited from
 
@@ -4048,7 +4048,7 @@ DepzError.message
 optional stack?: string;
 ```
 
-Defined in: node\_modules/typescript/lib/lib.es5.d.ts:1078
+Defined in: ../node\_modules/typescript/lib/lib.es5.d.ts:1078
 
 #### Inherited from
 
@@ -4064,7 +4064,7 @@ DepzError.stack
 static captureStackTrace(targetObject, constructorOpt?): void;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:52
+Defined in: ../node\_modules/@types/node/globals.d.ts:52
 
 Creates a `.stack` property on `targetObject`, which when accessed returns
 a string representing the location in the code at which
@@ -4135,7 +4135,7 @@ DepzError.captureStackTrace
 static prepareStackTrace(err, stackTraces): any;
 ```
 
-Defined in: node\_modules/@types/node/globals.d.ts:56
+Defined in: ../node\_modules/@types/node/globals.d.ts:56
 
 #### Parameters
 
@@ -4160,7 +4160,7 @@ DepzError.prepareStackTrace
 
 # Abstract Class: Vl53lxSensorDriver
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L142)
+Defined in: [sensors/vl53lx/uld/base.ts:142](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L142)
 
 Everything a caller may use on a sensor driver (mirror of the Python
 `SensorDriver`). Anything else a driver defines belongs to that product and
@@ -4181,7 +4181,7 @@ class (the registry reads them before construction) and as instance getters.
 new Vl53lxSensorDriver(p, product): SensorDriver;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:151](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L151)
+Defined in: [sensors/vl53lx/uld/base.ts:151](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L151)
 
 #### Parameters
 
@@ -4202,7 +4202,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:151](https://github.com/depz-ai/depz
 readonly static ADDR_WIDTH: number = 2;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L143)
+Defined in: [sensors/vl53lx/uld/base.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L143)
 
 ***
 
@@ -4212,7 +4212,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:143](https://github.com/depz-ai/depz
 readonly static CLEAR_STEPS: readonly readonly [number, number][] = [];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L144)
+Defined in: [sensors/vl53lx/uld/base.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L144)
 
 ***
 
@@ -4222,7 +4222,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:144](https://github.com/depz-ai/depz
 readonly static MAX_KHZ: number = 400;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L145)
+Defined in: [sensors/vl53lx/uld/base.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L145)
 
 ***
 
@@ -4232,7 +4232,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:145](https://github.com/depz-ai/depz
 readonly static SUPPORTS: ReadonlySet<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L146)
+Defined in: [sensors/vl53lx/uld/base.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L146)
 
 ***
 
@@ -4242,7 +4242,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:146](https://github.com/depz-ai/depz
 readonly static MODES: readonly string[] = [];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L147)
+Defined in: [sensors/vl53lx/uld/base.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L147)
 
 ***
 
@@ -4252,7 +4252,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:147](https://github.com/depz-ai/depz
 readonly static BUDGET_MS: readonly [number, number];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L148)
+Defined in: [sensors/vl53lx/uld/base.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L148)
 
 ***
 
@@ -4262,7 +4262,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:148](https://github.com/depz-ai/depz
 readonly static HISTOGRAM: boolean = false;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L149)
+Defined in: [sensors/vl53lx/uld/base.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L149)
 
 ***
 
@@ -4272,7 +4272,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:149](https://github.com/depz-ai/depz
 readonly p: BridgePlatform;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L152)
+Defined in: [sensors/vl53lx/uld/base.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L152)
 
 ***
 
@@ -4282,7 +4282,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:152](https://github.com/depz-ai/depz
 readonly product: string;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L154)
+Defined in: [sensors/vl53lx/uld/base.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L154)
 
 The product the board reports, e.g. 'VL53L4CX' (one driver serves several).
 
@@ -4296,7 +4296,7 @@ The product the board reports, e.g. 'VL53L4CX' (one driver serves several).
 get ADDR_WIDTH(): number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L160)
+Defined in: [sensors/vl53lx/uld/base.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L160)
 
 ##### Returns
 
@@ -4312,7 +4312,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:160](https://github.com/depz-ai/depz
 get CLEAR_STEPS(): readonly readonly [number, number][];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:163](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L163)
+Defined in: [sensors/vl53lx/uld/base.ts:163](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L163)
 
 ##### Returns
 
@@ -4328,7 +4328,7 @@ readonly readonly \[`number`, `number`\][]
 get MAX_KHZ(): number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:166](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L166)
+Defined in: [sensors/vl53lx/uld/base.ts:166](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L166)
 
 ##### Returns
 
@@ -4344,7 +4344,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:166](https://github.com/depz-ai/depz
 get SUPPORTS(): ReadonlySet<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:169](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L169)
+Defined in: [sensors/vl53lx/uld/base.ts:169](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L169)
 
 ##### Returns
 
@@ -4360,7 +4360,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:169](https://github.com/depz-ai/depz
 get MODES(): readonly string[];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:172](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L172)
+Defined in: [sensors/vl53lx/uld/base.ts:172](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L172)
 
 ##### Returns
 
@@ -4376,7 +4376,7 @@ readonly `string`[]
 get BUDGET_MS(): readonly [number, number];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L175)
+Defined in: [sensors/vl53lx/uld/base.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L175)
 
 ##### Returns
 
@@ -4392,7 +4392,7 @@ readonly \[`number`, `number`\]
 get HISTOGRAM(): boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:178](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L178)
+Defined in: [sensors/vl53lx/uld/base.ts:178](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L178)
 
 ##### Returns
 
@@ -4406,7 +4406,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:178](https://github.com/depz-ai/depz
 abstract modelId(): Promise<number>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L183)
+Defined in: [sensors/vl53lx/uld/base.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L183)
 
 #### Returns
 
@@ -4420,7 +4420,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:183](https://github.com/depz-ai/depz
 abstract sensorInit(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L185)
+Defined in: [sensors/vl53lx/uld/base.ts:185](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L185)
 
 Reset and configure; leaves the bus at MAX_KHZ. Safe to re-run.
 
@@ -4436,7 +4436,7 @@ Reset and configure; leaves the bus at MAX_KHZ. Safe to re-run.
 abstract startRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:186](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L186)
+Defined in: [sensors/vl53lx/uld/base.ts:186](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L186)
 
 #### Returns
 
@@ -4450,7 +4450,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:186](https://github.com/depz-ai/depz
 abstract stopRanging(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L187)
+Defined in: [sensors/vl53lx/uld/base.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L187)
 
 #### Returns
 
@@ -4464,7 +4464,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:187](https://github.com/depz-ai/depz
 abstract checkForDataReady(): Promise<boolean>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:190](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L190)
+Defined in: [sensors/vl53lx/uld/base.ts:190](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L190)
 
 #### Returns
 
@@ -4478,7 +4478,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:190](https://github.com/depz-ai/depz
 waitDataReady(timeoutS?): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:192](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L192)
+Defined in: [sensors/vl53lx/uld/base.ts:192](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L192)
 
 #### Parameters
 
@@ -4498,7 +4498,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:192](https://github.com/depz-ai/depz
 abstract clearInterrupt(): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:200](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L200)
+Defined in: [sensors/vl53lx/uld/base.ts:200](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L200)
 
 #### Returns
 
@@ -4512,7 +4512,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:200](https://github.com/depz-ai/depz
 abstract streamBlock(): [number, number];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:204](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L204)
+Defined in: [sensors/vl53lx/uld/base.ts:204](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L204)
 
 [addr, len] — the register block the bridge streams on each INT.
 
@@ -4528,7 +4528,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:204](https://github.com/depz-ai/depz
 abstract decode(raw): Vl53lxDriverMeasurement;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:206](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L206)
+Defined in: [sensors/vl53lx/uld/base.ts:206](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L206)
 
 Streamed block bytes → Measurement (pure; stateful on histogram parts).
 
@@ -4550,7 +4550,7 @@ Streamed block bytes → Measurement (pure; stateful on histogram parts).
 readMeasurement(): Promise<Vl53lxDriverMeasurement>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:209](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L209)
+Defined in: [sensors/vl53lx/uld/base.ts:209](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L209)
 
 One polled result. Default: read the stream block and decode it.
 
@@ -4566,7 +4566,7 @@ One polled result. Default: read the stream block and decode it.
 abstract setRangeTiming(timingBudgetMs, interMeasurementMs): Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:215](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L215)
+Defined in: [sensors/vl53lx/uld/base.ts:215](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L215)
 
 #### Parameters
 
@@ -4587,7 +4587,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:215](https://github.com/depz-ai/depz
 abstract getRangeTiming(): Promise<[number, number]>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L217)
+Defined in: [sensors/vl53lx/uld/base.ts:217](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L217)
 
 → [timingBudgetMs, interMeasurementMs].
 
@@ -4603,7 +4603,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:217](https://github.com/depz-ai/depz
 budgetChoices(): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:220](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L220)
+Defined in: [sensors/vl53lx/uld/base.ts:220](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L220)
 
 The only budgets accepted right now (ascending), or [] for any in BUDGET_MS.
 
@@ -4619,7 +4619,7 @@ The only budgets accepted right now (ascending), or [] for any in BUDGET_MS.
 setMode(_name): Promise<number | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:230](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L230)
+Defined in: [sensors/vl53lx/uld/base.ts:230](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L230)
 
 Apply one of MODES. → the timing budget in effect after the change, ms,
 on a driver whose mode change can move it (VL53L1: contract 12 §5), else
@@ -4643,7 +4643,7 @@ null.
 getMode(): Promise<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:233](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L233)
+Defined in: [sensors/vl53lx/uld/base.ts:233](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L233)
 
 #### Returns
 
@@ -4657,7 +4657,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:233](https://github.com/depz-ai/depz
 reachMm(): Promise<number | null>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:243](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L243)
+Defined in: [sensors/vl53lx/uld/base.ts:243](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L243)
 
 How far the configuration in use can measure (mm), read off the sensor —
 not the product's rating (registry): past it the phase is out of the
@@ -4676,7 +4676,7 @@ characterised.
 driverInfo(): Promise<Record<string, unknown>>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:248](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L248)
+Defined in: [sensors/vl53lx/uld/base.ts:248](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L248)
 
 Numbers beyond the contract, for display only.
 
@@ -4686,7 +4686,7 @@ Numbers beyond the contract, for display only.
 
 # Enumeration: Vl53lxCmd
 
-Defined in: [src/protocol/vl53lx.ts:22](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L22)
+Defined in: [protocol/vl53lx.ts:22](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L22)
 
 ## Enumeration Members
 
@@ -4696,7 +4696,7 @@ Defined in: [src/protocol/vl53lx.ts:22](https://github.com/depz-ai/depz-sensor-s
 ReadReg: 50;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L23)
+Defined in: [protocol/vl53lx.ts:23](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L23)
 
 ***
 
@@ -4706,7 +4706,7 @@ Defined in: [src/protocol/vl53lx.ts:23](https://github.com/depz-ai/depz-sensor-s
 WriteReg: 51;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:24](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L24)
+Defined in: [protocol/vl53lx.ts:24](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L24)
 
 ***
 
@@ -4716,7 +4716,7 @@ Defined in: [src/protocol/vl53lx.ts:24](https://github.com/depz-ai/depz-sensor-s
 Xshut: 52;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L25)
+Defined in: [protocol/vl53lx.ts:25](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L25)
 
 ***
 
@@ -4726,7 +4726,7 @@ Defined in: [src/protocol/vl53lx.ts:25](https://github.com/depz-ai/depz-sensor-s
 StartStream: 53;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:26](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L26)
+Defined in: [protocol/vl53lx.ts:26](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L26)
 
 ***
 
@@ -4736,7 +4736,7 @@ Defined in: [src/protocol/vl53lx.ts:26](https://github.com/depz-ai/depz-sensor-s
 StopStream: 54;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L27)
+Defined in: [protocol/vl53lx.ts:27](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L27)
 
 ***
 
@@ -4746,7 +4746,7 @@ Defined in: [src/protocol/vl53lx.ts:27](https://github.com/depz-ai/depz-sensor-s
 GetInfo: 55;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:28](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L28)
+Defined in: [protocol/vl53lx.ts:28](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L28)
 
 ***
 
@@ -4756,7 +4756,7 @@ Defined in: [src/protocol/vl53lx.ts:28](https://github.com/depz-ai/depz-sensor-s
 SetI2cSpeed: 56;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L29)
+Defined in: [protocol/vl53lx.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L29)
 
 ***
 
@@ -4766,7 +4766,7 @@ Defined in: [src/protocol/vl53lx.ts:29](https://github.com/depz-ai/depz-sensor-s
 SetAddrWidth: 57;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L30)
+Defined in: [protocol/vl53lx.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L30)
 
 ***
 
@@ -4776,11 +4776,11 @@ Defined in: [src/protocol/vl53lx.ts:30](https://github.com/depz-ai/depz-sensor-s
 ClearI2cErrors: 58;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:31](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L31)
+Defined in: [protocol/vl53lx.ts:31](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L31)
 
 # Enumeration: Vl53lxRpt
 
-Defined in: [src/protocol/vl53lx.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L34)
+Defined in: [protocol/vl53lx.ts:34](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L34)
 
 ## Enumeration Members
 
@@ -4790,7 +4790,7 @@ Defined in: [src/protocol/vl53lx.ts:34](https://github.com/depz-ai/depz-sensor-s
 RegData: 145;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L35)
+Defined in: [protocol/vl53lx.ts:35](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L35)
 
 ***
 
@@ -4800,7 +4800,7 @@ Defined in: [src/protocol/vl53lx.ts:35](https://github.com/depz-ai/depz-sensor-s
 Info: 146;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L36)
+Defined in: [protocol/vl53lx.ts:36](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L36)
 
 ***
 
@@ -4810,7 +4810,7 @@ Defined in: [src/protocol/vl53lx.ts:36](https://github.com/depz-ai/depz-sensor-s
 Stream: 147;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L37)
+Defined in: [protocol/vl53lx.ts:37](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L37)
 
 # Function: packVl53lxSetAddrWidth()
 
@@ -4818,7 +4818,7 @@ Defined in: [src/protocol/vl53lx.ts:37](https://github.com/depz-ai/depz-sensor-s
 function packVl53lxSetAddrWidth(width): Uint8Array;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L75)
+Defined in: [protocol/vl53lx.ts:75](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L75)
 
 VL53_SET_ADDR_WIDTH payload: register-address width, 1 or 2 bytes.
 
@@ -4842,7 +4842,7 @@ function packVl53lxStartStream(
    flags?): Uint8Array;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:52](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L52)
+Defined in: [protocol/vl53lx.ts:52](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L52)
 
 vl53_start_stream_t: block, flags, then `clear` — the (addr, value) writes
 the bridge plays after every block read (0..4 steps). 6+3n bytes.
@@ -4866,7 +4866,7 @@ the bridge plays after every block read (0..4 steps). 6+3n bytes.
 function plotDistances(m): number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:96](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L96)
+Defined in: [sensors/vl53lx/vl53lx.ts:96](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L96)
 
 The distances a chart should draw for one measurement: the plottable
 targets in driver order, or the single distance on a light driver.
@@ -4887,7 +4887,7 @@ targets in driver order, or the single distance on a light driver.
 function primaryTarget(m): Vl53lxTarget | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L104)
+Defined in: [sensors/vl53lx/vl53lx.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L104)
 
 The first plottable target, or null when the frame produced nothing usable.
 
@@ -4907,7 +4907,7 @@ The first plottable target, or null when the frame produced nothing usable.
 function resolveVl53lxClass(usbModel, deviceName): typeof Vl53lx;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:872](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L872)
+Defined in: [sensors/vl53lx/vl53lx.ts:872](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L872)
 
 Pick the 1D-family class (contract 12 §1): the production PID model, then
 the product the device name carries, then the generic class.
@@ -4929,7 +4929,7 @@ the product the device name carries, then the generic class.
 function unpackVl53lxInfo(payload): Vl53lxInfo;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L106)
+Defined in: [protocol/vl53lx.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L106)
 
 `<IIIBBBHBBI`; rejects a payload shorter than 23 bytes.
 
@@ -4945,7 +4945,7 @@ Defined in: [src/protocol/vl53lx.ts:106](https://github.com/depz-ai/depz-sensor-
 
 # Interface: HistogramDriverApi
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:115](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L115)
+Defined in: [sensors/vl53lx/vl53lx.ts:115](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L115)
 
 What the device class needs from the histogram (Bare) driver beyond
 `SensorDriver`: `binData(raw)` steps the frame-pair state and returns the
@@ -4960,7 +4960,7 @@ per frame.
 binData(raw): unknown;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:116](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L116)
+Defined in: [sensors/vl53lx/vl53lx.ts:116](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L116)
 
 #### Parameters
 
@@ -4980,7 +4980,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:116](https://github.com/depz-ai/depz-s
 toMeasurement(bins): Vl53lxDriverMeasurement;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:117](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L117)
+Defined in: [sensors/vl53lx/vl53lx.ts:117](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L117)
 
 #### Parameters
 
@@ -4994,7 +4994,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:117](https://github.com/depz-ai/depz-s
 
 # Interface: Vl53lxConfigureOptions
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:169](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L169)
+Defined in: [sensors/vl53lx/vl53lx.ts:169](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L169)
 
 ## Properties
 
@@ -5004,7 +5004,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:169](https://github.com/depz-ai/depz-s
 optional budgetMs?: number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L171)
+Defined in: [sensors/vl53lx/vl53lx.ts:171](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L171)
 
 Timing budget, ms (see budgetChoices()). Default 50.
 
@@ -5016,7 +5016,7 @@ Timing budget, ms (see budgetChoices()). Default 50.
 optional interMs?: number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:173](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L173)
+Defined in: [sensors/vl53lx/vl53lx.ts:173](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L173)
 
 0 = continuous; otherwise the period between measurements (> budget).
 
@@ -5028,7 +5028,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:173](https://github.com/depz-ai/depz-s
 optional mode?: string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L175)
+Defined in: [sensors/vl53lx/vl53lx.ts:175](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L175)
 
 One of `modes`, applied before the budget.
 
@@ -5040,7 +5040,7 @@ One of `modes`, applied before the budget.
 optional offsetMm?: number | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:177](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L177)
+Defined in: [sensors/vl53lx/vl53lx.ts:177](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L177)
 
 Re-apply a stored offset calibration.
 
@@ -5052,7 +5052,7 @@ Re-apply a stored offset calibration.
 optional xtalkKcps?: number | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:179](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L179)
+Defined in: [sensors/vl53lx/vl53lx.ts:179](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L179)
 
 Re-apply a stored crosstalk calibration.
 
@@ -5064,7 +5064,7 @@ Re-apply a stored crosstalk calibration.
 optional signalKcps?: number | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L187)
+Defined in: [sensors/vl53lx/vl53lx.ts:187](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L187)
 
 Replace the blob's signal threshold, kcps. The re-init puts it back to
 the default, so a lowered one goes here, not in a setSignalThresholdKcps()
@@ -5074,7 +5074,7 @@ die without the lens it was tuned for).
 
 # Interface: Vl53lxDriverMeasurement
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:103](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L103)
+Defined in: [sensors/vl53lx/uld/base.ts:103](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L103)
 
 One range result, the same shape for every sensor of the family. On the
 histogram driver `targets` holds every return strongest-first and the
@@ -5092,7 +5092,7 @@ top-level fields repeat `targets[0]`; on the light drivers it stays empty.
 distanceMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L104)
+Defined in: [sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L104)
 
 ***
 
@@ -5102,7 +5102,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz
 status: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L105)
+Defined in: [sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L105)
 
 ***
 
@@ -5112,7 +5112,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz
 statusText: string;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L106)
+Defined in: [sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L106)
 
 ***
 
@@ -5122,7 +5122,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz
 signalKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L107)
+Defined in: [sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L107)
 
 ***
 
@@ -5132,7 +5132,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz
 ambientKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L108)
+Defined in: [sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L108)
 
 ***
 
@@ -5142,7 +5142,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz
 sigmaMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L109)
+Defined in: [sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L109)
 
 ***
 
@@ -5152,7 +5152,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz
 spads: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L110)
+Defined in: [sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L110)
 
 ***
 
@@ -5162,7 +5162,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz
 targets: Vl53lxTarget[];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L111)
+Defined in: [sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L111)
 
 ***
 
@@ -5172,11 +5172,11 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz
 extra: Record<string, unknown>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L112)
+Defined in: [sensors/vl53lx/uld/base.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L112)
 
 # Interface: Vl53lxInfo
 
-Defined in: [src/protocol/vl53lx.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L91)
+Defined in: [protocol/vl53lx.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L91)
 
 RPT_VL53_INFO (v2.00, 23 bytes) — bridge state only; the bridge reads no
 sensor register. Counters are free-running (wrap silently): watch
@@ -5194,7 +5194,7 @@ sample the USB TX ring had no room for (since the stream was armed).
 intEdges: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L92)
+Defined in: [protocol/vl53lx.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L92)
 
 ***
 
@@ -5204,7 +5204,7 @@ Defined in: [src/protocol/vl53lx.ts:92](https://github.com/depz-ai/depz-sensor-s
 slotsSkipped: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L93)
+Defined in: [protocol/vl53lx.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L93)
 
 ***
 
@@ -5214,7 +5214,7 @@ Defined in: [src/protocol/vl53lx.ts:93](https://github.com/depz-ai/depz-sensor-s
 i2cErrors: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L94)
+Defined in: [protocol/vl53lx.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L94)
 
 ***
 
@@ -5224,7 +5224,7 @@ Defined in: [src/protocol/vl53lx.ts:94](https://github.com/depz-ai/depz-sensor-s
 lastI2cError: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:96](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L96)
+Defined in: [protocol/vl53lx.ts:96](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L96)
 
 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
 
@@ -5236,7 +5236,7 @@ Defined in: [src/protocol/vl53lx.ts:96](https://github.com/depz-ai/depz-sensor-s
 xshutLevel: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:97](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L97)
+Defined in: [protocol/vl53lx.ts:97](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L97)
 
 ***
 
@@ -5246,7 +5246,7 @@ Defined in: [src/protocol/vl53lx.ts:97](https://github.com/depz-ai/depz-sensor-s
 intLevel: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L98)
+Defined in: [protocol/vl53lx.ts:98](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L98)
 
 ***
 
@@ -5256,7 +5256,7 @@ Defined in: [src/protocol/vl53lx.ts:98](https://github.com/depz-ai/depz-sensor-s
 i2cKhz: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:99](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L99)
+Defined in: [protocol/vl53lx.ts:99](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L99)
 
 ***
 
@@ -5266,7 +5266,7 @@ Defined in: [src/protocol/vl53lx.ts:99](https://github.com/depz-ai/depz-sensor-s
 addrWidth: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:100](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L100)
+Defined in: [protocol/vl53lx.ts:100](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L100)
 
 ***
 
@@ -5276,7 +5276,7 @@ Defined in: [src/protocol/vl53lx.ts:100](https://github.com/depz-ai/depz-sensor-
 nClear: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:101](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L101)
+Defined in: [protocol/vl53lx.ts:101](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L101)
 
 ***
 
@@ -5286,11 +5286,11 @@ Defined in: [src/protocol/vl53lx.ts:101](https://github.com/depz-ai/depz-sensor-
 framesDropped: number;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:102](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L102)
+Defined in: [protocol/vl53lx.ts:102](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L102)
 
 # Interface: Vl53lxMeasurement
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:64](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L64)
+Defined in: [sensors/vl53lx/vl53lx.ts:64](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L64)
 
 One ranging result, the same shape for every product of the family. On
 the histogram driver `targets` holds every return strongest-first and the
@@ -5310,7 +5310,7 @@ top-level fields repeat `targets[0]`; `bins` carries the raw histogram
 distanceMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L104)
+Defined in: [sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L104)
 
 #### Inherited from
 
@@ -5324,7 +5324,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:104](https://github.com/depz-ai/depz
 status: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L105)
+Defined in: [sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L105)
 
 #### Inherited from
 
@@ -5338,7 +5338,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:105](https://github.com/depz-ai/depz
 statusText: string;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L106)
+Defined in: [sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L106)
 
 #### Inherited from
 
@@ -5352,7 +5352,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:106](https://github.com/depz-ai/depz
 signalKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L107)
+Defined in: [sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L107)
 
 #### Inherited from
 
@@ -5366,7 +5366,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:107](https://github.com/depz-ai/depz
 ambientKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L108)
+Defined in: [sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L108)
 
 #### Inherited from
 
@@ -5380,7 +5380,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:108](https://github.com/depz-ai/depz
 sigmaMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L109)
+Defined in: [sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L109)
 
 #### Inherited from
 
@@ -5394,7 +5394,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:109](https://github.com/depz-ai/depz
 spads: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L110)
+Defined in: [sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L110)
 
 #### Inherited from
 
@@ -5408,7 +5408,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:110](https://github.com/depz-ai/depz
 targets: Vl53lxTarget[];
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L111)
+Defined in: [sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L111)
 
 #### Inherited from
 
@@ -5422,7 +5422,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:111](https://github.com/depz-ai/depz
 extra: Record<string, unknown>;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L112)
+Defined in: [sensors/vl53lx/uld/base.ts:112](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L112)
 
 #### Inherited from
 
@@ -5436,7 +5436,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:112](https://github.com/depz-ai/depz
 timestampUs: bigint;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L66)
+Defined in: [sensors/vl53lx/vl53lx.ts:66](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L66)
 
 MCU uptime at the INT edge (stream) / read (poll).
 
@@ -5448,7 +5448,7 @@ MCU uptime at the INT edge (stream) / read (poll).
 bins: unknown;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:67](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L67)
+Defined in: [sensors/vl53lx/vl53lx.ts:67](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L67)
 
 ***
 
@@ -5458,7 +5458,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:67](https://github.com/depz-ai/depz-se
 valid: boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:69](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L69)
+Defined in: [sensors/vl53lx/vl53lx.ts:69](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L69)
 
 `status === 0`. On histogram products prefer `plottable`.
 
@@ -5470,13 +5470,13 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:69](https://github.com/depz-ai/depz-se
 plottable: boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:71](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L71)
+Defined in: [sensors/vl53lx/vl53lx.ts:71](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L71)
 
 The frame has a usable range (PLOTTABLE_STATUSES).
 
 # Interface: Vl53lxOptions
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:164](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L164)
+Defined in: [sensors/vl53lx/vl53lx.ts:164](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L164)
 
 ## Extends
 
@@ -5490,7 +5490,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:164](https://github.com/depz-ai/depz-s
 optional timeoutMs?: number;
 ```
 
-Defined in: [src/device/device.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L183)
+Defined in: [device/device.ts:183](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L183)
 
 #### Inherited from
 
@@ -5506,7 +5506,7 @@ DeviceOptions.timeoutMs
 optional txCrcType?: CrcType;
 ```
 
-Defined in: [src/device/device.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L184)
+Defined in: [device/device.ts:184](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/device/device.ts#L184)
 
 #### Inherited from
 
@@ -5522,7 +5522,7 @@ DeviceOptions.txCrcType
 optional sleepImpl?: (ms) => Promise<void>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:166](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L166)
+Defined in: [sensors/vl53lx/vl53lx.ts:166](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L166)
 
 ULD sleep implementation (tests inject an instant one).
 
@@ -5538,7 +5538,7 @@ ULD sleep implementation (tests inject an instant one).
 
 # Interface: Vl53lxProductInfo
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L143)
+Defined in: [sensors/vl53lx/vl53lx.ts:143](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L143)
 
 Everything about what is connected (`identifyProduct()`).
 
@@ -5550,7 +5550,7 @@ Everything about what is connected (`identifyProduct()`).
 board: string;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L144)
+Defined in: [sensors/vl53lx/vl53lx.ts:144](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L144)
 
 ***
 
@@ -5560,7 +5560,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:144](https://github.com/depz-ai/depz-s
 detected: string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L145)
+Defined in: [sensors/vl53lx/vl53lx.ts:145](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L145)
 
 ***
 
@@ -5570,7 +5570,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:145](https://github.com/depz-ai/depz-s
 product: string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L146)
+Defined in: [sensors/vl53lx/vl53lx.ts:146](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L146)
 
 ***
 
@@ -5580,7 +5580,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:146](https://github.com/depz-ai/depz-s
 driver: string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L147)
+Defined in: [sensors/vl53lx/vl53lx.ts:147](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L147)
 
 ***
 
@@ -5590,7 +5590,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:147](https://github.com/depz-ai/depz-s
 driverClass: string;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L148)
+Defined in: [sensors/vl53lx/vl53lx.ts:148](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L148)
 
 ***
 
@@ -5600,7 +5600,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:148](https://github.com/depz-ai/depz-s
 kinds: string[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L149)
+Defined in: [sensors/vl53lx/vl53lx.ts:149](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L149)
 
 ***
 
@@ -5610,7 +5610,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:149](https://github.com/depz-ai/depz-s
 modelId: number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L150)
+Defined in: [sensors/vl53lx/vl53lx.ts:150](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L150)
 
 ***
 
@@ -5620,7 +5620,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:150](https://github.com/depz-ai/depz-s
 modelIdOk: boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L152)
+Defined in: [sensors/vl53lx/vl53lx.ts:152](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L152)
 
 Cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
 
@@ -5632,7 +5632,7 @@ Cross-check only: L1CX/L1CB and L4CD/L4CX share their ids.
 supports: ReadonlySet<string>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:153](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L153)
+Defined in: [sensors/vl53lx/vl53lx.ts:153](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L153)
 
 ***
 
@@ -5642,7 +5642,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:153](https://github.com/depz-ai/depz-s
 modes: readonly string[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L154)
+Defined in: [sensors/vl53lx/vl53lx.ts:154](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L154)
 
 ***
 
@@ -5652,7 +5652,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:154](https://github.com/depz-ai/depz-s
 reachMm: number | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:155](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L155)
+Defined in: [sensors/vl53lx/vl53lx.ts:155](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L155)
 
 ***
 
@@ -5662,7 +5662,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:155](https://github.com/depz-ai/depz-s
 driverReachMm: number | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:156](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L156)
+Defined in: [sensors/vl53lx/vl53lx.ts:156](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L156)
 
 ***
 
@@ -5672,7 +5672,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:156](https://github.com/depz-ai/depz-s
 budgetMs: readonly [number, number];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:157](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L157)
+Defined in: [sensors/vl53lx/vl53lx.ts:157](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L157)
 
 ***
 
@@ -5682,7 +5682,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:157](https://github.com/depz-ai/depz-s
 budgetChoices: number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:158](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L158)
+Defined in: [sensors/vl53lx/vl53lx.ts:158](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L158)
 
 ***
 
@@ -5692,7 +5692,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:158](https://github.com/depz-ai/depz-s
 histogram: boolean;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:159](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L159)
+Defined in: [sensors/vl53lx/vl53lx.ts:159](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L159)
 
 ***
 
@@ -5702,7 +5702,7 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:159](https://github.com/depz-ai/depz-s
 maxKhz: number;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L160)
+Defined in: [sensors/vl53lx/vl53lx.ts:160](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L160)
 
 ***
 
@@ -5712,11 +5712,11 @@ Defined in: [src/sensors/vl53lx/vl53lx.ts:160](https://github.com/depz-ai/depz-s
 caveat: string | null;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L161)
+Defined in: [sensors/vl53lx/vl53lx.ts:161](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L161)
 
 # Interface: Vl53lxTarget
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:87](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L87)
+Defined in: [sensors/vl53lx/uld/base.ts:87](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L87)
 
 One return of a multi-target frame. `minRangeMm`/`maxRangeMm` are the edges
 of the target's own pulse (histogram parts); the others repeat `distanceMm`.
@@ -5729,7 +5729,7 @@ of the target's own pulse (histogram parts); the others repeat `distanceMm`.
 distanceMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:88](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L88)
+Defined in: [sensors/vl53lx/uld/base.ts:88](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L88)
 
 ***
 
@@ -5739,7 +5739,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:88](https://github.com/depz-ai/depz-
 status: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:89](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L89)
+Defined in: [sensors/vl53lx/uld/base.ts:89](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L89)
 
 ***
 
@@ -5749,7 +5749,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:89](https://github.com/depz-ai/depz-
 statusText: string;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L90)
+Defined in: [sensors/vl53lx/uld/base.ts:90](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L90)
 
 ***
 
@@ -5759,7 +5759,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:90](https://github.com/depz-ai/depz-
 signalKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L91)
+Defined in: [sensors/vl53lx/uld/base.ts:91](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L91)
 
 ***
 
@@ -5769,7 +5769,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:91](https://github.com/depz-ai/depz-
 ambientKcps: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L92)
+Defined in: [sensors/vl53lx/uld/base.ts:92](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L92)
 
 ***
 
@@ -5779,7 +5779,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:92](https://github.com/depz-ai/depz-
 sigmaMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L93)
+Defined in: [sensors/vl53lx/uld/base.ts:93](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L93)
 
 ***
 
@@ -5789,7 +5789,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:93](https://github.com/depz-ai/depz-
 minRangeMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L94)
+Defined in: [sensors/vl53lx/uld/base.ts:94](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L94)
 
 ***
 
@@ -5799,7 +5799,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:94](https://github.com/depz-ai/depz-
 maxRangeMm: number;
 ```
 
-Defined in: [src/sensors/vl53lx/uld/base.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L95)
+Defined in: [sensors/vl53lx/uld/base.ts:95](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/uld/base.ts#L95)
 
 # Type Alias: Vl53lxClearStep
 
@@ -5807,7 +5807,7 @@ Defined in: [src/sensors/vl53lx/uld/base.ts:95](https://github.com/depz-ai/depz-
 type Vl53lxClearStep = readonly [number, number];
 ```
 
-Defined in: [src/protocol/vl53lx.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L46)
+Defined in: [protocol/vl53lx.ts:46](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L46)
 
 One interrupt-release step: write `value` to register `addr`.
 
@@ -5817,7 +5817,7 @@ One interrupt-release step: write `value` to register `addr`.
 const PLOTTABLE_STATUSES: readonly number[];
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:55](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L55)
+Defined in: [sensors/vl53lx/vl53lx.ts:55](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L55)
 
 Statuses that mean "this distance is real". A histogram product reports 6
 on the first frame of a stream and 11 on a merged pulse: use this, not
@@ -5829,7 +5829,7 @@ on the first frame of a stream and 11 on a merged pulse: use this, not
 const VL53L4_XSHUT_OFF: 0 = 0;
 ```
 
-Defined in: [src/protocol/vl53l4.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L29)
+Defined in: [protocol/vl53l4.ts:29](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L29)
 
 # Variable: VL53L4\_XSHUT\_ON
 
@@ -5837,7 +5837,7 @@ Defined in: [src/protocol/vl53l4.ts:29](https://github.com/depz-ai/depz-sensor-s
 const VL53L4_XSHUT_ON: 1 = 1;
 ```
 
-Defined in: [src/protocol/vl53l4.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L30)
+Defined in: [protocol/vl53l4.ts:30](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L30)
 
 # Variable: VL53L4\_XSHUT\_RESET
 
@@ -5845,7 +5845,7 @@ Defined in: [src/protocol/vl53l4.ts:30](https://github.com/depz-ai/depz-sensor-s
 const VL53L4_XSHUT_RESET: 2 = 2;
 ```
 
-Defined in: [src/protocol/vl53l4.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L32)
+Defined in: [protocol/vl53l4.ts:32](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53l4.ts#L32)
 
 Blocking on the MCU (≤ 20 ms, typ. ~2 ms); answered after the boot handshake.
 
@@ -5855,7 +5855,7 @@ Blocking on the MCU (≤ 20 ms, typ. ~2 ms); answered after the boot handshake.
 const VL53LX_CLASS_BY_PRODUCT: Readonly<Record<string, typeof Vl53lx>>;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:860](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L860)
+Defined in: [sensors/vl53lx/vl53lx.ts:860](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L860)
 
 Class per product (VL53L4CD on this firmware uses the generic class).
 
@@ -5865,7 +5865,7 @@ Class per product (VL53L4CD on this firmware uses the generic class).
 const VL53LX_CLEAR_STEPS_MAX: 4 = 4;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:41](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L41)
+Defined in: [protocol/vl53lx.ts:41](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L41)
 
 Interrupt-release steps a stream may carry (VL53_CLEAR_STEPS_WIRE_MAX).
 
@@ -5875,7 +5875,7 @@ Interrupt-release steps a stream may carry (VL53_CLEAR_STEPS_WIRE_MAX).
 const VL53LX_DRIVER_KINDS: readonly ["uld", "ulp", "histogram"] = registry.DRIVER_KINDS;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:884](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L884)
+Defined in: [sensors/vl53lx/vl53lx.ts:884](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L884)
 
 Shared barrel for the VL53L 1D-family TypeDoc entry points
 (`entry-vl53l0x.ts` … `entry-vl53l4cx.ts`): the family class `Vl53lx`, the
@@ -5891,7 +5891,7 @@ Not part of the shipped package — a doc-generation helper only.
 const VL53LX_INFO_SIZE: 23 = 23;
 ```
 
-Defined in: [src/protocol/vl53lx.ts:43](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L43)
+Defined in: [protocol/vl53lx.ts:43](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/protocol/vl53lx.ts#L43)
 
 RPT_VL53_INFO payload size (v2.00).
 
@@ -5901,7 +5901,7 @@ RPT_VL53_INFO payload size (v2.00).
 const VL53LX_PRODUCTS: readonly ["VL53L0X", "VL53L1CX", "VL53L1CB", "VL53L3CX", "VL53L4CD", "VL53L4CX"] = registry.PRODUCTS;
 ```
 
-Defined in: [src/sensors/vl53lx/vl53lx.ts:883](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L883)
+Defined in: [sensors/vl53lx/vl53lx.ts:883](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53lx/vl53lx.ts#L883)
 
 Shared barrel for the VL53L 1D-family TypeDoc entry points
 (`entry-vl53l0x.ts` … `entry-vl53l4cx.ts`): the family class `Vl53lx`, the
@@ -5917,7 +5917,7 @@ Not part of the shipped package — a doc-generation helper only.
 const WINDOW_ABOVE: 1 = 1;
 ```
 
-Defined in: [src/sensors/vl53l4/uld.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L59)
+Defined in: [sensors/vl53l4/uld.ts:59](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L59)
 
 # Variable: WINDOW\_BELOW
 
@@ -5925,7 +5925,7 @@ Defined in: [src/sensors/vl53l4/uld.ts:59](https://github.com/depz-ai/depz-senso
 const WINDOW_BELOW: 0 = 0;
 ```
 
-Defined in: [src/sensors/vl53l4/uld.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L58)
+Defined in: [sensors/vl53l4/uld.ts:58](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L58)
 
 # Variable: WINDOW\_IN
 
@@ -5933,7 +5933,7 @@ Defined in: [src/sensors/vl53l4/uld.ts:58](https://github.com/depz-ai/depz-senso
 const WINDOW_IN: 3 = 3;
 ```
 
-Defined in: [src/sensors/vl53l4/uld.ts:61](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L61)
+Defined in: [sensors/vl53l4/uld.ts:61](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L61)
 
 # Variable: WINDOW\_OUT
 
@@ -5941,5 +5941,5 @@ Defined in: [src/sensors/vl53l4/uld.ts:61](https://github.com/depz-ai/depz-senso
 const WINDOW_OUT: 2 = 2;
 ```
 
-Defined in: [src/sensors/vl53l4/uld.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L60)
+Defined in: [sensors/vl53l4/uld.ts:60](https://github.com/depz-ai/depz-sensor-sdk/blob/main/packages/depz-sensor-sdk-ts/src/sensors/vl53l4/uld.ts#L60)
 

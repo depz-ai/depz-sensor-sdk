@@ -94,12 +94,12 @@ def render() -> str:
 def main() -> int:
     text = render()
     if "--check" in sys.argv:
-        if not OUT.exists() or OUT.read_text() != text:
+        if not OUT.exists() or OUT.read_text(encoding="utf-8") != text:
             print(f"{OUT.name} is stale: run scripts/gen_vl53l8_tables.py")
             return 1
         print(f"{OUT.name} up to date")
         return 0
-    OUT.write_text(text)
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
     return 0
 

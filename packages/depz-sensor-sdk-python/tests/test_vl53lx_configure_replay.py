@@ -20,7 +20,7 @@ RECORDINGS = Path(__file__).resolve().parents[3] / "contracts" / "vectors" / "re
 
 
 def _replay_to_init(stem):
-    expected = json.loads((RECORDINGS / f"{stem}.expected.json").read_text())
+    expected = json.loads((RECORDINGS / f"{stem}.expected.json").read_text(encoding="utf-8"))
     # The captures hold the pre-§4.4 probe (their scenarios are `probe: legacy`).
     dev, _ = open_legacy(ReplayLink(RECORDINGS / f"{stem}.depzrec", strict_tx=True),
                          None, None, timeout=2.0)

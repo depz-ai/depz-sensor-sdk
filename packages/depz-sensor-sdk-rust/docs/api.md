@@ -16388,7 +16388,9 @@ Threads: records and the [`PlayerState::Done`] state are delivered on a player t
 by the first [`DatasetPlayer::play`]); a state change a call makes is reported on the calling
 thread before it returns. Callbacks run outside the player's lock, so they may call its
 methods; once [`DatasetPlayer::pause`] returns no record callback is running or will start
-(unless `pause` was called from that callback). They must not block. With `threaded = false`
+(unless `pause` was called from that callback). They must not block. A callback that panics is
+counted in [`DatasetPlayer::callback_errors`], reported on stderr and dropped: the other callbacks
+still get the record and playback goes on (contract 09). With `threaded = false`
 no thread starts and the owner calls [`DatasetPlayer::tick`] (a GUI timer, or a test with a
 fake clock). Dropping the player stops it.
 
@@ -16438,6 +16440,14 @@ pub fn speed(&self) -> f64
 
 Playback speed (finite, ≥ 0; 0 = as fast as possible).
 
+#### DatasetPlayer::callback_errors
+
+```rust
+pub fn callback_errors(&self) -> u64
+```
+
+Record / state callbacks that panicked and were dropped (contract 09).
+
 #### DatasetPlayer::set_speed
 
 ```rust
@@ -16462,15 +16472,6 @@ pub fn on_state(&self, callback: impl Fn(PlayerState) + Send + Sync + 'static) -
 ```
 
 Call `callback` with the new state on every transition.
-
-#### DatasetPlayer::on_delivery_error
-
-```rust
-pub fn on_delivery_error(&self, callback: impl Fn(&str) + Send + Sync + 'static) -> Hook
-```
-
-Call `callback` with the message of a record callback that panicked on the player thread:
-playback paused there (the record counts as delivered).
 
 #### DatasetPlayer::play
 
@@ -16509,8 +16510,7 @@ pub fn tick(&self) -> Option<f64>
 ```
 
 Deliver every record due now, on the calling thread. Returns the seconds until the next one
-is due, or `None` when not playing. For `threaded = false`; harmless with a player thread. A
-record callback's panic pauses playback and propagates.
+is due, or `None` when not playing. For `threaded = false`; harmless with a player thread.
 
 #### DatasetPlayer::wait
 

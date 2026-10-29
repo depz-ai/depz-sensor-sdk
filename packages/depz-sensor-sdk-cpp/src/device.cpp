@@ -10,6 +10,12 @@
 
 namespace depz {
 
+void detail::callback_threw(std::atomic<std::uint64_t>& errors)
+{
+    errors.fetch_add(1, std::memory_order_relaxed);
+    std::cerr << "depz-sensor-sdk: a callback threw; dropped\n";
+}
+
 // ── errors ──────────────────────────────────────────────────────────────────
 
 static_assert(kErrArg == DEPZ_E_ARG, "depz/errors.hpp kErrArg must be the C SDK's DEPZ_E_ARG");
@@ -213,8 +219,7 @@ struct FnHolder : detail::CallbackHolder {
 // exception must not unwind through the C reader thread, and the reader goes on.
 void callback_threw(detail::CallbackHolder* h)
 {
-    if (h && h->errors) h->errors->fetch_add(1, std::memory_order_relaxed);
-    std::cerr << "depz-sensor-sdk: a callback threw on the reader thread; dropped\n";
+    if (h && h->errors) detail::callback_threw(*h->errors);
 }
 
 void event_tramp(const depz_device_event* ev, void* user)

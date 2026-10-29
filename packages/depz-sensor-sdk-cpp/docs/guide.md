@@ -170,7 +170,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.8.0
+    GIT_TAG        v0.9.0
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -185,7 +185,7 @@ How to pull it into your project:
 - **Conan / vcpkg** — the recipe and the port depend on `depz-sensor-sdk-c`;
   see the [README](../README.md#install) for the commands.
 
-Linux, macOS and Windows are built and tested in CI.
+Linux, macOS and Windows are built and tested.
 
 To regenerate the API reference after editing header doc-comments:
 
@@ -776,7 +776,8 @@ corrupt trailer, compressed members) and the committed dual-SR04 fixture;
 threaded driver. `ctest` runs 58
 tests in all: `vectors`, 14 `device_*` tests, 28 `scenario_*` replays and 15
 per-suite vector tests.
-CI runs the same suite on Linux, macOS and Windows, and again on Linux under
+The same suite runs on Linux, macOS and Windows, and before every release again
+on Linux under
 clang's UndefinedBehaviorSanitizer, AddressSanitizer with LeakSanitizer and
 ThreadSanitizer (`scripts/sanitize.sh undefined|address|thread cpp` at the
 repository root runs one locally).

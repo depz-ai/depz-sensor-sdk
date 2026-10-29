@@ -35,7 +35,7 @@ OUTPUT_DATA = "output_data"
 
 
 def _raw(name):
-    for c in json.loads(VECTORS.read_text())["histogram_raw"]:
+    for c in json.loads(VECTORS.read_text(encoding="utf-8"))["histogram_raw"]:
         if c["name"] == name:
             return bytes.fromhex(c["raw"])
     raise KeyError(name)

@@ -583,7 +583,7 @@ def main() -> None:
         "[BNO086](bno086/api.md).",
         "",
     ]
-    (DOCS / "api.md").write_text(_render_reference(root_header, sections))
+    (DOCS / "api.md").write_text(_render_reference(root_header, sections), encoding="utf-8", newline="\n")
     n_syms = sum(len(s) for _, s in sections)
     print("wrote %s (%d symbols, %d domains)"
           % (DOCS / "api.md", n_syms, len(sections)))
@@ -672,7 +672,7 @@ def _write_sensor(folder: str, title: str, syms: list[dict], note: list[str]):
         return
     out = DOCS / folder / "api.md"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_render_reference(_sensor_header(title, note), [(title, syms)]))
+    out.write_text(_render_reference(_sensor_header(title, note), [(title, syms)]), encoding="utf-8", newline="\n")
     print("wrote %s (%d symbols)" % (out, len(syms)))
 
 
@@ -696,7 +696,7 @@ def _write_board(folder: str, title: str, syms: list[dict], extra, note: list[st
         for r in rend:
             body += r["render"]
         n += len(rend)
-    out.write_text("\n".join(body).rstrip() + "\n")
+    out.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8", newline="\n")
     print("wrote %s (%d symbols)" % (out, n))
 
 
@@ -711,7 +711,7 @@ def _write_sensor_custom(folder: str, title: str, syms: list[dict],
                            "## %s" % title, ""]
     for s in syms:
         body += s["render"]
-    out.write_text("\n".join(body).rstrip() + "\n")
+    out.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8", newline="\n")
     print("wrote %s (%d symbols)" % (out, len(syms)))
 
 

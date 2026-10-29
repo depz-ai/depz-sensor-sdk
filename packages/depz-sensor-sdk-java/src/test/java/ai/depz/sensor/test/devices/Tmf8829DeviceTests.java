@@ -394,7 +394,7 @@ public final class Tmf8829DeviceTests {
      * The vectors dir: the {@code depz.vectors} system property, else {@code contracts/vectors} found walking
      * up from the working directory (../../contracts/vectors from packages/depz-sensor-sdk-java).
      */
-    private static Path vectorsDir() {
+    static Path vectorsDir() {
         String prop = System.getProperty("depz.vectors");
         if (prop != null && !prop.isEmpty()) {
             return Path.of(prop);

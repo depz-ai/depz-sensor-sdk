@@ -471,24 +471,42 @@ public final class DatasetRecorderTests {
         }
     }
 
-    public static void aCallbackErrorPausesAndPropagatesAndCallbacksMayControlThePlayer() throws Exception {
+    private static Dataset dualSr04() {
+        return Dataset.read(Tmf8829DeviceTests.vectorsDir().resolve("recordings/dataset_dual_sr04.depzdata"));
+    }
+
+    /**
+     * Contract 09 §Player: a throwing record / state callback is counted and dropped; the other callbacks
+     * still get every record and playback runs to the end (tick mode).
+     */
+    public static void aThrowingCallbackIsCountedAndPlaybackGoesOn() {
+        Dataset ds = dualSr04();
+        DatasetPlayer p = new DatasetPlayer(ds, 0, new FakeClock()::now, false);
+        Dataset.Record first = ds.records().get(0);
+        List<Dataset.Record> got = new ArrayList<>();
+        List<PlayerState> states = new ArrayList<>();
+        p.onRecord(r -> {
+            if (r.equals(first)) {
+                throw new IllegalStateException("consumer failed");
+            }
+        });
+        p.onRecord(got::add);
+        p.onState(s -> {
+            throw new IllegalStateException("state consumer failed");
+        });
+        p.onState(states::add);
+        p.play();
+        eq(null, p.tick());
+        eq(10, got.size());
+        eq(ds.records(), got);
+        eq(PlayerState.DONE, p.state());
+        eq(List.of(PlayerState.PLAYING, PlayerState.DONE), states);
+        eq(3L, p.callbackErrors()); // the first record + two state changes
+    }
+
+    public static void callbacksMayControlThePlayer() throws Exception {
         Path dir = tempDir();
         try {
-            Made m = make(evenly(dir), 0);
-            DatasetPlayer p = m.p();
-            p.onRecord(r -> {
-                if (r.tHostUs() == 1_200_000) {
-                    throw new IllegalStateException("consumer failed");
-                }
-            });
-            p.play();
-            eq("consumer failed", throwsType(IllegalStateException.class, p::tick).getMessage());
-            eq(List.of(PlayerState.PAUSED, 200_000L), List.of(p.state(), p.positionUs()));
-            p.play();
-            p.tick();
-            eq(5, m.seen().size());
-            eq(List.of(PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.PLAYING, PlayerState.DONE), m.states());
-
             Made m2 = make(evenly(dir), 0);
             DatasetPlayer q = m2.p();
             q.onRecord(r -> {
@@ -572,17 +590,21 @@ public final class DatasetRecorderTests {
                 eq(want, new ArrayList<>(seen2.subList(n, seen2.size())));
             }
 
-            try (DatasetPlayer e = new DatasetPlayer(evenly(dir), 0)) {
-                List<Exception> errors = Collections.synchronizedList(new ArrayList<>());
-                e.onDeliveryError(errors::add);
+            Dataset ds = dualSr04();
+            try (DatasetPlayer e = new DatasetPlayer(ds, 0)) {
+                Dataset.Record first = ds.records().get(0);
+                List<Dataset.Record> got = Collections.synchronizedList(new ArrayList<>());
                 e.onRecord(r -> {
-                    throw new java.util.NoSuchElementException("x");
+                    if (r.equals(first)) {
+                        throw new java.util.NoSuchElementException("x");
+                    }
                 });
+                e.onRecord(got::add);
                 e.play();
-                check(e.await(Duration.ofSeconds(5)), "stopped in time");
-                eq(PlayerState.PAUSED, e.state());
-                eq(1, errors.size());
-                check(errors.get(0) instanceof java.util.NoSuchElementException, "the callback's exception: " + errors);
+                check(e.await(Duration.ofSeconds(5)), "done in time");
+                eq(PlayerState.DONE, e.state());
+                eq(ds.records(), new ArrayList<>(got));
+                eq(1L, e.callbackErrors());
             }
         } finally {
             deleteTree(dir);

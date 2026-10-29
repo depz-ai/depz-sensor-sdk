@@ -165,18 +165,28 @@ internal sealed class Fanout<T>
     /// <summary>Run a user callback on the reader thread: one that throws is counted in
     /// <see cref="LinkStats.CallbackErrors"/>, traced and dropped — it never stops the reader, the
     /// other callbacks or the queues (contract 07 §3).</summary>
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
-        Justification = "contract 07 §3: whatever a user callback throws must not stop the reader")]
     internal static void Call(Action<T> cb, T item, LinkStats stats)
+    {
+        if (!Call(cb, item))
+            stats.CallbackErrors++;
+    }
+
+    /// <summary>Run a user callback where its exception must not stop the caller (a device reader, a dataset
+    /// player — contract 07 §3, 09 §Player): one that throws is traced and dropped. False if it threw, so the
+    /// caller counts it.</summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types",
+        Justification = "contract 07 §3 / 09: whatever a user callback throws must not stop its caller")]
+    internal static bool Call(Action<T> cb, T item)
     {
         try
         {
             cb(item);
+            return true;
         }
         catch (Exception e)
         {
-            stats.CallbackErrors++;
-            Trace.TraceError($"depz-sensor-sdk: a callback threw on the reader thread; dropped: {e}");
+            Trace.TraceError($"depz-sensor-sdk: a callback threw; dropped: {e}");
+            return false;
         }
     }
 

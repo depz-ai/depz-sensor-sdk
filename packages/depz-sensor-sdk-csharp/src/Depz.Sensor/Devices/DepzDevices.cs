@@ -146,8 +146,13 @@ public static class DepzDevices
 
 #if NET
     /// <summary>Probe one port: open it, run the probe, close. Null when nothing DEPZ-shaped answers.</summary>
-    public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null)
+    public static DeviceInfo? ProbePort(string port, TimeSpan? timeout = null) => ProbeOpening(port, timeout, out _);
+
+    // ProbePort that also hands back why the port could not be opened (busy, no permission, gone) —
+    // so OpenProbed can name it (contract 07 §3).
+    private static DeviceInfo? ProbeOpening(string port, TimeSpan? timeout, out Exception? openFailure)
     {
+        openFailure = null;
         SerialPortLink link;
         try
         {
@@ -156,6 +161,7 @@ public static class DepzDevices
         catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is DepzException
                                   || e is ArgumentException || e is InvalidOperationException)
         {
+            openFailure = e;
             return null;
         }
         return ProbeLink(link, timeout);
@@ -271,7 +277,12 @@ public static class DepzDevices
 
     private static DepzDevice OpenProbed(string port, TimeSpan? timeout)
     {
-        var info = ProbePort(port, timeout) ?? throw new NoDepzDeviceException($"no DEPZ device answered on {port}");
+        var info = ProbeOpening(port, timeout, out var openFailure);
+        if (openFailure is not null)
+            throw new NoDepzDeviceException(
+                $"no DEPZ device answered on {port}: could not open the port ({openFailure.Message})", openFailure);
+        if (info is null)
+            throw new NoDepzDeviceException($"no DEPZ device answered on {port}");
         var pi = PortId(SerialPorts.List(), port);
         return OpenResolved(info, pi.Vid, pi.Pid, timeout);
     }

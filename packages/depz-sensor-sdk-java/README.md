@@ -91,12 +91,12 @@ register-bridge driver (both variants) is an extension point and intentionally
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.8.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.9.0).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.8.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.9.0")
 ```
 
 Maven:
@@ -105,7 +105,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 

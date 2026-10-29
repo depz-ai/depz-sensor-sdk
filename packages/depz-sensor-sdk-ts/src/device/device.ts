@@ -464,12 +464,7 @@ export class DepzDevice {
    * other callbacks or the queues (contract 07 §3).
    */
   protected callGuarded<T>(cb: (item: T) => void, item: T): void {
-    try {
-      cb(item);
-    } catch (err) {
-      this.link.stats.callbackErrors += 1;
-      console.error("depz-sensor-sdk: a callback threw on the read pump", err);
-    }
+    if (!callGuarded(cb, item)) this.link.stats.callbackErrors += 1;
   }
 
   // ── TX / requests ──────────────────────────────────────────────────────────
@@ -663,4 +658,21 @@ function toHex(data: Uint8Array): string {
   let s = "";
   for (const b of data) s += b.toString(16).padStart(2, "0");
   return s;
+}
+
+/**
+ * Run a user callback where its error must not stop the caller (a device's
+ * read pump, a dataset player — contract 07 §3, 09 §Player): one that throws
+ * is logged with `console.error` and dropped. False if it threw, so the
+ * caller counts it.
+ * @internal
+ */
+export function callGuarded<T>(cb: (item: T) => void, item: T): boolean {
+  try {
+    cb(item);
+    return true;
+  } catch (err) {
+    console.error("depz-sensor-sdk: a callback threw; dropped", err);
+    return false;
+  }
 }

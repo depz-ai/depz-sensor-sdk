@@ -66,7 +66,7 @@ def test_two_devices_merged_timeline(tmp_path: Path):
     assert records[3].value["source"] == "once"
 
     # host-time mapping: t = device_ts - offset (contract 09)
-    hdr = json.loads(path.read_text().splitlines()[0])
+    hdr = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
     off_a = hdr["devices"]["d0"]["time_sync"]["offset_us"]
     assert all(abs(r.t_host_us) < 10**15 for r in records)
     assert isinstance(off_a, int)
@@ -219,7 +219,7 @@ def test_reader_sorts_within_a_device(tmp_path: Path):
     w.close()
     with pytest.raises(InvalidStateError):
         w.write("d0", 400, "event", {})  # contract 07 §3 (ERRATA A17)
-    with open(path, "a") as f:
+    with open(path, "a", encoding="utf-8", newline="\n") as f:
         f.write("\n   \n")  # blank lines are not records
     assert [(r.device_id, r.t_host_us) for r in DatasetReader(path)] == [
         ("d1", 50), ("d0", 100), ("d1", 200), ("d0", 250), ("d0", 300)]
@@ -229,7 +229,7 @@ def test_committed_dual_sr04_dataset(seen):
     """The committed fixture reads back record for record: header devices,
     every line as a record, one host-time-sorted timeline (TS reads it too)."""
     path = Path(__file__).resolve().parents[3] / "contracts/vectors/recordings/dataset_dual_sr04.depzdata"
-    lines = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     reader = DatasetReader(path)
     assert reader.devices == lines[0]["devices"]
     assert set(reader.devices) == {"d0", "d1"}
@@ -414,7 +414,7 @@ def test_tmf8829_records(tmp_path: Path):
 
 def test_reader_rejects_a_foreign_file(tmp_path: Path):
     other = tmp_path / "x.depzdata"
-    other.write_text(json.dumps({"schema": "depz.rec/1"}) + "\n")
+    other.write_text(json.dumps({"schema": "depz.rec/1"}) + "\n", encoding="utf-8", newline="\n")
     with pytest.raises(ValueError, match="not a depz.dataset"):
         DatasetReader(other)
 

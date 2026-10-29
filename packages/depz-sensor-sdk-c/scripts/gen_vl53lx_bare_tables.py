@@ -146,13 +146,13 @@ def render():
 def main() -> int:
     h, c = render()
     if "--check" in sys.argv:
-        stale = [p.name for p, t in ((OUT_H, h), (OUT_C, c)) if not p.exists() or p.read_text() != t]
+        stale = [p.name for p, t in ((OUT_H, h), (OUT_C, c)) if not p.exists() or p.read_text(encoding="utf-8") != t]
         if stale:
             print("stale (run scripts/gen_vl53lx_bare_tables.py): " + ", ".join(stale))
             return 1
         return 0
-    OUT_H.write_text(h)
-    OUT_C.write_text(c)
+    OUT_H.write_text(h, encoding="utf-8", newline="\n")
+    OUT_C.write_text(c, encoding="utf-8", newline="\n")
     return 0
 
 

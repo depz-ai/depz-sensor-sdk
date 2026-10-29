@@ -31,7 +31,7 @@ HISTOGRAM_BIN_DATA_I2C_INDEX = 0x0088  # the 83-byte frame starts one before the
 
 
 def _histogram_vector(name):
-    for c in json.loads(VECTORS.read_text())["histogram_raw"]:
+    for c in json.loads(VECTORS.read_text(encoding="utf-8"))["histogram_raw"]:
         if c["name"] == name:
             return bytes.fromhex(c["raw"]), c["expect"]
     raise KeyError(name)

@@ -345,7 +345,7 @@ def _collect():
 # assignment) on dataclass fields, enum members and class attributes.
 
 # Object reprs may embed memory addresses; strip them or the dump (and
-# the CI drift check) would churn on every run.
+# the drift check) would churn on every run.
 _ADDR = re.compile(r" at 0x[0-9a-fA-F]+")
 
 
@@ -634,7 +634,7 @@ def _write_json(groups, exports) -> int:
     # Infinity tokens (not valid strict JSON).
     JSON_OUT.write_text(
         json.dumps(model, indent=2, ensure_ascii=False, sort_keys=False,
-                   allow_nan=False) + "\n")
+                   allow_nan=False) + "\n", encoding="utf-8", newline="\n")
     return sum(len(g["symbols"]) for g in model["groups"])
 
 
@@ -684,7 +684,7 @@ def main() -> None:
         "",
     ]
     n_syms = sum(len(m) for _, _, m in groups)
-    OUT.write_text(_render_reference(groups, root_head))
+    OUT.write_text(_render_reference(groups, root_head), encoding="utf-8", newline="\n")
     print(f"wrote {OUT} ({n_syms} public symbols across {len(groups)} groups)")
 
     # Per-sensor references: one sensor each, common surface stays in the root.
@@ -706,7 +706,7 @@ def main() -> None:
         ]
         out = OUT.parent / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference([(folder, title, members)], sub_head))
+        out.write_text(_render_reference([(folder, title, members)], sub_head), encoding="utf-8", newline="\n")
         print(f"wrote {out} ({len(members)} symbols)")
 
     n_json = _write_json(groups, exports)

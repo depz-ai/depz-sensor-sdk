@@ -37,7 +37,7 @@ Java / C / C++ reference SDKs byte-for-byte via the shared golden vectors in
 
 ## Install
 
-Published on crates.io as `depz-sensor-sdk` (0.8.0):
+Published on crates.io as `depz-sensor-sdk` (0.9.0):
 
 ```bash
 cargo add depz-sensor-sdk
@@ -150,7 +150,7 @@ The register-bridge boards:
 
 ```bash
 cargo test
-cargo fmt --check && cargo clippy --all-targets -- -D warnings   # the CI lint gate
+cargo fmt --check && cargo clippy --all-targets -- -D warnings   # the lint gate
 scripts/coverage.sh       # line coverage with cargo-llvm-cov
 ```
 

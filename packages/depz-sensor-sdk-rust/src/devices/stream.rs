@@ -63,6 +63,16 @@ impl<T> Clone for Fanout<T> {
     }
 }
 
+/// Run a user callback where its panic must not stop the caller (a device reader, a dataset
+/// player — contract 07 §3, 09 §Player): a panic is counted in `errors`, reported on stderr (the
+/// panic hook has already printed it) and dropped.
+pub(crate) fn call_guarded(f: impl FnOnce(), errors: &AtomicU64) {
+    if catch_unwind(AssertUnwindSafe(f)).is_err() {
+        errors.fetch_add(1, Ordering::Relaxed);
+        eprintln!("depz-sensor-sdk: a callback panicked; dropped");
+    }
+}
+
 impl<T: Clone + Send + 'static> Fanout<T> {
     /// A stream whose panicking callbacks count in `callback_errors` — the device's counter
     /// ([`super::device::DepzDevice::callback_errors_counter`]).
@@ -133,12 +143,7 @@ impl<T: Clone + Send + 'static> Fanout<T> {
             .map(|(_, c)| c.clone())
             .collect();
         for cb in cbs {
-            // Contract 07 §3: a panicking callback is counted and dropped; the reader, the other
-            // callbacks and the queues go on (the panic hook has already printed it to stderr).
-            if catch_unwind(AssertUnwindSafe(|| cb(&item))).is_err() {
-                self.inner.callback_errors.fetch_add(1, Ordering::Relaxed);
-                eprintln!("depz-sensor-sdk: a callback panicked on the reader thread; dropped");
-            }
+            call_guarded(|| cb(&item), &self.inner.callback_errors);
         }
         let qs: Vec<Arc<Queue<T>>> = self.inner.queues.lock().unwrap().clone();
         for q in qs {

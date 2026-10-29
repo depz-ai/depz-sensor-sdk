@@ -180,6 +180,7 @@ def test_record_requires_out(capsys):
     assert "--out" in capsys.readouterr().err
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="port aliases are POSIX")
 def test_record_resolves_the_usb_id_of_an_aliased_port(rig, monkeypatch, tmp_path):
     """`--record` opens one connection and probes on it (`open_on_link`), so
     the USB id must come from the port the alias names (02 §4.3, ERRATA A5)."""
@@ -405,7 +406,7 @@ def test_record_keeps_probe_and_stream_on_one_connection(rig, tmp_path: Path):
     feeder.join(2.0)
     assert len(rig.opened["/dev/fake0"]) == 1  # one connection, not probe + reopen
 
-    header = json.loads(out.read_text().splitlines()[0])
+    header = json.loads(out.read_text(encoding="utf-8").splitlines()[0])
     assert header["port"] == "/dev/fake0"
 
     dev = discovery.open_on_link(ReplayLink(out, strict_tx=True), DEPZ_USB_VID, PID_SR04)
@@ -425,7 +426,7 @@ def test_monitor_record_flag_is_record(rig, tmp_path: Path):
     rig.add("/dev/fake0", FakeSr04)
     rig.interrupt_at("connected:")
     assert cli.main(["monitor", "/dev/fake0", "--record", str(out)]) == 0
-    assert json.loads(out.read_text().splitlines()[0])["port"] == "/dev/fake0"
+    assert json.loads(out.read_text(encoding="utf-8").splitlines()[0])["port"] == "/dev/fake0"
     assert len(rig.opened["/dev/fake0"]) == 1
 
 

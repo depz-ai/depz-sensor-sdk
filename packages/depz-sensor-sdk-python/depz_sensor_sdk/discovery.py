@@ -141,9 +141,16 @@ def probe_port(port: str, *, timeout: float = 0.2) -> DeviceInfo | None:
     `list_depz_devices`.
     """
     try:
-        dev = DeviceBase(port, timeout=timeout)
+        return _probe_port(port, timeout)
     except (DeviceLostError, DepzError):
         return None
+
+
+def _probe_port(port: str, timeout: float) -> DeviceInfo | None:
+    """`probe_port`, except that a port that cannot be opened raises the open
+    failure (busy, no permission, gone) instead of returning None — so
+    `open_device` can name it (contract 07 §3)."""
+    dev = DeviceBase(port, timeout=timeout)
     try:
         software, device_name, serial_number = _probe(dev)
         ident = parse_software_name(software)
@@ -323,7 +330,12 @@ def _fmt_vidpid(vid: int | None, pid: int | None) -> str:
 
 
 def _open_probed(port: str, timeout: float) -> DeviceBase:
-    info = probe_port(port, timeout=timeout)
+    try:
+        info = _probe_port(port, timeout)
+    except (DeviceLostError, DepzError) as exc:
+        raise NoDepzDeviceError(
+            f"no DEPZ device answered on {port}: could not open the port ({exc})"
+        ) from exc
     if info is None:
         raise NoDepzDeviceError(f"no DEPZ device answered on {port}")
     pi = _port_id(port)

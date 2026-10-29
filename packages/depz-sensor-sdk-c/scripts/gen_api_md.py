@@ -251,7 +251,7 @@ def parse_header(path: Path, banner_domain=_domain_for_banner,
     """Parse a public header into ordered symbol records:
     ``{name, kind, sig, doc, domain}``. `banner_domain` maps each ``===``
     banner title to a domain key; `domain` applies before the first banner."""
-    lines = path.read_text().split("\n")
+    lines = path.read_text(encoding="utf-8").split("\n")
     n = len(lines)
     symbols: list[dict] = []
     pending_doc: str | None = None
@@ -596,7 +596,7 @@ def main() -> None:
         "",
     ]
     DOCS.mkdir(parents=True, exist_ok=True)
-    (DOCS / "api.md").write_text(_render_reference(groups, root_head))
+    (DOCS / "api.md").write_text(_render_reference(groups, root_head), encoding="utf-8", newline="\n")
     print(f"wrote {DOCS / 'api.md'} ({len(symbols)} symbols across {len(groups)} groups)")
 
     for folder, title, syms, note_lines in _sensor_targets(by_domain):
@@ -621,7 +621,7 @@ def main() -> None:
         ]
         out = DOCS / folder / "api.md"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(_render_reference(groups_out, sub_head))
+        out.write_text(_render_reference(groups_out, sub_head), encoding="utf-8", newline="\n")
         print(f"wrote {out} ({n_syms} symbols)")
 
 

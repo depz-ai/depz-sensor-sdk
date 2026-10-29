@@ -3723,8 +3723,9 @@ static void test_bno055(void)
               "bno055 units 0x%02llx LSBs", (long long)sel);
         seen_case(c, f0);
     }
-    CHECK(DEPZ_BNO055_MAG_LSB == 16.0 && DEPZ_BNO055_QUAT_LSB == 16384.0 &&
-              DEPZ_BNO055_FUSION_ACCEL_LSB == 100.0, "bno055 fixed LSBs");
+    /* through an array: MSVC rejects a condition of constants (C4127 under /WX) */
+    const double fixed_lsb[] = {DEPZ_BNO055_MAG_LSB, DEPZ_BNO055_QUAT_LSB, DEPZ_BNO055_FUSION_ACCEL_LSB};
+    CHECK(fixed_lsb[0] == 16.0 && fixed_lsb[1] == 16384.0 && fixed_lsb[2] == 100.0, "bno055 fixed LSBs");
 
     /* calib_stat: 2-bit fields, fully_calibrated, exact repack */
     const json_value *cs = json_obj_get(root, "calib_stat");

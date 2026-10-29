@@ -487,24 +487,49 @@ fn seek_while_paused_skips_and_past_the_end_ends_playback() {
     ));
 }
 
-#[test]
-fn a_callback_panic_pauses_and_propagates_and_callbacks_may_control_the_player() {
-    let dir = TempDir::new();
-    let m = make(&evenly(&dir, 5, 100_000), 0.0);
-    let _h = m.p.on_record(|r| {
-        if r.t == 1_200_000 {
-            panic!("consumer failed");
-        }
-    });
-    m.p.play().unwrap();
-    let err = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| m.p.tick())).unwrap_err();
-    assert_eq!(err.downcast_ref::<&str>(), Some(&"consumer failed"));
-    assert_eq!((m.p.state(), m.p.position_us()), (Paused, 200_000));
-    m.p.play().unwrap();
-    m.p.tick();
-    assert_eq!(m.seen().len(), 5);
-    assert_eq!(m.states(), [Playing, Paused, Playing, Done]);
+fn dual_sr04() -> Dataset {
+    Dataset::read(common::recordings_dir().join("dataset_dual_sr04.depzdata")).unwrap()
+}
 
+// Contract 09 §Player: a panicking record / state callback is counted and dropped; the other
+// callbacks still get every record and playback runs to the end (tick mode).
+#[test]
+fn a_panicking_callback_is_counted_and_playback_goes_on() {
+    let ds = dual_sr04();
+    let p = DatasetPlayer::new(&ds, 0.0, Some(FakeClock::new().boxed()), false).unwrap();
+    let first = ds.records[0].t;
+    let (seen, states) = (
+        Arc::new(Mutex::new(Vec::new())),
+        Arc::new(Mutex::new(Vec::new())),
+    );
+    let (s, st) = (seen.clone(), states.clone());
+    let _hooks = [
+        p.on_record(move |r| {
+            if r.t == first {
+                panic!("consumer failed");
+            }
+        }),
+        p.on_record(move |r| s.lock().unwrap().push(r.t)),
+        p.on_state(|_| panic!("state consumer failed")),
+        p.on_state(move |x| st.lock().unwrap().push(x)),
+    ];
+    p.play().unwrap();
+    assert_eq!(p.tick(), None);
+    let want: Vec<i64> = ds.records.iter().map(|r| r.t).collect();
+    assert_eq!(want.len(), 10);
+    assert_eq!(*seen.lock().unwrap(), want);
+    assert_eq!(p.state(), Done);
+    assert_eq!(*states.lock().unwrap(), [Playing, Done]);
+    assert_eq!(
+        p.callback_errors(),
+        3,
+        "the first record + two state changes"
+    );
+}
+
+#[test]
+fn callbacks_may_control_the_player() {
+    let dir = TempDir::new();
     // A record callback may call the player (pause here).
     let q = Arc::new(
         DatasetPlayer::new(
@@ -622,4 +647,28 @@ fn threaded_delivers_on_the_player_thread_and_pauses_from_another() {
     let got = seen.lock().unwrap();
     let want: Vec<i64> = (40..50).map(|i| 1_000_000 + i * 100_000).collect();
     assert_eq!(&got[n..], &want[..]);
+}
+
+#[test]
+fn threaded_a_panicking_callback_does_not_stop_playback() {
+    let ds = dual_sr04();
+    let p = DatasetPlayer::new(&ds, 0.0, None, true).unwrap();
+    let first = ds.records[0].t;
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let s = seen.clone();
+    let _h1 = p.on_record(move |r| {
+        if r.t == first {
+            panic!("consumer failed");
+        }
+    });
+    let _h2 = p.on_record(move |r| s.lock().unwrap().push(r.t));
+    p.play().unwrap();
+    assert!(
+        p.wait(Some(Duration::from_secs(5))).unwrap(),
+        "done in time"
+    );
+    assert_eq!(p.state(), Done);
+    let want: Vec<i64> = ds.records.iter().map(|r| r.t).collect();
+    assert_eq!(*seen.lock().unwrap(), want);
+    assert_eq!(p.callback_errors(), 1);
 }

@@ -3,7 +3,9 @@
 // callbacks, streams, record/replay. The lab captures replay as contract 15
 // scenarios (test_scenarios.cpp).
 // Usage: depz_test_device [name] (no name = all).
+#include "depz/dataset.hpp"
 #include "depz/device.hpp"
+#include "depz/framing.hpp"
 #include "depz/recorder.hpp"
 
 #include <algorithm>
@@ -18,6 +20,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <thread>
 
@@ -156,6 +159,31 @@ void timeout_when_silent()
         CHECK(!dev->sensor_type());
     }
     fake_sr04_stop(f);
+}
+
+// Contract 07 §3: a port that does not open — as one another program holds —
+// is still NoDeviceError, and its message names the open failure.
+void a_port_that_does_not_open_names_the_open_failure()
+{
+#ifdef _WIN32
+    const std::string no_port = "\\\\.\\DEPZ_NO_SUCH_PORT";
+#else
+    const std::string no_port = "/nonexistent/depz-no-such-port";
+#endif
+    depz::OpenOptions o;
+    o.port = no_port;
+    o.timeout = 100ms;
+    std::string what;
+    try {
+        depz::open_device(o);
+    } catch (const depz::NoDeviceError& e) {
+        what = e.what();
+    } catch (...) {
+    }
+    const std::string want = "no DEPZ device answered on " + no_port + ": could not open the port (";
+    CHECK(what.compare(0, want.size(), want) == 0);
+    CHECK(what.find("cannot open", want.size()) != std::string::npos);
+    CHECK(!depz::probe_port(no_port, 100ms));
 }
 
 void measure_stream_and_callbacks()
@@ -1019,10 +1047,22 @@ void device_core_extras()
     r.dev->stop();
     CHECK(!fake_sr04_loop_running(r.fake));
 
-    // the fake knows no payload-CRC-type command: a typed StatusError
-    // (ERR_INVALID_CMD); it does answer the sync-pin pair (mode 0, polarity 0),
-    // while a pin outside 1..5 never reaches it
-    CHECK(throws<depz::StatusError>([&] { (void)r.dev->payload_crc_type(); }));
+    // the payload-CRC type round-trips; a value past 0..3 that does reach the
+    // device is a typed StatusError (ERR_INVALID_PARAM) and changes nothing.
+    // The sync-pin pair answers mode 0, polarity 0; a pin outside 1..5 never
+    // reaches the fake
+    CHECK(r.dev->payload_crc_type() == depz::CrcType::None);
+    r.dev->set_payload_crc_type(depz::CrcType::Crc16);
+    CHECK(fake_sr04_payload_crc_type(r.fake) == 2 && r.dev->payload_crc_type() == depz::CrcType::Crc16);
+    bool invalid_param = false;
+    try {
+        const depz::bytes seven{std::byte{7}};
+        r.dev->request_ok(0x09, seven);
+    } catch (const depz::StatusError& e) {
+        invalid_param = e.cmd() == 0x09 && e.status() == depz::Status::ErrInvalidParam;
+    }
+    CHECK(invalid_param);
+    CHECK(r.dev->payload_crc_type() == depz::CrcType::Crc16);
     const depz::SyncPinConfig sp = r.dev->sync_pin(1);
     CHECK(sp.pin == 1 && static_cast<int>(sp.mode) == 0 && static_cast<int>(sp.polarity) == 0);
     CHECK(throws<depz::ArgumentError>([&] { (void)r.dev->sync_pin(0); }));
@@ -1993,6 +2033,154 @@ void l4_fake_tuning_stream_and_registers()
     fake_vl53l4_stop(f);
 }
 
+// VL53L4CD_calibration.c through the wrapper (test_vl53l4cd_device.py): the
+// result block seeded in the fake's registers (raw status 9 = valid, 2048 raw
+// SPADs = 8), offset = target - mean, xtalk = (1 - mean/target) * signal/SPADs;
+// a bad argument is an ArgumentError, no valid sample a ProtocolError; a
+// callback that throws is counted and the stream goes on.
+void l4_fake_calibrations_and_a_throwing_callback()
+{
+    depz_link* host = nullptr;
+    fake_vl53l4* f = fake_vl53l4_start(&host);
+    CHECK(f);
+    const auto seed = [f](std::uint16_t mm, std::uint8_t status) {
+        std::uint8_t raw[17] = {};
+        raw[0] = status;
+        raw[2] = 1;
+        raw[3] = 0x08;  // spads 2048
+        raw[6] = 150;   // signal 1200 kcps / 8
+        raw[10] = 12;   // sigma 3 mm x 4
+        raw[13] = static_cast<std::uint8_t>(mm >> 8);
+        raw[14] = static_cast<std::uint8_t>(mm & 0xFF);
+        for (std::uint16_t i = 0; i < 17; i++) fake_vl53l4_set_reg(f, static_cast<std::uint16_t>(0x0089 + i), raw[i]);
+    };
+    {
+        auto dev = depz::Vl53l4cd::open(depz::Link::adopt(host));
+        dev->set_timeout(1000ms);
+        dev->init();
+        seed(120, 9);
+        CHECK(dev->calibrate_offset(150, 5) == 30);
+        CHECK(dev->offset_mm() == 30);
+        CHECK(dev->calibrate_xtalk(240, 5) == 75);
+        CHECK(dev->xtalk_kcps() == 75);
+        CHECK(throws<depz::ArgumentError>([&] { dev->calibrate_offset(9, 20); }));
+        CHECK(throws<depz::ArgumentError>([&] { dev->calibrate_xtalk(5001, 20); }));
+        seed(100, 4);  // "signal below threshold" in every frame
+        CHECK(throws<depz::ProtocolError>([&] { dev->calibrate_xtalk(200, 5); }));
+        dev->start_temperature_update();
+        CHECK(fake_vl53l4_reg(f, 0x0008) == 0x09 && fake_vl53l4_reg(f, 0x000B) == 0x00);
+        CHECK(fake_vl53l4_reg(f, 0x0087) == 0x80 && !dev->ranging());
+
+        static const std::uint8_t block[17] = {0x09, 0x00, 0x07, 0x0f, 0x00, 0x01, 0xf4, 0x00, 0x64,
+                                               0x00, 0x28, 0x00, 0x00, 0x01, 0x23, 0x00, 0xff};
+        auto boom = dev->on_measurement([](const depz::Vl53l4cdMeasurement&) { throw std::runtime_error("bug"); });
+        auto s = dev->measurements(4);
+        fake_vl53l4_send_stream(f, 1234, block, sizeof block);
+        auto m = s.next(1000ms);
+        CHECK(m && m->r.distance_mm == 291);
+        CHECK(dev->stats().callback_errors == 1);
+        dev->reset_sensor();
+        CHECK(!dev->initialized());
+    }
+    fake_vl53l4_stop(f);
+}
+
+// The TMF8829 reader over a bare loopback: a one-chunk frame completes and
+// reaches the frame callback (its 4 bytes are no results frame: a parse
+// error, no measurement), an event reaches the event callback; both
+// callbacks throw, are counted, and the reader goes on.
+void tmf8829_throwing_callbacks_are_counted()
+{
+    auto [host, side] = depz::Link::loopback_pair();
+    auto dev = depz::Tmf8829::open(std::move(host));
+    std::atomic<int> frames{0}, events{0};
+    auto f_off = dev->on_frame([&](const depz::tmf8829::RawFrame& r) {
+        if (r.timestamp_us == 77 && r.edge_us == 78 && r.frame_seq == 3 && r.data == bytes_of({1, 2, 3, 4})) frames++;
+        throw std::runtime_error("frame consumer bug");
+    });
+    auto e_off = dev->on_event([&](const depz::tmf8829::Tmf8829Event& e) {
+        if (e.timestamp_us == 0x0102 && e.int_status == 2 && e.code == 0 && e.frame_id == 5 && e.fifo_status == 6) events++;
+        throw 7;
+    });
+    // ts 77, full_size 4, offset 0, frame_seq 3, edge 78, then the 4 bytes
+    side.write(depz::build_packet(0x93, bytes_of({77, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 3, 78, 0, 0, 0, 0, 0, 0, 0,
+                                                  1, 2, 3, 4}), 0));
+    side.write(depz::build_packet(0x94, bytes_of({0x02, 0x01, 0, 0, 0, 0, 0, 0, 2, 0, 5, 6}), 1));
+    CHECK(wait_for([&] { return dev->stats().callback_errors == 2; }));
+    CHECK(frames == 1 && events == 1);
+    const depz::Tmf8829StreamStats st = dev->stream_stats();
+    CHECK(st.frames_completed == 1 && st.measurements == 0 && st.frame_parse_errors == 1 && st.chunk_errors == 0);
+}
+
+// The dataset layer's own JSON and gzip readers past what the vectors use:
+// every string escape, \u in either case, a surrogate pair, a too-big integer
+// read as a real, NaN / infinity written as null (as Python's dataset writer
+// does), refused syntax; a gzip member with FEXTRA and FNAME, and the damaged
+// headers / an invalid deflate block refused.
+void dataset_json_and_gzip_edges()
+{
+    using depz::dataset::Value;
+    const Value s = Value::parse(R"("q\"b\\s\/b\bf\fn\nr\rt\t é€😀")");
+    CHECK(s.is_string() && s.as_string() == "q\"b\\s/b\bf\fn\nr\rt\t \xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80");
+    const Value big = Value::parse("123456789012345678901");
+    CHECK(big.is_double() && big.as_double() == 123456789012345678901.0);
+    CHECK(Value(std::uint64_t{7}).as_int() == 7 && Value(std::uint64_t{7}).is_int());
+    CHECK(Value(2.75).as_int() == 2 && Value("x").as_int() == 0 && Value("x").as_double() == 0.0);
+    CHECK(Value(std::numeric_limits<double>::quiet_NaN()).to_json() == "null");
+    CHECK(Value(-std::numeric_limits<double>::infinity()).to_json() == "null");
+    CHECK(throws<std::runtime_error>([] { Value::parse(R"("\x")"); }));
+    CHECK(throws<std::runtime_error>([] { Value::parse(R"("\u12G4")"); }));
+    CHECK(throws<std::runtime_error>([] { Value::parse("[1 2]"); }));
+    CHECK(throws<std::runtime_error>([] { Value::parse(R"({"a": 1 "b": 2})"); }));
+
+    // gzip of "hi there" with FEXTRA "XY" and FNAME "n.txt" (Python's gzip reads it)
+    const depz::bytes member = bytes_of({0x1f, 0x8b, 0x08, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x02, 0x00, 0x58,
+                                         0x59, 0x6e, 0x2e, 0x74, 0x78, 0x74, 0x00, 0xcb, 0xc8, 0x54, 0x28, 0xc9, 0x48,
+                                         0x2d, 0x4a, 0x05, 0x00, 0xec, 0x76, 0xa3, 0xe3, 0x08, 0x00, 0x00, 0x00});
+    CHECK(depz::dataset::is_gzip(member) && !depz::dataset::is_gzip(bytes_of({0x1f})));
+    const depz::bytes text = depz::dataset::gunzip(member);
+    CHECK(std::string(reinterpret_cast<const char*>(text.data()), text.size()) == "hi there");
+    const auto refused = [](const depz::bytes& b, const char* what) {
+        try {
+            depz::dataset::gunzip(b);
+        } catch (const std::runtime_error& e) {
+            return std::strstr(e.what(), what) != nullptr;
+        }
+        return false;
+    };
+    CHECK(refused(bytes_of({0x1f, 0x8b, 0x07, 0, 0, 0, 0, 0, 0, 3}), "not a deflate member"));
+    CHECK(refused(bytes_of({0x1f, 0x8b, 0x08, 0x04, 0, 0, 0, 0, 0, 3, 0x02}), "truncated extra field"));
+    CHECK(refused(bytes_of({0x1f, 0x8b, 0x08, 0x08, 0, 0, 0, 0, 0, 3, 'n', '.'}), "truncated name"));
+    CHECK(refused(bytes_of({0x1f, 0x8b, 0x08, 0x00, 0, 0, 0, 0, 0, 3, 0x07}), "invalid block type"));
+
+    CHECK(std::strcmp(depz::dataset::to_string(depz::dataset::PlayerState::Idle), "idle") == 0);
+    CHECK(std::strcmp(depz::dataset::to_string(depz::dataset::PlayerState::Playing), "playing") == 0);
+    CHECK(std::strcmp(depz::dataset::to_string(depz::dataset::PlayerState::Paused), "paused") == 0);
+    CHECK(std::strcmp(depz::dataset::to_string(depz::dataset::PlayerState::Done), "done") == 0);
+
+    // framing: a payload past MAX_PAYLOAD does not fit a packet
+    const depz::bytes huge(depz::MAX_PAYLOAD + 1u);
+    CHECK(throws<std::length_error>([&] { (void)depz::build_packet(0x40, huge); }));
+}
+
+// Raw register access through the wrapper: the page register selects the
+// bank, a write lands in the fake's register file and reads back; a bridge
+// status on READ_REG is a typed error.
+void vl53l8_fake_raw_registers()
+{
+    L8Rig r(depz::Vl53l8Model::L8CX, L8_CRC_CX);
+    auto& l8 = *r.dev;
+    l8.write_reg(0x7FFF, bytes_of({0x01}));
+    CHECK(fake_vl53l8_page(r.fake) == 1);
+    l8.write_reg(0x0123, bytes_of({0x5A, 0xA5}));
+    CHECK(fake_vl53l8_reg(r.fake, 1, 0x0123) == 0x5A && fake_vl53l8_reg(r.fake, 1, 0x0124) == 0xA5);
+    CHECK(l8.read_reg(0x0123, 2) == bytes_of({0x5A, 0xA5}));
+    CHECK(l8.read_reg(0x7FFF, 1) == bytes_of({0x01}));
+    fake_vl53l8_fail_next(r.fake, 0x32, 0x06);  // ERR_BUSY
+    CHECK(throws<depz::BusyError>([&] { (void)l8.read_reg(0x0123, 2); }));
+    CHECK(l8.read_reg(0x0123, 1) == bytes_of({0x5A}));  // the next one is answered
+}
+
 // A thermometer that stops answering is skipped: the session goes on and
 // the file gets no temperature record (the sr04 records still land).
 void dataset_recorder_skips_a_failing_thermometer()
@@ -2030,6 +2218,7 @@ const Case k_cases[] = {
     {"errors_are_typed", errors_are_typed},
     {"short_reply_fails_its_request_and_the_reader_goes_on", short_reply_fails_its_request_and_the_reader_goes_on},
     {"timeout_when_silent", timeout_when_silent},
+    {"a_port_that_does_not_open_names_the_open_failure", a_port_that_does_not_open_names_the_open_failure},
     {"measure_stream_and_callbacks", measure_stream_and_callbacks},
     {"a_throwing_callback_never_stops_the_reader", a_throwing_callback_never_stops_the_reader},
     {"disconnect_ends_streams", disconnect_ends_streams},
@@ -2058,6 +2247,10 @@ const Case k_cases[] = {
     {"bno086_fake_commands", bno086_fake_commands},
     {"l4_fake_tuning_stream_and_registers", l4_fake_tuning_stream_and_registers},
     {"dataset_recorder_skips_a_failing_thermometer", dataset_recorder_skips_a_failing_thermometer},
+    {"l4_fake_calibrations_and_a_throwing_callback", l4_fake_calibrations_and_a_throwing_callback},
+    {"tmf8829_throwing_callbacks_are_counted", tmf8829_throwing_callbacks_are_counted},
+    {"dataset_json_and_gzip_edges", dataset_json_and_gzip_edges},
+    {"vl53l8_fake_raw_registers", vl53l8_fake_raw_registers},
 };
 
 }  // namespace

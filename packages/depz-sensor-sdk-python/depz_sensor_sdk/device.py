@@ -154,9 +154,27 @@ class LinkStats:
 _log = logging.getLogger("depz_sensor_sdk")
 
 
+def call_guarded(cb: Callable[[Any], None], item: Any) -> bool:
+    """Run a user callback where its exception must not stop the caller (a
+    device reader, a dataset player — contract 07 §3, 09 §Player): one that
+    raises is logged to ``depz_sensor_sdk`` and dropped. False if it raised,
+    so the caller counts it."""
+    try:
+        cb(item)
+    except Exception:
+        _log.exception("callback %r raised on %s", cb, type(item).__name__)
+        return False
+    return True
+
+
 def host_now_us() -> int:
-    """Monotonic host clock in µs — the host side of all time-sync math."""
-    return time.monotonic_ns() // 1000
+    """Monotonic host clock in µs — the host side of all time-sync math.
+
+    perf_counter, not monotonic: before Python 3.13 Windows' monotonic is
+    GetTickCount64, in 15.6 ms steps — coarser than a sync round trip. Both
+    are CLOCK_MONOTONIC on Linux; perf_counter is QueryPerformanceCounter on
+    Windows, as in the C SDK."""
+    return time.perf_counter_ns() // 1000
 
 
 def sync_time_all(devices: Iterable[DeviceBase], samples: int = 5) -> dict[DeviceBase, TimeSync]:
@@ -507,11 +525,8 @@ class DeviceBase:
         """Run a user callback on the reader: one that raises is counted in
         `stats.callback_errors`, logged and dropped — it never stops the
         reader, the other callbacks or the queues (contract 07 §3)."""
-        try:
-            cb(item)
-        except Exception:
+        if not call_guarded(cb, item):
             self.stats.callback_errors += 1
-            _log.exception("callback %r raised on %s", cb, type(item).__name__)
 
     # ── TX / requests ────────────────────────────────────────────────────────
 

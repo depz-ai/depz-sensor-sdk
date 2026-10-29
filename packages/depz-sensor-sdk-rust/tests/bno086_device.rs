@@ -374,3 +374,229 @@ fn reorientation_params_are_q14_and_checked() {
     );
     assert!(hub::set_reorientation_params(2.0, 0.0, 0.0, 0.0).is_err());
 }
+
+/// The Command Requests (0xF2) sent so far: (command, P0..P8).
+fn commands(hub: &Hub) -> Vec<(u8, Vec<u8>)> {
+    hub.sent_with(sh2::REPORT_COMMAND_REQUEST)
+        .into_iter()
+        .map(|c| (c[2], c[3..12].to_vec()))
+        .collect()
+}
+
+fn params(p: &[u8]) -> Vec<u8> {
+    let mut v = p.to_vec();
+    v.resize(9, 0);
+    v
+}
+
+#[test]
+fn commands_without_a_response_send_their_parameters() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    dev.tare_now(hub::TARE_Z, hub::TareBasis::GameRotationVector)
+        .unwrap();
+    dev.persist_tare().unwrap();
+    dev.set_reorientation(0.0, 0.0, 0.0, 1.0).unwrap();
+    dev.configure_periodic_dcd(false).unwrap();
+    dev.set_motion_intent(hub::MotionIntent::InMotion).unwrap();
+    assert_eq!(
+        commands(&hub),
+        vec![
+            (hub::CMD_TARE, params(&[0, hub::TARE_Z, 1])),
+            (hub::CMD_TARE, params(&[1])),
+            (hub::CMD_TARE, params(&[2, 0, 0, 0, 0, 0, 0, 0x00, 0x40])),
+            (hub::CMD_PERIODIC_DCD_CONFIG, params(&[1])),
+            (hub::CMD_INTERACTIVE_CALIBRATION, params(&[3])),
+        ]
+    );
+    // every request a sequence number of its own
+    let seqs: Vec<u8> = hub
+        .sent_with(sh2::REPORT_COMMAND_REQUEST)
+        .iter()
+        .map(|c| c[1])
+        .collect();
+    assert_eq!(seqs, vec![0, 1, 2, 3, 4]);
+    let sent = hub.sent.lock().unwrap().len();
+    assert!(matches!(
+        dev.set_reorientation(0.0, 0.0, 0.0, 2.0),
+        Err(DepzError::InvalidArgument(_))
+    ));
+    assert_eq!(hub.sent.lock().unwrap().len(), sent);
+}
+
+#[test]
+fn calibration_commands_check_their_status() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    let status = Arc::new(AtomicUsize::new(0));
+    let s = status.clone();
+    hub.on(move |_, c| {
+        if c[0] != sh2::REPORT_COMMAND_REQUEST {
+            return vec![];
+        }
+        let st = s.load(Ordering::SeqCst) as u8;
+        let r = match c[2] {
+            hub::CMD_ME_CALIBRATE if c[6] == hub::ME_CAL_GET => vec![st, 1, 0, 1, 1],
+            hub::CMD_GET_OSCILLATOR_TYPE => vec![hub::OSC_EXT_CRYSTAL],
+            _ => vec![st],
+        };
+        // a stale response of an earlier request first: skipped on (command, command_seq)
+        vec![
+            (CONTROL, resp(c[2], c[1].wrapping_sub(1), 0, &[9])),
+            (CONTROL, resp(c[2], c[1], 0, &r)),
+        ]
+    });
+    dev.set_calibration(true, true, false, false).unwrap();
+    assert_eq!(
+        commands(&hub)[0],
+        (hub::CMD_ME_CALIBRATE, params(&[1, 1, 0, 0, 0]))
+    );
+    assert_eq!(
+        dev.get_calibration().unwrap(),
+        hub::CalibrationConfig {
+            accel: true,
+            gyro: false,
+            mag: true,
+            planar: true,
+        }
+    );
+    dev.save_dcd().unwrap();
+    dev.clear_counts(5).unwrap();
+    assert_eq!(dev.get_oscillator_type().unwrap(), hub::OSC_EXT_CRYSTAL);
+
+    status.store(4, Ordering::SeqCst);
+    for r in [
+        dev.set_calibration(false, false, true, false),
+        dev.get_calibration().map(|_| ()),
+        dev.save_dcd(),
+        dev.clear_counts(5),
+    ] {
+        match r {
+            Err(DepzError::Sensor(m)) => assert!(m.contains("status 4"), "{m}"),
+            other => panic!("expected a sensor error, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn sleep_and_on_go_to_the_executable_channel_and_wake_pulses_the_pin() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    dev.sleep().unwrap();
+    dev.power_on().unwrap();
+    let exe = ShtpChannel::Executable as u8;
+    assert_eq!(
+        *hub.sent.lock().unwrap(),
+        vec![(exe, vec![3]), (exe, vec![2])]
+    );
+    dev.wake().unwrap();
+    assert!(hub
+        .link
+        .sent_snapshot()
+        .iter()
+        .any(|p| p.cmd == Bno086Cmd::SensorWakeUp as u8 && p.payload.is_empty()));
+    assert!(matches!(
+        dev.set_busy_retry(0, Duration::from_millis(200)),
+        Err(DepzError::InvalidArgument(_))
+    ));
+}
+
+#[test]
+fn a_hardware_reset_forgets_the_advertisement() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    hub.link
+        .inject(hub.data(ShtpChannel::Command as u8, &[0x00, 0x01, 0x02]));
+    hub.link
+        .inject(hub.data(ShtpChannel::Command as u8, &[0x03]));
+    assert!(common::fake_board::until(
+        || dev.advertisement().len() == 4,
+        1000
+    ));
+    assert_eq!(dev.advertisement(), vec![0, 1, 2, 3]);
+    dev.hardware_reset(Some(Duration::from_millis(100)))
+        .unwrap();
+    assert!(dev.advertisement().is_empty());
+    assert!(hub
+        .link
+        .sent_snapshot()
+        .iter()
+        .any(|p| p.cmd == Bno086Cmd::SensorReset as u8));
+}
+
+#[test]
+fn clear_dcd_and_reset_waits_for_the_reset_complete() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    hub.on(|_, c| {
+        if c[0] == sh2::REPORT_COMMAND_REQUEST && c[2] == hub::CMD_CLEAR_DCD_AND_RESET {
+            vec![(
+                ShtpChannel::Executable as u8,
+                vec![hub::EXECUTABLE_RESET_COMPLETE],
+            )]
+        } else {
+            vec![]
+        }
+    });
+    dev.clear_dcd_and_reset(Some(Duration::from_secs(1)))
+        .unwrap();
+    assert_eq!(
+        commands(&hub),
+        vec![(hub::CMD_CLEAR_DCD_AND_RESET, params(&[]))]
+    );
+    hub.on(|_, _| vec![]); // a hub that never comes back
+    match dev.clear_dcd_and_reset(Some(Duration::from_millis(50))) {
+        Err(DepzError::Timeout { cmd, .. }) => assert_eq!(cmd, Some(hub::CMD_CLEAR_DCD_AND_RESET)),
+        other => panic!("expected a timeout, got {other:?}"),
+    }
+}
+
+#[test]
+fn disable_and_motion_request_set_the_feature_without_reading_it_back() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    dev.enable_motion_request(10.0).unwrap();
+    dev.disable(0x05).unwrap();
+    let set = hub.sent_with(sh2::REPORT_SET_FEATURE_COMMAND);
+    assert_eq!(set.len(), 2);
+    assert_eq!((set[0][1], u32le(&set[0], 5)), (0x2B, 100_000));
+    assert_eq!((set[1][1], u32le(&set[1], 5)), (0x05, 0));
+    assert!(hub.sent_with(sh2::REPORT_GET_FEATURE_REQUEST).is_empty());
+}
+
+#[test]
+fn metadata_of_a_sensor_without_a_record_is_refused_before_sending() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    match dev.get_metadata(0xEE, None) {
+        Err(DepzError::Sensor(m)) => assert!(m.contains("0xEE"), "{m}"),
+        other => panic!("expected a sensor error, got {other:?}"),
+    }
+    assert!(hub.sent.lock().unwrap().is_empty());
+}
+
+#[test]
+fn the_gyro_integrated_rotation_vector_channel_emits_reports() {
+    let hub = Hub::new();
+    let dev = hub.open();
+    let q = dev.reports(None, 8);
+    let body: Vec<u8> = [1i16, 2, 3, 16384, -4, 5, -6]
+        .iter()
+        .flat_map(|v| v.to_le_bytes())
+        .collect();
+    hub.link.inject(hub.data(ShtpChannel::GyroRv as u8, &body));
+    hub.link
+        .inject(hub.data(ShtpChannel::GyroRv as u8, &body[..13])); // short: dropped
+    let r = q.take(Duration::from_secs(1)).unwrap();
+    assert_eq!(r.sensor_id(), 0x2A);
+    match r {
+        depz_sensor_sdk::bno086::Report::GyroIntegratedRv {
+            timestamp_us,
+            real_raw,
+            vz_raw,
+            ..
+        } => assert_eq!((timestamp_us, real_raw, vz_raw), (1_000_000, 16384, -6)),
+        other => panic!("expected a gyro-integrated RV, got {other:?}"),
+    }
+    assert!(q.take(Duration::from_millis(50)).is_err());
+}

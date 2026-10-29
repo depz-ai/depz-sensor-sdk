@@ -153,7 +153,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 165
+            "line": 172
           },
           "exported_as": [
             "depz_sensor_sdk.list_depz_devices"
@@ -214,7 +214,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 202
+            "line": 209
           },
           "exported_as": [
             "depz_sensor_sdk.open_device"
@@ -253,7 +253,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 286
+            "line": 293
           },
           "exported_as": [
             "depz_sensor_sdk.open_on_link"
@@ -292,7 +292,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 388
+            "line": 400
           },
           "exported_as": [
             "depz_sensor_sdk.resolve_sensor_class"
@@ -318,7 +318,7 @@
           "module": "depz_sensor_sdk.discovery",
           "source": {
             "file": "depz_sensor_sdk/discovery.py",
-            "line": 469
+            "line": 481
           },
           "exported_as": [
             "depz_sensor_sdk.attach_sensor_class"
@@ -357,7 +357,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 271
+            "line": 289
           },
           "exported_as": [
             "depz_sensor_sdk.DeviceBase"
@@ -902,7 +902,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 203
+            "line": 221
           },
           "exported_as": [
             "depz_sensor_sdk.StreamQueue"
@@ -952,12 +952,12 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 157
+            "line": 170
           },
           "exported_as": [
             "depz_sensor_sdk.host_now_us"
           ],
-          "doc": "Monotonic host clock in µs — the host side of all time-sync math."
+          "doc": "Monotonic host clock in µs — the host side of all time-sync math.\n\nperf_counter, not monotonic: before Python 3.13 Windows' monotonic is\nGetTickCount64, in 15.6 ms steps — coarser than a sync round trip. Both\nare CLOCK_MONOTONIC on Linux; perf_counter is QueryPerformanceCounter on\nWindows, as in the C SDK."
         },
         {
           "name": "sync_time_all",
@@ -979,7 +979,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 162
+            "line": 180
           },
           "exported_as": [
             "depz_sensor_sdk.sync_time_all"
@@ -1347,7 +1347,7 @@
           "module": "depz_sensor_sdk.device",
           "source": {
             "file": "depz_sensor_sdk/device.py",
-            "line": 227
+            "line": 245
           },
           "exported_as": [
             "depz_sensor_sdk.StreamIterator"
@@ -24942,7 +24942,7 @@
           "exported_as": [
             "depz_sensor_sdk.DatasetPlayer"
           ],
-          "doc": "Timeline player over a dataset: paced delivery with play / pause /\nseek / speed — the engine behind a viewer's playback mode\n(contract 09 §Player; the TS SDK's `DatasetPlayer`).\n\nUsage::\n\n    player = DatasetPlayer(DatasetReader(\"run.depzdata\"), speed=2.0)\n    player.on_record(lambda r: print(r.device_id, r.kind, r.t_host_us))\n    player.play()\n    player.wait()            # until done (or paused)\n\nTiming: playback runs on a media clock anchored to the host clock.\nRecord ``i`` is due at ``anchor_wall + (t_i - anchor_t) / speed``; the\nanchor is (now, t of the last delivered record — or of the first record\nwhen none was) at play / resume / seek, so the first record goes out at\nonce and every later one after its gap to the previous one. Pacing is\nagainst the clock, not cumulative: a slow consumer gets overdue records\nback to back and playback does not drift. ``speed=0`` delivers as fast as\npossible.\n\nThreads: by default records and the ``done`` state are delivered on a\nplayer thread (started on the first `play`); state changes made by a\ncall (`play`, `pause`, `seek_us`) are reported on the calling thread\nbefore it returns. Callbacks run under the player's lock, so they see a\nconsistent player, may call its methods, and once `pause` returns no\nrecord callback is running or will start. Like device stream callbacks\n(contract 07) they must not block — never wait in one for another thread\nthat uses this player.\n\n``threaded=False`` starts no thread: the owner calls `tick` from its own\nloop (a GUI timer, or a test with a fake ``clock``).",
+          "doc": "Timeline player over a dataset: paced delivery with play / pause /\nseek / speed — the engine behind a viewer's playback mode\n(contract 09 §Player; the TS SDK's `DatasetPlayer`).\n\nUsage::\n\n    player = DatasetPlayer(DatasetReader(\"run.depzdata\"), speed=2.0)\n    player.on_record(lambda r: print(r.device_id, r.kind, r.t_host_us))\n    player.play()\n    player.wait()            # until done (or paused)\n\nTiming: playback runs on a media clock anchored to the host clock.\nRecord ``i`` is due at ``anchor_wall + (t_i - anchor_t) / speed``; the\nanchor is (now, t of the last delivered record — or of the first record\nwhen none was) at play / resume / seek, so the first record goes out at\nonce and every later one after its gap to the previous one. Pacing is\nagainst the clock, not cumulative: a slow consumer gets overdue records\nback to back and playback does not drift. ``speed=0`` delivers as fast as\npossible.\n\nThreads: by default records and the ``done`` state are delivered on a\nplayer thread (started on the first `play`); state changes made by a\ncall (`play`, `pause`, `seek_us`) are reported on the calling thread\nbefore it returns. Callbacks run under the player's lock, so they see a\nconsistent player, may call its methods, and once `pause` returns no\nrecord callback is running or will start. Like device stream callbacks\n(contract 07) they must not block — never wait in one for another thread\nthat uses this player. A callback that raises is logged (logger\n``depz_sensor_sdk``), counted in `callback_errors` and dropped: the other\ncallbacks still get the record and playback goes on (contract 09).\n\n``threaded=False`` starts no thread: the owner calls `tick` from its own\nloop (a GUI timer, or a test with a fake ``clock``).",
           "members": [
             {
               "name": "state",
@@ -24960,6 +24960,12 @@
               "kind": "property",
               "returns": "int",
               "doc": "Current position, µs from the first record: the `t` of the last\ndelivered record (after a seek: of the record just before the\ntarget). 0 before anything was delivered."
+            },
+            {
+              "name": "callback_errors",
+              "kind": "property",
+              "returns": "int",
+              "doc": "Record / state callbacks that raised and were dropped (contract 09)."
             },
             {
               "name": "speed",
@@ -30033,7 +30039,7 @@
           "name": "__version__",
           "kind": "data",
           "type": "str",
-          "value": "0.8.0",
+          "value": "0.9.0",
           "exported_as": [
             "depz_sensor_sdk.__version__"
           ],

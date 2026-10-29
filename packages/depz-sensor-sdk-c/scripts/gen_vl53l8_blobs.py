@@ -58,7 +58,7 @@ def render() -> str:
     ]
     # Load uld.py as depz_sensor_sdk.vl53l8.uld so its relative imports
     # (..protocol._wire) resolve, without importing the SDK package itself
-    # (its __init__ needs pyserial; CI runs this with a bare python3).
+    # (its __init__ needs pyserial; the gates run this with a bare python3).
     sdk = ULD.parent.parent
     for name, path in (("depz_sensor_sdk", sdk), ("depz_sensor_sdk.vl53l8", ULD.parent)):
         if name not in sys.modules:
@@ -84,12 +84,12 @@ def render() -> str:
 def main() -> int:
     text = render()
     if "--check" in sys.argv:
-        if not OUT.exists() or OUT.read_text() != text:
+        if not OUT.exists() or OUT.read_text(encoding="utf-8") != text:
             print(f"{OUT.name} is stale: run scripts/gen_vl53l8_blobs.py")
             return 1
         print(f"{OUT.name} up to date")
         return 0
-    OUT.write_text(text)
+    OUT.write_text(text, encoding="utf-8", newline="\n")
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
     return 0
 

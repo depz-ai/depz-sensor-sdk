@@ -227,9 +227,11 @@ struct PlayerOptions {
 // reported on the calling thread before it returns. Callbacks run outside the
 // player's lock, so they may call its methods; once pause() returns no record
 // callback is running or will start (unless pause was called from that
-// callback). They must not block. With `threaded = false` no thread starts:
-// the owner calls tick() from its own loop (a GUI timer, or a test with a
-// fake clock). The destructor closes the player.
+// callback). They must not block. A callback that throws is counted in
+// callback_errors(), reported on stderr and dropped: the other callbacks
+// still get the record and playback goes on. With `threaded = false` no
+// thread starts: the owner calls tick() from its own loop (a GUI timer, or a
+// test with a fake clock). The destructor closes the player.
 class DatasetPlayer {
 public:
     using Unsubscribe = std::function<void()>;
@@ -252,14 +254,13 @@ public:
     // Change the speed (finite, ≥ 0, else std::invalid_argument). While
     // playing it applies at once: the rest of the current wait is rescaled.
     void set_speed(double speed);
+    // Record / state callbacks that threw and were dropped (contract 09).
+    std::uint64_t callback_errors() const;
 
     // Subscribe to delivered records / state changes (called with the new
     // state on every transition). The returned unsubscribe is idempotent.
     Unsubscribe on_record(std::function<void(const Record&)> cb);
     Unsubscribe on_state(std::function<void(PlayerState)> cb);
-    // The message of a record callback that threw on the player thread:
-    // playback paused there (the record counts as delivered).
-    Unsubscribe on_delivery_error(std::function<void(const std::string&)> cb);
 
     // Start, or resume after pause(); no-op while playing. From Done (or a
     // position past the end) playback restarts at the first record. An empty
@@ -276,8 +277,7 @@ public:
     // closed; on an empty dataset a seek is a no-op.
     void seek_us(double offset_us);
     // Deliver every record due now, on the calling thread. Returns the
-    // seconds until the next one is due, nullopt when not playing. A record
-    // callback's exception pauses playback and propagates.
+    // seconds until the next one is due, nullopt when not playing.
     std::optional<double> tick();
     // Block until the player is not playing (done, or paused by someone
     // else): true, or false on timeout (nullopt: no timeout). Needs the

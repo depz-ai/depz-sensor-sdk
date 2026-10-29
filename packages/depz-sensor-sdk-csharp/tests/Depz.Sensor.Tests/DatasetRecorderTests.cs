@@ -509,23 +509,38 @@ public class DatasetPlayerTests
         Assert.Throws<ArgumentException>(() => q.SeekUs(double.NaN));
     }
 
+    private static DatasetReader DualSr04() => new(Vectors.RecordingPath("dataset_dual_sr04.depzdata"));
+
+    // Contract 09 §Player: a throwing record / state callback is counted and dropped; the other callbacks still
+    // get every record and playback runs to the end (Tick mode).
     [Fact]
-    public void ACallbackErrorPausesAndPropagatesAndCallbacksMayControlThePlayer()
+    public void AThrowingCallbackIsCountedAndPlaybackGoesOn()
     {
-        var (p, _, seen, states) = Make(Evenly(), speed: 0);
+        var ds = DualSr04();
+        var p = new DatasetPlayer(ds, 0, new FakeClock().Now, threaded: false);
+        var first = ds.Records[0];
+        var got = new List<DatasetRecord>();
+        var states = new List<PlayerState>();
         p.OnRecord(r =>
         {
-            if (r.THostUs == 1_200_000)
+            if (ReferenceEquals(r, first))
                 throw new InvalidOperationException("consumer failed");
         });
+        p.OnRecord(got.Add);
+        p.OnState(_ => throw new InvalidOperationException("state consumer failed"));
+        p.OnState(states.Add);
         p.Play();
-        Assert.Equal("consumer failed", Assert.Throws<InvalidOperationException>(() => p.Tick()).Message);
-        Assert.Equal((PlayerState.Paused, 200_000L), (p.State, p.PositionUs));
-        p.Play();
-        p.Tick();
-        Assert.Equal(5, seen.Count);
-        Assert.Equal(new[] { PlayerState.Playing, PlayerState.Paused, PlayerState.Playing, PlayerState.Done }, states);
+        Assert.Null(p.Tick());
+        Assert.Equal(10, got.Count);
+        Assert.Equal(ds.Records, got);
+        Assert.Equal(PlayerState.Done, p.State);
+        Assert.Equal(new[] { PlayerState.Playing, PlayerState.Done }, states);
+        Assert.Equal(3, p.CallbackErrors); // the first record + two state changes
+    }
 
+    [Fact]
+    public void ACallbackMayControlThePlayer()
+    {
         var (q, _, seen2, states2) = Make(Evenly(), speed: 0);
         q.OnRecord(r =>
         {
@@ -597,13 +612,24 @@ public class DatasetPlayerTests
         Assert.True(q.Wait(TimeSpan.FromSeconds(5)));
         Assert.Equal(Enumerable.Range(40, 10).Select(i => 1_000_000L + i * 100_000), seen2.Skip(n));
 
-        using var e = new DatasetPlayer(Evenly(), 0);
-        var errors = new List<Exception>();
-        e.DeliveryError += errors.Add;
-        e.OnRecord(_ => throw new KeyNotFoundException("x"));
+        var ds = DualSr04();
+        using var e = new DatasetPlayer(ds, 0);
+        var got = new List<DatasetRecord>();
+        e.OnRecord(r =>
+        {
+            if (ReferenceEquals(r, ds.Records[0]))
+                throw new KeyNotFoundException("x");
+        });
+        e.OnRecord(r =>
+        {
+            lock (got)
+                got.Add(r);
+        });
         e.Play();
         Assert.True(e.Wait(TimeSpan.FromSeconds(5)));
-        Assert.Equal(PlayerState.Paused, e.State);
-        Assert.IsType<KeyNotFoundException>(Assert.Single(errors));
+        Assert.Equal(PlayerState.Done, e.State);
+        lock (got)
+            Assert.Equal(ds.Records, got);
+        Assert.Equal(1, e.CallbackErrors);
     }
 }

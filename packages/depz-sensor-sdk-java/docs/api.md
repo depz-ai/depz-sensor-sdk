@@ -19,7 +19,7 @@ Each sensor also has a focused reference with just its own symbols:
 - **Transport**: [`Crc`](#crc), [`CrcError`](#crcerror), [`CrcType`](#crctype), [`Event`](#event), [`Framing`](#framing), [`Packet`](#packet), [`PacketParser`](#packetparser), [`Trash`](#trash)
 - **USB identity**: [`Discovery`](#discovery), [`UsbIds`](#usbids), [`UsbIds.PortRef`](#usbidsportref)
 - **Protocol codecs (common)**: [`Common`](#common), [`Common.Cmd`](#commoncmd), [`Common.Rpt`](#commonrpt), [`Common.Status`](#commonstatus), [`Common.SyncPinMode`](#commonsyncpinmode), [`Common.SyncPinPolarity`](#commonsyncpinpolarity), [`Common.StatusReport`](#commonstatusreport), [`Common.TextReport`](#commontextreport), [`Common.SyncTimeReport`](#commonsynctimereport), [`Common.TemperatureReport`](#commontemperaturereport), [`Common.SequenceErrorReport`](#commonsequenceerrorreport), [`Common.SyncPinConfig`](#commonsyncpinconfig), [`Identity`](#identity), [`Identity.SensorType`](#identitysensortype), [`Wire`](#wire)
-- **Live devices**: [`BootloaderModeException`](#bootloadermodeexception), [`BusyException`](#busyexception), [`DepzDevice`](#depzdevice), [`DepzDevices`](#depzdevices), [`DepzDevices.ProbeResult`](#depzdevicesproberesult), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`DeviceEvent`](#deviceevent), [`DeviceInfo`](#deviceinfo), [`DeviceLostException`](#devicelostexception), [`InvalidReplyException`](#invalidreplyexception), [`InvalidStateException`](#invalidstateexception), [`Link`](#link), [`LinkClosedException`](#linkclosedexception), [`LinkStats`](#linkstats), [`NoDepzDeviceException`](#nodepzdeviceexception), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`ReplayMismatchException`](#replaymismatchexception), [`SerialPortLink`](#serialportlink), [`SerialPorts`](#serialports), [`SerialPorts.SerialPortInfo`](#serialportsserialportinfo), [`StatusException`](#statusexception), [`Subscription`](#subscription), [`TimeSyncResult`](#timesyncresult), [`WrongTypeException`](#wrongtypeexception)
+- **Live devices**: [`BootloaderModeException`](#bootloadermodeexception), [`BusyException`](#busyexception), [`CallbackGuard`](#callbackguard), [`DepzDevice`](#depzdevice), [`DepzDevices`](#depzdevices), [`DepzDevices.ProbeResult`](#depzdevicesproberesult), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`DeviceEvent`](#deviceevent), [`DeviceInfo`](#deviceinfo), [`DeviceLostException`](#devicelostexception), [`InvalidReplyException`](#invalidreplyexception), [`InvalidStateException`](#invalidstateexception), [`Link`](#link), [`LinkClosedException`](#linkclosedexception), [`LinkStats`](#linkstats), [`NoDepzDeviceException`](#nodepzdeviceexception), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`ReplayMismatchException`](#replaymismatchexception), [`SerialPortLink`](#serialportlink), [`SerialPorts`](#serialports), [`SerialPorts.SerialPortInfo`](#serialportsserialportinfo), [`StatusException`](#statusexception), [`Subscription`](#subscription), [`TimeSyncResult`](#timesyncresult), [`WrongTypeException`](#wrongtypeexception)
 - **SR04**: [`Sr04Device`](#sr04device), [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`Sr04.Sr04Cmd`](#sr04sr04cmd), [`Sr04.Sr04Rpt`](#sr04sr04rpt), [`Sr04.Sr04Data`](#sr04sr04data)
 - **Firmware container**: [`FwDepz`](#fwdepz), [`FwDepz.FwDepzError`](#fwdepzfwdepzerror), [`FwDepz.FwDepzImage`](#fwdepzfwdepzimage)
 - **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4`](#vl53l4), [`Vl53l4.Vl53l4Cmd`](#vl53l4vl53l4cmd), [`Vl53l4.Vl53l4Rpt`](#vl53l4vl53l4rpt), [`Vl53l4.RegData`](#vl53l4regdata), [`Vl53l4.Vl53l4Info`](#vl53l4vl53l4info), [`Vl53l4.StreamData`](#vl53l4streamdata), [`DetectionThresholds`](#detectionthresholds), [`RangeTiming`](#rangetiming), [`Vl53l4Platform`](#vl53l4platform), [`Vl53l4Uld`](#vl53l4uld), [`Vl53l4Uld.Vl53l4Error`](#vl53l4uldvl53l4error), [`Vl53l4Uld.Results`](#vl53l4uldresults), [`Vl53l4cdDriver`](#vl53l4cddriver)
@@ -811,6 +811,26 @@ public final class BusyException extends StatusException
 ```
 
 ERR_BUSY from the device, or a request whose opcode is already in flight.
+
+### CallbackGuard
+
+```java
+public final class CallbackGuard
+```
+
+Runs a user callback where its exception must not stop the caller — a device's reader thread, a dataset
+player (contract 07 §3, 09 §Player). Used by the SDK itself.
+
+#### CallbackGuard.call
+
+```java
+public static <T> boolean call(Consumer<T> cb, T item)
+```
+
+Call `cb` with `item`: an exception it throws is logged (`java.util.logging` logger
+`ai.depz.sensor`) and dropped; a `VirtualMachineError` still propagates.
+
+- Returns: false if the callback threw, so the caller counts it
 
 ### DepzDevice
 
@@ -15446,7 +15466,9 @@ fast as possible.
 Threads: records and the `PlayerState#DONE` state are delivered on a player thread (started by
 the first `play()`); a state change a call makes is reported on the calling thread before it
 returns. Callbacks run under the player's lock — they see a consistent player and may call its methods,
-and once `pause()` returns no record callback is running or will start. They must not block. With
+and once `pause()` returns no record callback is running or will start. They must not block. A
+callback that throws is logged (`java.util.logging` logger `ai.depz.sensor`), counted in
+`callbackErrors()` and dropped: the other callbacks still get the record and playback goes on. With
 `threaded = false` no thread starts and the owner calls `tick()` (a GUI timer, or a test
 with a fake clock).
 
@@ -15487,6 +15509,14 @@ public long positionUs()
 µs from the first record to the last delivered one (after a seek: to the record just before the
 target); 0 before anything was delivered.
 
+#### DatasetPlayer.callbackErrors
+
+```java
+public long callbackErrors()
+```
+
+Record / state callbacks that threw and were dropped (contract 09).
+
 #### DatasetPlayer.speed
 
 ```java
@@ -15519,15 +15549,6 @@ public AutoCloseable onState(Consumer<PlayerState> callback)
 ```
 
 Subscribe to state changes, called with the new state on every transition.
-
-#### DatasetPlayer.onDeliveryError
-
-```java
-public AutoCloseable onDeliveryError(Consumer<Exception> callback)
-```
-
-Subscribe to errors of callbacks on the player thread: playback paused there (the record counts as
-delivered).
 
 #### DatasetPlayer.play
 
@@ -15563,8 +15584,7 @@ public Double tick()
 ```
 
 Deliver every record due now, on the calling thread. Returns the seconds until the next one is due,
-or null when not playing. For `threaded = false`; harmless with a player thread. A callback's
-exception pauses playback and propagates.
+or null when not playing. For `threaded = false`; harmless with a player thread.
 
 #### DatasetPlayer.await
 

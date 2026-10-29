@@ -114,6 +114,9 @@ public final class DepzDevicesTests {
      * stands in for the node, the resolved path matches either way.
      */
     public static void findPortFollowsASymlinkAliasToTheEnumeratedPort() throws Exception {
+        if (System.getProperty("os.name", "").startsWith("Windows")) {
+            return; // POSIX only: on Windows a COM name is matched by string (SerialPorts.find)
+        }
         Path dir = Files.createTempDirectory("depz-a5-");
         try {
             Path node = dir.resolve("ttyACM0");
@@ -179,6 +182,23 @@ public final class DepzDevicesTests {
         FakeProbeBoard refusing = new FakeProbeBoard(null);
         throwsType(NoDepzDeviceException.class, () -> DepzDevices.openOnLink(refusing.link, null, null, TIMEOUT));
         check(refusing.link.isClosed(), "closed on failure");
+    }
+
+    public static void openPortThatCannotBeOpenedNamesTheOpenFailure() throws Exception {
+        // A regular file is no serial port: the open fails as on a port another process holds.
+        Path file = Files.createTempFile("depz-not-a-port-", "");
+        try {
+            String noPort = file.toString();
+            NoDepzDeviceException e = throwsType(NoDepzDeviceException.class,
+                    () -> DepzDevices.openPort(noPort, Duration.ofMillis(50)));
+            check(e.getCause() instanceof DepzException, "the open failure is the cause: " + e.getCause());
+            eq("no DEPZ device answered on " + noPort + ": could not open the port (" + e.getCause().getMessage()
+                    + ")", e.getMessage());
+            check(e.getCause().getMessage().contains("cannot open " + noPort), e.getCause().getMessage());
+            eq(null, DepzDevices.probePort(noPort, Duration.ofMillis(50)));
+        } finally {
+            Files.delete(file);
+        }
     }
 
     public static void openOnLinkClosesTheLinkOnAnArgumentError() throws Exception {

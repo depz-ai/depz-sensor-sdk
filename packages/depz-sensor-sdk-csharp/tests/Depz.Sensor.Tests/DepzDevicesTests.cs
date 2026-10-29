@@ -169,6 +169,8 @@ public class DepzDevicesTests
     {
         // A /dev/serial/by-id/… symlink names the port it points at (ERRATA A5): a regular file stands in
         // for the node, the resolved path matches either way.
+        if (OperatingSystem.IsWindows())
+            return; // POSIX only: on Windows a COM name is matched by string (SerialPorts.Find)
         string dir = Path.Combine(Path.GetTempPath(), $"depz-a5-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         try
@@ -197,6 +199,16 @@ public class DepzDevicesTests
         Assert.Contains("no DEPZ candidate at index -1", Assert.Throws<NoDepzDeviceException>(() => DepzDevices.OpenDevice(-1, Short)).Message);
         Assert.Throws<NoDepzDeviceException>(() => DepzDevices.OpenDevice(int.MaxValue, Short));
         Assert.Contains("no DEPZ device answered on", Assert.Throws<NoDepzDeviceException>(() => DepzDevices.OpenPort(NoPort, Short)).Message); // as on a link (ERRATA A14)
+    }
+
+    [Fact]
+    public void OpenPortThatCannotBeOpenedNamesTheOpenFailure()
+    {
+        // NoPort fails to open as a port another process holds does (contract 07 §3).
+        var e = Assert.Throws<NoDepzDeviceException>(() => DepzDevices.OpenPort(NoPort, Short));
+        Assert.NotNull(e.InnerException);
+        Assert.Equal($"no DEPZ device answered on {NoPort}: could not open the port ({e.InnerException!.Message})", e.Message);
+        Assert.Null(DepzDevices.ProbePort(NoPort, Short));
     }
 
     [Fact]

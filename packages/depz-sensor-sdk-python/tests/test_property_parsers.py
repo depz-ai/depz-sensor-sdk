@@ -561,7 +561,7 @@ def test_replay_link_on_a_corrupted_capture_raises_only_the_sdk_errors(tmp_path_
     good = d / "good.depzrec"
     _record(good, data.draw(_session()))
     bad = d / "bad.depzrec"
-    bad.write_text(data.draw(_corrupted(good.read_text())), encoding="utf-8")
+    bad.write_text(data.draw(_corrupted(good.read_text(encoding="utf-8"))), encoding="utf-8", newline="\n")
     try:
         _drain_replay(bad)
     except SDK_ERRORS:
@@ -606,7 +606,7 @@ def test_dataset_reader_on_a_corrupted_file_raises_only_the_sdk_errors(tmp_path_
     good = d / "good.depzdata"
     _write_dataset(good, data.draw(_dataset()))
     bad = d / "bad.depzdata"
-    bad.write_text(data.draw(_corrupted(good.read_text())), encoding="utf-8")
+    bad.write_text(data.draw(_corrupted(good.read_text(encoding="utf-8"))), encoding="utf-8", newline="\n")
     try:
         reader = DatasetReader(bad)
         reader.devices
