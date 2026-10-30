@@ -37,6 +37,7 @@ public sealed class Bno086Device : DepzDevice
     private readonly Dictionary<int, List<ManualResetEventSlim>> _flushWaiters = new();
     private readonly List<(Action<BnoReport> Callback, HashSet<int>? Filter)> _reportCallbacks = new();
     private readonly List<(Subscription<BnoReport> Queue, HashSet<int>? Filter)> _reportQueues = new();
+    private bool _reportsClosed; // guarded by _reportQueues: set when the reader stops
     private readonly ManualResetEventSlim _resetComplete = new(false);
     private readonly List<byte> _advertisement = new();
     private readonly Dictionary<int, FeatureResponse> _features = new();
@@ -145,8 +146,11 @@ public sealed class Bno086Device : DepzDevice
     private protected override void OnReaderStopped()
     {
         lock (_reportQueues)
+        {
+            _reportsClosed = true;
             foreach (var (q, _) in _reportQueues)
                 q.MarkClosed();
+        }
         base.OnReaderStopped();
     }
 
@@ -442,7 +446,12 @@ public sealed class Bno086Device : DepzDevice
                 _reportQueues.RemoveAll(e => ReferenceEquals(e.Queue, s));
         });
         lock (_reportQueues)
-            _reportQueues.Add((sub, filter));
+        {
+            if (_reportsClosed)
+                sub.MarkClosed(); // the device already closed: Take fails at once (contract 07 §3)
+            else
+                _reportQueues.Add((sub, filter));
+        }
         return sub;
     }
 

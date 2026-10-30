@@ -364,11 +364,17 @@ impl Vl53l4cdDevice {
     pub fn start_ranging(&self) -> Result<()> {
         self.require_not_ranging()?;
         self.uld.start_ranging()?;
-        self.request_ok(
+        if let Err(e) = self.request_ok(
             Vl53l4Cmd::StartStream as u8,
             &pack_start_stream(RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN, 0),
             None,
-        )?;
+        ) {
+            // The sensor ranges but the host will say it does not: stop it again, or
+            // stop_ranging() could never reach it. The START_STREAM error is the one the caller
+            // gets, even if this stop fails too.
+            let _ = self.uld.stop_ranging();
+            return Err(e);
+        }
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }

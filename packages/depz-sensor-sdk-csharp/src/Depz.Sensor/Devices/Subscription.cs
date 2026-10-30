@@ -55,7 +55,8 @@ public sealed class Subscription<T> : IDisposable
         return false;
     }
 
-    /// <summary>The oldest item, waiting up to <paramref name="timeout"/> for one.</summary>
+    /// <summary>The oldest item, waiting up to <paramref name="timeout"/> for one;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> waits without a deadline.</summary>
     /// <exception cref="DepzTimeoutException">Nothing arrived in time.</exception>
     /// <exception cref="DeviceLostException">The device closed with the queue empty.</exception>
     public T Take(TimeSpan timeout)
@@ -67,6 +68,11 @@ public sealed class Subscription<T> : IDisposable
             {
                 if (_closed)
                     throw new DeviceLostException("stream closed: the device is closed");
+                if (timeout == Timeout.InfiniteTimeSpan)
+                {
+                    Monitor.Wait(_q);
+                    continue;
+                }
                 var left = timeout - waited.Elapsed;
                 if (left <= TimeSpan.Zero)
                     throw new DepzTimeoutException($"no stream item within {timeout.TotalSeconds:0.000}s");
@@ -124,6 +130,7 @@ internal sealed class Fanout<T>
 {
     private readonly List<Action<T>> _callbacks = new();
     private readonly List<Subscription<T>> _queues = new();
+    private bool _closed; // guarded by _queues: set by CloseAll, never cleared
 
     public IDisposable OnItem(Action<T> callback)
     {
@@ -137,7 +144,12 @@ internal sealed class Fanout<T>
     {
         var sub = new Subscription<T>(capacity, s => { lock (_queues) _queues.Remove(s); });
         lock (_queues)
-            _queues.Add(sub);
+        {
+            if (_closed)
+                sub.MarkClosed(); // the device already closed: Take fails at once (contract 07 §3)
+            else
+                _queues.Add(sub);
+        }
         return sub;
     }
 
@@ -212,11 +224,15 @@ internal sealed class Fanout<T>
         }
     }
 
+    /// <summary>Close every queue, and every one subscribed from now on.</summary>
     public void CloseAll()
     {
         Subscription<T>[] qs;
         lock (_queues)
+        {
+            _closed = true;
             qs = _queues.ToArray();
+        }
         foreach (var q in qs)
             q.MarkClosed();
     }

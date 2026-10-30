@@ -65,6 +65,12 @@ describe("dataset writer/reader", () => {
   it("rejects non-dataset content", () => {
     expect(() => new DatasetReader('{"schema":"depz.rec/1"}\n')).toThrow();
   });
+
+  it("refuses a line nested 100 000 deep, naming it (contract 08 «Line rules»)", () => {
+    const deep = "[".repeat(100_000) + "]".repeat(100_000);
+    const text = `{"schema":"depz.dataset/2"}\n{"d":"d0","t":1,"k":"x","v":{"a":${deep}}}\n`;
+    expect(() => new DatasetReader(text)).toThrow(/line 2: not JSON: nested deeper than 256/);
+  });
 });
 
 // Contract 09 §Player, mirroring the reference tests
@@ -370,6 +376,32 @@ describe("dataset player", () => {
     expect(seen.length).toBeLessThan(50_000); // yielded to the event loop
     run(100);
     expect(seen.length).toBe(50_000);
+    expect(player.state).toBe("done");
+  });
+
+  it("a tiny speed waits in clamped slices instead of overflowing the timer", () => {
+    // 1e-300 puts the next record ~1e300 ms away; setTimeout past 2^31-1 ms
+    // fires after 1 ms, so an unclamped timer re-arms every millisecond
+    let clockCalls = 0;
+    const player = new DatasetPlayer(evenly(3, 1_000_000), {
+      speed: 1e-300,
+      clock: () => {
+        clockCalls += 1;
+        return Date.now();
+      },
+    });
+    const seen: number[] = [];
+    player.onRecord((r) => seen.push(r.tHostUs));
+    player.play();
+    run(0);
+    expect(seen).toEqual([1_000_000]);
+    const before = clockCalls;
+    run(1000);
+    expect(clockCalls - before).toBeLessThan(10);
+    expect(player.state).toBe("playing");
+    player.speed = 0;
+    run(0);
+    expect(seen.length).toBe(3);
     expect(player.state).toBe("done");
   });
 });

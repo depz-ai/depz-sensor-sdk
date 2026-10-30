@@ -16,6 +16,8 @@
  *     (the device's request timeout, 200 ms unless changed).
  *   - Callbacks run on the device's reader thread: keep them short, never
  *     block in them, and never call depz_device_close() from one.
+ *   - depz_device_close() may run while another thread waits inside a call
+ *     on the device: that call then fails with DEPZ_E_CLOSED.
  *   - A device owns the link it was opened on; depz_device_close() closes
  *     and frees both.
  *
@@ -163,7 +165,12 @@ int depz_attach_sensor_class(depz_device *dev, const char *class_name);
  * DEPZ_E_BOOTLOADER. */
 int depz_open_on_link(depz_link *link, int usb_vid, int usb_pid, int timeout_ms, depz_device **out);
 
-/* Stop the reader, close the link, free everything. NULL is a no-op. */
+/* Stop the reader, close the link, free everything. NULL is a no-op.
+ * May be called from another thread while a call on `dev` is in progress:
+ * a call waiting for the board, a frame or a measurement returns
+ * DEPZ_E_CLOSED, and close frees nothing until every call has returned.
+ * Never from a callback, and no call may begin on `dev` once close has
+ * returned. */
 void depz_device_close(depz_device *dev);
 
 void             depz_device_set_timeout_ms(depz_device *dev, int timeout_ms);
@@ -1380,6 +1387,7 @@ int depz_session_recorder_add(depz_session_recorder *rec, depz_device *dev, cons
 int depz_session_recorder_start(depz_session_recorder *rec);
 /* Stop writing, unhook the devices and close the file. Idempotent. */
 int depz_session_recorder_stop(depz_session_recorder *rec);
+/* Records in the file being written; after stop(), in the finished one. */
 uint64_t depz_session_recorder_records_written(const depz_session_recorder *rec);
 /* stop() and free; NULL is a no-op. */
 void depz_session_recorder_free(depz_session_recorder *rec);

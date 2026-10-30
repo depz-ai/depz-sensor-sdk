@@ -10,7 +10,7 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import { DepzError, DepzTimeoutError, InvalidStateError, StatusError } from "../src/index.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError, StatusError } from "../src/index.js";
 import { SensorDriver, measurement, type Measurement } from "../src/sensors/vl53lx/uld/base.js";
 import { phaseWindowMm } from "../src/sensors/vl53lx/uld/vl53l1-die.js";
 import { NotImplementedError } from "../src/sensors/vl53lx/uld/registry.js";
@@ -697,6 +697,7 @@ describe("vl53lx ranging (stream)", () => {
     expect(dev.streamDroppedCounts).toEqual([]);
     const pending = dev.getMeasurement(2000);
     await dev.close();
+    await expect(pending).rejects.toThrow(LinkClosedError);
     await expect(pending).rejects.toThrow(/device closed/);
   });
 
@@ -736,6 +737,17 @@ describe("vl53lx ranging (stream)", () => {
     expect(fake.rx.map((p) => p.cmd)).toEqual([CMD.stopStream, CMD.writeReg]);
     expect(fake.writes()).toEqual([[0x0087, [0x80]]]);
     expect(dev.ranging).toBe(false);
+  });
+
+  it("a refused START_STREAM stops the sensor again and keeps the original error", async () => {
+    const { dev, fake } = await ready();
+    fake.failNext(CMD.startStream, 0x03);
+    const err = await dev.startRanging().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(StatusError);
+    expect((err as StatusError).status).toBe(0x03);
+    expect(dev.ranging).toBe(false);
+    expect(fake.writes().at(-1)).toEqual([0x0087, [0x80]]); // the driver started the die
+    await dev.setOffsetMm(0); // configuration allowed again
   });
 
   it("a failed STOP_STREAM still stops the sensor and clears the flag", async () => {

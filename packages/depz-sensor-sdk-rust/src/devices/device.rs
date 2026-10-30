@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, RwLock, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -77,6 +77,8 @@ pub struct LinkStats {
     pub device_seq_errors: u64,
     /// Callbacks that panicked on the reader thread (contract 07 §3).
     pub callback_errors: u64,
+    /// Reports whose handler panicked: the packet was dropped (contract 07 §3).
+    pub report_errors: u64,
 }
 
 /// Result of [`DepzDevice::sync_time`]: device clock − host clock, the round trip of the kept
@@ -107,7 +109,8 @@ type AnyBox = Box<dyn Any + Send>;
 type ErasedMatcher = Box<dyn Fn(&Packet) -> Option<Result<AnyBox>> + Send>;
 
 struct Pending {
-    matcher: Option<ErasedMatcher>,
+    // Shared so the reader can run it with `pending` unlocked; only the reader ever locks it.
+    matcher: Option<Arc<Mutex<ErasedMatcher>>>,
     ok_completes: bool,
     done: SyncSender<Result<Option<AnyBox>>>,
 }
@@ -128,7 +131,26 @@ pub(crate) struct Core {
     pending: Mutex<HashMap<u8, Pending>>,
     handler: RwLock<Option<Arc<dyn ReportHandler>>>,
     closing: AtomicBool,
+    /// Set when the reader ended on its own (not by close()): every later request fails with it.
+    lost: Mutex<Option<String>>,
     reader: Mutex<Option<JoinHandle<()>>>,
+}
+
+/// Lock `m` even if a panic poisoned it: a panic on the reader must never turn into a panic in a
+/// caller's thread (contract 07 §3). Every critical section below leaves its data consistent.
+fn relock<T: ?Sized>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// What a caught panic said, for the error it becomes.
+fn panic_message(p: &(dyn Any + Send)) -> String {
+    if let Some(s) = p.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = p.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "a panic".into()
+    }
 }
 
 /// A connection to one DEPZ device in application mode (contracts 02, 07): a reader thread, replies
@@ -156,6 +178,7 @@ impl DepzDevice {
             pending: Mutex::new(HashMap::new()),
             handler: RwLock::new(None),
             closing: AtomicBool::new(false),
+            lost: Mutex::new(None),
             reader: Mutex::new(None),
         });
         let rc = core.clone();
@@ -187,7 +210,8 @@ impl DepzDevice {
     }
 
     pub fn is_closed(&self) -> bool {
-        self.core.link.is_closed()
+        // A reader that ended marks the device lost even if closing its link failed.
+        self.core.link.is_closed() || relock(&self.core.lost).is_some()
     }
 
     /// The timeout of requests that take none of their own.
@@ -215,7 +239,7 @@ impl DepzDevice {
     }
 
     pub fn stats(&self) -> LinkStats {
-        let mut s = self.core.stats.lock().unwrap().clone();
+        let mut s = relock(&self.core.stats).clone();
         s.callback_errors = self.core.callback_errors.load(Ordering::Relaxed);
         s
     }
@@ -434,13 +458,21 @@ impl DepzDevice {
 }
 
 /// A cloneable handle for requests on a device's connection — what a sensor class gives its driver's
-/// platform. It does not keep the device open: requests fail once the device closes.
+/// platform. It does not keep the device open: requests fail once the device closes. It holds the
+/// connection weakly: the driver it lives in is owned by the connection's report handler, and a
+/// strong reference back would keep the whole connection alive after the device is dropped.
 #[derive(Clone)]
 pub(crate) struct Requester {
-    core: Arc<Core>,
+    core: Weak<Core>,
 }
 
 impl Requester {
+    fn core(&self) -> Result<Arc<Core>> {
+        self.core
+            .upgrade()
+            .ok_or_else(|| DepzError::LinkClosed("device closed".into()))
+    }
+
     pub(crate) fn request<T: Send + 'static>(
         &self,
         cmd: u8,
@@ -448,10 +480,11 @@ impl Requester {
         matcher: impl Fn(&Packet) -> Option<Result<T>> + Send + 'static,
         timeout: Option<Duration>,
     ) -> Result<T> {
+        let core = self.core()?;
         let erased: ErasedMatcher =
             Box::new(move |p| matcher(p).map(|r| r.map(|v| Box::new(v) as AnyBox)));
-        let t = timeout.unwrap_or_else(|| *self.core.timeout.lock().unwrap());
-        match self.core.request(cmd, payload, Some(erased), false, t)? {
+        let t = timeout.unwrap_or_else(|| *core.timeout.lock().unwrap());
+        match core.request(cmd, payload, Some(erased), false, t)? {
             Some(b) => Ok(*b.downcast::<T>().expect("matcher type")),
             None => Err(DepzError::Protocol(format!(
                 "cmd 0x{cmd:02X}: no reply value"
@@ -465,8 +498,9 @@ impl Requester {
         payload: &[u8],
         timeout: Option<Duration>,
     ) -> Result<()> {
-        let t = timeout.unwrap_or_else(|| *self.core.timeout.lock().unwrap());
-        self.core.request(cmd, payload, None, true, t).map(|_| ())
+        let core = self.core()?;
+        let t = timeout.unwrap_or_else(|| *core.timeout.lock().unwrap());
+        core.request(cmd, payload, None, true, t).map(|_| ())
     }
 
     /// [`DepzDevice::read_mcu_temperature`] through the handle.
@@ -484,7 +518,7 @@ impl Requester {
 impl DepzDevice {
     pub(crate) fn requester(&self) -> Requester {
         Requester {
-            core: self.core.clone(),
+            core: Arc::downgrade(&self.core),
         }
     }
 }
@@ -526,12 +560,15 @@ pub fn expect_text(request_cmd: u8) -> impl Fn(&Packet) -> Option<Result<String>
 
 impl Core {
     fn send(&self, cmd: u8, payload: &[u8], crc: CrcType) -> Result<()> {
-        let mut tx = self.tx.lock().unwrap();
+        if let Some(m) = relock(&self.lost).clone() {
+            return Err(DepzError::DeviceLost(m));
+        }
+        let mut tx = relock(&self.tx);
         let frame = build_packet(cmd, payload, tx.seq as u32, crc)
             .map_err(|e| DepzError::InvalidArgument(e.to_string()))?;
         self.link.write(&frame)?;
         tx.seq = tx.seq.wrapping_add(1);
-        let mut s = self.stats.lock().unwrap();
+        let mut s = relock(&self.stats);
         s.tx_packets += 1;
         s.tx_bytes += frame.len() as u64;
         Ok(())
@@ -547,7 +584,7 @@ impl Core {
     ) -> Result<Option<AnyBox>> {
         let (done, wait) = sync_channel(1);
         {
-            let mut pending = self.pending.lock().unwrap();
+            let mut pending = relock(&self.pending);
             if pending.contains_key(&cmd) {
                 return Err(DepzError::Status {
                     cmd,
@@ -557,7 +594,7 @@ impl Core {
             pending.insert(
                 cmd,
                 Pending {
-                    matcher,
+                    matcher: matcher.map(|m| Arc::new(Mutex::new(m))),
                     ok_completes,
                     done,
                 },
@@ -565,13 +602,13 @@ impl Core {
         }
         let crc = *self.tx_crc.lock().unwrap();
         if let Err(e) = self.send(cmd, payload, crc) {
-            self.pending.lock().unwrap().remove(&cmd);
+            relock(&self.pending).remove(&cmd);
             return Err(e);
         }
         match wait.recv_timeout(timeout) {
             Ok(r) => r,
             Err(_) => {
-                self.pending.lock().unwrap().remove(&cmd);
+                relock(&self.pending).remove(&cmd);
                 // The reply may have landed between the wait and the removal.
                 match wait.try_recv() {
                     Ok(r) => r,
@@ -582,13 +619,7 @@ impl Core {
     }
 
     fn fail_all(&self, make: impl Fn() -> DepzError) {
-        let all: Vec<Pending> = self
-            .pending
-            .lock()
-            .unwrap()
-            .drain()
-            .map(|(_, p)| p)
-            .collect();
+        let all: Vec<Pending> = relock(&self.pending).drain().map(|(_, p)| p).collect();
         for p in all {
             let _ = p.done.try_send(Err(make()));
         }
@@ -603,7 +634,7 @@ impl Core {
         if let Some(last) = *last_rx_seq {
             let expected = last.wrapping_add(1);
             if pkt.seq != expected {
-                self.stats.lock().unwrap().seq_gaps += 1;
+                relock(&self.stats).seq_gaps += 1;
                 self.emit(DeviceEvent::SeqGap {
                     expected_seq: expected,
                     received_seq: pkt.seq,
@@ -616,7 +647,7 @@ impl Core {
         if pkt.cmd == Rpt::Status as u8 && payload.len() >= 2 {
             if let Ok(rep) = StatusReport::unpack(payload) {
                 if rep.cmd != common::UNSOLICITED {
-                    let mut pending = self.pending.lock().unwrap();
+                    let mut pending = relock(&self.pending);
                     if let Some(p) = pending.get(&rep.cmd) {
                         let outcome = if rep.status != Status::Ok as u8 {
                             Some(Err(DepzError::Status {
@@ -641,29 +672,39 @@ impl Core {
             }
         }
 
-        // Pending matchers get the first shot at any other packet.
-        let claimed = {
-            let mut pending = self.pending.lock().unwrap();
-            let mut hit = None;
-            for (cmd, p) in pending.iter() {
-                if let Some(m) = &p.matcher {
-                    if let Some(r) = m(pkt) {
-                        hit = Some((*cmd, r));
-                        break;
-                    }
-                }
-            }
-            hit.map(|(cmd, r)| (pending.remove(&cmd).unwrap(), cmd, r))
-        };
-        if let Some((p, cmd, r)) = claimed {
-            let out = match r {
-                Ok(v) => Ok(Some(v)),
-                Err(e) => Err(DepzError::Protocol(format!(
+        // Pending matchers get the first shot at any other packet. They are user code: they run
+        // with `pending` unlocked and under catch_unwind — a matcher that panics has claimed the
+        // packet and failed to decode it, so only its own request fails (contract 07 §3).
+        let matchers: Vec<(u8, Arc<Mutex<ErasedMatcher>>)> = relock(&self.pending)
+            .iter()
+            .filter_map(|(cmd, p)| p.matcher.as_ref().map(|m| (*cmd, m.clone())))
+            .collect();
+        for (cmd, m) in matchers {
+            let out = match catch_unwind(AssertUnwindSafe(|| (*relock(&m))(pkt))) {
+                Ok(None) => continue,
+                Ok(Some(Ok(v))) => Ok(Some(v)),
+                Ok(Some(Err(e))) => Err(DepzError::Protocol(format!(
                     "reply to cmd 0x{cmd:02X} does not decode: {e}"
                 ))),
+                Err(panic) => Err(DepzError::Protocol(format!(
+                    "reply to cmd 0x{cmd:02X} does not decode: the matcher panicked: {}",
+                    panic_message(&*panic)
+                ))),
             };
-            let _ = p.done.try_send(out);
-            return;
+            // The request may have timed out (and another of its opcode begun) meanwhile.
+            let claimed = {
+                let mut pending = relock(&self.pending);
+                match pending.get(&cmd) {
+                    Some(p) if p.matcher.as_ref().is_some_and(|x| Arc::ptr_eq(x, &m)) => {
+                        pending.remove(&cmd)
+                    }
+                    _ => None,
+                }
+            };
+            if let Some(p) = claimed {
+                let _ = p.done.try_send(out);
+                return;
+            }
         }
 
         // Contract 07 §3: a report longer than its fields is decoded and the
@@ -671,7 +712,7 @@ impl Core {
         // not a report of that kind and stays visible as hex text below.
         if pkt.cmd == Rpt::SequenceError as u8 && payload.len() >= 2 {
             if let Ok(rep) = SequenceErrorReport::unpack(payload) {
-                self.stats.lock().unwrap().device_seq_errors += 1;
+                relock(&self.stats).device_seq_errors += 1;
                 self.emit(DeviceEvent::SequenceError {
                     expected_seq: rep.expected_seq,
                     received_seq: rep.received_seq,
@@ -698,10 +739,27 @@ impl Core {
                 return;
             }
         }
-        let handler = self.handler.read().unwrap().clone();
+        // The report path runs guarded like the matchers: a stream handler that panics drops this
+        // one packet, counted — it never ends the reader (contract 07 §3).
+        let handler = self
+            .handler
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         if let Some(h) = handler {
-            if h.handle_report(pkt) {
-                return;
+            match catch_unwind(AssertUnwindSafe(|| h.handle_report(pkt))) {
+                Ok(true) => return,
+                Ok(false) => {}
+                Err(_) => {
+                    relock(&self.stats).report_errors += 1;
+                    // The panic hook has already printed the panic itself.
+                    eprintln!(
+                        "depz-sensor-sdk: report 0x{:02X} handler panicked on {}; dropped",
+                        pkt.cmd,
+                        self.link.name()
+                    );
+                    return;
+                }
             }
         }
         // An unrouted report stays visible, so new firmware is debuggable.
@@ -715,57 +773,60 @@ impl Core {
 fn reader_loop(core: Arc<Core>) {
     let mut parser = PacketParser::new();
     let mut last_rx_seq: Option<u8> = None;
+    // Some(cause) when the reader ends on its own; None when close() ended it.
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         while !core.closing.load(Ordering::SeqCst) {
             let data = match core.link.read(READ_SLICE) {
                 Ok(d) => d,
-                Err(e) => {
-                    if !core.closing.load(Ordering::SeqCst) {
-                        let msg = e.to_string();
-                        core.fail_all(|| DepzError::DeviceLost(msg.clone()));
-                        core.emit(DeviceEvent::Disconnected(msg.clone()));
-                    }
-                    return;
-                }
+                Err(e) => return Some(e.to_string()),
             };
             if data.is_empty() {
                 continue;
             }
-            core.stats.lock().unwrap().rx_bytes += data.len() as u64;
+            relock(&core.stats).rx_bytes += data.len() as u64;
             for ev in parser.feed(&data) {
                 match ev {
                     Event::Packet(pkt) => {
-                        core.stats.lock().unwrap().rx_packets += 1;
+                        relock(&core.stats).rx_packets += 1;
                         core.dispatch(&pkt, &mut last_rx_seq);
                     }
                     Event::CrcError { cmd, seq } => {
-                        core.stats.lock().unwrap().crc_errors += 1;
+                        relock(&core.stats).crc_errors += 1;
                         core.emit(DeviceEvent::LinkCrcError { cmd, seq });
                     }
                     Event::Trash(t) => {
-                        core.stats.lock().unwrap().trash_bytes += t.len() as u64;
+                        relock(&core.stats).trash_bytes += t.len() as u64;
                         core.emit(DeviceEvent::Trash(t));
                     }
                 }
             }
-            core.stats.lock().unwrap().header_errors = parser.header_errors;
+            relock(&core.stats).header_errors = parser.header_errors;
         }
+        None
     }));
-    if outcome.is_err() {
-        // A callback or handler panicked: the reader is gone, as in the reference SDK.
-        core.fail_all(|| {
-            DepzError::DeviceLost("device reader stopped: a callback panicked".into())
-        });
+    let ended = match outcome {
+        Ok(cause) => cause,
+        Err(panic) => Some(format!("reader ended: {}", panic_message(&*panic))),
+    };
+    // A reader that ends on its own must not leave a device that looks open and times every
+    // request out: close the link, fail what is pending and every later request, say why
+    // (contract 07 §3). Nothing here may panic again, or the queues would never close.
+    if let Some(msg) = ended.filter(|_| !core.closing.load(Ordering::SeqCst)) {
+        *relock(&core.lost) = Some(msg.clone());
+        let _ = catch_unwind(AssertUnwindSafe(|| core.link.close()));
+        core.fail_all(|| DepzError::DeviceLost(msg.clone()));
         let _ = catch_unwind(AssertUnwindSafe(|| {
-            core.emit(DeviceEvent::Disconnected(
-                "reader stopped: a callback panicked".into(),
-            ))
+            core.emit(DeviceEvent::Disconnected(msg.clone()))
         }));
     }
     core.fail_all(|| DepzError::LinkClosed("device closed".into()));
-    let handler = core.handler.read().unwrap().clone();
+    let handler = core
+        .handler
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
     if let Some(h) = handler {
-        h.reader_stopped();
+        let _ = catch_unwind(AssertUnwindSafe(|| h.reader_stopped()));
     }
-    core.events.close_all();
+    let _ = catch_unwind(AssertUnwindSafe(|| core.events.close_all()));
 }

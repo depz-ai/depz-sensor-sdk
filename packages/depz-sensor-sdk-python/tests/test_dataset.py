@@ -273,8 +273,9 @@ def test_recorder_lifecycle_rules(tmp_path: Path):
             fake.send_measurement(0x37)
             time.sleep(0.05)
             assert rec.records_written == 1
-        assert rec.records_written == 0  # writer released on exit
+        assert rec.records_written == 1  # the finished file's count survives exit
         rec.stop()  # idempotent after exit
+        assert rec.records_written == 1
     finally:
         dev.close()
         fake.close()
@@ -417,6 +418,17 @@ def test_reader_rejects_a_foreign_file(tmp_path: Path):
     other.write_text(json.dumps({"schema": "depz.rec/1"}) + "\n", encoding="utf-8", newline="\n")
     with pytest.raises(ValueError, match="not a depz.dataset"):
         DatasetReader(other)
+
+
+def test_reader_refuses_a_line_nested_100000_deep(tmp_path: Path):
+    # contract 08 «Line rules»: a 200 KB line of `[[[[…` is a damaged line
+    # naming its number, not a RecursionError out of the JSON parser
+    path = tmp_path / "deep.depzdata"
+    deep = "[" * 100_000 + "]" * 100_000
+    path.write_text(json.dumps({"schema": "depz.dataset/2"}) + '\n{"d": "d0", "t": 1, "k": "x", "v": {"a": '
+                    + deep + "}}\n", encoding="utf-8", newline="\n")
+    with pytest.raises(ValueError, match=r":2: .*nested deeper than 256"):
+        DatasetReader(path).records
 
 
 def test_play_from_an_offset_and_stop_during_a_wait(tmp_path: Path):

@@ -306,9 +306,12 @@ static int rp_read(void *self, uint8_t *buf, size_t cap, int timeout_ms, size_t 
             depz_mutex_unlock(&r->lock);
             return depz_fail(DEPZ_E_CLOSED, "replay: closed");
         }
-        if (r->idx >= r->n_ev) { depz_mutex_unlock(&r->lock); return DEPZ_OK; }
-        e = r->ev[r->idx];
-        if (r->tx_written >= e.tx_prefix) break;
+        /* exhausted: wait like a quiet port (until the timeout or close),
+         * else the reader loop spins a core on empty reads */
+        if (r->idx < r->n_ev) {
+            e = r->ev[r->idx];
+            if (r->tx_written >= e.tx_prefix) break;
+        }
         left = depz_ms_until(deadline);
         if (!left) { depz_mutex_unlock(&r->lock); return DEPZ_OK; }
         depz_cond_wait_ms(&r->cond, &r->lock, left);

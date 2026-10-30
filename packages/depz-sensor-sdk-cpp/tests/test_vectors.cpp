@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
@@ -777,8 +778,33 @@ static void test_vl53l8_real_units() {
         check(f->reflectance[k] == refl[k], "vl53l8 synthetic reflectance[" + std::to_string(k) + "]");
 }
 
+// A METADATA block too short to carry the silicon temperature (body byte 8;
+// the real block has 12) leaves it at 0 (bug hunt C-4). The frame is all zero
+// — zero headers walk 4 bytes at a time — with one METADATA header of `size`
+// bytes: at 16, where the byte the temperature would be read from is 0xF6
+// (-10), or as the last word of a maximum-size frame, where the read would run
+// past the frame.
+static void check_vl53l8_short_metadata(std::uint32_t size, bool at_end) {
+    std::vector<std::uint8_t> buf(at_end ? 8192 : 540, 0);
+    const std::size_t at = at_end ? buf.size() - 4 : 16;
+    const std::uint32_t bh = (size << 4) | (0x54b4u << 16);
+    for (int b = 0; b < 4; ++b) buf[at + static_cast<std::size_t>(b)] = static_cast<std::uint8_t>(bh >> (8 * b));
+    if (!at_end) buf[16 + 12] = 0xf6;
+    depz::bytes raw(buf.size());
+    for (std::size_t w = 0; w < buf.size(); w += 4)
+        for (std::size_t b = 0; b < 4; ++b) raw[w + b] = static_cast<std::byte>(buf[w + 3 - b]);
+    const std::string nm = "vl53l8 short METADATA " + std::to_string(size) + (at_end ? " B at end" : " B");
+    auto f = depz::vl53l8::decode_frame(depz::as_bytes(raw), depz::vl53l8::FOOTER_ID_OFF_CX);
+    check(f.has_value(), nm + " decodes");
+    if (!f) return;
+    check_eq(static_cast<std::int64_t>(f->silicon_temp_degc), 0, nm + " temp");
+}
+
 static void test_vl53l8_frame() {
     test_vl53l8_real_units();
+    check_vl53l8_short_metadata(4, false);
+    check_vl53l8_short_metadata(8, false);
+    check_vl53l8_short_metadata(0, true);
     const int f0 = g_fails;
     Value exp = testjson::parse(load_recording("vl53l8_8x8_15hz_3s.expected.json"));
     const auto& want_frames = exp.at("frames").as_array();
@@ -2220,6 +2246,18 @@ static void test_dataset_json() {
         check(threw, std::string("json rejects '") + bad + "'");
     }
     check(ds::Value(2) == ds::Value(2.0) && ds::Value(2) != ds::Value("2"), "json equality");
+
+    // contract 08 «Line rules»: a line nested deeper than 256 is damaged — the
+    // reader's invalid_argument naming the line, not a stack overflow
+    const std::string deep = std::string(100000, '[') + std::string(100000, ']');
+    std::string what;
+    try {
+        ds::Reader r("{\"schema\": \"depz.dataset/2\"}\n{\"d\":\"d0\",\"t\":1,\"k\":\"x\",\"v\":{\"a\":" + deep + "}}\n");
+    } catch (const std::invalid_argument& e) {
+        what = e.what();
+    }
+    check(what.find("line 2: record is not JSON (JSON: nested deeper than 256)") != std::string::npos,
+          "a line nested 100000 deep is refused naming it: " + what);
 }
 
 static ds::Value::Object two_devices() {
@@ -2762,6 +2800,40 @@ static void test_dataset_player() {
         check(p.wait(std::chrono::seconds(5)) && p.state() == S::Done, "threaded: a throwing callback does not stop playback");
         std::lock_guard<std::mutex> g(m);
         check(seen.size() == 10 && seen.front() == first && p.callback_errors() == 1, "threaded: the other callback gets every record");
+    }
+    {
+        // a tiny speed puts the next record ~1e300 s away: the wait is clamped
+        // (an unclamped duration<double> overflows the timer and the thread
+        // spins); the player consults its clock once per wake
+        const ds::Reader three = evenly(3, 1000000);
+        std::atomic<long> clock_calls{0};
+        ds::PlayerOptions o;
+        o.speed = 1e-300;
+        o.clock = [&clock_calls] {
+            clock_calls++;
+            return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        };
+        ds::DatasetPlayer p(three, o);
+        std::mutex m;
+        std::condition_variable cv;
+        std::vector<std::int64_t> seen;
+        p.on_record([&](const ds::Record& r) {
+            std::lock_guard<std::mutex> g(m);
+            seen.push_back(r.t_host_us);
+            cv.notify_all();
+        });
+        p.play();
+        {
+            std::unique_lock<std::mutex> g(m);
+            check(cv.wait_for(g, std::chrono::seconds(5), [&] { return !seen.empty(); }), "tiny speed: first record");
+        }
+        const long before = clock_calls.load();
+        check(!p.wait(std::chrono::milliseconds(300)), "tiny speed: still waiting for the second record");
+        check(clock_calls.load() - before < 20, "tiny speed: the player sleeps, it does not spin");
+        p.set_speed(0);
+        check(p.wait(std::chrono::seconds(5)) && p.state() == S::Done, "tiny speed: a speed change finishes playback");
+        std::lock_guard<std::mutex> g(m);
+        check(seen.size() == 3, "tiny speed: every record delivered");
     }
 }
 

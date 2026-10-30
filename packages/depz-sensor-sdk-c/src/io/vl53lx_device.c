@@ -218,9 +218,6 @@ static bool vlx_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t l
     size_t i, n;
     int rc;
     if (cmd != DEPZ_VL53LX_RPT_STREAM || len < 12) return false;
-    /* The driver's decode state is only touched here while ranging, and
-     * configuration is refused then — no other thread uses the driver. */
-    if (!s->drv) return true;
     if (depz_vl53l4_unpack_stream(p, len, &sd) != 0) {
         /* shorter than its own length field: count it, keep the reader alive */
         depz_mutex_lock(&s->lock);
@@ -228,14 +225,18 @@ static bool vlx_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t l
         depz_mutex_unlock(&s->lock);
         return true;
     }
+    /* Configuration is refused while ranging, but xshut() is not: it frees
+     * the driver under `lock`, so the decode holds it too. */
     vlx_measurement_init(&m);
-    rc = s->drv->ops->decode(s->drv, sd.data, sd.len, &m);
-    if (rc) {
-        depz_mutex_lock(&s->lock);
-        s->parse_errors++;
+    depz_mutex_lock(&s->lock);
+    if (!s->drv) {
         depz_mutex_unlock(&s->lock);
         return true;
     }
+    rc = s->drv->ops->decode(s->drv, sd.data, sd.len, &m);
+    if (rc) s->parse_errors++;
+    depz_mutex_unlock(&s->lock);
+    if (rc) return true;
     m.timestamp_us = sd.timestamp_us;
     n = depz_cb_list_snapshot(&s->cbs, &cbs);
     for (i = 0; i < n; i++) ((vlx_fn)cbs[i].fn)(&m, cbs[i].user);
@@ -339,6 +340,10 @@ static int need(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
 static bool is_ranging(depz_device *dev)
 {
     vlx_state *s = st(dev);
@@ -384,9 +389,11 @@ static int need_cap(depz_device *dev, unsigned cap, const char *group)
     do {                                  \
         int locked_rc_;                   \
         VLX_TRY(need(dev));               \
+        VLX_TRY(depz_device_enter(dev));  \
         depz_mutex_lock(&st(dev)->seq);   \
         locked_rc_ = (body);              \
         depz_mutex_unlock(&st(dev)->seq); \
+        depz_device_leave(dev);           \
         return locked_rc_;                \
     } while (0)
 
@@ -406,10 +413,11 @@ static const char *board_name(depz_device *dev)
 depz_vl53lx_product depz_vl53lx_detected_product(depz_device *dev)
 {
     depz_vl53lx_product p;
-    if (need(dev)) return DEPZ_VL53LX_PRODUCT_NONE;
+    if (need(dev) || depz_device_enter(dev)) return DEPZ_VL53LX_PRODUCT_NONE;
     depz_mutex_lock(&st(dev)->seq);
     p = depz_vl53lx_product_from_board_name(board_name(dev));
     depz_mutex_unlock(&st(dev)->seq);
+    depz_device_leave(dev);
     return p;
 }
 
@@ -456,8 +464,10 @@ static int do_init(depz_device *dev, depz_vl53lx_driver kind, depz_vl53lx_produc
         drv->ops->destroy(drv);
         return rc;
     }
+    depz_mutex_lock(&s->lock);
     if (s->drv) s->drv->ops->destroy(s->drv);
     s->drv = drv;
+    depz_mutex_unlock(&s->lock);
     s->product = product;
     s->kind = kind;
     s->caveat = caveat;
@@ -469,7 +479,17 @@ int depz_vl53lx_init(depz_device *dev, depz_vl53lx_driver driver, depz_vl53lx_pr
     LOCKED(do_init(dev, driver, product));
 }
 
-bool depz_vl53lx_initialized(const depz_device *dev) { return depz_is_vl53lx(dev) && st((depz_device *)dev)->drv; }
+bool depz_vl53lx_initialized(const depz_device *dev)
+{
+    vlx_state *s;
+    bool yes;
+    if (!depz_is_vl53lx(dev)) return false;
+    s = st((depz_device *)dev);
+    depz_mutex_lock(&s->lock);
+    yes = s->drv != NULL;
+    depz_mutex_unlock(&s->lock);
+    return yes;
+}
 
 depz_vl53lx_product depz_vl53lx_product_bound(const depz_device *dev)
 {
@@ -519,12 +539,19 @@ uint32_t depz_vl53lx_driver_reach_mm(const depz_device *dev)
     return mm;
 }
 
+/* s->drv under s->lock: xshut() on another thread destroys it. */
 bool depz_vl53lx_supports(const depz_device *dev, unsigned cap)
 {
+    depz_device *d = (depz_device *)dev;
     vlx_state *s;
-    if (!depz_is_vl53lx(dev)) return false;
-    s = st((depz_device *)dev);
-    return s->drv && (s->drv->ops->supports & cap) == cap;
+    bool yes;
+    if (!depz_is_vl53lx(dev) || depz_device_enter(d)) return false;
+    s = st(d);
+    depz_mutex_lock(&s->lock);
+    yes = s->drv && (s->drv->ops->supports & cap) == cap;
+    depz_mutex_unlock(&s->lock);
+    depz_device_leave(d);
+    return yes;
 }
 
 bool depz_vl53lx_ranging(const depz_device *dev) { return depz_is_vl53lx(dev) && is_ranging((depz_device *)dev); }
@@ -539,29 +566,42 @@ int depz_vl53lx_model_id(depz_device *dev, uint16_t *model_id) { LOCKED(do_model
 
 size_t depz_vl53lx_modes(const depz_device *dev, const char **names, size_t cap)
 {
+    depz_device *d = (depz_device *)dev;
     vlx_state *s;
-    if (!depz_is_vl53lx(dev)) return 0;
-    s = st((depz_device *)dev);
-    if (!s->drv || !s->drv->ops->modes) return 0;
-    return s->drv->ops->modes(s->drv, names, cap);
+    size_t n = 0;
+    if (!depz_is_vl53lx(dev) || depz_device_enter(d)) return 0;
+    s = st(d);
+    depz_mutex_lock(&s->lock);
+    if (s->drv && s->drv->ops->modes) n = s->drv->ops->modes(s->drv, names, cap);
+    depz_mutex_unlock(&s->lock);
+    depz_device_leave(d);
+    return n;
 }
 
-int depz_vl53lx_budget_range(const depz_device *dev, int *min_ms, int *max_ms)
+static int do_budget_range(depz_device *dev, int *min_ms, int *max_ms)
 {
-    vlx_state *s;
-    VLX_TRY(need(dev));
-    s = st((depz_device *)dev);
-    if (!s->drv) return depz_fail(DEPZ_E_ARG, "vl53lx: call init() first");
-    if (s->drv->ops->budget_range) {
-        int lo, hi;
+    vlx_state *s = st(dev);
+    int lo = 0, hi = 0, rc = DEPZ_OK;
+    depz_mutex_lock(&s->lock);
+    if (!s->drv) {
+        rc = depz_fail(DEPZ_E_ARG, "vl53lx: call init() first");
+    } else if (s->drv->ops->budget_range) {
         s->drv->ops->budget_range(s->drv, &lo, &hi);
-        if (min_ms) *min_ms = lo;
-        if (max_ms) *max_ms = hi;
     } else {
-        if (min_ms) *min_ms = s->drv->ops->budget_min_ms;
-        if (max_ms) *max_ms = s->drv->ops->budget_max_ms;
+        lo = s->drv->ops->budget_min_ms;
+        hi = s->drv->ops->budget_max_ms;
     }
+    depz_mutex_unlock(&s->lock);
+    if (rc) return rc;
+    if (min_ms) *min_ms = lo;
+    if (max_ms) *max_ms = hi;
     return DEPZ_OK;
+}
+
+int depz_vl53lx_budget_range(const depz_device *cdev, int *min_ms, int *max_ms)
+{
+    depz_device *dev = (depz_device *)cdev;
+    ENTERED(do_budget_range(dev, min_ms, max_ms));
 }
 
 static int do_budget_choices(depz_device *dev, int *choices, size_t cap, size_t *n)
@@ -584,9 +624,13 @@ static int do_xshut(depz_device *dev, uint8_t action)
 {
     vlx_state *s = st(dev);
     VLX_TRY(xshut_cmd(&s->plat, action));
-    set_ranging(dev, false);
+    /* Allowed while ranging (as Python): the reader may be decoding with the
+     * driver, so it stops ranging and goes under the same `lock`. */
+    depz_mutex_lock(&s->lock);
+    s->ranging = false;
     if (s->drv) s->drv->ops->destroy(s->drv);
     s->drv = NULL;
+    depz_mutex_unlock(&s->lock);
     return DEPZ_OK;
 }
 
@@ -839,13 +883,24 @@ static int do_start(depz_device *dev)
     uint8_t p[DEPZ_VL53LX_START_STREAM_MAX];
     uint16_t addr, len;
     size_t n;
+    int rc;
     VLX_TRY(need_not_ranging(dev));
     VLX_TRY(need_driver(dev));
     d = st(dev)->drv;
     VLX_TRY(d->ops->start_ranging(d));
     d->ops->stream_block(d, &addr, &len);
     n = depz_vl53lx_pack_start_stream(addr, len, 0, d->ops->clear, d->ops->n_clear, p);
-    VLX_TRY(depz_device_request(dev, DEPZ_VL53LX_CMD_START_STREAM, p, n, NULL, NULL, true, -1));
+    rc = depz_device_request(dev, DEPZ_VL53LX_CMD_START_STREAM, p, n, NULL, NULL, true, -1);
+    if (rc) {
+        /* The sensor ranges but the host will say it does not: stop it again, or
+         * stop_ranging() could never reach it. The START_STREAM error is the one
+         * the caller gets, even if this stop fails too. */
+        depz_saved_error first;
+        depz_error_save(&first);
+        (void)d->ops->stop_ranging(d);
+        depz_error_restore(&first);
+        return rc;
+    }
     set_ranging(dev, true);
     return DEPZ_OK;
 }
@@ -891,34 +946,48 @@ int depz_vl53lx_measure_once(depz_device *dev, int timeout_ms, depz_vl53lx_measu
     LOCKED(do_measure_once(dev, timeout_ms, out));
 }
 
-int depz_vl53lx_on_measurement(depz_device *dev, depz_vl53lx_measurement_cb cb, void *user, int *token)
+static int do_on_measurement(depz_device *dev, depz_vl53lx_measurement_cb cb, void *user, int *token)
 {
     VLX_TRY(need(dev));
     if (!cb) return depz_fail(DEPZ_E_ARG, "vl53lx: NULL callback");
     return depz_cb_list_add(&st(dev)->cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_vl53lx_on_measurement(depz_device *dev, depz_vl53lx_measurement_cb cb, void *user, int *token)
+{
+    ENTERED(do_on_measurement(dev, cb, user, token));
+}
+
 void depz_vl53lx_off_measurement(depz_device *dev, int token)
 {
-    if (depz_is_vl53lx(dev)) depz_cb_list_remove(&st(dev)->cbs, token);
+    if (!depz_is_vl53lx(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_vl53lx_measurements(depz_device *dev, size_t maxsize)
 {
-    if (need(dev)) return NULL;
-    return depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 64);
+    depz_stream *s;
+    if (need(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 64);
+    depz_device_leave(dev);
+    return s;
 }
 
-int depz_vl53lx_get_measurement(depz_device *dev, int timeout_ms, depz_vl53lx_measurement *out)
+static int do_get_measurement(depz_device *dev, int timeout_ms, depz_vl53lx_measurement *out)
 {
     depz_stream *s;
     int rc;
-    VLX_TRY(need(dev));
     s = depz_hub_subscribe(st(dev)->hub, 1);
     if (!s) return depz_fail(DEPZ_E_NOMEM, "vl53lx: cannot subscribe");
     rc = depz_stream_next(s, out, timeout_ms < 0 ? 2000 : timeout_ms);
     depz_stream_close(s);
     return rc;
+}
+
+int depz_vl53lx_get_measurement(depz_device *dev, int timeout_ms, depz_vl53lx_measurement *out)
+{
+    ENTERED(do_get_measurement(dev, timeout_ms, out));
 }
 
 uint64_t depz_vl53lx_stream_parse_errors(const depz_device *dev)

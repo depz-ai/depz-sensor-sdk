@@ -1,7 +1,7 @@
 //! Timeline player over a dataset (contract 09 §Player; reference: the Python `DatasetPlayer`).
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread::{JoinHandle, ThreadId};
 use std::time::{Duration, Instant};
 
@@ -245,7 +245,11 @@ impl DatasetPlayer {
         // Once pause returns no record callback runs: wait out one on another thread.
         let me = std::thread::current().id();
         while st.delivering.is_some_and(|t| t != me) {
-            st = self.inner.changed.wait(st).unwrap();
+            st = self
+                .inner
+                .changed
+                .wait(st)
+                .unwrap_or_else(PoisonError::into_inner);
         }
         self.inner.notify(st, changes);
     }
@@ -309,13 +313,24 @@ impl DatasetPlayer {
         let mut st = self.inner.lock();
         while st.state == PlayerState::Playing {
             match end {
-                None => st = self.inner.changed.wait(st).unwrap(),
+                None => {
+                    st = self
+                        .inner
+                        .changed
+                        .wait(st)
+                        .unwrap_or_else(PoisonError::into_inner)
+                }
                 Some(end) => {
                     let left = end.saturating_duration_since(Instant::now());
                     if left.is_zero() {
                         return Ok(false);
                     }
-                    st = self.inner.changed.wait_timeout(st, left).unwrap().0;
+                    st = self
+                        .inner
+                        .changed
+                        .wait_timeout(st, left)
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .0;
                 }
             }
         }
@@ -361,6 +376,14 @@ fn check_speed(value: f64) -> Result<f64> {
         )));
     }
     Ok(value)
+}
+
+/// Longest single wait of the player thread: a gap stretched by a tiny speed can exceed what a
+/// `Duration` holds, and the loop re-evaluates after every wake anyway (contract 09 §Player).
+const MAX_WAIT: Duration = Duration::from_secs(60);
+
+fn wait_slice(seconds: f64) -> Duration {
+    Duration::try_from_secs_f64(seconds).map_or(MAX_WAIT, |d| d.min(MAX_WAIT))
 }
 
 impl Inner {
@@ -461,15 +484,18 @@ impl Inner {
                     if st.generation == gen {
                         drop(
                             self.changed
-                                .wait_timeout(st, Duration::from_secs_f64(w))
-                                .unwrap(),
+                                .wait_timeout(st, wait_slice(w))
+                                .unwrap_or_else(PoisonError::into_inner),
                         );
                     }
                 }
                 Step::Idle(gen) => {
                     let mut st = self.lock();
                     while !st.closed && st.generation == gen {
-                        st = self.changed.wait(st).unwrap();
+                        st = self
+                            .changed
+                            .wait(st)
+                            .unwrap_or_else(PoisonError::into_inner);
                     }
                     if st.closed {
                         return;

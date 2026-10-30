@@ -417,9 +417,19 @@ class Vl53l8cx(DeviceBase):
         self.uld.start_ranging(cnh_data_size=cnh_size)
         frame_size = self.uld.data_read_size
         self._reassembler = FrameReassembler(self._STREAM_CHUNK)
-        self.request(
-            Vl53l8Cmd.START_STREAM, pack_start_stream(frame_size), ok_completes=True
-        )
+        try:
+            self.request(
+                Vl53l8Cmd.START_STREAM, pack_start_stream(frame_size), ok_completes=True
+            )
+        except BaseException:
+            # The sensor ranges but the host will say it does not: stop it
+            # again, or stop_ranging() could never reach it. The START_STREAM
+            # error is the one the caller gets, even if this stop fails too.
+            try:
+                self.uld.stop_ranging()
+            except Exception:
+                pass
+            raise
         self._ranging = True
 
     def stop_ranging(self) -> None:

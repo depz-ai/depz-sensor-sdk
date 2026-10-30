@@ -213,8 +213,25 @@ public sealed class Vl53l4cdDevice : DepzDevice
     {
         RequireNotRanging();
         Uld.StartRanging();
-        RequestOk((int)Vl53l4Cmd.StartStream,
-            Vl53l4Wire.PackStartStream(Vl53l4Uld.ResultBlockAddr, Vl53l4Uld.ResultBlockLen));
+        try
+        {
+            RequestOk((int)Vl53l4Cmd.StartStream,
+                Vl53l4Wire.PackStartStream(Vl53l4Uld.ResultBlockAddr, Vl53l4Uld.ResultBlockLen));
+        }
+        catch
+        {
+            // The sensor ranges but the host will say it does not: stop it again, or StopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try
+            {
+                Uld.StopRanging();
+            }
+            catch
+            {
+                // the original error matters more
+            }
+            throw;
+        }
         _ranging = true;
     }
 

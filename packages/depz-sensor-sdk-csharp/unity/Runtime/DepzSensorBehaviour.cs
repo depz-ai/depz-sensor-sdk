@@ -1,5 +1,6 @@
 #if UNITY_5_3_OR_NEWER
 #nullable enable
+using System;
 using Depz.Sensor.Devices;
 using UnityEngine;
 
@@ -24,26 +25,50 @@ namespace Depz.Sensor.Unity
 
         private Subscription<DeviceEvent>? _events;
 
-        /// <summary>The open device, or null before Start() and after a failed open.</summary>
+        /// <summary>The open device, or null before Start() and after a failed one.</summary>
         public DepzDevice? Device { get; private set; }
 
+        /// <summary>Open the device and hand it to <see cref="OnOpened"/>. Whatever fails after the open — a
+        /// request, <see cref="OnOpened"/> itself — closes the device again and logs: the component is either
+        /// started or has no device.</summary>
         protected virtual void Start()
         {
+            DepzDevice device;
             try
             {
-                Device = Port.Length > 0
-                    ? DepzDevicesUnity.OpenPort(Port)
-                    : DepzDevicesUnity.OpenDevice(Serial.Length > 0 ? Serial : null);
+                device = OpenDevice();
             }
             catch (DepzException e)
             {
                 Debug.LogError($"DEPZ: {e.Message}", this);
                 return;
             }
-            _events = Device.Events();
-            Debug.Log($"DEPZ: {Device.GetType().Name} on {Device.Port}: {Device.GetSoftwareName()}", this);
-            OnOpened(Device);
+            try
+            {
+                _events = device.Events();
+                Debug.Log($"DEPZ: {device.GetType().Name} on {device.Port}: {device.GetSoftwareName()}", this);
+                Device = device;
+                OnOpened(device);
+            }
+            catch (Exception e)
+            {
+                _events?.Dispose();
+                _events = null;
+                Device = null;
+                device.Close();
+                if (e is DepzException)
+                    Debug.LogError($"DEPZ: {e.Message}", this);
+                else
+                    Debug.LogException(e, this);
+            }
         }
+
+        /// <summary>Open the device Start() runs on: <see cref="Port"/>, else the board of <see cref="Serial"/>, else
+        /// the first one. Override to open it another way (a replay link, say).</summary>
+        protected virtual DepzDevice OpenDevice() =>
+            Port.Length > 0
+                ? DepzDevicesUnity.OpenPort(Port)
+                : DepzDevicesUnity.OpenDevice(Serial.Length > 0 ? Serial : null);
 
         protected virtual void Update()
         {

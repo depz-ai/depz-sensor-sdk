@@ -4,6 +4,7 @@
  */
 
 import { LinkClosedError, ReplayMismatchError } from "../errors.js";
+import { jsonTooDeep, MAX_JSON_DEPTH } from "../jsonl.js";
 import type { SerialTransport, SerialTransportInfo } from "./types.js";
 
 export const RECORDING_SCHEMA = "depz.rec/1";
@@ -35,6 +36,9 @@ const BLANK_LINE = /^[ \t\r]*$/;
  * never a crash in the reader).
  */
 function jsonObjectLine(lineno: number, line: string): Record<string, unknown> {
+  if (jsonTooDeep(line)) {
+    throw new TypeError(`.depzrec line ${lineno}: not JSON: nested deeper than ${MAX_JSON_DEPTH}`);
+  }
   let obj: unknown;
   try {
     obj = JSON.parse(line);

@@ -231,3 +231,47 @@ pub fn until(cond: impl Fn() -> bool, ms: u64) -> bool {
     }
     cond()
 }
+
+/// A link that flags its own drop: whether the device let go of the connection.
+pub struct DropProbe<L: Link> {
+    pub inner: L,
+    pub dropped: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl<L: Link> DropProbe<L> {
+    pub fn new(inner: L) -> (DropProbe<L>, Arc<std::sync::atomic::AtomicBool>) {
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        (
+            DropProbe {
+                inner,
+                dropped: dropped.clone(),
+            },
+            dropped,
+        )
+    }
+}
+
+impl<L: Link> Drop for DropProbe<L> {
+    fn drop(&mut self) {
+        self.dropped
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl<L: Link> Link for DropProbe<L> {
+    fn read(&self, timeout: Duration) -> Result<Vec<u8>, DepzError> {
+        self.inner.read(timeout)
+    }
+    fn write(&self, data: &[u8]) -> Result<(), DepzError> {
+        self.inner.write(data)
+    }
+    fn close(&self) {
+        self.inner.close()
+    }
+    fn is_closed(&self) -> bool {
+        self.inner.is_closed()
+    }
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+}

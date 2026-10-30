@@ -458,7 +458,18 @@ public class Vl53lxDevice extends DepzDevice {
         Vl53lxDriver drv = driver();
         drv.startRanging();
         int[] block = drv.streamBlock();
-        requestOk(Vl53lx.Vl53lxCmd.START_STREAM.value, Vl53lx.packStartStream(block[0], block[1], drv.clearSteps(), 0));
+        try {
+            requestOk(Vl53lx.Vl53lxCmd.START_STREAM.value, Vl53lx.packStartStream(block[0], block[1], drv.clearSteps(), 0));
+        } catch (RuntimeException e) {
+            // The sensor ranges but the host will say it does not: stop it again, or stopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try {
+                drv.stopRanging();
+            } catch (RuntimeException stopFailure) {
+                e.addSuppressed(stopFailure);
+            }
+            throw e;
+        }
         ranging = true;
     }
 

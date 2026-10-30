@@ -215,7 +215,7 @@ this way.
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.9.0
+  GIT_TAG        v0.9.1
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 
@@ -283,7 +283,7 @@ find_package(depz-sensor-sdk-cpp CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE depz::sensor_sdk_cpp)
 ```
 
-> The portfile references release tag `v0.9.0`; fill in the archive `SHA512`
+> The portfile references release tag `v0.9.1`; fill in the archive `SHA512`
 > in `vcpkg/portfile.cmake` when that tag is published.
 
 ## Build & test

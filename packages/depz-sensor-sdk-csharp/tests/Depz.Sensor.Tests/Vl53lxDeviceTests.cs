@@ -762,12 +762,18 @@ public class Vl53lxDeviceTests
     }
 
     [Fact]
-    public void ARefusedStartStreamLeavesTheDeviceNotRanging()
+    public void ARefusedStartStreamStopsTheSensorAgain()
     {
         using var r = new Rig().Ready();
         r.Fake.FailNext(StartStream, (int)Status.ErrPayloadFormat);
-        Assert.Throws<StatusException>(() => r.Dev.StartRanging());
+        var e = Assert.Throws<StatusException>(() => r.Dev.StartRanging());
+        Assert.Equal((int)Status.ErrPayloadFormat, e.Status); // the original error, not one from the stop
         Assert.False(r.Dev.Ranging);
+        // the driver started the die, so it is stopped again
+        var keys = r.Fake.WriteKeys();
+        Assert.Equal(Key(0x0087, 0x21), keys[0]);
+        Assert.Equal(Key(0x0087, 0x80), keys[^1]);
+        r.Dev.SetOffsetMm(0); // configuration allowed again
     }
 
     // ── MeasureOnce (poll) ───────────────────────────────────────────────────

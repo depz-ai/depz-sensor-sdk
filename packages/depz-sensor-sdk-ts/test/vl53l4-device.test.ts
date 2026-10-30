@@ -8,9 +8,9 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  DepzError,
   DepzTimeoutError,
   InvalidStateError,
+  LinkClosedError,
   StatusError,
   Vl53l4cd,
   Vl53l4cdError,
@@ -273,6 +273,22 @@ describe("vl53l4cd ranging", () => {
     expect(dev.ranging).toBe(true);
   });
 
+  it("a START_STREAM timeout stops the sensor again and keeps the timeout", async () => {
+    const { dev, fake } = await connect(200);
+    await dev.init();
+    fake.rx.length = 0;
+    fake.failNext(CMD.startStream, "silent");
+    await expect(dev.startRanging()).rejects.toThrow(DepzTimeoutError);
+    expect(dev.ranging).toBe(false);
+    expect(fake.writes()).toEqual([
+      [0x0087, [0x21]],
+      [0x0087, [0x80]], // the ULD started the die, so it is stopped again
+    ]);
+    await dev.setOffsetMm(3); // not wedged: reconfiguration works
+    await dev.startRanging(); // and a retry starts cleanly
+    expect(dev.ranging).toBe(true);
+  });
+
   it("decodes streamed blocks (vector result_block)", async () => {
     const { dev, fake } = await ready();
     const seen: Vl53l4Measurement[] = [];
@@ -349,7 +365,7 @@ describe("vl53l4cd ranging", () => {
     await expect(dev.getMeasurement(20)).rejects.toThrow(DepzTimeoutError);
     const pending = dev.getMeasurement(2000);
     await dev.close();
-    await expect(pending).rejects.toThrow(DepzError);
+    await expect(pending).rejects.toThrow(LinkClosedError);
     await expect(pending).rejects.toThrow(/device closed/);
   });
 

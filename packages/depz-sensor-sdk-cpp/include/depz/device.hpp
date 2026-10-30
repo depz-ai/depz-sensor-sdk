@@ -256,18 +256,24 @@ public:
     void send(std::uint8_t cmd, byte_span payload = {});
 
     // Events: callbacks stay registered until unsubscribed or the device dies.
+    // An Unsubscribe called after close() (or after the device is gone) does
+    // nothing.
     using Unsubscribe = std::function<void()>;
     Unsubscribe on_event(std::function<void(const DeviceEvent&)> cb);
     Stream<DeviceEvent> events(std::size_t maxsize = 256);
 
-    depz_device* c_handle() const noexcept { return d_; }
+    depz_device* c_handle() const noexcept { return d_.load(); }
 
 protected:
     explicit Device(depz_device* d) : d_(d) {}
     // The C handle, or DeviceLostError after close().
     depz_device* handle() const;
     void keep(std::unique_ptr<detail::CallbackHolder> h);
-    depz_device* d_;
+    // The Unsubscribe of C callback `token`: `off(handle, token)` while the
+    // device is open, nothing once close() freed the handle.
+    Unsubscribe unsubscriber(void (*off)(depz_device*, int), int token) const;
+    // Atomic: close() may run on another thread than a call (contract 07 §3).
+    std::atomic<depz_device*> d_;
 
     // Register a callback holder: it shares the device's callback_errors count.
     template <class H>
@@ -284,10 +290,12 @@ private:
     std::vector<std::unique_ptr<detail::CallbackHolder>> held_;
     std::shared_ptr<std::atomic<std::uint64_t>> callback_errors_ =
         std::make_shared<std::atomic<std::uint64_t>>(0);
+    // Cleared by close() before the handle is freed; Unsubscribes watch it.
+    std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
     // The wrapper of the class now attached to `dev`'s handle; `dev` is spent.
     static std::unique_ptr<Device> rewrap(std::unique_ptr<Device> dev);
     friend std::unique_ptr<Device> wrap_device(depz_device* d);
-    friend std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev,
+    friend std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device>&& dev,
                                                        const std::string& class_name);
 };
 
@@ -491,6 +499,8 @@ public:
     // Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
     // (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
     // sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
+    // An exception from `progress` is not called again and leaves init() once
+    // the boot has run to its end (contract 07 §3).
     void init(Vl53l8Progress progress = {});
     bool initialized() const;
     bool ranging() const;  // between start_ranging() and stop_ranging()
@@ -1058,7 +1068,9 @@ public:
     static std::unique_ptr<Tmf8829> open(Link link);
 
     // Soft reset -> sensor bootloader -> firmware download -> RAM application.
-    // Stops a running stream first; forgets the config.
+    // Stops a running stream first; forgets the config. An exception from
+    // `progress` is not called again and leaves init() once the download has
+    // run to its end (contract 07 §3).
     Tmf8829SensorId init(Tmf8829Progress progress = {});
     // What the last init() read; ArgumentError before one.
     Tmf8829SensorId sensor_id();
@@ -1150,9 +1162,11 @@ std::unique_ptr<Device> open_device(const OpenOptions& opt = {});
 // sensor_class_names(), as from resolve_sensor_class()) on the same
 // connection — contract 02 §4.4: no reopen, the reader and the host sequence
 // numbers run on. `dev` must be a plain Device (no class yet) with no request
-// in flight (ArgumentError otherwise); it is consumed — use the result.
-// "device" returns `dev` itself; "bootloader" throws BootloaderModeError.
-std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name);
+// in flight (ArgumentError otherwise); on success it is consumed — use the
+// result. "device" returns `dev` itself; "bootloader" throws
+// BootloaderModeError. On any failure `dev` stays the caller's, open and
+// usable.
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device>&& dev, const std::string& class_name);
 
 // Open a device on a connection that cannot be reopened — a replay or
 // recording link, an adopted transport (contract 02 §4.4). Runs the probe

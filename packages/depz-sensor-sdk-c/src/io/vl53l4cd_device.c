@@ -152,6 +152,10 @@ static int need(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
 static bool get_flag(depz_device *dev, bool ranging)
 {
     l4_state *s = st(dev);
@@ -386,17 +390,18 @@ static int collect(depz_device *dev, int nb, sample_fn fn, void *ctx)
 
 /* ── public: lifecycle ─────────────────────────────────────────────────── */
 
-int depz_vl53l4cd_is_alive(depz_device *dev, bool *alive)
+static int do_is_alive(depz_device *dev, bool *alive)
 {
     uint16_t id;
-    int rc = need(dev);
-    if (rc) return rc;
+    int rc;
     rc = rd_word(dev, IDENTIFICATION__MODEL_ID, &id);
     if (alive) *alive = rc == DEPZ_OK && id == DEPZ_VL53L4_MODEL_ID;
     return rc;
 }
 
-int depz_vl53l4cd_init(depz_device *dev, uint16_t bus_khz)
+int depz_vl53l4cd_is_alive(depz_device *dev, bool *alive) { ENTERED(do_is_alive(dev, alive)); }
+
+static int do_init(depz_device *dev, uint16_t bus_khz)
 {
     int rc = need_idle(dev);
     if (rc) return rc;
@@ -405,15 +410,18 @@ int depz_vl53l4cd_init(depz_device *dev, uint16_t bus_khz)
     return rc;
 }
 
-int depz_vl53l4cd_xshut(depz_device *dev, uint8_t action)
+int depz_vl53l4cd_init(depz_device *dev, uint16_t bus_khz) { ENTERED(do_init(dev, bus_khz)); }
+
+static int do_xshut(depz_device *dev, uint8_t action)
 {
-    int rc = need(dev);
-    if (rc) return rc;
+    int rc;
     rc = depz_device_request(dev, DEPZ_VL53L4_CMD_XSHUT, &action, 1, NULL, NULL, true,
                              action == DEPZ_VL53L4_XSHUT_RESET ? 2000 : -1);
     if (rc == DEPZ_OK) set_flags(dev, 0, 0);
     return rc;
 }
+
+int depz_vl53l4cd_xshut(depz_device *dev, uint8_t action) { ENTERED(do_xshut(dev, action)); }
 
 int depz_vl53l4cd_reset_sensor(depz_device *dev)
 {
@@ -430,11 +438,10 @@ static bool match_info(uint8_t cmd, const uint8_t *p, size_t len, void *c)
     return true;
 }
 
-int depz_vl53l4cd_bridge_info(depz_device *dev, depz_vl53l4_info *out)
+static int do_bridge_info(depz_device *dev, depz_vl53l4_info *out)
 {
     info_ctx c;
-    int rc = need(dev);
-    if (rc) return rc;
+    int rc;
     if (!out) return depz_fail(DEPZ_E_ARG, "bridge_info: NULL output");
     c.out = out;
     c.ok = false;
@@ -443,25 +450,36 @@ int depz_vl53l4cd_bridge_info(depz_device *dev, depz_vl53l4_info *out)
     return rc;
 }
 
-int depz_vl53l4cd_set_i2c_speed_khz(depz_device *dev, uint16_t khz)
+int depz_vl53l4cd_bridge_info(depz_device *dev, depz_vl53l4_info *out) { ENTERED(do_bridge_info(dev, out)); }
+
+static int do_set_i2c_speed_khz(depz_device *dev, uint16_t khz)
 {
     int rc = need_idle(dev);
     return rc ? rc : set_speed(dev, khz);
 }
 
+int depz_vl53l4cd_set_i2c_speed_khz(depz_device *dev, uint16_t khz)
+{
+    ENTERED(do_set_i2c_speed_khz(dev, khz));
+}
+
 /* ── public: configuration ─────────────────────────────────────────────── */
 
-int depz_vl53l4cd_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t inter_ms)
+static int do_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t inter_ms)
 {
     int rc = need_idle(dev);
     return rc ? rc : uld_set_range_timing(dev, budget_ms, inter_ms);
 }
 
-int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32_t *inter_ms)
+int depz_vl53l4cd_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t inter_ms)
+{
+    ENTERED(do_set_range_timing(dev, budget_ms, inter_ms));
+}
+
+static int do_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32_t *inter_ms)
 {
     uint32_t im;
     uint16_t pll, osc, a;
-    TRY(need(dev));
     TRY(rd_dword(dev, INTERMEASUREMENT_MS, &im));
     TRY(rd_word(dev, RESULT__OSC_CALIBRATE_VAL, &pll));
     TRY(rd_word(dev, OSC_FREQUENCY, &osc));
@@ -471,7 +489,12 @@ int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm)
+int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32_t *inter_ms)
+{
+    ENTERED(do_get_range_timing(dev, budget_ms, inter_ms));
+}
+
+static int do_set_offset_mm(depz_device *dev, int32_t offset_mm)
 {
     uint16_t raw;
     if (depz_vl53l4_offset_raw_checked(offset_mm, &raw))
@@ -482,16 +505,25 @@ int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm)
     return wr_word(dev, OUTER_OFFSET_MM, 0);
 }
 
-int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm)
+int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm)
+{
+    ENTERED(do_set_offset_mm(dev, offset_mm));
+}
+
+static int do_get_offset_mm(depz_device *dev, int32_t *offset_mm)
 {
     uint16_t w;
-    TRY(need(dev));
     TRY(rd_word(dev, RANGE_OFFSET_MM, &w));
     *offset_mm = depz_vl53l4_decode_offset(w);
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps)
+int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm)
+{
+    ENTERED(do_get_offset_mm(dev, offset_mm));
+}
+
+static int do_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps)
 {
     uint16_t raw;
     if (depz_vl53l4_xtalk_raw_checked(xtalk_kcps, &raw))
@@ -502,17 +534,26 @@ int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps)
     return wr_word(dev, XTALK_PLANE_OFFSET_KCPS, raw);
 }
 
-int depz_vl53l4cd_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps)
+int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps)
+{
+    ENTERED(do_set_xtalk_kcps(dev, xtalk_kcps));
+}
+
+static int do_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps)
 {
     uint16_t w;
-    TRY(need(dev));
     TRY(rd_word(dev, XTALK_PLANE_OFFSET_KCPS, &w));
     *xtalk_kcps = depz_vl53l4_decode_xtalk(w);
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_set_detection_thresholds(depz_device *dev, uint16_t low_mm, uint16_t high_mm,
-                                           uint8_t window)
+int depz_vl53l4cd_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps)
+{
+    ENTERED(do_get_xtalk_kcps(dev, xtalk_kcps));
+}
+
+static int do_set_detection_thresholds(depz_device *dev, uint16_t low_mm, uint16_t high_mm,
+                                       uint8_t window)
 {
     TRY(need_idle(dev));
     TRY(wr_byte(dev, SYSTEM__INTERRUPT, window));
@@ -520,11 +561,16 @@ int depz_vl53l4cd_set_detection_thresholds(depz_device *dev, uint16_t low_mm, ui
     return wr_word(dev, THRESH_LOW, low_mm);
 }
 
-int depz_vl53l4cd_get_detection_thresholds(depz_device *dev, uint16_t *low_mm, uint16_t *high_mm,
-                                           uint8_t *window)
+int depz_vl53l4cd_set_detection_thresholds(depz_device *dev, uint16_t low_mm, uint16_t high_mm,
+                                           uint8_t window)
+{
+    ENTERED(do_set_detection_thresholds(dev, low_mm, high_mm, window));
+}
+
+static int do_get_detection_thresholds(depz_device *dev, uint16_t *low_mm, uint16_t *high_mm,
+                                       uint8_t *window)
 {
     uint8_t w;
-    TRY(need(dev));
     TRY(rd_word(dev, THRESH_HIGH, high_mm));
     TRY(rd_word(dev, THRESH_LOW, low_mm));
     TRY(rd_byte(dev, SYSTEM__INTERRUPT, &w));
@@ -532,22 +578,37 @@ int depz_vl53l4cd_get_detection_thresholds(depz_device *dev, uint16_t *low_mm, u
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_set_signal_threshold_kcps(depz_device *dev, uint16_t kcps)
+int depz_vl53l4cd_get_detection_thresholds(depz_device *dev, uint16_t *low_mm, uint16_t *high_mm,
+                                           uint8_t *window)
+{
+    ENTERED(do_get_detection_thresholds(dev, low_mm, high_mm, window));
+}
+
+static int do_set_signal_threshold_kcps(depz_device *dev, uint16_t kcps)
 {
     TRY(need_idle(dev));
     return wr_word(dev, MIN_COUNT_RATE_RTN_LIMIT_MCPS, depz_vl53l4_signal_threshold_raw(kcps));
 }
 
-int depz_vl53l4cd_get_signal_threshold_kcps(depz_device *dev, uint16_t *kcps)
+int depz_vl53l4cd_set_signal_threshold_kcps(depz_device *dev, uint16_t kcps)
+{
+    ENTERED(do_set_signal_threshold_kcps(dev, kcps));
+}
+
+static int do_get_signal_threshold_kcps(depz_device *dev, uint16_t *kcps)
 {
     uint16_t w;
-    TRY(need(dev));
     TRY(rd_word(dev, MIN_COUNT_RATE_RTN_LIMIT_MCPS, &w));
     *kcps = depz_vl53l4_decode_signal_threshold(w);
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_set_sigma_threshold_mm(depz_device *dev, uint16_t mm)
+int depz_vl53l4cd_get_signal_threshold_kcps(depz_device *dev, uint16_t *kcps)
+{
+    ENTERED(do_get_signal_threshold_kcps(dev, kcps));
+}
+
+static int do_set_sigma_threshold_mm(depz_device *dev, uint16_t mm)
 {
     uint16_t raw;
     TRY(need_idle(dev));
@@ -556,16 +617,25 @@ int depz_vl53l4cd_set_sigma_threshold_mm(depz_device *dev, uint16_t mm)
     return wr_word(dev, RANGE_CONFIG__SIGMA_THRESH, raw);
 }
 
-int depz_vl53l4cd_get_sigma_threshold_mm(depz_device *dev, uint16_t *mm)
+int depz_vl53l4cd_set_sigma_threshold_mm(depz_device *dev, uint16_t mm)
+{
+    ENTERED(do_set_sigma_threshold_mm(dev, mm));
+}
+
+static int do_get_sigma_threshold_mm(depz_device *dev, uint16_t *mm)
 {
     uint16_t w;
-    TRY(need(dev));
     TRY(rd_word(dev, RANGE_CONFIG__SIGMA_THRESH, &w));
     *mm = depz_vl53l4_decode_sigma_threshold(w);
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_start_temperature_update(depz_device *dev)
+int depz_vl53l4cd_get_sigma_threshold_mm(depz_device *dev, uint16_t *mm)
+{
+    ENTERED(do_get_sigma_threshold_mm(dev, mm));
+}
+
+static int do_start_temperature_update(depz_device *dev)
 {
     TRY(need_idle(dev));
     TRY(wr_byte(dev, VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND, 0x81));
@@ -578,6 +648,8 @@ int depz_vl53l4cd_start_temperature_update(depz_device *dev)
     return wr_byte(dev, 0x000B, 0x00);
 }
 
+int depz_vl53l4cd_start_temperature_update(depz_device *dev) { ENTERED(do_start_temperature_update(dev)); }
+
 /* ── public: calibration (VL53L4CD_calibration.c) ─────────────────────── */
 
 typedef struct { long sum; } offset_acc;
@@ -588,8 +660,8 @@ static void add_distance(int i, const depz_vl53l4_result *r, void *c)
     ((offset_acc *)c)->sum += r->distance_mm;
 }
 
-int depz_vl53l4cd_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
-                                   int32_t *offset_mm)
+static int do_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
+                               int32_t *offset_mm)
 {
     offset_acc acc;
     int32_t off;
@@ -614,6 +686,12 @@ int depz_vl53l4cd_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t
     return DEPZ_OK;
 }
 
+int depz_vl53l4cd_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
+                                   int32_t *offset_mm)
+{
+    ENTERED(do_calibrate_offset(dev, target_mm, nb_samples, offset_mm));
+}
+
 typedef struct { int n; double distance, spads, signal; } xtalk_acc;
 
 static void add_xtalk(int i, const depz_vl53l4_result *r, void *c)
@@ -627,8 +705,8 @@ static void add_xtalk(int i, const depz_vl53l4_result *r, void *c)
     a->signal += r->signal_rate_kcps;
 }
 
-int depz_vl53l4cd_calibrate_xtalk(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
-                                  uint16_t *xtalk_kcps)
+static int do_calibrate_xtalk(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
+                              uint16_t *xtalk_kcps)
 {
     xtalk_acc acc;
     double tmp;
@@ -649,23 +727,41 @@ int depz_vl53l4cd_calibrate_xtalk(depz_device *dev, uint16_t target_mm, uint8_t 
     return DEPZ_OK;
 }
 
+int depz_vl53l4cd_calibrate_xtalk(depz_device *dev, uint16_t target_mm, uint8_t nb_samples,
+                                  uint16_t *xtalk_kcps)
+{
+    ENTERED(do_calibrate_xtalk(dev, target_mm, nb_samples, xtalk_kcps));
+}
+
 /* ── public: ranging ───────────────────────────────────────────────────── */
 
-int depz_vl53l4cd_start_ranging(depz_device *dev)
+static int do_start_ranging(depz_device *dev)
 {
     uint8_t p[5];
+    int rc;
     TRY(need_idle(dev));
     TRY(uld_start(dev));
     depz_vl53l4_pack_start_stream(DEPZ_VL53L4_RESULT_BLOCK_ADDR, DEPZ_VL53L4_RESULT_BLOCK_LEN, 0, p);
-    TRY(depz_device_request(dev, DEPZ_VL53L4_CMD_START_STREAM, p, 5, NULL, NULL, true, -1));
+    rc = depz_device_request(dev, DEPZ_VL53L4_CMD_START_STREAM, p, 5, NULL, NULL, true, -1);
+    if (rc) {
+        /* The sensor ranges but the host will say it does not: stop it again, or
+         * stop_ranging() could never reach it. The START_STREAM error is the one
+         * the caller gets, even if this stop fails too. */
+        depz_saved_error first;
+        depz_error_save(&first);
+        (void)uld_stop(dev);
+        depz_error_restore(&first);
+        return rc;
+    }
     set_flags(dev, 1, -1);
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_stop_ranging(depz_device *dev)
+int depz_vl53l4cd_start_ranging(depz_device *dev) { ENTERED(do_start_ranging(dev)); }
+
+static int do_stop_ranging(depz_device *dev)
 {
     int rc, rc2;
-    TRY(need(dev));
     if (!get_flag(dev, true)) return DEPZ_OK;
     /* Clear host state and stop the sensor even when the stream stop fails,
      * or the device stays wedged "ranging". */
@@ -675,7 +771,9 @@ int depz_vl53l4cd_stop_ranging(depz_device *dev)
     return rc ? rc : rc2;
 }
 
-int depz_vl53l4cd_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
+int depz_vl53l4cd_stop_ranging(depz_device *dev) { ENTERED(do_stop_ranging(dev)); }
+
+static int do_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
 {
     depz_vl53l4_result r = {0};
     int rc;
@@ -699,35 +797,54 @@ int depz_vl53l4cd_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_m
     return DEPZ_OK;
 }
 
-int depz_vl53l4cd_on_measurement(depz_device *dev, depz_vl53l4cd_measurement_cb cb, void *user,
-                                 int *token)
+int depz_vl53l4cd_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
 {
-    TRY(need(dev));
+    ENTERED(do_measure_once(dev, timeout_ms, out));
+}
+
+static int do_on_measurement(depz_device *dev, depz_vl53l4cd_measurement_cb cb, void *user,
+                             int *token)
+{
     if (!cb) return depz_fail(DEPZ_E_ARG, "vl53l4cd: NULL callback");
     return depz_cb_list_add(&st(dev)->cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_vl53l4cd_on_measurement(depz_device *dev, depz_vl53l4cd_measurement_cb cb, void *user,
+                                 int *token)
+{
+    ENTERED(do_on_measurement(dev, cb, user, token));
+}
+
 void depz_vl53l4cd_off_measurement(depz_device *dev, int token)
 {
-    if (depz_is_vl53l4cd(dev)) depz_cb_list_remove(&st(dev)->cbs, token);
+    if (!depz_is_vl53l4cd(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_vl53l4cd_stream(depz_device *dev, size_t maxsize)
 {
-    if (need(dev)) return NULL;
-    return depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 64);
+    depz_stream *s;
+    if (need(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 64);
+    depz_device_leave(dev);
+    return s;
 }
 
-int depz_vl53l4cd_get_measurement(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
+static int do_get_measurement(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
 {
     depz_stream *s;
     int rc;
-    TRY(need(dev));
     s = depz_hub_subscribe(st(dev)->hub, 1);
     if (!s) return depz_fail(DEPZ_E_NOMEM, "vl53l4cd: cannot subscribe");
     rc = depz_stream_next(s, out, timeout_ms < 0 ? 2000 : timeout_ms);
     depz_stream_close(s);
     return rc;
+}
+
+int depz_vl53l4cd_get_measurement(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out)
+{
+    ENTERED(do_get_measurement(dev, timeout_ms, out));
 }
 
 uint64_t depz_vl53l4cd_stream_parse_errors(const depz_device *dev)
@@ -742,14 +859,22 @@ uint64_t depz_vl53l4cd_stream_parse_errors(const depz_device *dev)
     return n;
 }
 
+static int do_read_reg(depz_device *dev, uint16_t addr, uint8_t *buf, size_t len)
+{
+    return depz_rb_read(&st(dev)->rb, addr, buf, len);
+}
+
 int depz_vl53l4cd_read_reg(depz_device *dev, uint16_t addr, uint8_t *buf, size_t len)
 {
-    TRY(need(dev));
-    return depz_rb_read(&st(dev)->rb, addr, buf, len);
+    ENTERED(do_read_reg(dev, addr, buf, len));
+}
+
+static int do_write_reg(depz_device *dev, uint16_t addr, const uint8_t *data, size_t len)
+{
+    return depz_rb_write(&st(dev)->rb, addr, data, len);
 }
 
 int depz_vl53l4cd_write_reg(depz_device *dev, uint16_t addr, const uint8_t *data, size_t len)
 {
-    TRY(need(dev));
-    return depz_rb_write(&st(dev)->rb, addr, data, len);
+    ENTERED(do_write_reg(dev, addr, data, len));
 }

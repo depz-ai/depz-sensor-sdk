@@ -5,6 +5,7 @@ does on its own: diagnostic events (contract 07 §2), link-level damage
 
 from __future__ import annotations
 
+import gc
 import logging
 import struct
 import threading
@@ -359,3 +360,116 @@ def test_close_from_an_event_callback(rig):
     peer.send(Rpt.TEXT, bytes((0x04,)) + b"bye\x00")
     dev._reader.join(1.0)
     assert dev.closed and not dev._reader.is_alive()
+
+
+def test_abandoned_iterators_deregister_on_gc():
+    """stream()/events() iterators dropped without close() leave the
+    registry once collected (the reader stops filling their queues)."""
+    from depz_sensor_sdk import Sr04
+    from depz_sensor_sdk.transport.link import LoopbackLink
+
+    link, side = LoopbackLink.pair()
+    dev = Sr04(link, timeout=0.1)
+    try:
+        for _ in range(20):
+            it = dev.stream()
+            ev = dev.events()
+            del it, ev
+        gc.collect()
+        assert dev.stream_dropped_counts == []
+        assert dev._event_queues == []
+        kept = dev.stream()
+        assert len(dev.stream_dropped_counts) == 1
+        kept.close()
+        kept.close()  # idempotent
+        assert dev.stream_dropped_counts == []
+    finally:
+        dev.close()
+        side.close()
+
+
+class _RaisingReports(DeviceBase):
+    """A sensor class whose stream handler raises on report 0x9E — a decoder
+    bug, or a frame it does not expect (bug hunt 2026-10-29, group A)."""
+
+    def _handle_report(self, pkt):
+        if pkt.cmd == 0x9E:
+            raise RuntimeError("stream decoder bug")
+        return False
+
+
+def test_a_raising_report_handler_drops_that_packet_and_the_reader_goes_on(caplog):
+    """Contract 07 §3: an exception in the report path (`_handle_report`, any
+    stream handler) drops that one packet, counts it in
+    `stats.report_errors`, logs it — the reader reads on and requests
+    complete."""
+    peer = Peer()
+    dev = _RaisingReports(peer.host, timeout=0.5)
+    try:
+        after = threading.Event()
+        dev.on_event(lambda ev: ev == TextEvent(0x04, "after") and after.set())
+        with caplog.at_level(logging.ERROR, logger="depz_sensor_sdk"):
+            peer.send(0x9E, b"\x01\x02")
+            peer.send(Rpt.TEXT, bytes((0x04,)) + b"after\x00")
+            assert after.wait(1.0)  # the packet after the bad one was read
+        assert dev.stats.report_errors == 1
+        assert "stream decoder bug" in caplog.text
+        t, out = _in_thread(dev.get_device_name)
+        peer.expect(Cmd.GET_DEVICE_NAME)
+        peer.send(Rpt.TEXT, bytes((Cmd.GET_DEVICE_NAME,)) + b"still here\x00")
+        t.join(1.0)
+        assert out == {"result": "still here"}
+        assert dev._reader.is_alive() and not dev.closed
+    finally:
+        dev.close()
+        peer.side.close()
+
+
+class _BrokenRead(LoopbackLink):
+    """A link whose read fails with something other than closed/lost."""
+
+    def read(self, timeout=None):
+        raise ValueError("I/O operation on closed file.")
+
+
+def test_a_reader_that_ends_for_any_reason_closes_the_device(caplog):
+    """The reader ending on anything but close() leaves the device closed:
+    `closed` is true and a later request fails at once with DeviceLostError — never a timeout on a device that looks open."""
+    host = _BrokenRead()
+    host.peer = LoopbackLink()
+    with caplog.at_level(logging.ERROR, logger="depz_sensor_sdk"):
+        dev = DeviceBase(host, timeout=5.0)
+        dev._reader.join(2.0)
+    try:
+        assert not dev._reader.is_alive()
+        assert dev.closed
+        t, out = _in_thread(dev.get_device_name)
+        t.join(1.0)
+        assert not t.is_alive()  # at once, not after the 5 s timeout
+        assert isinstance(out["error"], DeviceLostError)
+        assert isinstance(out["error"].__cause__, ValueError)
+        assert "I/O operation on closed file" in caplog.text
+    finally:
+        dev.close()
+
+
+class _BrokenReadAndClose(_BrokenRead):
+    """…and whose close() raises too, so the link never reports closed."""
+
+    def close(self):
+        raise OSError("close failed")
+
+
+def test_a_dead_reader_leaves_the_device_closed_even_if_the_link_close_raises(caplog):
+    host = _BrokenReadAndClose()
+    host.peer = LoopbackLink()
+    with caplog.at_level(logging.ERROR, logger="depz_sensor_sdk"):
+        dev = DeviceBase(host, timeout=5.0)
+        dev._reader.join(2.0)
+    assert not dev._reader.is_alive()
+    assert not host.closed  # the link itself never got closed
+    assert dev.closed
+    t, out = _in_thread(dev.get_device_name)
+    t.join(1.0)
+    assert not t.is_alive()
+    assert isinstance(out["error"], DeviceLostError)

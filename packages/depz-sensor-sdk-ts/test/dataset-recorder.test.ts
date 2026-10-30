@@ -67,6 +67,35 @@ describe("DatasetRecorder cross-sensor sync", () => {
     await fake.close();
   });
 
+  it("start() after stop() starts a fresh capture, as Python does", async () => {
+    const fake = new FakeSr04();
+    const dev = new Sr04(fake.transport, { timeoutMs: 1000 });
+    await dev.open();
+    const rec = new DatasetRecorder();
+    await rec.add(dev, "sr");
+    const oneMeasurement = async (): Promise<void> => {
+      await fake.sendMeasurement(0x37);
+      await dev.getSamplePeriodUs(); // round trip: the RPT_DATA was dispatched
+    };
+
+    rec.start();
+    await oneMeasurement();
+    rec.stop();
+    expect(rec.recordsWritten).toBe(1);
+    await oneMeasurement(); // stopped: not recorded
+    expect(rec.recordsWritten).toBe(1);
+    expect(new DatasetReader(rec.dump()).records.length).toBe(1);
+
+    rec.start();
+    await oneMeasurement();
+    await oneMeasurement();
+    rec.stop();
+    expect(rec.recordsWritten).toBe(2);
+    expect(new DatasetReader(rec.dump()).records.length).toBe(2);
+    await dev.close();
+    await fake.close();
+  });
+
   it("records two devices on a shared host timeline", async () => {
     const fakeA = new FakeSr04();
     const fakeB = new FakeSr04();

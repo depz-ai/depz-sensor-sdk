@@ -1544,6 +1544,14 @@ public long callbackErrors()
 
 Callbacks that threw on the reader thread (contract 07 §3).
 
+#### LinkStats.reportErrors
+
+```java
+public long reportErrors()
+```
+
+Reports whose handler threw: the packet was dropped (contract 07 §3).
+
 ### NoDepzDeviceException
 
 ```java
@@ -15770,6 +15778,8 @@ public String add(DepzDevice device)
 public long recordsWritten()
 ```
 
+Records in the file being written, or in the last one after `stop()`.
+
 #### SessionRecorder.start
 
 ```java
@@ -15802,6 +15812,16 @@ integers → `Long` (`BigInteger` beyond the long range), reals →
 `serialize` writes those back, plus any `Number`, primitive arrays and
 `byte[]` (as a lowercase hex string). Malformed or truncated text is refused with
 `IllegalArgumentException` naming the index — never an index error of the runtime.
+
+#### JsonText.MAX_DEPTH *(field)*
+
+```java
+public static final int MAX_DEPTH = 256
+```
+
+Arrays and objects nest at most this deep, the outermost value being level 1
+(contract 08 «Line rules»): beyond it the text is refused instead of
+overflowing the stack of this recursive-descent parser.
 
 #### JsonText.parse
 

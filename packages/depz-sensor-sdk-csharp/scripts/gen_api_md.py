@@ -70,7 +70,7 @@ DOMAIN_TITLE = {
 # Nicer-than-alphabetical file ordering within a domain (headline codecs first).
 FILE_PRIORITY = [
     "DepzDevices.cs", "DepzDevice.cs", "Subscription.cs", "Links.cs", "SerialPorts.cs", "Errors.cs",
-    "DepzDevicesUnity.cs", "WindowsSerialLink.cs", "WindowsSerialPorts.cs", "IRegistry.cs", "DepzSensorBehaviour.cs",
+    "DepzDevicesUnity.cs", "WindowsSerialLink.cs", "WindowsSerialPorts.cs", "WindowsRegistry.cs", "DepzSensorBehaviour.cs",
     "Sr04Device.cs", "Sr04.cs",
     "Vl53l4cdDevice.cs", "Vl53l4Wire.cs", "Vl53l4Uld.cs", "Vl53l4cdDriver.cs",
     "Vl53l8cxDevice.cs", "Vl53l8Driver.cs", "FrameDecoder.cs", "Vl53l8Stream.cs", "Advanced.cs", "Cnh.cs", "CnhSetup.cs", "Vl53l8Tables.g.cs",

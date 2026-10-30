@@ -218,7 +218,10 @@ public sealed class Vl53l8FrameDecoder
 
             if (idx == MetadataIdx)
             {
-                siliconTemp = (sbyte)buf[i + 12];
+                // The temperature is body byte 8 (the real block has 12); a
+                // shorter block leaves it at 0.
+                if (msize >= 9)
+                    siliconTemp = (sbyte)buf[i + 12];
             }
             else if (idx == DistanceIdx)
             {

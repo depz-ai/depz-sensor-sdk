@@ -328,11 +328,21 @@ class Vl53l4cd(DeviceBase):
         RPT_VL53_STREAM per INT edge carrying the 17-byte result block."""
         self._require_not_ranging()
         self._uld.start_ranging()
-        self.request(
-            Vl53l4Cmd.START_STREAM,
-            pack_start_stream(RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN),
-            ok_completes=True,
-        )
+        try:
+            self.request(
+                Vl53l4Cmd.START_STREAM,
+                pack_start_stream(RESULT_BLOCK_ADDR, RESULT_BLOCK_LEN),
+                ok_completes=True,
+            )
+        except BaseException:
+            # The sensor ranges but the host will say it does not: stop it
+            # again, or stop_ranging() could never reach it. The START_STREAM
+            # error is the one the caller gets, even if this stop fails too.
+            try:
+                self._uld.stop_ranging()
+            except Exception:
+                pass
+            raise
         self._ranging = True
 
     def stop_ranging(self) -> None:

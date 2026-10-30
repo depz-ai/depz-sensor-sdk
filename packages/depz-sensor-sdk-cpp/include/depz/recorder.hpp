@@ -96,6 +96,7 @@ public:
     // Stop writing, unhook the devices and close the file. Idempotent.
     void stop();
     bool recording() const;
+    // Records in the file being written; after stop(), in the finished one.
     std::uint64_t records_written() const;
 
 private:

@@ -78,6 +78,7 @@ public final class Bno086Device extends DepzDevice {
     private final Map<Integer, List<CountDownLatch>> flushWaiters = new HashMap<>();
     private final List<Listener> reportCallbacks = new ArrayList<>();
     private final List<ReportQueue> reportQueues = new ArrayList<>();
+    private boolean reportsClosed; // guarded by reportQueues: set when the reader stops
     private final ByteArrayOutputStream advertisement = new ByteArrayOutputStream();
     private final Map<Integer, FeatureResponse> features = new HashMap<>();
     private final Object resetLock = new Object();
@@ -245,6 +246,7 @@ public final class Bno086Device extends DepzDevice {
     protected void onReaderStopped() {
         if (reportQueues != null) {
             synchronized (reportQueues) {
+                reportsClosed = true;
                 for (ReportQueue q : reportQueues) {
                     q.queue().markClosed();
                 }
@@ -653,7 +655,12 @@ public final class Bno086Device extends DepzDevice {
             }
         });
         synchronized (reportQueues) {
-            reportQueues.add(new ReportQueue(sub, f));
+            if (reportsClosed) {
+                // The device already closed: a closed queue, so take() fails at once (contract 07 §3).
+                sub.markClosed();
+            } else {
+                reportQueues.add(new ReportQueue(sub, f));
+            }
         }
         return sub;
     }

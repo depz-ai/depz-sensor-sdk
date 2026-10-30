@@ -38,6 +38,7 @@ public final class SessionRecorder implements AutoCloseable {
     private final List<Entry> entries = new ArrayList<>();
     private final Map<String, Double> lastSilicon = new HashMap<>();
     private volatile DatasetWriter writer;
+    private volatile long lastRecordsWritten;
     private Thread tempThread;
     private CountDownLatch tempStop;
 
@@ -99,9 +100,10 @@ public final class SessionRecorder implements AutoCloseable {
         return add(device, null, 5);
     }
 
+    /** Records in the file being written, or in the last one after {@link #stop()}. */
     public long recordsWritten() {
         DatasetWriter w = writer;
-        return w == null ? 0 : w.recordsWritten();
+        return w == null ? lastRecordsWritten : w.recordsWritten();
     }
 
     /** Open the file and hook every device's stream. */
@@ -230,6 +232,7 @@ public final class SessionRecorder implements AutoCloseable {
         }
         if (writer != null) {
             writer.close();
+            lastRecordsWritten = writer.recordsWritten();
             writer = null;
         }
     }

@@ -159,6 +159,7 @@ struct depz_session_recorder {
     size_t n_entries, cap_entries;
     depz_mutex lock;        /* the writer, the entries' silicon readings */
     depz_dataset_writer *writer;
+    uint64_t last_written;  /* the finished file's count, after stop() */
     /* the temperature sampler */
     depz_thread thread;
     bool thread_live, stop;
@@ -416,6 +417,7 @@ int depz_session_recorder_stop(depz_session_recorder *r)
     for (size_t i = 0; i < r->n_entries; i++) unhook(&r->entries[i]);
     depz_mutex_lock(&r->lock);
     depz_dataset_writer *w = r->writer;
+    if (w) r->last_written = depz_dataset_writer_records_written(w);
     r->writer = NULL;
     depz_mutex_unlock(&r->lock);
     if (w && depz_dataset_writer_close(w) != 0) rc = depz_fail(DEPZ_E_IO, "cannot finish %s", r->path);
@@ -427,7 +429,7 @@ uint64_t depz_session_recorder_records_written(const depz_session_recorder *r)
     uint64_t n = 0;
     if (!r) return 0;
     depz_mutex_lock((depz_mutex *)&r->lock);
-    n = depz_dataset_writer_records_written(r->writer);
+    n = r->writer ? depz_dataset_writer_records_written(r->writer) : r->last_written;
     depz_mutex_unlock((depz_mutex *)&r->lock);
     return n;
 }

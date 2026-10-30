@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 final class Fanout<T> {
     private final List<Consumer<T>> callbacks = new ArrayList<>();
     private final List<Subscription<T>> queues = new ArrayList<>();
+    private boolean closed; // guarded by queues: set by closeAll, never cleared
 
     AutoCloseable onItem(Consumer<T> callback) {
         if (callback == null) {
@@ -36,7 +37,12 @@ final class Fanout<T> {
             }
         });
         synchronized (queues) {
-            queues.add(sub);
+            if (closed) {
+                // The device already closed: a closed queue, so take() fails at once (contract 07 §3).
+                sub.markClosed();
+            } else {
+                queues.add(sub);
+            }
         }
         return sub;
     }
@@ -101,9 +107,11 @@ final class Fanout<T> {
         }
     }
 
+    /** Close every queue, and every one subscribed from now on. */
     void closeAll() {
         List<Subscription<T>> qs;
         synchronized (queues) {
+            closed = true;
             qs = new ArrayList<>(queues);
         }
         for (Subscription<T> q : qs) {

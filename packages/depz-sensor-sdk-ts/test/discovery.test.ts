@@ -14,6 +14,7 @@ import {
   LoopbackTransport,
   NoDepzDeviceError,
   PacketParser,
+  attachSensorClass,
   Sr04,
   Vl53l8,
   Vl53l8ch,
@@ -504,6 +505,49 @@ describe("openOnTransport (contract 02 §4.4)", () => {
     } finally {
       await dev.close();
       await fw.close();
+    }
+  });
+
+  it("applies classOptions.txCrcType to the adopted link (and attachSensorClass too)", async () => {
+    const fw = new FakeFirmware("APP_usonic_SR04_v0.95", "DEPZ Usonic SR04", "SN0042");
+    const sent: number[] = [];
+    const write = fw.transport.write.bind(fw.transport);
+    vi.spyOn(fw.transport, "write").mockImplementation((data: Uint8Array) => {
+      sent.push(data[3]! >>> 6); // the frame's CRC type, bits 14-15 of data_size
+      return write(data);
+    });
+    const dev = await openOnTransport(fw.transport, {
+      usbVid: DEPZ_VID,
+      usbPid: 0xec78,
+      timeoutMs: 500,
+      classOptions: { txCrcType: CrcType.Crc16 },
+    });
+    try {
+      expect(dev).toBeInstanceOf(Sr04);
+      expect(await dev.getSerialNumber()).toBe("SN0042");
+      // the probe's three requests without, the class's with the CRC asked for
+      expect(sent).toEqual([CrcType.None, CrcType.None, CrcType.None, CrcType.Crc16]);
+    } finally {
+      await dev.close();
+      await fw.close();
+    }
+
+    const fw2 = new FakeFirmware("APP_usonic_SR04_v0.95", "DEPZ Usonic SR04", "SN0043");
+    const sent2: number[] = [];
+    const write2 = fw2.transport.write.bind(fw2.transport);
+    vi.spyOn(fw2.transport, "write").mockImplementation((data: Uint8Array) => {
+      sent2.push(data[3]! >>> 6);
+      return write2(data);
+    });
+    const base = new DepzDevice(fw2.transport, { timeoutMs: 500 });
+    await base.open();
+    const sr = attachSensorClass(base, "sr04", { txCrcType: CrcType.Crc32 });
+    try {
+      expect(await sr.getSerialNumber()).toBe("SN0043");
+      expect(sent2).toEqual([CrcType.Crc32]);
+    } finally {
+      await sr.close();
+      await fw2.close();
     }
   });
 

@@ -916,7 +916,7 @@ void dataset_recorder_two_sr04()
         fake_sr04_send_measurement(b.fake, 0x36);
         CHECK(until([&] { return rec.records_written() >= 4; }, 2000));
         rec.stop();
-        CHECK(!rec.recording() && rec.records_written() == 0);
+        CHECK(!rec.recording() && rec.records_written() == 4);  // the finished file's count
         fake_sr04_send_measurement(a.fake, 0x37);  // unhooked: dropped
         std::this_thread::sleep_for(20ms);
     }
@@ -2112,6 +2112,62 @@ void tmf8829_throwing_callbacks_are_counted()
     CHECK(st.frames_completed == 1 && st.measurements == 0 && st.frame_parse_errors == 1 && st.chunk_errors == 0);
 }
 
+// Contract 07 §3: progress callbacks run on the caller's thread unguarded —
+// an exception thrown there leaves init() (TMF8829 and VL53L8 alike), is not
+// counted as a reader callback error, and the callback is not called again.
+void a_throwing_progress_callback_propagates_out_of_init()
+{
+    {
+        TmfRig rig;
+        depz_link* link = nullptr;
+        rig.fake = fake_tmf8829_start(&link);
+        CHECK(rig.fake);
+        auto t = depz::Tmf8829::open(depz::Link::adopt(link));
+        t->set_timeout(1000ms);
+        int calls = 0;
+        bool thrown = false;
+        try {
+            t->init([&](std::size_t, std::size_t) {
+                if (++calls == 3) throw std::runtime_error("user cancels the download");
+            });
+        } catch (const std::runtime_error& e) {
+            thrown = std::string(e.what()) == "user cancels the download";
+        }
+        CHECK(thrown && calls == 3);
+        CHECK(t->stats().callback_errors == 0);
+        CHECK(t->init().serial == FAKE_TMF8829_SERIAL);  // the device stays usable
+        rig.dev = std::move(t);
+    }
+    {
+        L8Rig r(depz::Vl53l8Model::L8CX, L8_CRC_CX);
+        int calls = 0;
+        CHECK(throws<int>([&] { r.dev->init([&](const std::string&, std::size_t, std::size_t) { calls++; throw 7; }); }));
+        CHECK(calls == 1 && r.dev->stats().callback_errors == 0);
+        r.dev->init();
+        CHECK(r.dev->initialized());
+    }
+}
+
+// attach_sensor_class() refusing a class leaves the caller's device open and
+// usable (the C function and Python do not close it either).
+void attach_sensor_class_refusal_keeps_the_device()
+{
+    depz_link* host = nullptr;
+    fake_sr04* f = fake_sr04_start(&host);
+    {
+        auto dev = depz::Device::open(depz::Link::adopt(host));
+        dev->set_timeout(1000ms);
+        CHECK(throws<depz::ArgumentError>([&] { depz::attach_sensor_class(std::move(dev), "no_such_class"); }));
+        CHECK(dev && dev->software_name() == FAKE_SR04_SOFTWARE);
+        CHECK(throws<depz::BootloaderModeError>([&] { depz::attach_sensor_class(std::move(dev), "bootloader"); }));
+        CHECK(dev && dev->software_name() == FAKE_SR04_SOFTWARE);
+        auto sr = depz::Device::promote(std::move(dev));
+        CHECK(throws<depz::ArgumentError>([&] { depz::attach_sensor_class(std::move(sr), "sr04"); }));  // has a class
+        CHECK(sr && sr->device_name() == FAKE_SR04_NAME);
+    }
+    fake_sr04_stop(f);
+}
+
 // The dataset layer's own JSON and gzip readers past what the vectors use:
 // every string escape, \u in either case, a surrogate pair, a too-big integer
 // read as a real, NaN / infinity written as null (as Python's dataset writer
@@ -2213,6 +2269,126 @@ void dataset_recorder_skips_a_failing_thermometer()
     CHECK(sr04 == 1 && temps == 0);
 }
 
+// CPP-1: an Unsubscribe outlives its device's handle. Once the device is
+// closed or destroyed it does nothing (the C handle is freed) — the
+// SessionRecorder's own stop() unhooks after a close; an Unsubscribe taken
+// before promote() still removes its callback from the promoted device.
+void an_unsubscribe_after_close_does_nothing()
+{
+    {
+        Rig r;
+        auto unsub = r.dev->on_measurement([](const depz::Sr04Measurement&) {});
+        r.dev->close();
+        unsub();
+        unsub();
+    }
+    {
+        Rig r;
+        auto unsub = r.dev->on_event([](const depz::DeviceEvent&) {});
+        r.dev.reset();
+        unsub();
+    }
+    {
+        Rig r;
+        const std::string path = tmp_dataset_path("closed.depzdata");
+        {
+            ds::RecorderOptions o;
+            o.temperature_hz = std::nullopt;
+            ds::SessionRecorder rec(path, o);
+            rec.add(*r.dev);
+            rec.start();
+            r.dev->close();
+            rec.stop();
+        }
+        std::remove(path.c_str());
+    }
+    {
+        auto [host, side] = depz::Link::loopback_pair();
+        auto plain = depz::Device::open(std::move(host));
+        std::atomic<int> texts{0};
+        auto unsub = plain->on_event([&](const depz::DeviceEvent& e) {
+            if (e.type == depz::DeviceEvent::Type::Text) texts++;
+        });
+        auto dev = depz::attach_sensor_class(std::move(plain), "sr04");
+        std::atomic<int> after{0};  // registered last: runs after `texts`
+        dev->on_event([&](const depz::DeviceEvent& e) {
+            if (e.type == depz::DeviceEvent::Type::Text) after++;
+        });
+        const depz::bytes payload{std::byte{0x00}};
+        side.write(depz::build_packet(0x7F, payload, 1));
+        CHECK(until([&] { return after == 1; }, 2000));
+        CHECK(texts == 1);
+        unsub();  // the handle lives on in `dev`: this really unsubscribes
+        side.write(depz::build_packet(0x7F, payload, 2));
+        CHECK(until([&] { return after == 2; }, 2000));
+        CHECK(texts == 1);
+    }
+}
+
+// CPP-2: the reader may run a recorder hook it snapshotted before stop()
+// unhooked it — here behind a slow user callback, with the recorder destroyed
+// meanwhile. The hook must find the recorder gone, not touch freed memory.
+void a_recorder_destroyed_under_a_running_hook_is_not_touched()
+{
+    Rig r;
+    std::atomic<bool> inside{false}, release{false}, tail{false};
+    auto slow = r.dev->on_measurement([&](const depz::Sr04Measurement&) {
+        inside = true;
+        until([&] { return release.load(); }, 3000);
+    });
+    const std::string path = tmp_dataset_path("dtor.depzdata");
+    depz::Device::Unsubscribe last;
+    {
+        ds::RecorderOptions o;
+        o.temperature_hz = std::nullopt;
+        ds::SessionRecorder rec(path, o);
+        rec.add(*r.dev);
+        rec.start();
+        // registered after the recorder's hook: it runs after it, same packet
+        last = r.dev->on_measurement([&](const depz::Sr04Measurement&) { tail = true; });
+        fake_sr04_send_measurement(r.fake, 0x37);
+        CHECK(until([&] { return inside.load(); }, 2000));
+    }
+    release = true;
+    CHECK(until([&] { return tail.load(); }, 2000));
+    slow();
+    last();
+    std::remove(path.c_str());
+}
+
+// CPP-3: close() on one thread while another waits inside a request: the
+// waiter gets DeviceLostError, and no thread races on the handle (ThreadSanitizer).
+void close_while_a_request_waits()
+{
+    depz_link* host = nullptr;
+    fake_sr04* f = fake_silent_start(&host);
+    std::unique_ptr<depz::Device> dev = depz::Sr04::open(depz::Link::adopt(host));
+    dev->set_timeout(5000ms);
+    std::atomic<int> outcome{0};  // 1 DeviceLostError, 2 anything else
+    std::thread waiter([&] {
+        try {
+            dev->device_name();
+            outcome = 2;
+        } catch (const depz::DeviceLostError&) {
+            outcome = 1;
+        } catch (...) {
+            outcome = 2;
+        }
+    });
+    const bool sent = until([&] { return dev->stats().tx_packets >= 1; }, 2000);
+    // a reader of the handle with no lock in common with close()
+    std::thread watcher([&] {
+        while (dev->c_handle()) std::this_thread::yield();
+    });
+    dev->close();
+    watcher.join();
+    waiter.join();
+    dev.reset();
+    fake_sr04_stop(f);
+    CHECK(sent);
+    CHECK(outcome == 1);
+}
+
 const Case k_cases[] = {
     {"identity_and_types", identity_and_types},
     {"errors_are_typed", errors_are_typed},
@@ -2251,6 +2427,11 @@ const Case k_cases[] = {
     {"tmf8829_throwing_callbacks_are_counted", tmf8829_throwing_callbacks_are_counted},
     {"dataset_json_and_gzip_edges", dataset_json_and_gzip_edges},
     {"vl53l8_fake_raw_registers", vl53l8_fake_raw_registers},
+    {"a_throwing_progress_callback_propagates_out_of_init", a_throwing_progress_callback_propagates_out_of_init},
+    {"attach_sensor_class_refusal_keeps_the_device", attach_sensor_class_refusal_keeps_the_device},
+    {"an_unsubscribe_after_close_does_nothing", an_unsubscribe_after_close_does_nothing},
+    {"a_recorder_destroyed_under_a_running_hook_is_not_touched", a_recorder_destroyed_under_a_running_hook_is_not_touched},
+    {"close_while_a_request_waits", close_while_a_request_waits},
 };
 
 }  // namespace

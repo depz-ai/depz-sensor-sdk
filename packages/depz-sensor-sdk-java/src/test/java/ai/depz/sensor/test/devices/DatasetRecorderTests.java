@@ -148,6 +148,10 @@ public final class DatasetRecorderTests {
                 Thread.sleep(20);
                 b.sendMeasurement(0x36);
                 until(() -> rec.recordsWritten() >= 4, 2000);
+                rec.stop();
+                eq(4L, rec.recordsWritten()); // the finished file's count survives stop()
+                rec.stop(); // idempotent
+                eq(4L, rec.recordsWritten());
             }
             Dataset reader = Dataset.read(path);
             eq(List.of("d0", "d1"), reader.devices().keySet().stream().sorted().toList());

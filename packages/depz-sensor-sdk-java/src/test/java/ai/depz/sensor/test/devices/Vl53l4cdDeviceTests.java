@@ -316,6 +316,36 @@ public final class Vl53l4cdDeviceTests {
         }
     }
 
+    public static void aStartStreamTimeoutStopsTheSensorAgain() {
+        try (Rig r = connect(Duration.ofMillis(200))) {
+            r.dev.init();
+            r.fake.failNext(FakeVl53l4Bridge.START_STREAM, FakeVl53l4Bridge.SILENT);
+            DepzTimeoutException e = throwsType(DepzTimeoutException.class, r.dev::startRanging);
+            check(e.getMessage().contains("0x35"), "the START_STREAM timeout: " + e.getMessage());
+            check(!r.dev.ranging(), "not ranging");
+            // the ULD started the die, so it is stopped again
+            eq(new byte[] {(byte) 0x80}, lastWrite(r.fake, Vl53l4Uld.SYSTEM_START));
+            r.dev.setOffsetMm(3); // not wedged: reconfiguration works
+            r.dev.startRanging(); // and a retry starts cleanly
+            check(r.dev.ranging(), "ranging");
+        }
+    }
+
+    public static void aFailingStopAfterARefusedStartStreamKeepsTheOriginalError() {
+        try (Rig r = ready()) {
+            r.fake.failNext(FakeVl53l4Bridge.WRITE_REG, 0x00); // the start write: acked
+            r.fake.failNext(FakeVl53l4Bridge.START_STREAM, FakeVl53l4Bridge.ERR_HARDWARE_FAULT);
+            r.fake.failNext(FakeVl53l4Bridge.WRITE_REG, 0x01); // the stop write fails too
+            StatusException e = throwsType(StatusException.class, r.dev::startRanging);
+            eq(FakeVl53l4Bridge.START_STREAM, e.cmd());
+            eq(FakeVl53l4Bridge.ERR_HARDWARE_FAULT, e.status());
+            check(!r.dev.ranging(), "not ranging");
+            Object[] last = r.fake.lastRx();
+            eq(FakeVl53l4Bridge.WRITE_REG, last[0]);
+            eq(new byte[] {(byte) 0x87, 0x00, (byte) 0x80}, last[1]); // SYSTEM_START <- 0x80 was sent
+        }
+    }
+
     public static void stopRangingClearsTheStateEvenWhenTheBridgeRefuses() {
         try (Rig r = ready()) {
             r.dev.startRanging();

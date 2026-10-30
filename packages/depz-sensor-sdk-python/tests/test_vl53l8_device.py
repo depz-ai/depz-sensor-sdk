@@ -477,9 +477,10 @@ def test_start_ranging_refuses_a_laser_safety_fault(cx):
     assert dev.ranging is False and not fake.streaming
 
 
-def test_start_stream_rejected_by_the_bridge_leaves_the_host_not_ranging(cx):
+def test_start_stream_rejected_by_the_bridge_stops_the_sensor_again(cx):
     """A bridge that refuses START_STREAM (ERR_INVALID_PARAM) surfaces as a
-    StatusError and the host does not believe it is ranging."""
+    StatusError, the host does not believe it is ranging and the sensor the
+    ULD already started is stopped again."""
     fake, dev = cx
     dev.init()
     dev.set_ranging_frequency_hz(15)
@@ -498,6 +499,9 @@ def test_start_stream_rejected_by_the_bridge_leaves_the_host_not_ranging(cx):
         dev.start_ranging()
     assert e.value.status == FakeVl53l8.ERR_INVALID_PARAM
     assert dev.ranging is False
+    assert fake.sensor.ranging is False
+    fake._handle_bridge = orig
+    dev.set_ranging_frequency_hz(30)  # not wedged: reconfiguration works
 
 
 def test_stop_ranging_clears_state_even_if_stop_stream_fails(cx):

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text.Json;
 using Depz.Sensor.Bno086;
 using Depz.Sensor.Dataset;
@@ -113,6 +114,27 @@ public class Vl53l8ReplayTests
                 Assert.Null(got.CnhRaw);
         }
         Vectors.Seen($"recordings/{stem}.depzrec");
+    }
+
+    // A METADATA block too short to carry the silicon temperature (body byte 8;
+    // the real block has 12) leaves it at 0 (bug hunt C-4). The frame is all
+    // zero — zero headers walk 4 bytes at a time — with one METADATA header of
+    // `size` bytes: at 16, where the byte the temperature would be read from is
+    // 0xF6 (-10), or as the last word of the frame, where the read would run
+    // past it.
+    [Theory]
+    [InlineData(4, false)]
+    [InlineData(8, false)]
+    [InlineData(0, true)]
+    public void ShortMetadataBlock_LeavesTheTemperatureAtZero(int size, bool atEnd)
+    {
+        var buf = new byte[540];
+        int at = atEnd ? buf.Length - 4 : 16;
+        BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(at), (0x54B4u << 16) | ((uint)size << 4));
+        if (!atEnd)
+            buf[16 + 12] = 0xF6;
+        var f = new Vl53l8FrameDecoder().ParseFrame(0, Vl53l8FrameDecoder.SwapBuffer(buf));
+        Assert.Equal(0, f.SiliconTempDegc);
     }
 }
 

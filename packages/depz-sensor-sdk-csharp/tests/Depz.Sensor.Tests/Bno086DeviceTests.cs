@@ -245,4 +245,18 @@ public class Bno086DeviceTests
         Assert.Throws<ArgumentOutOfRangeException>(() => Sh2Hub.SetReorientationParams(2, 0, 0, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => Sh2Hub.TareNowParams((TareAxis)256));
     }
+
+    /// <summary>Contract 07 §3 (bug hunt 2026-10-29 CSHARP-7): Reports() after Close is a closed
+    /// queue, so Take fails at once.</summary>
+    [Fact]
+    public void ReportsSubscribedAfterCloseAreClosedAtOnce()
+    {
+        var (dev, _) = Make();
+        dev.Close();
+        using var q = dev.Reports();
+        Assert.True(q.IsClosed, "Reports() after Close is open");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<DeviceLostException>(() => q.Take(TimeSpan.FromSeconds(5)));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"Take on a closed device's reports waited {sw.Elapsed}");
+    }
 }

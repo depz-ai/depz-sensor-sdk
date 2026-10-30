@@ -2,6 +2,7 @@
 
 import gzip
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import pytest
 
 from depz_sensor_sdk import Sr04
 from depz_sensor_sdk.errors import LinkClosedError, ReplayMismatchError
-from depz_sensor_sdk.transport.link import LoopbackLink
+from depz_sensor_sdk.transport.link import Link, LoopbackLink
 from depz_sensor_sdk.transport.record_replay import RecordingLink, ReplayLink
 
 from fake_device import FakeSr04
@@ -132,6 +133,15 @@ def test_replay_refuses_a_gzipped_capture(tmp_path: Path):
             ReplayLink(path)
 
 
+def test_replay_refuses_a_header_nested_100000_deep(tmp_path: Path):
+    # contract 08 «Line rules»: a damaged line naming its number, not a RecursionError
+    path = tmp_path / "deep.depzrec"
+    path.write_text('{"schema": "depz.rec/1", "x": ' + "[" * 100_000 + "]" * 100_000 + "}\n",
+                    encoding="utf-8", newline="\n")
+    with pytest.raises(ValueError, match=r":1: .*nested deeper than 256"):
+        ReplayLink(path)
+
+
 def test_replay_realtime_paces_rx_by_recorded_time(tmp_path: Path):
     path = _capture(tmp_path / "c.depzrec", [
         (0, "rx", b"\x00"),          # already due: no wait
@@ -150,3 +160,81 @@ def test_replay_realtime_paces_rx_by_recorded_time(tmp_path: Path):
     assert time.monotonic() - t0 < 0.5
     assert not link.exhausted
     link.close()
+
+
+def test_exhausted_replay_waits_out_the_read_timeout(tmp_path: Path):
+    """An exhausted capture behaves like a quiet port: the read sleeps its
+    timeout instead of returning at once (the reader loop would spin a core)."""
+    link = ReplayLink(_capture(tmp_path / "c.depzrec", []))
+    assert link.exhausted
+    t0 = time.perf_counter()
+    assert link.read(0.1) == b""
+    assert time.perf_counter() - t0 >= 0.08
+    link.close()
+
+
+def test_exhausted_replay_read_wakes_on_close(tmp_path: Path):
+    link = ReplayLink(_capture(tmp_path / "c.depzrec", []))
+    outcome: list[object] = []
+
+    def reader():
+        try:
+            outcome.append(link.read(30.0))
+        except LinkClosedError as e:
+            outcome.append(e)
+
+    t = threading.Thread(target=reader)
+    t.start()
+    deadline = time.monotonic() + 0.1
+    while time.monotonic() < deadline:  # let the read reach its wait
+        time.sleep(0.005)
+    link.close()
+    t.join(5.0)
+    assert not t.is_alive()
+    assert len(outcome) == 1 and isinstance(outcome[0], LinkClosedError)
+
+
+def test_recording_link_close_never_lets_the_reader_write_a_closed_journal(tmp_path: Path):
+    """Bug hunt 2026-10-29 PY-5: close() closed the journal before the inner
+    link, so a chunk the reader got in between was written to a closed file —
+    ValueError out of the reader thread. The inner link here holds the reader
+    in read() until it is closed and then hands it a chunk: the worst order."""
+    import threading
+
+    class _HoldingLink(Link):
+        def __init__(self) -> None:
+            self._closed = threading.Event()
+            self.waiting = threading.Event()
+
+        def read(self, timeout: float | None = None) -> bytes:
+            self.waiting.set()
+            self._closed.wait(5.0)
+            return b"\xaa"  # a chunk already on its way when the link closed
+
+        def write(self, data: bytes) -> None:
+            pass
+
+        def close(self) -> None:
+            self._closed.set()
+
+        @property
+        def closed(self) -> bool:
+            return self._closed.is_set()
+
+    inner = _HoldingLink()
+    rec = RecordingLink(inner, tmp_path / "r.depzrec")
+    errors: list[BaseException] = []
+
+    def reader() -> None:
+        try:
+            rec.read(5.0)
+        except BaseException as e:  # noqa: BLE001 — the test is what the reader raises
+            errors.append(e)
+
+    t = threading.Thread(target=reader)
+    t.start()
+    assert inner.waiting.wait(5.0)
+    rec.close()
+    t.join(5.0)
+    assert not t.is_alive()
+    assert not errors, repr(errors[0])

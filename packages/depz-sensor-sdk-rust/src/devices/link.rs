@@ -243,10 +243,9 @@ impl Link for ReplayLink {
                 if s.closed {
                     return Err(DepzError::LinkClosed("replay link closed".into()));
                 }
-                if s.rx_idx >= self.rx.len() {
-                    return Ok(Vec::new());
-                }
-                if s.tx_written >= self.rx[s.rx_idx].tx_prefix {
+                // exhausted: wait like a quiet port (until the timeout or close), else the
+                // reader loop spins a core on empty reads
+                if s.rx_idx < self.rx.len() && s.tx_written >= self.rx[s.rx_idx].tx_prefix {
                     break;
                 }
                 let now = Instant::now();

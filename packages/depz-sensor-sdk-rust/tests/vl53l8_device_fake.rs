@@ -641,7 +641,8 @@ fn start_ranging_refuses_a_laser_safety_fault() {
 }
 
 #[test]
-fn start_stream_rejected_by_the_bridge_leaves_the_host_not_ranging() {
+fn start_stream_rejected_by_the_bridge_stops_the_sensor_again() {
+    // The host does not believe it is ranging, and the sensor the ULD already started is stopped.
     let (f, d) = cx();
     d.init().unwrap();
     d.set_ranging_frequency_hz(15).unwrap();
@@ -658,6 +659,14 @@ fn start_stream_rejected_by_the_bridge_leaves_the_host_not_ranging() {
         other => panic!("{other:?}"),
     }
     assert!(!d.ranging());
+    assert!(!f.lock().sensor.ranging);
+    f.lock().refuse.remove(&(Vl53l8Cmd::StartStream as u8));
+    d.set_ranging_frequency_hz(30).unwrap(); // not wedged: reconfiguration works
+    assert_eq!(d.get_ranging_frequency_hz().unwrap(), 30);
+    d.start_ranging().unwrap(); // and a retry starts cleanly
+    assert!(d.ranging());
+    let b = f.lock();
+    assert!(b.streaming && b.sensor.ranging);
 }
 
 #[test]
@@ -1112,4 +1121,34 @@ fn frames_subscription_ends_when_the_device_closes() {
     d.close();
     assert!(until(|| it.is_closed(), 2000));
     assert!(it.take(T).is_err());
+}
+
+/// Dropping the device frees the connection — the link and what the callbacks captured — also after
+/// init(), when the driver (owned by the report handler) talks to the board through it.
+#[test]
+fn dropping_the_device_frees_the_connection_with_and_without_init() {
+    for init in [false, true] {
+        let f = FakeVl53l8::new();
+        let (link, dropped) = common::fake_board::DropProbe::new(f.link());
+        let d = Vl53l8cxDevice::attach(DepzDevice::new(link, Some(Duration::from_millis(500))));
+        let user_state = Arc::new(());
+        let u = user_state.clone();
+        d.on_frame(move |_| {
+            let _ = &u;
+        })
+        .forget();
+        if init {
+            d.init().unwrap();
+        }
+        drop(d);
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "init={init}: link not dropped"
+        );
+        assert_eq!(
+            Arc::strong_count(&user_state),
+            1,
+            "init={init}: callback kept"
+        );
+    }
 }

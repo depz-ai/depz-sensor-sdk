@@ -14,6 +14,7 @@ public final class LinkStats {
     final AtomicLong seqGaps = new AtomicLong();
     final AtomicLong deviceSeqErrors = new AtomicLong();
     final AtomicLong callbackErrors = new AtomicLong();
+    final AtomicLong reportErrors = new AtomicLong();
 
     public long txPackets() {
         return txPackets.get();
@@ -56,5 +57,10 @@ public final class LinkStats {
     /** Callbacks that threw on the reader thread (contract 07 §3). */
     public long callbackErrors() {
         return callbackErrors.get();
+    }
+
+    /** Reports whose handler threw: the packet was dropped (contract 07 §3). */
+    public long reportErrors() {
+        return reportErrors.get();
     }
 }

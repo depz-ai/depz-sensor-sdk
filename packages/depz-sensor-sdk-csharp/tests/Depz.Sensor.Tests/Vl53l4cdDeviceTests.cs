@@ -25,6 +25,8 @@ internal sealed class FakeVl53l4cdBoard
     public uint IntEdges;
     public uint I2cErrors;
     public bool ShortReadNext;
+    /// <summary>Called with every command as it arrives, before <see cref="FailNext"/> is consulted (link thread).</summary>
+    public Action<int>? OnCommand;
     private readonly Dictionary<int, Queue<Status?>> _failures = new();
 
     public FakeVl53l4cdBoard() => Link.OnPacket = Handle;
@@ -108,6 +110,7 @@ internal sealed class FakeVl53l4cdBoard
         byte[] payload = pkt.Payload;
         lock (Rx)
             Rx.Add((cmd, payload.ToArray()));
+        OnCommand?.Invoke(cmd);
         if (_failures.TryGetValue(cmd, out var q) && q.Count > 0)
         {
             Status? fail = q.Dequeue();
@@ -471,6 +474,57 @@ public class Vl53l4cdDeviceTests
         var cmds = fake.Cmds();
         Assert.Equal(new[] { (int)Vl53l4Cmd.StopStream, (int)Vl53l4Cmd.WriteReg }, cmds.Skip(cmds.Count - 2));
         Assert.Equal(new byte[] { 0x87, 0x00, 0x80 }, fake.Sent(Vl53l4Cmd.WriteReg)[^1]);
+    }
+
+    [Fact]
+    public void ARefusedStartStreamStopsTheSensorAgain()
+    {
+        var (dev, fake) = Ready();
+        using var _ = dev;
+        fake.FailNext(Vl53l4Cmd.StartStream, Status.ErrHardwareFault);
+        var e = Assert.Throws<StatusException>(() => dev.StartRanging());
+        Assert.Equal((int)Status.ErrHardwareFault, e.Status);
+        Assert.False(dev.Ranging);
+        // the ULD started the die before START_STREAM, so it is stopped again: the last write is SYSTEM_START ← 0x80
+        Assert.Equal(new byte[] { 0x21 }, fake.Platform.WrittenTo(Vl53l4Uld.SystemStart)[0]);
+        Assert.Equal(new byte[] { 0x87, 0x00, 0x80 }, fake.Sent(Vl53l4Cmd.WriteReg)[^1]);
+        dev.SetOffsetMm(3); // not wedged: reconfiguration works
+        Assert.Equal(3, dev.GetOffsetMm());
+    }
+
+    [Fact]
+    public void AStartStreamTimeoutStopsTheSensorAgain()
+    {
+        var (dev, fake) = Connect(TimeSpan.FromMilliseconds(200));
+        using var _ = dev;
+        dev.Init();
+        fake.FailNext(Vl53l4Cmd.StartStream, null);
+        Assert.Throws<DepzTimeoutException>(() => dev.StartRanging());
+        Assert.False(dev.Ranging);
+        Assert.Equal(new byte[] { 0x80 }, fake.Platform.WrittenTo(Vl53l4Uld.SystemStart)[^1]);
+        dev.SetOffsetMm(3); // not wedged: reconfiguration works
+        dev.StartRanging(); // and a retry starts cleanly
+        Assert.True(dev.Ranging && fake.Streaming);
+    }
+
+    [Fact]
+    public void AFailingStopAfterARefusedStartStreamKeepsTheOriginalError()
+    {
+        var (dev, fake) = Ready();
+        using var _ = dev;
+        fake.FailNext(Vl53l4Cmd.StartStream, Status.ErrHardwareFault);
+        // the stop's SYSTEM_START write (the first write after START_STREAM) is refused with another status
+        fake.OnCommand = cmd =>
+        {
+            if (cmd == (int)Vl53l4Cmd.StartStream)
+                fake.FailNext(Vl53l4Cmd.WriteReg, Status.ErrBusy);
+        };
+        var e = Assert.Throws<StatusException>(() => dev.StartRanging());
+        Assert.Equal((int)Status.ErrHardwareFault, e.Status);
+        Assert.Equal((int)Vl53l4Cmd.StartStream, e.Cmd);
+        Assert.False(dev.Ranging);
+        // the stop was attempted
+        Assert.Equal((int)Vl53l4Cmd.WriteReg, fake.Cmds()[^1]);
     }
 
     [Fact]

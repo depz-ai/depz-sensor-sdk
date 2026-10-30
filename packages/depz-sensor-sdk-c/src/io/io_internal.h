@@ -105,6 +105,7 @@ struct depz_device {
     int last_rx_seq;      /* -1 before the first packet */
 
     bool closing;         /* under `lock` */
+    int  users;           /* under `lock`: threads inside public calls */
     bool reader_running;
     bool reader_done;
     depz_thread reader;
@@ -126,6 +127,26 @@ int depz_device_create(depz_link *link, const depz_sensor_ops *ops, void *sensor
                        depz_device **out);
 /* Attach a sensor class to a running device (promote). */
 void depz_device_attach(depz_device *dev, const depz_sensor_ops *ops, void *sensor);
+
+/* A public call entering / leaving the device: depz_device_close() waits
+ * for every thread inside to leave before it frees anything, so a call may
+ * be in flight on another thread when close begins. Enter fails with
+ * DEPZ_E_CLOSED once close has begun; every successful enter is paired with
+ * one leave, after the last use of the device (error messages included). */
+int  depz_device_enter(depz_device *dev);
+void depz_device_leave(depz_device *dev);
+
+/* The body of a public call, inside enter/leave: `check` (the class's type
+ * test) runs first, then the device is entered for the whole of `body`. */
+#define DEPZ_ENTERED(dev, check, body)                                \
+    do {                                                              \
+        int entered_rc_ = (check);                                    \
+        if (!entered_rc_) entered_rc_ = depz_device_enter(dev);       \
+        if (entered_rc_) return entered_rc_;                          \
+        entered_rc_ = (body);                                         \
+        depz_device_leave(dev);                                       \
+        return entered_rc_;                                           \
+    } while (0)
 
 /* Emit to event callbacks + event streams. */
 void depz_device_emit(depz_device *dev, const depz_device_event *ev);

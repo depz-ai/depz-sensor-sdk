@@ -326,7 +326,7 @@ class TimeSync(offset_us: int, rtt_us: int, synced_at_host_us: int) -> None
 ### LinkStats
 
 ```python
-class LinkStats(tx_packets: int = 0, rx_packets: int = 0, tx_bytes: int = 0, rx_bytes: int = 0, crc_errors: int = 0, header_errors: int = 0, trash_bytes: int = 0, seq_gaps: int = 0, device_seq_errors: int = 0, callback_errors: int = 0) -> None
+class LinkStats(tx_packets: int = 0, rx_packets: int = 0, tx_bytes: int = 0, rx_bytes: int = 0, crc_errors: int = 0, header_errors: int = 0, trash_bytes: int = 0, seq_gaps: int = 0, device_seq_errors: int = 0, callback_errors: int = 0, report_errors: int = 0) -> None
 ```
 
 ### StreamQueue
@@ -11052,8 +11052,11 @@ the reboot (step 6); `ApplicationNotBackError` if it does not within
 find_bootloader_port(serial_number: str, *, timeout: float = 10.0) -> str
 ```
 
-Poll serial ports until a BOOTDEPZ device with `serial_number` appears
-(after an app→bootloader reboot the USB serial string is preserved).
+Poll the DEPZ candidate ports until a BOOTDEPZ device with
+`serial_number` appears (after an app→bootloader reboot the USB serial
+string is preserved). Only ports with a known DEPZ USB id are opened
+(contract 02 §4.3), and of those only the ones whose USB iSerial is
+`serial_number` or unknown to the OS.
 
 ## Datasets (record & replay)
 
@@ -11099,6 +11102,8 @@ stop(self) -> None
 ```
 
 #### SessionRecorder.records_written *(property)*
+
+Records in the file being written, or in the last one after stop().
 
 ### DatasetReader
 

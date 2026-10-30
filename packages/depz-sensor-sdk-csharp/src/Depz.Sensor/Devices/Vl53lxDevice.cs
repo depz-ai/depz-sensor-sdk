@@ -353,8 +353,25 @@ public class Vl53lxDevice : DepzDevice
         RequireNotRanging();
         var drv = Driver;
         drv.StartRanging();
-        var (addr, len) = drv.StreamBlock();
-        RequestOk((int)Vl53lxCmd.StartStream, Vl53lxWire.PackStartStream((ushort)addr, (ushort)len, drv.ClearSteps));
+        try
+        {
+            var (addr, len) = drv.StreamBlock();
+            RequestOk((int)Vl53lxCmd.StartStream, Vl53lxWire.PackStartStream((ushort)addr, (ushort)len, drv.ClearSteps));
+        }
+        catch
+        {
+            // The sensor ranges but the host will say it does not: stop it again, or StopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try
+            {
+                drv.StopRanging();
+            }
+            catch
+            {
+                // the original error matters more
+            }
+            throw;
+        }
         _ranging = true;
     }
 

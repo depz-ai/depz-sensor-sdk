@@ -1,5 +1,7 @@
 using Depz.Sensor.Devices;
+using Depz.Sensor.Tests;
 using Depz.Sensor.Unity;
+using Depz.Sensor.Usb;
 using Xunit;
 
 namespace Depz.Sensor.Unity.Tests;
@@ -8,6 +10,8 @@ public class DepzDevicesUnityTests
 {
     // No OS has a port of this name: Windows' COM space stops far below, POSIX has no such path.
     private const string Missing = "COM4095";
+    private const string Sr04Hw = "VID_1BCF&PID_EC78";
+    private const string L8cxHw = "VID_1BCF&PID_ED4B";
 
     [Fact]
     public void A_missing_port_is_a_DeviceLostException_from_the_link()
@@ -84,5 +88,21 @@ public class DepzDevicesUnityTests
         Assert.Empty(DepzDevicesUnity.ListPorts());
         var e = Assert.Throws<NoDepzDeviceException>(() => DepzDevicesUnity.OpenDevice());
         Assert.Contains("Windows", e.Message);
+    }
+
+    [Fact]
+    public void Depz_candidates_are_filtered_by_usb_id_and_sorted_by_serial_then_port()
+    {
+        var reg = new FakeRegistry().Present("COM3", "COM10", "COM4", "COM6", "COM7", "COM1")
+            .UsbPort(Sr04Hw, "SN000042", "COM3")
+            .UsbPort(L8cxHw, "SN000041", "COM10")
+            .UsbPort(L8cxHw, "SN000042", "COM7")                                 // same serial: port breaks the tie
+            .UsbPort("VID_0483&PID_56DC", "5&1234&0&1", "COM4", attached: true)  // dev default, no USB serial: Windows-generated id
+            .UsbPort("VID_067B&PID_2303", "SN000001", "COM6");                   // not DEPZ
+        var candidates = DepzDevicesUnity.ListDepzPorts(reg);
+        Assert.Equal(new[] { "COM10", "COM3", "COM7", "COM4" }, candidates.Select(p => p.Port));
+        Assert.Equal(new SerialPortInfo("COM4", 0x0483, 0x56DC, null), candidates[3]);
+        Assert.True(candidates.All(p => UsbIds.IsKnownDepzUsb(p.Vid, p.Pid)));
+        Assert.Equal(6, DepzDevicesUnity.ListPorts(reg).Count);
     }
 }

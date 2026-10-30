@@ -54,6 +54,7 @@ public final class Subscription<T> implements AutoCloseable {
      *
      * @throws DepzTimeoutException nothing arrived in time
      * @throws DeviceLostException the device closed with the queue empty
+     * @throws DepzException the thread was interrupted (its interrupt flag stays set)
      */
     public synchronized T take(Duration timeout) {
         long deadline = System.nanoTime() + timeout.toNanos();
@@ -70,7 +71,7 @@ public final class Subscription<T> implements AutoCloseable {
                 wait(Math.max(1, left / 1_000_000), (int) (left % 1_000_000));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new DepzTimeoutException("interrupted while waiting for a stream item");
+                throw new DepzException("interrupted");
             }
         }
         return q.pollFirst();

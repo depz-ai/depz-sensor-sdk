@@ -124,9 +124,11 @@ public sealed class DatasetReader
             if (speed > 0)
             {
                 firstT ??= rec.THostUs;
-                double delay = (rec.THostUs - firstT.Value) / 1e6 / speed - wall.Elapsed.TotalSeconds;
-                if (delay > 0 && cancel.WaitHandle.WaitOne(TimeSpan.FromSeconds(delay)))
-                    return;
+                double due = (rec.THostUs - firstT.Value) / 1e6 / speed;
+                // in slices: a tiny speed makes the delay overflow TimeSpan / WaitOne
+                for (double delay = due - wall.Elapsed.TotalSeconds; delay > 0; delay = due - wall.Elapsed.TotalSeconds)
+                    if (cancel.WaitHandle.WaitOne(TimeSpan.FromSeconds(Math.Min(delay, DatasetPlayer.MaxWaitS))))
+                        return;
             }
             callback(rec);
         }

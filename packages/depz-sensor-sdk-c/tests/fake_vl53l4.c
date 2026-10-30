@@ -21,6 +21,9 @@ struct fake_vl53l4 {
     size_t      n_speeds;
     bool        streaming;
     uint64_t    mcu_time_us;
+    uint8_t     fail_next[256];
+    uint8_t     then_cmd[256];
+    uint8_t     then_st[256];
 };
 
 static void put_u16le(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
@@ -53,6 +56,15 @@ static void handle(fake_vl53l4 *f, uint8_t cmd, const uint8_t *p, size_t len)
 {
     uint8_t out[270];
     f->mcu_time_us += 1000;
+    if (f->fail_next[cmd]) {
+        status(f, cmd, f->fail_next[cmd]);
+        f->fail_next[cmd] = 0;
+        if (f->then_st[cmd]) {
+            f->fail_next[f->then_cmd[cmd]] = f->then_st[cmd];
+            f->then_st[cmd] = 0;
+        }
+        return;
+    }
     switch (cmd) {
     case 0x03: {
         static const char name[] = "DEPZ ToF VL53L4CD USB v2.1 FAKE";
@@ -221,6 +233,23 @@ size_t fake_vl53l4_write_at(fake_vl53l4 *f, uint16_t addr, size_t k, uint8_t *ou
     }
     depz_mutex_unlock(&f->lock);
     return n;
+}
+
+void fake_vl53l4_fail_next(fake_vl53l4 *f, uint8_t cmd, uint8_t st)
+{
+    depz_mutex_lock(&f->lock);
+    f->fail_next[cmd] = st;
+    depz_mutex_unlock(&f->lock);
+}
+
+void fake_vl53l4_fail_next_then(fake_vl53l4 *f, uint8_t cmd, uint8_t st, uint8_t then_cmd,
+                                uint8_t then_st)
+{
+    depz_mutex_lock(&f->lock);
+    f->fail_next[cmd] = st;
+    f->then_cmd[cmd] = then_cmd;
+    f->then_st[cmd] = then_st;
+    depz_mutex_unlock(&f->lock);
 }
 
 bool fake_vl53l4_streaming(fake_vl53l4 *f)

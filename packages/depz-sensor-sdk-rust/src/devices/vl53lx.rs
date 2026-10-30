@@ -822,11 +822,16 @@ impl Vl53lxDevice {
             let (addr, len) = d.stream_block();
             Ok((addr, len, d.clear_steps()))
         })?;
-        self.request_ok(
-            Vl53lxCmd::StartStream as u8,
-            &pack_start_stream(addr, len, &clear, 0)?,
-            None,
-        )?;
+        let started = pack_start_stream(addr, len, &clear, 0)
+            .map_err(DepzError::from)
+            .and_then(|payload| self.request_ok(Vl53lxCmd::StartStream as u8, &payload, None));
+        if let Err(e) = started {
+            // The sensor ranges but the host will say it does not: stop it again, or
+            // stop_ranging() could never reach it. The START_STREAM error is the one the caller
+            // gets, even if this stop fails too.
+            let _ = self.with_driver(|d| d.stop_ranging());
+            return Err(e);
+        }
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }

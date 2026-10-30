@@ -6,9 +6,10 @@ Excluded by design: ROM DFU entry and bootloader self-update.
 from __future__ import annotations
 
 import time
+from collections import deque
 from typing import Callable
 
-from .errors import DepzError, DepzTimeoutError, DeviceLostError
+from .errors import DepzError, DepzTimeoutError, DeviceLostError, InvalidReplyError
 from .protocol.bootloader import (
     BlCmd,
     BlRpt,
@@ -68,6 +69,9 @@ class BootloaderDevice:
             self.port = getattr(port_or_link, "port", "<link>")
         self.timeout = timeout
         self._parser = PacketParser()
+        # Packets parsed but not yet consumed: one read can carry several
+        # frames (an ACK and the typed reply, contract 06 §1).
+        self._rx: deque[Packet] = deque()
         self._tx_seq = 0
 
     def close(self) -> None:
@@ -87,12 +91,10 @@ class BootloaderDevice:
 
     def _recv(self, timeout: float | None = None) -> Packet | None:
         deadline = time.monotonic() + (timeout if timeout is not None else self.timeout)
-        while time.monotonic() < deadline:
+        while not self._rx and time.monotonic() < deadline:
             data = self._link.read(0.05)
-            for ev in self._parser.feed(data):
-                if isinstance(ev, Packet):
-                    return ev
-        return None
+            self._rx.extend(ev for ev in self._parser.feed(data) if isinstance(ev, Packet))
+        return self._rx.popleft() if self._rx else None
 
     def transact(
         self,
@@ -151,6 +153,21 @@ class BootloaderDevice:
         pkt = self.transact(BlCmd.GET_FLASH_INFO, min_len=13)
         return FlashInfo.unpack(pkt.payload)
 
+    def _usable_flash_info(self) -> FlashInfo:
+        """GET_FLASH_INFO whose geometry the page loop can walk: a page size
+        of 0, or an app area that is not a whole number of pages, is a reply
+        the client cannot use (contract 07 §3: invalid_reply)."""
+        info = self.get_flash_info()
+        if info.page_size == 0 or info.app_size % info.page_size:
+            raise InvalidReplyError(
+                BlCmd.GET_FLASH_INFO,
+                ValueError(
+                    f"page_size {info.page_size}, app_size {info.app_size}: "
+                    "the app area is not a whole number of pages"
+                ),
+            )
+        return info
+
     # ── flashing primitives ──────────────────────────────────────────────────
 
     def erase_app(self) -> None:
@@ -198,7 +215,7 @@ class BootloaderDevice:
             if progress:
                 progress(frac, msg)
 
-        info = self.get_flash_info()
+        info = self._usable_flash_info()
         if image.load_addr != info.app_start:
             raise DepzError(
                 f"load_addr mismatch: file=0x{image.load_addr:08X} "
@@ -242,15 +259,20 @@ class BootloaderDevice:
 
 
 def find_bootloader_port(serial_number: str, *, timeout: float = 10.0) -> str:
-    """Poll serial ports until a BOOTDEPZ device with `serial_number` appears
-    (after an app→bootloader reboot the USB serial string is preserved)."""
-    from serial.tools import list_ports
+    """Poll the DEPZ candidate ports until a BOOTDEPZ device with
+    `serial_number` appears (after an app→bootloader reboot the USB serial
+    string is preserved). Only ports with a known DEPZ USB id are opened
+    (contract 02 §4.3), and of those only the ones whose USB iSerial is
+    `serial_number` or unknown to the OS."""
+    from .discovery import _depz_candidates
 
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        for p in list_ports.comports():
+        for pi in _depz_candidates():
+            if pi.usb_serial not in (None, serial_number):
+                continue
             try:
-                bl = BootloaderDevice(p.device, timeout=0.5)
+                bl = BootloaderDevice(pi.port, timeout=0.5)
             except (DeviceLostError, DepzError):
                 continue
             try:
@@ -258,7 +280,7 @@ def find_bootloader_port(serial_number: str, *, timeout: float = 10.0) -> str:
                     continue
                 if bl.get_serial_number() == serial_number:
                     bl.close()
-                    return p.device
+                    return pi.port
             except (DepzTimeoutError, DeviceLostError, DepzError):
                 pass
             finally:
@@ -312,22 +334,23 @@ def update_firmware(
 
     image = FwDepzImage.load(fwdepz_path)
 
-    dev = DeviceBase(port, timeout=0.5)
-    try:
-        name = dev.get_software_name()
-    except DepzTimeoutError:
-        name = ""
-    if name.upper().startswith("BOOTDEPZ"):
-        # Already in bootloader mode; pyserial can't share the port — reopen.
-        dev.close()
+    # The app-mode connection is released on every path, a failed probe
+    # included: pyserial can't share the port, and a retry must reopen it.
+    with DeviceBase(port, timeout=0.5) as dev:
+        try:
+            name = dev.get_software_name()
+        except DepzTimeoutError:
+            name = ""
+        in_bootloader = name.upper().startswith("BOOTDEPZ")
+        if not in_bootloader:
+            serial_number = dev.get_serial_number()
+            if progress:
+                progress(0.0, "rebooting into bootloader")
+            dev.enter_bootloader_mode()
+    if in_bootloader:
         bl = BootloaderDevice(port)
     else:
-        serial_number = dev.get_serial_number()
-        if progress:
-            progress(0.0, "rebooting into bootloader")
-        dev.enter_bootloader_mode()  # also closes
-        bl_port = find_bootloader_port(serial_number)
-        bl = BootloaderDevice(bl_port)
+        bl = BootloaderDevice(find_bootloader_port(serial_number))
 
     try:
         bl.flash(image, progress=progress)

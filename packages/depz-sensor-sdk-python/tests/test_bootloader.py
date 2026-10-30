@@ -17,10 +17,18 @@ from depz_sensor_sdk.bootloader import (
     ApplicationNotBackError,
     update_firmware,
 )
-from depz_sensor_sdk.errors import DepzError, DepzTimeoutError, DeviceLostError, LinkClosedError
+from depz_sensor_sdk.errors import (
+    DepzError,
+    DepzTimeoutError,
+    DeviceLostError,
+    InvalidReplyError,
+    LinkClosedError,
+    StatusError,
+)
 from depz_sensor_sdk.protocol.bootloader import BlCmd, BlRpt, BlStatus, FwDepzImage, reply_report
 from depz_sensor_sdk.transport import CrcType, Packet, PacketParser, build_packet, crc32_iso_hdlc
 from depz_sensor_sdk.transport.link import LoopbackLink
+from depz_sensor_sdk.usb_ids import DEPZ_USB_VID, DEV_USB_PID, DEV_USB_VID, PID_SR04
 
 from fake_device import FakeSr04
 
@@ -46,6 +54,7 @@ class FakeBootloader:
         serial: str = "SN0042",
         firmware_name: str = "BOOTDEPZ_v1.1",
         app_size: int = APP_SIZE,
+        page_size: int = PAGE_SIZE,
         silent: frozenset[int] = frozenset(),
         write_status: int = BlStatus.ACK,
         verify_status: int = BlStatus.ACK,
@@ -64,6 +73,7 @@ class FakeBootloader:
         self.serial = serial
         self.firmware_name = firmware_name
         self.app_size = app_size
+        self.page_size = page_size
         self.silent = silent
         self.write_status = write_status
         self.verify_status = verify_status
@@ -117,7 +127,7 @@ class FakeBootloader:
         elif cmd == 0x03:
             self._send(0x81, bytes([cmd]) + b"DEPZ Test\x00")
         elif cmd == 0x08:
-            self._send(0x89, struct.pack("<BHHII", cmd, PAGE_SIZE, 0, APP_START, self.app_size))
+            self._send(0x89, struct.pack("<BHHII", cmd, self.page_size, 0, APP_START, self.app_size))
         elif cmd == 0x09:
             if self.erase_status != BlStatus.ACK:
                 self._send(0x80, bytes([cmd, self.erase_status]))
@@ -289,6 +299,26 @@ def test_transact_skips_unrelated_short_and_junk_frames(fake_bl):
         assert (info.page_size, info.app_start, info.app_size) == (PAGE_SIZE, APP_START, 64)
 
 
+def test_transact_finds_the_reply_among_frames_of_one_read(fake_bl):
+    """Over USB CDC several small frames arrive in one read. An ACK ahead of a
+    typed reply (contract 06 §1) or a stray report must not swallow the frames
+    after it — once only the first frame of a chunk was kept and the reply
+    was lost to a timeout."""
+    fake = fake_bl(silent=frozenset({BlCmd.GET_FLASH_INFO, BlCmd.GET_SERIAL}))
+    with BootloaderDevice(fake.link, timeout=0.5) as bl:
+        fake._side.write(
+            build_packet(BlRpt.STATUS, bytes([BlCmd.GET_FLASH_INFO, BlStatus.ACK]), 0)
+            + build_packet(BlRpt.FLASH_INFO,
+                           struct.pack("<BHHII", BlCmd.GET_FLASH_INFO, PAGE_SIZE, 0, APP_START, 64), 1)
+        )
+        assert bl.get_flash_info().page_size == PAGE_SIZE
+        fake._side.write(
+            build_packet(BlRpt.STRING, bytes([BlCmd.GET_DEVICE_NAME]) + b"DEPZ\x00", 2)
+            + build_packet(BlRpt.STRING, bytes([BlCmd.GET_SERIAL]) + b"SN1\x00", 3)
+        )
+        assert bl.get_serial_number() == "SN1"
+
+
 def test_transact_raises_on_non_ack_status(fake_bl):
     fake = fake_bl()
     with BootloaderDevice(fake.link, timeout=1.0) as bl:
@@ -430,6 +460,22 @@ def test_flash_rejects_image_larger_than_app_area(image, fake_bl):
     assert not fake.erased  # rejected before touching the flash
 
 
+@pytest.mark.parametrize(
+    "knobs",
+    [{"page_size": 0}, {"app_size": APP_SIZE + 1}],
+    ids=["page_size_zero", "app_size_not_page_multiple"],
+)
+def test_flash_rejects_an_impossible_flash_info_before_erasing(image, fake_bl, knobs):
+    """Contract 07 §3: a reply value the client cannot use is invalid_reply,
+    never a bare ZeroDivisionError — and the app area is left untouched."""
+    fake = fake_bl(**knobs)
+    with BootloaderDevice(fake.link, timeout=2.0) as bl:
+        with pytest.raises(InvalidReplyError) as ei:
+            bl.flash(image)
+    assert ei.value.cmd == BlCmd.GET_FLASH_INFO
+    assert BlCmd.ERASE_APP not in fake.seen and not fake.erased
+
+
 def test_flash_gives_up_after_page_retries_on_bad_crc(image, fake_bl):
     fake = fake_bl(always_bad_page_crc=True)
     with BootloaderDevice(fake.link, timeout=1.0) as bl:
@@ -489,13 +535,23 @@ class FakeApp(FakeSr04):
     """App-mode firmware whose BOOTLOADER command "reboots" the port: the
     virtual bus then opens a FakeBootloader with the same USB serial."""
 
-    def __init__(self, bus: "FakeBus", port: str, *, silent: frozenset[int] = frozenset()):
-        self.bus, self.port_name, self.silent = bus, port, silent
+    def __init__(
+        self,
+        bus: "FakeBus",
+        port: str,
+        *,
+        silent: frozenset[int] = frozenset(),
+        refuse: frozenset[int] = frozenset(),
+    ):
+        self.bus, self.port_name, self.silent, self.refuse = bus, port, silent, refuse
         self.rebooted = False
         super().__init__()
 
     def _handle(self, pkt: Packet) -> None:
         if pkt.cmd in self.silent:
+            return
+        if pkt.cmd in self.refuse:
+            self._status(pkt.cmd, 0x01)  # ERR_UNKNOWN_CMD
             return
         if pkt.cmd == 0x01:
             self._status(pkt.cmd, 0x00)
@@ -516,6 +572,9 @@ class FakeBus:
 
     def __init__(self):
         self.ports: dict[str, object] = {}
+        # port → (vid, pid, USB iSerial); a port not listed is a dev-default
+        # DEPZ unit whose OS gives no iSerial.
+        self.usb: dict[str, tuple[int, int, str | None]] = {}
         self._boot_steps: dict[str, list] = {}
         self._scripts: dict[str, list] = {}
         self.bootloaders: list[FakeBootloader] = []
@@ -553,7 +612,12 @@ class FakeBus:
         return factory().link
 
     def comports(self):
-        return [SimpleNamespace(device=p) for p in self.ports]
+        default = (DEV_USB_VID, DEV_USB_PID, None)
+        return [
+            SimpleNamespace(device=p, vid=vid, pid=pid, serial_number=serial)
+            for p in self.ports
+            for vid, pid, serial in [self.usb.get(p, default)]
+        ]
 
     def close(self):
         for fake in self.bootloaders + self.apps:
@@ -584,6 +648,28 @@ def test_find_bootloader_port_matches_name_and_serial(bus):
     # the app-mode port was recognised by name alone: no serial query
     assert bus.bootloaders[0].seen == [0x04, 0x05]
     assert bus.bootloaders[1].seen == [0x04]  # mute: timed out on the name
+
+
+def test_find_bootloader_port_talks_only_to_depz_candidates(bus):
+    """Contract 06 §3 / 07 §3: only ports with a DEPZ USB id are candidates,
+    and one whose USB iSerial names another board is not opened at all."""
+    bus.ports["/dev/ttyUSB0"] = lambda: bus.bootloader(serial="SN0042")  # foreign USB id
+    bus.usb["/dev/ttyUSB0"] = (0x2341, 0x0043, "SN0042")
+    bus.ports["/dev/ttyACM1"] = lambda: bus.bootloader(serial="SN0001")  # another DEPZ board
+    bus.usb["/dev/ttyACM1"] = (DEPZ_USB_VID, PID_SR04, "SN0001")
+    bus.ports["/dev/ttyACM2"] = lambda: bus.bootloader(serial="SN0042")  # no iSerial: probed
+
+    assert find_bootloader_port("SN0042", timeout=3.0) == "/dev/ttyACM2"
+    assert bus.opened == ["/dev/ttyACM2"]
+
+
+def test_find_bootloader_port_opens_the_iserial_match_first(bus):
+    bus.ports["/dev/ttyACM0"] = lambda: bus.bootloader(serial="SN0042")  # no iSerial
+    bus.ports["/dev/ttyACM1"] = lambda: bus.bootloader(serial="SN0042")
+    bus.usb["/dev/ttyACM1"] = (DEPZ_USB_VID, PID_SR04, "SN0042")
+
+    assert find_bootloader_port("SN0042", timeout=3.0) == "/dev/ttyACM1"
+    assert bus.opened == ["/dev/ttyACM1"]
 
 
 def test_find_bootloader_port_times_out(bus):
@@ -699,3 +785,25 @@ def test_update_firmware_times_out_naming_what_it_last_saw(bus, image, tmp_path,
     assert ei.value.port == "/dev/ttyACM0" and ei.value.timeout == 0.5
     assert len(bus.opened) >= 4  # kept polling until the deadline
     assert bus.bootloaders[1]._app_bytes() == image.payload
+
+
+@pytest.mark.parametrize(
+    "refuse",
+    [0x04, 0x05, 0x01],
+    ids=["software_name", "serial", "bootloader_cmd"],
+)
+def test_update_firmware_closes_the_app_connection_when_the_probe_fails(
+    bus, image, tmp_path, refuse
+):
+    """Any failure before the hand-off to the bootloader releases the port:
+    a retry in the same process must be able to open it again."""
+    fw = tmp_path / "app.fwdepz"
+    fw.write_bytes(FwDepzImage.build(APP_START, image.payload))
+    bus.ports["/dev/ttyACM0"] = lambda: bus.app("/dev/ttyACM0", refuse=frozenset({refuse}))
+
+    with pytest.raises(StatusError) as ei:
+        update_firmware("/dev/ttyACM0", str(fw))
+
+    assert ei.value.cmd == refuse
+    assert len(bus.apps) == 1 and bus.apps[0].link.closed
+    assert not bus.bootloaders

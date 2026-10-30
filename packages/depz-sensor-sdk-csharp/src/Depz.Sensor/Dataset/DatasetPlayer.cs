@@ -37,6 +37,10 @@ public enum PlayerState
 /// </summary>
 public sealed class DatasetPlayer : IDisposable
 {
+    // Longest single wait, seconds: a tiny speed stretches a gap past what TimeSpan / Monitor.Wait take;
+    // the player re-evaluates after every wake anyway.
+    internal const double MaxWaitS = 60.0;
+
     private readonly object _lock = new();
     private readonly IReadOnlyList<DatasetRecord> _recs;
     private readonly Func<double> _clock;
@@ -354,7 +358,7 @@ public sealed class DatasetPlayer : IDisposable
                     continue;
                 }
                 if (r.Wait is double s)
-                    Monitor.Wait(_lock, TimeSpan.FromSeconds(s));
+                    Monitor.Wait(_lock, TimeSpan.FromSeconds(Math.Min(s, MaxWaitS)));
                 else
                     Monitor.Wait(_lock);
             }

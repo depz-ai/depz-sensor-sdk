@@ -332,7 +332,11 @@ public final class Vl53l8Uld {
                 break;
             }
             if (bhIdx == METADATA_IDX) {
-                r.siliconTempDegc = buf[i + 12]; // signed byte
+                // The temperature is body byte 8 (the real block has 12); a
+                // shorter block leaves it at 0.
+                if (msize >= 9) {
+                    r.siliconTempDegc = buf[i + 12]; // signed byte
+                }
             } else if (bhIdx == DISTANCE_IDX) {
                 int[] out = new int[msize / 2];
                 for (int k = 0; k < out.length; k++) {

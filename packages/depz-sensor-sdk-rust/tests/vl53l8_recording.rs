@@ -220,3 +220,32 @@ fn vl53l8ch_8x8_recording_replay() {
 fn vl53l8ch_cnh_recording_replay() {
     vl53l8ch_replay("vl53l8ch_cnh_8x8_15hz", true);
 }
+
+/// A METADATA block too short to carry the silicon temperature (body byte 8;
+/// the real block has 12) leaves it at 0 (bug hunt C-4). The frame is all
+/// zero — zero headers walk 4 bytes at a time — with one METADATA header of
+/// `size` bytes: at 16, where the byte the temperature would be read from is
+/// 0xF6 (-10), or as the last word of the frame, where the read would run
+/// past it.
+fn short_metadata_temp(size: u32, at_end: bool) -> i8 {
+    let mut buf = vec![0u8; 540];
+    let at = if at_end { buf.len() - 4 } else { 16 };
+    buf[at..at + 4].copy_from_slice(&((size << 4) | (0x54b4 << 16)).to_le_bytes());
+    if !at_end {
+        buf[16 + 12] = 0xf6;
+    }
+    let raw: Vec<u8> = buf
+        .chunks(4)
+        .flat_map(|w| w.iter().rev().copied())
+        .collect();
+    parse_frame(&raw, Variant::Cx)
+        .expect("frame decodes")
+        .silicon_temp_degc
+}
+
+#[test]
+fn short_metadata_block_leaves_the_temperature_at_zero() {
+    assert_eq!(short_metadata_temp(4, false), 0);
+    assert_eq!(short_metadata_temp(8, false), 0);
+    assert_eq!(short_metadata_temp(0, true), 0);
+}

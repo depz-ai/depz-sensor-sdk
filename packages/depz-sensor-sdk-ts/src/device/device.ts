@@ -181,6 +181,11 @@ export class StreamQueue<T> implements AsyncIterableIterator<T> {
 
 export interface DeviceOptions {
   timeoutMs?: number;
+  /**
+   * CRC type of the frames the device sends (default `CrcType.None`); on an
+   * adopted connection (`attachSensorClass`, `openOnTransport`) it replaces
+   * the link's, left as it was when not given.
+   */
   txCrcType?: CrcType;
   /**
    * @internal Continue on this already-started link instead of creating one
@@ -227,11 +232,13 @@ export class DepzDevice {
   constructor(transport: SerialTransport, opts?: DeviceOptions) {
     this.transport = transport;
     this.timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.link = opts?.[ADOPT_LINK] ?? new DepzLink(transport, { txCrcType: opts?.txCrcType ?? CrcType.None });
+    const adopted = opts?.[ADOPT_LINK];
+    this.link = adopted ?? new DepzLink(transport, { txCrcType: opts?.txCrcType ?? CrcType.None });
+    if (adopted !== undefined && opts?.txCrcType !== undefined) adopted.txCrcType = opts.txCrcType;
     this.unsubLink = [
       this.link.onParserEvent((ev) => this.handleParserEvent(ev)),
       this.link.onSeqGap((gap) => this.emitEvent({ type: "seqGap", ...gap })),
-      this.link.onClose(() => this.handleLinkClosed()),
+      this.link.onClose((cause) => this.handleLinkClosed(cause)),
     ];
   }
 
@@ -279,14 +286,22 @@ export class DepzDevice {
     return this.link.stats;
   }
 
-  private handleLinkClosed(): void {
+  private handleLinkClosed(cause?: unknown): void {
     if (this.torndown) return;
     this.torndown = true;
-    const error = this.closing
-      ? new LinkClosedError("device closed")
-      : new DeviceLostError("transport closed");
+    let error: DepzError;
+    if (this.closing) {
+      error = new LinkClosedError("device closed");
+    } else if (cause === undefined) {
+      error = new DeviceLostError("transport closed");
+    } else {
+      // The read pump failed: the device is gone as surely as on an unplug.
+      console.error("depz-sensor-sdk: the read pump ended", cause);
+      error = new DeviceLostError(`read pump ended: ${cause instanceof Error ? cause.message : String(cause)}`);
+      error.cause = cause;
+    }
     this.failAllPending(error);
-    if (!this.closing) this.emitEvent({ type: "disconnected", reason: "transport closed" });
+    if (!this.closing) this.emitEvent({ type: "disconnected", reason: error.message });
     // Let subclasses reject their own in-flight waiters (e.g. BNO086's SH-2
     // control layer) so a disconnect doesn't leave them hanging until their own
     // timeout, and clear any per-connection resolver state.
@@ -408,7 +423,19 @@ export class DepzDevice {
       return;
     }
 
-    if (this.handleReport(pkt)) return;
+    // The report path runs guarded like the matchers above: a stream handler
+    // that throws drops this one packet, counted and logged — it never ends
+    // the read pump (contract 07 §3).
+    let consumed: boolean;
+    try {
+      consumed = this.handleReport(pkt);
+    } catch (err) {
+      this.link.stats.reportErrors += 1;
+      const id = pkt.cmd.toString(16).padStart(2, "0");
+      console.error(`depz-sensor-sdk: the handler of report 0x${id} threw; packet dropped`, err);
+      return;
+    }
+    if (consumed) return;
     // Unknown/unrouted report: keep it visible so new firmware is debuggable.
     this.emitEvent({ type: "text", cmd: pkt.cmd, text: toHex(pkt.payload) });
   }
@@ -489,6 +516,9 @@ export class DepzDevice {
       throw new DepzError("configure matcher or okCompletes");
     }
     if (this.handedOver) throw new LinkClosedError("connection handed over to another device object");
+    // Contract 07 §3: closed by this side, or lost — said before sending.
+    if (this.closing) throw new LinkClosedError("device closed");
+    if (this.torndown) throw new DeviceLostError("transport closed");
     if (this.pending.has(cmd)) throw new BusyError(cmd);
     const timeoutMs = opts.timeoutMs ?? this.timeoutMs;
     const result = new Promise<T>((resolve, reject) => {
@@ -517,7 +547,14 @@ export class DepzDevice {
         clearTimeout(p.timer);
         this.pending.delete(cmd);
       }
-      throw err;
+      if (err instanceof DepzError) throw err;
+      // A transport's own Error (port gone, write failed) is the SDK's lost
+      // error, or closed when this side is closing; the cause stays attached.
+      const mapped = this.closing
+        ? new LinkClosedError("device closed")
+        : new DeviceLostError(`write failed: ${err instanceof Error ? err.message : String(err)}`);
+      mapped.cause = err;
+      throw mapped;
     }
     return result;
   }

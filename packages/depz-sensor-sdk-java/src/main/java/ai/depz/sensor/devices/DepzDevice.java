@@ -21,6 +21,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A connection to one DEPZ device in application mode (contracts 02, 07): a reader thread,
@@ -34,6 +36,7 @@ public class DepzDevice implements AutoCloseable {
     public static final Duration DEFAULT_TIMEOUT = Duration.ofMillis(200);
 
     private static final Duration READ_SLICE = Duration.ofMillis(50);
+    private static final Logger LOG = Logger.getLogger("ai.depz.sensor");
 
     private final Core core;
 
@@ -70,7 +73,8 @@ public class DepzDevice implements AutoCloseable {
     }
 
     public boolean isClosed() {
-        return core.link.isClosed();
+        // A reader that ended marks the device lost even if closing its link failed.
+        return core.link.isClosed() || core.lost != null;
     }
 
     /** The timeout of requests that take none of their own. */
@@ -323,6 +327,8 @@ public class DepzDevice implements AutoCloseable {
         private int txSeq;
         private int lastRxSeq = -1;
         private volatile boolean closing;
+        /** Set when the reader ended on its own (not by close()): every later request fails with it. */
+        volatile DeviceLostException lost;
 
         Core(Link link, Duration timeout, DepzDevice owner) {
             this.link = link;
@@ -349,6 +355,10 @@ public class DepzDevice implements AutoCloseable {
         }
 
         void send(int cmd, byte[] payload, CrcType crcType) {
+            DeviceLostException dead = lost;
+            if (dead != null) {
+                throw new DeviceLostException(dead.getMessage(), dead.getCause());
+            }
             synchronized (txLock) {
                 byte[] frame = Framing.buildPacket(cmd, payload, txSeq, crcType);
                 link.write(frame);
@@ -377,8 +387,9 @@ public class DepzDevice implements AutoCloseable {
             try {
                 done = p.done.await(wait.toNanos(), TimeUnit.NANOSECONDS);
             } catch (InterruptedException e) {
+                take(cmd, p);
                 Thread.currentThread().interrupt();
-                done = false;
+                throw new DepzException("interrupted");
             }
             if (!done) {
                 take(cmd, p);
@@ -423,10 +434,7 @@ public class DepzDevice implements AutoCloseable {
                     try {
                         data = link.read(READ_SLICE);
                     } catch (DeviceLostException | UncheckedIOException | IllegalStateException e) {
-                        if (!closing) {
-                            failAll(new DeviceLostException(String.valueOf(e.getMessage()), e));
-                            emit(new DeviceEvent.Disconnected(String.valueOf(e.getMessage())));
-                        }
+                        lose(new DeviceLostException(String.valueOf(e.getMessage()), e));
                         return;
                     }
                     if (data.length == 0) {
@@ -449,18 +457,35 @@ public class DepzDevice implements AutoCloseable {
                     stats.headerErrors.set(parser.headerErrors);
                 }
             } catch (RuntimeException e) {
-                // A callback or handler threw: the reader is gone, as in the reference SDK.
-                failAll(new DeviceLostException("device reader stopped: " + e.getClass().getSimpleName() + ": "
-                        + e.getMessage(), e));
-                try {
-                    emit(new DeviceEvent.Disconnected("reader stopped: " + e.getMessage()));
-                } catch (RuntimeException again) {
-                    // the same callback again
+                // Anything else ending the reader (a link that threw something unexpected) must not
+                // leave a device that looks open and times every request out (contract 07 §3).
+                if (!closing) {
+                    LOG.log(Level.SEVERE, "reader of " + link.name() + " ended", e);
                 }
+                lose(new DeviceLostException("reader ended: " + e.getClass().getSimpleName() + ": "
+                        + e.getMessage(), e));
             } finally {
                 failAll(new LinkClosedException("device closed"));
                 owner.onReaderStopped();
             }
+        }
+
+        /**
+         * The reader ended on its own: close the link, fail what is pending and every later request
+         * with {@code e}, say why. Nothing to do when close() ended it.
+         */
+        private void lose(DeviceLostException e) {
+            if (closing) {
+                return;
+            }
+            lost = e;
+            try {
+                link.close();
+            } catch (RuntimeException again) {
+                LOG.log(Level.SEVERE, "closing " + link.name() + " after its reader ended", again);
+            }
+            failAll(e);
+            emit(new DeviceEvent.Disconnected(String.valueOf(e.getMessage())));
         }
 
         private void trackSeq(int seq) {
@@ -523,8 +548,9 @@ public class DepzDevice implements AutoCloseable {
                     }
                     try {
                         result = p.matcher.apply(pkt);
-                    } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
-                        // The reply is for this request but does not decode (contract 07 §3: reject it).
+                    } catch (RuntimeException e) {
+                        // The reply is for this request but does not decode (contract 07 §3: reject
+                        // it). Whatever the matcher threw, it must never end the reader.
                         bad = e;
                     }
                     if (result != null || bad != null) {
@@ -562,7 +588,17 @@ public class DepzDevice implements AutoCloseable {
                 emit(new DeviceEvent.Temperature(rep.timestampUs(), rep.celsius()));
                 return;
             }
-            if (owner.handleReport(pkt)) {
+            // The report path runs guarded like the matchers: a stream handler that throws drops
+            // this one packet, counted and logged — it never ends the reader (contract 07 §3).
+            boolean consumed;
+            try {
+                consumed = owner.handleReport(pkt);
+            } catch (RuntimeException e) {
+                stats.reportErrors.incrementAndGet();
+                LOG.log(Level.SEVERE, String.format("report 0x%02X handler threw on %s", pkt.cmd(), link.name()), e);
+                return;
+            }
+            if (consumed) {
                 return;
             }
             // An unrouted report stays visible, so new firmware is debuggable.

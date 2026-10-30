@@ -12,7 +12,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError } from "../../errors.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
   BNO055_RESET_TIMEOUT_MS,
@@ -624,7 +624,7 @@ export class Bno055 extends DepzDevice {
           timer = setTimeout(() => reject(new DepzTimeoutError(Bno055Rpt.Stream, timeoutMs)), timeoutMs);
         }),
       ]);
-      if (result.done === true) throw new DepzError("device closed");
+      if (result.done === true) throw new LinkClosedError("device closed");
       return result.value;
     } finally {
       if (timer !== undefined) clearTimeout(timer);

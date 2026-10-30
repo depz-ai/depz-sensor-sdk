@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DepzDevice, NoDepzDeviceError, Vl53l8ch, Vl53l8cx, type SerialTransport } from "../src/index.js";
+import { DepzDevice, DeviceLostError, LinkClosedError, NoDepzDeviceError, Vl53l8ch, Vl53l8cx, type SerialTransport } from "../src/index.js";
 import { NodeSerialTransport, listDepzDevices, listSerialPorts, openDevice, withAlias } from "../src/transport/node.js";
 import { FakeTof } from "./fake-tof.js";
 
@@ -177,6 +177,23 @@ describe("NodeSerialTransport", () => {
     await t.open();
     await t.close();
     await expect(t.write(Uint8Array.of(1))).rejects.toThrow(/port not open/);
+  });
+
+  it("a device turns the transport's bare errors into the SDK's closed / lost errors", async () => {
+    plug("/dev/ttyACM0", new FakeTof());
+    const closed = new DepzDevice(new NodeSerialTransport("/dev/ttyACM0"), { timeoutMs: 500 });
+    await closed.open();
+    await closed.close();
+    await expect(closed.getDeviceName()).rejects.toBeInstanceOf(LinkClosedError);
+
+    const dev = new DepzDevice(new NodeSerialTransport("/dev/ttyACM0"), { timeoutMs: 500 });
+    opened.push(dev);
+    await dev.open();
+    const cause = new Error("EIO");
+    fakeSerial.writeError = cause;
+    const err = await dev.getDeviceName().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeviceLostError);
+    expect((err as DeviceLostError).cause).toBe(cause);
   });
 
   it("open() rejects with the port's error", async () => {

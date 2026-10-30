@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -452,3 +453,44 @@ def test_threaded_raising_callback_does_not_stop_playback():
         assert p.state is PlayerState.DONE
         assert got == list(reader) and len(got) == 10
         assert p.callback_errors == 1
+
+
+
+def _until_waiting(cond: threading.Condition, alive, timeout: float = 5.0) -> bool:
+    """Poll until some thread waits on `cond` (True) or `alive()` turns False."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and alive():
+        with cond:
+            if cond._waiters:  # type: ignore[attr-defined]
+                return True
+        time.sleep(0.001)
+    return False
+
+
+def test_threaded_tiny_speed_does_not_kill_the_player_thread(tmp_path: Path):
+    """A wait of 1e300 s overflows the platform's lock timeout (OverflowError
+    past threading.TIMEOUT_MAX): the player clamps each wait and re-evaluates,
+    so the thread lives on and a later speed change finishes playback."""
+    with DatasetPlayer(_evenly(tmp_path, n=3, gap_us=1_000_000), speed=1e-300) as p:
+        seen: list[int] = []
+        p.on_record(lambda r: seen.append(r.t_host_us))
+        p.play()
+        thread = p._thread
+        assert thread is not None
+        assert _until_waiting(p._cond, thread.is_alive)
+        assert seen == [1_000_000]
+        p.speed = 0
+        assert p.wait(5.0)
+        assert p.state is PlayerState.DONE and len(seen) == 3
+
+
+def test_reader_play_tiny_speed_stops_on_the_event(tmp_path: Path):
+    reader = DatasetReader(_evenly(tmp_path, n=3, gap_us=1_000_000))
+    stop = threading.Event()
+    seen: list[int] = []
+    me = threading.current_thread()
+    setter = threading.Thread(target=lambda: (_until_waiting(stop._cond, me.is_alive), stop.set()))
+    setter.start()
+    reader.play(lambda r: seen.append(r.t_host_us), speed=1e-300, stop=stop)
+    setter.join(5.0)
+    assert seen == [1_000_000]

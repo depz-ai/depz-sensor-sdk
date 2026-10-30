@@ -95,6 +95,10 @@ public class DatasetRecorderTests
                 var until = DateTime.UtcNow.AddSeconds(2);
                 while (rec.RecordsWritten < 4 && DateTime.UtcNow < until)
                     Thread.Sleep(5);
+                rec.Stop();
+                Assert.Equal(4, rec.RecordsWritten); // the finished file's count survives Stop()
+                rec.Stop(); // idempotent
+                Assert.Equal(4, rec.RecordsWritten);
             }
             var reader = new DatasetReader(path);
             Assert.Equal(new[] { "d0", "d1" }, reader.Devices.Keys.OrderBy(k => k));
@@ -631,5 +635,45 @@ public class DatasetPlayerTests
         lock (got)
             Assert.Equal(ds.Records, got);
         Assert.Equal(1, e.CallbackErrors);
+    }
+
+    [Fact]
+    public void TinySpeedDoesNotKillThePlayerThread()
+    {
+        // 1 s / 1e-300 is past what TimeSpan / Monitor.Wait take: the player clamps each wait and re-evaluates
+        using var p = new DatasetPlayer(Evenly(3, 1_000_000), 1e-300);
+        var seen = new List<long>();
+        Thread? player = null;
+        p.OnRecord(r =>
+        {
+            player = Thread.CurrentThread;
+            lock (seen)
+                seen.Add(r.THostUs);
+        });
+        p.Play();
+        Assert.True(SpinWait.SpinUntil(() => player is { } t && (!t.IsAlive || t.ThreadState.HasFlag(ThreadState.WaitSleepJoin)), 5000));
+        Assert.True(player!.IsAlive);
+        p.Speed = 0;
+        Assert.True(p.Wait(TimeSpan.FromSeconds(5)));
+        lock (seen)
+            Assert.Equal((PlayerState.Done, 3), (p.State, seen.Count));
+    }
+
+    [Fact]
+    public void ReaderPlayAtATinySpeedStopsOnCancel()
+    {
+        var reader = new DatasetReader(Evenly(3, 1_000_000));
+        using var cts = new CancellationTokenSource();
+        var me = Thread.CurrentThread;
+        var seen = new List<long>();
+        var canceller = new Thread(() =>
+        {
+            SpinWait.SpinUntil(() => seen.Count > 0 && me.ThreadState.HasFlag(ThreadState.WaitSleepJoin), 5000);
+            cts.Cancel();
+        });
+        canceller.Start();
+        reader.Play(r => seen.Add(r.THostUs), 1e-300, cancel: cts.Token);
+        canceller.Join(TimeSpan.FromSeconds(5));
+        Assert.Equal(new[] { 1_000_000L }, seen);
     }
 }

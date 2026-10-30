@@ -293,14 +293,20 @@ static int need(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
 /* Public entry: serialise the whole sequence. */
 #define LOCKED(body)                          \
     do {                                      \
         int locked_rc_;                       \
         TRY(need(dev));                       \
+        TRY(depz_device_enter(dev));          \
         depz_mutex_lock(&st(dev)->op);        \
         locked_rc_ = (body);                  \
         depz_mutex_unlock(&st(dev)->op);      \
+        depz_device_leave(dev);               \
         return locked_rc_;                    \
     } while (0)
 
@@ -562,16 +568,20 @@ int depz_bno086_power_on(depz_device *dev)
     LOCKED(send_shtp(dev, DEPZ_SHTP_CH_EXECUTABLE, p, sizeof p));
 }
 
-int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
+static int do_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
 {
     bno_state *s;
-    TRY(need(dev));
     s = st(dev);
     depz_mutex_lock(&s->lock);
     if (buf) memcpy(buf, s->adv, s->adv_len < cap ? s->adv_len : cap);
     if (len) *len = s->adv_len;
     depz_mutex_unlock(&s->lock);
     return DEPZ_OK;
+}
+
+int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
+{
+    ENTERED(do_advertisement(dev, buf, cap, len));
 }
 
 /* ── identification and features ───────────────────────────────────────── */
@@ -720,34 +730,47 @@ int depz_bno086_disable(depz_device *dev, uint8_t sensor) { LOCKED(do_disable(de
 
 /* ── reports ───────────────────────────────────────────────────────────── */
 
-int depz_bno086_on_report(depz_device *dev, depz_bno086_report_cb cb, void *user, int *token)
+static int do_on_report(depz_device *dev, depz_bno086_report_cb cb, void *user, int *token)
 {
-    TRY(need(dev));
     if (!cb) return depz_fail(DEPZ_E_ARG, "bno086: NULL callback");
     return depz_cb_list_add(&st(dev)->cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_bno086_on_report(depz_device *dev, depz_bno086_report_cb cb, void *user, int *token)
+{
+    ENTERED(do_on_report(dev, cb, user, token));
+}
+
 void depz_bno086_off_report(depz_device *dev, int token)
 {
-    if (depz_is_bno086(dev)) depz_cb_list_remove(&st(dev)->cbs, token);
+    if (!depz_is_bno086(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_bno086_reports(depz_device *dev, size_t maxsize)
 {
-    if (need(dev)) return NULL;
-    return depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 1024);
+    depz_stream *s;
+    if (need(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 1024);
+    depz_device_leave(dev);
+    return s;
 }
 
-int depz_bno086_get_report(depz_device *dev, int timeout_ms, depz_bno_report *out)
+static int do_get_report(depz_device *dev, int timeout_ms, depz_bno_report *out)
 {
     depz_stream *s;
     int rc;
-    TRY(need(dev));
     s = depz_hub_subscribe(st(dev)->hub, 1);
     if (!s) return depz_fail(DEPZ_E_NOMEM, "bno086: cannot subscribe");
     rc = depz_stream_next(s, out, timeout_ms < 0 ? 1000 : timeout_ms);
     depz_stream_close(s);
     return rc;
+}
+
+int depz_bno086_get_report(depz_device *dev, int timeout_ms, depz_bno_report *out)
+{
+    ENTERED(do_get_report(dev, timeout_ms, out));
 }
 
 uint64_t depz_bno086_shtp_discarded(const depz_device *dev)

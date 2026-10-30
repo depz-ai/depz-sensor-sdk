@@ -562,11 +562,13 @@ impl Bno086Device {
             Some(s) => {
                 let fan = Fanout::new(self.callback_errors_counter());
                 let sub = fan.subscribe(capacity);
-                self.hub
-                    .filtered
-                    .lock()
-                    .unwrap()
-                    .push((Some(s.iter().copied().collect()), fan));
+                let mut filtered = self.hub.filtered.lock().unwrap();
+                // reader_stopped closes `reports` before it walks `filtered`: either it sees this
+                // fanout, or `reports` is closed already (contract 07 §3).
+                if self.hub.reports.is_closed() {
+                    fan.close_all();
+                }
+                filtered.push((Some(s.iter().copied().collect()), fan));
                 sub
             }
         }

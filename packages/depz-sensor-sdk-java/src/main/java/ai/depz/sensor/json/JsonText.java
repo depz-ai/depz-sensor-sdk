@@ -19,8 +19,16 @@ import java.util.Map;
  * {@link IllegalArgumentException} naming the index — never an index error of the runtime.
  */
 public final class JsonText {
+    /**
+     * Arrays and objects nest at most this deep, the outermost value being level 1
+     * (contract 08 «Line rules»): beyond it the text is refused instead of
+     * overflowing the stack of this recursive-descent parser.
+     */
+    public static final int MAX_DEPTH = 256;
+
     private final String s;
     private int i;
+    private int depth;
 
     private JsonText(String s) {
         this.s = s;
@@ -65,13 +73,19 @@ public final class JsonText {
     private Object value() {
         char c = peek();
         switch (c) {
-            case '{': return object();
-            case '[': return array();
+            case '{': enter(); return object();
+            case '[': enter(); return array();
             case '"': return string();
             case 't': expect("true"); return true;
             case 'f': expect("false"); return false;
             case 'n': expect("null"); return null;
             default: return number();
+        }
+    }
+
+    private void enter() {
+        if (++depth > MAX_DEPTH) {
+            throw new IllegalArgumentException("nested deeper than " + MAX_DEPTH + " at index " + i);
         }
     }
 
@@ -86,7 +100,7 @@ public final class JsonText {
         Map<String, Object> m = new LinkedHashMap<>();
         i++; // {
         ws();
-        if (peek() == '}') { i++; return m; }
+        if (peek() == '}') { i++; depth--; return m; }
         while (true) {
             ws();
             String key = string();
@@ -100,6 +114,7 @@ public final class JsonText {
             if (c == '}') break;
             if (c != ',') throw new IllegalArgumentException("expected ',' or '}' at " + (i - 1));
         }
+        depth--;
         return m;
     }
 
@@ -107,7 +122,7 @@ public final class JsonText {
         List<Object> a = new ArrayList<>();
         i++; // [
         ws();
-        if (peek() == ']') { i++; return a; }
+        if (peek() == ']') { i++; depth--; return a; }
         while (true) {
             ws();
             a.add(value());
@@ -116,6 +131,7 @@ public final class JsonText {
             if (c == ']') break;
             if (c != ',') throw new IllegalArgumentException("expected ',' or ']' at " + (i - 1));
         }
+        depth--;
         return a;
     }
 

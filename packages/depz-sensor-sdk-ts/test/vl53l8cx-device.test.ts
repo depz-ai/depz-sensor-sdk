@@ -6,7 +6,7 @@
  * full-stack replay test (init + streaming) and the ULD-level advanced tests.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DepzError,
   InvalidStateError,
@@ -15,7 +15,9 @@ import {
   MIN_RANGING_FREQUENCY_HZ,
   RESOLUTION_4X4,
   RESOLUTION_8X8,
+  StatusError,
   Vl53l8,
+  Vl53l8Cmd,
   Vl53l8cx,
   zoneGrid,
 } from "../src/index.js";
@@ -79,6 +81,23 @@ describe("vl53l8cx config guards", () => {
     const dev = cx();
     expect(dev.ranging).toBe(false);
     await dev.stopRanging(); // must resolve without touching the transport
+  });
+
+  it("a refused START_STREAM stops the sensor the ULD started and keeps the original error", async () => {
+    const dev = cx();
+    const { drv } = makeDriver();
+    (dev as unknown as { uldDriver: unknown }).uldDriver = drv;
+    // the ULD start: the sensor now ranges and reports its frame size
+    const start = vi.spyOn(drv, "startRanging").mockImplementation(async () => {
+      (drv as unknown as { dataReadSize: number }).dataReadSize = 1000;
+    });
+    const stop = vi.spyOn(drv, "stopRanging").mockRejectedValue(new DepzError("stop failed too"));
+    const refused = new StatusError(Vl53l8Cmd.StartStream, 0x04);
+    vi.spyOn(dev as unknown as { request: () => Promise<unknown> }, "request").mockRejectedValue(refused);
+    await expect(dev.startRanging()).rejects.toBe(refused);
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledTimes(1); // the sensor is not left ranging
+    expect(dev.ranging).toBe(false);
   });
 
   it("requireNotRanging blocks reconfiguration while the stream owns the bank", async () => {

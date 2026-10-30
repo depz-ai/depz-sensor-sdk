@@ -156,7 +156,9 @@ std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off) {
         if (i + 4 + msize > drs) break;
 
         if (bf.idx == METADATA_IDX) {
-            silicon_temp = static_cast<std::int8_t>(u8(buf[i + 12]));
+            // The temperature is body byte 8 (the real block has 12); a
+            // shorter block leaves it at 0.
+            if (msize >= 9) silicon_temp = static_cast<std::int8_t>(u8(buf[i + 12]));
         } else if (bf.idx == DISTANCE_IDX) {
             std::size_t nz = msize / 2;
             distance.assign(nz, 0);

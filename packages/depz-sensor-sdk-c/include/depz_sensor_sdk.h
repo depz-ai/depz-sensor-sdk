@@ -2474,7 +2474,8 @@ int  depz_json_push(depz_json *array, depz_json *item);
 int  depz_json_set(depz_json *object, const char *key, depz_json *item);
 void depz_json_free(depz_json *v);
 
-/* Parse one JSON document out of text[0..len). NULL when it does not parse. */
+/* Parse one JSON document out of text[0..len). NULL when it does not parse or
+ * nests arrays/objects deeper than 256 (contract 08 «Line rules»). */
 depz_json *depz_json_parse(const char *text, size_t len);
 /* Serialize compactly (no spaces, non-ASCII as \uXXXX, reals in the shortest
  * form that reads back exactly; NaN / infinities as null). Returns the text's

@@ -7,8 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   Bno086,
   BusyError,
+  Cmd,
+  CrcType,
+  DepzDevice,
   DepzTimeoutError,
+  DeviceLostError,
   InvalidStateError,
+  LinkClosedError,
   LoopbackTransport,
   Sr04,
   StatusError,
@@ -16,8 +21,11 @@ import {
   SyncPinPolarity,
   Vl53l8ch,
   Vl53l8cx,
+  Rpt,
+  buildPacket,
   syncTimeAll,
   type DeviceEvent,
+  type PacketEvent,
   type Sr04Measurement,
 } from "../src/index.js";
 import { HAND_OVER } from "../src/device/device.js";
@@ -313,6 +321,134 @@ describe("Sr04", () => {
     } finally {
       await dev2.close();
       await fake2.close();
+    }
+  });
+});
+
+// Bug hunt 2026-10-29, group A: the read pump survives whatever a report does,
+// and a pump that ends anyway tears the device down — never a dead device
+// that looks open, never an unhandled rejection.
+describe("the read pump survives a report (contract 07 §3)", () => {
+  class RaisingReports extends DepzDevice {
+    protected override handleReport(pkt: PacketEvent): boolean {
+      if (pkt.cmd === 0x9e) throw new Error("stream decoder bug");
+      return false;
+    }
+  }
+
+  const textPkt = (cmd: number, text: string, seq: number): Uint8Array =>
+    buildPacket(Rpt.Text, Uint8Array.of(cmd, ...new TextEncoder().encode(text)), seq, CrcType.None);
+
+  async function until(cond: () => boolean): Promise<void> {
+    for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 5));
+    expect(cond()).toBe(true);
+  }
+
+  it("a throwing handleReport drops that packet, counted and logged; the pump goes on", async () => {
+    const [host, peer] = LoopbackTransport.pair();
+    const d = new RaisingReports(host, { timeoutMs: 500 });
+    await d.open();
+    const seen: DeviceEvent[] = [];
+    d.onEvent((ev) => seen.push(ev));
+    const errors: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      await peer.write(buildPacket(0x9e, Uint8Array.of(1, 2), 0, CrcType.None));
+      await peer.write(textPkt(0x04, "after", 1));
+      await until(() => seen.length > 0);
+      expect(seen).toEqual([{ type: "text", cmd: 0x04, text: "after" }]);
+      expect(d.stats.reportErrors).toBe(1);
+      expect(errors.map((a) => a.map(String).join(" ")).join("\n")).toContain("stream decoder bug");
+      const name = d.getDeviceName();
+      await peer.write(textPkt(Cmd.GetDeviceName, "still here", 2));
+      expect(await name).toBe("still here");
+    } finally {
+      console.error = orig;
+      await d.close();
+    }
+  });
+
+  it("a pump that ends with an error fails requests with DeviceLostError(cause), no unhandled rejection", async () => {
+    let fail: (e: Error) => void = () => {};
+    const failed = new Promise<never>((_, reject) => (fail = reject));
+    class BrokenRead extends LoopbackTransport {
+      override async *readable(): AsyncIterableIterator<Uint8Array> {
+        yield await failed; // the read itself fails, e.g. a dead port
+      }
+    }
+    const host = new BrokenRead();
+    host.peer = new LoopbackTransport();
+    const rejections: unknown[] = [];
+    const onRejection = (e: unknown): void => void rejections.push(e);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const d = new DepzDevice(host, { timeoutMs: 5000 });
+      await d.open();
+      const seen: DeviceEvent[] = [];
+      d.onEvent((ev) => seen.push(ev));
+      const req = d.getDeviceName().catch((e: unknown) => e);
+      const cause = new Error("read failed");
+      fail(cause);
+      const err = await req;
+      expect(err).toBeInstanceOf(DeviceLostError);
+      expect((err as DeviceLostError).cause).toBe(cause);
+      expect(seen).toEqual([{ type: "disconnected", reason: expect.stringContaining("read failed") }]);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(rejections).toEqual([]);
+      await d.close();
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+  });
+});
+
+describe("a request on a closed or lost device (contract 07 §3)", () => {
+  async function until(cond: () => boolean): Promise<void> {
+    for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 5));
+    expect(cond()).toBe(true);
+  }
+
+  it("after close() it rejects with LinkClosedError", async () => {
+    const [host] = LoopbackTransport.pair();
+    const d = new DepzDevice(host, { timeoutMs: 5000 });
+    await d.open();
+    await d.close();
+    const err = await d.getDeviceName().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LinkClosedError);
+  });
+
+  it("after the device was lost it rejects with DeviceLostError", async () => {
+    const [host, peer] = LoopbackTransport.pair();
+    const d = new DepzDevice(host, { timeoutMs: 5000 });
+    await d.open();
+    const seen: string[] = [];
+    d.onEvent((ev) => seen.push(ev.type));
+    await peer.close();
+    await until(() => seen.includes("disconnected"));
+    const err = await d.getDeviceName().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DeviceLostError);
+    await d.close();
+    expect(await d.getDeviceName().catch((e: unknown) => e)).toBeInstanceOf(LinkClosedError);
+  });
+
+  it("a transport write that fails with a plain Error is DeviceLostError with that cause", async () => {
+    const cause = new Error("EIO");
+    class FailingWrite extends LoopbackTransport {
+      override async write(): Promise<void> {
+        throw cause;
+      }
+    }
+    const host = new FailingWrite();
+    host.peer = new LoopbackTransport();
+    const d = new DepzDevice(host, { timeoutMs: 5000 });
+    await d.open();
+    try {
+      const err = await d.getDeviceName().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DeviceLostError);
+      expect((err as DeviceLostError).cause).toBe(cause);
+    } finally {
+      await d.close();
     }
   });
 });

@@ -7,12 +7,21 @@
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DefineConstants>$(DefineConstants);UNITY_5_3_OR_NEWER</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the in-memory registry and board of the core tests -->
+    <Compile Include="..\Depz.Sensor.Tests\FakeRegistry.cs" Link="FakeRegistry.cs" />
+    <Compile Include="..\Depz.Sensor.Tests\FakeBoardLink.cs" Link="FakeBoardLink.cs" />
+    <!-- the sample MonoBehaviour, against a UnityEngine stub (UnityEngineStub.cs) -->
+    <Compile Include="..\..\unity\Runtime\DepzSensorBehaviour.cs" Link="DepzSensorBehaviour.cs" />
   </ItemGroup>
 
   <ItemGroup>

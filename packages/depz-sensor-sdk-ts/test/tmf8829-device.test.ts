@@ -13,6 +13,7 @@ import {
   DepzError,
   DepzTimeoutError,
   InvalidStateError,
+  LinkClosedError,
   StatusError,
   Tmf8829,
   Tmf8829Error,
@@ -420,6 +421,7 @@ describe("measurements from the stream", () => {
     const pending = dev.getMeasurement(2000);
     await tick();
     await dev.close();
+    await expect(pending).rejects.toThrow(LinkClosedError);
     await expect(pending).rejects.toThrow("device closed");
   });
 
@@ -444,6 +446,33 @@ describe("measurements from the stream", () => {
     await dev.stop();
     await dev.start();
     expect([dev.framesDropped, dev.framesDiscarded, dev.frameParseErrors]).toEqual([0, 0, 0]);
+  });
+  it("drops a frame whose u64 times a JS number cannot carry; the pump goes on (bug hunt TS-1)", async () => {
+    // 0xFF×8 is a legal wire u64; as a Number it rounds to 2^64. It used to
+    // throw a RangeError out of handleReport and end the read pump with an
+    // unhandled rejection and a false "disconnected".
+    const rejections: unknown[] = [];
+    const onRejection = (e: unknown): void => void rejections.push(e);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const got: Tmf8829Measurement[] = [];
+      const events: string[] = [];
+      dev.onMeasurement((m) => got.push(m));
+      dev.onEvent((ev) => events.push(ev.type));
+      await dev.start();
+      await fake.emitFrame(raw("8x8#0"), 0xffff_ffff_ffff_ffffn, 0n);
+      await fake.emitFrame(raw("8x8#1"), 2125672180n, 0xffff_ffff_ffff_ff00n);
+      await fake.emitFrame(raw("8x8#0"), 2125575099n, 2125575071n);
+      await waitFor(got, 1);
+      expect(got[0]!.fNumber).toBe(1); // the good frame after the two bad ones
+      expect(dev.frameParseErrors).toBe(2);
+      expect(dev.stats.reportErrors).toBe(0);
+      expect(events).not.toContain("disconnected");
+      await tick();
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
   });
 });
 

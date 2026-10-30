@@ -533,6 +533,27 @@ public final class Vl53l8DriverTests {
         eq(Vl53l8Error.STATUS_CORRUPTED_FRAME, code(() -> drv.parseFrame(0, Vl53l8Uld.swapBuffer(buf))));
     }
 
+    /**
+     * A METADATA block too short to carry the silicon temperature (body byte 8;
+     * the real block has 12) leaves it at 0 (bug hunt C-4). The frame is all
+     * zero — zero headers walk 4 bytes at a time — with one METADATA header of
+     * {@code size} bytes: at 16, where the byte the temperature would be read
+     * from is 0xF6 (−10), or as the last word of the frame, where the read
+     * would run past it.
+     */
+    public static void aShortMetadataBlockLeavesTheTemperatureAtZero() {
+        int[][] cases = {{4, 0}, {8, 0}, {0, 1}};
+        for (int[] c : cases) {
+            boolean atEnd = c[1] == 1;
+            byte[] buf = new byte[540];
+            putU32(buf, atEnd ? 540 - 4 : 16, (0x54B4L << 16) | ((long) c[0] << 4));
+            if (!atEnd) {
+                buf[16 + 12] = (byte) 0xF6;
+            }
+            eq(0, Vl53l8Uld.parseFrame(Vl53l8Uld.swapBuffer(buf), 540, 12).siliconTempDegc);
+        }
+    }
+
     public static void theMotionBlockIsParsedOnceTheIndicatorIsConfigured() {
         FakePlatform p = ranging(16);
         Vl53l8Driver drv = new Vl53l8Driver(p);

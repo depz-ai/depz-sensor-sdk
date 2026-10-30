@@ -50,5 +50,6 @@ bool   fake_vl53l8_send_frame(fake_vl53l8 *f);
 void fake_vl53l8_xtalk_cal_fails(fake_vl53l8 *f, bool on);  /* "coverglass too good" */
 void fake_vl53l8_laser_safety_fault(fake_vl53l8 *f, bool on);
 void fake_vl53l8_fail_next(fake_vl53l8 *f, uint8_t cmd, uint8_t status);
+void fake_vl53l8_silent_next(fake_vl53l8 *f, uint8_t cmd);             /* no answer at all */
 
 #endif

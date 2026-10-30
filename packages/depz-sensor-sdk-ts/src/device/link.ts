@@ -30,6 +30,8 @@ export interface LinkStats {
   seqGaps: number;
   /** Callbacks that threw on the read pump (contract 07 §3). */
   callbackErrors: number;
+  /** Reports whose handler threw: that packet dropped (contract 07 §3). */
+  reportErrors: number;
 }
 
 /** A host-observed gap in the device→host seq (contract 01 §5 step 5). */
@@ -51,10 +53,12 @@ export class DepzLink {
     trashBytes: 0,
     seqGaps: 0,
     callbackErrors: 0,
+    reportErrors: 0,
   };
 
+  /** CRC type of the frames this link sends; may change between requests. */
+  txCrcType: CrcType;
   private readonly transport: SerialTransport;
-  private readonly txCrcType: CrcType;
   private readonly parser = new PacketParser();
   private txSeq = 0;
   private lastRxSeq: number | null = null;
@@ -63,7 +67,7 @@ export class DepzLink {
   private packetCbs: Array<(pkt: PacketEvent) => void> = [];
   private parserCbs: Array<(ev: ParserEvent) => void> = [];
   private seqGapCbs: Array<(gap: SeqGap) => void> = [];
-  private closeCbs: Array<() => void> = [];
+  private closeCbs: Array<(cause?: unknown) => void> = [];
   private unsubDisconnect: (() => void) | null = null;
 
   constructor(transport: SerialTransport, opts?: { txCrcType?: CrcType }) {
@@ -71,16 +75,19 @@ export class DepzLink {
     this.txCrcType = opts?.txCrcType ?? CrcType.None;
   }
 
-  /**
-   * Begin the read pump. Must be called exactly once, after the transport
-   * is open. Ends (and fires `onClose`) when the transport's readable
-   * iterator finishes or the transport reports a disconnect.
-   */
   /** True once `start()` ran (the read pump is, or was, running). */
   get isStarted(): boolean {
     return this.started;
   }
 
+  /**
+   * Begin the read pump. Must be called exactly once, after the transport
+   * is open. Ends (and fires `onClose`) when the transport's readable
+   * iterator finishes or the transport reports a disconnect. A pump that
+   * fails (the transport's read, or anything on the pump context) closes
+   * the transport and fires `onClose` with that cause — never an unhandled
+   * rejection.
+   */
   start(): void {
     if (this.started) throw new InvalidStateError("DepzLink already started");
     this.started = true;
@@ -95,6 +102,9 @@ export class DepzLink {
         for (const ev of this.parser.feed(chunk)) this.handleParserEvent(ev);
         this.stats.headerErrors = this.parser.headerErrors;
       }
+    } catch (err) {
+      this.fireClose(err);
+      await this.transport.close().catch(() => {});
     } finally {
       this.fireClose();
     }
@@ -165,19 +175,30 @@ export class DepzLink {
     };
   }
 
-  /** Subscribe to link teardown (fires once). Returns an unsubscribe. */
-  onClose(cb: () => void): () => void {
+  /**
+   * Subscribe to link teardown (fires once; `cause` is set when the read pump
+   * failed). Returns an unsubscribe.
+   */
+  onClose(cb: (cause?: unknown) => void): () => void {
     this.closeCbs.push(cb);
     return () => {
       this.closeCbs = this.closeCbs.filter((c) => c !== cb);
     };
   }
 
-  private fireClose(): void {
+  private fireClose(cause?: unknown): void {
     if (this.closeFired) return;
     this.closeFired = true;
     this.unsubDisconnect?.();
-    for (const cb of [...this.closeCbs]) cb();
+    // On the pump's own exit path: a throwing subscriber must not turn the
+    // teardown into an unhandled rejection, nor keep the others from running.
+    for (const cb of [...this.closeCbs]) {
+      try {
+        cb(cause);
+      } catch (err) {
+        console.error("depz-sensor-sdk: a link close subscriber threw", err);
+      }
+    }
   }
 
   async close(): Promise<void> {

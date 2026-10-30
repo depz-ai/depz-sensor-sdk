@@ -73,6 +73,7 @@ struct fake_vl53l8 {
     uint16_t    cal_dist4, cal_refl16;
     uint8_t     cal_nb;
     uint8_t     fail_next[256];
+    bool        silent_next[256];
     uint64_t    mcu_time_us;
 };
 
@@ -363,6 +364,10 @@ static void handle(fake_vl53l8 *f, uint8_t cmd, const uint8_t *p, size_t len)
         f->fail_next[cmd] = 0;
         return;
     }
+    if (f->silent_next[cmd]) {
+        f->silent_next[cmd] = false;
+        return;
+    }
     switch (cmd) {
     case 0x32: { /* READ_REG: addr u16, len u16 -> RPT 0x91: cmd, ts u64, data */
         uint16_t a, n;
@@ -602,5 +607,12 @@ void fake_vl53l8_fail_next(fake_vl53l8 *f, uint8_t cmd, uint8_t st)
 {
     depz_mutex_lock(&f->lock);
     f->fail_next[cmd] = st;
+    depz_mutex_unlock(&f->lock);
+}
+
+void fake_vl53l8_silent_next(fake_vl53l8 *f, uint8_t cmd)
+{
+    depz_mutex_lock(&f->lock);
+    f->silent_next[cmd] = true;
     depz_mutex_unlock(&f->lock);
 }

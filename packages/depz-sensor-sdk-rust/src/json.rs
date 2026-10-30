@@ -39,7 +39,11 @@ impl Value {
     /// Parse a single JSON value from `text` (trailing whitespace allowed).
     pub fn parse(text: &str) -> Result<Value, JsonError> {
         let bytes = text.as_bytes();
-        let mut p = Parser { bytes, pos: 0 };
+        let mut p = Parser {
+            bytes,
+            pos: 0,
+            depth: 0,
+        };
         p.skip_ws();
         let v = p.parse_value()?;
         p.skip_ws();
@@ -172,9 +176,14 @@ fn write_json_string(s: &str, out: &mut String) {
     out.push('"');
 }
 
+/// Contract 08 «Line rules»: arrays and objects nest at most this deep (the outermost value is
+/// level 1) — deeper is a parse error, not a stack overflow.
+const MAX_DEPTH: usize = 256;
+
 struct Parser<'a> {
     bytes: &'a [u8],
     pos: usize,
+    depth: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -201,8 +210,19 @@ impl<'a> Parser<'a> {
 
     fn parse_value(&mut self) -> Result<Value, JsonError> {
         match self.peek() {
-            Some(b'{') => self.parse_object(),
-            Some(b'[') => self.parse_array(),
+            Some(c @ (b'{' | b'[')) => {
+                if self.depth == MAX_DEPTH {
+                    return Err(self.err("nested deeper than 256"));
+                }
+                self.depth += 1;
+                let v = if c == b'{' {
+                    self.parse_object()
+                } else {
+                    self.parse_array()
+                };
+                self.depth -= 1;
+                v
+            }
             Some(b'"') => Ok(Value::String(self.parse_string()?)),
             Some(b't') | Some(b'f') => self.parse_bool(),
             Some(b'n') => self.parse_null(),

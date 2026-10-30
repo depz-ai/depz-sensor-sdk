@@ -11,10 +11,11 @@ public sealed record SerialPortInfo(string Port, int? Vid, int? Pid, string? Usb
 
 /// <summary>
 /// Serial port enumeration with USB ids: Linux (sysfs) and Windows (the
-/// registry). On macOS the ports are listed without USB ids, so discovery
-/// finds no DEPZ candidate there: open a port path explicitly. Enumeration
-/// needs .NET 8; the netstandard2.1 build keeps the ordering only, and the
-/// Unity module (<c>unity/</c>) enumerates Windows ports on its own.
+/// registry, <see cref="WindowsSerialPorts"/>). On macOS the ports are listed
+/// without USB ids, so discovery finds no DEPZ candidate there: open a port
+/// path explicitly. Enumeration needs .NET 8; the netstandard2.1 build keeps
+/// the ordering and <see cref="WindowsSerialPorts"/>, which the Unity module
+/// (<c>unity/</c>) runs over its own registry reader.
 /// </summary>
 public static class SerialPorts
 {
@@ -31,7 +32,7 @@ public static class SerialPorts
         if (OperatingSystem.IsLinux())
             return ListLinux();
         if (OperatingSystem.IsWindows())
-            return ListWindows();
+            return ListWindows(new LocalMachineRegistry());
         return SerialPort.GetPortNames().Select(p => new SerialPortInfo(p, null, null, null)).ToList();
     }
 
@@ -128,59 +129,33 @@ public static class SerialPorts
     private static int? ParseHex(string s) =>
         int.TryParse(s.Trim(), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int v) ? v : null;
 
+    // The ports present now, with the owning USB device's ids: the Unity module's code, over the
+    // registry of this process.
+    internal static IReadOnlyList<SerialPortInfo> ListWindows(IRegistry registry) => WindowsSerialPorts.List(registry);
+
+    /// <summary>HKEY_LOCAL_MACHINE through Microsoft.Win32.Registry; a missing or unreadable key is null.</summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static List<SerialPortInfo> ListWindows()
+    private sealed class LocalMachineRegistry : IRegistry
     {
-        // HKLM\SYSTEM\CurrentControlSet\Enum\USB\VID_xxxx&PID_xxxx[&MI_nn]\<instance>\Device Parameters\PortName.
-        // The instance id of a plain device is its USB serial; an interface of a composite device
-        // (…&MI_nn) carries a generated id, so the serial is the parent device's instance id.
-        var byPort = new Dictionary<string, SerialPortInfo>(StringComparer.OrdinalIgnoreCase);
-        try
+        public IReadOnlyList<string>? SubKeyNames(string path) => Read(path, k => k.GetSubKeyNames());
+
+        public IReadOnlyList<string>? ValueNames(string path) => Read(path, k => k.GetValueNames());
+
+        public string? GetString(string path, string name) => Read(path, k => k.GetValue(name) as string);
+
+        private static T? Read<T>(string path, Func<RegistryKey, T?> read) where T : class
         {
-            using var usb = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\USB");
-            if (usb != null)
+            try
             {
-                foreach (string hw in usb.GetSubKeyNames())
-                {
-                    int? vid = HwField(hw, "VID_"), pid = HwField(hw, "PID_");
-                    bool iface = hw.Contains("&MI_", StringComparison.OrdinalIgnoreCase);
-                    using var hwKey = usb.OpenSubKey(hw);
-                    if (hwKey is null)
-                        continue;
-                    foreach (string inst in hwKey.GetSubKeyNames())
-                    {
-                        using var p = hwKey.OpenSubKey(inst + @"\Device Parameters");
-                        if (p?.GetValue("PortName") is not string port)
-                            continue;
-                        string? serial = iface ? ParentSerial(usb, vid, pid) : inst;
-                        byPort[port] = new SerialPortInfo(port, vid, pid, serial);
-                    }
-                }
+                using RegistryKey? key = Registry.LocalMachine.OpenSubKey(path);
+                return key is null ? null : read(key);
+            }
+            catch (Exception e) when (e is System.Security.SecurityException || e is UnauthorizedAccessException
+                                      || e is IOException || e is ObjectDisposedException)
+            {
+                return null;
             }
         }
-        catch (Exception e) when (e is System.Security.SecurityException || e is UnauthorizedAccessException || e is IOException)
-        {
-            // Without registry access the ports are still listed, without USB ids.
-        }
-        foreach (string port in SerialPort.GetPortNames())
-            if (!byPort.ContainsKey(port))
-                byPort[port] = new SerialPortInfo(port, null, null, null);
-        return byPort.Values.ToList();
-    }
-
-    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static string? ParentSerial(RegistryKey usb, int? vid, int? pid)
-    {
-        if (vid is null || pid is null)
-            return null;
-        using var parent = usb.OpenSubKey($"VID_{vid:X4}&PID_{pid:X4}");
-        return parent?.GetSubKeyNames().FirstOrDefault();
-    }
-
-    private static int? HwField(string hw, string tag)
-    {
-        int i = hw.IndexOf(tag, StringComparison.OrdinalIgnoreCase);
-        return i >= 0 && hw.Length >= i + tag.Length + 4 ? ParseHex(hw.Substring(i + tag.Length, 4)) : null;
     }
 #endif
 }

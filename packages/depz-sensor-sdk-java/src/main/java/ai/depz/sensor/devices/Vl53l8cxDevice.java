@@ -361,7 +361,18 @@ public class Vl53l8cxDevice extends DepzDevice {
         getResolution(); // refresh the cache that shapes frames
         uld().startRanging(cnhSize);
         reassembler = new FrameReassembler(streamChunk());
-        requestOk(Vl53l8.Vl53l8Cmd.START_STREAM.value, Vl53l8.packStartStream(uld().dataReadSize()));
+        try {
+            requestOk(Vl53l8.Vl53l8Cmd.START_STREAM.value, Vl53l8.packStartStream(uld().dataReadSize()));
+        } catch (RuntimeException e) {
+            // The sensor ranges but the host will say it does not: stop it again, or stopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try {
+                uld().stopRanging();
+            } catch (RuntimeException stopFailure) {
+                e.addSuppressed(stopFailure);
+            }
+            throw e;
+        }
         ranging = true;
     }
 

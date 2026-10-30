@@ -7,6 +7,7 @@ import static ai.depz.sensor.test.devices.T.throwsType;
 import ai.depz.sensor.devices.Bno086Device;
 import ai.depz.sensor.devices.BusyException;
 import ai.depz.sensor.devices.DepzTimeoutException;
+import ai.depz.sensor.devices.DeviceLostException;
 import ai.depz.sensor.devices.Subscription;
 import ai.depz.sensor.protocol.Bno086;
 import ai.depz.sensor.protocol.Common;
@@ -278,6 +279,18 @@ public final class Bno086DeviceTests {
             eq("Acceleration", all.take(Duration.ofSeconds(1)).type());
             eq("Gyroscope", all.take(Duration.ofSeconds(1)).type());
             check(accel.tryTake().isEmpty(), "the gyroscope report passed the accelerometer filter");
+        }
+    }
+
+    /** Bug hunt 2026-10-29 JAVA-3: reports() after close is a closed queue, take() fails at once. */
+    public static void reportsSubscribedAfterCloseAreClosedAtOnce() {
+        Bno086Device dev = open(new FakeHub());
+        dev.close();
+        try (Subscription<Reports.Report> q = dev.reports()) {
+            check(q.isClosed(), "reports() after close is not closed");
+            long t0 = System.nanoTime();
+            throwsType(DeviceLostException.class, () -> q.take(Duration.ofSeconds(5)));
+            check(System.nanoTime() - t0 < 1_000_000_000L, "take on a closed device's reports waited");
         }
     }
 

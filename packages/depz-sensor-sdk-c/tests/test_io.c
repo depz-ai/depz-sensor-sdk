@@ -165,6 +165,18 @@ static void wrong_type_is_refused(void)
     CHECK(!depz_is_sr04(dev));
     CHECK_RC(depz_sr04_get_sample_period_us(dev, &v), DEPZ_E_WRONG_TYPE);
     CHECK(depz_sr04_stream(dev, 4) == NULL);
+    {   /* other classes too: the type test comes before anything else */
+        depz_tmf8829_info info;
+        const char *modes[4];
+        int lo, hi;
+        CHECK_RC(depz_vl53lx_budget_range(NULL, &lo, &hi), DEPZ_E_ARG);
+        CHECK_RC(depz_vl53lx_budget_range(dev, &lo, &hi), DEPZ_E_WRONG_TYPE);
+        CHECK(depz_vl53lx_modes(NULL, modes, 4) == 0 && depz_vl53lx_modes(dev, modes, 4) == 0);
+        CHECK(!depz_vl53lx_supports(dev, 0) && !depz_vl53lx_initialized(dev));
+        CHECK_RC(depz_tmf8829_bridge_info(NULL, &info), DEPZ_E_ARG);
+        CHECK_RC(depz_tmf8829_bridge_info(dev, &info), DEPZ_E_WRONG_TYPE); /* no GET_INFO sent */
+        CHECK_RC(depz_bno055_set_axis_placement(dev, "P9"), DEPZ_E_WRONG_TYPE);
+    }
     /* promote = identify + attach, as open_device does after its probe */
     CHECK_RC(depz_device_promote(dev), DEPZ_OK);
     CHECK(depz_is_sr04(dev));
@@ -538,6 +550,107 @@ static bool peer_expect(peer *p, uint8_t cmd)
     return p->got && p->cmd == cmd;
 }
 
+/* A call waiting for the board on another thread when depz_device_close()
+ * runs ends with the closed error (contract 07 §3, as Python); close frees
+ * nothing until it has left (C-2: it destroyed the lock and freed the device
+ * under the waiter — ASan / TSan). */
+typedef struct { depz_device *dev; int rc; char err[128]; } closing_arg;
+
+static void closing_request(void *a)
+{
+    closing_arg *x = (closing_arg *)a;
+    x->rc = depz_device_request(x->dev, 0x5A, NULL, 0, NULL, NULL, true, 5000);
+    depz_strlcpy(x->err, depz_last_error(), sizeof x->err);
+}
+
+/* Bounded: the request is in the device's pending list. */
+static bool request_in_flight(depz_device *dev)
+{
+    uint64_t deadline = depz_host_now_us() + 2000000u;
+    while (depz_host_now_us() < deadline) {
+        bool in;
+        depz_mutex_lock(&dev->lock);
+        in = dev->pending != NULL;
+        depz_mutex_unlock(&dev->lock);
+        if (in) return true;
+        depz_sleep_ms(1);
+    }
+    return false;
+}
+
+static void close_while_a_request_waits(void)
+{
+    peer p;
+    depz_device *dev;
+    depz_thread t;
+    closing_arg a;
+    uint64_t t0;
+    CHECK(peer_up(&p, &dev));
+    memset(&a, 0, sizeof a);
+    a.dev = dev;
+    a.rc = 1;
+    t0 = depz_host_now_us();
+    CHECK(depz_thread_start(&t, closing_request, &a) == 0);
+    CHECK(peer_expect(&p, 0x5A) && request_in_flight(dev)); /* the peer stays silent */
+    depz_device_close(dev);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_E_CLOSED && strstr(a.err, "device closed") != NULL);
+    CHECK(depz_host_now_us() - t0 < 4000000u); /* not the 5 s timeout */
+    depz_link_free(p.side);
+    depz_parser_free(&p.parser);
+}
+
+static void closing_product_ids(void *a)
+{
+    closing_arg *x = (closing_arg *)a;
+    depz_bno_product_id ids[4];
+    size_t n = 0;
+    x->rc = depz_bno086_product_ids(x->dev, ids, 4, &n);
+    depz_strlcpy(x->err, depz_last_error(), sizeof x->err);
+}
+
+/* The same for a BNO086 control request: SEND_SHTP_PACKET is acknowledged,
+ * the SH-2 answer never comes — close ends the wait for it. */
+static void bno086_close_while_a_control_request_waits(void)
+{
+    static const uint8_t ack[2] = {DEPZ_BNO086_CMD_SEND_SHTP_PACKET, DEPZ_STATUS_OK};
+    peer p;
+    depz_link *host;
+    depz_device *dev = NULL;
+    depz_thread t;
+    closing_arg a;
+    uint64_t t0;
+    memset(&p, 0, sizeof p);
+    depz_parser_init(&p.parser);
+    CHECK_RC(depz_link_loopback_pair(&host, &p.side), DEPZ_OK);
+    CHECK_RC(depz_bno086_open_link(host, &dev), DEPZ_OK);
+    depz_device_set_timeout_ms(dev, 5000);
+    memset(&a, 0, sizeof a);
+    a.dev = dev;
+    a.rc = 1;
+    t0 = depz_host_now_us();
+    CHECK(depz_thread_start(&t, closing_product_ids, &a) == 0);
+    CHECK(peer_expect(&p, DEPZ_BNO086_CMD_SEND_SHTP_PACKET));
+    peer_send(&p, DEPZ_RPT_STATUS, ack, sizeof ack);
+    {   /* bounded: the ack has completed the request; the thread waits for the answer */
+        uint64_t deadline = depz_host_now_us() + 2000000u;
+        bool in = true;
+        while (in && depz_host_now_us() < deadline) {
+            depz_mutex_lock(&dev->lock);
+            in = dev->pending != NULL;
+            depz_mutex_unlock(&dev->lock);
+            if (in) depz_sleep_ms(1);
+        }
+        CHECK(!in);
+    }
+    depz_device_close(dev);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_E_CLOSED && strstr(a.err, "device closed") != NULL);
+    CHECK(depz_host_now_us() - t0 < 4000000u);
+    depz_link_free(p.side);
+    depz_parser_free(&p.parser);
+}
+
 /* Contract 07 §3: unsolicited reports become events, the callback and the
  * stream see the same ones; a report no class knows stays visible as hex
  * text; after off_event the stream is still fed (test_device_events.py). */
@@ -876,6 +989,60 @@ static void record_then_replay(void)
     remove(path);
 }
 
+typedef struct {
+    depz_link *link;
+    int rc;
+    bool done;
+} exhausted_read_arg;
+
+static void exhausted_read_long(void *p)
+{
+    exhausted_read_arg *a = (exhausted_read_arg *)p;
+    uint8_t buf[16];
+    size_t got = 0;
+    a->rc = depz_link_read(a->link, buf, sizeof buf, 30000, &got);
+    a->done = true;
+}
+
+/* A capture with nothing left behaves like a quiet port: a read returns
+ * empty at its timeout (or at close), never at once — the reader thread
+ * would spin a core on empty reads (contract 08 «Replay semantics»). */
+static void replay_exhausted_waits_its_timeout(void)
+{
+    static const char header_only[] = "{\"schema\": \"depz.rec/1\"}\n";
+    const char *path = "test_io_exhausted.depzrec";
+    depz_link *rp = NULL;
+    depz_thread t;
+    exhausted_read_arg a;
+    uint8_t buf[16];
+    size_t got = 1;
+    uint64_t t0;
+    FILE *f = fopen(path, "wb");
+    CHECK(f);
+    if (!f) return;
+    fwrite(header_only, 1, sizeof header_only - 1, f);
+    fclose(f);
+    CHECK_RC(depz_link_open_replay(path, false, false, &rp), DEPZ_OK);
+    if (!rp) return;
+    CHECK(depz_link_replay_exhausted(rp));
+    t0 = depz_host_now_us();
+    CHECK_RC(depz_link_read(rp, buf, sizeof buf, 100, &got), DEPZ_OK);
+    CHECK(got == 0);
+    CHECK(depz_host_now_us() - t0 >= 80000);
+    /* a long read ends at close(), not at its 30 s timeout */
+    a.link = rp;
+    a.rc = 1;
+    a.done = false;
+    CHECK(depz_thread_start(&t, exhausted_read_long, &a) == 0);
+    t0 = depz_host_now_us();
+    depz_link_close(rp);
+    depz_thread_join(t);
+    CHECK(a.done && a.rc == DEPZ_E_CLOSED);
+    CHECK(depz_host_now_us() - t0 < 5000000);
+    depz_link_free(rp);
+    remove(path);
+}
+
 /* ERRATA A6: there is no `.depzrec.gz` — a capture is plain text, a gzip
  * container is not inflated but refused like any damaged file. The gzipped
  * bytes (mtime 0) are the same 70 in every SDK's test; `plain` is what they
@@ -907,6 +1074,43 @@ static void replay_refuses_a_gzipped_capture(void)
     fclose(f);
     CHECK_RC(depz_link_open_replay(path, false, false, &rp), DEPZ_E_ARG);
     CHECK(rp == NULL);
+    remove(path);
+}
+
+/* contract 08 «Line rules»: a line nested deeper than 256 is damaged — the
+ * invalid-argument error naming the line, not a stack overflow in the
+ * recursive-descent parser (a 200 KB line of `[[[[…` used to SIGSEGV). */
+static void reader_refuses_a_line_nested_100000_deep(void)
+{
+    enum { DEEP = 100000 };
+    static const char rec_head[] = "{\"schema\": \"depz.dataset/2\"}\n{\"d\":\"d0\",\"t\":1,\"k\":\"x\",\"v\":{\"a\":";
+    static const char cap_head[] = "{\"schema\": \"depz.rec/1\", \"x\": ";
+    const char *path = "test_io_deep.depzrec";
+    size_t hl = sizeof rec_head - 1, n;
+    char *text = (char *)malloc(hl + 2 * DEEP + 8);
+    depz_link *rp = NULL;
+    FILE *f;
+    CHECK(text);
+    if (!text) return;
+    memset(text, '[', DEEP);
+    memset(text + DEEP, ']', DEEP);
+    CHECK(depz_json_parse(text, 2 * DEEP) == NULL);
+    memmove(text + hl, text, 2 * DEEP);
+    memcpy(text, rec_head, hl);
+    memcpy(text + hl + 2 * DEEP, "}}\n", 3);
+    n = hl + 2 * DEEP + 3;
+    CHECK(depz_dataset_parse(text, n) == NULL);
+    CHECK(strstr(depz_last_error(), "dataset: line 2: record is not JSON") != NULL);
+    f = fopen(path, "wb");
+    CHECK(f);
+    if (!f) { free(text); return; }
+    fwrite(cap_head, 1, sizeof cap_head - 1, f);
+    fwrite(text + hl, 1, 2 * DEEP, f);
+    fwrite("}\n", 1, 2, f);
+    fclose(f);
+    free(text);
+    CHECK_RC(depz_link_open_replay(path, false, false, &rp), DEPZ_E_ARG);
+    CHECK(rp == NULL && strstr(depz_last_error(), ":1: not JSON") != NULL);
     remove(path);
 }
 
@@ -1075,6 +1279,42 @@ L4_RIG(l4_config_refused_while_ranging)
     CHECK(fake_vl53l4_reg(r->fake, 0x0087) == 0x80);
     CHECK_RC(depz_vl53l4cd_xshut(r->dev, DEPZ_VL53L4_XSHUT_RESET), DEPZ_OK);
     CHECK(!depz_vl53l4cd_initialized(r->dev));
+}
+
+/* START_STREAM refused after the ULD started the die: the caller gets the
+ * START_STREAM error, the host says not ranging, so the die is stopped again
+ * (SYSTEM_START <- 0x80) and configuration works afterwards (PY-2/TS-5). */
+L4_RIG(l4_a_refused_start_stream_stops_the_sensor_again)
+{
+    uint8_t got[1];
+    size_t starts;
+    CHECK_RC(depz_vl53l4cd_init(r->dev, 0), DEPZ_OK);
+    starts = fake_vl53l4_writes_at(r->fake, 0x0087);
+    fake_vl53l4_fail_next(r->fake, 0x35, DEPZ_STATUS_ERR_HARDWARE_FAULT);
+    CHECK_RC(depz_vl53l4cd_start_ranging(r->dev), DEPZ_E_STATUS);
+    CHECK(depz_last_status_cmd() == 0x35 && depz_last_status() == DEPZ_STATUS_ERR_HARDWARE_FAULT); /* not an error of the stop */
+    CHECK(!depz_vl53l4cd_ranging(r->dev) && !fake_vl53l4_streaming(r->fake));
+    CHECK(fake_vl53l4_writes_at(r->fake, 0x0087) == starts + 2); /* start, then the stop */
+    CHECK(fake_vl53l4_write_at(r->fake, 0x0087, starts + 1, got, 1) == 1 && got[0] == 0x80);
+    CHECK(fake_vl53l4_reg(r->fake, 0x0087) == 0x80);
+    CHECK_RC(depz_vl53l4cd_set_offset_mm(r->dev, 3), DEPZ_OK); /* not wedged */
+    CHECK_RC(depz_vl53l4cd_start_ranging(r->dev), DEPZ_OK);    /* a retry starts cleanly */
+    CHECK(depz_vl53l4cd_ranging(r->dev) && fake_vl53l4_streaming(r->fake));
+    CHECK_RC(depz_vl53l4cd_stop_ranging(r->dev), DEPZ_OK);
+}
+
+/* The stop after a refused START_STREAM is refused too: the caller still gets
+ * the START_STREAM error and status, not the stop's WRITE_REG ones — the C++
+ * exception is built from them. */
+L4_RIG(l4_a_refused_stop_after_a_refused_start_stream_keeps_its_error)
+{
+    CHECK_RC(depz_vl53l4cd_init(r->dev, 0), DEPZ_OK);
+    fake_vl53l4_fail_next_then(r->fake, 0x35, DEPZ_STATUS_ERR_HARDWARE_FAULT, 0x33, DEPZ_STATUS_ERR_BUSY);
+    CHECK_RC(depz_vl53l4cd_start_ranging(r->dev), DEPZ_E_STATUS);
+    CHECK(depz_last_status_cmd() == 0x35);
+    CHECK(depz_last_status() == DEPZ_STATUS_ERR_HARDWARE_FAULT);
+    CHECK(strstr(depz_last_error(), "0x35") != NULL);
+    CHECK(!depz_vl53l4cd_ranging(r->dev) && !fake_vl53l4_streaming(r->fake));
 }
 
 L4_RIG(l4_stream_decodes_and_counts_short_blocks)
@@ -2478,6 +2718,71 @@ VLX_RIG(vlx_l1_stream_decodes_and_counts_bad_blocks, VLX_L1CX_BOARD)
     CHECK(fake_vl53lx_count(r->fake, 0x36) == 1);
 }
 
+/* xshut() is allowed while ranging (as Python): it stops ranging and frees
+ * the driver while the reader may be decoding a stream report with it (C-1:
+ * use-after-free — TSan / ASan). */
+typedef struct { fake_vl53lx *fake; depz_mutex lock; bool stop; unsigned sent; } vlx_streamer;
+
+static void vlx_stream_until_stopped(void *a)
+{
+    vlx_streamer *x = (vlx_streamer *)a;
+    uint64_t ts = 1;
+    for (;;) {
+        bool stop;
+        fake_vl53lx_stream(x->fake, ts++, 17, VLX_L1_BLOCK, sizeof VLX_L1_BLOCK);
+        depz_mutex_lock(&x->lock);
+        x->sent++;
+        stop = x->stop;
+        depz_mutex_unlock(&x->lock);
+        if (stop) break;
+    }
+}
+
+static unsigned vlx_streamed(vlx_streamer *x)
+{
+    unsigned n;
+    depz_mutex_lock(&x->lock);
+    n = x->sent;
+    depz_mutex_unlock(&x->lock);
+    return n;
+}
+
+VLX_RIG(vlx_xshut_while_streaming, VLX_L1CX_BOARD)
+{
+    vlx_streamer x;
+    depz_thread t;
+    depz_vl53lx_measurement m;
+    depz_vl53lx_info info;
+    depz_stream *s;
+    uint64_t deadline;
+    uint16_t id = 0;
+    unsigned at_xshut;
+    int rc;
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_OK);
+    s = depz_vl53lx_measurements(r->dev, 4);
+    CHECK(s);
+    memset(&x, 0, sizeof x);
+    x.fake = r->fake;
+    CHECK(depz_mutex_init(&x.lock) == 0);
+    CHECK(depz_thread_start(&t, vlx_stream_until_stopped, &x) == 0);
+    rc = depz_stream_next(s, &m, 1000); /* the reader is decoding */
+    if (rc == DEPZ_OK) rc = depz_vl53lx_xshut(r->dev, DEPZ_VL53L4_XSHUT_OFF);
+    /* reports keep coming with no driver to decode them (bounded) */
+    at_xshut = vlx_streamed(&x);
+    deadline = depz_host_now_us() + 2000000u;
+    while (vlx_streamed(&x) < at_xshut + 200 && depz_host_now_us() < deadline) depz_sleep_ms(1);
+    if (rc == DEPZ_OK) rc = depz_vl53lx_bridge_info(r->dev, &info); /* the reader is alive */
+    depz_mutex_lock(&x.lock);
+    x.stop = true;
+    depz_mutex_unlock(&x.lock);
+    depz_thread_join(t);
+    depz_mutex_destroy(&x.lock);
+    depz_stream_close(s);
+    CHECK_RC(rc, DEPZ_OK);
+    CHECK(!depz_vl53lx_ranging(r->dev) && !depz_vl53lx_initialized(r->dev));
+    CHECK_RC(depz_vl53lx_model_id(r->dev, &id), DEPZ_E_ARG); /* init() again first */
+}
+
 /* configure() re-inits, then timing, offset, xtalk, signal threshold
  * (vectors/vl53l4.json tuning: -10 -> 65496, 20 -> 10240, 1024 -> 128). */
 VLX_RIG(vlx_l4_configure_reinits_then_tunes, VLX_L4CD_BOARD)
@@ -2558,6 +2863,29 @@ VLX_RIG(vlx_l4_period_selects_autonomous_mode, VLX_L4CD_BOARD)
     }
     CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK);
     CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x80); /* the L4CD stop code */
+}
+
+/* START_STREAM refused after the driver started the die: the caller gets the
+ * START_STREAM error, the host says not ranging, so the die is stopped again
+ * (the L4CD stop code 0x80 into SYSTEM_START) and configuration works
+ * afterwards (PY-2/TS-5). */
+VLX_RIG(vlx_a_refused_start_stream_stops_the_sensor_again, VLX_L4CD_BOARD)
+{
+    static const vlx_w stop = {0x0087, 1, {0x80}};
+    size_t n;
+    fake_vl53lx_clear(r->fake);
+    fake_vl53lx_fail_next(r->fake, 0x35, 0x03);
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_E_STATUS);
+    CHECK(depz_last_status_cmd() == 0x35 && depz_last_status() == 0x03); /* not an error of the stop */
+    CHECK(!depz_vl53lx_ranging(r->dev));
+    CHECK(fake_vl53lx_count(r->fake, 0x35) == 1);
+    n = fake_vl53lx_count(r->fake, 0x33);
+    CHECK(n >= 2 && vlx_writes_are(r->fake, n - 1, &stop, 1)); /* the die stopped again */
+    CHECK(fake_vl53lx_reg(r->fake, 0x0087) == 0x80);
+    CHECK_RC(depz_vl53lx_set_offset_mm(r->dev, 0), DEPZ_OK); /* configuration allowed again */
+    CHECK_RC(depz_vl53lx_start_ranging(r->dev), DEPZ_OK);
+    CHECK(depz_vl53lx_ranging(r->dev));
+    CHECK_RC(depz_vl53lx_stop_ranging(r->dev), DEPZ_OK);
 }
 
 VLX_RIG(vlx_l4_tuning_round_trips, VLX_L4CD_BOARD)
@@ -3857,6 +4185,107 @@ L8_RIG(l8_start_stop_and_refusals, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
     CHECK_RC(depz_vl53l7_pin_ctrl(r->dev, 0), DEPZ_E_WRONG_TYPE);
 }
 
+/* START_STREAM refused after the ULD started the die: the caller gets the
+ * START_STREAM error, the host says not ranging, so the ULD stop runs (MCU
+ * stop undone, xshut bypass off) and configuration works afterwards
+ * (PY-2/TS-5). */
+L8_RIG(l8_a_refused_start_stream_stops_the_sensor_again, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX)
+{
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 15), DEPZ_OK);
+    fake_vl53l8_fail_next(r->fake, 0x35, 0x03);
+    CHECK_RC(depz_vl53l8_start_ranging(r->dev), DEPZ_E_STATUS);
+    CHECK(depz_last_status_cmd() == 0x35 && depz_last_status() == 0x03); /* not an error of the stop */
+    CHECK(!depz_vl53l8_ranging(r->dev));
+    CHECK(!fake_vl53l8_ranging(r->fake)); /* the die stopped again */
+    CHECK(fake_vl53l8_reg(r->fake, 0, 0x09) == 0x04 && fake_vl53l8_reg(r->fake, 0, 0x14) == 0x00);
+    CHECK_RC(depz_vl53l8_set_ranging_frequency_hz(r->dev, 30), DEPZ_OK); /* not wedged */
+    CHECK_RC(depz_vl53l8_start_ranging(r->dev), DEPZ_OK);               /* a retry starts cleanly */
+    CHECK(depz_vl53l8_ranging(r->dev) && fake_vl53l8_ranging(r->fake));
+    CHECK_RC(depz_vl53l8_stop_ranging(r->dev), DEPZ_OK);
+}
+
+/* stop_ranging() goes on after its STOP_STREAM request (host flag, ULD
+ * stop): close on another thread while that request waits ends the call with
+ * the closed error and frees nothing until it has returned (C-2: the class
+ * state was freed under the caller once the request itself had left — TSan /
+ * ASan). */
+static void closing_stop_ranging(void *a)
+{
+    closing_arg *x = (closing_arg *)a;
+    x->rc = depz_vl53l8_stop_ranging(x->dev);
+    depz_strlcpy(x->err, depz_last_error(), sizeof x->err);
+}
+
+static void l8_close_while_stop_ranging_waits(void)
+{
+    l8rig r;
+    depz_thread t;
+    closing_arg a;
+    uint64_t t0;
+    if (!l8_up(&r, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX, true)) {
+        g_failed++;
+        l8_down(&r);
+        return;
+    }
+    CHECK_RC(depz_vl53l8_start_ranging(r.dev), DEPZ_OK);
+    fake_vl53l8_silent_next(r.fake, DEPZ_VL53L8_CMD_STOP_STREAM);
+    depz_device_set_timeout_ms(r.dev, 5000);
+    memset(&a, 0, sizeof a);
+    a.dev = r.dev;
+    a.rc = 1;
+    t0 = depz_host_now_us();
+    CHECK(depz_thread_start(&t, closing_stop_ranging, &a) == 0);
+    CHECK(request_in_flight(r.dev)); /* STOP_STREAM, never answered */
+    depz_device_close(r.dev);
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_E_CLOSED && strstr(a.err, "device closed") != NULL);
+    CHECK(depz_host_now_us() - t0 < 4000000u); /* not the 5 s timeout */
+    fake_vl53l8_stop(r.fake);
+}
+
+/* get_frame() waiting on another thread when close runs: the reader's exit
+ * marks the frame hub closed, so the wait ends at once with the closed error
+ * (not the 10 s timeout) and close returns as soon as it has. */
+static void closing_get_frame(void *a)
+{
+    closing_arg *x = (closing_arg *)a;
+    depz_vl53l8_live_frame f;
+    x->rc = depz_vl53l8_get_frame(x->dev, 10000, &f);
+    depz_strlcpy(x->err, depz_last_error(), sizeof x->err);
+}
+
+static void l8_close_while_get_frame_waits(void)
+{
+    l8rig r;
+    depz_thread t;
+    closing_arg a;
+    uint64_t t0, deadline;
+    bool inside = false;
+    if (!l8_up(&r, DEPZ_VL53L8_MODEL_L8CX, L8_CRC_CX, true)) {
+        g_failed++;
+        l8_down(&r);
+        return;
+    }
+    memset(&a, 0, sizeof a);
+    a.dev = r.dev;
+    a.rc = 1;
+    t0 = depz_host_now_us();
+    CHECK(depz_thread_start(&t, closing_get_frame, &a) == 0);
+    deadline = depz_host_now_us() + 2000000u; /* bounded: the call has entered */
+    while (!inside && depz_host_now_us() < deadline) {
+        depz_mutex_lock(&r.dev->lock);
+        inside = r.dev->users > 0;
+        depz_mutex_unlock(&r.dev->lock);
+        if (!inside) depz_sleep_ms(1);
+    }
+    CHECK(inside);
+    depz_device_close(r.dev);
+    CHECK(depz_host_now_us() - t0 < 4000000u); /* close did not wait out the 10 s */
+    depz_thread_join(t);
+    CHECK(a.rc == DEPZ_E_CLOSED && strstr(a.err, "closed") != NULL);
+    fake_vl53l8_stop(r.fake);
+}
+
 /* The VL53L8CH: the LMZ calibration table, CNH armed on its firmware. */
 L8_RIG(l8ch_cnh_and_lmz_calibration_table, DEPZ_VL53L8_MODEL_L8CH, L8_CRC_CH)
 {
@@ -4065,7 +4494,7 @@ static void dataset_recorder_two_sr04(void)
     for (i = 0; i < 100 && depz_session_recorder_records_written(rec) < 4; i++) depz_sleep_ms(10);
     CHECK(depz_session_recorder_records_written(rec) == 4);
     CHECK_RC(depz_session_recorder_stop(rec), DEPZ_OK);
-    CHECK(depz_session_recorder_records_written(rec) == 0); /* closed: nothing counts */
+    CHECK(depz_session_recorder_records_written(rec) == 4); /* the finished file's count */
     fake_sr04_send_measurement(a.fake, 0x37);              /* unhooked: dropped */
     depz_sleep_ms(20);
     depz_session_recorder_free(rec);
@@ -4539,9 +4968,13 @@ static const test_case k_tests[] = {
     {"sync_in_single_shot_reaches_stream", sync_in_single_shot_reaches_stream, NULL},
     {"events_and_disconnect", NULL, events_and_disconnect},
     {"host_seq_gap_is_an_event", NULL, host_seq_gap_is_an_event},
+    {"close_while_a_request_waits", NULL, close_while_a_request_waits},
+    {"bno086_close_while_a_control_request_waits", NULL, bno086_close_while_a_control_request_waits},
     {"same_opcode_in_flight_is_busy", NULL, same_opcode_in_flight_is_busy},
     {"record_then_replay", NULL, record_then_replay},
     {"replay_refuses_a_gzipped_capture", NULL, replay_refuses_a_gzipped_capture},
+    {"replay_exhausted_waits_its_timeout", NULL, replay_exhausted_waits_its_timeout},
+    {"reader_refuses_a_line_nested_100000_deep", NULL, reader_refuses_a_line_nested_100000_deep},
     {"l4_init_boot_speed_then_retimes", NULL, l4_init_boot_speed_then_retimes},
     {"l4_init_at_400_never_retimes", NULL, l4_init_at_400_never_retimes},
     {"l4_init_config_block_and_vhv", NULL, l4_init_config_block_and_vhv},
@@ -4549,6 +4982,8 @@ static const test_case k_tests[] = {
     {"l4_tuning_roundtrips", NULL, l4_tuning_roundtrips},
     {"l4_is_alive_checks_model_id", NULL, l4_is_alive_checks_model_id},
     {"l4_config_refused_while_ranging", NULL, l4_config_refused_while_ranging},
+    {"l4_a_refused_start_stream_stops_the_sensor_again", NULL, l4_a_refused_start_stream_stops_the_sensor_again},
+    {"l4_a_refused_stop_after_a_refused_start_stream_keeps_its_error", NULL, l4_a_refused_stop_after_a_refused_start_stream_keeps_its_error},
     {"l4_stream_decodes_and_counts_short_blocks", NULL, l4_stream_decodes_and_counts_short_blocks},
     {"l4_measure_once_polls_and_stops", NULL, l4_measure_once_polls_and_stops},
     {"l8_guards_and_cnh_math", NULL, l8_guards_and_cnh_math},
@@ -4557,6 +4992,9 @@ static const test_case k_tests[] = {
     {"l8_thresholds_motion_and_power", NULL, l8_thresholds_motion_and_power},
     {"l8_xtalk_calibration_round_trip", NULL, l8_xtalk_calibration_round_trip},
     {"l8_start_stop_and_refusals", NULL, l8_start_stop_and_refusals},
+    {"l8_a_refused_start_stream_stops_the_sensor_again", NULL, l8_a_refused_start_stream_stops_the_sensor_again},
+    {"l8_close_while_stop_ranging_waits", NULL, l8_close_while_stop_ranging_waits},
+    {"l8_close_while_get_frame_waits", NULL, l8_close_while_get_frame_waits},
     {"l8ch_cnh_and_lmz_calibration_table", NULL, l8ch_cnh_and_lmz_calibration_table},
     {"l8ch_cnh_and_motion_exclusive", NULL, l8ch_cnh_and_motion_exclusive},
     {"bno086_features", NULL, bno086_features},
@@ -4583,9 +5021,11 @@ static const test_case k_tests[] = {
     {"vlx_l1_xtalk_calibration", NULL, vlx_l1_xtalk_calibration},
     {"vlx_l1_roi_size_and_centre", NULL, vlx_l1_roi_size_and_centre},
     {"vlx_l1_stream_decodes_and_counts_bad_blocks", NULL, vlx_l1_stream_decodes_and_counts_bad_blocks},
+    {"vlx_xshut_while_streaming", NULL, vlx_xshut_while_streaming},
     {"vlx_l4_configure_reinits_then_tunes", NULL, vlx_l4_configure_reinits_then_tunes},
     {"vlx_l4_period_selects_autonomous_mode", NULL, vlx_l4_period_selects_autonomous_mode},
     {"vlx_l4_tuning_round_trips", NULL, vlx_l4_tuning_round_trips},
+    {"vlx_a_refused_start_stream_stops_the_sensor_again", NULL, vlx_a_refused_start_stream_stops_the_sensor_again},
     {"vlx_l4_temperature_update_reruns_vhv", NULL, vlx_l4_temperature_update_reruns_vhv},
     {"vlx_l4_calibrations", NULL, vlx_l4_calibrations},
     {"vlx_l4_measure_once_polls_the_block", NULL, vlx_l4_measure_once_polls_the_block},

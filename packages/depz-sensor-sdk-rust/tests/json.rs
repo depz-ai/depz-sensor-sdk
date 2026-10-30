@@ -132,3 +132,53 @@ fn a_float_that_is_not_finite_writes_null() {
     assert_eq!(Value::float(-0.5).to_json(), "-0.5");
     assert_eq!(Value::float(1e300).as_f64(), Some(1e300));
 }
+
+// contract 08 «Line rules»: arrays and objects nest at most 256 deep (the outermost value is
+// level 1); a deeper damaged line is the reader's error naming it, not a stack-overflow abort.
+fn nested(levels: usize) -> String {
+    format!("{}{}", "[".repeat(levels), "]".repeat(levels))
+}
+
+#[test]
+fn nesting_stops_at_256_levels() {
+    assert!(Value::parse(&nested(256)).is_ok());
+    let e = Value::parse(&nested(257)).unwrap_err();
+    assert_eq!(e.msg, "nested deeper than 256");
+}
+
+#[test]
+fn a_dataset_line_nested_1_000_000_deep_is_refused_naming_it() {
+    let text = format!(
+        "{{\"schema\":\"depz.dataset/2\"}}\n{{\"d\":\"d0\",\"t\":0,\"k\":\"x\",\"v\":{{\"a\":{}}}}}\n",
+        nested(1_000_000)
+    );
+    let e = depz_sensor_sdk::dataset::Dataset::parse(&text).unwrap_err();
+    assert!(
+        e.to_string().starts_with("line 2: ") && e.to_string().contains("nested deeper than 256"),
+        "{e}"
+    );
+}
+
+#[test]
+fn a_depzrec_header_nested_1_000_000_deep_is_refused_naming_it() {
+    let p = std::env::temp_dir().join(format!("depz_rust_nested_{}.depzrec", std::process::id()));
+    std::fs::write(
+        &p,
+        format!(
+            "{{\"schema\":\"depz.rec/1\",\"x\":{}}}\n",
+            nested(1_000_000)
+        ),
+    )
+    .unwrap();
+    let r = depz_sensor_sdk::devices::ReplayLink::open(&p, false, false);
+    std::fs::remove_file(&p).unwrap();
+    match r {
+        Err(depz_sensor_sdk::devices::DepzError::InvalidArgument(m)) => {
+            assert!(
+                m.contains(":1: not JSON") && m.contains("nested deeper than 256"),
+                "{m}"
+            )
+        }
+        other => panic!("expected InvalidArgument, got {:?}", other.map(|_| ())),
+    }
+}

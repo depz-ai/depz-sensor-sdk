@@ -1233,7 +1233,10 @@ class VL53L8CX:
             self.last_blocks.append((bh_idx, bh_type, bh_size))
 
             if bh_idx == METADATA_IDX:
-                silicon_temp_degc = struct.unpack_from('<b', buf, i + 12)[0]
+                # The temperature is body byte 8 (the real block has 12); a
+                # shorter block leaves it at 0.
+                if msize >= 9:
+                    silicon_temp_degc = struct.unpack_from('<b', buf, i + 12)[0]
             elif bh_idx == DISTANCE_IDX:
                 distance_raw = list(
                     struct.unpack_from('<%dh' % (msize // 2), buf, i + 4))

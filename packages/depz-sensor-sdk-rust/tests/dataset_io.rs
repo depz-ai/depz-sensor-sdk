@@ -144,6 +144,8 @@ fn two_devices_land_on_one_host_timeline() {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(until(|| rec.records_written() >= 4, 2000));
+        rec.stop().unwrap();
+        assert_eq!(rec.records_written(), 4); // the finished file's count
     }
     let ds = Dataset::read(&path).unwrap();
     assert_eq!(
@@ -671,4 +673,28 @@ fn threaded_a_panicking_callback_does_not_stop_playback() {
     let want: Vec<i64> = ds.records.iter().map(|r| r.t).collect();
     assert_eq!(*seen.lock().unwrap(), want);
     assert_eq!(p.callback_errors(), 1);
+}
+
+/// Bug hunt 2026-10-29 RUST-6: a tiny speed stretches a gap beyond what a `Duration` holds; the
+/// player thread waits in capped slices instead of dying under its lock, so `wait()` keeps working
+/// and a later speed change plays the rest.
+#[test]
+fn player_survives_a_tiny_speed() {
+    let ds = Dataset::parse(
+        "{\"schema\":\"depz.dataset/2\"}\n{\"d\":\"d0\",\"t\":0,\"k\":\"x\",\"v\":{}}\n{\"d\":\"d0\",\"t\":1000000,\"k\":\"x\",\"v\":{}}\n",
+    )
+    .unwrap();
+    let p = DatasetPlayer::new(&ds, 1e-300, None, true).unwrap();
+    let n = Arc::new(AtomicU64::new(0));
+    let n2 = n.clone();
+    let _h = p.on_record(move |_| {
+        n2.fetch_add(1, Ordering::SeqCst);
+    });
+    p.play().unwrap();
+    assert!(!p.wait(Some(Duration::from_millis(200))).unwrap());
+    assert_eq!(p.state(), PlayerState::Playing);
+    p.set_speed(0.0).unwrap();
+    assert!(p.wait(Some(Duration::from_secs(5))).unwrap());
+    assert_eq!(n.load(Ordering::SeqCst), 2);
+    assert_eq!(p.state(), PlayerState::Done);
 }

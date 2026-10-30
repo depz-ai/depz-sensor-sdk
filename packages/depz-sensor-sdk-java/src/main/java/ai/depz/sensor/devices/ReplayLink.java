@@ -154,10 +154,8 @@ public final class ReplayLink implements Link {
                 if (closed) {
                     throw new LinkClosedException("replay link closed");
                 }
-                if (rxIdx >= rx.size()) {
-                    return new byte[0];
-                }
-                if (txWritten >= rx.get(rxIdx).txPrefix()) {
+                // exhausted: wait like a quiet port (until the timeout or close()), else the reader spins a core
+                if (rxIdx < rx.size() && txWritten >= rx.get(rxIdx).txPrefix()) {
                     break;
                 }
                 long left = deadline - System.nanoTime();

@@ -170,7 +170,7 @@ How to pull it into your project:
   include(FetchContent)
   FetchContent_Declare(depz-sensor-sdk-cpp
     GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-    GIT_TAG        v0.9.0
+    GIT_TAG        v0.9.1
     SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
   FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
   target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)
@@ -351,10 +351,10 @@ ways:
   keep it short, never block in it, never call a method that waits for a reply
   (`measure_once`, `sync_time`, …: the reply is what this thread would
   deliver), never close or destroy the device from it. An exception thrown
-  from a callback is swallowed — it must not unwind into the C reader. Call
-  the `Unsubscribe` while the device is open; the callback may still be
-  running right after it returns, so whatever it captures must live as long as
-  the device.
+  from a callback is swallowed — it must not unwind into the C reader. An
+  `Unsubscribe` called after `close()` (or after the device is destroyed) does
+  nothing; the callback may still be running right after it returns, so
+  whatever it captures must live as long as the device.
 - **Streams** — `events(maxsize)` (and e.g. `Sr04::stream(maxsize)`,
   `Vl53l4cd::measurements(maxsize)`, `Vl53l8::frames(maxsize)`,
   `Bno055::samples(maxsize)`) return a

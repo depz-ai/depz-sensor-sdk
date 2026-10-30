@@ -29,10 +29,12 @@ const GET_INFO: u8 = Vl53l4Cmd::GetInfo as u8;
 const SET_I2C_SPEED: u8 = Vl53l4Cmd::SetI2cSpeed as u8;
 
 /// A failure queued for the next request of an opcode: an error status, or no answer at all.
+/// `Pass` answers normally, so a later request of the same opcode can be the one that fails.
 #[derive(Clone, Copy)]
 enum Fail {
     Status(u8),
     Silent,
+    Pass,
 }
 
 /// The sensor's register file, as a booted VL53L4CD answers it.
@@ -118,10 +120,11 @@ impl FakeVl53l4cd {
             let (cmd, pl) = (p.cmd, p.payload.as_slice());
             b.rx.push((cmd, pl.to_vec()));
             if let Some(q) = b.failures.get_mut(&cmd).filter(|q| !q.is_empty()) {
-                return match q.remove(0) {
-                    Fail::Status(s) => vec![FakeBoard::status(cmd, s)],
-                    Fail::Silent => vec![],
-                };
+                match q.remove(0) {
+                    Fail::Status(s) => return vec![FakeBoard::status(cmd, s)],
+                    Fail::Silent => return vec![],
+                    Fail::Pass => {}
+                }
             }
             let ok = vec![FakeBoard::status(cmd, Status::Ok as u8)];
             if (cmd == READ_REG || cmd == WRITE_REG) && !b.powered {
@@ -636,6 +639,47 @@ fn start_ranging_starts_the_sensor_then_arms_the_stream() {
         rx[rx.len() - 2..],
         [(STOP_STREAM, vec![]), (WRITE_REG, stop)]
     );
+}
+
+#[test]
+fn a_start_stream_timeout_stops_the_sensor_again() {
+    // START_STREAM unanswered after the ULD started the die: the call returns the timeout and the
+    // die is stopped again — the SDK reports not ranging, so nothing may be left ranging.
+    let (dev, fake) = connect(100);
+    dev.init(None).unwrap();
+    fake.fail_next(START_STREAM, Fail::Silent);
+    assert!(matches!(
+        dev.start_ranging(),
+        Err(DepzError::Timeout {
+            cmd: Some(START_STREAM),
+            ..
+        })
+    ));
+    assert!(!dev.ranging());
+    assert_eq!(fake.written_to(uld::SYSTEM_START).pop().unwrap(), [0x80]);
+    dev.set_offset_mm(3).unwrap(); // not wedged: reconfiguration works
+    dev.start_ranging().unwrap(); // and a retry starts cleanly
+    assert!(dev.ranging() && fake.s.lock().unwrap().streaming);
+}
+
+#[test]
+fn a_failing_stop_after_a_refused_start_stream_keeps_the_original_error() {
+    let (dev, fake) = ready();
+    fake.fail_next(START_STREAM, Fail::Status(ERR_HARDWARE_FAULT));
+    fake.fail_next(WRITE_REG, Fail::Pass); // the start itself (SYSTEM_START <- 0x21)
+    fake.fail_next(WRITE_REG, Fail::Status(0x01)); // the stop that follows the refusal
+    assert!(matches!(
+        dev.start_ranging(),
+        Err(DepzError::Status {
+            cmd: START_STREAM,
+            status: ERR_HARDWARE_FAULT
+        })
+    ));
+    assert!(!dev.ranging());
+    // the stop was tried: SYSTEM_START <- 0x80 went out after the refused START_STREAM
+    let mut stop = uld::SYSTEM_START.to_le_bytes().to_vec();
+    stop.push(0x80);
+    assert_eq!(fake.last_rx(), (WRITE_REG, stop));
 }
 
 #[test]

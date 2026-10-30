@@ -12,7 +12,7 @@ The DEPZ sensor line in Unity on Windows. Two parts, one package:
 | Type | What it is |
 |------|------------|
 | `WindowsSerialLink` | `ILink` over `System.IO.Ports.SerialPort`: 115200 8N1, DTR and RTS raised on open |
-| `WindowsSerialPorts`, `IRegistry` | COM ports with USB VID / PID / serial from the registry (`SERIALCOMM` + `Enum\USB`) |
+| `WindowsRegistry` | The registry reader for the shared library's `WindowsSerialPorts` / `IRegistry` (`Depz.Sensor.Devices`): COM ports with USB VID / PID / serial (`SERIALCOMM` + `Enum\USB`) |
 | `DepzDevicesUnity` | `OpenDevice`, `OpenSr04` … `OpenTmf8829`, `OpenPort`, `ListDepzDevices`: the `DepzDevices` calls, for Unity |
 | `DepzSensorBehaviour` | Sample `MonoBehaviour`: open in `Start()`, poll in `Update()`, close in `OnDestroy()` |
 
@@ -36,14 +36,14 @@ documented in the [C# SDK guide](../docs/guide.md) and
 Window › Package Manager › **+** › *Add package from git URL…*:
 
 ```
-https://github.com/depz-ai/depz-sensor-sdk.git?path=packages/depz-sensor-sdk-csharp/unity#v0.9.0
+https://github.com/depz-ai/depz-sensor-sdk.git?path=packages/depz-sensor-sdk-csharp/unity#v0.9.1
 ```
 
 Then bring the shared library into the project, in either way:
 
 - [NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity): install
-  `Depz.Sensor` 0.9.0; or
-- take `lib/netstandard2.1/Depz.Sensor.dll` out of the `Depz.Sensor.0.9.0.nupkg`
+  `Depz.Sensor` 0.9.1; or
+- take `lib/netstandard2.1/Depz.Sensor.dll` out of the `Depz.Sensor.0.9.1.nupkg`
   (a zip file) and drop it under `Assets/Plugins/`.
 
 The module's assembly definition references `Depz.Sensor.dll` **by name**,

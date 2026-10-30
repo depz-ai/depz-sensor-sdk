@@ -419,6 +419,8 @@ void init(Vl53l8Progress progress = {});
 Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
 (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
 sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
+An exception from `progress` is not called again and leaves init() once
+the boot has run to its end (contract 07 §3).
 
 #### Vl53l8.initialized
 

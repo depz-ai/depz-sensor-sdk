@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(depz_sensor_sdk_cpp VERSION 0.9.0 LANGUAGES CXX)
+project(depz_sensor_sdk_cpp VERSION 0.9.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -240,7 +240,10 @@ if(DEPZ_SENSOR_SDK_CPP_BUILD_TESTS)
               bno086_fake_commands l4_fake_tuning_stream_and_registers
               dataset_recorder_skips_a_failing_thermometer
               l4_fake_calibrations_and_a_throwing_callback tmf8829_throwing_callbacks_are_counted dataset_json_and_gzip_edges
-              vl53l8_fake_raw_registers)
+              vl53l8_fake_raw_registers a_throwing_progress_callback_propagates_out_of_init
+              attach_sensor_class_refusal_keeps_the_device
+              an_unsubscribe_after_close_does_nothing a_recorder_destroyed_under_a_running_hook_is_not_touched
+              close_while_a_request_waits)
       add_test(NAME device_${t} COMMAND depz_test_device ${t})
     endforeach()
   endif()

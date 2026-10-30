@@ -39,6 +39,10 @@ SCHEMA = "depz.dataset/2"
 #: The schema id this SDK writes (same value as `SCHEMA`; the TS SDK's name).
 DATASET_SCHEMA = SCHEMA
 
+# Longest single wait of a player, seconds: a tiny speed stretches a gap past
+# what a lock timeout takes; the player re-evaluates after every wake anyway.
+_MAX_WAIT_S = 60.0
+
 # Report attribute → record key, for the scalar fields contract 09 `bno086` keeps.
 _BNO086_RECORD_KEYS = (
     ("i", "i"), ("j", "j"), ("k", "k"), ("real", "real"),
@@ -189,6 +193,7 @@ class SessionRecorder:
         self._temperature_hz = temperature_hz
         self._entries: dict[str, _DeviceEntry] = {}
         self._writer: DatasetWriter | None = None
+        self._records_written = 0
         self._temp_thread: threading.Thread | None = None
         self._temp_stop = threading.Event()
         self._last_silicon: dict[str, float] = {}
@@ -414,11 +419,13 @@ class SessionRecorder:
             entry.unsubscribes.clear()
         if self._writer is not None:
             self._writer.close()
+            self._records_written = self._writer.records_written
             self._writer = None
 
     @property
     def records_written(self) -> int:
-        return self._writer.records_written if self._writer else 0
+        """Records in the file being written, or in the last one after stop()."""
+        return self._writer.records_written if self._writer else self._records_written
 
     def __enter__(self) -> "SessionRecorder":
         return self
@@ -507,11 +514,16 @@ class DatasetReader:
                 due = wall0 + (rec.t_host_us - first_t) / 1e6 / speed
                 delay = due - time.monotonic()
                 if delay > 0:
-                    if stop is not None:
-                        if stop.wait(delay):
-                            return
-                    else:
-                        time.sleep(delay)
+                    # in slices: a tiny speed makes `delay` overflow the
+                    # platform's timeout (OverflowError past TIMEOUT_MAX)
+                    while delay > 0:
+                        step = min(delay, _MAX_WAIT_S)
+                        if stop is not None:
+                            if stop.wait(step):
+                                return
+                        else:
+                            time.sleep(step)
+                        delay = due - time.monotonic()
             callback(rec)
 
 
@@ -839,4 +851,6 @@ class DatasetPlayer:
                     finally:
                         cond.acquire()
                     continue
-                cond.wait(r)
+                # clamped: a tiny speed gives waits past threading.TIMEOUT_MAX
+                # (OverflowError); the loop re-evaluates after every wake
+                cond.wait(r if r is None else min(r, _MAX_WAIT_S))

@@ -214,6 +214,10 @@ static int need(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
 static bool is_streaming(depz_device *dev)
 {
     tmf_state *s = st(dev);
@@ -237,9 +241,11 @@ static void set_flag(depz_device *dev, bool *flag, bool v)
     do {                                      \
         int locked_rc_;                       \
         TRY(need(dev));                       \
+        TRY(depz_device_enter(dev));          \
         depz_mutex_lock(&st(dev)->seq);       \
         locked_rc_ = (body);                  \
         depz_mutex_unlock(&st(dev)->seq);     \
+        depz_device_leave(dev);               \
         return locked_rc_;                    \
     } while (0)
 
@@ -596,11 +602,10 @@ static bool match_info(uint8_t cmd, const uint8_t *p, size_t len, void *c)
     return true;
 }
 
-int depz_tmf8829_bridge_info(depz_device *dev, depz_tmf8829_info *out)
+static int do_bridge_info(depz_device *dev, depz_tmf8829_info *out)
 {
     info_ctx c;
     int rc;
-    TRY(need(dev));
     if (!out) return depz_fail(DEPZ_E_ARG, "tmf8829: NULL info");
     c.out = out;
     c.ok = false;
@@ -608,6 +613,8 @@ int depz_tmf8829_bridge_info(depz_device *dev, depz_tmf8829_info *out)
     if (rc == DEPZ_OK && !c.ok) return depz_fail(DEPZ_E_PROTOCOL, "tmf8829: info report did not decode");
     return rc;
 }
+
+int depz_tmf8829_bridge_info(depz_device *dev, depz_tmf8829_info *out) { ENTERED(do_bridge_info(dev, out)); }
 
 /* ── streaming ─────────────────────────────────────────────────────────── */
 
@@ -671,59 +678,85 @@ bool depz_tmf8829_streaming(const depz_device *dev)
     return depz_is_tmf8829(dev) && is_streaming((depz_device *)dev);
 }
 
-int depz_tmf8829_on_measurement(depz_device *dev, depz_tmf8829_measurement_cb cb, void *user, int *token)
+static int do_on_measurement(depz_device *dev, depz_tmf8829_measurement_cb cb, void *user, int *token)
 {
     TRY(need(dev));
     if (!cb) return depz_fail(DEPZ_E_ARG, "tmf8829: NULL callback");
     return depz_cb_list_add(&st(dev)->meas_cbs, (void (*)(void))cb, user, token);
 }
 
-void depz_tmf8829_off_measurement(depz_device *dev, int token)
+int depz_tmf8829_on_measurement(depz_device *dev, depz_tmf8829_measurement_cb cb, void *user, int *token)
 {
-    if (depz_is_tmf8829(dev)) depz_cb_list_remove(&st(dev)->meas_cbs, token);
+    ENTERED(do_on_measurement(dev, cb, user, token));
 }
 
-int depz_tmf8829_on_frame(depz_device *dev, depz_tmf8829_frame_cb cb, void *user, int *token)
+void depz_tmf8829_off_measurement(depz_device *dev, int token)
 {
-    TRY(need(dev));
+    if (!depz_is_tmf8829(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->meas_cbs, token);
+    depz_device_leave(dev);
+}
+
+static int do_on_frame(depz_device *dev, depz_tmf8829_frame_cb cb, void *user, int *token)
+{
     if (!cb) return depz_fail(DEPZ_E_ARG, "tmf8829: NULL callback");
     return depz_cb_list_add(&st(dev)->frame_cbs, (void (*)(void))cb, user, token);
 }
 
-void depz_tmf8829_off_frame(depz_device *dev, int token)
+int depz_tmf8829_on_frame(depz_device *dev, depz_tmf8829_frame_cb cb, void *user, int *token)
 {
-    if (depz_is_tmf8829(dev)) depz_cb_list_remove(&st(dev)->frame_cbs, token);
+    ENTERED(do_on_frame(dev, cb, user, token));
 }
 
-int depz_tmf8829_on_event(depz_device *dev, depz_tmf8829_event_cb cb, void *user, int *token)
+void depz_tmf8829_off_frame(depz_device *dev, int token)
 {
-    TRY(need(dev));
+    if (!depz_is_tmf8829(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->frame_cbs, token);
+    depz_device_leave(dev);
+}
+
+static int do_on_event(depz_device *dev, depz_tmf8829_event_cb cb, void *user, int *token)
+{
     if (!cb) return depz_fail(DEPZ_E_ARG, "tmf8829: NULL callback");
     return depz_cb_list_add(&st(dev)->event_cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_tmf8829_on_event(depz_device *dev, depz_tmf8829_event_cb cb, void *user, int *token)
+{
+    ENTERED(do_on_event(dev, cb, user, token));
+}
+
 void depz_tmf8829_off_event(depz_device *dev, int token)
 {
-    if (depz_is_tmf8829(dev)) depz_cb_list_remove(&st(dev)->event_cbs, token);
+    if (!depz_is_tmf8829(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->event_cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_tmf8829_measurements(depz_device *dev, size_t maxsize)
 {
-    if (need(dev)) return NULL;
-    return depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 16);
+    depz_stream *s;
+    if (need(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 16);
+    depz_device_leave(dev);
+    return s;
 }
 
-int depz_tmf8829_get_measurement(depz_device *dev, int timeout_ms, depz_tmf8829_measurement *out)
+static int do_get_measurement(depz_device *dev, int timeout_ms, depz_tmf8829_measurement *out)
 {
     depz_stream *s;
     int rc;
-    TRY(need(dev));
     if (!out) return depz_fail(DEPZ_E_ARG, "tmf8829: NULL measurement");
     s = depz_hub_subscribe(st(dev)->hub, 1);
     if (!s) return depz_fail(DEPZ_E_NOMEM, "tmf8829: cannot subscribe");
     rc = depz_stream_next(s, out, timeout_ms < 0 ? 1000 : timeout_ms);
     depz_stream_close(s);
     return rc;
+}
+
+int depz_tmf8829_get_measurement(depz_device *dev, int timeout_ms, depz_tmf8829_measurement *out)
+{
+    ENTERED(do_get_measurement(dev, timeout_ms, out));
 }
 
 void depz_tmf8829_get_stream_stats(const depz_device *dev, depz_tmf8829_stream_stats *out)

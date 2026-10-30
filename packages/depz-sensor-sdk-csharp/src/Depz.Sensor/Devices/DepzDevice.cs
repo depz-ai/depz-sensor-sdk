@@ -62,6 +62,9 @@ public sealed class LinkStats
 
     /// <summary>Callbacks that threw on the reader thread (contract 07 §3).</summary>
     public long CallbackErrors { get; internal set; }
+
+    /// <summary>Reports whose handler threw: the packet was dropped (contract 07 §3).</summary>
+    public long ReportErrors { get; internal set; }
 }
 
 /// <summary>Claims a packet as the reply to a request: return true and set <paramref name="result"/>.</summary>
@@ -114,7 +117,8 @@ public class DepzDevice : IDisposable
     /// <summary>The link's name: the port path, or what the link wraps.</summary>
     public string Port => _core.Link.Name;
 
-    public bool IsClosed => _core.Link.IsClosed;
+    // A reader that ended marks the device lost even if closing its link failed.
+    public bool IsClosed => _core.Link.IsClosed || _core.Lost != null;
 
     /// <summary>The timeout of requests that take none of their own.</summary>
     public TimeSpan Timeout
@@ -308,10 +312,12 @@ public class DepzDevice : IDisposable
     /// <summary>The host monotonic clock in µs — the host side of all time-sync math.</summary>
     public static long HostNowUs()
     {
-        long ticks = Stopwatch.GetTimestamp();
-        long f = Stopwatch.Frequency;
-        return ticks / f * 1_000_000 + ticks % f * 1_000_000 / f;
+        return TicksToUs(Stopwatch.GetTimestamp(), Stopwatch.Frequency);
     }
+
+    // Stopwatch ticks → µs, split so ticks * 1e6 cannot overflow (at 1 GHz it would after 2 h 34 min).
+    internal static long TicksToUs(long ticks, long frequency) =>
+        ticks / frequency * 1_000_000 + ticks % frequency * 1_000_000 / frequency;
 
     private sealed class Boxed
     {
@@ -338,6 +344,8 @@ public class DepzDevice : IDisposable
         private int _txSeq;
         private int _lastRxSeq = -1;
         private volatile bool _closing;
+        /// <summary>Set when the reader ended on its own (not by Close()): every later request fails with it.</summary>
+        public volatile DeviceLostException? Lost;
 
         public Core(ILink link, TimeSpan timeout, DepzDevice owner)
         {
@@ -359,6 +367,9 @@ public class DepzDevice : IDisposable
 
         public void Send(int cmd, byte[] payload, CrcType crcType)
         {
+            var lost = Lost;
+            if (lost != null)
+                throw new DeviceLostException(lost.Message, lost.InnerException!);
             lock (_txLock)
             {
                 byte[] frame = Framing.BuildPacket(cmd, payload, _txSeq, crcType);
@@ -438,11 +449,7 @@ public class DepzDevice : IDisposable
                                               || e is ObjectDisposedException || e is InvalidOperationException
                                               || e is UnauthorizedAccessException)
                     {
-                        if (!_closing)
-                        {
-                            FailAll(new DeviceLostException(e.Message, e));
-                            Emit(new DisconnectedEvent(e.Message));
-                        }
+                        Lose(new DeviceLostException(e.Message, e));
                         return;
                     }
                     if (data.Length == 0)
@@ -472,15 +479,38 @@ public class DepzDevice : IDisposable
             }
             catch (Exception e)
             {
-                // A callback or handler threw: the reader is gone, as in the reference SDK.
-                FailAll(new DeviceLostException($"device reader stopped: {e.GetType().Name}: {e.Message}", e));
-                try { Emit(new DisconnectedEvent($"reader stopped: {e.Message}")); } catch { /* the same callback again */ }
+                // Anything else ending the reader (a link that threw something unexpected) must not
+                // leave a device that looks open and times every request out (contract 07 §3).
+                if (!_closing)
+                    Trace.TraceError($"depz-sensor-sdk: reader of {Link.Name} ended: {e}");
+                Lose(new DeviceLostException($"reader ended: {e.GetType().Name}: {e.Message}", e));
             }
             finally
             {
                 FailAll(new LinkClosedException("device closed"));
                 Owner.ReaderStopped();
             }
+        }
+
+        /// <summary>The reader ended on its own: close the link, fail what is pending and every later
+        /// request with <paramref name="e"/>, say why. Nothing to do when Close() ended it.</summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types",
+            Justification = "the device is already lost; a link whose Close() throws must not stop the cleanup")]
+        private void Lose(DeviceLostException e)
+        {
+            if (_closing)
+                return;
+            Lost = e;
+            try
+            {
+                Link.Close();
+            }
+            catch (Exception again)
+            {
+                Trace.TraceError($"depz-sensor-sdk: closing {Link.Name} after its reader ended: {again}");
+            }
+            FailAll(e);
+            Emit(new DisconnectedEvent(e.Message));
         }
 
         private void TrackSeq(int seq)
@@ -550,9 +580,10 @@ public class DepzDevice : IDisposable
                     {
                         result = p.Matcher(pkt);
                     }
-                    catch (Exception e) when (e is ArgumentException || e is InvalidDataException || e is FormatException)
+                    catch (Exception e) when (!(e is OutOfMemoryException))
                     {
-                        // The reply is for this request but does not decode (contract 07 §3: reject it).
+                        // The reply is for this request but does not decode (contract 07 §3: reject
+                        // it). Whatever the matcher threw, it must never end the reader.
                         bad = e;
                     }
                     if (result != null || bad != null)
@@ -594,7 +625,20 @@ public class DepzDevice : IDisposable
                 Emit(new TemperatureEvent(rep.TimestampUs, rep.Celsius));
                 return;
             }
-            if (Owner.DispatchReport(pkt))
+            // The report path runs guarded like the matchers: a stream handler that throws drops this
+            // one packet, counted and traced — it never ends the reader (contract 07 §3).
+            bool consumed;
+            try
+            {
+                consumed = Owner.DispatchReport(pkt);
+            }
+            catch (Exception e) when (!(e is OutOfMemoryException))
+            {
+                Stats.ReportErrors++;
+                Trace.TraceError($"depz-sensor-sdk: report 0x{pkt.Cmd:X2} handler threw on {Link.Name}: {e}");
+                return;
+            }
+            if (consumed)
                 return;
             // An unrouted report stays visible, so new firmware is debuggable.
             Emit(new TextEvent(pkt.Cmd, BitConverter.ToString(pkt.Payload).Replace("-", "").ToLowerInvariant()));

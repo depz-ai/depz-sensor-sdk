@@ -17,6 +17,7 @@ import {
   DCI_ZONE_CONFIG,
   AMBIENT_RATE_IDX,
   DISTANCE_IDX,
+  METADATA_IDX,
   MOTION_DETEC_IDX,
   NB_TARGET_DETECTED_IDX,
   REFLECTANCE_EST_PC_IDX,
@@ -260,6 +261,27 @@ describe("vl53l8 uld: getRangingData (poll-mode frame)", () => {
     const err = await drv.getRangingData().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Vl53l8cxError);
     expect((err as Vl53l8cxError).code).toBe(STATUS_CORRUPTED_FRAME);
+  });
+
+  // An all-zero frame (zero headers walk 4 bytes at a time) holding one
+  // METADATA block too short to carry the temperature at body offset 8. Mid
+  // frame, the byte where it would be is 0xF6 (-10); at the end, the read
+  // would run past the frame.
+  it.each([
+    [4, false],
+    [8, false],
+    [0, true],
+  ])("a %i-byte METADATA block (at end: %s) leaves the temperature at 0", (size, atEnd) => {
+    const { drv } = makeDriver();
+    const a = drv as unknown as Record<string, unknown>;
+    a.dataReadSize = 540;
+    const buf = new Uint8Array(540);
+    const at = atEnd ? 540 - 4 : 16;
+    new DataView(buf.buffer).setUint32(at, ((METADATA_IDX << 16) | (size << 4)) >>> 0, true);
+    if (!atEnd) buf[16 + 12] = 0xf6;
+    const r = drv.parseFrame(swapBuffer(buf));
+    expect(drv.lastBlocks.map((b) => b[0])).toContain(METADATA_IDX);
+    expect(r.siliconTempDegc).toBe(0);
   });
 });
 

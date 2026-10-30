@@ -134,7 +134,7 @@ pub fn list_depz_ports() -> Result<Vec<SerialPortInfo>> {
 /// A serial port as a [`Link`]: 115200 8N1 with DTR and RTS raised, opened exclusively (a second
 /// opener of a CDC-ACM tty would silently share the byte stream). Reads block up to their timeout,
 /// so [`Link::close`] returns within one read slice; a lost port fails the next read or write with
-/// [`DepzError::DeviceLost`].
+/// [`DepzError::DeviceLost`] and the link is closed from then on.
 pub struct SerialPortLink {
     reader: Mutex<Option<Box<dyn SerialPort>>>,
     writer: Mutex<Option<Box<dyn SerialPort>>>,
@@ -184,7 +184,10 @@ impl SerialPortLink {
         DepzError::LinkClosed(format!("{} closed", self.name))
     }
 
+    /// An I/O error: the port is gone, so the link is closed from now on (as Python's
+    /// `SerialLink`); the device reports itself closed.
     fn lost(&self, what: &str, e: &std::io::Error) -> DepzError {
+        self.closed.store(true, Ordering::SeqCst);
         DepzError::DeviceLost(format!("{}: {what} failed ({e})", self.name))
     }
 }
@@ -227,22 +230,24 @@ impl Link for SerialPortLink {
         }
         let mut guard = self.writer.lock().unwrap();
         let port = guard.as_mut().ok_or_else(|| self.closed_err())?;
-        port.write_all(data)
-            .and_then(|_| port.flush())
-            .map_err(|e| {
-                if self.closed.load(Ordering::SeqCst) {
-                    self.closed_err()
-                } else {
-                    self.lost("write", &e)
-                }
-            })
+        // No flush: it is tcdrain, which waits with no timeout for a board that stopped reading
+        // (ERRATA E10). write_all already handed the bytes to the OS, as Python's SerialLink does.
+        let r = port.write_all(data);
+        if self.closed.load(Ordering::SeqCst) {
+            // close() came while this write was in the OS and left the handle to it.
+            guard.take();
+            return Err(self.closed_err());
+        }
+        r.map_err(|e| self.lost("write", &e))
     }
 
     fn close(&self) {
-        if self.closed.swap(true, Ordering::SeqCst) {
-            return;
+        // Not skipped when an I/O error already marked the link closed: the handles go here.
+        self.closed.store(true, Ordering::SeqCst);
+        // Never waits for a write stuck in the OS: that write releases the handle when it returns.
+        if let Ok(mut w) = self.writer.try_lock() {
+            w.take();
         }
-        self.writer.lock().unwrap().take();
         // Waits for a read in progress (one read slice at most), then releases the port.
         self.reader.lock().unwrap().take();
     }
@@ -253,5 +258,86 @@ impl Link for SerialPortLink {
 
     fn name(&self) -> String {
         self.name.clone()
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    /// A link over the slave side of a pseudo-terminal; dropping the master is an unplug.
+    fn pty_link() -> (serialport::TTYPort, SerialPortLink) {
+        let (master, slave) = serialport::TTYPort::pair().expect("a pseudo-terminal");
+        let writer = slave.try_clone().expect("a second handle");
+        let link = SerialPortLink {
+            reader: Mutex::new(Some(Box::new(slave))),
+            writer: Mutex::new(Some(writer)),
+            name: "pty".into(),
+            closed: AtomicBool::new(false),
+            read_timeout: Mutex::new(None),
+        };
+        (master, link)
+    }
+
+    /// Bug hunt 2026-10-29 RUST-2: a read that fails with an I/O error marks the link closed, as
+    /// Python's SerialLink does, so the device reports itself closed after an unplug.
+    #[test]
+    fn a_read_io_error_marks_the_link_closed() {
+        let (master, link) = pty_link();
+        assert!(!link.is_closed());
+        drop(master);
+        let r = link.read(Duration::from_millis(200));
+        assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+        assert!(link.is_closed(), "the link is open after a failed read");
+        assert!(matches!(
+            link.read(Duration::from_millis(10)),
+            Err(DepzError::LinkClosed(_))
+        ));
+    }
+
+    /// Bug hunt 2026-10-29 RUST-5: close() returns while a write is stuck in the OS (a board that
+    /// stops reading its OUT endpoint, ERRATA E10); the stuck write fails once the port goes.
+    #[test]
+    fn close_does_not_wait_for_a_write_stuck_in_the_os() {
+        let (master, link) = pty_link();
+        let link = std::sync::Arc::new(link);
+        let w = link.clone();
+        // Far more than the pty buffer: with nobody reading, the blocking write never completes.
+        let writer = std::thread::spawn(move || w.write(&vec![0x55u8; 1 << 20]));
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while master.bytes_to_read().unwrap_or(0) == 0 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the write never started"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let (done_tx, done) = std::sync::mpsc::channel();
+        let c = link.clone();
+        std::thread::spawn(move || {
+            c.close();
+            let _ = done_tx.send(());
+        });
+        let closed = done.recv_timeout(Duration::from_secs(1));
+        drop(master);
+        assert!(closed.is_ok(), "close() waited for the stuck write");
+        assert!(link.is_closed());
+        let r = writer.join().unwrap();
+        assert!(matches!(r, Err(DepzError::LinkClosed(_))), "{r:?}");
+        assert!(
+            link.writer.lock().unwrap().is_none(),
+            "the write kept the port"
+        );
+    }
+
+    /// RUST-2: the same for a write.
+    #[test]
+    fn a_write_io_error_marks_the_link_closed() {
+        let (master, link) = pty_link();
+        drop(master);
+        let r = link.write(&[1, 2, 3]);
+        assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+        assert!(link.is_closed(), "the link is open after a failed write");
+        assert!(matches!(link.write(&[1]), Err(DepzError::LinkClosed(_))));
     }
 }

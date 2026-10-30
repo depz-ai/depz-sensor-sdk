@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <typeinfo>
 
@@ -297,11 +298,23 @@ void l8_tramp(const depz_vl53l8_live_frame* f, void* user)
     }
 }
 
+// Progress callbacks run on the caller's thread and are not guarded (contract
+// 07 §3): the first exception is kept, the callback is not called again and
+// the exception is rethrown once the C call returns.
+template <class Fn>
+struct ProgressCtx {
+    Fn& fn;
+    std::exception_ptr error;
+};
+
 void progress_tramp(const char* phase, std::size_t done, std::size_t total, void* user)
 {
+    auto* ctx = static_cast<ProgressCtx<Vl53l8Progress>*>(user);
+    if (ctx->error) return;
     try {
-        (*static_cast<Vl53l8Progress*>(user))(phase, done, total);
+        ctx->fn(phase, done, total);
     } catch (...) {
+        ctx->error = std::current_exception();
     }
 }
 
@@ -645,6 +658,7 @@ std::unique_ptr<Device> Device::rewrap(std::unique_ptr<Device> dev)
         out->held_ = std::move(dev->held_);
         out->callback_errors_ = dev->callback_errors_;
     }
+    out->alive_ = dev->alive_;  // Unsubscribes taken before stay live
     dev->d_ = nullptr;  // the new wrapper owns the handle now
     return out;
 }
@@ -655,14 +669,14 @@ std::unique_ptr<Device> Device::promote(std::unique_ptr<Device> dev)
     return rewrap(std::move(dev));
 }
 
-std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name)
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device>&& dev, const std::string& class_name)
 {
     if (!dev) throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class: no device");
     const Device& plain = *dev;
     if (typeid(plain) != typeid(Device))
         throw ArgumentError(DEPZ_E_ARG, "attach_sensor_class needs a plain Device (it already has a class)");
     check(depz_attach_sensor_class(dev->handle(), class_name.c_str()));
-    if (class_name == "device") return dev;
+    if (class_name == "device") return std::move(dev);
     return Device::rewrap(std::move(dev));
 }
 
@@ -679,16 +693,30 @@ Device::~Device() { close(); }
 
 void Device::close()
 {
-    // Reader first, then the callback storage it may still be running.
-    depz_device_close(std::exchange(d_, nullptr));
+    // Unsubscribes first (they must not reach the freed handle), then the
+    // reader, then the callback storage it may still be running.
+    depz_device* d = d_.exchange(nullptr);
+    if (d) alive_->store(false);
+    depz_device_close(d);
     std::lock_guard<std::mutex> g(held_lock_);
     held_.clear();
 }
 
 depz_device* Device::handle() const
 {
-    if (!d_) throw DeviceLostError(DEPZ_E_CLOSED, "device closed");
-    return d_;
+    depz_device* d = d_.load();
+    if (!d) throw DeviceLostError(DEPZ_E_CLOSED, "device closed");
+    return d;
+}
+
+Device::Unsubscribe Device::unsubscriber(void (*off)(depz_device*, int), int token) const
+{
+    std::weak_ptr<std::atomic<bool>> alive = alive_;
+    depz_device* d = d_.load();
+    return [alive, d, off, token] {
+        const auto a = alive.lock();
+        if (a && a->load()) off(d, token);
+    };
 }
 
 void Device::keep(std::unique_ptr<detail::CallbackHolder> h)
@@ -697,8 +725,18 @@ void Device::keep(std::unique_ptr<detail::CallbackHolder> h)
     held_.push_back(std::move(h));
 }
 
-bool Device::closed() const { return !d_ || depz_device_closed(d_); }
-std::string Device::port() const { return d_ ? depz_device_port(d_) : ""; }
+bool Device::closed() const
+{
+    depz_device* d = d_.load();
+    return !d || depz_device_closed(d);
+}
+
+std::string Device::port() const
+{
+    depz_device* d = d_.load();
+    return d ? depz_device_port(d) : "";
+}
+
 std::optional<SensorType> Device::sensor_type() const { return to_cpp(depz_device_sensor_type(d_)); }
 void Device::set_timeout(std::chrono::milliseconds t) { depz_device_set_timeout_ms(handle(), ms(t)); }
 
@@ -837,8 +875,7 @@ Device::Unsubscribe Device::on_event(std::function<void(const DeviceEvent&)> cb)
     int token = 0;
     check(depz_device_on_event(handle(), event_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_device_off_event(d, token); };
+    return unsubscriber(depz_device_off_event, token);
 }
 
 Stream<DeviceEvent> Device::events(std::size_t maxsize)
@@ -916,8 +953,7 @@ Device::Unsubscribe Sr04::on_measurement(std::function<void(const Sr04Measuremen
     int token = 0;
     check(depz_sr04_on_measurement(handle(), sr04_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_sr04_off_measurement(d, token); };
+    return unsubscriber(depz_sr04_off_measurement, token);
 }
 
 Stream<Sr04Measurement> Sr04::stream(std::size_t maxsize)
@@ -1077,8 +1113,7 @@ Device::Unsubscribe Vl53l4cd::on_measurement(std::function<void(const Vl53l4cdMe
     int token = 0;
     check(depz_vl53l4cd_on_measurement(handle(), l4_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_vl53l4cd_off_measurement(d, token); };
+    return unsubscriber(depz_vl53l4cd_off_measurement, token);
 }
 
 Stream<Vl53l4cdMeasurement> Vl53l4cd::measurements(std::size_t maxsize)
@@ -1159,7 +1194,10 @@ bool Vl53l8::is_alive()
 
 void Vl53l8::init(Vl53l8Progress progress)
 {
-    check(depz_vl53l8_init(handle(), progress ? progress_tramp : nullptr, progress ? &progress : nullptr));
+    ProgressCtx<Vl53l8Progress> ctx{progress, nullptr};
+    const int rc = depz_vl53l8_init(handle(), progress ? progress_tramp : nullptr, progress ? &ctx : nullptr);
+    if (ctx.error) std::rethrow_exception(ctx.error);
+    check(rc);
 }
 
 bool Vl53l8::initialized() const { return depz_vl53l8_initialized(d_); }
@@ -1324,8 +1362,7 @@ Device::Unsubscribe Vl53l8::on_frame(std::function<void(const Vl53l8LiveFrame&)>
     int token = 0;
     check(depz_vl53l8_on_frame(handle(), l8_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_vl53l8_off_frame(d, token); };
+    return unsubscriber(depz_vl53l8_off_frame, token);
 }
 
 Stream<Vl53l8LiveFrame> Vl53l8::frames(std::size_t maxsize)
@@ -1715,8 +1752,7 @@ Device::Unsubscribe Bno055::on_sample(std::function<void(const Bno055Sample&)> c
     int token = 0;
     check(depz_bno055_on_sample(handle(), bno_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_bno055_off_sample(d, token); };
+    return unsubscriber(depz_bno055_off_sample, token);
 }
 
 Stream<Bno055Sample> Bno055::samples(std::size_t maxsize)
@@ -1903,8 +1939,7 @@ Device::Unsubscribe Bno086::on_report(std::function<void(const Bno086Report&)> c
     int token = 0;
     check(depz_bno086_on_report(handle(), bno086_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_bno086_off_report(d, token); };
+    return unsubscriber(depz_bno086_off_report, token);
 }
 
 Stream<Bno086Report> Bno086::reports(std::size_t maxsize)
@@ -2315,8 +2350,7 @@ Device::Unsubscribe Vl53lx::on_measurement(std::function<void(const Vl53lxMeasur
     int token = 0;
     check(depz_vl53lx_on_measurement(handle(), vlx_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_vl53lx_off_measurement(d, token); };
+    return unsubscriber(depz_vl53lx_off_measurement, token);
 }
 
 Stream<Vl53lxMeasurement> Vl53lx::measurements(std::size_t maxsize)
@@ -2458,9 +2492,12 @@ Tmf8829Config tmf_config_from_c(const depz_tmf8829_config& c)
 
 void tmf_progress_tramp(std::size_t done, std::size_t total, void* user)
 {
+    auto* ctx = static_cast<ProgressCtx<Tmf8829Progress>*>(user);
+    if (ctx->error) return;
     try {
-        (*static_cast<Tmf8829Progress*>(user))(done, total);
+        ctx->fn(done, total);
     } catch (...) {
+        ctx->error = std::current_exception();
     }
 }
 
@@ -2525,8 +2562,11 @@ Tmf8829SensorId Tmf8829::init(Tmf8829Progress progress)
 {
     char ver[16] = {0};
     std::uint32_t serial = 0;
-    check(depz_tmf8829_init(handle(), progress ? tmf_progress_tramp : nullptr, progress ? &progress : nullptr, ver,
-                            sizeof ver, &serial));
+    ProgressCtx<Tmf8829Progress> ctx{progress, nullptr};
+    const int rc = depz_tmf8829_init(handle(), progress ? tmf_progress_tramp : nullptr, progress ? &ctx : nullptr, ver,
+                                     sizeof ver, &serial);
+    if (ctx.error) std::rethrow_exception(ctx.error);
+    check(rc);
     return Tmf8829SensorId{ver, serial};
 }
 
@@ -2605,8 +2645,7 @@ Device::Unsubscribe Tmf8829::on_measurement(std::function<void(const Tmf8829Meas
     int token = 0;
     check(depz_tmf8829_on_measurement(handle(), tmf_measurement_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_tmf8829_off_measurement(d, token); };
+    return unsubscriber(depz_tmf8829_off_measurement, token);
 }
 
 Device::Unsubscribe Tmf8829::on_frame(std::function<void(const tmf8829::RawFrame&)> cb)
@@ -2616,8 +2655,7 @@ Device::Unsubscribe Tmf8829::on_frame(std::function<void(const tmf8829::RawFrame
     int token = 0;
     check(depz_tmf8829_on_frame(handle(), tmf_frame_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_tmf8829_off_frame(d, token); };
+    return unsubscriber(depz_tmf8829_off_frame, token);
 }
 
 Device::Unsubscribe Tmf8829::on_event(std::function<void(const tmf8829::Tmf8829Event&)> cb)
@@ -2627,8 +2665,7 @@ Device::Unsubscribe Tmf8829::on_event(std::function<void(const tmf8829::Tmf8829E
     int token = 0;
     check(depz_tmf8829_on_event(handle(), tmf_event_tramp, h.get(), &token));
     hold(std::move(h));
-    depz_device* d = d_;
-    return [d, token] { depz_tmf8829_off_event(d, token); };
+    return unsubscriber(depz_tmf8829_off_event, token);
 }
 
 Stream<Tmf8829Measurement> Tmf8829::measurements(std::size_t maxsize)

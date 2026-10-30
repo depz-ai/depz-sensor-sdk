@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(depz_sensor_sdk_c VERSION 0.9.0 LANGUAGES C)
+project(depz_sensor_sdk_c VERSION 0.9.1 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -292,12 +292,17 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         measure_once_busy_during_loop no_echo_timeout_sentinel temperature_compensated_distance
         stream_drop_oldest_counter two_independent_streams sync_in_single_shot_reaches_stream
         events_and_disconnect host_seq_gap_is_an_event same_opcode_in_flight_is_busy record_then_replay
+        close_while_a_request_waits bno086_close_while_a_control_request_waits vlx_xshut_while_streaming
+        l8_close_while_stop_ranging_waits l8_close_while_get_frame_waits
         l4_init_boot_speed_then_retimes l4_init_at_400_never_retimes l4_init_config_block_and_vhv
         l4_range_timing_roundtrip_and_bounds l4_tuning_roundtrips l4_is_alive_checks_model_id
-        l4_config_refused_while_ranging l4_stream_decodes_and_counts_short_blocks
+        l4_config_refused_while_ranging l4_a_refused_start_stream_stops_the_sensor_again
+        l4_a_refused_stop_after_a_refused_start_stream_keeps_its_error
+        l4_stream_decodes_and_counts_short_blocks
         l4_measure_once_polls_and_stops l8_guards_and_cnh_math
         l8_init_downloads_and_reads_the_defaults l8_configuration_round_trips l8_thresholds_motion_and_power
-        l8_xtalk_calibration_round_trip l8_start_stop_and_refusals l8ch_cnh_and_lmz_calibration_table
+        l8_xtalk_calibration_round_trip l8_start_stop_and_refusals
+        l8_a_refused_start_stream_stops_the_sensor_again l8ch_cnh_and_lmz_calibration_table
         l8ch_cnh_and_motion_exclusive
         bno086_features bno086_busy_retry bno086_reports bno086_cargo_capture bno086_commands
         bno086_frs bno086_codecs tmf8829_fake_session vlx_unsupported_group_refused
@@ -306,11 +311,13 @@ if(DEPZ_SENSOR_SDK_C_BUILD_TESTS)
         dataset_live_records vlx_bare_tables_roundtrip discovery_without_a_port discovery_open_on_link_attaches_in_place
         vlx_l1_mode_change_moves_the_budget vlx_l1_unreadable_mode_byte_is_an_error vlx_l1_thresholds_keep_the_other_bits vlx_l1_offset_calibration vlx_l1_xtalk_calibration
         vlx_l1_roi_size_and_centre vlx_l1_stream_decodes_and_counts_bad_blocks vlx_l4_configure_reinits_then_tunes vlx_l4_period_selects_autonomous_mode vlx_l4_tuning_round_trips
+        vlx_a_refused_start_stream_stops_the_sensor_again
         vlx_l4_temperature_update_reruns_vhv vlx_l4_calibrations vlx_l4_measure_once_polls_the_block vlx_l3_refusals_name_the_caveat vlx_init_binding_and_bridge_refusals
         b055_identity_and_raw_registers b055_operation_and_power_modes b055_found_asleep_and_stuck_fusion b055_units_axes_temperature_source
         b055_configure_restore_and_reset b055_configure_boot_states b055_status_self_test_calibration b055_page1_configs_and_interrupts
         b055_polling_scales_by_the_units b055_stream_wire_units_and_bad_reports
         short_reply_fails_its_request_and_the_reader_goes_on explicit_port_alias_names_its_port replay_refuses_a_gzipped_capture
+        replay_exhausted_waits_its_timeout
         unsolicited_reports_become_events link_damage_is_counted_and_reported pending_requests_meet_echoes_acks_and_a_drop
         bootloader_ack_closes_the_device payload_crc_type_roundtrip reset_acks_then_the_link_drops requests_refused_on_the_host
         tmf8829_damaged_reports_and_refusals tmf8829_init_and_configure_refusals

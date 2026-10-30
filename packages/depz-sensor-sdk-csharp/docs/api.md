@@ -12,8 +12,8 @@ Regenerate: `python3 scripts/gen_api_md.py` (from the package root).
 
 ## Contents
 
-- **Live devices (connection, streams, discovery)**: [`DeviceInfo`](#deviceinfo), [`DepzDevices`](#depzdevices), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`SeqGapEvent`](#seqgapevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`TimeSyncResult`](#timesyncresult), [`LinkStats`](#linkstats), [`ReplyMatcher`](#replymatcher), [`DepzDevice`](#depzdevice), [`Subscription`](#subscription), [`ILink`](#ilink), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`SerialPortInfo`](#serialportinfo), [`SerialPorts`](#serialports), [`SerialPortLink`](#serialportlink), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`InvalidReplyException`](#invalidreplyexception), [`StatusException`](#statusexception), [`BusyException`](#busyexception), [`DeviceLostException`](#devicelostexception), [`LinkClosedException`](#linkclosedexception), [`InvalidStateException`](#invalidstateexception), [`NoDepzDeviceException`](#nodepzdeviceexception), [`BootloaderModeException`](#bootloadermodeexception), [`WrongTypeException`](#wrongtypeexception), [`ReplayMismatchException`](#replaymismatchexception)
-- **Unity (Windows communication module)**: [`DepzDevicesUnity`](#depzdevicesunity), [`WindowsSerialLink`](#windowsseriallink), [`WindowsSerialPorts`](#windowsserialports), [`IRegistry`](#iregistry), [`WindowsRegistry`](#windowsregistry), [`DepzSensorBehaviour`](#depzsensorbehaviour)
+- **Live devices (connection, streams, discovery)**: [`DeviceInfo`](#deviceinfo), [`DepzDevices`](#depzdevices), [`DeviceEvent`](#deviceevent), [`SequenceErrorEvent`](#sequenceerrorevent), [`SeqGapEvent`](#seqgapevent), [`LinkCrcErrorEvent`](#linkcrcerrorevent), [`TrashEvent`](#trashevent), [`UnsolicitedStatusEvent`](#unsolicitedstatusevent), [`TextEvent`](#textevent), [`TemperatureEvent`](#temperatureevent), [`DisconnectedEvent`](#disconnectedevent), [`TimeSyncResult`](#timesyncresult), [`LinkStats`](#linkstats), [`ReplyMatcher`](#replymatcher), [`DepzDevice`](#depzdevice), [`Subscription`](#subscription), [`ILink`](#ilink), [`RecordingLink`](#recordinglink), [`ReplayLink`](#replaylink), [`SerialPortInfo`](#serialportinfo), [`SerialPorts`](#serialports), [`SerialPortLink`](#serialportlink), [`DepzException`](#depzexception), [`DepzTimeoutException`](#depztimeoutexception), [`InvalidReplyException`](#invalidreplyexception), [`StatusException`](#statusexception), [`BusyException`](#busyexception), [`DeviceLostException`](#devicelostexception), [`LinkClosedException`](#linkclosedexception), [`InvalidStateException`](#invalidstateexception), [`NoDepzDeviceException`](#nodepzdeviceexception), [`BootloaderModeException`](#bootloadermodeexception), [`WrongTypeException`](#wrongtypeexception), [`ReplayMismatchException`](#replaymismatchexception), [`IRegistry`](#iregistry), [`WindowsSerialPorts`](#windowsserialports)
+- **Unity (Windows communication module)**: [`DepzDevicesUnity`](#depzdevicesunity), [`WindowsSerialLink`](#windowsseriallink), [`WindowsRegistry`](#windowsregistry), [`DepzSensorBehaviour`](#depzsensorbehaviour)
 - **USB identity**: [`UsbIds`](#usbids), [`Discovery`](#discovery)
 - **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
 - **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`Vl53l4Xshut`](#vl53l4xshut), [`Vl53l4Wire`](#vl53l4wire), [`Vl53l4RegData`](#vl53l4regdata), [`Vl53l4Info`](#vl53l4info), [`Vl53l4StreamData`](#vl53l4streamdata), [`Vl53l4Exception`](#vl53l4exception), [`Vl53l4Results`](#vl53l4results), [`Vl53l4Uld`](#vl53l4uld), [`IVl53l4Platform`](#ivl53l4platform), [`Vl53l4cdDriver`](#vl53l4cddriver)
@@ -366,6 +366,14 @@ public long CallbackErrors
 
 Callbacks that threw on the reader thread (contract 07 §3).
 
+#### LinkStats.ReportErrors *(property)*
+
+```csharp
+public long ReportErrors
+```
+
+Reports whose handler threw: the packet was dropped (contract 07 §3).
+
 ### ReplyMatcher
 
 ```csharp
@@ -624,7 +632,7 @@ The oldest waiting item, without blocking.
 public T Take(TimeSpan timeout)
 ```
 
-The oldest item, waiting up to `timeout` for one.
+The oldest item, waiting up to `timeout` for one; `InfiniteTimeSpan` waits without a deadline.
 
 #### Subscription.Drain
 
@@ -794,7 +802,7 @@ One serial port and its USB identity, where the OS tells it.
 public static class SerialPorts
 ```
 
-Serial port enumeration with USB ids: Linux (sysfs) and Windows (the registry). On macOS the ports are listed without USB ids, so discovery finds no DEPZ candidate there: open a port path explicitly. Enumeration needs .NET 8; the netstandard2.1 build keeps the ordering only, and the Unity module (`unity/`) enumerates Windows ports on its own.
+Serial port enumeration with USB ids: Linux (sysfs) and Windows (the registry, `WindowsSerialPorts`). On macOS the ports are listed without USB ids, so discovery finds no DEPZ candidate there: open a port path explicitly. Enumeration needs .NET 8; the netstandard2.1 build keeps the ordering and `WindowsSerialPorts`, which the Unity module (`unity/`) runs over its own registry reader.
 
 #### SerialPorts.BySerial
 
@@ -1098,6 +1106,46 @@ A `ReplayLink` in strict mode saw the SDK write bytes the capture does not hold.
 public ReplayMismatchException(string message) : base(message)
 ```
 
+### IRegistry
+
+```csharp
+public interface IRegistry
+```
+
+The slice of the Windows registry port discovery reads, under HKEY_LOCAL_MACHINE. A missing or unreadable key is null, never an exception, so discovery degrades to "ports without USB ids" instead of failing. The .NET 8 build reads the real one on Windows, the Unity module brings its own (`WindowsRegistry`); tests supply a fake.
+
+### WindowsSerialPorts
+
+```csharp
+public static class WindowsSerialPorts
+```
+
+Windows serial-port enumeration from the registry, with USB ids. The ports present now are the values of `HKLM\HARDWARE\DEVICEMAP\SERIALCOMM`; which USB device owns which port is under `HKLM\SYSTEM\CurrentControlSet\Enum\USB\VID_xxxx&PID_xxxx[&MI_nn]\<instance>\Device Parameters\PortName`, where a plain device's instance id is its USB serial (a device without one gets a generated id with `&` in it: no serial). Pure reads over `IRegistry`, so it is testable without Windows.
+
+#### WindowsSerialPorts.SerialCommKey *(constant)*
+
+```csharp
+public const string SerialCommKey = @"HARDWARE\DEVICEMAP\SERIALCOMM"
+```
+
+The key whose values are the serial ports present now (name: driver device, data: `COMn`).
+
+#### WindowsSerialPorts.UsbEnumKey *(constant)*
+
+```csharp
+public const string UsbEnumKey = @"SYSTEM\CurrentControlSet\Enum\USB"
+```
+
+The USB device tree: `VID_xxxx&PID_xxxx[&MI_nn]\<instance>` keys.
+
+#### WindowsSerialPorts.List
+
+```csharp
+public static IReadOnlyList<SerialPortInfo> List(IRegistry registry)
+```
+
+Every COM port present now, with the USB ids of the device that owns it where the registry says so (null ids for a non-USB port, or one several devices claim). Sorted by port name.
+
 ## Unity (Windows communication module)
 
 ### DepzDevicesUnity
@@ -1296,53 +1344,13 @@ public void Dispose()
 public void Close()
 ```
 
-### WindowsSerialPorts
-
-```csharp
-public static class WindowsSerialPorts
-```
-
-Windows serial-port enumeration from the registry, with USB ids. The ports present now are the values of `HKLM\HARDWARE\DEVICEMAP\SERIALCOMM`; which USB device owns which port is under `HKLM\SYSTEM\CurrentControlSet\Enum\USB\VID_xxxx&PID_xxxx[&MI_nn]\<instance>\Device Parameters\PortName`, where a plain device's instance id is its USB serial (a device without one gets a generated id with `&` in it: no serial). Pure reads over `IRegistry`, so it is testable without Windows.
-
-#### WindowsSerialPorts.SerialCommKey *(constant)*
-
-```csharp
-public const string SerialCommKey = @"HARDWARE\DEVICEMAP\SERIALCOMM"
-```
-
-The key whose values are the serial ports present now (name: driver device, data: `COMn`).
-
-#### WindowsSerialPorts.UsbEnumKey *(constant)*
-
-```csharp
-public const string UsbEnumKey = @"SYSTEM\CurrentControlSet\Enum\USB"
-```
-
-The USB device tree: `VID_xxxx&PID_xxxx[&MI_nn]\<instance>` keys.
-
-#### WindowsSerialPorts.List
-
-```csharp
-public static IReadOnlyList<SerialPortInfo> List(IRegistry registry)
-```
-
-Every COM port present now, with the USB ids of the device that owns it where the registry says so (null ids for a non-USB port, or one several devices claim). Sorted by port name.
-
-### IRegistry
-
-```csharp
-public interface IRegistry
-```
-
-The slice of the Windows registry port discovery reads, under HKEY_LOCAL_MACHINE. A missing or unreadable key is null, never an exception, so discovery degrades to "ports without USB ids" instead of failing. `WindowsRegistry` is the real one; tests supply a fake.
-
 ### WindowsRegistry
 
 ```csharp
 public sealed class WindowsRegistry : IRegistry
 ```
 
-HKEY_LOCAL_MACHINE through Microsoft.Win32.Registry. Off Windows every key is missing.
+HKEY_LOCAL_MACHINE through Microsoft.Win32.Registry, for `WindowsSerialPorts`. Off Windows every key is missing.
 
 #### WindowsRegistry.IsAvailable *(property)*
 
@@ -1396,7 +1404,7 @@ public string Serial = ""
 public DepzDevice? Device
 ```
 
-The open device, or null before Start() and after a failed open.
+The open device, or null before Start() and after a failed one.
 
 ## USB identity
 
@@ -14877,6 +14885,8 @@ Register a device before recording starts; runs `SyncTime` so its timestamps lan
 ```csharp
 public long RecordsWritten
 ```
+
+Records in the file being written, or in the last one after `Stop`.
 
 #### SessionRecorder.Start
 

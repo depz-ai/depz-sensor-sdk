@@ -125,6 +125,8 @@ void put_utf8(std::string& out, std::uint32_t cp)
 
 // A minimal recursive-descent JSON parser (objects, arrays, strings with
 // escapes and surrogate pairs, integers as int64, other numbers as double).
+// Arrays and objects nest at most kMaxDepth deep, the outermost value being
+// level 1 (contract 08 «Line rules») — deeper fails instead of overflowing the stack.
 class Parser {
 public:
     explicit Parser(const std::string& t) : t_(t) {}
@@ -139,8 +141,10 @@ public:
     }
 
 private:
+    static constexpr unsigned kMaxDepth = 256;
     const std::string& t_;
     std::size_t pos_ = 0;
+    unsigned depth_ = 0;
 
     [[noreturn]] void fail(const std::string& m) { throw std::runtime_error("JSON: " + m); }
     int peek() const { return pos_ < t_.size() ? static_cast<unsigned char>(t_[pos_]) : -1; }
@@ -160,8 +164,13 @@ private:
         skip_ws();
         const int c = peek();
         if (c == '"') return Value(string());
-        if (c == '{') return object();
-        if (c == '[') return array();
+        if (c == '{' || c == '[') {
+            if (depth_ == kMaxDepth) fail("nested deeper than 256");
+            ++depth_;
+            Value v = c == '{' ? object() : array();
+            --depth_;
+            return v;
+        }
         if (c == '-' || (c >= '0' && c <= '9')) return number();
         if (lit("true")) return Value(true);
         if (lit("false")) return Value(false);
@@ -879,6 +888,9 @@ const char* to_string(PlayerState s)
     return "?";
 }
 
+// Longest single wait of the player thread, seconds (see run()).
+constexpr double MAX_WAIT_S = 60.0;
+
 struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
     using RecordCb = std::shared_ptr<std::function<void(const Record&)>>;
     using StateCb = std::shared_ptr<std::function<void(PlayerState)>>;
@@ -1014,7 +1026,10 @@ struct DatasetPlayer::Impl : std::enable_shared_from_this<Impl> {
                 case Step::Wait: {
                     std::unique_lock<std::mutex> g(lock);
                     if (closed) return;
-                    if (generation == gen) changed.wait_for(g, std::chrono::duration<double>(wait));
+                    // clamped: a tiny speed gives waits a timer cannot hold
+                    // (the duration overflows, the thread spins); the loop
+                    // re-evaluates after every wake
+                    if (generation == gen) changed.wait_for(g, std::chrono::duration<double>(wait < MAX_WAIT_S ? wait : MAX_WAIT_S));
                     break;
                 }
                 case Step::Idle: {

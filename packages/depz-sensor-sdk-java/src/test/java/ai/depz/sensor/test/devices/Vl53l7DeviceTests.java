@@ -527,12 +527,26 @@ public final class Vl53l7DeviceTests {
         }
     }
 
-    public static void startStreamRejectedByTheBridgeLeavesTheHostNotRangingAndStopKeepsItsPromise() throws Exception {
+    public static void startStreamRejectedByTheBridgeStopsTheSensorAgainAndStopKeepsItsPromise() throws Exception {
         try (Rig r = cx()) {
             ready(r, 16, L8_4X4_FRAME);
+            // what the ULD stop sends on the bus: a normal stop past its STOP_STREAM
+            r.dev.startRanging();
+            r.board.clearRx();
+            r.dev.stopRanging();
+            List<Integer> stop = r.board.cmds();
+            eq(FakeVl53l8Board.STOP_STREAM, stop.get(0));
+            List<Integer> uldStop = stop.subList(1, stop.size());
+            check(!uldStop.isEmpty(), "the ULD stop talks to the sensor");
+            r.board.clearRx();
             r.board.failNext(FakeVl53l8Board.START_STREAM, 0x03);
-            throwsType(StatusException.class, r.dev::startRanging);
+            StatusException e = throwsType(StatusException.class, r.dev::startRanging);
+            eq(0x03, e.status());
             check(!r.dev.ranging(), "not ranging");
+            List<Integer> cmds = r.board.cmds();
+            int start = cmds.lastIndexOf(FakeVl53l8Board.START_STREAM);
+            // the ULD started the sensor, so it is stopped again
+            eq(uldStop, cmds.subList(start + 1, cmds.size()));
             r.dev.stopRanging(); // not ranging: a no-op
             r.dev.startRanging();
             r.board.failNext(FakeVl53l8Board.STOP_STREAM, 0x01);

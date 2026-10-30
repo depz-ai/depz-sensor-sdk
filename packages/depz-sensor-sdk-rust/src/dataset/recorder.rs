@@ -255,6 +255,7 @@ pub struct SessionRecorder {
     shared: Arc<Shared>,
     entries: Vec<Entry>,
     temp_thread: Option<(Sender<()>, JoinHandle<()>)>,
+    last_written: u64, // the finished file's count, after stop()
 }
 
 impl SessionRecorder {
@@ -279,6 +280,7 @@ impl SessionRecorder {
             }),
             entries: Vec::new(),
             temp_thread: None,
+            last_written: 0,
         }
     }
 
@@ -339,8 +341,11 @@ impl SessionRecorder {
         self.shared.writer.lock().unwrap().is_some()
     }
 
+    /// Records in the file being written; after [`stop`](Self::stop), in the finished one.
     pub fn records_written(&self) -> u64 {
-        self.shared.writer().map_or(0, |w| w.records_written())
+        self.shared
+            .writer()
+            .map_or(self.last_written, |w| w.records_written())
     }
 
     /// Open the file and start writing. No-op while recording.
@@ -385,6 +390,7 @@ impl SessionRecorder {
         }
         let writer = self.shared.writer.lock().unwrap().take();
         if let Some(w) = writer {
+            self.last_written = w.records_written();
             w.close()?;
         }
         Ok(())

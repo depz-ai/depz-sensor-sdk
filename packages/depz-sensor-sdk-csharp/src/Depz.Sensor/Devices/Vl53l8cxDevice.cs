@@ -292,7 +292,24 @@ public class Vl53l8cxDevice : DepzDevice
         GetResolution(); // refresh the cache that shapes frames
         Uld.StartRanging(cnhSize);
         _reassembler = new FrameReassembler(StreamChunk);
-        RequestOk((int)Vl53l8Cmd.StartStream, Vl53l8Wire.PackStartStream(Uld.DataReadSize));
+        try
+        {
+            RequestOk((int)Vl53l8Cmd.StartStream, Vl53l8Wire.PackStartStream(Uld.DataReadSize));
+        }
+        catch
+        {
+            // The sensor ranges but the host will say it does not: stop it again, or StopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try
+            {
+                Uld.StopRanging();
+            }
+            catch
+            {
+                // the original error matters more
+            }
+            throw;
+        }
         _ranging = true;
     }
 

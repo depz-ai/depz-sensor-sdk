@@ -234,7 +234,9 @@ The shared library opens no port in Unity; the **Windows communication module**
 `DepzDevicesUnity` mirrors `DepzDevices` — `OpenDevice`, `OpenSr04` …
 `OpenTmf8829`, `OpenPort`, `ListDepzDevices`, `ProbePort` — over
 `WindowsSerialPorts` (COM ports with USB VID / PID / serial from the registry,
-behind `IRegistry` so it is testable with a fake) and `WindowsSerialLink` (an
+behind `IRegistry` so it is testable with a fake — the shared library's code,
+which `SerialPorts.List()` runs on .NET 8 too; the module brings the registry
+reader, `WindowsRegistry`) and `WindowsSerialLink` (an
 `ILink` over `System.IO.Ports.SerialPort`: 115200 8N1, DTR / RTS raised, short
 reads so `Close()` never waits on Mono's port). Selection is contract 02 §4.3
 (DEPZ USB ids, ordered by USB serial); the class comes from the probe, run on

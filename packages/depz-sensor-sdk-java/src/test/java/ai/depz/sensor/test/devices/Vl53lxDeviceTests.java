@@ -853,11 +853,16 @@ public final class Vl53lxDeviceTests {
         }
     }
 
-    public static void aRefusedStartStreamLeavesTheDeviceNotRanging() throws Exception {
+    public static void aRefusedStartStreamStopsTheSensorAgain() throws Exception {
         try (Rig r = ready()) {
             r.fake.failNext(START_STREAM, 0x03);
-            throwsType(StatusException.class, r.dev::startRanging);
+            StatusException e = throwsType(StatusException.class, r.dev::startRanging);
+            eq(0x03, e.status()); // the original error, not one from the stop
             check(!r.dev.ranging(), "not ranging");
+            List<?> writes = r.fake.writeKeys();
+            // the driver started the die, so it is stopped again
+            eq(key(0x0087, 0x80), writes.get(writes.size() - 1));
+            r.dev.setOffsetMm(0); // configuration allowed again
         }
     }
 

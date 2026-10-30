@@ -5,6 +5,7 @@
 #include "internal.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #if defined(_MSC_VER)
 #  define DEPZ_TLS __declspec(thread)
@@ -12,7 +13,7 @@
 #  define DEPZ_TLS _Thread_local
 #endif
 
-static DEPZ_TLS char t_msg[512];
+static DEPZ_TLS char t_msg[DEPZ_ERROR_MSG_MAX];
 static DEPZ_TLS int  t_status = -1;
 static DEPZ_TLS int  t_status_cmd = -1;
 
@@ -49,6 +50,20 @@ int depz_fail(int err, const char *fmt, ...)
     t_status = -1;
     t_status_cmd = -1;
     return err;
+}
+
+void depz_error_save(depz_saved_error *out)
+{
+    memcpy(out->msg, t_msg, sizeof out->msg);
+    out->status = t_status;
+    out->status_cmd = t_status_cmd;
+}
+
+void depz_error_restore(const depz_saved_error *saved)
+{
+    memcpy(t_msg, saved->msg, sizeof t_msg);
+    t_status = saved->status;
+    t_status_cmd = saved->status_cmd;
 }
 
 static const char *status_name(uint8_t s)

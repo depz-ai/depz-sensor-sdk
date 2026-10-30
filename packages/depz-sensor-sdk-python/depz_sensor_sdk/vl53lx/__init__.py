@@ -552,11 +552,21 @@ class Vl53lx(DeviceBase):
         drv = self.driver
         drv.start_ranging()
         addr, length = drv.stream_block()
-        self.request(
-            Vl53lxCmd.START_STREAM,
-            pack_start_stream(addr, length, tuple(drv.CLEAR_STEPS)),
-            ok_completes=True,
-        )
+        try:
+            self.request(
+                Vl53lxCmd.START_STREAM,
+                pack_start_stream(addr, length, tuple(drv.CLEAR_STEPS)),
+                ok_completes=True,
+            )
+        except BaseException:
+            # The sensor ranges but the host will say it does not: stop it
+            # again, or stop_ranging() could never reach it. The START_STREAM
+            # error is the one the caller gets, even if this stop fails too.
+            try:
+                drv.stop_ranging()
+            except Exception:
+                pass
+            raise
         self._ranging = True
 
     def stop_ranging(self) -> None:

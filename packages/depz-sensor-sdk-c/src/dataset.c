@@ -206,7 +206,11 @@ bool depz_json_equal(const depz_json *a, const depz_json *b)
 
 /* ---- parser ------------------------------------------------------------- */
 
-typedef struct { const char *p, *end; bool error; } jparser;
+/* Contract 08 «Line rules»: arrays and objects nest at most this deep (the
+ * outermost value is level 1) — deeper is a parse error, not a stack overflow. */
+#define J_MAX_DEPTH 256
+
+typedef struct { const char *p, *end; bool error; unsigned depth; } jparser;
 
 static depz_json *j_parse_value(jparser *ps);
 
@@ -413,8 +417,14 @@ static depz_json *j_parse_value(jparser *ps)
         v->slen = n;
         return v;
     }
-    if (c == '{') return j_parse_object(ps);
-    if (c == '[') return j_parse_array(ps);
+    if (c == '{' || c == '[') {
+        depz_json *v;
+        if (ps->depth == J_MAX_DEPTH) { ps->error = true; return NULL; }
+        ps->depth++;
+        v = c == '{' ? j_parse_object(ps) : j_parse_array(ps);
+        ps->depth--;
+        return v;
+    }
     if (c == '-' || (c >= '0' && c <= '9')) return j_parse_number(ps);
     if (j_lit(ps, "true")) return depz_json_bool(true);
     if (j_lit(ps, "false")) return depz_json_bool(false);
@@ -426,7 +436,7 @@ static depz_json *j_parse_value(jparser *ps)
 depz_json *depz_json_parse(const char *text, size_t len)
 {
     if (!text) return NULL;
-    jparser ps = { text, text + len, false };
+    jparser ps = { text, text + len, false, 0 };
     depz_json *v = j_parse_value(&ps);
     if (ps.error) { depz_json_free(v); return NULL; }
     j_skip_ws(&ps);

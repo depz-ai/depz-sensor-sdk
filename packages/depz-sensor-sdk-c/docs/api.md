@@ -5875,7 +5875,8 @@ void depz_json_free(depz_json *v);
 depz_json *depz_json_parse(const char *text, size_t len);
 ```
 
-Parse one JSON document out of text[0..len). NULL when it does not parse.
+Parse one JSON document out of text[0..len). NULL when it does not parse or
+nests arrays/objects deeper than 256 (contract 08 «Line rules»).
 
 ### depz_json_dump
 
@@ -6652,6 +6653,11 @@ void depz_device_close(depz_device *dev);
 ```
 
 Stop the reader, close the link, free everything. NULL is a no-op.
+May be called from another thread while a call on `dev` is in progress:
+a call waiting for the board, a frame or a measurement returns
+DEPZ_E_CLOSED, and close frees nothing until every call has returned.
+Never from a callback, and no call may begin on `dev` once close has
+returned.
 
 ### depz_device_set_timeout_ms
 
@@ -9934,6 +9940,8 @@ Stop writing, unhook the devices and close the file. Idempotent.
 ```c
 uint64_t depz_session_recorder_records_written(const depz_session_recorder *rec);
 ```
+
+Records in the file being written; after stop(), in the finished one.
 
 ### depz_session_recorder_free
 

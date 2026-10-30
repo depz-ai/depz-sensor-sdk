@@ -157,6 +157,8 @@ export class Bno086 extends DepzDevice {
   private txChain: Promise<void> = Promise.resolve();
   private reportCbs: Array<{ cb: (r: Report) => void; filter: Set<number> | null }> = [];
   private readonly flushWaiters = new Map<number, Set<() => void>>();
+  // Rejecters of the flush() calls in flight, failed at teardown.
+  private flushFails = new Set<(err: Error) => void>();
   private reportQueues: Array<{ queue: StreamQueue<Report>; filter: Set<number> | null }> = [];
   private controlWaiters = new Map<number, ControlWaiter[]>();
   // Parallel registry of the `fail` handle for each in-flight control exchange,
@@ -181,6 +183,8 @@ export class Bno086 extends DepzDevice {
     // accumulate across the connection's life.
     for (const fail of [...this.controlFails]) fail(error);
     this.controlFails.clear();
+    for (const fail of [...this.flushFails]) fail(error);
+    this.flushFails.clear();
     this.controlWaiters.clear();
     this.resetResolvers.length = 0;
   }
@@ -777,18 +781,24 @@ export class Bno086 extends DepzDevice {
       this.flushWaiters.set(sensor, waiters);
     }
     let done!: () => void;
+    let fail!: (err: Error) => void;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const completed = new Promise<void>((resolve, reject) => {
       done = resolve;
+      fail = reject;
       timer = setTimeout(() => reject(new DepzTimeoutError(FLUSH_COMPLETED, timeoutMs)), timeoutMs);
     });
+    // A teardown during the send rejects `completed` before it is awaited.
+    void completed.catch(() => undefined);
     waiters.add(done);
+    this.flushFails.add(fail);
     try {
       await this.sendShtp(ShtpChannel.Control, payload);
       await completed;
     } finally {
       clearTimeout(timer);
       waiters.delete(done);
+      this.flushFails.delete(fail);
     }
   }
 

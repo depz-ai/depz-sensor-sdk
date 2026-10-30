@@ -354,6 +354,7 @@ struct SessionRecorder::Impl : std::enable_shared_from_this<Impl> {
     const RecorderOptions options;
     std::mutex lock;  // the writer, the entries' silicon readings
     std::unique_ptr<Writer> writer;
+    std::uint64_t last_written = 0;  // the finished file's count, after stop()
     std::vector<std::unique_ptr<Entry>> entries;
     std::thread thread;
     std::mutex tlock;
@@ -381,54 +382,65 @@ struct SessionRecorder::Impl : std::enable_shared_from_this<Impl> {
         }
     }
 
+    // A hook body run only while the recorder lives: the reader may still call
+    // a hook it picked up before stop() unhooked it — even after the recorder
+    // is gone — so the hook holds the recorder weakly and keeps it for the call.
+    template <class T, class F>
+    std::function<void(const T&)> guarded(F body)
+    {
+        return [w = weak_from_this(), body](const T& x) {
+            if (const auto self = w.lock()) body(*self, x);
+        };
+    }
+
     void hook(Entry& e)
     {
         Device& d = *e.device;
         Entry* ep = &e;
         if (auto* s = dynamic_cast<Sr04*>(&d)) {
-            e.hooks.push_back(s->on_measurement([this, ep](const Sr04Measurement& m) {
-                emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "sr04", records::sr04(m));
-            }));
+            e.hooks.push_back(s->on_measurement(guarded<Sr04Measurement>([ep](Impl& self, const Sr04Measurement& m) {
+                self.emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "sr04", records::sr04(m));
+            })));
         } else if (auto* l4 = dynamic_cast<Vl53l4cd*>(&d)) {
-            e.hooks.push_back(l4->on_measurement([this, ep](const Vl53l4cdMeasurement& m) {
-                emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "vl53l4", records::vl53l4(m));
-            }));
+            e.hooks.push_back(l4->on_measurement(guarded<Vl53l4cdMeasurement>([ep](Impl& self, const Vl53l4cdMeasurement& m) {
+                self.emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "vl53l4", records::vl53l4(m));
+            })));
         } else if (auto* l8 = dynamic_cast<Vl53l8*>(&d)) {
-            e.hooks.push_back(l8->on_frame([this, ep, l8](const Vl53l8LiveFrame& f) {
+            e.hooks.push_back(l8->on_frame(guarded<Vl53l8LiveFrame>([ep, l8](Impl& self, const Vl53l8LiveFrame& f) {
                 {
-                    std::lock_guard<std::mutex> g(lock);
+                    std::lock_guard<std::mutex> g(self.lock);
                     ep->silicon = static_cast<double>(f.frame.silicon_temp_degc);
                 }
                 const auto t = static_cast<std::int64_t>(f.frame.timestamp_us);
-                emit(*ep, t, "vl53l8", records::vl53l8(f, options.vl53l8_layers));
+                self.emit(*ep, t, "vl53l8", records::vl53l8(f, self.options.vl53l8_layers));
                 // CH: the raw CNH block riding this frame, with the armed setup's
                 // decode parameters (contract 09 `vl53l8_cnh`).
                 if (f.frame.cnh_raw && !f.frame.cnh_raw->empty()) {
-                    if (const auto setup = l8->cnh_setup()) emit(*ep, t, "vl53l8_cnh", records::vl53l8_cnh(*f.frame.cnh_raw, *setup));
+                    if (const auto setup = l8->cnh_setup()) self.emit(*ep, t, "vl53l8_cnh", records::vl53l8_cnh(*f.frame.cnh_raw, *setup));
                 }
-            }));
+            })));
         } else if (auto* lx = dynamic_cast<Vl53lx*>(&d)) {
-            e.hooks.push_back(lx->on_measurement([this, ep, lx](const Vl53lxMeasurement& m) {
+            e.hooks.push_back(lx->on_measurement(guarded<Vl53lxMeasurement>([ep, lx](Impl& self, const Vl53lxMeasurement& m) {
                 const auto product = lx->product();
                 const auto kind = lx->driver_kind();
-                emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "vl53lx",
-                     records::vl53lx(m, product ? *product : "", kind ? vl53lx::to_string(*kind) : ""));
-            }));
+                self.emit(*ep, static_cast<std::int64_t>(m.timestamp_us), "vl53lx",
+                          records::vl53lx(m, product ? *product : "", kind ? vl53lx::to_string(*kind) : ""));
+            })));
         } else if (auto* b55 = dynamic_cast<Bno055*>(&d)) {
-            e.hooks.push_back(b55->on_sample([this, ep](const Bno055Sample& s) {
-                emit(*ep, static_cast<std::int64_t>(s.timestamp_us), "bno055", records::bno055(s));
-            }));
+            e.hooks.push_back(b55->on_sample(guarded<Bno055Sample>([ep](Impl& self, const Bno055Sample& sample) {
+                self.emit(*ep, static_cast<std::int64_t>(sample.timestamp_us), "bno055", records::bno055(sample));
+            })));
         } else if (auto* tmf = dynamic_cast<Tmf8829*>(&d)) {
-            e.hooks.push_back(tmf->on_measurement([this, ep](const Tmf8829Measurement& m) {
-                emit(*ep, m.timestamp_us, "tmf8829", records::tmf8829(m));
-            }));
+            e.hooks.push_back(tmf->on_measurement(guarded<Tmf8829Measurement>([ep](Impl& self, const Tmf8829Measurement& m) {
+                self.emit(*ep, m.timestamp_us, "tmf8829", records::tmf8829(m));
+            })));
         } else if (auto* b86 = dynamic_cast<Bno086*>(&d)) {
             // Every enabled sensor's report at its measurement time; reports of
             // one cargo carry out-of-order device times, so t may step back
             // within a device — readers sort (contract 09).
-            e.hooks.push_back(b86->on_report([this, ep](const Bno086Report& r) {
-                emit(*ep, r.timestamp_us, "bno086", records::bno086(r));
-            }));
+            e.hooks.push_back(b86->on_report(guarded<Bno086Report>([ep](Impl& self, const Bno086Report& r) {
+                self.emit(*ep, r.timestamp_us, "bno086", records::bno086(r));
+            })));
         }
         // a plain Device: nothing to hook
     }
@@ -549,6 +561,7 @@ void SessionRecorder::stop()
     {
         std::lock_guard<std::mutex> g(impl_->lock);
         writer = std::move(impl_->writer);
+        if (writer) impl_->last_written = writer->records_written();
     }
     if (writer) writer->close();
 }
@@ -558,7 +571,7 @@ bool SessionRecorder::recording() const { return impl_->recording(); }
 std::uint64_t SessionRecorder::records_written() const
 {
     std::lock_guard<std::mutex> g(impl_->lock);
-    return impl_->writer ? impl_->writer->records_written() : 0;
+    return impl_->writer ? impl_->writer->records_written() : impl_->last_written;
 }
 
 }  // namespace dataset

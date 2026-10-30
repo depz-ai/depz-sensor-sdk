@@ -208,6 +208,10 @@ static int need(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
 static bool is_streaming(depz_device *dev)
 {
     bno_state *s = st(dev);
@@ -414,9 +418,11 @@ static void remember_units(depz_device *dev, const depz_bno055_units *u, bool kn
     do {                                      \
         int locked_rc_;                       \
         TRY(need(dev));                       \
+        TRY(depz_device_enter(dev));          \
         depz_mutex_lock(&st(dev)->seq);       \
         locked_rc_ = (body);                  \
         depz_mutex_unlock(&st(dev)->seq);     \
+        depz_device_leave(dev);               \
         return locked_rc_;                    \
     } while (0)
 
@@ -918,34 +924,48 @@ int depz_bno055_stop_stream(depz_device *dev) { LOCKED(do_stop_stream(dev)); }
 
 bool depz_bno055_streaming(const depz_device *dev) { return depz_is_bno055(dev) && is_streaming((depz_device *)dev); }
 
-int depz_bno055_on_sample(depz_device *dev, depz_bno055_sample_cb cb, void *user, int *token)
+static int do_on_sample(depz_device *dev, depz_bno055_sample_cb cb, void *user, int *token)
 {
     TRY(need(dev));
     if (!cb) return depz_fail(DEPZ_E_ARG, "bno055: NULL callback");
     return depz_cb_list_add(&st(dev)->cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_bno055_on_sample(depz_device *dev, depz_bno055_sample_cb cb, void *user, int *token)
+{
+    ENTERED(do_on_sample(dev, cb, user, token));
+}
+
 void depz_bno055_off_sample(depz_device *dev, int token)
 {
-    if (depz_is_bno055(dev)) depz_cb_list_remove(&st(dev)->cbs, token);
+    if (!depz_is_bno055(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&st(dev)->cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_bno055_samples(depz_device *dev, size_t maxsize)
 {
-    if (need(dev)) return NULL;
-    return depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 256);
+    depz_stream *s;
+    if (need(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(st(dev)->hub, maxsize ? maxsize : 256);
+    depz_device_leave(dev);
+    return s;
 }
 
-int depz_bno055_get_sample(depz_device *dev, int timeout_ms, depz_bno055_sample *out)
+static int do_get_sample(depz_device *dev, int timeout_ms, depz_bno055_sample *out)
 {
     depz_stream *s;
     int rc;
-    TRY(need(dev));
     s = depz_hub_subscribe(st(dev)->hub, 1);
     if (!s) return depz_fail(DEPZ_E_NOMEM, "bno055: cannot subscribe");
     rc = depz_stream_next(s, out, timeout_ms < 0 ? 1000 : timeout_ms);
     depz_stream_close(s);
     return rc;
+}
+
+int depz_bno055_get_sample(depz_device *dev, int timeout_ms, depz_bno055_sample *out)
+{
+    ENTERED(do_get_sample(dev, timeout_ms, out));
 }
 
 uint64_t depz_bno055_stream_parse_errors(const depz_device *dev)

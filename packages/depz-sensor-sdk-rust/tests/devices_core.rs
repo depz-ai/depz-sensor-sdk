@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use common::fake_board::{until, FakeBoard};
 use depz_sensor_sdk::devices::{
-    host_now_us, open_on_link, AnyDevice, DepzDevice, DepzError, DeviceEvent, RecordingLink,
-    ReplayLink, Sr04Device,
+    host_now_us, open_on_link, AnyDevice, DepzDevice, DepzError, DeviceEvent, Link, RecordingLink,
+    ReplayLink, ReportHandler, Sr04Device,
 };
 use depz_sensor_sdk::framing::{build_packet, CrcType};
 use depz_sensor_sdk::json::Value;
@@ -229,6 +229,187 @@ fn unplug_fails_pending_and_ends_streams() {
         Err(DepzError::DeviceLost(_))
     ));
     assert!(lp.is_closed());
+    // Contract 07 §3: a reader that ended leaves the device closed; a later request fails at once.
+    assert!(
+        until(|| dev.is_closed(), 1000),
+        "the device is open after the loss"
+    );
+    let t0 = std::time::Instant::now();
+    let r = dev.get_sample_period_us();
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    assert!(
+        t0.elapsed() < Duration::from_secs(1),
+        "waited {:?}",
+        t0.elapsed()
+    );
+}
+
+/// Contract 07 §3 (bug hunt 2026-10-29 RUST-2): a queue subscribed after the device closed is
+/// closed at once — take() fails with the closed error instead of waiting out its timeout.
+#[test]
+fn a_queue_subscribed_after_close_is_closed_at_once() {
+    let dev = Sr04Device::attach(DepzDevice::new(FakeBoard::new(), SHORT));
+    dev.close();
+    let events = dev.events(4);
+    let lp = dev.measurements(4);
+    assert!(events.is_closed(), "events() after close is open");
+    assert!(lp.is_closed(), "measurements() after close is open");
+    let t0 = std::time::Instant::now();
+    let r = lp.take(Duration::from_secs(5));
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    let r = events.take(Duration::from_secs(5));
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    assert!(
+        t0.elapsed() < Duration::from_secs(1),
+        "waited {:?}",
+        t0.elapsed()
+    );
+}
+
+/// RUST-2: the same after a loss (the link failed, nobody called close()).
+#[test]
+fn a_queue_subscribed_after_a_loss_is_closed_at_once() {
+    let board = FakeBoard::new();
+    let dev = Sr04Device::attach(DepzDevice::new(board.clone(), SHORT));
+    let events = dev.events(8);
+    board.unplug();
+    assert!(
+        until(|| events.is_closed(), 1000),
+        "the old queue stays open"
+    );
+    let late = dev.events(4);
+    let lp = dev.measurements(4);
+    assert!(
+        late.is_closed() && lp.is_closed(),
+        "a queue subscribed after the loss is open"
+    );
+    let t0 = std::time::Instant::now();
+    let r = late.take(Duration::from_secs(5));
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    let r = dev.get_measurement(Some(Duration::from_secs(5)));
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    assert!(
+        t0.elapsed() < Duration::from_secs(1),
+        "waited {:?}",
+        t0.elapsed()
+    );
+}
+
+/// Contract 07 §3 (bug hunt 2026-10-29 RUST-1): a matcher that panics fails its own request with
+/// the invalid-reply error — never a panic in the caller or a poisoned device; the reader goes on.
+#[test]
+fn a_panicking_matcher_fails_only_its_request() {
+    let board = FakeBoard::new();
+    let b = board.clone();
+    board.on_packet(move |p| vec![b.reply(Rpt::Text as u8, &text(p.cmd, "name"))]);
+    let dev = Sr04Device::attach(DepzDevice::new(board.clone(), Some(Duration::from_secs(2))));
+    let events = dev.events(8);
+    let meas = dev.measurements(8);
+    let r = dev.request::<()>(
+        Cmd::GetDeviceName as u8,
+        &[],
+        |_| -> Option<depz_sensor_sdk::devices::Result<()>> { panic!("matcher boom") },
+        None,
+    );
+    match r {
+        Err(DepzError::Protocol(m)) => {
+            assert!(
+                m.contains("does not decode") && m.contains("matcher boom"),
+                "{m}"
+            )
+        }
+        other => panic!("expected the invalid-reply error, got {other:?}"),
+    }
+    assert!(!dev.is_closed());
+    assert!(!events.is_closed() && !meas.is_closed());
+    assert_eq!(dev.get_device_name().unwrap(), "name");
+}
+
+/// Routes 0x9E into a panic — a stream decoder bug.
+struct PanickingReports;
+
+impl ReportHandler for PanickingReports {
+    fn handle_report(&self, packet: &depz_sensor_sdk::framing::Packet) -> bool {
+        if packet.cmd == 0x9E {
+            panic!("stream decoder bug");
+        }
+        false
+    }
+}
+
+/// Contract 07 §3: a report handler that panics drops that packet, counted; the reader goes on.
+#[test]
+fn a_panicking_report_handler_drops_that_packet() {
+    let board = FakeBoard::new();
+    let b = board.clone();
+    board.on_packet(move |p| vec![b.reply(Rpt::Text as u8, &text(p.cmd, "still here"))]);
+    let dev = DepzDevice::new(board.clone(), SHORT);
+    dev.set_report_handler(Arc::new(PanickingReports));
+    let events = dev.events(8);
+    board.inject(board.reply(0x9E, &[1, 2]));
+    board.inject(board.reply(0xC5, &[0xAB]));
+    assert_eq!(
+        events.take(Duration::from_secs(1)).unwrap(),
+        DeviceEvent::Text {
+            cmd: 0xC5,
+            text: "ab".into()
+        }
+    );
+    assert_eq!(dev.stats().report_errors, 1);
+    assert_eq!(dev.get_device_name().unwrap(), "still here");
+    assert!(!dev.is_closed());
+}
+
+/// A link whose read panics — something no link is expected to do.
+struct PanickingReadLink {
+    inner: FakeBoard,
+}
+
+impl Link for PanickingReadLink {
+    fn read(&self, _timeout: Duration) -> depz_sensor_sdk::devices::Result<Vec<u8>> {
+        panic!("read broke")
+    }
+    fn write(&self, data: &[u8]) -> depz_sensor_sdk::devices::Result<()> {
+        self.inner.write(data)
+    }
+    fn close(&self) {
+        self.inner.close()
+    }
+    fn is_closed(&self) -> bool {
+        self.inner.is_closed()
+    }
+    fn name(&self) -> String {
+        "broken".into()
+    }
+}
+
+/// Contract 07 §3: a reader that ends for any reason other than close() closes the device —
+/// `is_closed()` is true, the queues close and a later request fails at once with DeviceLost.
+#[test]
+fn a_reader_that_ends_for_any_reason_closes_the_device() {
+    let board = FakeBoard::new();
+    let dev = Sr04Device::attach(DepzDevice::new(
+        PanickingReadLink {
+            inner: board.clone(),
+        },
+        Some(Duration::from_secs(5)),
+    ));
+    let meas = dev.measurements(8);
+    assert!(
+        until(|| dev.is_closed(), 1000),
+        "the device is open after its reader ended"
+    );
+    assert!(board.is_closed_for_test(), "the link is open");
+    assert!(until(|| meas.is_closed(), 1000), "the queue is open");
+    let t0 = std::time::Instant::now();
+    let r = dev.get_device_name();
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    assert!(
+        t0.elapsed() < Duration::from_secs(1),
+        "waited {:?}",
+        t0.elapsed()
+    );
+    assert_eq!(board.sent_count(), 0);
 }
 
 #[test]
@@ -353,6 +534,35 @@ fn replay_refuses_a_gzipped_capture() {
         ReplayLink::open(&path, false, false),
         Err(DepzError::InvalidArgument(_))
     ));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A capture with nothing left behaves like a quiet port: a read returns empty at its timeout
+/// (or at close), never at once — the reader thread would spin a core on empty reads
+/// (contract 08 «Replay semantics»).
+#[test]
+fn exhausted_replay_waits_its_timeout() {
+    let dir = std::env::temp_dir().join(format!("depz-rec-exhausted-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.depzrec");
+    std::fs::write(&path, "{\"schema\": \"depz.rec/1\"}\n").unwrap();
+    let link = Arc::new(ReplayLink::open(&path, false, false).unwrap());
+    assert!(link.rx_exhausted());
+    let t0 = std::time::Instant::now();
+    assert!(link.read(Duration::from_millis(100)).unwrap().is_empty());
+    assert!(t0.elapsed() >= Duration::from_millis(80));
+    // a long read ends at close(), not at its 30 s timeout
+    let reader = {
+        let link = link.clone();
+        std::thread::spawn(move || link.read(Duration::from_secs(30)))
+    };
+    let t0 = std::time::Instant::now();
+    link.close();
+    assert!(matches!(
+        reader.join().unwrap(),
+        Err(DepzError::LinkClosed(_))
+    ));
+    assert!(t0.elapsed() < Duration::from_secs(5));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

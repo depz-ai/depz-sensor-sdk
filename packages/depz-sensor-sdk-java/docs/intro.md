@@ -30,12 +30,12 @@ and API reference:
 
 ## Install
 
-Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.9.0).
+Published on Maven Central as `io.github.depz-ai:depz-sensor-sdk` (0.9.1).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.depz-ai:depz-sensor-sdk:0.9.0")
+implementation("io.github.depz-ai:depz-sensor-sdk:0.9.1")
 ```
 
 Maven:
@@ -44,7 +44,7 @@ Maven:
 <dependency>
   <groupId>io.github.depz-ai</groupId>
   <artifactId>depz-sensor-sdk</artifactId>
-  <version>0.9.0</version>
+  <version>0.9.1</version>
 </dependency>
 ```
 

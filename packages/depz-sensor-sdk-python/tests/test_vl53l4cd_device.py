@@ -286,6 +286,36 @@ def test_start_ranging_starts_the_sensor_then_arms_the_stream(ready):
     assert fake.rx[-2:] == [(STOP_STREAM, b""), (WRITE_REG, struct.pack("<H", uld_mod.SYSTEM_START) + b"\x80")]
 
 
+def test_a_start_stream_timeout_stops_the_sensor_again(connect):
+    """START_STREAM unanswered after the ULD started the die: the call raises
+    the timeout and the die is stopped again — the SDK reports not ranging,
+    so nothing may be left ranging (contract 07 §3)."""
+    dev, fake = connect(timeout=0.2)
+    dev.init()
+    fake.fail_next(START_STREAM, "silent")
+    with pytest.raises(DepzTimeoutError):
+        dev.start_ranging()
+    assert not dev.ranging
+    assert fake.platform.reg[uld_mod.SYSTEM_START] == 0x80
+    dev.set_offset_mm(3)  # not wedged: reconfiguration works
+    dev.start_ranging()  # and a retry starts cleanly
+    assert dev.ranging and fake.streaming
+
+
+def test_a_failing_stop_after_a_refused_start_stream_keeps_the_original_error(ready, monkeypatch):
+    dev, fake = ready()
+    fake.fail_next(START_STREAM, ERR_HARDWARE_FAULT)
+
+    def broken_stop() -> None:
+        raise Vl53l4cdError("stop failed too")
+
+    monkeypatch.setattr(dev._uld, "stop_ranging", broken_stop)
+    with pytest.raises(StatusError) as e:
+        dev.start_ranging()
+    assert e.value.status == ERR_HARDWARE_FAULT
+    assert not dev.ranging
+
+
 def test_stop_ranging_clears_the_state_even_when_the_bridge_refuses(ready):
     dev, fake = ready()
     dev.start_ranging()

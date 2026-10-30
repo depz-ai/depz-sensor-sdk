@@ -1,6 +1,6 @@
-using Depz.Sensor.Unity;
+using Depz.Sensor.Devices;
 
-namespace Depz.Sensor.Unity.Tests;
+namespace Depz.Sensor.Tests;
 
 /// <summary>An in-memory HKEY_LOCAL_MACHINE: keys by path (case-insensitive, parents implied),
 /// string values, and "locked" keys that read as unreadable (null), like a key the user may not open.</summary>

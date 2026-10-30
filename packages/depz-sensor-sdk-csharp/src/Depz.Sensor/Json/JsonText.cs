@@ -128,6 +128,8 @@ public static class JsonText
 
     private sealed class Parser
     {
+        // Arrays and objects nest at most this deep, the outermost value being level 1
+        // (contract 08 «Line rules»): beyond it the text is refused, not the stack overflowed.
         private const int MaxDepth = 256;
         private readonly string _s;
         public int Pos;
@@ -142,15 +144,15 @@ public static class JsonText
                 Pos++;
         }
 
+        /// <summary>The value at <see cref="Pos"/>, inside <paramref name="depth"/> open arrays/objects.</summary>
         public object? Value(int depth)
         {
-            if (depth > MaxDepth) throw Error("nesting too deep");
             if (Pos >= _s.Length) throw Error("unexpected end");
             char c = _s[Pos];
             switch (c)
             {
-                case '{': return Obj(depth);
-                case '[': return Arr(depth);
+                case '{': return Obj(Enter(depth));
+                case '[': return Arr(Enter(depth));
                 case '"': return Str();
                 case 't': Literal("true"); return true;
                 case 'f': Literal("false"); return false;
@@ -159,6 +161,12 @@ public static class JsonText
                     if (c == '-' || (c >= '0' && c <= '9')) return Num();
                     throw Error($"unexpected '{c}'");
             }
+        }
+
+        private int Enter(int depth)
+        {
+            if (depth >= MaxDepth) throw Error($"nested deeper than {MaxDepth}");
+            return depth + 1;
         }
 
         private void Literal(string word)
@@ -182,7 +190,7 @@ public static class JsonText
                 if (Pos >= _s.Length || _s[Pos] != ':') throw Error("expected ':'");
                 Pos++;
                 SkipWs();
-                d[key] = Value(depth + 1);
+                d[key] = Value(depth);
                 SkipWs();
                 if (Pos >= _s.Length) throw Error("unexpected end");
                 if (_s[Pos] == ',') { Pos++; continue; }
@@ -200,7 +208,7 @@ public static class JsonText
             while (true)
             {
                 SkipWs();
-                l.Add(Value(depth + 1));
+                l.Add(Value(depth));
                 SkipWs();
                 if (Pos >= _s.Length) throw Error("unexpected end");
                 if (_s[Pos] == ',') { Pos++; continue; }

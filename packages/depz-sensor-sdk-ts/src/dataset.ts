@@ -6,6 +6,7 @@
 
 import { callGuarded, type DepzDevice } from "./device/device.js";
 import { InvalidStateError } from "./errors.js";
+import { jsonTooDeep, MAX_JSON_DEPTH } from "./jsonl.js";
 import { Bno055 } from "./sensors/bno055/bno055.js";
 import { tmf8829RecordValue } from "./sensors/tmf8829/builder.js";
 import { Tmf8829 } from "./sensors/tmf8829/tmf8829.js";
@@ -167,11 +168,12 @@ export class DatasetRecorder {
     unsub?: () => void;
   }> = [];
   private writer: DatasetWriter | null = null;
+  private recording = false;
 
   constructor(private opts: { note?: string; vl53l8Layers?: boolean } = {}) {}
 
   async add(device: DepzDevice, deviceId?: string, syncSamples = 5): Promise<string> {
-    if (this.writer) throw new InvalidStateError("add() all devices before start()");
+    if (this.recording) throw new InvalidStateError("add() all devices before start()");
     const id = deviceId ?? `d${this.entries.length}`;
     const sync = await device.syncTime(syncSamples);
     const meta: DatasetDeviceMeta = {
@@ -189,8 +191,10 @@ export class DatasetRecorder {
     return id;
   }
 
+  /** Start a capture; after `stop()`, a fresh one (the last is dropped), as Python. */
   start(): void {
-    if (this.writer) return;
+    if (this.recording) return;
+    this.recording = true;
     this.writer = new DatasetWriter(
       Object.fromEntries(this.entries.map((e) => [e.id, e.meta])),
       this.opts.note,
@@ -312,6 +316,7 @@ export class DatasetRecorder {
       e.unsub?.();
       e.unsub = undefined;
     }
+    this.recording = false;
   }
 
   get recordsWritten(): number {
@@ -333,6 +338,9 @@ const BLANK_LINE = /^[ \t\r]*$/;
  * never a crash in the reader).
  */
 function jsonObjectLine(lineno: number, line: string): Record<string, unknown> {
+  if (jsonTooDeep(line)) {
+    throw new TypeError(`.depzdata line ${lineno}: not JSON: nested deeper than ${MAX_JSON_DEPTH}`);
+  }
   let obj: unknown;
   try {
     obj = JSON.parse(line);
@@ -423,6 +431,9 @@ export interface DatasetPlayerOptions {
 const DUE_SLACK_MS = 1;
 /** At speed 0 the player yields to the event loop after this much work. */
 const BURST_MS = 10;
+/** Longest single timer: a tiny speed stretches a gap past what setTimeout
+ *  takes (past 2^31-1 ms it fires after 1 ms); pump() re-evaluates anyway. */
+const MAX_WAIT_MS = 60_000;
 
 /**
  * Timeline player: paced delivery with play / pause / seek / speed — the
@@ -638,7 +649,7 @@ export class DatasetPlayer {
       if (this._speed > 0) {
         const due = this.anchorWall + (rec.tHostUs - this.anchorT) / 1000 / this._speed;
         if (due - now > DUE_SLACK_MS) {
-          this.timer = setTimeout(() => this.pump(), due - now);
+          this.timer = setTimeout(() => this.pump(), Math.min(due - now, MAX_WAIT_MS));
           return;
         }
       }

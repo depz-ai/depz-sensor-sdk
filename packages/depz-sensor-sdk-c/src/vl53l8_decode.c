@@ -217,7 +217,10 @@ static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
 
         const uint8_t *body = buf + i + 4;
         if (idx == BH_METADATA_IDX) {
-            out->silicon_temp_degc = (int8_t)buf[i + 12];
+            /* the temperature is body byte 8 (the real block has 12); a
+             * shorter block leaves it at 0 */
+            if (msize >= 9)
+                out->silicon_temp_degc = (int8_t)buf[i + 12];
         } else if (idx == BH_DISTANCE_IDX) {
             dist_n = (int)(msize / 2);
             if (dist_n > DEPZ_VL53L8_MAX_ZONES) dist_n = DEPZ_VL53L8_MAX_ZONES;

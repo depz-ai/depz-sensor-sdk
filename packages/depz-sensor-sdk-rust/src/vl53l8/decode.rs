@@ -206,7 +206,11 @@ pub fn parse_frame(raw: &[u8], variant: Variant) -> Result<Vl53l8Results, Vl53l8
         }
 
         if bh_idx == METADATA_IDX {
-            silicon_temp_degc = buf[i + 12] as i8;
+            // The temperature is body byte 8 (the real block has 12); a
+            // shorter block leaves it at 0.
+            if msize >= 9 {
+                silicon_temp_degc = buf[i + 12] as i8;
+            }
         } else if bh_idx == DISTANCE_IDX {
             let mut out = Vec::with_capacity(msize / 2);
             for k in 0..msize / 2 {

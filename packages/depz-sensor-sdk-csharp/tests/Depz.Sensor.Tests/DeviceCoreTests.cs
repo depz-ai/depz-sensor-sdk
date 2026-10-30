@@ -6,86 +6,6 @@ using Xunit;
 
 namespace Depz.Sensor.Tests;
 
-/// <summary>An in-memory board: every host packet goes to <c>OnPacket</c>, whose reply bytes
-/// the device then reads. <c>Inject</c> pushes unsolicited bytes; <c>Unplug</c> makes reads fail.</summary>
-internal sealed class FakeBoardLink : ILink
-{
-    private readonly Queue<byte[]> _rx = new();
-    private readonly PacketParser _parser = new();
-    private int _seq;
-    private bool _closed;
-    private bool _unplugged;
-
-    public Func<Packet, IEnumerable<byte[]>>? OnPacket;
-    public readonly List<Packet> Sent = new();
-
-    public string Name => "fake";
-
-    public bool IsClosed
-    {
-        get { lock (_rx) return _closed; }
-    }
-
-    public static byte[] Status(int cmd, Status status) =>
-        Framing.BuildPacket((int)Rpt.Status, new[] { (byte)cmd, (byte)status });
-
-    public byte[] Reply(int cmd, byte[] payload) => Framing.BuildPacket(cmd, payload, _seq++ & 0xFF);
-
-    public void Inject(byte[] bytes)
-    {
-        lock (_rx)
-        {
-            _rx.Enqueue(bytes);
-            Monitor.PulseAll(_rx);
-        }
-    }
-
-    public void Unplug()
-    {
-        lock (_rx)
-        {
-            _unplugged = true;
-            Monitor.PulseAll(_rx);
-        }
-    }
-
-    public byte[] Read(TimeSpan timeout)
-    {
-        lock (_rx)
-        {
-            if (_rx.Count == 0 && !_closed && !_unplugged)
-                Monitor.Wait(_rx, timeout);
-            if (_closed)
-                throw new LinkClosedException("fake closed");
-            if (_unplugged)
-                throw new DeviceLostException("fake unplugged");
-            return _rx.Count > 0 ? _rx.Dequeue() : Array.Empty<byte>();
-        }
-    }
-
-    public void Write(byte[] data)
-    {
-        foreach (var ev in _parser.Feed(data))
-        {
-            if (ev is not Packet p)
-                continue;
-            lock (Sent)
-                Sent.Add(p);
-            foreach (var r in OnPacket?.Invoke(p) ?? Array.Empty<byte[]>())
-                Inject(r);
-        }
-    }
-
-    public void Close()
-    {
-        lock (_rx)
-        {
-            _closed = true;
-            Monitor.PulseAll(_rx);
-        }
-    }
-}
-
 public class DeviceCoreTests
 {
     private static readonly TimeSpan Short = TimeSpan.FromMilliseconds(100);
@@ -245,6 +165,140 @@ public class DeviceCoreTests
         Assert.IsType<DisconnectedEvent>(events.Take(TimeSpan.FromSeconds(1)));
         Assert.Throws<DeviceLostException>(() => loop.Take(TimeSpan.FromSeconds(1)));
         Assert.True(loop.IsClosed);
+        // Contract 07 §3: a reader that ended leaves the device closed; a later request fails at once.
+        Assert.True(SpinWait.SpinUntil(() => dev.IsClosed, 1000), "the device is open after the loss");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<DeviceLostException>(() => dev.GetSamplePeriodUs());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"the request after the loss waited {sw.Elapsed}");
+    }
+
+    /// <summary>Contract 07 §3 (bug hunt 2026-10-29 CSHARP-7): a queue subscribed after the device
+    /// closed is closed at once — Take fails with the closed error instead of waiting out its timeout.</summary>
+    [Fact]
+    public void AQueueSubscribedAfterCloseIsClosedAtOnce()
+    {
+        var dev = new Sr04Device(new FakeBoardLink(), Short);
+        dev.Close();
+        using var q = dev.Measurements();
+        using var events = dev.Events();
+        Assert.True(q.IsClosed, "Measurements() after Close is open");
+        Assert.True(events.IsClosed, "Events() after Close is open");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<DeviceLostException>(() => q.Take(TimeSpan.FromSeconds(5)));
+        Assert.Throws<DeviceLostException>(() => events.Take(TimeSpan.FromSeconds(5)));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"Take on a closed device's queue waited {sw.Elapsed}");
+    }
+
+    /// <summary>CSHARP-7: the same after a loss (the link failed, nobody called Close).</summary>
+    [Fact]
+    public void AQueueSubscribedAfterALossIsClosedAtOnce()
+    {
+        var link = new FakeBoardLink();
+        using var dev = new Sr04Device(link, Short);
+        link.Unplug();
+        Assert.True(SpinWait.SpinUntil(() => dev.IsClosed, 1000), "the device is open after the loss");
+        using var q = dev.Measurements();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Throws<DeviceLostException>(() => q.Take(TimeSpan.FromSeconds(5)));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"Take after the loss waited {sw.Elapsed}");
+    }
+
+    /// <summary>Bug hunt 2026-10-29 CSHARP-6: Take(Timeout.InfiniteTimeSpan) waits without a deadline
+    /// (Python get(timeout=None)) — for an item, or until the device closes.</summary>
+    [Fact]
+    public void TakeWithAnInfiniteTimeoutWaits()
+    {
+        var link = new FakeBoardLink();
+        var dev = new Sr04Device(link, Short);
+        using var q = dev.Measurements();
+        var item = Task.Run(() => q.Take(Timeout.InfiniteTimeSpan));
+        var payload = new byte[11];
+        payload[0] = (byte)Sr04Cmd.StartMeasurementLoop;
+        payload[9] = 7;
+        link.Inject(link.Reply((int)Sr04Rpt.Data, payload));
+        Assert.True(item.Wait(TimeSpan.FromSeconds(5)), "Take(InfiniteTimeSpan) did not return the item");
+        Assert.Equal(7, item.Result.EchoTimeUs);
+        var closed = Task.Run(() => Assert.Throws<DeviceLostException>(() => q.Take(Timeout.InfiniteTimeSpan)));
+        dev.Close();
+        Assert.True(closed.Wait(TimeSpan.FromSeconds(5)), "Take(InfiniteTimeSpan) did not end at Close");
+    }
+
+    /// <summary>Contract 07 §3 (bug hunt 2026-10-29 CSHARP-1): a matcher that throws anything fails
+    /// its own request with InvalidReplyException; the reader goes on and the device stays open.</summary>
+    [Fact]
+    public void AMatcherThatThrowsFailsOnlyItsRequest()
+    {
+        var link = new FakeBoardLink();
+        link.OnPacket = p => new[] { link.Reply((int)Rpt.Text, Text(p.Cmd, "name")) };
+        using var dev = new DepzDevice(link, TimeSpan.FromSeconds(2));
+        var bugs = new Exception[]
+        {
+            new IndexOutOfRangeException("decode bug"), new NullReferenceException("decode bug"),
+            new InvalidOperationException("decode bug"), new InvalidCastException("decode bug"),
+            new OverflowException("decode bug"), new DepzException("decode bug"),
+        };
+        foreach (var bug in bugs)
+        {
+            var e = Assert.Throws<InvalidReplyException>(() => dev.Request<string>((int)Cmd.GetDeviceName, null,
+                (Packet _, out string r) => throw bug));
+            Assert.Equal((int)Cmd.GetDeviceName, e.Cmd);
+            Assert.Same(bug, e.InnerException);
+        }
+        Assert.False(dev.IsClosed);
+        Assert.Equal("name", dev.GetDeviceName());
+    }
+
+    /// <summary>A device whose stream handler throws on report 0x9E — a decoder bug.</summary>
+    private sealed class RaisingReports : DepzDevice
+    {
+        public RaisingReports(ILink link) : base(link, Short) { }
+
+        private protected override bool HandleReport(Packet packet) =>
+            packet.Cmd == 0x9E ? throw new InvalidOperationException("stream decoder bug") : false;
+    }
+
+    /// <summary>Contract 07 §3: a report handler that throws drops that packet, counted; the reader goes on.</summary>
+    [Fact]
+    public void AThrowingReportHandlerDropsThatPacket()
+    {
+        var link = new FakeBoardLink();
+        link.OnPacket = p => new[] { link.Reply((int)Rpt.Text, Text(p.Cmd, "still here")) };
+        using var dev = new RaisingReports(link);
+        using var events = dev.Events();
+        link.Inject(link.Reply(0x9E, new byte[] { 1, 2 }));
+        link.Inject(link.Reply(0xC5, new byte[] { 0xAB }));
+        Assert.Equal(new TextEvent(0xC5, "ab"), events.Take(TimeSpan.FromSeconds(1)));
+        Assert.Equal(1, dev.Stats.ReportErrors);
+        Assert.Equal("still here", dev.GetDeviceName());
+        Assert.False(dev.IsClosed);
+    }
+
+    /// <summary>A link whose read fails with something no link is expected to throw.</summary>
+    private sealed class BrokenReadLink : ILink
+    {
+        public readonly FakeBoardLink Inner = new();
+        public string Name => "broken";
+        public bool IsClosed => Inner.IsClosed;
+        public byte[] Read(TimeSpan timeout) => throw new NotSupportedException("read broke");
+        public void Write(byte[] data) => Inner.Write(data);
+        public void Close() => Inner.Close();
+    }
+
+    /// <summary>Contract 07 §3: a reader that ends for any reason other than Close() closes the device —
+    /// IsClosed is true and a later request fails at once with DeviceLostException carrying the cause.</summary>
+    [Fact]
+    public void AReaderThatEndsForAnyReasonClosesTheDevice()
+    {
+        var link = new BrokenReadLink();
+        using var dev = new DepzDevice(link, TimeSpan.FromSeconds(5));
+        Assert.True(SpinWait.SpinUntil(() => dev.IsClosed, 1000), "the device is open after its reader ended");
+        Assert.True(link.IsClosed, "the link is open");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var e = Assert.Throws<DeviceLostException>(() => dev.GetDeviceName());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"the request waited {sw.Elapsed}");
+        Assert.IsType<NotSupportedException>(e.InnerException);
+        lock (link.Inner.Sent)
+            Assert.Empty(link.Inner.Sent);
     }
 
     /// <summary>Contract 07 §3: a callback that throws is counted and dropped — the other callback
@@ -301,6 +355,53 @@ public class DeviceCoreTests
     }
 
     [Fact]
+    public void ExhaustedReplayWaitsOutTheReadTimeoutAndWakesOnClose()
+    {
+        // contract 08: an exhausted capture is a quiet port — a read returning at once spins the reader thread
+        string path = Path.Combine(Path.GetTempPath(), $"depz-{Guid.NewGuid():N}.depzrec");
+        File.WriteAllText(path, "{\"schema\": \"depz.rec/1\"}\n");
+        try
+        {
+            var link = new ReplayLink(path);
+            Assert.True(link.RxExhausted);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            Assert.Empty(link.Read(TimeSpan.FromMilliseconds(100)));
+            Assert.True(sw.ElapsedMilliseconds >= 80, $"returned after {sw.ElapsedMilliseconds} ms");
+
+            Exception? outcome = null;
+            var reader = new Thread(() =>
+            {
+                try
+                {
+                    link.Read(TimeSpan.FromSeconds(30));
+                }
+                catch (Exception e)
+                {
+                    outcome = e;
+                }
+            });
+            reader.Start();
+            Assert.True(SpinWait.SpinUntil(() => reader.ThreadState.HasFlag(ThreadState.WaitSleepJoin), 5000));
+            link.Close();
+            Assert.True(reader.Join(TimeSpan.FromSeconds(5)));
+            Assert.IsType<LinkClosedException>(outcome);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TicksToUsDoesNotOverflowOnALongCapture()
+    {
+        // 3 h at a 1 GHz Stopwatch (Linux / macOS): ticks * 1e6 overflows a long after 2 h 34 min
+        const long Ghz = 1_000_000_000;
+        Assert.Equal(10_800_000_000L, DepzDevice.TicksToUs(3L * 3600 * Ghz, Ghz));
+        Assert.Equal(1_234_567L, DepzDevice.TicksToUs(12_345_670, 10_000_000)); // Windows: 100 ns ticks
+    }
+
+    [Fact]
     public void RecordingReplaysByteForByte()
     {
         string path = Path.Combine(Path.GetTempPath(), $"depz-{Guid.NewGuid():N}.depzrec");
@@ -347,6 +448,28 @@ public class DeviceCoreTests
             Assert.Equal("depz.rec/1", new ReplayLink(path).Header["schema"]); // a valid capture
             File.WriteAllBytes(path, GzippedCapture);
             Assert.Throws<ArgumentException>(() => new ReplayLink(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // Contract 08 «Line rules»: arrays and objects nest at most 256 deep; a 200 KB
+    // line of `[[[[…` is a damaged line naming its number, never a stack overflow.
+    [Fact]
+    public void ALineNested100000DeepIsADamagedLine()
+    {
+        string deep = new string('[', 100_000) + new string(']', 100_000);
+        string path = Path.Combine(Path.GetTempPath(), $"depz-{Guid.NewGuid():N}.depzdata");
+        try
+        {
+            File.WriteAllText(path, "{\"schema\":\"depz.dataset/2\"}\n{\"d\":\"d0\",\"t\":1,\"k\":\"x\",\"v\":{\"a\":" + deep + "}}\n");
+            var e = Assert.Throws<ArgumentException>(() => new Dataset.DatasetReader(path).Records);
+            Assert.StartsWith($"{path}:2: not JSON: JSON: nested deeper than 256", e.Message);
+            File.WriteAllText(path, "{\"schema\":\"depz.rec/1\",\"x\":" + deep + "}\n");
+            e = Assert.Throws<ArgumentException>(() => new ReplayLink(path));
+            Assert.StartsWith($"{path}:1: not JSON: JSON: nested deeper than 256", e.Message);
         }
         finally
         {

@@ -75,7 +75,7 @@ public sealed class RecordingLink : ILink, IDisposable
         {
             if (_fileClosed)
                 return;
-            long t = _clock.ElapsedTicks * 1_000_000 / Stopwatch.Frequency;
+            long t = DepzDevice.TicksToUs(_clock.ElapsedTicks, Stopwatch.Frequency);
             _file.WriteLine(JsonText.Serialize(new Dictionary<string, object?>
             {
                 ["t"] = t,
@@ -249,9 +249,8 @@ public sealed class ReplayLink : ILink
             {
                 if (_closed)
                     throw new LinkClosedException("replay link closed");
-                if (_rxIdx >= _rx.Count)
-                    return Array.Empty<byte>();
-                if (_txWritten >= _rx[_rxIdx].TxPrefix)
+                // exhausted: wait like a quiet port (until the timeout or Close()), else the reader spins a core
+                if (_rxIdx < _rx.Count && _txWritten >= _rx[_rxIdx].TxPrefix)
                     break;
                 var remaining = deadline - _clock.Elapsed;
                 if (remaining <= TimeSpan.Zero)

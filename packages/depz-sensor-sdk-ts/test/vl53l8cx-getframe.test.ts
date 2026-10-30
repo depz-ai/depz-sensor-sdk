@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DepzError, LoopbackTransport, Vl53l8 } from "../src/index.js";
+import { LinkClosedError, LoopbackTransport, Vl53l8 } from "../src/index.js";
 
 describe("Vl53l8.getFrame teardown", () => {
   it("rejects promptly with 'device closed' on disconnect", async () => {
@@ -17,7 +17,7 @@ describe("Vl53l8.getFrame teardown", () => {
     const started = Date.now();
     const waiting = dev.getFrame(30_000);
     await dev.close();
-    await expect(waiting).rejects.toThrow(DepzError);
+    await expect(waiting).rejects.toThrow(LinkClosedError);
     await expect(waiting).rejects.toThrow(/device closed/);
     expect(Date.now() - started).toBeLessThan(2_000);
   });

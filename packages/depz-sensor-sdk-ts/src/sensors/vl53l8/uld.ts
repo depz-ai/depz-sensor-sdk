@@ -1341,7 +1341,9 @@ export class VL53L8CX {
       this.lastBlocks.push([bhIdx, bhType, bhSize]);
 
       if (bhIdx === METADATA_IDX) {
-        results.siliconTempDegc = dv.getInt8(i + 12);
+        // The temperature is body byte 8 (the real block has 12); a shorter
+        // block leaves it at 0.
+        if (msize >= 9) results.siliconTempDegc = dv.getInt8(i + 12);
       } else if (bhIdx === DISTANCE_IDX) {
         const out: number[] = [];
         for (let k = 0; k < Math.floor(msize / 2); k++) out.push(dv.getInt16(i + 4 + 2 * k, true));

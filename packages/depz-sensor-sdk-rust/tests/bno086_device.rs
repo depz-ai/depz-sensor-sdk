@@ -600,3 +600,25 @@ fn the_gyro_integrated_rotation_vector_channel_emits_reports() {
     }
     assert!(q.take(Duration::from_millis(50)).is_err());
 }
+
+/// Contract 07 §3 (bug hunt 2026-10-29 RUST-2): reports() after close — filtered or not — is a
+/// closed queue, so take() fails at once.
+#[test]
+fn reports_subscribed_after_close_are_closed_at_once() {
+    let dev = Hub::new().open();
+    dev.close();
+    let all = dev.reports(None, 8);
+    let accel = dev.reports(Some(&[0x01]), 8);
+    assert!(
+        all.is_closed() && accel.is_closed(),
+        "reports() after close is open"
+    );
+    let t0 = std::time::Instant::now();
+    let r = accel.take(Duration::from_secs(5));
+    assert!(matches!(r, Err(DepzError::DeviceLost(_))), "{r:?}");
+    assert!(
+        t0.elapsed() < Duration::from_secs(1),
+        "waited {:?}",
+        t0.elapsed()
+    );
+}

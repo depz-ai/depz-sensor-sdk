@@ -90,7 +90,7 @@ with FetchContent (it fetches the whole repository, C SDK included):
 include(FetchContent)
 FetchContent_Declare(depz-sensor-sdk-cpp
   GIT_REPOSITORY https://github.com/depz-ai/depz-sensor-sdk.git
-  GIT_TAG        v0.9.0
+  GIT_TAG        v0.9.1
   SOURCE_SUBDIR  packages/depz-sensor-sdk-cpp)
 FetchContent_MakeAvailable(depz-sensor-sdk-cpp)
 target_link_libraries(my_app PRIVATE depz::sensor_sdk_cpp)

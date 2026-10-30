@@ -25,6 +25,27 @@ static void set_closing(depz_device *dev)
 {
     depz_mutex_lock(&dev->lock);
     dev->closing = true;
+    depz_cond_broadcast(&dev->cond);
+    depz_mutex_unlock(&dev->lock);
+}
+
+int depz_device_enter(depz_device *dev)
+{
+    depz_mutex_lock(&dev->lock);
+    if (dev->closing) {
+        depz_mutex_unlock(&dev->lock);
+        return depz_fail(DEPZ_E_CLOSED, "%s: device closed", dev->port);
+    }
+    dev->users++;
+    depz_mutex_unlock(&dev->lock);
+    return DEPZ_OK;
+}
+
+void depz_device_leave(depz_device *dev)
+{
+    depz_mutex_lock(&dev->lock);
+    dev->users--;
+    if (dev->closing && !dev->users) depz_cond_broadcast(&dev->cond);
     depz_mutex_unlock(&dev->lock);
 }
 
@@ -122,6 +143,12 @@ void depz_device_close(depz_device *dev)
         if (!depz_thread_is_current(dev->reader)) depz_thread_join(dev->reader);
         dev->reader_running = false;
     }
+    /* The reader has failed every pending request and woken its waiter; a
+     * call on another thread may still be on its way out (contract 07 §3:
+     * it ends with the closed error). Free nothing until all have left. */
+    depz_mutex_lock(&dev->lock);
+    while (dev->users) depz_cond_wait_ms(&dev->cond, &dev->lock, -1);
+    depz_mutex_unlock(&dev->lock);
     if (dev->ops && dev->ops->destroy) dev->ops->destroy(dev);
     depz_hub_close(dev->event_hub);
     depz_cb_list_free(&dev->event_cbs);
@@ -428,16 +455,13 @@ static void take_pending(depz_device *dev, depz_pending *pend)
         if (*pp == pend) { *pp = pend->next; return; }
 }
 
-int depz_device_request(depz_device *dev, uint8_t cmd, const uint8_t *payload, size_t len,
-                        depz_matcher matcher, void *ctx, bool ok_completes, int timeout_ms)
+static int request_entered(depz_device *dev, uint8_t cmd, const uint8_t *payload, size_t len,
+                           depz_matcher matcher, void *ctx, bool ok_completes, int timeout_ms)
 {
     depz_pending pend, *q;
     uint64_t deadline;
     int rc;
 
-    if (!dev) return depz_fail(DEPZ_E_ARG, "request: NULL device");
-    if (!matcher && !ok_completes)
-        return depz_fail(DEPZ_E_ARG, "request: configure a matcher or ok_completes");
     memset(&pend, 0, sizeof pend);
     pend.cmd = cmd;
     pend.matcher = matcher;
@@ -483,6 +507,20 @@ int depz_device_request(depz_device *dev, uint8_t cmd, const uint8_t *payload, s
     if (pend.result == DEPZ_E_CLOSED)
         return depz_fail(DEPZ_E_CLOSED, "%s: device closed", dev->port);
     return DEPZ_OK;
+}
+
+int depz_device_request(depz_device *dev, uint8_t cmd, const uint8_t *payload, size_t len,
+                        depz_matcher matcher, void *ctx, bool ok_completes, int timeout_ms)
+{
+    int rc;
+    if (!dev) return depz_fail(DEPZ_E_ARG, "request: NULL device");
+    if (!matcher && !ok_completes)
+        return depz_fail(DEPZ_E_ARG, "request: configure a matcher or ok_completes");
+    rc = depz_device_enter(dev);
+    if (rc) return rc;
+    rc = request_entered(dev, cmd, payload, len, matcher, ctx, ok_completes, timeout_ms);
+    depz_device_leave(dev);
+    return rc;
 }
 
 /* ── common commands ──────────────────────────────────────────────────── */

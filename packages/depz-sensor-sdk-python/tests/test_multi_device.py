@@ -150,7 +150,7 @@ def test_recorder_two_same_type_devices(tmp_path: Path):
         fake_a.send_measurement(0x37); time.sleep(0.02)
         fake_b.send_measurement(0x37); time.sleep(0.1)
         rec.stop()
-        assert rec.records_written == 0  # writer cleared on stop
+        assert rec.records_written == 4  # the finished file's count survives stop()
     finally:
         for d in (dev_a, dev_b):
             d.stop(); d.close()

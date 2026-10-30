@@ -1046,11 +1046,23 @@ fn a_failed_stop_stream_still_stops_the_sensor_and_clears_the_flag() {
 }
 
 #[test]
-fn a_refused_start_stream_leaves_the_device_not_ranging() {
+fn a_refused_start_stream_stops_the_sensor_again() {
     let (dev, fake) = ready(L4CD_BOARD, None);
     fake.fail_next(START_STREAM, Fail::Status(0x03));
-    assert!(matches!(dev.start_ranging(), Err(DepzError::Status { .. })));
+    // the original error, not one from the stop
+    assert!(matches!(
+        dev.start_ranging(),
+        Err(DepzError::Status {
+            cmd: START_STREAM,
+            status: 0x03
+        })
+    ));
     assert!(!dev.ranging());
+    // the driver started the die, so it is stopped again
+    assert_eq!(fake.writes().last(), Some(&(0x0087, vec![0x80])));
+    dev.set_offset_mm(0).unwrap(); // configuration allowed again
+    dev.start_ranging().unwrap(); // and a retry starts cleanly
+    assert!(dev.ranging());
 }
 
 // ── measure_once (poll) ──────────────────────────────────────────────────────
@@ -1329,5 +1341,35 @@ fn driver_captures_replay_through_the_device_class() {
         dev.stop_ranging().unwrap();
         assert_eq!(dev.stream_parse_errors(), 0, "{stem}");
         common::seen(format!("recordings/{stem}.depzrec").as_str());
+    }
+}
+
+/// Dropping the device frees the connection — the link and what the callbacks captured — also after
+/// init(), when the driver (owned by the report handler) talks to the board through it.
+#[test]
+fn dropping_the_device_frees_the_connection_with_and_without_init() {
+    for init in [false, true] {
+        let fake = FakeBridge::new(L4CD_BOARD, false);
+        let (link, dropped) = common::fake_board::DropProbe::new(fake.board.clone());
+        let dev = Vl53lxDevice::attach(DepzDevice::new(link, Some(Duration::from_millis(500))));
+        let user_state = Arc::new(());
+        let u = user_state.clone();
+        dev.on_measurement(move |_| {
+            let _ = &u;
+        })
+        .forget();
+        if init {
+            dev.init(None, None).unwrap();
+        }
+        drop(dev);
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "init={init}: link not dropped"
+        );
+        assert_eq!(
+            Arc::strong_count(&user_state),
+            1,
+            "init={init}: callback kept"
+        );
     }
 }

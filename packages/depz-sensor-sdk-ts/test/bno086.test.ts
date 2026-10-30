@@ -9,6 +9,7 @@ import {
   BusyError,
   DepzError,
   DepzTimeoutError,
+  DeviceLostError,
   FeatureFlag,
   FrsRecordId,
   MotionIntent,
@@ -419,6 +420,16 @@ describe("diagnostics", () => {
   it("flush times out when the hub stays silent", async () => {
     fake.answerFlush = false;
     await expect(dev.flush(SensorId.Accelerometer, 50)).rejects.toBeInstanceOf(DepzTimeoutError);
+  });
+
+  it("a flush in flight when the device is lost fails at once with DeviceLostError", async () => {
+    fake.answerFlush = false;
+    const started = Date.now();
+    const pending = dev.flush(SensorId.Accelerometer, 3_000).catch((e: unknown) => e);
+    await waitFor(() => fake.flushRequests.length === 1);
+    await fake.close();
+    expect(await pending).toBeInstanceOf(DeviceLostError);
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 
   it("configurePeriodicDcd sends without expecting a response", async () => {

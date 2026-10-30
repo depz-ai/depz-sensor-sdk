@@ -11,6 +11,7 @@ import logging
 import queue
 import threading
 import time
+import weakref
 from dataclasses import dataclass
 from typing import Any, Callable, Generic, Iterable, Iterator, TypeVar, Union, overload
 
@@ -149,6 +150,7 @@ class LinkStats:
     seq_gaps: int = 0  # gaps in device->host seq (host-observed)
     device_seq_errors: int = 0  # RPT_SEQUENCE_ERROR count (device-observed)
     callback_errors: int = 0  # callbacks that raised on the reader (contract 07 §3)
+    report_errors: int = 0  # reports whose handler raised: packet dropped (contract 07 §3)
 
 
 _log = logging.getLogger("depz_sensor_sdk")
@@ -242,6 +244,12 @@ class StreamQueue(Generic[T]):
         return self._q.get(timeout=timeout)
 
 
+def _deregister(registry: list[StreamQueue[Any]], q: StreamQueue[Any]) -> None:
+    # no reference to the iterator: weakref.finalize must not keep it alive
+    if q in registry:
+        registry.remove(q)
+
+
 class StreamIterator(Generic[T]):
     """Iterator over a StreamQueue that registers **eagerly** at construction.
 
@@ -261,9 +269,10 @@ class StreamIterator(Generic[T]):
         # `queue`: a subclass instance when the device filters per queue
         # (Bno086.reports); otherwise a plain bounded queue of `maxsize`.
         self._queue: StreamQueue[T] = StreamQueue(maxsize) if queue is None else queue
-        self._registry = registry
         self._closed_fn = closed_fn
         registry.append(self._queue)
+        # An iterator dropped without close() leaves the registry when collected.
+        self._deregister = weakref.finalize(self, _deregister, registry, self._queue)
 
     @property
     def dropped_count(self) -> int:
@@ -282,8 +291,7 @@ class StreamIterator(Generic[T]):
                     raise StopIteration from None
 
     def close(self) -> None:
-        if self._queue in self._registry:
-            self._registry.remove(self._queue)
+        self._deregister()
 
 
 class DeviceBase:
@@ -321,6 +329,9 @@ class DeviceBase:
         self._last_rx_seq: int | None = None
         self._time_sync: TimeSync | None = None
         self._closing = False
+        # Set when the reader ended on its own (not by close()): the cause of
+        # every later request's DeviceLostError.
+        self._lost: DeviceLostError | None = None
 
         # Subclass state must exist before the reader thread can dispatch a
         # report into `_handle_report` (replay links deliver instantly).
@@ -351,7 +362,8 @@ class DeviceBase:
 
     @property
     def closed(self) -> bool:
-        return self._link.closed
+        # A dead reader marks the device lost even if closing its link failed.
+        return self._link.closed or self._lost is not None
 
     # ── reader ───────────────────────────────────────────────────────────────
 
@@ -380,6 +392,21 @@ class DeviceBase:
                         self.stats.trash_bytes += len(ev.data)
                         self._emit_event(TrashEvent(ev.data))
                 self.stats.header_errors = self._parser.header_errors
+        except Exception as exc:
+            # Anything else ending the reader (a link that raised something
+            # other than closed/lost) must not leave a device that looks open
+            # and times every request out: close it, say why.
+            if not self._closing:
+                _log.exception("reader of %s ended", self._port_name)
+                lost = DeviceLostError(f"reader ended: {exc!r}")
+                lost.__cause__ = exc
+                self._lost = lost
+                try:
+                    self._link.close()
+                except Exception:
+                    _log.exception("closing %s after its reader ended", self._port_name)
+                self._fail_all_pending(lost)
+                self._emit_event(DisconnectedEvent(str(lost)))
         finally:
             self._fail_all_pending(LinkClosedError("device closed"))
 
@@ -477,7 +504,16 @@ class DeviceBase:
             self._emit_event(TemperatureEvent(temp.timestamp_us, temp.celsius))
             return
 
-        if self._handle_report(pkt):
+        # The report path runs guarded like the matchers above: a stream
+        # handler that raises drops this one packet, counted and logged — it
+        # never ends the reader (contract 07 §3).
+        try:
+            consumed = self._handle_report(pkt)
+        except Exception:
+            self.stats.report_errors += 1
+            _log.exception("report 0x%02X handler raised on %s", pkt.cmd, self._port_name)
+            return
+        if consumed:
             return
         # Unknown/unrouted report: surface as trash-level diagnostics? Keep
         # it visible as an event so new firmware is debuggable.
@@ -533,6 +569,8 @@ class DeviceBase:
     def send(self, cmd: int, payload: bytes = b"", *, crc_type: CrcType | None = None) -> None:
         """Fire-and-forget packet (escape hatch; prefer `request`)."""
         ct = self.tx_crc_type if crc_type is None else crc_type
+        if self._lost is not None:
+            raise DeviceLostError(str(self._lost)) from self._lost.__cause__
         with self._tx_lock:
             frame = build_packet(cmd, payload, self._tx_seq, ct)
             self._tx_seq = (self._tx_seq + 1) & 0xFF

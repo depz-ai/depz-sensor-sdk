@@ -103,6 +103,10 @@ static int need_sr04(const depz_device *dev)
     return DEPZ_OK;
 }
 
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need_sr04(dev), body)
+
 /* ── measurements ─────────────────────────────────────────────────────── */
 
 bool depz_sr04_valid(const depz_sr04_measurement *m)
@@ -134,11 +138,10 @@ static bool match_rpt(uint8_t cmd, const uint8_t *p, size_t len, void *c)
     return true;
 }
 
-int depz_sr04_get_sample_period_us(depz_device *dev, uint32_t *out)
+static int do_get_sample_period_us(depz_device *dev, uint32_t *out)
 {
     rpt_ctx r;
-    int rc = need_sr04(dev);
-    if (rc) return rc;
+    int rc;
     memset(&r, 0, sizeof r);
     r.rpt = DEPZ_SR04_RPT_SAMPLE_PERIOD;
     rc = depz_device_request(dev, DEPZ_SR04_GET_SAMPLE_PERIOD, NULL, 0, match_rpt, &r, false, -1);
@@ -148,20 +151,27 @@ int depz_sr04_get_sample_period_us(depz_device *dev, uint32_t *out)
     return DEPZ_OK;
 }
 
-int depz_sr04_set_sample_period_us(depz_device *dev, uint32_t period_us)
+int depz_sr04_get_sample_period_us(depz_device *dev, uint32_t *out)
+{
+    ENTERED(do_get_sample_period_us(dev, out));
+}
+
+static int do_set_sample_period_us(depz_device *dev, uint32_t period_us)
 {
     uint8_t b[4];
-    int rc = need_sr04(dev);
-    if (rc) return rc;
     depz_sr04_pack_sample_period(period_us, b);
     return depz_device_request(dev, DEPZ_SR04_SET_SAMPLE_PERIOD, b, 4, NULL, NULL, true, -1);
 }
 
-int depz_sr04_get_echo_decay_us(depz_device *dev, uint16_t *out)
+int depz_sr04_set_sample_period_us(depz_device *dev, uint32_t period_us)
+{
+    ENTERED(do_set_sample_period_us(dev, period_us));
+}
+
+static int do_get_echo_decay_us(depz_device *dev, uint16_t *out)
 {
     rpt_ctx r;
-    int rc = need_sr04(dev);
-    if (rc) return rc;
+    int rc;
     memset(&r, 0, sizeof r);
     r.rpt = DEPZ_SR04_RPT_ECHO_DECAY;
     rc = depz_device_request(dev, DEPZ_SR04_GET_ECHO_DECAY, NULL, 0, match_rpt, &r, false, -1);
@@ -171,12 +181,13 @@ int depz_sr04_get_echo_decay_us(depz_device *dev, uint16_t *out)
     return DEPZ_OK;
 }
 
-int depz_sr04_set_echo_decay_us(depz_device *dev, uint32_t decay_us, uint16_t *effective)
+int depz_sr04_get_echo_decay_us(depz_device *dev, uint16_t *out) { ENTERED(do_get_echo_decay_us(dev, out)); }
+
+static int do_set_echo_decay_us(depz_device *dev, uint32_t decay_us, uint16_t *effective)
 {
     uint8_t b[2];
     uint16_t eff;
-    int rc = need_sr04(dev);
-    if (rc) return rc;
+    int rc;
     /* Inside the u16 field but outside 4000..65000 is legal — the device
      * clamps, which is why the value is re-read. Beyond the field is a bug. */
     if (decay_us > 0xFFFFu)
@@ -192,6 +203,11 @@ int depz_sr04_set_echo_decay_us(depz_device *dev, uint32_t decay_us, uint16_t *e
     return rc;
 }
 
+int depz_sr04_set_echo_decay_us(depz_device *dev, uint32_t decay_us, uint16_t *effective)
+{
+    ENTERED(do_set_echo_decay_us(dev, decay_us, effective));
+}
+
 /* ── measuring ────────────────────────────────────────────────────────── */
 
 typedef struct { depz_sr04_measurement m; } once_ctx;
@@ -204,11 +220,10 @@ static bool match_once(uint8_t cmd, const uint8_t *p, size_t len, void *c)
     return from_data(&d, &((once_ctx *)c)->m);
 }
 
-int depz_sr04_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measurement *out)
+static int do_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measurement *out)
 {
     once_ctx c;
-    int rc = need_sr04(dev);
-    if (rc) return rc;
+    int rc;
     memset(&c, 0, sizeof c);
     /* The reply is the measurement itself, at echo end (or the ~65.5 ms
      * no-echo timeout): the 200 ms default is too tight. */
@@ -218,35 +233,48 @@ int depz_sr04_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measureme
     return rc;
 }
 
-int depz_sr04_start(depz_device *dev)
+int depz_sr04_measure_once(depz_device *dev, int timeout_ms, depz_sr04_measurement *out)
 {
-    int rc = need_sr04(dev);
-    if (rc) return rc;
+    ENTERED(do_measure_once(dev, timeout_ms, out));
+}
+
+static int do_start(depz_device *dev)
+{
     return depz_device_request(dev, DEPZ_SR04_START_MEASUREMENT_LOOP, NULL, 0, NULL, NULL, true, -1);
 }
 
-int depz_sr04_stop(depz_device *dev)
+int depz_sr04_start(depz_device *dev) { ENTERED(do_start(dev)); }
+
+static int do_stop(depz_device *dev)
 {
-    int rc = need_sr04(dev);
-    if (rc) return rc;
     return depz_device_request(dev, DEPZ_SR04_STOP_MEASUREMENT_LOOP, NULL, 0, NULL, NULL, true, -1);
 }
 
-int depz_sr04_on_measurement(depz_device *dev, depz_sr04_measurement_cb cb, void *user, int *token)
+int depz_sr04_stop(depz_device *dev) { ENTERED(do_stop(dev)); }
+
+static int do_on_measurement(depz_device *dev, depz_sr04_measurement_cb cb, void *user, int *token)
 {
-    int rc = need_sr04(dev);
-    if (rc) return rc;
     if (!cb) return depz_fail(DEPZ_E_ARG, "sr04: NULL callback");
     return depz_cb_list_add(&((sr04_state *)dev->sensor)->cbs, (void (*)(void))cb, user, token);
 }
 
+int depz_sr04_on_measurement(depz_device *dev, depz_sr04_measurement_cb cb, void *user, int *token)
+{
+    ENTERED(do_on_measurement(dev, cb, user, token));
+}
+
 void depz_sr04_off_measurement(depz_device *dev, int token)
 {
-    if (depz_is_sr04(dev)) depz_cb_list_remove(&((sr04_state *)dev->sensor)->cbs, token);
+    if (!depz_is_sr04(dev) || depz_device_enter(dev)) return;
+    depz_cb_list_remove(&((sr04_state *)dev->sensor)->cbs, token);
+    depz_device_leave(dev);
 }
 
 depz_stream *depz_sr04_stream(depz_device *dev, size_t maxsize)
 {
-    if (need_sr04(dev)) return NULL;
-    return depz_hub_subscribe(((sr04_state *)dev->sensor)->hub, maxsize ? maxsize : 256);
+    depz_stream *s;
+    if (need_sr04(dev) || depz_device_enter(dev)) return NULL;
+    s = depz_hub_subscribe(((sr04_state *)dev->sensor)->hub, maxsize ? maxsize : 256);
+    depz_device_leave(dev);
+    return s;
 }

@@ -9,7 +9,7 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError } from "../../errors.js";
 import { chunkedRead, chunkedWrite } from "../reg-bridge.js";
 import type { PacketEvent } from "../../protocol/framing.js";
 import {
@@ -442,9 +442,17 @@ export class Vl53l8cx extends DepzDevice {
     await this.uld.startRanging(cnhSize);
     const frameSize = this.uld.dataReadSize;
     this.reassembler = new FrameReassembler(this.streamChunk);
-    await this.request(Vl53l8Cmd.StartStream, packStartStream(frameSize), {
-      okCompletes: true,
-    });
+    try {
+      await this.request(Vl53l8Cmd.StartStream, packStartStream(frameSize), {
+        okCompletes: true,
+      });
+    } catch (e) {
+      // The sensor ranges but the host will say it does not: stop it again,
+      // or stopRanging() could never reach it. The START_STREAM error is the
+      // one the caller gets, even if this stop fails too.
+      await this.uld.stopRanging().catch(() => undefined);
+      throw e;
+    }
     this.rangingFlag = true;
   }
 
@@ -515,7 +523,7 @@ export class Vl53l8cx extends DepzDevice {
           );
         }),
       ]);
-      if (result.done === true) throw new DepzError("device closed");
+      if (result.done === true) throw new LinkClosedError("device closed");
       return result.value;
     } finally {
       if (timer !== undefined) clearTimeout(timer);

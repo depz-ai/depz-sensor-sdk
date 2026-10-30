@@ -485,6 +485,27 @@ def test_parse_frame_stops_at_a_block_running_past_the_end():
     assert r['distance_mm'][0] == 400
 
 
+def _short_metadata_frame(size, at_end):
+    """An all-zero frame (zero headers walk 4 bytes at a time) holding one
+    METADATA block of `size` bytes, too short to carry the temperature at
+    body offset 8. at_end: its header is the frame's last word; otherwise it
+    sits at 16 and the byte where the temperature would be is 0xF6 (-10)."""
+    buf = bytearray(540)
+    at = 540 - 4 if at_end else 16
+    struct.pack_into('<I', buf, at, (uld.METADATA_IDX << 16) | (size << 4))
+    if not at_end:
+        buf[16 + 12] = 0xF6
+    return swap_buffer(bytes(buf))
+
+
+@pytest.mark.parametrize('size,at_end', [(4, False), (8, False), (0, True)])
+def test_parse_frame_short_metadata_block_leaves_temperature_unset(size, at_end):
+    drv, _, _ = _started_4x4()
+    r = drv.parse_frame(_short_metadata_frame(size, at_end))
+    assert uld.METADATA_IDX in [b[0] for b in drv.last_blocks]
+    assert r['silicon_temp_degc'] == 0
+
+
 def test_parse_frame_motion_indicator_block():
     drv, _, out = _started_4x4()
     drv._motion_present = True

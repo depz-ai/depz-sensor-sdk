@@ -534,13 +534,20 @@ impl Vl53l8cxDevice {
         })?;
         *self.shared.reassembler.lock().unwrap() =
             FrameReassembler::with_chunk_max(self.profile.stream_chunk);
-        let payload = u16::try_from(frame_size)
+        let started = u16::try_from(frame_size)
             .ok()
             .and_then(|n| pack_start_stream(n).ok())
             .ok_or_else(|| {
                 DepzError::InvalidArgument(format!("frame_size {frame_size} outside 1..8192"))
-            })?;
-        self.request_ok(Vl53l8Cmd::StartStream as u8, &payload, None)?;
+            })
+            .and_then(|payload| self.request_ok(Vl53l8Cmd::StartStream as u8, &payload, None));
+        if let Err(e) = started {
+            // The sensor ranges but the host will say it does not: stop it again, or
+            // stop_ranging() could never reach it. The START_STREAM error is the one the caller
+            // gets, even if this stop fails too.
+            let _ = self.with_uld(|u| u.stop_ranging());
+            return Err(e);
+        }
         self.ranging.store(true, Ordering::SeqCst);
         Ok(())
     }

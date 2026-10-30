@@ -1626,9 +1626,40 @@ static void test_vl53l8_real_units(void)
         CHECK(f.reflectance[k] == refl[k], "synthetic reflectance[%d]: got %g", k, f.reflectance[k]);
 }
 
+/* A METADATA block too short to carry the silicon temperature (body byte 8;
+ * the real block has 12) leaves it at 0 (bug hunt C-4). The frame is all
+ * zero — zero headers walk 4 bytes at a time — with one METADATA header of
+ * `size` bytes: at 16, where the byte the temperature would be read from is
+ * 0xF6 (-10), or as the last word of a maximum-size frame, where the read
+ * would run past the decoder's buffer. */
+static void check_vl53l8_short_metadata(uint32_t size, bool at_end)
+{
+    static uint8_t buf[DEPZ_VL53L8_STREAM_TOTAL_MAX];
+    size_t len = at_end ? sizeof buf : 540;
+    memset(buf, 0, sizeof buf);
+    size_t at = at_end ? len - 4 : 16;
+    uint32_t bh = (size << 4) | (0x54b4u << 16);
+    buf[at] = (uint8_t)bh; buf[at + 1] = (uint8_t)(bh >> 8);
+    buf[at + 2] = (uint8_t)(bh >> 16); buf[at + 3] = (uint8_t)(bh >> 24);
+    if (!at_end)
+        buf[16 + 12] = 0xf6;
+    for (size_t w = 0; w < len; w += 4) {
+        uint8_t t0 = buf[w], t1 = buf[w + 1];
+        buf[w] = buf[w + 3]; buf[w + 1] = buf[w + 2]; buf[w + 2] = t1; buf[w + 3] = t0;
+    }
+    depz_vl53l8_frame f;
+    CHECK(depz_vl53l8_decode_frame(buf, len, 0, &f) == 0,
+          "short METADATA (%u B, at end %d) did not decode", (unsigned)size, (int)at_end);
+    CHECK(f.silicon_temp_degc == 0, "short METADATA (%u B, at end %d): temperature %d, want 0",
+          (unsigned)size, (int)at_end, f.silicon_temp_degc);
+}
+
 static void test_vl53l8_replay(void)
 {
     test_vl53l8_real_units();
+    check_vl53l8_short_metadata(4, false);
+    check_vl53l8_short_metadata(8, false);
+    check_vl53l8_short_metadata(0, true);
     char path[512];
     snprintf(path, sizeof(path), "%s/recordings/vl53l8_8x8_15hz_3s.depzrec", DEPZ_VECTORS_DIR);
     char *rec = read_file(path);

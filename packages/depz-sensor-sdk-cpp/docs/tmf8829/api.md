@@ -1352,7 +1352,9 @@ Tmf8829SensorId init(Tmf8829Progress progress = {});
 ```
 
 Soft reset -> sensor bootloader -> firmware download -> RAM application.
-Stops a running stream first; forgets the config.
+Stops a running stream first; forgets the config. An exception from
+`progress` is not called again and leaves init() once the download has
+run to its end (contract 07 §3).
 
 #### Tmf8829.sensor_id
 

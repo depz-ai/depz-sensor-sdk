@@ -14,6 +14,7 @@ import {
   DepzError,
   DepzTimeoutError,
   InvalidStateError,
+  LinkClosedError,
   StatusError,
   type Bno055Sample,
   type Bno055Units,
@@ -721,6 +722,7 @@ describe("streaming", () => {
 
     const pending = dev.getSample(1000);
     await dev.close();
+    await expect(pending).rejects.toThrow(LinkClosedError);
     await expect(pending).rejects.toThrow(/device closed/);
   });
 

@@ -120,6 +120,25 @@ public class Vl53l8cxDeviceTests
     }
 
     [Fact]
+    public void ARefusedStartStreamStopsTheSensorAgain()
+    {
+        using var r = Ready();
+        var dev = r.Dev;
+        r.P.Reg[0x06] = 0x80; // the MCU acknowledges a stop at once
+        r.P.Writes.Clear();
+        r.Board.FailNext((int)Vl53l8Cmd.StartStream, (int)Depz.Sensor.Protocol.Status.ErrInvalidParam);
+        var e = Assert.Throws<StatusException>(() => dev.StartRanging());
+        Assert.Equal((int)Depz.Sensor.Protocol.Status.ErrInvalidParam, e.Status); // the original error, not one from the stop
+        Assert.False(dev.Ranging);
+        // the ULD started the sensor before START_STREAM, so its stop ran: MCU stop provoked, then undone
+        var writes = r.P.Writes.Select(w => (w.Addr, Convert.ToHexString(w.Data))).ToList();
+        Assert.Contains((0x15, "16"), writes);
+        Assert.Equal(new[] { (0x7FFF, "00"), (0x14, "00"), (0x15, "00"), (0x09, "04"), (0x7FFF, "02") }, writes.TakeLast(5));
+        dev.SetRangingFrequencyHz(30); // not wedged: reconfiguration works
+        Assert.Equal(30, dev.GetRangingFrequencyHz());
+    }
+
+    [Fact]
     public void ACorruptStreamedFrameIsCountedAndTheNextOneGoesThrough()
     {
         using var r = Ready();

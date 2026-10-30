@@ -59,6 +59,8 @@ class RecordingLink(Link):
     def _emit(self, direction: str, data: bytes) -> None:
         if data:
             with self._lock:
+                if self._file.closed:  # close() raced a reader still in read()
+                    return
                 self._file.write(
                     json.dumps({"t": self._stamp(), "dir": direction, "data": data.hex()}) + "\n"
                 )
@@ -73,11 +75,13 @@ class RecordingLink(Link):
         self._inner.write(data)
 
     def close(self) -> None:
+        # The inner link first, so the reader stops reading; the journal under
+        # the lock, so a chunk it already holds is never written to a closed file.
         try:
-            self._file.flush()
-            self._file.close()
-        finally:
             self._inner.close()
+        finally:
+            with self._lock:
+                self._file.close()
 
     @property
     def closed(self) -> bool:
@@ -134,11 +138,12 @@ class ReplayLink(Link):
             while True:
                 if self._closed:
                     raise LinkClosedError("replay link closed")
-                if self.exhausted:
-                    return b""
-                t_ev, data, tx_prefix = self._rx[self._rx_idx]
-                if self._tx_written >= tx_prefix:
-                    break
+                # Exhausted: wait like a quiet port (until the timeout or
+                # close()), else the reader loop spins a core on empty reads.
+                if not self.exhausted:
+                    t_ev, data, tx_prefix = self._rx[self._rx_idx]
+                    if self._tx_written >= tx_prefix:
+                        break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     return b""

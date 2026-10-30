@@ -28,6 +28,12 @@ size_t  fake_vl53l4_speeds(fake_vl53l4 *f, uint16_t *out, size_t cap);
 size_t  fake_vl53l4_writes_at(fake_vl53l4 *f, uint16_t addr);
 size_t  fake_vl53l4_write_at(fake_vl53l4 *f, uint16_t addr, size_t i, uint8_t *out, size_t cap);
 bool    fake_vl53l4_streaming(fake_vl53l4 *f);
+/* Answer the next `cmd` with STATUS `st` instead of serving it (one shot). */
+void    fake_vl53l4_fail_next(fake_vl53l4 *f, uint8_t cmd, uint8_t st);
+/* As fail_next, and once that failure is sent, fail the next `then_cmd` with
+ * `then_st` too. */
+void    fake_vl53l4_fail_next_then(fake_vl53l4 *f, uint8_t cmd, uint8_t st, uint8_t then_cmd,
+                                   uint8_t then_st);
 /* Emit one RPT_VL53_STREAM carrying `block` as the ISR would. */
 void    fake_vl53l4_send_stream(fake_vl53l4 *f, uint64_t ts, const uint8_t *block, size_t len);
 

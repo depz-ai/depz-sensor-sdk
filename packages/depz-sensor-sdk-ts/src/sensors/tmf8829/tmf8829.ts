@@ -10,8 +10,9 @@
  */
 
 import { DepzDevice, StreamQueue, type DeviceOptions } from "../../device/device.js";
-import { DepzError, DepzTimeoutError, InvalidStateError } from "../../errors.js";
+import { DepzError, DepzTimeoutError, InvalidStateError, LinkClosedError } from "../../errors.js";
 import type { PacketEvent } from "../../protocol/framing.js";
+import { checkU64 } from "../../protocol/wire.js";
 import {
   TMF8829_INT_HISTOGRAMS,
   TMF8829_INT_RESULTS,
@@ -49,6 +50,9 @@ import {
   type Tmf8829Preset,
 } from "./config.js";
 import { TMF8829_FP_GRID } from "./frames.js";
+
+/** Largest MCU µs time a measurement's `number` fields carry exactly. */
+const MAX_SAFE_US = BigInt(Number.MAX_SAFE_INTEGER);
 
 const REG_APP_ID = 0x00;
 const REG_CMD_STAT = 0x08;
@@ -416,7 +420,7 @@ export class Tmf8829 extends DepzDevice {
           timer = setTimeout(() => reject(new DepzTimeoutError(Tmf8829Rpt.Frame, timeoutMs)), timeoutMs);
         }),
       ]);
-      if (result.done === true) throw new DepzError("device closed");
+      if (result.done === true) throw new LinkClosedError("device closed");
       return result.value;
     } finally {
       if (timer !== undefined) clearTimeout(timer);
@@ -539,7 +543,16 @@ export class Tmf8829 extends DepzDevice {
       if (pkt.payload.length < 21) return true;
       const raw = this.reassembler.feed(unpackTmf8829FrameChunk(pkt.payload));
       if (raw === null) return true;
-      const m = this.builder.add(raw.data, Number(raw.timestampUs), Number(raw.edgeUs));
+      // The wire times are u64; the measurement carries them as numbers. One
+      // a number cannot hold exactly (≥ 2^53, e.g. 0xFF×8 from a glitched
+      // board) drops the frame as unparseable — never a RangeError on the pump.
+      const ts = checkU64("timestampUs", raw.timestampUs);
+      const edge = checkU64("edgeUs", raw.edgeUs);
+      if (ts > MAX_SAFE_US || edge > MAX_SAFE_US) {
+        this.builder.parseErrors += 1;
+        return true;
+      }
+      const m = this.builder.add(raw.data, Number(ts), Number(edge));
       if (m !== null) {
         for (const cb of [...this.measCbs]) this.callGuarded(cb, m);
         for (const q of [...this.measQueues]) q.push(m);

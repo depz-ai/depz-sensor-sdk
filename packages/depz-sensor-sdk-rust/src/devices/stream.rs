@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::time::{Duration, Instant};
 
@@ -45,6 +45,8 @@ impl<T> Queue<T> {
 struct FanoutInner<T> {
     callbacks: Mutex<Vec<(u64, Callback<T>)>>,
     queues: Mutex<Vec<Arc<Queue<T>>>>,
+    /// Set by `close_all` under the `queues` lock, never cleared: a later subscription is closed.
+    closed: AtomicBool,
     next_id: Mutex<u64>,
     /// Callbacks that panicked — the device's `LinkStats::callback_errors`.
     callback_errors: Arc<AtomicU64>,
@@ -81,6 +83,7 @@ impl<T: Clone + Send + 'static> Fanout<T> {
             inner: Arc::new(FanoutInner {
                 callbacks: Mutex::new(Vec::new()),
                 queues: Mutex::new(Vec::new()),
+                closed: AtomicBool::new(false),
                 next_id: Mutex::new(0),
                 callback_errors,
             }),
@@ -116,7 +119,14 @@ impl<T: Clone + Send + 'static> Fanout<T> {
             }),
             ready: Condvar::new(),
         });
-        self.inner.queues.lock().unwrap().push(q.clone());
+        let mut queues = self.inner.queues.lock().unwrap();
+        if self.inner.closed.load(Ordering::SeqCst) {
+            // The device already closed: a closed queue, so take() fails at once (contract 07 §3).
+            q.mark_closed();
+        } else {
+            queues.push(q.clone());
+        }
+        drop(queues);
         Subscription {
             queue: q,
             fanout: Arc::downgrade(&self.inner),
@@ -169,10 +179,18 @@ impl<T: Clone + Send + 'static> Fanout<T> {
         }
     }
 
+    /// Close every queue, and every one subscribed from now on.
     pub(crate) fn close_all(&self) {
-        for q in self.inner.queues.lock().unwrap().iter() {
+        let queues = self.inner.queues.lock().unwrap();
+        self.inner.closed.store(true, Ordering::SeqCst);
+        for q in queues.iter() {
             q.mark_closed();
         }
+    }
+
+    /// [`Fanout::close_all`] has run.
+    pub(crate) fn is_closed(&self) -> bool {
+        self.inner.closed.load(Ordering::SeqCst)
     }
 }
 

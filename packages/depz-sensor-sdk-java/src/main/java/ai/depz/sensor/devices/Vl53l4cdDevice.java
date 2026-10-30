@@ -208,8 +208,19 @@ public final class Vl53l4cdDevice extends DepzDevice {
     public void startRanging() {
         requireNotRanging();
         uld.startRanging();
-        requestOk(Vl53l4.Vl53l4Cmd.START_STREAM.value,
-                Vl53l4.packStartStream(Vl53l4Uld.RESULT_BLOCK_ADDR, Vl53l4Uld.RESULT_BLOCK_LEN, 0));
+        try {
+            requestOk(Vl53l4.Vl53l4Cmd.START_STREAM.value,
+                    Vl53l4.packStartStream(Vl53l4Uld.RESULT_BLOCK_ADDR, Vl53l4Uld.RESULT_BLOCK_LEN, 0));
+        } catch (RuntimeException e) {
+            // The sensor ranges but the host will say it does not: stop it again, or stopRanging() could
+            // never reach it. The START_STREAM error is the one the caller gets, even if this stop fails too.
+            try {
+                uld.stopRanging();
+            } catch (RuntimeException stopFailure) {
+                e.addSuppressed(stopFailure);
+            }
+            throw e;
+        }
         ranging = true;
     }
 

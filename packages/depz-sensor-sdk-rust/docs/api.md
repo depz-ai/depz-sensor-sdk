@@ -321,6 +321,8 @@ pub struct LinkStats {
     pub device_seq_errors: u64,
     /// Callbacks that panicked on the reader thread (contract 07 §3).
     pub callback_errors: u64,
+    /// Reports whose handler panicked: the packet was dropped (contract 07 §3).
+    pub report_errors: u64,
 }
 ```
 
@@ -1211,7 +1213,7 @@ pub struct SerialPortLink {
 A serial port as a [`Link`]: 115200 8N1 with DTR and RTS raised, opened exclusively (a second
 opener of a CDC-ACM tty would silently share the byte stream). Reads block up to their timeout,
 so [`Link::close`] returns within one read slice; a lost port fails the next read or write with
-[`DepzError::DeviceLost`].
+[`DepzError::DeviceLost`] and the link is closed from then on.
 
 #### SerialPortLink::open
 
@@ -16598,6 +16600,7 @@ pub struct SessionRecorder {
     shared: Arc<Shared>,
     entries: Vec<Entry>,
     temp_thread: Option<(Sender<()>, JoinHandle<()>)>,
+    last_written: u64, // the finished file's count, after stop()
 }
 ```
 
@@ -16643,6 +16646,8 @@ Returns its device id (`d0`, `d1`, … unless given).
 ```rust
 pub fn records_written(&self) -> u64
 ```
+
+Records in the file being written; after [`stop`](Self::stop), in the finished one.
 
 #### SessionRecorder::start
 

@@ -1,9 +1,7 @@
 using Depz.Sensor.Devices;
-using Depz.Sensor.Unity;
-using Depz.Sensor.Usb;
 using Xunit;
 
-namespace Depz.Sensor.Unity.Tests;
+namespace Depz.Sensor.Tests;
 
 public class WindowsSerialPortsTests
 {
@@ -126,19 +124,37 @@ public class WindowsSerialPortsTests
         Assert.Equal(new[] { new SerialPortInfo("COM3", null, null, null) }, WindowsSerialPorts.List(reg));
     }
 
+    // CSHARP-5: the .NET 8 Windows enumeration is this same code — before, it listed every
+    // PortName the registry ever saw, guessed a composite interface's serial and let the
+    // last of two claims on one port win.
     [Fact]
-    public void Depz_candidates_are_filtered_by_usb_id_and_sorted_by_serial_then_port()
+    public void Net8_windows_listing_skips_unplugged_boards()
     {
-        var reg = new FakeRegistry().Present("COM3", "COM10", "COM4", "COM6", "COM7", "COM1")
-            .UsbPort(Sr04, "SN000042", "COM3")
-            .UsbPort(L8cx, "SN000041", "COM10")
-            .UsbPort(L8cx, "SN000042", "COM7")                                   // same serial: port breaks the tie
-            .UsbPort("VID_0483&PID_56DC", "5&1234&0&1", "COM4", attached: true)  // dev default, no USB serial: Windows-generated id
-            .UsbPort("VID_067B&PID_2303", "SN000001", "COM6");                   // not DEPZ
-        var candidates = DepzDevicesUnity.ListDepzPorts(reg);
-        Assert.Equal(new[] { "COM10", "COM3", "COM7", "COM4" }, candidates.Select(p => p.Port));
-        Assert.Equal(new SerialPortInfo("COM4", 0x0483, 0x56DC, null), candidates[3]);
-        Assert.True(candidates.All(p => UsbIds.IsKnownDepzUsb(p.Vid, p.Pid)));
-        Assert.Equal(6, DepzDevicesUnity.ListPorts(reg).Count);
+        var reg = new FakeRegistry().Present("COM3")
+            .UsbPort(Sr04, "SN000001", "COM7", attached: false)  // moved to another hub port since
+            .UsbPort(Sr04, "SN000042", "COM3");
+        Assert.Equal(new[] { new SerialPortInfo("COM3", 0x1BCF, 0xEC78, "SN000042") }, SerialPorts.ListWindows(reg));
+    }
+
+    [Fact]
+    public void Net8_windows_listing_gives_each_composite_interface_its_own_parent_serial()
+    {
+        var reg = new FakeRegistry().Present("COM9", "COM11")
+            .UsbParent(L8cx, "SN000001", "7&2a1b3c4d&0")
+            .UsbParent(L8cx, "SN000002", "7&5e6f7a8b&0")
+            .UsbPort(L8cx + "&MI_00", "7&2a1b3c4d&0&0000", "COM9")
+            .UsbPort(L8cx + "&MI_00", "7&5e6f7a8b&0&0000", "COM11");
+        Assert.Equal(
+            new[] { new SerialPortInfo("COM11", 0x1BCF, 0xED4B, "SN000002"), new SerialPortInfo("COM9", 0x1BCF, 0xED4B, "SN000001") },
+            SerialPorts.ListWindows(reg));
+    }
+
+    [Fact]
+    public void Net8_windows_listing_gives_no_ids_to_a_port_two_models_claim()
+    {
+        var reg = new FakeRegistry().Present("COM5")
+            .UsbPort(Sr04, "SN000001", "COM5", attached: false)
+            .UsbPort(L8cx, "SN000002", "COM5", attached: false);
+        Assert.Equal(new[] { new SerialPortInfo("COM5", null, null, null) }, SerialPorts.ListWindows(reg));
     }
 }

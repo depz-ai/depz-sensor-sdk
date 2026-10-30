@@ -5655,6 +5655,8 @@ bool recording() const;
 std::uint64_t records_written() const;
 ```
 
+Records in the file being written; after stop(), in the finished one.
+
 ## Live hardware (links, device, discovery)
 
 ### kErrArg
@@ -6769,6 +6771,8 @@ void init(Vl53l8Progress progress = {});
 Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
 (~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
 sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
+An exception from `progress` is not called again and leaves init() once
+the boot has run to its end (contract 07 §3).
 
 #### Vl53l8.initialized
 
@@ -8501,7 +8505,9 @@ Tmf8829SensorId init(Tmf8829Progress progress = {});
 ```
 
 Soft reset -> sensor bootloader -> firmware download -> RAM application.
-Stops a running stream first; forgets the config.
+Stops a running stream first; forgets the config. An exception from
+`progress` is not called again and leaves init() once the download has
+run to its end (contract 07 §3).
 
 #### Tmf8829.sensor_id
 
@@ -8704,15 +8710,17 @@ USB id) then opens the port afresh.
 ### attach_sensor_class
 
 ```cpp
-std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device> dev, const std::string& class_name);
+std::unique_ptr<Device> attach_sensor_class(std::unique_ptr<Device>&& dev, const std::string& class_name);
 ```
 
 Continue the open plain Device `dev` as `class_name` (one of
 sensor_class_names(), as from resolve_sensor_class()) on the same
 connection — contract 02 §4.4: no reopen, the reader and the host sequence
 numbers run on. `dev` must be a plain Device (no class yet) with no request
-in flight (ArgumentError otherwise); it is consumed — use the result.
-"device" returns `dev` itself; "bootloader" throws BootloaderModeError.
+in flight (ArgumentError otherwise); on success it is consumed — use the
+result. "device" returns `dev` itself; "bootloader" throws
+BootloaderModeError. On any failure `dev` stays the caller's, open and
+usable.
 
 ### open_on_link
 

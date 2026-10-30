@@ -765,12 +765,16 @@ def test_a_failed_stop_stream_still_stops_the_sensor_and_clears_the_flag(ready):
     dev.set_offset_mm(0)  # configuration allowed again
 
 
-def test_a_refused_start_stream_leaves_the_device_not_ranging(ready):
+def test_a_refused_start_stream_stops_the_sensor_again(ready):
     dev, fake = ready()
     fake.fail_next(START_STREAM, 0x03)
-    with pytest.raises(StatusError):
+    with pytest.raises(StatusError) as e:
         dev.start_ranging()
+    assert e.value.status == 0x03  # the original error, not one from the stop
     assert dev.ranging is False
+    # the driver started the die, so it is stopped again
+    assert fake.writes()[-1] == (0x0087, [0x80])
+    dev.set_offset_mm(0)  # configuration allowed again
 
 
 # ── measure_once (poll) ──────────────────────────────────────────────────────

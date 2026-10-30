@@ -89,6 +89,7 @@ public sealed class SessionRecorder : IDisposable
     private readonly List<(string Id, DepzDevice Device, Dictionary<string, object?> Meta, List<IDisposable> Hooks)> _entries = new();
     private readonly Dictionary<string, double> _lastSilicon = new();
     private DatasetWriter? _writer;
+    private long _recordsWritten;
     private Thread? _tempThread;
     private ManualResetEventSlim? _tempStop;
 
@@ -133,7 +134,8 @@ public sealed class SessionRecorder : IDisposable
         return id;
     }
 
-    public long RecordsWritten => _writer?.RecordsWritten ?? 0;
+    /// <summary>Records in the file being written, or in the last one after <see cref="Stop"/>.</summary>
+    public long RecordsWritten => _writer?.RecordsWritten ?? _recordsWritten;
 
     /// <summary>Open the file and hook every device's stream.</summary>
     public void Start()
@@ -235,8 +237,12 @@ public sealed class SessionRecorder : IDisposable
                 h.Dispose();
             e.Hooks.Clear();
         }
-        _writer?.Close();
-        _writer = null;
+        if (_writer is not null)
+        {
+            _writer.Close();
+            _recordsWritten = _writer.RecordsWritten;
+            _writer = null;
+        }
     }
 
     public void Dispose() => Stop();

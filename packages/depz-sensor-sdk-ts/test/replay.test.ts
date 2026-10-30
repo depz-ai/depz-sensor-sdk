@@ -114,4 +114,11 @@ describe("record/replay", () => {
     const gzipped = new TextDecoder().decode(GZIPPED_CAPTURE);
     expect(() => new ReplayTransport(gzipped)).toThrow(TypeError);
   });
+
+  it("refuses a header nested 100 000 deep, naming it (contract 08 «Line rules»)", () => {
+    const deep = "[".repeat(100_000) + "]".repeat(100_000);
+    expect(() => new ReplayTransport(`{"schema":"depz.rec/1","x":${deep}}\n`)).toThrow(
+      /line 1: not JSON: nested deeper than 256/,
+    );
+  });
 });
