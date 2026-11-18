@@ -1,0 +1,333 @@
+using System.Buffers.Binary;
+
+namespace Depz.Sensor.Vl53l4;
+
+/// <summary>
+/// VL53L4CD ULD codec/math layer (ST STSW-IMG026 2.2.3, contract 10 §5): the
+/// pure register-word codecs of <c>VL53L4CD_api.c</c> — result-block decode,
+/// SetRangeTiming/GetRangeTiming register math, tuning-word codecs and the init
+/// configuration block — ported byte-exact from the reference Python
+/// <c>vl53l4/uld.py</c> and pinned to the golden vectors.
+///
+/// The register sequences on top of it (init, ranging, calibration) are
+/// <see cref="Vl53l4cdDriver"/>; <see cref="Devices.Vl53l4cdDevice"/> runs them over the board.
+/// </summary>
+internal static class Vl53l4Uld
+{
+    // ── Registers (VL53L4CD_api.h) ──────────────────────────────────────────
+    public const ushort SoftReset = 0x0000;
+    public const ushort I2cSlaveDeviceAddress = 0x0001;
+
+    /// <summary>Oscillator-frequency word (unnamed register 0x0006 in the C driver).</summary>
+    public const ushort OscFrequency = 0x0006;
+
+    public const ushort VhvConfigTimeoutMacropLoopBound = 0x0008;
+    public const ushort XtalkPlaneOffsetKcps = 0x0016;
+    public const ushort XtalkXPlaneGradientKcps = 0x0018;
+    public const ushort XtalkYPlaneGradientKcps = 0x001A;
+    public const ushort RangeOffsetMm = 0x001E;
+    public const ushort InnerOffsetMm = 0x0020;
+    public const ushort OuterOffsetMm = 0x0022;
+    public const ushort GpioHvMuxCtrl = 0x0030;
+    public const ushort GpioTioHvStatus = 0x0031;
+    public const ushort SystemInterrupt = 0x0046;
+    public const ushort RangeConfigA = 0x005E;
+    public const ushort RangeConfigB = 0x0061;
+    public const ushort RangeConfigSigmaThresh = 0x0064;
+    public const ushort MinCountRateRtnLimitMcps = 0x0066;
+    public const ushort IntermeasurementMs = 0x006C;
+    public const ushort ThreshHigh = 0x0072;
+    public const ushort ThreshLow = 0x0074;
+    public const ushort SystemInterruptClear = 0x0086;
+    public const ushort SystemStart = 0x0087;
+    public const ushort ResultRangeStatus = 0x0089;
+    public const ushort ResultSpadNb = 0x008C;
+    public const ushort ResultSignalRate = 0x008E;
+    public const ushort ResultAmbientRate = 0x0090;
+    public const ushort ResultSigma = 0x0092;
+    public const ushort ResultDistance = 0x0096;
+    public const ushort ResultOscCalibrateVal = 0x00DE;
+    public const ushort FirmwareSystemStatus = 0x00E5;
+    public const ushort IdentificationModelId = 0x010F;
+
+    /// <summary>IDENTIFICATION__MODEL_ID word expected for VL53L4CD silicon.</summary>
+    public const ushort ModelId = 0xEBAA;
+
+    // Detection-threshold window modes (SYSTEM__INTERRUPT).
+    public const int WindowBelow = 0;
+    public const int WindowAbove = 1;
+    public const int WindowOut = 2;
+    public const int WindowIn = 3;
+
+    /// <summary>First register of the init configuration block (0x2D..0x87).</summary>
+    public const ushort ConfigAddr = 0x002D;
+
+    /// <summary>Last register of the init configuration block.</summary>
+    public const ushort ConfigEnd = 0x0087;
+
+    /// <summary>
+    /// Byte 0 of <see cref="ConfigBlock"/> (register 0x2D): I2C pad in Fast
+    /// Mode Plus — set unconditionally and never cleared (FM+ pads work at
+    /// every bus step down to 100 kHz).
+    /// </summary>
+    public const byte ConfigFmpByte = 0x12;
+
+    /// <summary>The block the MCU streams: RESULT__RANGE_STATUS .. 0x0099.</summary>
+    public const ushort ResultBlockAddr = ResultRangeStatus;
+
+    /// <summary>Length of the streamed result block (every VL53L4CD_ResultsData_t field).</summary>
+    public const int ResultBlockLen = 17;
+
+    /// <summary>The bridge boots at 400 kHz; init must run its configuration block there.</summary>
+    public const int I2cKhzBoot = 400;
+
+    /// <summary>Recommended post-init bus speed (the result-block read is ~4× faster).</summary>
+    public const int I2cKhzDefault = 1000;
+
+    /// <summary>
+    /// VL53L4CD_DEFAULT_CONFIGURATION[] — 91 bytes, registers 0x2D..0x87.
+    /// <see cref="ConfigBlock"/> always overrides byte 0 with
+    /// <see cref="ConfigFmpByte"/>.
+    /// </summary>
+    public static ReadOnlySpan<byte> DefaultConfiguration => new byte[]
+    {
+        0x00, 0x00, 0x00, 0x11, 0x02, 0x00, 0x02, 0x08,   // 0x2D..0x34
+        0x00, 0x08, 0x10, 0x01, 0x01, 0x00, 0x00, 0x00,   // 0x35..0x3C
+        0x00, 0xff, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,   // 0x3D..0x44
+        0x00, 0x20, 0x0b, 0x00, 0x00, 0x02, 0x14, 0x21,   // 0x45..0x4C
+        0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0xc8,   // 0x4D..0x54
+        0x00, 0x00, 0x38, 0xff, 0x01, 0x00, 0x08, 0x00,   // 0x55..0x5C
+        0x00, 0x01, 0xcc, 0x07, 0x01, 0xf1, 0x05, 0x00,   // 0x5D..0x64
+        0xa0, 0x00, 0x80, 0x08, 0x38, 0x00, 0x00, 0x00,   // 0x65..0x6C
+        0x00, 0x0f, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00,   // 0x6D..0x74
+        0x00, 0x00, 0x01, 0x07, 0x05, 0x06, 0x06, 0x00,   // 0x75..0x7C
+        0x00, 0x02, 0xc7, 0xff, 0x9B, 0x00, 0x00, 0x00,   // 0x7D..0x84
+        0x01, 0x00, 0x00,                                  // 0x85..0x87
+    };
+
+    /// <summary>GetResult() raw status → ULD status (status_rtn[24] in VL53L4CD_api.c; raw 9 → 0 valid).</summary>
+    public static ReadOnlySpan<byte> StatusRtn => new byte[]
+    {
+        255, 255, 255, 5, 2, 4, 1, 7, 3,
+        0, 255, 255, 9, 13, 255, 255, 255, 255, 10, 6,
+        255, 255, 11, 12,
+    };
+
+    /// <summary>Range status (after the ST mapping) → its meaning; 0 is a valid measurement.</summary>
+    public static readonly IReadOnlyDictionary<int, string> RangeStatusNames = new Dictionary<int, string>
+    {
+        [0] = "valid",
+        [1] = "sigma above threshold",
+        [2] = "signal below threshold",
+        [3] = "distance below detection threshold",
+        [4] = "phase out of valid limit",
+        [5] = "hardware fail",
+        [6] = "no wrap-around check done",
+        [7] = "wrapped target, phase mismatch",
+        [8] = "processing fail",
+        [9] = "crosstalk signal fail",
+        [10] = "interrupt error",
+        [11] = "merged target",
+        [12] = "signal too low",
+        [255] = "other error",
+    };
+
+    /// <summary>
+    /// The 91-byte block sensor_init() writes at <see cref="ConfigAddr"/>: the
+    /// ST default configuration with byte 0 forced to <see cref="ConfigFmpByte"/>
+    /// (Fast Mode Plus).
+    /// </summary>
+    public static byte[] ConfigBlock()
+    {
+        byte[] block = DefaultConfiguration.ToArray();
+        block[0] = ConfigFmpByte;
+        return block;
+    }
+
+    /// <summary>
+    /// Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
+    /// decodes the same registers read one by one. Register contents are
+    /// big-endian words (the bridge passes them through untouched). Raw status
+    /// ≥ 24 passes through unmapped.
+    /// </summary>
+    /// <exception cref="Vl53l4Exception">when <paramref name="raw"/> is shorter than <see cref="ResultBlockLen"/> (17) bytes (contract 10 §5); a longer buffer is decoded and the tail ignored.</exception>
+    public static Vl53l4Results ParseResultBlock(ReadOnlySpan<byte> raw)
+    {
+        // contract 10 §5: the block is 17 bytes; shorter is rejected, a tail is ignored
+        if (raw.Length < ResultBlockLen)
+            throw new Vl53l4Exception($"result block too short: {raw.Length} bytes");
+
+        int status = raw[0] & 0x1F;
+        if (status < StatusRtn.Length)
+            status = StatusRtn[status];
+
+        int rawSpads = BinaryPrimitives.ReadUInt16BigEndian(raw[3..]);        // 0x008C
+        int signalKcps = BinaryPrimitives.ReadUInt16BigEndian(raw[5..]) * 8;  // 0x008E
+        int ambientKcps = BinaryPrimitives.ReadUInt16BigEndian(raw[7..]) * 8; // 0x0090
+
+        return new Vl53l4Results(
+            RangeStatus: status,
+            DistanceMm: BinaryPrimitives.ReadUInt16BigEndian(raw[13..]),      // 0x0096
+            AmbientRateKcps: ambientKcps,
+            AmbientPerSpadKcps: rawSpads == 0 ? 0 : ambientKcps * 256 / rawSpads,
+            SignalRateKcps: signalKcps,
+            SignalPerSpadKcps: rawSpads == 0 ? 0 : signalKcps * 256 / rawSpads,
+            NumberOfSpad: rawSpads / 256,
+            SigmaMm: BinaryPrimitives.ReadUInt16BigEndian(raw[9..]) / 4,      // 0x0092
+            StreamCount: raw[2]);
+    }
+
+    /// <summary>
+    /// SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT), which need
+    /// no register (contract 10 §5).
+    /// </summary>
+    /// <exception cref="ArgumentException">budget outside 10..200 ms, or an inter-measurement
+    /// period neither 0 (continuous) nor above the budget (autonomous) and a u32.</exception>
+    public static void CheckRangeTiming(int timingBudgetMs, long interMeasurementMs)
+    {
+        InRange("timingBudgetMs", timingBudgetMs, 10, 200);
+        InRange("interMeasurementMs", interMeasurementMs, 0, 0xFFFFFFFFL);
+        if (interMeasurementMs > 0 && interMeasurementMs <= timingBudgetMs)
+            throw new ArgumentOutOfRangeException(nameof(interMeasurementMs), interMeasurementMs,
+                "inter_measurement_ms must be 0 or > timing_budget_ms");
+    }
+
+    /// <summary>
+    /// SetRangeTiming register math → (RANGE_CONFIG_A, RANGE_CONFIG_B,
+    /// INTERMEASUREMENT_MS raw dword). <paramref name="oscFrequency"/> is the
+    /// word read from 0x0006; <paramref name="clockPll"/> is the word read from
+    /// RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
+    /// <paramref name="interMeasurementMs"/> &gt; 0). Bit-exact port of the C
+    /// ULD, 32-bit truncations and the 1.055 PLL factor included.
+    /// </summary>
+    /// <exception cref="Vl53l4Exception">osc reads 0.</exception>
+    /// <exception cref="ArgumentException">what <see cref="CheckRangeTiming"/> refuses, or a
+    /// register word out of range — never wrapped: <paramref name="oscFrequency"/> 1..65535,
+    /// <paramref name="clockPll"/> 0..65535, and an INTERMEASUREMENT_MS dword that would
+    /// overflow u32.</exception>
+    public static (ushort RangeConfigA, ushort RangeConfigB, uint IntermeasurementRaw) RangeTimingRegisters(
+        int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll = 0)
+    {
+        CheckRangeTiming(timingBudgetMs, interMeasurementMs);
+        if (oscFrequency == 0)
+            throw new Vl53l4Exception("osc_frequency reads 0");
+        InRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        InRange("clockPll", clockPll, 0, 0xFFFF);
+
+        ulong timingBudgetUs = (ulong)timingBudgetMs * 1000;
+        ulong macroPeriodUs = ((2304ul * (0x40000000ul / (uint)oscFrequency)) & 0xFFFFFFFFul) >> 6;
+
+        uint intermeasurementRaw;
+        if (interMeasurementMs == 0)
+        {
+            // Continuous mode.
+            intermeasurementRaw = 0;
+            timingBudgetUs -= 2500;
+        }
+        else
+        {
+            // Autonomous low power, above the budget (CheckRangeTiming): PLL factor in
+            // double, truncated toward zero.
+            double factor = Math.Floor(1.055 * interMeasurementMs * (clockPll & 0x3FF));
+            if (factor > 0xFFFFFFFFL)
+                throw new ArgumentOutOfRangeException(nameof(interMeasurementMs), interMeasurementMs,
+                    "INTERMEASUREMENT_MS overflows u32");
+            intermeasurementRaw = (uint)factor;
+            timingBudgetUs = (timingBudgetUs - 4300) / 2;
+        }
+
+        timingBudgetUs = (timingBudgetUs << 12) & 0xFFFFFFFFul;
+        Span<ushort> words = stackalloc ushort[2];
+        ReadOnlySpan<int> mults = stackalloc int[] { 16, 12 }; // RANGE_CONFIG_A, RANGE_CONFIG_B
+        for (int i = 0; i < mults.Length; i++)
+        {
+            ulong tmp = ((macroPeriodUs * (ulong)mults[i]) & 0xFFFFFFFFul) >> 6;
+            ulong lsByte = ((timingBudgetUs + (tmp >> 1)) / tmp) - 1;
+            int msByte = 0;
+            while ((lsByte & 0xFFFFFF00ul) != 0)
+            {
+                lsByte >>= 1;
+                msByte++;
+            }
+            words[i] = (ushort)(((((ulong)msByte << 8) + (lsByte & 0xFF)) & 0xFFFF));
+        }
+        return (words[0], words[1], intermeasurementRaw);
+    }
+
+    /// <summary>
+    /// GetRangeTiming register math → (timing_budget_ms, inter_measurement_ms).
+    /// Inputs are the raw register reads: the INTERMEASUREMENT_MS dword, the
+    /// RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
+    /// word. Bit-exact port (1.065 PLL factor, 32-bit wrap of the ms-byte).
+    /// </summary>
+    /// <exception cref="Vl53l4Exception">when <paramref name="oscFrequency"/> reads 0.</exception>
+    /// <exception cref="ArgumentException">a word is wider than its u16 register.</exception>
+    public static (int TimingBudgetMs, int InterMeasurementMs) DecodeRangeTiming(
+        uint intermeasurementRaw, int clockPll, int oscFrequency, int rangeConfigA)
+    {
+        if (oscFrequency == 0)
+            throw new Vl53l4Exception("osc_frequency reads 0");
+        InRange("clockPll", clockPll, 0, 0xFFFF);
+        InRange("oscFrequency", oscFrequency, 1, 0xFFFF);
+        InRange("rangeConfigA", rangeConfigA, 0, 0xFFFF);
+
+        int pll = (int)((long)(1.065 * (clockPll & 0x3FF)) & 0xFFFF);
+        int interMeasurementMs = pll == 0 ? 0 : (int)((intermeasurementRaw / (uint)pll) & 0xFFFF);
+
+        ulong macroPeriodUs = ((2304ul * (0x40000000ul / (uint)oscFrequency)) & 0xFFFFFFFFul) >> 6;
+        ulong lsByte = (ulong)((rangeConfigA & 0x00FF) << 4);
+        long msByte = (rangeConfigA & 0xFF00) >> 8;
+        msByte = (0x04 - (msByte - 1) - 1) & 0xFFFFFFFFL; // wraps negative in 32 bits
+        macroPeriodUs = (macroPeriodUs * 16) & 0xFFFFFFFFul;
+
+        ulong budget = ((((lsByte + 1) * (macroPeriodUs >> 6))
+                         - ((macroPeriodUs >> 6) >> 1)) & 0xFFFFFFFFul) >> 12;
+        if (msByte < 12)
+            budget >>= (int)msByte;
+        budget = intermeasurementRaw == 0 ? budget + 2500 : budget * 2 + 4300;
+        return ((int)(budget / 1000), interMeasurementMs);
+    }
+
+    // ── Threshold / offset / xtalk raw codecs (register word ↔ user units) ──
+
+    /// <summary>RANGE_OFFSET_MM word for SetOffset (INNER/OUTER are zeroed alongside).</summary>
+    /// <exception cref="ArgumentException"><paramref name="offsetMm"/> outside the 11-bit −1024..1023.</exception>
+    public static ushort OffsetRaw(int offsetMm) =>
+        (ushort)((InRange("offsetMm", offsetMm, -1024, 1023) * 4) & 0xFFFF);
+
+    /// <summary>GetOffset: RANGE_OFFSET_MM word → signed millimetres.</summary>
+    public static int DecodeOffset(ushort raw)
+    {
+        int temp = ((raw << 3) & 0xFFFF) >> 5;
+        return temp > 1024 ? temp - 2048 : temp;
+    }
+
+    /// <summary>XTALK_PLANE_OFFSET_KCPS word for SetXtalk.</summary>
+    /// <exception cref="ArgumentException"><paramref name="xtalkKcps"/> outside 0..127.</exception>
+    public static ushort XtalkRaw(int xtalkKcps) => (ushort)(InRange("xtalkKcps", xtalkKcps, 0, 0xFFFF >> 9) << 9);
+
+    /// <summary>GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps.</summary>
+    public static int DecodeXtalk(ushort raw) =>
+        (int)Math.Round(raw / 512.0, MidpointRounding.AwayFromZero);
+
+    /// <summary>MIN_COUNT_RATE_RTN_LIMIT_MCPS word for SetSignalThreshold.</summary>
+    /// <exception cref="ArgumentException"><paramref name="signalKcps"/> outside 0..65535.</exception>
+    public static int SignalThresholdRaw(int signalKcps) => InRange("signalKcps", signalKcps, 0, 0xFFFF) >> 3;
+
+    /// <summary>GetSignalThreshold: MIN_COUNT_RATE_RTN_LIMIT_MCPS word → kcps.</summary>
+    /// <exception cref="ArgumentException"><paramref name="raw"/> outside 0..65535.</exception>
+    public static int DecodeSignalThreshold(int raw) => (InRange("rawWord", raw, 0, 0xFFFF) << 3) & 0xFFFF;
+
+    /// <summary>RANGE_CONFIG__SIGMA_THRESH word for SetSigmaThreshold.</summary>
+    /// <exception cref="ArgumentException">when <paramref name="sigmaMm"/> &gt; 16383.</exception>
+    public static int SigmaThresholdRaw(int sigmaMm) => InRange("sigmaMm", sigmaMm, 0, 0xFFFF >> 2) << 2;
+
+    /// <summary>GetSigmaThreshold: RANGE_CONFIG__SIGMA_THRESH word → mm.</summary>
+    /// <exception cref="ArgumentException"><paramref name="raw"/> outside 0..65535.</exception>
+    public static int DecodeSigmaThreshold(int raw) => InRange("rawWord", raw, 0, 0xFFFF) >> 2;
+
+    /// <summary>An argument outside <c>lo..hi</c> → <see cref="ArgumentOutOfRangeException"/>
+    /// (invalid_argument, never wrapped).</summary>
+    private static int InRange(string name, long v, long lo, long hi) =>
+        v < lo || v > hi ? throw new ArgumentOutOfRangeException(name, v, $"{name} {v} out of range {lo}..{hi}") : (int)v;
+}

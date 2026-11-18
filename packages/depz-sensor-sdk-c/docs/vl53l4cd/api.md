@@ -1,0 +1,675 @@
+# VL53L4CD (ToF, single-zone) — API reference
+
+The public API for the VL53L4CD (ToF, single-zone) sensor. Transport, discovery,
+the common command/report codecs and other cross-sensor symbols
+live in the [top-level API reference](../api.md).
+
+Auto-generated from the header's doc-comments — edit them in the
+header, not this file.
+
+## Contents
+
+- **VL53L4CD (ToF)**: [`depz_vl53l4_cmd`](#depz_vl53l4_cmd), [`depz_vl53l4_rpt`](#depz_vl53l4_rpt), [`DEPZ_VL53L4_XFER_MAX`](#depz_vl53l4_xfer_max), [`DEPZ_VL53L4_XSHUT_OFF`](#depz_vl53l4_xshut_off), [`DEPZ_VL53L4_XSHUT_ON`](#depz_vl53l4_xshut_on), [`DEPZ_VL53L4_XSHUT_RESET`](#depz_vl53l4_xshut_reset), [`DEPZ_VL53L4_SF_INT_ACT_HIGH`](#depz_vl53l4_sf_int_act_high), [`DEPZ_VL53L4_RESULT_BLOCK_ADDR`](#depz_vl53l4_result_block_addr), [`DEPZ_VL53L4_RESULT_BLOCK_LEN`](#depz_vl53l4_result_block_len), [`DEPZ_VL53L4_MODEL_ID`](#depz_vl53l4_model_id), [`DEPZ_VL53L4_CONFIG_ADDR`](#depz_vl53l4_config_addr), [`DEPZ_VL53L4_CONFIG_FMP_BYTE`](#depz_vl53l4_config_fmp_byte), [`depz_vl53l4_pack_read_reg`](#depz_vl53l4_pack_read_reg), [`depz_vl53l4_pack_write_reg`](#depz_vl53l4_pack_write_reg), [`depz_vl53l4_pack_xshut`](#depz_vl53l4_pack_xshut), [`depz_vl53l4_pack_start_stream`](#depz_vl53l4_pack_start_stream), [`depz_vl53l4_pack_set_i2c_speed`](#depz_vl53l4_pack_set_i2c_speed), [`depz_vl53l4_reg_data`](#depz_vl53l4_reg_data), [`depz_vl53l4_unpack_reg_data`](#depz_vl53l4_unpack_reg_data), [`depz_vl53l4_info`](#depz_vl53l4_info), [`depz_vl53l4_unpack_info`](#depz_vl53l4_unpack_info), [`depz_vl53l4_stream`](#depz_vl53l4_stream), [`depz_vl53l4_unpack_stream`](#depz_vl53l4_unpack_stream), [`depz_vl53l4_result`](#depz_vl53l4_result), [`depz_vl53l4_parse_result_block`](#depz_vl53l4_parse_result_block), [`depz_vl53l4_range_timing_registers`](#depz_vl53l4_range_timing_registers), [`depz_vl53l4_decode_range_timing`](#depz_vl53l4_decode_range_timing), [`depz_vl53l4_offset_raw`](#depz_vl53l4_offset_raw), [`depz_vl53l4_decode_offset`](#depz_vl53l4_decode_offset), [`depz_vl53l4_xtalk_raw`](#depz_vl53l4_xtalk_raw), [`depz_vl53l4_offset_raw_checked`](#depz_vl53l4_offset_raw_checked), [`depz_vl53l4_xtalk_raw_checked`](#depz_vl53l4_xtalk_raw_checked), [`depz_vl53l4_decode_xtalk`](#depz_vl53l4_decode_xtalk), [`depz_vl53l4_signal_threshold_raw`](#depz_vl53l4_signal_threshold_raw), [`depz_vl53l4_decode_signal_threshold`](#depz_vl53l4_decode_signal_threshold), [`depz_vl53l4_sigma_threshold_raw`](#depz_vl53l4_sigma_threshold_raw), [`depz_vl53l4_decode_sigma_threshold`](#depz_vl53l4_decode_sigma_threshold), [`DEPZ_VL53L4_DEFAULT_CONFIGURATION`](#depz_vl53l4_default_configuration), [`depz_vl53l4_config_block`](#depz_vl53l4_config_block)
+- **VL53L4CD sensor class (live layer)**: [`depz_vl53l4cd_measurement`](#depz_vl53l4cd_measurement), [`DEPZ_VL53L4CD_WINDOW_BELOW`](#depz_vl53l4cd_window_below), [`DEPZ_VL53L4CD_WINDOW_ABOVE`](#depz_vl53l4cd_window_above), [`DEPZ_VL53L4CD_WINDOW_OUT`](#depz_vl53l4cd_window_out), [`DEPZ_VL53L4CD_WINDOW_IN`](#depz_vl53l4cd_window_in), [`DEPZ_VL53L4CD_I2C_KHZ_DEFAULT`](#depz_vl53l4cd_i2c_khz_default), [`depz_vl53l4cd_open_link`](#depz_vl53l4cd_open_link), [`depz_is_vl53l4cd`](#depz_is_vl53l4cd), [`depz_vl53l4cd_status_text`](#depz_vl53l4cd_status_text), [`depz_vl53l4cd_is_alive`](#depz_vl53l4cd_is_alive), [`depz_vl53l4cd_init`](#depz_vl53l4cd_init), [`depz_vl53l4cd_initialized`](#depz_vl53l4cd_initialized), [`depz_vl53l4cd_ranging`](#depz_vl53l4cd_ranging), [`depz_vl53l4cd_xshut`](#depz_vl53l4cd_xshut), [`depz_vl53l4cd_reset_sensor`](#depz_vl53l4cd_reset_sensor), [`depz_vl53l4cd_bridge_info`](#depz_vl53l4cd_bridge_info), [`depz_vl53l4cd_set_i2c_speed_khz`](#depz_vl53l4cd_set_i2c_speed_khz), [`depz_vl53l4cd_set_range_timing`](#depz_vl53l4cd_set_range_timing), [`depz_vl53l4cd_get_range_timing`](#depz_vl53l4cd_get_range_timing), [`depz_vl53l4cd_set_offset_mm`](#depz_vl53l4cd_set_offset_mm), [`depz_vl53l4cd_get_offset_mm`](#depz_vl53l4cd_get_offset_mm), [`depz_vl53l4cd_set_xtalk_kcps`](#depz_vl53l4cd_set_xtalk_kcps), [`depz_vl53l4cd_get_xtalk_kcps`](#depz_vl53l4cd_get_xtalk_kcps), [`depz_vl53l4cd_set_detection_thresholds`](#depz_vl53l4cd_set_detection_thresholds), [`depz_vl53l4cd_get_detection_thresholds`](#depz_vl53l4cd_get_detection_thresholds), [`depz_vl53l4cd_set_signal_threshold_kcps`](#depz_vl53l4cd_set_signal_threshold_kcps), [`depz_vl53l4cd_get_signal_threshold_kcps`](#depz_vl53l4cd_get_signal_threshold_kcps), [`depz_vl53l4cd_set_sigma_threshold_mm`](#depz_vl53l4cd_set_sigma_threshold_mm), [`depz_vl53l4cd_get_sigma_threshold_mm`](#depz_vl53l4cd_get_sigma_threshold_mm), [`depz_vl53l4cd_start_temperature_update`](#depz_vl53l4cd_start_temperature_update), [`depz_vl53l4cd_calibrate_offset`](#depz_vl53l4cd_calibrate_offset), [`depz_vl53l4cd_calibrate_xtalk`](#depz_vl53l4cd_calibrate_xtalk), [`depz_vl53l4cd_start_ranging`](#depz_vl53l4cd_start_ranging), [`depz_vl53l4cd_stop_ranging`](#depz_vl53l4cd_stop_ranging), [`depz_vl53l4cd_measure_once`](#depz_vl53l4cd_measure_once), [`depz_vl53l4cd_measurements`](#depz_vl53l4cd_measurements), [`depz_vl53l4cd_read_reg`](#depz_vl53l4cd_read_reg), [`depz_vl53l4cd_write_reg`](#depz_vl53l4cd_write_reg)
+
+## VL53L4CD (ToF)
+
+### depz_vl53l4_cmd
+
+```c
+typedef enum {
+    DEPZ_VL53L4_CMD_READ_REG      = 0x32,
+    DEPZ_VL53L4_CMD_WRITE_REG     = 0x33,
+    DEPZ_VL53L4_CMD_XSHUT         = 0x34,
+    DEPZ_VL53L4_CMD_START_STREAM  = 0x35,
+    DEPZ_VL53L4_CMD_STOP_STREAM   = 0x36,
+    DEPZ_VL53L4_CMD_GET_INFO      = 0x37,
+    DEPZ_VL53L4_CMD_SET_I2C_SPEED = 0x38
+} depz_vl53l4_cmd;
+```
+
+### depz_vl53l4_rpt
+
+```c
+typedef enum {
+    DEPZ_VL53L4_RPT_REG_DATA = 0x91,
+    DEPZ_VL53L4_RPT_INFO     = 0x92,
+    DEPZ_VL53L4_RPT_STREAM   = 0x93
+} depz_vl53l4_rpt;
+```
+
+### DEPZ_VL53L4_XFER_MAX
+
+```c
+#define DEPZ_VL53L4_XFER_MAX 253u
+```
+
+Max read length / write data length per transfer (STM32 I2C NBYTES is
+8-bit; a write spends two bytes on the register address; the firmware
+applies one number to both directions). addr + len must be <= 0x10000.
+
+### DEPZ_VL53L4_XSHUT_OFF
+
+```c
+#define DEPZ_VL53L4_XSHUT_OFF   0u
+```
+
+VL53_XSHUT actions. RESET is answered after the boot handshake.
+
+### DEPZ_VL53L4_XSHUT_ON
+
+```c
+#define DEPZ_VL53L4_XSHUT_ON    1u
+```
+
+### DEPZ_VL53L4_XSHUT_RESET
+
+```c
+#define DEPZ_VL53L4_XSHUT_RESET 2u
+```
+
+### DEPZ_VL53L4_SF_INT_ACT_HIGH
+
+```c
+#define DEPZ_VL53L4_SF_INT_ACT_HIGH 0x02u
+```
+
+VL53_START_STREAM flags bit 1: INT active high (mirrors bit 4 of
+GPIO_HV_MUX__CTRL 0x0030). Clear (default) = INT active low.
+
+### DEPZ_VL53L4_RESULT_BLOCK_ADDR
+
+```c
+#define DEPZ_VL53L4_RESULT_BLOCK_ADDR 0x0089u
+```
+
+The usual stream configuration: the whole result block in one read.
+
+### DEPZ_VL53L4_RESULT_BLOCK_LEN
+
+```c
+#define DEPZ_VL53L4_RESULT_BLOCK_LEN  17u
+```
+
+### DEPZ_VL53L4_MODEL_ID
+
+```c
+#define DEPZ_VL53L4_MODEL_ID 0xEBAAu
+```
+
+IDENTIFICATION__MODEL_ID (0x010F) expected value.
+
+### DEPZ_VL53L4_CONFIG_ADDR
+
+```c
+#define DEPZ_VL53L4_CONFIG_ADDR 0x2Du
+```
+
+First register of the 91-byte init configuration block (0x2D..0x87).
+
+### DEPZ_VL53L4_CONFIG_FMP_BYTE
+
+```c
+#define DEPZ_VL53L4_CONFIG_FMP_BYTE 0x12u
+```
+
+Byte 0 of the config block is always forced to 0x12 (I2C Fast Mode Plus
+pad, never cleared) — what VL53L4CD_I2C_FAST_MODE_PLUS does in the C ULD.
+
+### depz_vl53l4_pack_read_reg
+
+```c
+size_t depz_vl53l4_pack_read_reg(uint16_t addr, uint16_t len, uint8_t *out);
+```
+
+Encoders (return payload length written).
+VL53_READ_REG payload: addr u16, len u16. Returns 4, or 0 when len is outside
+1..DEPZ_VL53L4_XFER_MAX or addr + len > 0x10000 (contract 10 §1).
+
+### depz_vl53l4_pack_write_reg
+
+```c
+size_t depz_vl53l4_pack_write_reg(uint16_t addr, const uint8_t *data, size_t data_len, uint8_t *out);
+```
+
+VL53_WRITE_REG payload: addr u16 + data. Returns 2 + data_len, or 0 when
+data_len is outside 1..DEPZ_VL53L4_XFER_MAX or addr + data_len > 0x10000.
+
+### depz_vl53l4_pack_xshut
+
+```c
+size_t depz_vl53l4_pack_xshut(uint8_t action, uint8_t *out);
+```
+
+/* 1 B */
+
+### depz_vl53l4_pack_start_stream
+
+```c
+size_t depz_vl53l4_pack_start_stream(uint16_t addr, uint16_t len, uint8_t flags, uint8_t *out);
+```
+
+/* 5 B */
+
+### depz_vl53l4_pack_set_i2c_speed
+
+```c
+size_t depz_vl53l4_pack_set_i2c_speed(uint16_t khz, uint8_t *out);
+```
+
+/* 2 B */
+
+### depz_vl53l4_reg_data
+
+```c
+typedef struct {
+    uint8_t  cmd;
+    uint64_t timestamp_us; /* MCU uptime at I2C-read completion */
+    const uint8_t *data;   /* points into the report payload */
+    size_t   data_len;
+} depz_vl53l4_reg_data;
+```
+
+RPT_VL53_REG_DATA payload: echoed opcode, u64 timestamp, register bytes.
+
+### depz_vl53l4_unpack_reg_data
+
+```c
+int depz_vl53l4_unpack_reg_data(const uint8_t *payload, size_t len, depz_vl53l4_reg_data *out);
+```
+
+/* needs >= 9 B */
+
+### depz_vl53l4_info
+
+```c
+typedef struct {
+    uint32_t int_edges;
+    uint32_t slots_skipped;
+    uint32_t i2c_errors;
+    uint8_t  last_i2c_error; /* 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR */
+    uint16_t model_id;       /* expected DEPZ_VL53L4_MODEL_ID (0xEBAA) */
+    uint8_t  fw_status;      /* expected 0x03 (booted) */
+    uint8_t  initialized;    /* 1 = MODEL_ID read back as 0xEBAA on this GET_INFO */
+    uint8_t  xshut_level;
+    uint8_t  int_level;
+    uint16_t i2c_khz;
+} depz_vl53l4_info;
+```
+
+RPT_VL53_INFO — bridge diagnostics (21 B, little-endian). Counters wrap
+silently; watch increments, not absolute values. i2c_errors counts since the
+last successful XSHUT reset (the bridge clears it there), not since power-up.
+
+### depz_vl53l4_unpack_info
+
+```c
+int depz_vl53l4_unpack_info(const uint8_t *payload, size_t len, depz_vl53l4_info *out);
+```
+
+### depz_vl53l4_stream
+
+```c
+typedef struct {
+    uint64_t timestamp_us; /* MCU uptime at the INT edge (the sensor event) */
+    uint16_t addr;
+    uint16_t len;
+    const uint8_t *data;   /* points into the report payload (len bytes) */
+} depz_vl53l4_stream;
+```
+
+RPT_VL53_STREAM — one streamed register block. `addr`/`len` echo the
+stream configuration so each report is self-describing.
+
+### depz_vl53l4_unpack_stream
+
+```c
+int depz_vl53l4_unpack_stream(const uint8_t *payload, size_t len, depz_vl53l4_stream *out);
+```
+
+### depz_vl53l4_result
+
+```c
+typedef struct {
+    int range_status;          /* 0 = valid; raw >= 24 passes through unmapped */
+    int distance_mm;
+    int ambient_rate_kcps;
+    int ambient_per_spad_kcps;
+    int signal_rate_kcps;
+    int signal_per_spad_kcps;
+    int number_of_spad;
+    int sigma_mm;
+    int stream_count;          /* RESULT__STREAM_COUNT, wraps at 255 */
+} depz_vl53l4_result;
+```
+
+VL53L4CD_ResultsData_t plus the sensor's own frame counter.
+
+### depz_vl53l4_parse_result_block
+
+```c
+int depz_vl53l4_parse_result_block(const uint8_t *raw, size_t len, depz_vl53l4_result *out);
+```
+
+Decode the streamed 17-byte 0x0089..0x0099 block exactly as
+VL53L4CD_GetResult() decodes the same registers read one by one. Register
+contents are big-endian words (the bridge passes them through untouched).
+Returns 0 on success, -1 when len < DEPZ_VL53L4_RESULT_BLOCK_LEN (17); a
+longer buffer is decoded and the tail ignored (contract 07 §3).
+
+### depz_vl53l4_range_timing_registers
+
+```c
+int depz_vl53l4_range_timing_registers(uint32_t budget_ms, uint32_t inter_ms, uint16_t osc_frequency, uint16_t clock_pll, uint16_t *range_config_a, uint16_t *range_config_b, uint32_t *intermeasurement_raw);
+```
+
+SetRangeTiming register math -> RANGE_CONFIG_A (0x005E), RANGE_CONFIG_B
+(0x0061) and the INTERMEASUREMENT_MS (0x006C) raw dword. `osc_frequency` is
+the word read from 0x0006; `clock_pll` is the word read from
+RESULT__OSC_CALIBRATE_VAL (used only in autonomous mode, i.e. when
+inter_ms > 0). inter_ms == 0 selects continuous mode; a value greater than
+the budget selects autonomous low power. Returns 0 on success, -1 when
+osc_frequency == 0, budget_ms outside 10..200, 0 < inter_ms <= budget_ms,
+or an INTERMEASUREMENT_MS value that would overflow u32.
+
+### depz_vl53l4_decode_range_timing
+
+```c
+int depz_vl53l4_decode_range_timing(uint32_t intermeasurement_raw, uint16_t clock_pll, uint16_t osc_frequency, uint16_t range_config_a, uint32_t *budget_ms, uint32_t *inter_ms);
+```
+
+GetRangeTiming register math -> (budget_ms, inter_ms) from the raw register
+reads: the INTERMEASUREMENT_MS dword, the RESULT__OSC_CALIBRATE_VAL word,
+the 0x0006 word and the RANGE_CONFIG_A word. Returns 0 on success, -1 when
+osc_frequency == 0.
+
+### depz_vl53l4_offset_raw
+
+```c
+uint16_t depz_vl53l4_offset_raw(int32_t mm);
+```
+
+Tuning word codecs (register word <-> user units).
+/* RANGE_OFFSET_MM: mm*4 */
+
+### depz_vl53l4_decode_offset
+
+```c
+int32_t depz_vl53l4_decode_offset(uint16_t raw);
+```
+
+/* -> signed millimetres */
+
+### depz_vl53l4_xtalk_raw
+
+```c
+uint16_t depz_vl53l4_xtalk_raw(uint16_t kcps);
+```
+
+/* XTALK_PLANE_OFFSET: kcps*512 */
+
+### depz_vl53l4_offset_raw_checked
+
+```c
+int depz_vl53l4_offset_raw_checked(int32_t mm, uint16_t *raw);
+```
+
+Range-checked forms (contract 07 §3 — prefer these; the unchecked ones
+above wrap): offset -1024..1023 mm (the 11-bit word decode_offset reads
+back), xtalk 0..127 kcps (fits the word after << 9). 0, or -1 with *raw
+untouched.
+
+### depz_vl53l4_xtalk_raw_checked
+
+```c
+int depz_vl53l4_xtalk_raw_checked(uint16_t kcps, uint16_t *raw);
+```
+
+### depz_vl53l4_decode_xtalk
+
+```c
+uint16_t depz_vl53l4_decode_xtalk(uint16_t raw);
+```
+
+/* lround(raw/512.0) */
+
+### depz_vl53l4_signal_threshold_raw
+
+```c
+uint16_t depz_vl53l4_signal_threshold_raw(uint16_t kcps);
+```
+
+/* kcps/8 */
+
+### depz_vl53l4_decode_signal_threshold
+
+```c
+uint16_t depz_vl53l4_decode_signal_threshold(uint16_t raw);
+```
+
+/* raw*8 */
+
+### depz_vl53l4_sigma_threshold_raw
+
+```c
+int depz_vl53l4_sigma_threshold_raw(uint16_t mm, uint16_t *raw);
+```
+
+RANGE_CONFIG__SIGMA_THRESH: mm*4. Returns 0 on success, -1 when mm > 16383.
+
+### depz_vl53l4_decode_sigma_threshold
+
+```c
+uint16_t depz_vl53l4_decode_sigma_threshold(uint16_t raw);
+```
+
+/* raw/4 */
+
+### DEPZ_VL53L4_DEFAULT_CONFIGURATION
+
+```c
+extern const uint8_t DEPZ_VL53L4_DEFAULT_CONFIGURATION[91];
+```
+
+VL53L4CD_DEFAULT_CONFIGURATION[] — the stock ST 91-byte block for registers
+0x2D..0x87 (byte 0 as shipped, i.e. NOT the FM+ override).
+
+### depz_vl53l4_config_block
+
+```c
+size_t depz_vl53l4_config_block(uint8_t *out);
+```
+
+Write the 91-byte block sensor_init() sends at DEPZ_VL53L4_CONFIG_ADDR: the
+ST default configuration with byte 0 forced to DEPZ_VL53L4_CONFIG_FMP_BYTE
+(I2C Fast Mode Plus). Returns 91.
+
+## VL53L4CD sensor class (live layer)
+
+### depz_vl53l4cd_measurement
+
+```c
+typedef struct {
+    uint64_t timestamp_us;     /* MCU µs at the INT edge (stream) / the read (poll) */
+    depz_vl53l4_result r;      /* range_status 0 = valid, distance_mm, ... */
+} depz_vl53l4cd_measurement;
+```
+
+### DEPZ_VL53L4CD_WINDOW_BELOW
+
+```c
+#define DEPZ_VL53L4CD_WINDOW_BELOW 0u
+```
+
+Detection-threshold windows (SYSTEM__INTERRUPT).
+
+### DEPZ_VL53L4CD_WINDOW_ABOVE
+
+```c
+#define DEPZ_VL53L4CD_WINDOW_ABOVE 1u
+```
+
+### DEPZ_VL53L4CD_WINDOW_OUT
+
+```c
+#define DEPZ_VL53L4CD_WINDOW_OUT   2u
+```
+
+### DEPZ_VL53L4CD_WINDOW_IN
+
+```c
+#define DEPZ_VL53L4CD_WINDOW_IN    3u
+```
+
+### DEPZ_VL53L4CD_I2C_KHZ_DEFAULT
+
+```c
+#define DEPZ_VL53L4CD_I2C_KHZ_DEFAULT 1000u
+```
+
+init() runs its configuration block at 400 kHz and leaves the bus here.
+
+### depz_vl53l4cd_open_link
+
+```c
+int depz_vl53l4cd_open_link(depz_link *link, depz_device **out);
+```
+
+A VL53L4CD on a link without an identity probe (tests, replay).
+
+### depz_is_vl53l4cd
+
+```c
+bool depz_is_vl53l4cd(const depz_device *dev);
+```
+
+### depz_vl53l4cd_status_text
+
+```c
+const char *depz_vl53l4cd_status_text(int range_status);
+```
+
+UM2931 name of a range status ("valid", "sigma above threshold", ...).
+
+### depz_vl53l4cd_is_alive
+
+```c
+int depz_vl53l4cd_is_alive(depz_device *dev, bool *alive);
+```
+
+The sensor answers with its model id (0xEBAA).
+
+### depz_vl53l4cd_init
+
+```c
+int depz_vl53l4cd_init(depz_device *dev, uint16_t bus_khz);
+```
+
+Default configuration block + VHV calibration (ULD sensor_init), then the
+bus at `bus_khz` (0 = DEPZ_VL53L4CD_I2C_KHZ_DEFAULT). Well under a second.
+
+### depz_vl53l4cd_initialized
+
+```c
+bool depz_vl53l4cd_initialized(const depz_device *dev);
+```
+
+### depz_vl53l4cd_ranging
+
+```c
+bool depz_vl53l4cd_ranging(const depz_device *dev);
+```
+
+### depz_vl53l4cd_xshut
+
+```c
+int depz_vl53l4cd_xshut(depz_device *dev, uint8_t action);
+```
+
+XSHUT pin: DEPZ_VL53L4_XSHUT_OFF / _ON / _RESET. OFF and RESET stop any
+stream; a power-cycled sensor needs init() again.
+
+### depz_vl53l4cd_reset_sensor
+
+```c
+int depz_vl53l4cd_reset_sensor(depz_device *dev);
+```
+
+/* = xshut(RESET) */
+
+### depz_vl53l4cd_bridge_info
+
+```c
+int depz_vl53l4cd_bridge_info(depz_device *dev, depz_vl53l4_info *out);
+```
+
+Bridge identity, pin levels and counters; safe while streaming.
+
+### depz_vl53l4cd_set_i2c_speed_khz
+
+```c
+int depz_vl53l4cd_set_i2c_speed_khz(depz_device *dev, uint16_t khz);
+```
+
+Re-time the bus to the nominal step nearest `khz`. Not while ranging.
+
+### depz_vl53l4cd_set_range_timing
+
+```c
+int depz_vl53l4cd_set_range_timing(depz_device *dev, uint32_t budget_ms, uint32_t inter_ms);
+```
+
+Configuration — init() first, never while ranging.
+Budget 10..200 ms; inter 0 = continuous, > budget = autonomous low power.
+
+### depz_vl53l4cd_get_range_timing
+
+```c
+int depz_vl53l4cd_get_range_timing(depz_device *dev, uint32_t *budget_ms, uint32_t *inter_ms);
+```
+
+### depz_vl53l4cd_set_offset_mm
+
+```c
+int depz_vl53l4cd_set_offset_mm(depz_device *dev, int32_t offset_mm);
+```
+
+Offset -1024..1023 mm, xtalk 0..127 kcps (0 = off): DEPZ_E_ARG outside,
+nothing written.
+
+### depz_vl53l4cd_get_offset_mm
+
+```c
+int depz_vl53l4cd_get_offset_mm(depz_device *dev, int32_t *offset_mm);
+```
+
+### depz_vl53l4cd_set_xtalk_kcps
+
+```c
+int depz_vl53l4cd_set_xtalk_kcps(depz_device *dev, uint16_t xtalk_kcps);
+```
+
+### depz_vl53l4cd_get_xtalk_kcps
+
+```c
+int depz_vl53l4cd_get_xtalk_kcps(depz_device *dev, uint16_t *xtalk_kcps);
+```
+
+### depz_vl53l4cd_set_detection_thresholds
+
+```c
+int depz_vl53l4cd_set_detection_thresholds(depz_device *dev, uint16_t low_mm, uint16_t high_mm, uint8_t window);
+```
+
+INT fires only when the window condition holds (DEPZ_VL53L4CD_WINDOW_*).
+
+### depz_vl53l4cd_get_detection_thresholds
+
+```c
+int depz_vl53l4cd_get_detection_thresholds(depz_device *dev, uint16_t *low_mm, uint16_t *high_mm, uint8_t *window);
+```
+
+### depz_vl53l4cd_set_signal_threshold_kcps
+
+```c
+int depz_vl53l4cd_set_signal_threshold_kcps(depz_device *dev, uint16_t kcps);
+```
+
+### depz_vl53l4cd_get_signal_threshold_kcps
+
+```c
+int depz_vl53l4cd_get_signal_threshold_kcps(depz_device *dev, uint16_t *kcps);
+```
+
+### depz_vl53l4cd_set_sigma_threshold_mm
+
+```c
+int depz_vl53l4cd_set_sigma_threshold_mm(depz_device *dev, uint16_t mm);
+```
+
+/* <= 16383 */
+
+### depz_vl53l4cd_get_sigma_threshold_mm
+
+```c
+int depz_vl53l4cd_get_sigma_threshold_mm(depz_device *dev, uint16_t *mm);
+```
+
+### depz_vl53l4cd_start_temperature_update
+
+```c
+int depz_vl53l4cd_start_temperature_update(depz_device *dev);
+```
+
+Re-run VHV calibration; after a > 8 °C ambient change.
+
+### depz_vl53l4cd_calibrate_offset
+
+```c
+int depz_vl53l4cd_calibrate_offset(depz_device *dev, uint16_t target_mm, uint8_t nb_samples, int32_t *offset_mm);
+```
+
+Against a target at `target_mm` (10..1000); nb_samples 5..255 (0 = 20).
+Blocks for the bursts; *offset_mm (optional) = the offset now programmed.
+
+### depz_vl53l4cd_calibrate_xtalk
+
+```c
+int depz_vl53l4cd_calibrate_xtalk(depz_device *dev, uint16_t target_mm, uint8_t nb_samples, int32_t *xtalk_kcps);
+```
+
+Against a target at `target_mm` (10..5000); *xtalk_kcps = the value the
+ULD computed and programmed (two's complement in the register), rounded
+half away from zero — negative when the mean distance exceeds the target.
+
+### depz_vl53l4cd_start_ranging
+
+```c
+int depz_vl53l4cd_start_ranging(depz_device *dev);
+```
+
+Ranging.
+Start the sensor and arm the MCU stream: one measurement per INT edge.
+
+### depz_vl53l4cd_stop_ranging
+
+```c
+int depz_vl53l4cd_stop_ranging(depz_device *dev);
+```
+
+Idempotent; the sensor is stopped even when the stream stop fails.
+
+### depz_vl53l4cd_measure_once
+
+```c
+int depz_vl53l4cd_measure_once(depz_device *dev, int timeout_ms, depz_vl53l4cd_measurement *out);
+```
+
+Poll mode: start, wait data-ready, read, stop (< 0 timeout = 1000 ms).
+Refused while the stream runs.
+
+### depz_vl53l4cd_measurements
+
+```c
+depz_stream *depz_vl53l4cd_measurements(depz_device *dev);
+```
+
+The measurements stream: depz_vl53l4cd_measurement items (default
+subscription size 64; next() names RPT_STREAM; parse_errors counts the
+stream reports whose block did not decode). NULL + DEPZ_E_WRONG_TYPE on a
+device of another class.
+
+### depz_vl53l4cd_read_reg
+
+```c
+int depz_vl53l4cd_read_reg(depz_device *dev, uint16_t addr, uint8_t *buf, size_t len);
+```
+
+Raw register access (escape hatch): 16-bit address, contents as the
+sensor has them (big-endian words). Split at the bridge's 253-byte limit.
+
+### depz_vl53l4cd_write_reg
+
+```c
+int depz_vl53l4cd_write_reg(depz_device *dev, uint16_t addr, const uint8_t *data, size_t len);
+```

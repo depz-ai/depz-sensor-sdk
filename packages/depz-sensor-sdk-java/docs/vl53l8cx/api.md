@@ -1,0 +1,1994 @@
+# VL53L8CX (ToF) — API reference
+
+The public API for the VL53L8CX (ToF) sensor. Transport, USB identity, the common
+protocol codecs and other cross-sensor symbols shared by every sensor
+live in the [top-level API reference](../api.md).
+
+Generated from the Javadoc of the Java sources.
+
+## Contents
+
+- **VL53L8CX (ToF)**: [`Vl53l8chDevice`](#vl53l8chdevice), [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8`](#vl53l8), [`Vl53l8.Vl53l8Cmd`](#vl53l8vl53l8cmd), [`Vl53l8.Vl53l8Rpt`](#vl53l8vl53l8rpt), [`Vl53l8.RegData`](#vl53l8regdata), [`FrameReassembler`](#framereassembler), [`FrameReassembler.FrameChunk`](#framereassemblerframechunk), [`FrameReassembler.CompletedFrame`](#framereassemblercompletedframe), [`Vl53l8CnhSetup`](#vl53l8cnhsetup), [`Vl53l8Driver`](#vl53l8driver), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Platform`](#vl53l8platform), [`Vl53l8Tables`](#vl53l8tables), [`Vl53l8Uld`](#vl53l8uld), [`Vl53l8Uld.Variant`](#vl53l8uldvariant), [`Vl53l8Uld.CnhAggregate`](#vl53l8uldcnhaggregate), [`Vl53l8Uld.CnhResult`](#vl53l8uldcnhresult), [`Vl53l8Uld.Results`](#vl53l8uldresults), [`Vl53l8Uld.DetectionThreshold`](#vl53l8ulddetectionthreshold), [`Vl53l8Uld.PackedThresholds`](#vl53l8uldpackedthresholds), [`Vl53l8Uld.MotionConfig`](#vl53l8uldmotionconfig), [`Vl53l8Uld.Vl53l8Error`](#vl53l8uldvl53l8error)
+
+## VL53L8CX (ToF)
+
+### Vl53l8chDevice
+
+```java
+public class Vl53l8chDevice extends Vl53l8cxDevice
+```
+
+VL53L8CH: the VL53L8CX superset (every CX method) plus CNH, compact network histograms — each
+frame can carry a per-aggregate distance histogram. `init()` downloads the CH firmware
+(VL53LMZ ULD 2.0.16).
+
+#### Vl53l8chDevice.cnhSetup
+
+```java
+public @Nullable Vl53l8CnhSetup cnhSetup()
+```
+
+The CNH setup armed by `configureCnh`, or null; recorders keep it next to the raw blocks to decode them later.
+
+#### Vl53l8chDevice.configureCnh
+
+```java
+public void configureCnh(Vl53l8CnhSetup setup)
+```
+
+Arm CNH for the next `startRanging()`: every frame then carries
+`Vl53l8Frame#cnhRaw()`, decoded with `Vl53l8Uld.decodeCnh`. CNH and the motion
+indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+`Vl53l8Frame#motion()`).
+
+### Vl53l8cxDevice
+
+```java
+public class Vl53l8cxDevice extends DepzDevice
+```
+
+VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here
+(`uld()`). `init()` downloads the ~84 KB sensor firmware (about a second), then
+configure and `startRanging()`: the board pushes one frame per INT edge in chunks,
+reassembled and parsed into `frames()`. Configuration needs `init()` and throws
+`InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH
+superset is `Vl53l8chDevice`.
+
+#### Vl53l8cxDevice.MIN_RANGING_FREQUENCY_HZ *(field)*
+
+```java
+public static final int MIN_RANGING_FREQUENCY_HZ = 2
+```
+
+Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.maxRangingFrequencyHz
+
+```java
+public static int maxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon
+limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+
+#### Vl53l8cxDevice.firmwareSet
+
+```java
+protected Vl53l8Firmware firmwareSet()
+```
+
+The sensor firmware `init()` downloads.
+
+#### Vl53l8cxDevice.readChunk
+
+```java
+protected int readChunk()
+```
+
+Register bytes per READ_REG (the I2C L5/L7 board reads less per call).
+
+#### Vl53l8cxDevice.writeChunk
+
+```java
+protected int writeChunk()
+```
+
+Register bytes per WRITE_REG.
+
+#### Vl53l8cxDevice.streamChunk
+
+```java
+protected int streamChunk()
+```
+
+Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4).
+
+#### Vl53l8cxDevice.minRangingHz
+
+```java
+protected int minRangingHz()
+```
+
+The lowest ranging frequency that streams on this sensor.
+
+#### Vl53l8cxDevice.uld
+
+```java
+public Vl53l8Driver uld()
+```
+
+The ULD driver (escape hatch for DCI access). @throws InvalidStateException before `init()`
+
+#### Vl53l8cxDevice.uldOrNull
+
+```java
+protected @Nullable Vl53l8Driver uldOrNull()
+```
+
+The driver after `init()`, or null.
+
+#### Vl53l8cxDevice.ranging
+
+```java
+public boolean ranging()
+```
+
+#### Vl53l8cxDevice.isAlive
+
+```java
+public boolean isAlive()
+```
+
+True when the sensor answers with its own silicon ids (a bus error or a foreign id: false).
+
+#### Vl53l8cxDevice.init
+
+```java
+public void init(@Nullable Consumer<String> progress, @Nullable BiConsumer<Integer, Integer> writeProgress)
+```
+
+Download the sensor firmware and the default configuration. `progress` gets phase
+texts, `writeProgress` (done, total) the big firmware writes; either may be null.
+
+#### Vl53l8cxDevice.init
+
+```java
+public void init()
+```
+
+#### Vl53l8cxDevice.getResolution
+
+```java
+public int getResolution()
+```
+
+Zones in use: 16 (4×4) or 64 (8×8).
+
+#### Vl53l8cxDevice.setResolution
+
+```java
+public void setResolution(int zones)
+```
+
+16 (4×4) or 64 (8×8) zones.
+
+#### Vl53l8cxDevice.getRangingFrequencyHz
+
+```java
+public int getRangingFrequencyHz()
+```
+
+#### Vl53l8cxDevice.setRangingFrequencyHz
+
+```java
+public void setRangingFrequencyHz(int hz)
+```
+
+At least 2 Hz (1 Hz on L5/L7); at most `maxRangingFrequencyHz` of the resolution last
+set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11
+§3). Refused host-side, nothing reaches the bus.
+
+#### Vl53l8cxDevice.getRangingMode
+
+```java
+public int getRangingMode()
+```
+
+`Vl53l8Driver#RANGING_MODE_CONTINUOUS` or `Vl53l8Driver#RANGING_MODE_AUTONOMOUS`.
+
+#### Vl53l8cxDevice.setRangingMode
+
+```java
+public void setRangingMode(int mode)
+```
+
+#### Vl53l8cxDevice.getIntegrationTimeMs
+
+```java
+public int getIntegrationTimeMs()
+```
+
+#### Vl53l8cxDevice.setIntegrationTimeMs
+
+```java
+public void setIntegrationTimeMs(int ms)
+```
+
+2–1000 ms; autonomous mode only.
+
+#### Vl53l8cxDevice.getSharpenerPercent
+
+```java
+public int getSharpenerPercent()
+```
+
+#### Vl53l8cxDevice.setSharpenerPercent
+
+```java
+public void setSharpenerPercent(int pct)
+```
+
+Edge sharpener, 0–99 % (0 = off).
+
+#### Vl53l8cxDevice.getTargetOrder
+
+```java
+public int getTargetOrder()
+```
+
+`Vl53l8Driver#TARGET_ORDER_CLOSEST` or `Vl53l8Driver#TARGET_ORDER_STRONGEST`.
+
+#### Vl53l8cxDevice.setTargetOrder
+
+```java
+public void setTargetOrder(int order)
+```
+
+#### Vl53l8cxDevice.getPowerMode
+
+```java
+public int getPowerMode()
+```
+
+`Vl53l8Driver#POWER_MODE_SLEEP`, `Vl53l8Driver#POWER_MODE_WAKEUP` or `Vl53l8Driver#POWER_MODE_DEEP_SLEEP`.
+
+#### Vl53l8cxDevice.setPowerMode
+
+```java
+public void setPowerMode(int mode)
+```
+
+Waking from deep sleep downloads the firmware again.
+
+#### Vl53l8cxDevice.getXtalkMargin
+
+```java
+public int getXtalkMargin()
+```
+
+Xtalk margin, whole kcps/SPAD (as ST).
+
+#### Vl53l8cxDevice.setXtalkMargin
+
+```java
+public void setXtalkMargin(int marginKcps)
+```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
+
+#### Vl53l8cxDevice.calibrateXtalk
+
+```java
+public void calibrateXtalk(int reflectancePercent, int nbSamples, int distanceMm)
+```
+
+On-device crosstalk calibration against a flat target (`Vl53l8Driver#calibrateXtalk`); read the result with `getCaldataXtalk()`.
+
+#### Vl53l8cxDevice.getCaldataXtalk
+
+```java
+public byte[] getCaldataXtalk()
+```
+
+The 776-byte xtalk calibration buffer (save / restore).
+
+#### Vl53l8cxDevice.setCaldataXtalk
+
+```java
+public void setCaldataXtalk(byte[] blob)
+```
+
+#### Vl53l8cxDevice.getDetectionThresholdsEnable
+
+```java
+public int getDetectionThresholdsEnable()
+```
+
+#### Vl53l8cxDevice.setDetectionThresholdsEnable
+
+```java
+public void setDetectionThresholdsEnable(boolean enabled)
+```
+
+#### Vl53l8cxDevice.getDetectionThresholds
+
+```java
+public List<Vl53l8Uld.DetectionThreshold> getDetectionThresholds()
+```
+
+#### Vl53l8cxDevice.setDetectionThresholds
+
+```java
+public void setDetectionThresholds(List<Vl53l8Uld.DetectionThreshold> thresholds)
+```
+
+The 64 detection thresholds (interrupt on threshold).
+
+#### Vl53l8cxDevice.setDetectionThresholdsAutoStop
+
+```java
+public void setDetectionThresholdsAutoStop(boolean autoStop)
+```
+
+#### Vl53l8cxDevice.configureMotionIndicator
+
+```java
+public Vl53l8Uld.MotionConfig configureMotionIndicator(int distanceMinMm, int distanceMaxMm)
+```
+
+Enable the motion indicator over [min, max] mm; every frame then carries
+`Vl53l8Frame#motion()`. Returns the configuration for further tuning.
+
+On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms
+CNH (`cnhSetup()` null, no `Vl53l8Frame#cnhRaw()`).
+
+#### Vl53l8cxDevice.configureMotionIndicator
+
+```java
+public Vl53l8Uld.MotionConfig configureMotionIndicator()
+```
+
+#### Vl53l8cxDevice.armedCnh
+
+```java
+protected @Nullable Vl53l8CnhSetup armedCnh()
+```
+
+The CNH setup the CH classes armed, or null.
+
+#### Vl53l8cxDevice.armCnh
+
+```java
+protected void armCnh(Vl53l8CnhSetup setup)
+```
+
+#### Vl53l8cxDevice.forgetSensor
+
+```java
+protected void forgetSensor()
+```
+
+#### Vl53l8cxDevice.startRanging
+
+```java
+public void startRanging()
+```
+
+Program the output list, start the sensor and the board's stream.
+
+#### Vl53l8cxDevice.stopRanging
+
+```java
+public void stopRanging()
+```
+
+#### Vl53l8cxDevice.frames
+
+```java
+public SensorStream<Vl53l8Frame> frames()
+```
+
+The stream of parsed frames (contract 07 §3): `frames().on(cb)` subscribes (reader
+thread; don't block), `frames().subscribe(capacity)` queues (bounded, drop-oldest,
+subscribed when it returns), `frames().next(timeout)` waits for one; `parseErrors()` counts the frames dropped because they did not parse (a short chunk header,
+a corrupt frame, a bad size) — not reassembly gaps, which are `reassemblerDiscards()`.
+
+#### Vl53l8cxDevice.reassemblerDiscards
+
+```java
+public int reassemblerDiscards()
+```
+
+Chunked frames the reassembler discarded (gaps, offset errors).
+
+#### Vl53l8cxDevice.requireNotRanging
+
+```java
+protected void requireNotRanging()
+```
+
+### Vl53l8
+
+```java
+public final class Vl53l8
+```
+
+VL53L8 register-bridge command codecs (contract 04): the SPI bridge of the
+VL53L8CX / CH boards, which the L5 / L7 I2C boards speak too (contract 11). RPT_VL53_FRAME
+chunks are reassembled by `sensors.vl53l8.FrameReassembler`.
+
+#### Vl53l8.CHUNK_SIZE *(field)*
+
+```java
+public static final int CHUNK_SIZE = 2048
+```
+
+Register bytes one READ_REG / WRITE_REG moves at most (the bridge's limit).
+
+#### Vl53l8.STREAM_CHUNK_MAX *(field)*
+
+```java
+public static final int STREAM_CHUNK_MAX = 1528
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### Vl53l8.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Max frame_size accepted by START_STREAM.
+
+#### Vl53l8.packReadReg
+
+```java
+public static byte[] packReadReg(int addr, int length)
+```
+
+VL53_READ_REG payload: addr u16 LE, length u16 LE.
+
+#### Vl53l8.packWriteReg
+
+```java
+public static byte[] packWriteReg(int addr, byte[] data, int offset, int length)
+```
+
+VL53_WRITE_REG payload: addr u16 LE, then at least one data byte (contract 04 §2).
+
+#### Vl53l8.packWriteReg
+
+```java
+public static byte[] packWriteReg(int addr, byte[] data)
+```
+
+#### Vl53l8.packStartStream
+
+```java
+public static byte[] packStartStream(int frameSize)
+```
+
+VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE.
+
+### Vl53l8.Vl53l8Cmd
+
+```java
+public enum Vl53l8Cmd
+```
+
+Host→device opcodes. 0x34 is intentionally unused (a gap in the firmware's sequence).
+
+#### Vl53l8.Vl53l8Cmd — constants
+
+`READ_REG`(0x32), `WRITE_REG`(0x33), `START_STREAM`(0x35), `STOP_STREAM`(0x36)
+
+#### Vl53l8.Vl53l8Cmd.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l8.Vl53l8Rpt
+
+```java
+public enum Vl53l8Rpt
+```
+
+Device→host report ids.
+
+#### Vl53l8.Vl53l8Rpt — constants
+
+`REG_DATA`(0x91), `VL53_FRAME`(0x93)
+
+#### Vl53l8.Vl53l8Rpt.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l8.RegData
+
+```java
+public record RegData(int cmd, long timestampUs, byte[] data)
+```
+
+RPT_VL53_REG_DATA: the echoed READ_REG opcode, the MCU timestamp and the register bytes.
+
+#### Vl53l8.RegData.unpack
+
+```java
+public static RegData unpack(byte[] p)
+```
+
+### FrameReassembler
+
+```java
+public final class FrameReassembler
+```
+
+Rebuilds full VL53L8 sensor frames from chunked RPT_VL53_FRAME reports
+(contract 04). Shared by both VL53L8CX and VL53L8CH — the
+chunk transport is identical across the two parts.
+
+Rules: reset on `offset == 0`; chunks must be contiguous — a gap
+discards the frame in progress; a frame completes when the accumulated bytes
+equal `fullSize`. A chunk out of the rule-4 bounds (more than
+`chunkMax` bytes, `fullSize` over `STREAM_TOTAL_MAX`, or
+running past `fullSize`) is damaged: dropped and counted as a lost
+frame like the other damaged input, never thrown. Mirror of the TS/Python
+`FrameReassembler`.
+
+#### FrameReassembler.STREAM_CHUNK_MAX *(field)*
+
+```java
+public static final int STREAM_CHUNK_MAX = 1528
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### FrameReassembler.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Largest frame_size START_STREAM accepts (contract 04 §4 rule 4).
+
+#### FrameReassembler.completed *(field)*
+
+```java
+public int completed = 0
+```
+
+#### FrameReassembler.discarded *(field)*
+
+```java
+public int discarded = 0
+```
+
+#### FrameReassembler.unpackFrameChunk
+
+```java
+public static FrameChunk unpackFrameChunk(byte[] payload)
+```
+
+Decode a RPT_VL53_FRAME payload: ts u64 LE, fullSize u16, offset u16, data.
+
+#### FrameReassembler.feed
+
+```java
+public @Nullable CompletedFrame feed(FrameChunk chunk)
+```
+
+Returns a completed frame or `null`.
+
+### FrameReassembler.FrameChunk
+
+```java
+public record FrameChunk(long timestampUs, int fullSize, int offset, byte[] data)
+```
+
+One RPT_VL53_FRAME chunk (payload of a cmd-0x93 packet).
+
+### FrameReassembler.CompletedFrame
+
+```java
+public record CompletedFrame(long timestampUs, byte[] frame)
+```
+
+Result of a completed frame.
+
+### Vl53l8CnhSetup
+
+```java
+public final class Vl53l8CnhSetup
+```
+
+The CNH (compact network histogram) configuration of a VL53L8CH / VL53L7CH: a mirror of
+`VL53LMZ_Motion_Configuration` with the plugin helpers that fill it
+(`vl53lmz_plugin_cnh.c`, ULD 2.0.16), ported from the reference Python `CnhConfig`.
+Build it with `initConfig` and `createAggMap`, check `requiredMemory()`,
+then arm it with the device's `configureCnh`. The flags are fixed to ping-pong and variance
+off (`Example_12_cnh_data.c`), which `Vl53l8Uld#decodeCnh` assumes. Arguments outside
+their fields throw `IllegalArgumentException`, never wrap.
+
+#### Vl53l8CnhSetup.MI_CFG_DEV_IDX *(field)*
+
+```java
+public static final int MI_CFG_DEV_IDX = 0xBFAC
+```
+
+#### Vl53l8CnhSetup.CNH_MAX_DATA_BYTES *(field)*
+
+```java
+public static final int CNH_MAX_DATA_BYTES
+```
+
+#### Vl53l8CnhSetup.PULSE_WIDTH_BIN *(field)*
+
+```java
+public static final int PULSE_WIDTH_BIN = 10
+```
+
+#### Vl53l8CnhSetup.BIN_WIDTH_MM *(field)*
+
+```java
+public static final double BIN_WIDTH_MM
+```
+
+#### Vl53l8CnhSetup.refBinOffset
+
+```java
+public int refBinOffset()
+```
+
+#### Vl53l8CnhSetup.sumSpan
+
+```java
+public int sumSpan()
+```
+
+#### Vl53l8CnhSetup.featureLength
+
+```java
+public int featureLength()
+```
+
+#### Vl53l8CnhSetup.nbOfAggregates
+
+```java
+public int nbOfAggregates()
+```
+
+#### Vl53l8CnhSetup.cnhCfg
+
+```java
+public int cnhCfg()
+```
+
+#### Vl53l8CnhSetup.cnhFlexShift
+
+```java
+public int cnhFlexShift()
+```
+
+#### Vl53l8CnhSetup.mapId
+
+```java
+public int[] mapId()
+```
+
+Device zone → CNH aggregate, −1 for a zone in none (64 entries).
+
+#### Vl53l8CnhSetup.initConfig
+
+```java
+public void initConfig(int startBin, int numBins, int subSample)
+```
+
+vl53lmz_cnh_init_config. `startBin`: first device histogram bin; `numBins`: CNH
+bins; `subSample`: device bins summed per CNH bin.
+
+#### Vl53l8CnhSetup.createAggMap
+
+```java
+public void createAggMap(int resolution, int startX, int startY, int mergeX, int mergeY, int cols, int rows)
+```
+
+vl53lmz_cnh_create_agg_map: aggregates of `mergeX`×`mergeY` zones, `cols`×
+`rows` of them from (`startX`, `startY`). `resolution` (16 or 64) must
+be the sensor's.
+
+#### Vl53l8CnhSetup.requiredMemory
+
+```java
+public int requiredMemory()
+```
+
+vl53lmz_cnh_calc_required_memory: the on-device CNH buffer, bytes.
+
+#### Vl53l8CnhSetup.minMaxDistanceMm
+
+```java
+public int[] minMaxDistanceMm()
+```
+
+{min, max} target distance, mm, the histogram captures whole.
+
+#### Vl53l8CnhSetup.binCenterMm
+
+```java
+public double binCenterMm(int binIdx)
+```
+
+Distance, mm, at the centre of CNH bin `binIdx`.
+
+#### Vl53l8CnhSetup.pack
+
+```java
+public byte[] pack()
+```
+
+The 156-byte VL53LMZ_Motion_Configuration struct for the device (DCI 0xBFAC).
+
+### Vl53l8Driver
+
+```java
+public final class Vl53l8Driver
+```
+
+The ST VL53L8CX ULD 2.1.0 / VL53LMZ ULD 2.0.16 / VL53L5CX-L7CX ULD 2.0.1 on the host, ported from
+the reference Python driver: init (sensor firmware download), resolution, frequency, mode,
+integration time, sharpener, target order, ranging, frame parsing, power modes, xtalk margin and
+calibration, detection thresholds, motion indicator. Register sequences are a 1:1 port — every
+request matches the Python one, so captures replay in both.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l8Driver.RESOLUTION_4X4 *(field)*
+
+```java
+public static final int RESOLUTION_4X4 = 16
+```
+
+#### Vl53l8Driver.RESOLUTION_8X8 *(field)*
+
+```java
+public static final int RESOLUTION_8X8 = 64
+```
+
+#### Vl53l8Driver.RANGING_MODE_CONTINUOUS *(field)*
+
+```java
+public static final int RANGING_MODE_CONTINUOUS = 1
+```
+
+#### Vl53l8Driver.RANGING_MODE_AUTONOMOUS *(field)*
+
+```java
+public static final int RANGING_MODE_AUTONOMOUS = 3
+```
+
+#### Vl53l8Driver.TARGET_ORDER_CLOSEST *(field)*
+
+```java
+public static final int TARGET_ORDER_CLOSEST = 1
+```
+
+#### Vl53l8Driver.TARGET_ORDER_STRONGEST *(field)*
+
+```java
+public static final int TARGET_ORDER_STRONGEST = 2
+```
+
+#### Vl53l8Driver.POWER_MODE_SLEEP *(field)*
+
+```java
+public static final int POWER_MODE_SLEEP = 0
+```
+
+#### Vl53l8Driver.POWER_MODE_WAKEUP *(field)*
+
+```java
+public static final int POWER_MODE_WAKEUP = 1
+```
+
+#### Vl53l8Driver.POWER_MODE_DEEP_SLEEP *(field)*
+
+```java
+public static final int POWER_MODE_DEEP_SLEEP = 2
+```
+
+#### Vl53l8Driver.MODULE_TYPE_MZ *(field)*
+
+```java
+public static final int MODULE_TYPE_MZ = 0
+```
+
+#### Vl53l8Driver.MODULE_TYPE_MZEVO *(field)*
+
+```java
+public static final int MODULE_TYPE_MZEVO = 1
+```
+
+#### Vl53l8Driver.MODULE_TYPE_MZPLUS *(field)*
+
+```java
+public static final int MODULE_TYPE_MZPLUS = 2
+```
+
+#### Vl53l8Driver.NVM_DATA_SIZE *(field)*
+
+```java
+public static final int NVM_DATA_SIZE = 492
+```
+
+#### Vl53l8Driver.OFFSET_BUFFER_SIZE *(field)*
+
+```java
+public static final int OFFSET_BUFFER_SIZE = 488
+```
+
+#### Vl53l8Driver.XTALK_BUFFER_SIZE *(field)*
+
+```java
+public static final int XTALK_BUFFER_SIZE = 776
+```
+
+#### Vl53l8Driver.firmware
+
+```java
+public Vl53l8Firmware firmware()
+```
+
+#### Vl53l8Driver.isI2c
+
+```java
+public boolean isI2c()
+```
+
+The L5/L7 boards: the sensor sits on I2C (other boot sequence, per-target blocks keep 64 entries in 4×4).
+
+#### Vl53l8Driver.moduleType
+
+```java
+public @Nullable Integer moduleType()
+```
+
+L5/L7: MZ (VL53L5CX) or MZEVO (VL53L7CX/CH), read during `init`; else null.
+
+#### Vl53l8Driver.dataReadSize
+
+```java
+public int dataReadSize()
+```
+
+The frame size the firmware streams (bytes), set by `startRanging`.
+
+#### Vl53l8Driver.frameSizeMismatch
+
+```java
+public int @Nullable [] frameSizeMismatch()
+```
+
+{firmware, host} frame sizes when the firmware reported another size than the ULD formula; else null.
+
+#### Vl53l8Driver.resolution
+
+```java
+public @Nullable Integer resolution()
+```
+
+Zones the last `startRanging` used, or null.
+
+#### Vl53l8Driver.xtalkCalibrationFailed
+
+```java
+public boolean xtalkCalibrationFailed()
+```
+
+The last `calibrateXtalk` ran into "coverglass too good": the default xtalk buffer is kept.
+
+#### Vl53l8Driver.xtalkData
+
+```java
+public byte[] xtalkData()
+```
+
+The 776-byte xtalk buffer the driver uploads (default, calibrated or restored).
+
+#### Vl53l8Driver.siliconIdMatches
+
+```java
+public static boolean siliconIdMatches(int deviceId, int revisionId, boolean i2c)
+```
+
+Whether the silicon ids are the sensor's: (0xF0, 0x0C) on L8 over SPI; revision 0x02, or 0x01
+with device id 0xF0, on L5/L7 over I2C.
+
+#### Vl53l8Driver.dciReadData
+
+```java
+public byte[] dciReadData(int index, int dataSize)
+```
+
+#### Vl53l8Driver.dciWriteData
+
+```java
+public void dciWriteData(int index, byte[] data)
+```
+
+#### Vl53l8Driver.dciReplaceData
+
+```java
+public void dciReplaceData(int index, int dataSize, byte[] newData, int newDataPos)
+```
+
+#### Vl53l8Driver.isAlive
+
+```java
+public int[] isAlive()
+```
+
+{device id, revision id} of the silicon; `siliconIdMatches` tells whether they are the sensor's.
+
+#### Vl53l8Driver.init
+
+```java
+public void init(@Nullable Consumer<String> progress)
+```
+
+vl53l8cx_init: boot the sensor MCU, download the 84 KB sensor firmware, upload the NVM
+offsets, the default xtalk and the default configuration. `progress` (may be null)
+gets phase texts.
+
+#### Vl53l8Driver.init
+
+```java
+public void init()
+```
+
+#### Vl53l8Driver.getResolution
+
+```java
+public int getResolution()
+```
+
+#### Vl53l8Driver.setResolution
+
+```java
+public void setResolution(int res)
+```
+
+#### Vl53l8Driver.getRangingFrequencyHz
+
+```java
+public int getRangingFrequencyHz()
+```
+
+#### Vl53l8Driver.setRangingFrequencyHz
+
+```java
+public void setRangingFrequencyHz(int hz)
+```
+
+#### Vl53l8Driver.setRangingMode
+
+```java
+public void setRangingMode(int mode)
+```
+
+#### Vl53l8Driver.getRangingMode
+
+```java
+public int getRangingMode()
+```
+
+#### Vl53l8Driver.getIntegrationTimeMs
+
+```java
+public int getIntegrationTimeMs()
+```
+
+#### Vl53l8Driver.setIntegrationTimeMs
+
+```java
+public void setIntegrationTimeMs(int timeMs)
+```
+
+2..1000 ms; no effect in continuous mode.
+
+#### Vl53l8Driver.getSharpenerPercent
+
+```java
+public int getSharpenerPercent()
+```
+
+0..99 %, rounded to nearest on the way back (ST truncates and loses a count for 95 of the 100
+legal values; the stored byte is the same).
+
+#### Vl53l8Driver.setSharpenerPercent
+
+```java
+public void setSharpenerPercent(int pct)
+```
+
+#### Vl53l8Driver.getTargetOrder
+
+```java
+public int getTargetOrder()
+```
+
+#### Vl53l8Driver.setTargetOrder
+
+```java
+public void setTargetOrder(int order)
+```
+
+#### Vl53l8Driver.startRanging
+
+```java
+public void startRanging(@Nullable Integer cnhDataSize)
+```
+
+Program the output list and start. `cnhDataSize` (bytes, from
+`Vl53l8CnhSetup#requiredMemory()`; null for none) appends the CNH block to every frame.
+
+#### Vl53l8Driver.startRanging
+
+```java
+public void startRanging()
+```
+
+#### Vl53l8Driver.stopRanging
+
+```java
+public void stopRanging()
+```
+
+#### Vl53l8Driver.checkDataReady
+
+```java
+public boolean checkDataReady()
+```
+
+Poll mode: a new frame is ready.
+
+#### Vl53l8Driver.getRangingData
+
+```java
+public Vl53l8Frame getRangingData(long timestampUs)
+```
+
+Poll mode: read one frame from register 0x00 and parse it.
+
+#### Vl53l8Driver.parseFrame
+
+```java
+public Vl53l8Frame parseFrame(long timestampUs, byte[] raw)
+```
+
+Parse one raw frame (`dataReadSize()` bytes) — polled, or pushed by the board's stream.
+L5/L7 frames are trimmed to the zones in use.
+
+#### Vl53l8Driver.getPowerMode
+
+```java
+public int getPowerMode()
+```
+
+#### Vl53l8Driver.setPowerMode
+
+```java
+public void setPowerMode(int powerMode)
+```
+
+Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs `init`:
+the sensor firmware is lost.
+
+#### Vl53l8Driver.getXtalkMargin
+
+```java
+public int getXtalkMargin()
+```
+
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
+
+#### Vl53l8Driver.setXtalkMargin
+
+```java
+public void setXtalkMargin(int marginKcps)
+```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
+
+#### Vl53l8Driver.getCaldataXtalk
+
+```java
+public byte[] getCaldataXtalk()
+```
+
+The live 776-byte xtalk calibration buffer (save / restore); the resolution is restored afterwards.
+
+#### Vl53l8Driver.setCaldataXtalk
+
+```java
+public void setCaldataXtalk(byte[] blob)
+```
+
+Restore a saved 776-byte xtalk buffer; it is uploaded again by the next resolution change and at once here.
+
+#### Vl53l8Driver.getDetectionThresholdsEnable
+
+```java
+public int getDetectionThresholdsEnable()
+```
+
+#### Vl53l8Driver.setDetectionThresholdsEnable
+
+```java
+public void setDetectionThresholdsEnable(boolean enabled)
+```
+
+#### Vl53l8Driver.getDetectionThresholds
+
+```java
+public List<Vl53l8Uld.DetectionThreshold> getDetectionThresholds()
+```
+
+The 64 thresholds, low / high rescaled to the units of their measurement.
+
+#### Vl53l8Driver.setDetectionThresholds
+
+```java
+public void setDetectionThresholds(List<Vl53l8Uld.DetectionThreshold> thresholds)
+```
+
+Program the 64 thresholds (missing entries are zeros; more than 64 is refused).
+
+#### Vl53l8Driver.setDetectionThresholdsAutoStop
+
+```java
+public void setDetectionThresholdsAutoStop(boolean autoStop)
+```
+
+#### Vl53l8Driver.motionIndicatorInit
+
+```java
+public Vl53l8Uld.MotionConfig motionIndicatorInit(int res)
+```
+
+A default motion-indicator configuration for `res`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.motionIndicatorDisarm
+
+```java
+public void motionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `motion` null. Called when the
+VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+
+#### Vl53l8Driver.motionIndicatorSetResolution
+
+```java
+public void motionIndicatorSetResolution(Vl53l8Uld.MotionConfig cfg, int res)
+```
+
+#### Vl53l8Driver.motionIndicatorSetDistanceMotion
+
+```java
+public void motionIndicatorSetDistanceMotion(Vl53l8Uld.MotionConfig cfg, int distanceMinMm, int distanceMaxMm)
+```
+
+#### Vl53l8Driver.calibrateXtalk
+
+```java
+public void calibrateXtalk(int reflectancePercent, int nbSamples, int distanceMm)
+```
+
+vl53l8cx_calibrate_xtalk: on-device crosstalk calibration against a flat target at
+`distanceMm` (600..3000) of `reflectancePercent` (1..99), averaging
+`nbSamples` (1..16). Takes seconds; the configuration is saved and restored around it.
+Without cover glass the firmware answers "coverglass too good": `xtalkCalibrationFailed()`,
+and the default buffer stays.
+
+### Vl53l8Firmware
+
+```java
+public enum Vl53l8Firmware
+```
+
+The sensor firmware a `Vl53l8Driver` downloads.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l8Firmware — constants
+
+`CX`, `CH`, `L7CX`, `L7CH`
+
+#### Vl53l8Firmware.setName *(field)*
+
+```java
+public final String setName
+```
+
+The blob set name under `vl53l8/data`.
+
+### Vl53l8Frame
+
+```java
+public record Vl53l8Frame(long timestampUs, int resolution, int siliconTempDegc, int[] distanceMm, int[] targetStatus, int[] nbTargetDetected, double[] signalPerSpad, double[] ambientPerSpad, long[] nbSpadsEnabled, double[] rangeSigmaMm, double[] reflectance, byte @Nullable [] cnhRaw, @Nullable Vl53l8Motion motion)
+```
+
+One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64
+for 8×8); zone index runs row-major. Values are in the real units ST's GetRangingData gives
+(contract 04 §5); ST divides integers, here the scaled values keep their fraction:
+`distanceMm` mm (raw ÷4 floored, a negative distance clamped to 0, as ST),
+`signalPerSpad` / `ambientPerSpad` kcps/SPAD (raw ÷2048), `rangeSigmaMm` mm
+(raw ÷128), `reflectance` % (raw ÷2). `targetStatus` 5 or 9 = valid, 255 = no
+target. `cnhRaw` is the raw CNH data block (VL53L8CH / VL53L7CH with CNH armed), else
+null; `motion` the motion-indicator output when it is configured, else null.
+
+#### Vl53l8Frame.withResolution
+
+```java
+public Vl53l8Frame withResolution(int zones)
+```
+
+This frame with `resolution` replaced (the device's own count of zones in use).
+
+### Vl53l8Motion
+
+```java
+public record Vl53l8Motion(long globalIndicator1, long globalIndicator2, int status, int nbOfDetectedAggregates, int nbOfAggregates, long[] motion)
+```
+
+The motion-indicator block of a frame (`VL53L8CX_ResultsData MotionIndicator`).
+
+### Vl53l8Platform
+
+```java
+public interface Vl53l8Platform
+```
+
+What the ULD needs from the board: register access through the bridge (16-bit addresses,
+auto-increment) and a delay. `Vl53l8cxDevice` maps it onto the firmware bridge; a test can
+script it.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+### Vl53l8Tables
+
+```java
+public final class Vl53l8Tables
+```
+
+The ST command tables the VL53L8 / L5 / L7 ULD writes verbatim. Each accessor returns a copy.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l8Tables.getXtalkCmd
+
+```java
+public static byte[] getXtalkCmd()
+```
+
+vl53l8cx_plugin_xtalk.h: the command that reads the xtalk buffer back; 72 bytes.
+
+#### Vl53l8Tables.calibrateXtalkCx
+
+```java
+public static byte[] calibrateXtalkCx()
+```
+
+VL53L8CX_CALIBRATE_XTALK (ULD 2.1.0); 1000 bytes.
+
+#### Vl53l8Tables.calibrateXtalkLmz
+
+```java
+public static byte[] calibrateXtalkLmz()
+```
+
+VL53LMZ_CALIBRATE_XTALK (ULD 2.0.16: L8CH, L7CH); 984 bytes.
+
+#### Vl53l8Tables.calibrateXtalkL7cx
+
+```java
+public static byte[] calibrateXtalkL7cx()
+```
+
+VL53L7CX_CALIBRATE_XTALK (ULD 2.0.1: L5CX, L7CX); 984 bytes.
+
+#### Vl53l8Tables.xtalkCalOutput
+
+```java
+public static int[] xtalkCalOutput()
+```
+
+the 17-block output list of the xtalk calibration run (u32 block headers as Java ints).
+
+#### Vl53l8Tables.xtalkCalOutputEnable
+
+```java
+public static int[] xtalkCalOutputEnable()
+```
+
+the output enables of xtalkCalOutput (u32 block headers as Java ints).
+
+### Vl53l8Uld
+
+```java
+public final class Vl53l8Uld
+```
+
+VL53L8CX/CH ULD — the frame decode and DCI codecs under the driver.
+
+The DEPZ ToF is two sensors: VL53L8CX (the base multizone
+part, also the dev/unprogrammed default) and VL53L8CH (CX plus CNH
+compact histograms and its own production USB PID `0xED40`). Their
+results-frame wire layout is identical, so this decoder serves both:
+`parseFrame` is shared, and the advanced-feature DCI codecs (motion
+configuration, detection thresholds, xtalk margin) apply equally to CX and CH.
+The only variant difference in the decode path is the footer-id offset —
+see `Variant`. Semantics mirror the TS/Python references 1:1.
+
+These are the pure parts of the ST ULD (`vl53l8cx_api.c`, ULD 2.1.0)
+that golden vectors pin; the live driver over the register bridge (firmware
+download, DCI access, ranging, power modes, calibration) is `Vl53l8Driver`.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l8Uld.RESOLUTION_4X4 *(field)*
+
+```java
+public static final int RESOLUTION_4X4 = 16
+```
+
+#### Vl53l8Uld.RESOLUTION_8X8 *(field)*
+
+```java
+public static final int RESOLUTION_8X8 = 64
+```
+
+#### Vl53l8Uld.NB_TARGET_PER_ZONE *(field)*
+
+```java
+public static final int NB_TARGET_PER_ZONE = 1
+```
+
+#### Vl53l8Uld.FOOTER_ID_OFF_CX *(field)*
+
+```java
+public static final int FOOTER_ID_OFF_CX = 12
+```
+
+Footer-id offset from frame end: cx (ULD 2.1.0) = 12, ch (2.0.16) = 4.
+
+#### Vl53l8Uld.FOOTER_ID_OFF_CH *(field)*
+
+```java
+public static final int FOOTER_ID_OFF_CH = 4
+```
+
+#### Vl53l8Uld.STATUS_INVALID_PARAM *(field)*
+
+```java
+public static final int STATUS_INVALID_PARAM = 127
+```
+
+#### Vl53l8Uld.STATUS_CORRUPTED_FRAME *(field)*
+
+```java
+public static final int STATUS_CORRUPTED_FRAME = 2
+```
+
+#### Vl53l8Uld.CNH_DATA_IDX *(field)*
+
+```java
+public static final int CNH_DATA_IDX = 0xc048
+```
+
+VL53LMZ CNH data output block (VL53L8CH / VL53L7CH).
+
+#### Vl53l8Uld.RESOLUTION_FROM_FRAME *(field)*
+
+```java
+public static final int RESOLUTION_FROM_FRAME = -1
+```
+
+`resolution` argument of `parseFrame(byte[], int, int, int)`:
+take the zone count from the zone-scaled ambient block (index 0x54D0,
+always sized to the resolution) and trim to it.
+
+#### Vl53l8Uld.DIST_MM *(field)*
+
+```java
+public static final int DIST_MM = 1
+```
+
+#### Vl53l8Uld.SIGNAL_PER_SPAD_KCPS *(field)*
+
+```java
+public static final int SIGNAL_PER_SPAD_KCPS = 2
+```
+
+#### Vl53l8Uld.RANGE_SIGMA_MM *(field)*
+
+```java
+public static final int RANGE_SIGMA_MM = 4
+```
+
+#### Vl53l8Uld.AMBIENT_PER_SPAD_KCPS *(field)*
+
+```java
+public static final int AMBIENT_PER_SPAD_KCPS = 8
+```
+
+#### Vl53l8Uld.NB_TARGET_DETECTED *(field)*
+
+```java
+public static final int NB_TARGET_DETECTED = 9
+```
+
+#### Vl53l8Uld.TAR_STATUS *(field)*
+
+```java
+public static final int TAR_STATUS = 12
+```
+
+#### Vl53l8Uld.NB_SPADS_ENABLED *(field)*
+
+```java
+public static final int NB_SPADS_ENABLED = 13
+```
+
+#### Vl53l8Uld.MOTION_INDICATOR *(field)*
+
+```java
+public static final int MOTION_INDICATOR = 19
+```
+
+#### Vl53l8Uld.NB_THRESHOLDS *(field)*
+
+```java
+public static final int NB_THRESHOLDS = 64
+```
+
+#### Vl53l8Uld.LAST_THRESHOLD *(field)*
+
+```java
+public static final int LAST_THRESHOLD = 128
+```
+
+#### Vl53l8Uld.POWER_MODE_SLEEP *(field)*
+
+```java
+public static final int POWER_MODE_SLEEP = 0
+```
+
+#### Vl53l8Uld.POWER_MODE_WAKEUP *(field)*
+
+```java
+public static final int POWER_MODE_WAKEUP = 1
+```
+
+#### Vl53l8Uld.POWER_MODE_DEEP_SLEEP *(field)*
+
+```java
+public static final int POWER_MODE_DEEP_SLEEP = 2
+```
+
+#### Vl53l8Uld.CNH_MAX_AGGREGATES *(field)*
+
+```java
+public static final int CNH_MAX_AGGREGATES = 64
+```
+
+decodeCnh() bounds — the same limits as the other SDKs.
+
+#### Vl53l8Uld.CNH_MAX_FEATURE_LENGTH *(field)*
+
+```java
+public static final int CNH_MAX_FEATURE_LENGTH = 255
+```
+
+#### Vl53l8Uld.decodeCnh
+
+```java
+public static CnhResult decodeCnh(int nbOfAggregates, int featureLength, byte[] raw)
+```
+
+Decode a captured CNH data block (`raw`, byte-swapped exactly like the
+standard ranging blocks) into per-aggregate histograms, for the fixed
+cnh_cfg (ping-pong + variance disabled). Faithful port of the ST CNH plugin
+/ Python `cnh.decode`.
+
+- `nbOfAggregates` — number of CNH aggregates (from the CNH config)
+- `featureLength` — CNH bins per aggregate (from the CNH config)
+- `raw` — captured CNH block bytes
+shorter than those counts imply (as the C / C++ / Rust / C# decoders)
+
+#### Vl53l8Uld.swapBuffer
+
+```java
+public static byte[] swapBuffer(byte[] data)
+```
+
+VL53L8CX_SwapBuffer: byte-reverse every 32-bit word (tail untouched).
+
+#### Vl53l8Uld.bhFields
+
+```java
+public static int[] bhFields(long bh)
+```
+
+union Block_header: type[3:0], size[15:4], idx[31:16].
+
+#### Vl53l8Uld.parseFrame
+
+```java
+public static Results parseFrame(byte[] raw, int dataReadSize, Variant variant)
+```
+
+Parse one raw results frame (`dataReadSize` bytes) for the given
+variant (CX or CH). Convenience overload of
+`parseFrame(byte[], int, int)` that picks the variant-specific
+footer-id offset. The decode body is shared across CX and CH.
+
+#### Vl53l8Uld.parseFrame
+
+```java
+public static Results parseFrame(byte[] raw, int dataReadSize, int footerIdOff)
+```
+
+Parse one raw results frame (`dataReadSize` bytes). `footerIdOff`
+is variant-specific (cx = 12, ch = 4); prefer the
+`parseFrame(byte[], int, Variant)` overload. Shared by VL53L8CX and
+VL53L8CH. Throws on a header/footer id mismatch.
+
+#### Vl53l8Uld.parseFrame
+
+```java
+public static Results parseFrame(byte[] raw, int dataReadSize, int footerIdOff, int resolution)
+```
+
+Parse one raw results frame and trim every per-zone array to
+`resolution` zones (x `NB_TARGET_PER_ZONE` for per-target
+arrays). Needed on VL53L5/L7 (contract 11 §3): blocks above index 0x6C90
+keep their declared 64-entry size even in 4x4, the sensor fills the first
+`resolution` entries and zero-pads the rest. `resolution`:
+`0` = no trim (VL53L8 behaviour), `16`/`64` = explicit,
+`RESOLUTION_FROM_FRAME` = the size of the zone-scaled ambient block.
+
+#### Vl53l8Uld.XTALK_MARGIN_MAX_KCPS *(field)*
+
+```java
+public static final int XTALK_MARGIN_MAX_KCPS = 10000
+```
+
+Largest xtalk margin `setXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
+#### Vl53l8Uld.xtalkMarginToRaw
+
+```java
+public static long xtalkMarginToRaw(int marginKcps)
+```
+
+Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+(kcps * 2048). The margin is 0..`XTALK_MARGIN_MAX_KCPS`; a negative
+or a bigger value throws `Vl53l8Error` (INVALID_PARAM) — never
+wrapped (contract 07 §3).
+
+#### Vl53l8Uld.xtalkMarginFromRaw
+
+```java
+public static int xtalkMarginFromRaw(long raw)
+```
+
+Inverse: raw DCI value -> whole kcps/SPAD (raw / 2048, integer division as ST).
+
+#### Vl53l8Uld.packDetectionThresholds
+
+```java
+public static PackedThresholds packDetectionThresholds(List<DetectionThreshold> thresholds)
+```
+
+Pack up to 64 detection thresholds into the DCI_DET_THRESH_START payload
+plus the 8-byte valid-status block. Each threshold's low/high are scaled
+by its measurement selector. Mirror of set_detection_thresholds.
+Anything out of its field's range (measurement/type/zone/operation u8,
+scaled low/high i32) or more than 64 entries throws
+`IllegalArgumentException`, never wrapped or dropped.
+
+#### Vl53l8Uld.motionConfigSetResolution
+
+```java
+public static void motionConfigSetResolution(MotionConfig cfg, int resolution)
+```
+
+Set MotionConfig.mapId for the given resolution (pure — no I/O).
+
+#### Vl53l8Uld.defaultMotionConfig
+
+```java
+public static MotionConfig defaultMotionConfig(int resolution)
+```
+
+Default motion-indicator configuration for a resolution (pure).
+
+### Vl53l8Uld.Variant
+
+```java
+public enum Variant
+```
+
+Which VL53L8 part produced a frame. The frame decode is shared; the only
+per-variant difference is the footer-id offset. CX is the dev-default base
+part; CH adds CNH histograms and its own production USB PID (0xED40).
+
+#### Vl53l8Uld.Variant — constants
+
+`CX`(FOOTER_ID_OFF_CX), `CH`(FOOTER_ID_OFF_CH)
+
+#### Vl53l8Uld.Variant.footerIdOff *(field)*
+
+```java
+public final int footerIdOff
+```
+
+Footer-id offset from the frame end for this variant.
+
+### Vl53l8Uld.CnhAggregate
+
+```java
+public static final class CnhAggregate
+```
+
+One decoded CNH aggregate: raw histogram ints + per-bin int8 scalers.
+
+#### Vl53l8Uld.CnhAggregate.histRaw *(field)*
+
+```java
+public final int[] histRaw
+```
+
+Signed int32 histogram value per CNH bin (len == featureLength).
+
+#### Vl53l8Uld.CnhAggregate.histScaler *(field)*
+
+```java
+public final int[] histScaler
+```
+
+int8 scaler per CNH bin (len == featureLength); value = histRaw / 2^scaler.
+
+### Vl53l8Uld.CnhResult
+
+```java
+public static final class CnhResult
+```
+
+Decoded CNH data block: reference residual word + per-aggregate histograms.
+
+#### Vl53l8Uld.CnhResult.refResidualWord *(field)*
+
+```java
+public final long refResidualWord
+```
+
+Raw uint32 ref-residual word (words[2]); float residual = value / 2048.
+
+#### Vl53l8Uld.CnhResult.aggregates *(field)*
+
+```java
+public final CnhAggregate[] aggregates
+```
+
+Per-aggregate histograms (len == nbOfAggregates).
+
+### Vl53l8Uld.Results
+
+```java
+public static final class Results
+```
+
+Parsed results frame, in the real units ST's GetRangingData gives (contract
+04 §5). ST divides integers; the scaled values here keep their fraction.
+
+#### Vl53l8Uld.Results.distanceMm *(field)*
+
+```java
+public int[] distanceMm
+```
+
+mm: raw / 4 floored, a negative distance clamped to 0 (as ST).
+
+#### Vl53l8Uld.Results.targetStatus *(field)*
+
+```java
+public int[] targetStatus
+```
+
+5 or 9 = valid measurement; 255 = no target detected.
+
+#### Vl53l8Uld.Results.nbTargetDetected *(field)*
+
+```java
+public int[] nbTargetDetected
+```
+
+Targets found per zone.
+
+#### Vl53l8Uld.Results.signalPerSpad *(field)*
+
+```java
+public double[] signalPerSpad
+```
+
+Signal rate, kcps/SPAD (raw / 2048).
+
+#### Vl53l8Uld.Results.ambientPerSpad *(field)*
+
+```java
+public double[] ambientPerSpad
+```
+
+Ambient rate, kcps/SPAD (raw / 2048), one per zone.
+
+#### Vl53l8Uld.Results.nbSpadsEnabled *(field)*
+
+```java
+public long[] nbSpadsEnabled
+```
+
+Active SPAD count per zone.
+
+#### Vl53l8Uld.Results.rangeSigmaMm *(field)*
+
+```java
+public double[] rangeSigmaMm
+```
+
+Measurement noise, mm (raw / 128).
+
+#### Vl53l8Uld.Results.reflectance *(field)*
+
+```java
+public double[] reflectance
+```
+
+Estimated target reflectance, % (raw / 2).
+
+#### Vl53l8Uld.Results.siliconTempDegc *(field)*
+
+```java
+public int siliconTempDegc = 0
+```
+
+#### Vl53l8Uld.Results.cnhRaw *(field)*
+
+```java
+public byte @Nullable [] cnhRaw
+```
+
+Raw CNH (compact-histogram) block bytes (VL53L8CH / VL53L7CH, block
+`CNH_DATA_IDX`, word-swapped like every block); `null`
+when absent (always on CX). Decode with `decodeCnh`.
+
+#### Vl53l8Uld.Results.resolution
+
+```java
+public int resolution()
+```
+
+Zones actually present this frame (16 for 4x4, 64 for 8x8).
+
+### Vl53l8Uld.DetectionThreshold
+
+```java
+public record DetectionThreshold(int lowThresh, int highThresh, int measurement, int type, int zoneNum, int operation)
+```
+
+One detection-threshold entry (real units).
+
+#### Vl53l8Uld.DetectionThreshold.of
+
+```java
+public static DetectionThreshold of(int lowThresh, int highThresh, int measurement, int type, int zoneNum, int operation)
+```
+
+Build one: the path that survives a component appended after 1.0 (contract 07 §5).
+
+### Vl53l8Uld.PackedThresholds
+
+```java
+public record PackedThresholds(byte[] start, byte[] valid)
+```
+
+`DCI_DET_THRESH_START` payload (64x12 B) + 8-B valid-status block.
+
+### Vl53l8Uld.MotionConfig
+
+```java
+public static final class MotionConfig
+```
+
+Mirror of VL53L8CX_Motion_Configuration (156 bytes, `<i3I12B64b32B32B`).
+
+#### Vl53l8Uld.MotionConfig.refBinOffset *(field)*
+
+```java
+public int refBinOffset = 0
+```
+
+#### Vl53l8Uld.MotionConfig.detectionThreshold *(field)*
+
+```java
+public long detectionThreshold = 0
+```
+
+#### Vl53l8Uld.MotionConfig.extraNoiseSigma *(field)*
+
+```java
+public long extraNoiseSigma = 0
+```
+
+#### Vl53l8Uld.MotionConfig.nullDenClipValue *(field)*
+
+```java
+public long nullDenClipValue = 0
+```
+
+#### Vl53l8Uld.MotionConfig.memUpdateMode *(field)*
+
+```java
+public int memUpdateMode = 0
+```
+
+#### Vl53l8Uld.MotionConfig.memUpdateChoice *(field)*
+
+```java
+public int memUpdateChoice = 0
+```
+
+#### Vl53l8Uld.MotionConfig.sumSpan *(field)*
+
+```java
+public int sumSpan = 0
+```
+
+#### Vl53l8Uld.MotionConfig.featureLength *(field)*
+
+```java
+public int featureLength = 0
+```
+
+#### Vl53l8Uld.MotionConfig.nbOfAggregates *(field)*
+
+```java
+public int nbOfAggregates = 0
+```
+
+#### Vl53l8Uld.MotionConfig.nbOfTemporalAccumulations *(field)*
+
+```java
+public int nbOfTemporalAccumulations = 0
+```
+
+#### Vl53l8Uld.MotionConfig.minNbForGlobalDetection *(field)*
+
+```java
+public int minNbForGlobalDetection = 0
+```
+
+#### Vl53l8Uld.MotionConfig.globalIndicatorFormat1 *(field)*
+
+```java
+public int globalIndicatorFormat1 = 0
+```
+
+#### Vl53l8Uld.MotionConfig.globalIndicatorFormat2 *(field)*
+
+```java
+public int globalIndicatorFormat2 = 0
+```
+
+#### Vl53l8Uld.MotionConfig.spare1 *(field)*
+
+```java
+public int spare1 = 0
+```
+
+#### Vl53l8Uld.MotionConfig.spare2 *(field)*
+
+```java
+public int spare2 = 0
+```
+
+#### Vl53l8Uld.MotionConfig.spare3 *(field)*
+
+```java
+public int spare3 = 0
+```
+
+#### Vl53l8Uld.MotionConfig.mapId *(field)*
+
+```java
+public final int[] mapId
+```
+
+#### Vl53l8Uld.MotionConfig.indicatorFormat1 *(field)*
+
+```java
+public final int[] indicatorFormat1
+```
+
+#### Vl53l8Uld.MotionConfig.indicatorFormat2 *(field)*
+
+```java
+public final int[] indicatorFormat2
+```
+
+#### Vl53l8Uld.MotionConfig.pack
+
+```java
+public byte[] pack()
+```
+
+### Vl53l8Uld.Vl53l8Error
+
+```java
+public static final class Vl53l8Error extends RuntimeException
+```
+
+A VL53L8 / L5 / L7 ULD status (vl53l8cx_api.h codes) with where it happened.
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_TIMEOUT_ERROR *(field)*
+
+```java
+public static final int STATUS_TIMEOUT_ERROR = 1
+```
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_CORRUPTED_FRAME *(field)*
+
+```java
+public static final int STATUS_CORRUPTED_FRAME = 2
+```
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_LASER_SAFETY *(field)*
+
+```java
+public static final int STATUS_LASER_SAFETY = 3
+```
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_FW_CHECKSUM_FAIL *(field)*
+
+```java
+public static final int STATUS_FW_CHECKSUM_FAIL = 5
+```
+
+#### Vl53l8Uld.Vl53l8Error.MCU_ERROR *(field)*
+
+```java
+public static final int MCU_ERROR = 66
+```
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_INVALID_PARAM *(field)*
+
+```java
+public static final int STATUS_INVALID_PARAM = 127
+```
+
+#### Vl53l8Uld.Vl53l8Error.STATUS_ERROR *(field)*
+
+```java
+public static final int STATUS_ERROR = 255
+```
+
+#### Vl53l8Uld.Vl53l8Error.code *(field)*
+
+```java
+public final int code
+```

@@ -1,0 +1,761 @@
+# VL53L8CX (ToF) — API reference
+
+The public API for the VL53L8CX (ToF) sensor: its codecs and its live class. Transport,
+common-protocol, identity and other cross-sensor symbols shared by
+every sensor live in the [top-level API reference](../api.md).
+
+The live class (`depz::Vl53l8`) derives from `depz::Device`; the
+device core it inherits (common commands, time sync, events),
+the links, streams, errors and discovery are in the
+[top-level API reference](../api.md#live-hardware-links-device-discovery).
+
+`depz::Vl53l8` drives the VL53L8CX and the VL53L8CH alike, and
+the VL53L5CX / VL53L7CX / VL53L7CH on the I2C board
+(`module_type`, `bridge_info`, `set_i2c_speed_khz` and
+`pin_ctrl` are for that board only); `CnhSetup`, the CH-only
+CNH configuration, is in the
+[VL53L8CH API reference](../vl53l8ch/api.md).
+
+Generated from the header doc-comments — edit the doc-comments in
+the headers, not this file.
+
+## Contents
+
+- **VL53L8 codecs (depz/vl53l8.hpp)**: [`RESOLUTION_4X4`](#resolution_4x4), [`RESOLUTION_8X8`](#resolution_8x8), [`STREAM_CHUNK_MAX`](#stream_chunk_max), [`STREAM_TOTAL_MAX`](#stream_total_max), [`pack_start_stream`](#pack_start_stream), [`Variant`](#variant), [`FOOTER_ID_OFF_CX`](#footer_id_off_cx), [`footer_id_off`](#footer_id_off), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Frame`](#vl53l8frame), [`swap_buffer`](#swap_buffer), [`decode_frame`](#decode_frame), [`XTALK_MARGIN_MAX_KCPS`](#xtalk_margin_max_kcps), [`xtalk_margin_raw`](#xtalk_margin_raw), [`xtalk_margin_kcps`](#xtalk_margin_kcps), [`ThreshMeasurement`](#threshmeasurement), [`DetectionThreshold`](#detectionthreshold), [`NB_THRESHOLDS`](#nb_thresholds), [`pack_detection_thresholds`](#pack_detection_thresholds), [`detection_thresholds_valid_status`](#detection_thresholds_valid_status), [`MotionConfig`](#motionconfig), [`motion_config_init`](#motion_config_init)
+- **VL53L8 live class (depz/device.hpp)**: [`Vl53l8Model`](#vl53l8model), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8LiveFrame`](#vl53l8liveframe), [`Vl53l8Progress`](#vl53l8progress), [`Vl53l8`](#vl53l8), [`open_vl53l8`](#open_vl53l8)
+
+## VL53L8 codecs (depz/vl53l8.hpp)
+
+### RESOLUTION_4X4
+
+```cpp
+inline constexpr int RESOLUTION_4X4 = 16;
+```
+
+### RESOLUTION_8X8
+
+```cpp
+inline constexpr int RESOLUTION_8X8 = 64;
+```
+
+### STREAM_CHUNK_MAX
+
+```cpp
+inline constexpr std::size_t STREAM_CHUNK_MAX = 1528;
+```
+
+Max frame-data bytes carried in one RPT_VL53_FRAME chunk (contract 04).
+
+### STREAM_TOTAL_MAX
+
+```cpp
+inline constexpr std::size_t STREAM_TOTAL_MAX = 8192;
+```
+
+Largest frame_size VL53_START_STREAM accepts (contract 04 §2).
+
+### pack_start_stream
+
+```cpp
+bytes pack_start_stream(std::uint16_t frame_size);
+```
+
+VL53_START_STREAM (0x35) payload: frame_size u16 LE — the host ULD's
+data_read_size (contract 04 §2). Byte-exact with the reference
+pack_start_stream; frame_size outside 1..8192 throws std::invalid_argument
+(contract 04 §4 rule 4 — the firmware refuses it too).
+
+### Variant
+
+```cpp
+enum class Variant {
+    CX,  // base ToF (ULD 2.1.0); dev-default, no dedicated production USB PID
+    CH,  // CX + CNH histograms; production USB PID 0xED40 (VL53LMZ 2.0.16)
+};
+```
+
+The two DEPZ ToF die variants. Both stream the same results-frame layout
+decoded by decode_frame(); they differ in the footer-id offset here, and the
+CH additionally emits CNH histograms (decode_cnh, at the bottom).
+
+### FOOTER_ID_OFF_CX
+
+```cpp
+inline constexpr int FOOTER_ID_OFF_CX = 12;
+```
+
+Footer-id offset used by decode_frame's header/footer match check, per
+variant: 12 for VL53L8CX (ULD 2.1.0), 4 for VL53L8CH (VL53LMZ 2.0.16).
+
+### footer_id_off
+
+```cpp
+inline constexpr int footer_id_off(Variant v);
+```
+
+Footer-id offset for a variant (convenience for decode_frame's argument).
+
+### FrameChunk
+
+```cpp
+struct FrameChunk {
+    std::uint64_t timestamp_us = 0;
+    std::uint16_t full_size = 0;
+    std::uint16_t offset = 0;
+    bytes data;
+};
+```
+
+One RPT_VL53_FRAME payload: capture timestamp + this chunk's slice of the
+full frame. Header is ts(u64) full_size(u16) offset(u16), then data.
+
+#### FrameChunk.unpack
+
+```cpp
+static FrameChunk unpack(byte_span payload);
+```
+
+### FrameReassembler
+
+```cpp
+class FrameReassembler {
+    // (no public data members)
+};
+```
+
+Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports
+(depz_vl53l8_reassembler). Rules (contract 04 §4): reset on offset==0;
+chunks must be contiguous — a gap discards the frame in progress; a frame
+completes when the accumulated bytes equal full_size. A chunk out of the
+rule-4 bounds (more than chunk_max bytes, full_size over STREAM_TOTAL_MAX, or
+running past full_size) is damaged: dropped and counted as a lost frame like
+the other damaged input, never thrown. chunk_max is the device's
+VL53_STREAM_FRAME_MAX (vl53l7::STREAM_CHUNK_MAX = 1536 on the I2C board,
+contract 11 §3).
+
+#### FrameReassembler.FrameReassembler
+
+```cpp
+explicit FrameReassembler(std::size_t chunk_max = STREAM_CHUNK_MAX);
+```
+
+#### FrameReassembler.feed
+
+```cpp
+std::optional<std::pair<std::uint64_t, bytes>> feed(const FrameChunk& chunk);
+```
+
+Returns (timestamp_us, frame_bytes) when a frame completes, else nullopt.
+
+#### FrameReassembler.completed
+
+```cpp
+std::uint64_t completed() const noexcept;
+```
+
+frames handed out
+
+#### FrameReassembler.discarded
+
+```cpp
+std::uint64_t discarded() const noexcept;
+```
+
+frames lost to damaged input
+
+### Vl53l8Frame
+
+```cpp
+struct Vl53l8Frame {
+    std::uint64_t timestamp_us = 0;
+    int resolution = 0;
+    int silicon_temp_degc = 0;
+    std::vector<std::int32_t> distance_mm;  // mm, >= 0
+    std::vector<std::uint8_t> target_status;
+    std::vector<std::uint8_t> nb_target_detected;
+    std::vector<double> signal_per_spad;  // kcps/SPAD
+    std::vector<double> ambient_per_spad;  // kcps/SPAD
+    std::vector<std::uint32_t> nb_spads_enabled;
+    std::vector<double> range_sigma_mm;  // mm
+    std::vector<double> reflectance;  // %
+    std::optional<bytes> cnh_raw;
+};
+```
+
+One decoded ranging frame. Arrays are sized to the active resolution (16 or
+64 zones), row-major, in the real units ST's GetRangingData gives (contract
+04 §5): `distance_mm` = wire value / 4 floored, a negative result clamped to
+0; signal / ambient = wire / 2048 (kcps/SPAD); `range_sigma_mm` = wire / 128
+(mm); `reflectance` = wire / 2 (%). ST divides integers; the double fields
+keep the fraction.
+
+### swap_buffer
+
+```cpp
+bytes swap_buffer(byte_span data);
+```
+
+VL53L8CX_SwapBuffer (depz_vl53l8_swap_buffer): byte-reverse every complete
+32-bit word; a tail of 1..3 bytes is unchanged. The decoders do this
+themselves on the raw frame.
+
+### decode_frame
+
+```cpp
+std::optional<Vl53l8Frame> decode_frame(byte_span raw, int footer_id_off = FOOTER_ID_OFF_CX);
+```
+
+Decode one raw results frame (the full reassembled frame bytes). Shared by
+both CX and CH — the layout is identical. Resolution is inferred from the
+frame's block layout. Returns nullopt for a corrupted frame (header/footer id
+mismatch). `footer_id_off` is variant-specific (FOOTER_ID_OFF_CX /
+FOOTER_ID_OFF_CH, or footer_id_off(Variant)); it defaults to the CX offset;
+std::invalid_argument for any other value.
+
+### XTALK_MARGIN_MAX_KCPS
+
+```cpp
+constexpr std::uint32_t XTALK_MARGIN_MAX_KCPS = 10000;
+```
+
+Largest xtalk margin set_xtalk_margin accepts, kcps/SPAD (as ST).
+
+### xtalk_margin_raw
+
+```cpp
+std::uint32_t xtalk_margin_raw(std::uint32_t margin_kcps);
+```
+
+Xtalk margin, a whole number of kcps/SPAD (as ST) <-> DCI_XTALK_CFG raw word
+(raw = kcps*2048). xtalk_margin_raw: std::out_of_range above
+XTALK_MARGIN_MAX_KCPS. xtalk_margin_kcps: raw / 2048 (integer division).
+
+### xtalk_margin_kcps
+
+```cpp
+std::uint32_t xtalk_margin_kcps(std::uint32_t raw);
+```
+
+### ThreshMeasurement
+
+```cpp
+enum ThreshMeasurement : std::uint8_t {
+    THRESH_DIST_MM = 1,
+    THRESH_SIGNAL_PER_SPAD_KCPS = 2,
+    THRESH_RANGE_SIGMA_MM = 4,
+    THRESH_AMBIENT_PER_SPAD_KCPS = 8,
+    THRESH_NB_TARGET_DETECTED = 9,
+    THRESH_TAR_STATUS = 12,
+    THRESH_NB_SPADS_ENABLED = 13,
+    THRESH_MOTION_INDICATOR = 19,
+};
+```
+
+Detection-threshold measurement selectors (plugin source).
+
+### DetectionThreshold
+
+```cpp
+using DetectionThreshold = depz_vl53l8_threshold;
+```
+
+One detection threshold (the C SDK's depz_vl53l8_threshold): low_thresh /
+high_thresh in real units (scaled on pack), measurement (ThreshMeasurement),
+type (window selector), zone_num, operation (combine op).
+
+### NB_THRESHOLDS
+
+```cpp
+inline constexpr int NB_THRESHOLDS = 64;
+```
+
+### pack_detection_thresholds
+
+```cpp
+bytes pack_detection_thresholds(const std::vector<DetectionThreshold>& thresholds);
+```
+
+Pack the 64-entry DCI_DET_THRESH_START block (768 bytes). Missing entries
+default to zeros; low/high are multiplied by the measurement's scale factor.
+std::invalid_argument for more than 64 entries, std::out_of_range when a
+scaled low/high does not fit the i32 field (contract 07 §3).
+
+### detection_thresholds_valid_status
+
+```cpp
+bytes detection_thresholds_valid_status();
+```
+
+The 8-byte DCI_DET_THRESH_VALID_STATUS write that accompanies the block.
+
+### MotionConfig
+
+```cpp
+struct MotionConfig : depz_vl53l8_motion_cfg {
+    // (no public data members)
+};
+```
+
+Mirror of VL53L8CX_Motion_Configuration (156 bytes, plugin source): the C
+SDK's depz_vl53l8_motion_cfg — ref_bin_offset, detection_threshold,
+extra_noise_sigma, null_den_clip_value, mem_update_mode, mem_update_choice,
+sum_span, feature_length, nb_of_aggregates, nb_of_temporal_accumulations,
+min_nb_for_global_detection, global_indicator_format_1 / _2, spare_1..3,
+map_id[64], indicator_format_1[32], indicator_format_2[32].
+
+#### MotionConfig.pack
+
+```cpp
+bytes pack() const;
+```
+
+The 156-byte DCI block (depz_vl53l8_motion_cfg_pack).
+
+### motion_config_init
+
+```cpp
+MotionConfig motion_config_init(int resolution);
+```
+
+The default motion-indicator configuration for `resolution` (RESOLUTION_4X4
+or RESOLUTION_8X8), matching uld.motion_indicator_init
+(depz_vl53l8_motion_cfg_default). std::invalid_argument for any other
+resolution.
+
+## VL53L8 live class (depz/device.hpp)
+
+### Vl53l8Model
+
+```cpp
+enum class Vl53l8Model {
+    L8CX = 0, L8CH = 1, L5CX = 2, L7CX = 3, L7CH = 4
+};
+```
+
+The multizone boards this class serves: VL53L8CX/CH on the SPI bridge
+(APP_VL53L8), VL53L5CX/L7CX/L7CH on the I2C bridge (APP_VL53L7). The model
+fixes the sensor firmware init() downloads (L8CX: ST ULD 2.1.0, L8CH:
+VL53LMZ 2.0.16 with CNH); open_device() picks L8CH for the VL53L8 production
+USB PID 0xED40, else L8CX; on APP_VL53L7 the PID (0xED48 / 0xED49 / 0xED4A),
+else the device name, else L7CX.
+
+### Vl53l8Motion
+
+```cpp
+struct Vl53l8Motion {
+    std::uint32_t global_indicator_1, global_indicator_2;
+    std::uint8_t status, nb_of_detected_aggregates, nb_of_aggregates;
+    std::array<std::uint32_t, 32> motion;
+};
+```
+
+The motion-indicator output of a frame (configure_motion_indicator).
+
+### Vl53l8LiveFrame
+
+```cpp
+struct Vl53l8LiveFrame {
+    vl53l8::Vl53l8Frame frame;
+    std::optional<Vl53l8Motion> motion;
+};
+```
+
+One streamed frame: the zone arrays in `frame` (real units as ST
+GetRangingData — distance_mm in mm, see vl53l8::Vl53l8Frame; CH with
+CNH armed: frame.cnh_raw, decode with vl53l8::decode_cnh()), plus motion.
+
+### Vl53l8Progress
+
+```cpp
+using Vl53l8Progress = std::function<void(const std::string& phase, std::size_t done, std::size_t total)>;
+```
+
+Progress of init(): phase text, and done/total bytes during the big writes.
+
+### Vl53l8
+
+```cpp
+class Vl53l8 : public Device {
+    // (no public data members)
+};
+```
+
+Multizone ToF: the ST ULD on the host over the board's register bridge,
+one class for every Vl53l8Model.
+
+#### Vl53l8.open
+
+```cpp
+static std::unique_ptr<Vl53l8> open(Link link, Vl53l8Model model);
+```
+
+A multizone ToF on a link without an identity probe, the model given by
+hand (tests, replay).
+
+#### Vl53l8.model
+
+```cpp
+Vl53l8Model model() const;
+```
+
+fixed at open: the USB PID, or open(link, model)
+
+#### Vl53l8.is_alive
+
+```cpp
+bool is_alive();
+```
+
+id 0xF0 / rev 0x0C over SPI; rev 0x02 (or 0xF0 / 0x01) on L5/L7
+
+#### Vl53l8.init
+
+```cpp
+void init(Vl53l8Progress progress = {});
+```
+
+Boot the sensor MCU, download its firmware, upload NVM / xtalk / config
+(~0.8 s over SPI, ~1.3 s over I2C). Needed after every power-up, deep
+sleep and L5/L7 LpnOff / SoftCycle; it disarms CNH and the motion indicator.
+An exception from `progress` is not called again and leaves init() once
+the boot has run to its end (contract 07 §3).
+
+#### Vl53l8.initialized
+
+```cpp
+bool initialized() const;
+```
+
+#### Vl53l8.ranging
+
+```cpp
+bool ranging() const;
+```
+
+between start_ranging() and stop_ranging()
+
+#### Vl53l8.resolution
+
+```cpp
+int resolution();
+```
+
+16 | 64 zones
+
+#### Vl53l8.set_resolution
+
+```cpp
+void set_resolution(int zones);
+```
+
+vl53l8::RESOLUTION_4X4 | _8X8
+
+#### Vl53l8.ranging_frequency_hz
+
+```cpp
+std::uint8_t ranging_frequency_hz();
+```
+
+Hz
+
+#### Vl53l8.set_ranging_frequency_hz
+
+```cpp
+void set_ranging_frequency_hz(std::uint8_t hz);
+```
+
+>= 2 VL53L8, >= 1 L5/L7; max 60 (4x4) / 15 (8x8)
+
+#### Vl53l8.ranging_mode
+
+```cpp
+std::uint8_t ranging_mode();
+```
+
+DEPZ_VL53L8_RANGING_MODE_*: 1 continuous, 3 autonomous
+
+#### Vl53l8.set_ranging_mode
+
+```cpp
+void set_ranging_mode(std::uint8_t mode);
+```
+
+1 continuous, 3 autonomous
+
+#### Vl53l8.integration_time_ms
+
+```cpp
+std::uint32_t integration_time_ms();
+```
+
+ms per frame in autonomous mode
+
+#### Vl53l8.set_integration_time_ms
+
+```cpp
+void set_integration_time_ms(std::uint32_t ms);
+```
+
+2..1000, autonomous only
+
+#### Vl53l8.sharpener_percent
+
+```cpp
+std::uint8_t sharpener_percent();
+```
+
+0 = off; read back rounded
+
+#### Vl53l8.set_sharpener_percent
+
+```cpp
+void set_sharpener_percent(std::uint8_t pct);
+```
+
+0..99
+
+#### Vl53l8.target_order
+
+```cpp
+std::uint8_t target_order();
+```
+
+1 closest, 2 strongest
+
+#### Vl53l8.set_target_order
+
+```cpp
+void set_target_order(std::uint8_t order);
+```
+
+1 closest, 2 strongest
+
+#### Vl53l8.power_mode
+
+```cpp
+std::uint8_t power_mode();
+```
+
+0 sleep, 1 wakeup, 2 deep sleep
+
+#### Vl53l8.set_power_mode
+
+```cpp
+void set_power_mode(std::uint8_t mode);
+```
+
+no deep sleep on L5CX/L7CX; waking from it re-runs init()
+
+#### Vl53l8.xtalk_margin
+
+```cpp
+std::uint32_t xtalk_margin();
+```
+
+whole kcps/SPAD (raw / 2048, as ST)
+
+#### Vl53l8.set_xtalk_margin
+
+```cpp
+void set_xtalk_margin(std::uint32_t kcps_per_spad);
+```
+
+whole kcps/SPAD 0..10000 (as ST); above is refused
+
+#### Vl53l8.calibrate_xtalk
+
+```cpp
+bool calibrate_xtalk(std::uint8_t reflectance_percent, std::uint8_t nb_samples, std::uint16_t distance_mm);
+```
+
+Crosstalk calibration (reflectance 1..99 %, samples 1..16, 600..3000 mm);
+returns false when the firmware found nothing to calibrate (no cover glass).
+
+#### Vl53l8.caldata_xtalk
+
+```cpp
+bytes caldata_xtalk();
+```
+
+the 776-byte blob, to save
+
+#### Vl53l8.set_caldata_xtalk
+
+```cpp
+void set_caldata_xtalk(byte_span blob);
+```
+
+restore a saved blob (776 bytes)
+
+#### Vl53l8.detection_thresholds_enabled
+
+```cpp
+bool detection_thresholds_enabled();
+```
+
+Detection thresholds: with them enabled, INT (and so the stream) only
+fires for frames that meet them.
+
+#### Vl53l8.set_detection_thresholds_enabled
+
+```cpp
+void set_detection_thresholds_enabled(bool enabled);
+```
+
+#### Vl53l8.detection_thresholds
+
+```cpp
+std::vector<vl53l8::DetectionThreshold> detection_thresholds();
+```
+
+all 64
+
+#### Vl53l8.set_detection_thresholds
+
+```cpp
+void set_detection_thresholds(const std::vector<vl53l8::DetectionThreshold>& thresholds);
+```
+
+Up to 64, low/high in real units; bit 7 of zone_num marks the last one.
+
+#### Vl53l8.set_detection_thresholds_auto_stop
+
+```cpp
+void set_detection_thresholds_auto_stop(bool auto_stop);
+```
+
+stop ranging on a hit; not on L5CX/L7CX
+
+#### Vl53l8.configure_motion_indicator
+
+```cpp
+void configure_motion_indicator(std::uint16_t min_mm = 400, std::uint16_t max_mm = 1500);
+```
+
+Motion indicator over [min_mm, max_mm] (400..4000, span <= 1500) for the
+current resolution; frames then carry `motion`. It shares DCI 0xBFAC
+with CNH: this disarms CNH (cnh_setup() nullopt, no frame.cnh_raw).
+
+#### Vl53l8.configure_cnh
+
+```cpp
+void configure_cnh(const CnhSetup& setup);
+```
+
+L8CH / L7CH only (WrongTypeError otherwise): arm CNH for the next
+start_ranging(); frames then carry frame.cnh_raw and no `motion` (the
+motion indicator is disarmed: one DCI block). init() disarms both.
+
+#### Vl53l8.cnh_setup
+
+```cpp
+std::optional<CnhSetup> cnh_setup() const;
+```
+
+The CNH setup configure_cnh() armed; nullopt when none is.
+
+#### Vl53l8.start_ranging
+
+```cpp
+void start_ranging();
+```
+
+start the sensor and the MCU's frame stream
+
+#### Vl53l8.stop_ranging
+
+```cpp
+void stop_ranging();
+```
+
+idempotent
+
+#### Vl53l8.frames
+
+```cpp
+Stream<Vl53l8LiveFrame>& frames();
+```
+
+The streamed frames (RPT_FRAME); a frame is several KB, so subscriptions
+default to 8 items — keep maxsize small. parse_errors() counts the
+frames that did not decode.
+
+#### Vl53l8.reassembler_discards
+
+```cpp
+std::uint64_t reassembler_discards() const;
+```
+
+chunked frames lost on a gap
+
+#### Vl53l8.read_reg
+
+```cpp
+bytes read_reg(std::uint16_t addr, std::size_t len);
+```
+
+Escape hatches: raw registers and DCI indices.
+
+#### Vl53l8.write_reg
+
+```cpp
+void write_reg(std::uint16_t addr, byte_span data);
+```
+
+#### Vl53l8.dci_read
+
+```cpp
+bytes dci_read(std::uint16_t index, std::size_t len);
+```
+
+#### Vl53l8.dci_write
+
+```cpp
+void dci_write(std::uint16_t index, byte_span data);
+```
+
+#### Vl53l8.module_type
+
+```cpp
+std::optional<int> module_type() const;
+```
+
+L5/L7: the module type read at init(): 0 MZ = VL53L5CX, 1 MZEVO =
+VL53L7CX/CH (never CX vs CH); nullopt before init and on a VL53L8.
+
+#### Vl53l8.bridge_info
+
+```cpp
+vl53l7::Vl53l7Info bridge_info();
+```
+
+L5/L7 only (WrongTypeError on a VL53L8), like the next two: the bridge
+counters; read before / after a run, not during one.
+
+#### Vl53l8.set_i2c_speed_khz
+
+```cpp
+std::uint16_t set_i2c_speed_khz(std::uint16_t khz);
+```
+
+L5/L7 only. SCL snaps to 100, 200, 400, 500 ... 1000 kHz; returns the
+value in effect.
+
+#### Vl53l8.pin_ctrl
+
+```cpp
+void pin_ctrl(vl53l7::PinAction action);
+```
+
+L5/L7 only. LpnOff / SoftCycle drop the sensor's state: init() again.
+
+### open_vl53l8
+
+```cpp
+std::unique_ptr<Vl53l8> open_vl53l8(const OpenOptions& opt = {});
+```
+
+open_device, and WrongTypeError unless it is a multizone ToF. The model
+comes from the USB PID (0xED40 -> L8CH, else L8CX on APP_VL53L8; 0xED48 /
+0xED49 / 0xED4A -> L5CX / L7CX / L7CH, else the device name, else L7CX on
+APP_VL53L7).

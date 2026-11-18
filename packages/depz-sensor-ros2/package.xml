@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>depz_sensors</name>
+  <version>1.0.0</version>
+  <description>ROS 2 driver for DEPZ USB sensors (HC-SR04, VL53L0X/L1/L3/L4, VL53L5/L7/L8, TMF8829, BNO055, BNO085/086) over the DEPZ C++ SDK: automatic discovery, one topic set per board, standard sensor_msgs.</description>
+  <maintainer email="support@depz.ai">DEPZ</maintainer>
+  <!-- The package's own code is MIT. The DEPZ C++ and C SDKs it compiles into the node are MIT too,
+       and carry VL53L8 codecs derived from the ST ULD and the VL53L8 sensor firmware of
+       STMicroelectronics: BSD-3-Clause (LICENSE says which). -->
+  <license file="LICENSE">MIT</license>
+  <license>BSD-3-Clause</license>
+  <url type="website">https://depz.ai/developers/sensors/sdk</url>
+  <url type="repository">https://github.com/depz-ai/depz-sensor-sdk</url>
+  <url type="bugtracker">https://github.com/depz-ai/depz-sensor-sdk/issues</url>
+  <author>DEPZ</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>diagnostic_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_ros_py</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pep257</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>composition_interfaces</test_depend>
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>tf2_msgs</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

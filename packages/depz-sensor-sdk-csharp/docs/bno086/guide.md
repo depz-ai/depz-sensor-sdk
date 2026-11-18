@@ -1,0 +1,236 @@
+# BNO086 — user guide
+
+Hands-on guide to the BNO086: the live device
+(`Depz.Sensor.Devices.Bno086Device`, the SH-2 host stack) and the codecs under
+it (`Depz.Sensor.Bno086`). For what the sensor is and its concepts, read the
+[introduction](introduction.md); for exact signatures see the
+[API reference](api.md).
+
+## Contents
+
+- [Live device](#live-device)
+- [The decode pipeline](#the-decode-pipeline)
+- [Reassembling SHTP cargos](#reassembling-shtp-cargos)
+- [Decoding input reports](#decoding-input-reports)
+- [Report types and units](#report-types-and-units)
+- [The gyro-integrated RV](#the-gyro-integrated-rv)
+- [Encoding control reports](#encoding-control-reports)
+- [Sleep and power on](#sleep-and-power-on)
+- [Gotchas](#gotchas)
+
+## Live device
+
+```csharp
+using Depz.Sensor.Bno086;
+using Depz.Sensor.Devices;
+
+using var imu = (Bno086Device)DepzDevices.OpenDevice();
+imu.HardwareReset();
+Console.WriteLine(imu.ProductId().SwPartNumber);       // 10004563 = BNO086, 10004148 = BNO085
+
+using var reports = imu.Reports.Subscribe(where: r => r.SensorIdValue == (int)SensorId.RotationVector);
+FeatureResponse? granted = imu.Enable((int)SensorId.RotationVector, hz: 100);   // the rate the hub granted
+var rv = (RotationVector)reports.Take(TimeSpan.FromSeconds(1));
+imu.Disable((int)SensorId.RotationVector);
+```
+
+- `Enable(sensor, hz)` (or `intervalUs:`, `batchUs:`, `flags:` …) sends Set
+  Feature and reads the rate back; a rate the hub granted outside 0.9–2.1 × the
+  request is traced as a warning. `GetFeature`, `Disable`.
+- Reports stream to `Reports` (`Reports.On(callback)`, `Reports.Subscribe()`,
+  `Reports.Next()`; a `where` predicate on `On` / `Subscribe` filters by sensor
+  id). Batched sensors: `Flush(sensor)` returns once the hub's Flush Completed
+  arrives.
+- Calibration: `SetCalibration` / `GetCalibration`, `SaveDcd`,
+  `ConfigurePeriodicDcd`, `ClearDcdAndReset`; tare: `TareNow`, `PersistTare`,
+  `SetReorientation`; `SetMotionIntent` and `EnableMotionRequest` (interactive
+  calibration, BNO086 only).
+- FRS records: `FrsRead` / `FrsWrite` (`FrsRecordId`), `GetMetadata(sensor)`.
+- Hub state: `Sleep` / `PowerOn` (SH-2), `Wake` (the WAKE pin),
+  `GetOscillatorType`, `GetErrors`, `GetCounts` / `ClearCounts`.
+- Every request goes as one SHTP frame through the bridge; when both of its
+  transmit slots are full the bridge answers ERR_BUSY and the device backs off
+  200 ms and resends (`BusyRetries`, `BusyBackoff`).
+
+The sections below are the layers under the device.
+
+## The decode pipeline
+
+BNO086 data arrives as SH-2 wrapped in SHTP wrapped in DEPZ packets. Peel the
+layers in order:
+
+<!-- doc-check: skip — diagram -->
+```
+Packet (bridge RPT_DATA)  ─►  ShtpLayer.Feed  ─►  ShtpCargo(Channel, Seq, Payload)
+      ├─ channel 3/4  ─►  Sh2Reports.ParseInputCargo   ─►  List<BnoReport>
+      └─ channel 5    ─►  Sh2Reports.ParseGyroRvCargo   ─►  GyroIntegratedRV?
+```
+
+## Reassembling SHTP cargos
+
+The bridge delivers SHTP frames as the payload of unsolicited data reports.
+The RPT_DATA payload is a `Bno086Data`: the MCU capture time and one SHTP
+frame; unpack it and feed the frame and the time to a `ShtpLayer`; it returns
+a complete `ShtpCargo` once all continuation fragments have arrived (`null`
+while a cargo is still incomplete):
+
+```csharp
+using Depz.Sensor.Transport;
+using Depz.Sensor.Bno086;
+
+var parser = new PacketParser();
+var shtp   = new ShtpLayer();
+
+foreach (ParserEvent ev in parser.Feed(chunk))
+{
+    if (ev is not Packet pkt || pkt.Cmd != (int)Bno086Rpt.Data) continue;
+    Bno086Data data = Bno086Data.Unpack(pkt.Payload);                 // capture time (MCU µs) + one SHTP frame
+    if (shtp.Feed(data.Shtp, (long)data.TimestampUs) is not ShtpCargo cargo) continue;   // still assembling
+
+    if (cargo.Channel == (int)ShtpChannel.InputNormal ||
+        cargo.Channel == (int)ShtpChannel.InputWake)
+    {
+        foreach (BnoReport r in Sh2Reports.ParseInputCargo(cargo.Payload, cargo.CaptureUs))
+            Handle(r);
+    }
+    else if (cargo.Channel == (int)ShtpChannel.GyroRv)
+    {
+        if (Sh2Reports.ParseGyroRvCargo(cargo.Payload, cargo.CaptureUs) is { } rv)
+            Handle(rv);
+    }
+}
+// shtp.Discarded counts cargos dropped on a framing gap/overrun.
+```
+
+`ShtpLayer.Reset()` forgets all TX seq counters and partial cargos — call it on a
+sensor hardware reset. On the TX side, `ShtpLayer.NextFrame(channel, payload)`
+frames a control cargo and consumes that channel's sequence counter.
+
+## Decoding input reports
+
+`Sh2Reports.ParseInputCargo` walks a channel-3/4 cargo and returns a list of
+typed `BnoReport`. It handles the 0xFB base-timebase reference and 0xFA rebase
+markers, folding them into an absolute `TimestampUs` (in the MCU clock) per
+report. Dispatch on the concrete record type or `report.Kind`:
+
+```csharp
+void Handle(BnoReport r)
+{
+    switch (r)
+    {
+        case RotationVector rv:
+            double w = rv.RealRaw / 16384.0;    // Q14
+            double? accRad = rv.AccuracyRaw is { } a ? a / 4096.0 : null;  // Q12, radians
+            Console.WriteLine($"quat real={w:F3} acc={accRad}");
+            break;
+        case Acceleration acc:
+            Console.WriteLine($"a=({acc.XRaw/256.0:F2},{acc.YRaw/256.0:F2},{acc.ZRaw/256.0:F2}) m/s²"); // Q8
+            break;
+        case UnknownReport u:
+            Console.WriteLine($"unknown report 0x{u.SensorIdValue:X2}: {u.Fields()["data"]}");
+            break;
+    }
+}
+```
+
+Every `InputReport` also carries `Seq` (rolling sample counter for drop
+detection), `Accuracy` (0 unreliable … 3 high) and `DelayUs`. `BnoReport.Fields()`
+returns the flat field→value dictionary that matches the golden vectors — handy
+for logging or generic serialization. Unrecognised report IDs surface as
+`UnknownReport`.
+
+## Report types and units
+
+Raw wire integers are authoritative; each record also gives them scaled by the
+fixed **Q point** (`value = raw / 2^Q`, table `Bno086Q`). The common ones:
+
+| SensorId | record | fields (units) | Q |
+|---|---|---|---|
+| `Accelerometer` / `LinearAcceleration` / `Gravity` | `Acceleration` | `XRaw/YRaw/ZRaw`; `X/Y/Z` m/s² | Q8 |
+| `Gyroscope` | `Gyroscope` | `XRaw/YRaw/ZRaw`; `X/Y/Z` rad/s | Q9 |
+| `Magnetometer` | `Magnetometer` | `XRaw/YRaw/ZRaw`; `X/Y/Z` µT | Q4 |
+| `RotationVector` / `Geomagnetic…` / `ArvrStabilizedRv` | `RotationVector` | `IRaw/JRaw/KRaw/RealRaw` + `AccuracyRaw`; `I/J/K/Real`, `AccuracyRad` | Q14 quat, Q12 (rad) accuracy |
+| `GameRotationVector` / `ArvrStabilizedGameRv` | `RotationVector` | as above; `AccuracyRaw` / `AccuracyRad` are `null` | Q14 |
+| `GyroIntegratedRv` | `GyroIntegratedRV` | quaternion + `VxRaw/VyRaw/VzRaw`; `AngularVelocity` rad/s | Q14 quat, Q10 velocity |
+| `StepCounter` | `StepCounter` | `Steps`, `LatencyUs` | — |
+| `TapDetector` | `TapDetector` | `Flags` | — |
+| `StabilityClassifier` | `StabilityClassifier` | `Classification` | — |
+| `PersonalActivityClassifier` | `PersonalActivityClassifier` | `MostLikelyState`, `Confidences[]` | — |
+
+Pressure/light/humidity/proximity/temperature and other scalar reports decode to
+`ScalarReport` (`ValueRaw`, scaled `Value`); unmapped IDs to `GenericEvent`.
+
+## The gyro-integrated RV
+
+The dense gyro-integrated rotation vector rides its own channel (5) in a compact
+format, so it has its own parser (returns `null` when the cargo is too short):
+
+```csharp
+GyroIntegratedRV? rv = Sh2Reports.ParseGyroRvCargo(cargo.Payload, cargo.CaptureUs);
+if (rv is { } g)
+{
+    double qw = g.RealRaw / 16384.0;      // Q14
+    double wz = g.VzRaw / 1024.0;         // Q10, rad/s
+}
+```
+
+## Encoding control reports
+
+`Sh2Control` produces the header-less SH-2 cargo payloads for channel 2; frame
+them with `ShtpLayer.NextFrame` (or `BuildFrame` / `FragmentCargo` for control):
+
+```csharp
+using Depz.Sensor.Bno086;
+
+var shtp = new ShtpLayer();
+
+// Enable rotation vector at 100 Hz (10 000 µs report interval):
+byte[] setFeature = Sh2Control.SetFeature((int)SensorId.RotationVector, intervalUs: 10_000);
+byte[] frame      = shtp.NextFrame((int)ShtpChannel.Control, setFeature);
+
+byte[] getFeature = Sh2Control.GetFeature((int)SensorId.Gyroscope);
+byte[] productId  = Sh2Control.ProductId();
+byte[] frsRead    = Sh2Control.FrsRead(frsType: 0x7979);
+byte[] command    = Sh2Control.Command(seq: 0, command: 0x84, parameters: stackalloc byte[0]); // e.g. tare
+```
+
+`Sh2Control` covers Set/Get Feature, Product ID, the generic Command request,
+FRS read/write/data, and the executable-channel `Sleep` / `PowerOn` (below). Each returns the exact cargo bytes the golden vectors pin.
+
+## Sleep and power on
+
+The hub has two power commands, one byte each on the **executable** channel
+(SHTP channel 1, not control): "Sleep" stops every report but keeps the
+configuration (enabled sensors, rates); "On" ends it, and every report that was
+on comes back at its rate — no re-enabling. The hub answers neither.
+
+```csharp
+// a gyroscope at 50 Hz that keeps going while the hub sleeps
+byte[] gyro  = Sh2Control.SetFeature((int)SensorId.Gyroscope, intervalUs: 20_000,
+                                     flags: FeatureFlags.Wakeup | FeatureFlags.AlwaysOn);
+byte[] sleep = shtp.NextFrame((int)ShtpChannel.Executable, Sh2Control.Sleep());    // [0x03]
+byte[] on    = shtp.NextFrame((int)ShtpChannel.Executable, Sh2Control.PowerOn());  // [0x02]
+```
+
+Measured on a DEPZ BNO086 (SH-2 3.12.6, 2026-10-16): after sleep all reports
+stopped within one sample; a report enabled with wake-up | always-on kept
+streaming at full rate (it arrives on SHTP channel 4); power-on restored every
+report at its rate.
+
+Not to be confused with the board's SENSOR_WAKE_UP command (0x33): that pulses
+the WAKE pin, a hardware signal. "On" is the SH-2 command that ends sleep.
+
+## Gotchas
+
+- **Reassemble before you decode** — feed frames to `ShtpLayer.Feed` and only
+  decode a returned `ShtpCargo`; a partial cargo returns `null`.
+- **Dispatch by channel** — channels 3/4 use `ParseInputCargo`; channel 5 uses
+  `ParseGyroRvCargo`. They are different formats.
+- **Mind the units** — the scaled values follow the SH-2 Q points: rotation-vector
+  accuracy is Q12 **radians**, and game/AR-VR-game vectors have
+  `AccuracyRaw == null`.
+- **TX cargo fits one MCU slot** — `NextFrame` rejects payloads over
+  `ShtpLayer.MaxTxFrame` (64 B incl. header, ERRATA E2); use `FragmentCargo` for
+  anything larger.
+- **Reset clears SHTP state** — on a sensor hardware reset, call `ShtpLayer.Reset`
+  so seq counters and partial cargos restart from zero.

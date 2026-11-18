@@ -1,0 +1,1319 @@
+# VL53L8CX (ToF) — API reference
+
+The public API for the VL53L8CX (ToF) sensor. The shared foundation —
+transport framing, common protocol codecs, firmware image parse,
+dataset reader and USB identity — lives in the
+[top-level API reference](../api.md).
+
+Auto-generated from the source — edit the `///` summaries
+in the source, not this file.
+
+## Contents
+
+- **VL53L8CX (ToF)**: [`Vl53l8cxDevice`](#vl53l8cxdevice), [`Vl53l8Firmware`](#vl53l8firmware), [`Vl53l8Exception`](#vl53l8exception), [`Vl53l8Motion`](#vl53l8motion), [`Vl53l8Driver`](#vl53l8driver), [`Vl53l8Variant`](#vl53l8variant), [`Vl53l8Frame`](#vl53l8frame), [`Vl53l8FrameDecoder`](#vl53l8framedecoder), [`Vl53l8Cmd`](#vl53l8cmd), [`Vl53l8Rpt`](#vl53l8rpt), [`Vl53l8Wire`](#vl53l8wire), [`Vl53l8RegData`](#vl53l8regdata), [`FrameChunk`](#framechunk), [`FrameReassembler`](#framereassembler), [`Vl53l8Advanced`](#vl53l8advanced), [`MotionConfig`](#motionconfig)
+
+## VL53L8CX (ToF)
+
+### Vl53l8cxDevice
+
+```csharp
+public class Vl53l8cxDevice : DepzDevice
+```
+
+VL53L8CX multizone ToF (contract 04). The board is a thin SPI bridge; the ST ULD runs here (`Uld`). `Init` downloads the ~84 KB sensor firmware (about a second), then configure and `StartRanging`: the board pushes one frame per INT edge in chunks, reassembled and parsed into `Frames`. Configuration needs `Init` and throws `InvalidStateException` while ranging — the stream owns the register bank. The VL53L8CH superset is `Vl53l8chDevice`.
+
+#### Vl53l8cxDevice.MinRangingFrequencyHz *(constant)*
+
+```csharp
+public const int MinRangingFrequencyHz = 2
+```
+
+Below this the sensor never enters its ranging loop and streams nothing (contract 04).
+
+#### Vl53l8cxDevice.MaxRangingFrequencyHz
+
+```csharp
+public static int MaxRangingFrequencyHz(int resolution)
+```
+
+Highest ranging frequency at `resolution` zones (contract 11 §3; the same silicon limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+
+#### Vl53l8cxDevice.Vl53l8cxDevice *(constructor)*
+
+```csharp
+public Vl53l8cxDevice(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Vl53l8cxDevice.Frames *(property)*
+
+```csharp
+public SensorStream<Vl53l8Frame> Frames
+```
+
+The parsed frames (contract 07 §3): `Frames.On(cb)`, `Frames.Subscribe()` (8 by default), `Frames.Next()`; `ParseErrors` counts frames dropped because they did not parse (a short chunk header, a corrupt frame, a bad size — contract 07 §2), not reassembly gaps (`ReassemblerDiscards`).
+
+#### Vl53l8cxDevice.Uld *(property)*
+
+```csharp
+public Vl53l8Driver Uld
+```
+
+The ULD driver (escape hatch for DCI access); unstable — not covered by the 1.0 freeze.
+
+#### Vl53l8cxDevice.Ranging *(property)*
+
+```csharp
+public bool Ranging
+```
+
+#### Vl53l8cxDevice.IsAlive
+
+```csharp
+public bool IsAlive()
+```
+
+True when the sensor answers with its own silicon ids (a bus error or a foreign id: false).
+
+#### Vl53l8cxDevice.Init
+
+```csharp
+public virtual void Init(Action<string>? progress = null, Action<int, int>? writeProgress = null)
+```
+
+Download the sensor firmware and the default configuration. `progress` gets phase texts, `writeProgress` (done, total) the big firmware writes.
+
+#### Vl53l8cxDevice.GetResolution
+
+```csharp
+public int GetResolution()
+```
+
+Zones in use: 16 (4×4) or 64 (8×8).
+
+#### Vl53l8cxDevice.SetResolution
+
+```csharp
+public void SetResolution(int zones)
+```
+
+16 (4×4) or 64 (8×8) zones.
+
+#### Vl53l8cxDevice.GetRangingFrequencyHz
+
+```csharp
+public int GetRangingFrequencyHz()
+```
+
+#### Vl53l8cxDevice.SetRangingFrequencyHz
+
+```csharp
+public void SetRangingFrequencyHz(int hz)
+```
+
+At least `MinRangingHz`; at most `MaxRangingFrequencyHz` of the resolution last set or read through this class (4×4 after init) — 60 Hz at 4×4, 15 Hz at 8×8 (contract 11 §3). Refused host-side, nothing reaches the bus.
+
+#### Vl53l8cxDevice.GetRangingMode
+
+```csharp
+public int GetRangingMode()
+```
+
+`RangingModeContinuous` or `RangingModeAutonomous`.
+
+#### Vl53l8cxDevice.SetRangingMode
+
+```csharp
+public void SetRangingMode(int mode)
+```
+
+#### Vl53l8cxDevice.GetIntegrationTimeMs
+
+```csharp
+public int GetIntegrationTimeMs()
+```
+
+#### Vl53l8cxDevice.SetIntegrationTimeMs
+
+```csharp
+public void SetIntegrationTimeMs(int ms)
+```
+
+2–1000 ms; autonomous mode only.
+
+#### Vl53l8cxDevice.GetSharpenerPercent
+
+```csharp
+public int GetSharpenerPercent()
+```
+
+#### Vl53l8cxDevice.SetSharpenerPercent
+
+```csharp
+public void SetSharpenerPercent(int pct)
+```
+
+Edge sharpener, 0–99 % (0 = off).
+
+#### Vl53l8cxDevice.GetTargetOrder
+
+```csharp
+public int GetTargetOrder()
+```
+
+`TargetOrderClosest` or `TargetOrderStrongest`.
+
+#### Vl53l8cxDevice.SetTargetOrder
+
+```csharp
+public void SetTargetOrder(int order)
+```
+
+#### Vl53l8cxDevice.GetPowerMode
+
+```csharp
+public int GetPowerMode()
+```
+
+`PowerModeSleep`, `PowerModeWakeup` or `PowerModeDeepSleep`.
+
+#### Vl53l8cxDevice.SetPowerMode
+
+```csharp
+public void SetPowerMode(int mode)
+```
+
+Waking from deep sleep downloads the firmware again.
+
+#### Vl53l8cxDevice.GetXtalkMargin
+
+```csharp
+public int GetXtalkMargin()
+```
+
+Xtalk margin, whole kcps/SPAD (as ST).
+
+#### Vl53l8cxDevice.SetXtalkMargin
+
+```csharp
+public void SetXtalkMargin(int marginKcps)
+```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused.
+
+#### Vl53l8cxDevice.CalibrateXtalk
+
+```csharp
+public void CalibrateXtalk(int reflectancePercent, int nbSamples, int distanceMm)
+```
+
+On-device crosstalk calibration against a flat target (see `CalibrateXtalk`); read the result with `GetCaldataXtalk`.
+
+#### Vl53l8cxDevice.GetCaldataXtalk
+
+```csharp
+public byte[] GetCaldataXtalk()
+```
+
+The 776-byte xtalk calibration buffer (save / restore).
+
+#### Vl53l8cxDevice.SetCaldataXtalk
+
+```csharp
+public void SetCaldataXtalk(byte[] blob)
+```
+
+#### Vl53l8cxDevice.GetDetectionThresholdsEnable
+
+```csharp
+public int GetDetectionThresholdsEnable()
+```
+
+#### Vl53l8cxDevice.SetDetectionThresholdsEnable
+
+```csharp
+public void SetDetectionThresholdsEnable(bool enabled)
+```
+
+#### Vl53l8cxDevice.GetDetectionThresholds
+
+```csharp
+public IReadOnlyList<Vl53l8Advanced.DetectionThreshold> GetDetectionThresholds()
+```
+
+#### Vl53l8cxDevice.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(IReadOnlyList<Vl53l8Advanced.DetectionThreshold> thresholds)
+```
+
+The 64 detection thresholds (interrupt on threshold).
+
+#### Vl53l8cxDevice.SetDetectionThresholdsAutoStop
+
+```csharp
+public void SetDetectionThresholdsAutoStop(bool autoStop)
+```
+
+#### Vl53l8cxDevice.ConfigureMotionIndicator
+
+```csharp
+public MotionConfig ConfigureMotionIndicator(int distanceMinMm = 400, int distanceMaxMm = 1500)
+```
+
+Enable the motion indicator over [min, max] mm; every frame then carries `Motion`. Returns the configuration for further tuning. On CH firmware the motion indicator and CNH share one DCI struct (0xBFAC): this disarms CNH (`CnhSetup` null, no `CnhRaw`).
+
+#### Vl53l8cxDevice.StartRanging
+
+```csharp
+public void StartRanging()
+```
+
+Program the output list, start the sensor and the board's stream.
+
+#### Vl53l8cxDevice.StopRanging
+
+```csharp
+public void StopRanging()
+```
+
+#### Vl53l8cxDevice.ReassemblerDiscards *(property)*
+
+```csharp
+public int ReassemblerDiscards
+```
+
+Chunked frames the reassembler discarded (gaps, offset errors).
+
+### Vl53l8Firmware
+
+```csharp
+public enum Vl53l8Firmware
+{
+    Cx,
+    Ch,
+    L7cx,
+    L7ch,
+}
+```
+
+The sensor firmware a `Vl53l8Driver` downloads.
+
+### Vl53l8Exception
+
+```csharp
+public sealed class Vl53l8Exception : Exception
+```
+
+A VL53L8 / L5 / L7 ULD status (vl53l8cx_api.h codes) with where it happened.
+
+#### Vl53l8Exception.StatusTimeoutError *(constant)*
+
+```csharp
+public const int StatusTimeoutError = 1
+```
+
+#### Vl53l8Exception.StatusCorruptedFrame *(constant)*
+
+```csharp
+public const int StatusCorruptedFrame = 2
+```
+
+#### Vl53l8Exception.StatusLaserSafety *(constant)*
+
+```csharp
+public const int StatusLaserSafety = 3
+```
+
+#### Vl53l8Exception.StatusFwChecksumFail *(constant)*
+
+```csharp
+public const int StatusFwChecksumFail = 5
+```
+
+#### Vl53l8Exception.McuError *(constant)*
+
+```csharp
+public const int McuError = 66
+```
+
+#### Vl53l8Exception.StatusInvalidParam *(constant)*
+
+```csharp
+public const int StatusInvalidParam = 127
+```
+
+#### Vl53l8Exception.StatusError *(constant)*
+
+```csharp
+public const int StatusError = 255
+```
+
+#### Vl53l8Exception.Code *(property)*
+
+```csharp
+public int Code
+```
+
+#### Vl53l8Exception.Vl53l8Exception *(constructor)*
+
+```csharp
+public Vl53l8Exception(int code, string where = "") : base($"VL53L8CX {NameOf(code)} (code {code}) {where}".TrimEnd())
+```
+
+### Vl53l8Motion
+
+```csharp
+public sealed record Vl53l8Motion(uint GlobalIndicator1, uint GlobalIndicator2, int Status, int NbOfDetectedAggregates, int NbOfAggregates, uint[] Motion)
+```
+
+The motion-indicator block of a frame (VL53L8CX_ResultsData MotionIndicator).
+
+### Vl53l8Driver
+
+```csharp
+public sealed class Vl53l8Driver
+```
+
+The ST VL53L8CX ULD 2.1.0 / VL53LMZ ULD 2.0.16 / VL53L5CX-L7CX ULD 2.0.1 on the host, ported from the reference Python driver: init (sensor firmware download), resolution, frequency, mode, integration time, sharpener, target order, ranging, frame parsing, power modes, xtalk margin and calibration, detection thresholds, motion indicator. Register sequences are a 1:1 port — every request matches the Python one, so captures replay in both.
+
+#### Vl53l8Driver.Resolution4x4 *(constant)*
+
+```csharp
+public const int Resolution4x4 = 16
+```
+
+#### Vl53l8Driver.Resolution8x8 *(constant)*
+
+```csharp
+public const int Resolution8x8 = 64
+```
+
+#### Vl53l8Driver.RangingModeContinuous *(constant)*
+
+```csharp
+public const int RangingModeContinuous = 1
+```
+
+#### Vl53l8Driver.RangingModeAutonomous *(constant)*
+
+```csharp
+public const int RangingModeAutonomous = 3
+```
+
+#### Vl53l8Driver.TargetOrderClosest *(constant)*
+
+```csharp
+public const int TargetOrderClosest = 1
+```
+
+#### Vl53l8Driver.TargetOrderStrongest *(constant)*
+
+```csharp
+public const int TargetOrderStrongest = 2
+```
+
+#### Vl53l8Driver.PowerModeSleep *(constant)*
+
+```csharp
+public const int PowerModeSleep = 0
+```
+
+#### Vl53l8Driver.PowerModeWakeup *(constant)*
+
+```csharp
+public const int PowerModeWakeup = 1
+```
+
+#### Vl53l8Driver.PowerModeDeepSleep *(constant)*
+
+```csharp
+public const int PowerModeDeepSleep = 2
+```
+
+#### Vl53l8Driver.ModuleTypeMz *(constant)*
+
+```csharp
+public const int ModuleTypeMz = 0
+```
+
+#### Vl53l8Driver.ModuleTypeMzevo *(constant)*
+
+```csharp
+public const int ModuleTypeMzevo = 1
+```
+
+#### Vl53l8Driver.ModuleTypeMzplus *(constant)*
+
+```csharp
+public const int ModuleTypeMzplus = 2
+```
+
+#### Vl53l8Driver.NvmDataSize *(constant)*
+
+```csharp
+public const int NvmDataSize = 492
+```
+
+#### Vl53l8Driver.OffsetBufferSize *(constant)*
+
+```csharp
+public const int OffsetBufferSize = 488
+```
+
+#### Vl53l8Driver.XtalkBufferSize *(constant)*
+
+```csharp
+public const int XtalkBufferSize = 776
+```
+
+#### Vl53l8Driver.Firmware *(property)*
+
+```csharp
+public Vl53l8Firmware Firmware
+```
+
+#### Vl53l8Driver.IsI2c *(property)*
+
+```csharp
+public bool IsI2c
+```
+
+The L5/L7 boards: the sensor sits on I2C (other boot sequence, per-target blocks keep 64 entries in 4×4).
+
+#### Vl53l8Driver.ModuleType *(property)*
+
+```csharp
+public int? ModuleType
+```
+
+L5/L7: MZ (VL53L5CX) or MZEVO (VL53L7CX/CH), read during `Init`; else null.
+
+#### Vl53l8Driver.DataReadSize *(property)*
+
+```csharp
+public int DataReadSize
+```
+
+The frame size the firmware streams (bytes), set by `StartRanging`.
+
+#### Vl53l8Driver.FrameSizeMismatch
+
+```csharp
+public (int Firmware, int Host)? FrameSizeMismatch
+```
+
+(firmware, host) frame sizes when the firmware reported another size than the ULD formula; the firmware value is used.
+
+#### Vl53l8Driver.Resolution *(property)*
+
+```csharp
+public int? Resolution
+```
+
+Zones the last `StartRanging` used.
+
+#### Vl53l8Driver.XtalkCalibrationFailed *(property)*
+
+```csharp
+public bool XtalkCalibrationFailed
+```
+
+The last `CalibrateXtalk` ran into "coverglass too good": the default xtalk buffer is kept.
+
+#### Vl53l8Driver.XtalkData *(property)*
+
+```csharp
+public byte[] XtalkData
+```
+
+The 776-byte xtalk buffer the driver uploads (default, calibrated or restored).
+
+#### Vl53l8Driver.SiliconIdMatches
+
+```csharp
+public static bool SiliconIdMatches(int deviceId, int revisionId, bool i2c)
+```
+
+Whether the silicon ids are the sensor's: (0xF0, 0x0C) on L8 over SPI; revision 0x02, or 0x01 with device id 0xF0, on L5/L7 over I2C.
+
+#### Vl53l8Driver.DciReadData
+
+```csharp
+public byte[] DciReadData(int index, int dataSize)
+```
+
+#### Vl53l8Driver.DciWriteData
+
+```csharp
+public void DciWriteData(int index, byte[] data)
+```
+
+#### Vl53l8Driver.DciReplaceData
+
+```csharp
+public void DciReplaceData(int index, int dataSize, byte[] newData, int newDataPos)
+```
+
+#### Vl53l8Driver.IsAlive
+
+```csharp
+public (int DeviceId, int RevisionId) IsAlive()
+```
+
+(device id, revision id) of the silicon; `SiliconIdMatches` tells whether they are the sensor's.
+
+#### Vl53l8Driver.Init
+
+```csharp
+public void Init(Action<string>? progress = null)
+```
+
+vl53l8cx_init: boot the sensor MCU, download the 84 KB sensor firmware, upload the NVM offsets, the default xtalk and the default configuration. `progress` gets phase texts.
+
+#### Vl53l8Driver.GetResolution
+
+```csharp
+public int GetResolution()
+```
+
+#### Vl53l8Driver.SetResolution
+
+```csharp
+public void SetResolution(int resolution)
+```
+
+#### Vl53l8Driver.GetRangingFrequencyHz
+
+```csharp
+public int GetRangingFrequencyHz()
+```
+
+#### Vl53l8Driver.SetRangingFrequencyHz
+
+```csharp
+public void SetRangingFrequencyHz(int hz)
+```
+
+#### Vl53l8Driver.SetRangingMode
+
+```csharp
+public void SetRangingMode(int mode)
+```
+
+#### Vl53l8Driver.GetRangingMode
+
+```csharp
+public int GetRangingMode()
+```
+
+#### Vl53l8Driver.GetIntegrationTimeMs
+
+```csharp
+public int GetIntegrationTimeMs()
+```
+
+#### Vl53l8Driver.SetIntegrationTimeMs
+
+```csharp
+public void SetIntegrationTimeMs(int timeMs)
+```
+
+2..1000 ms; no effect in continuous mode.
+
+#### Vl53l8Driver.GetSharpenerPercent
+
+```csharp
+public int GetSharpenerPercent()
+```
+
+0..99 %, rounded to nearest on the way back (ST truncates and loses a count for 95 of the 100 legal values; the stored byte is the same).
+
+#### Vl53l8Driver.SetSharpenerPercent
+
+```csharp
+public void SetSharpenerPercent(int pct)
+```
+
+#### Vl53l8Driver.GetTargetOrder
+
+```csharp
+public int GetTargetOrder()
+```
+
+#### Vl53l8Driver.SetTargetOrder
+
+```csharp
+public void SetTargetOrder(int order)
+```
+
+#### Vl53l8Driver.StartRanging
+
+```csharp
+public void StartRanging(int? cnhDataSize = null)
+```
+
+Program the output list and start. `cnhDataSize` (bytes, from `RequiredMemory`) appends the CNH block to every frame.
+
+#### Vl53l8Driver.StopRanging
+
+```csharp
+public void StopRanging()
+```
+
+#### Vl53l8Driver.CheckDataReady
+
+```csharp
+public bool CheckDataReady()
+```
+
+Poll mode: a new frame is ready.
+
+#### Vl53l8Driver.GetRangingData
+
+```csharp
+public Vl53l8Frame GetRangingData(ulong timestampUs = 0)
+```
+
+Poll mode: read one frame from register 0x00 and parse it.
+
+#### Vl53l8Driver.ParseFrame
+
+```csharp
+public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw)
+```
+
+Parse one raw frame (`DataReadSize` bytes) — polled, or pushed by the board's stream. L5/L7 frames are trimmed to the zones in use.
+
+#### Vl53l8Driver.GetPowerMode
+
+```csharp
+public int GetPowerMode()
+```
+
+#### Vl53l8Driver.SetPowerMode
+
+```csharp
+public void SetPowerMode(int powerMode)
+```
+
+Wakeup, sleep or deep sleep (not on L5CX/L7CX). Waking from deep sleep re-runs `Init`: the sensor firmware is lost.
+
+#### Vl53l8Driver.GetXtalkMargin
+
+```csharp
+public int GetXtalkMargin()
+```
+
+Xtalk margin, whole kcps/SPAD (raw / 2048 rounded down, as ST).
+
+#### Vl53l8Driver.SetXtalkMargin
+
+```csharp
+public void SetXtalkMargin(int marginKcps)
+```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is INVALID_PARAM, nothing written.
+
+#### Vl53l8Driver.GetCaldataXtalk
+
+```csharp
+public byte[] GetCaldataXtalk()
+```
+
+The live 776-byte xtalk calibration buffer (save / restore); the resolution is restored afterwards.
+
+#### Vl53l8Driver.SetCaldataXtalk
+
+```csharp
+public void SetCaldataXtalk(byte[] xtalkData)
+```
+
+Restore a saved 776-byte xtalk buffer; it is uploaded again by the next resolution change and at once here.
+
+#### Vl53l8Driver.GetDetectionThresholdsEnable
+
+```csharp
+public int GetDetectionThresholdsEnable()
+```
+
+#### Vl53l8Driver.SetDetectionThresholdsEnable
+
+```csharp
+public void SetDetectionThresholdsEnable(bool enabled)
+```
+
+#### Vl53l8Driver.GetDetectionThresholds
+
+```csharp
+public IReadOnlyList<Vl53l8Advanced.DetectionThreshold> GetDetectionThresholds()
+```
+
+The 64 thresholds, low / high rescaled to the units of their measurement.
+
+#### Vl53l8Driver.SetDetectionThresholds
+
+```csharp
+public void SetDetectionThresholds(IReadOnlyList<Vl53l8Advanced.DetectionThreshold> thresholds)
+```
+
+Program the 64 thresholds (missing entries are zeros; more than 64 is refused).
+
+#### Vl53l8Driver.SetDetectionThresholdsAutoStop
+
+```csharp
+public void SetDetectionThresholdsAutoStop(bool autoStop)
+```
+
+#### Vl53l8Driver.MotionIndicatorInit
+
+```csharp
+public MotionConfig MotionIndicatorInit(int resolution)
+```
+
+A default motion-indicator configuration for `resolution`, written to the sensor; frames carry motion output from here on.
+
+#### Vl53l8Driver.MotionIndicatorDisarm
+
+```csharp
+public void MotionIndicatorDisarm()
+```
+
+Stop surfacing the motion block: frames parse with `Motion` null. Called when the VL53LMZ CNH setup overwrites the shared DCI 0xBFAC struct (contract 04 §7, ERRATA B4).
+
+#### Vl53l8Driver.MotionIndicatorSetResolution
+
+```csharp
+public void MotionIndicatorSetResolution(MotionConfig cfg, int resolution)
+```
+
+#### Vl53l8Driver.MotionIndicatorSetDistanceMotion
+
+```csharp
+public void MotionIndicatorSetDistanceMotion(MotionConfig cfg, int distanceMinMm, int distanceMaxMm)
+```
+
+#### Vl53l8Driver.CalibrateXtalk
+
+```csharp
+public void CalibrateXtalk(int reflectancePercent, int nbSamples, int distanceMm)
+```
+
+vl53l8cx_calibrate_xtalk: on-device crosstalk calibration against a flat target at `distanceMm` (600..3000) of `reflectancePercent` (1..99), averaging `nbSamples` (1..16). Takes seconds; the configuration is saved and restored around it. Without cover glass the firmware answers "coverglass too good": `XtalkCalibrationFailed`, and the default buffer stays.
+
+### Vl53l8Variant
+
+```csharp
+public enum Vl53l8Variant
+{
+    Cx,
+    Ch,
+}
+```
+
+The two VL53L8 ToF silicon variants in the DEPZ family. Both stream the same ULD results-frame layout, so `Vl53l8FrameDecoder` and the `Vl53l8Advanced` DCI codecs serve both; the differences are:
+
+USB product id — `Ch` ships as production PID 0xED40; `Cx` is the development default and enumerates under the raw ST VID/PID. Results-frame footer-id offset — CX FW (ULD 2.1.0) echoes the frame id 12 bytes before the end, CH FW (VL53LMZ 2.0.16) 4 bytes (`ForVariant`). CNH histograms — CH-only; the frame decoder copies the raw block into `CnhRaw` and `DecodeHistogram` decodes it.
+
+### Vl53l8Frame
+
+```csharp
+public sealed record Vl53l8Frame(ulong TimestampUs, int Resolution, int SiliconTempDegc, int[] DistanceMm, byte[] TargetStatus, byte[] NbTargetDetected, double[] SignalPerSpad, double[] AmbientPerSpad, uint[] NbSpadsEnabled, double[] RangeSigmaMm, double[] Reflectance)
+```
+
+One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64 for 8×8); zone index runs row-major. Values are in the real units ST's GetRangingData gives (contract 04 §5); ST divides integers, here the scaled values keep their fraction.
+
+#### Vl53l8Frame.CnhRaw *(property)*
+
+```csharp
+public byte[]? CnhRaw
+```
+
+Raw CNH data block (output index 0xC048), byte-swapped like every other block — decode with `DecodeHistogram`. Null when the frame carries no CNH block (CX variants, or CNH not configured).
+
+#### Vl53l8Frame.Motion *(property)*
+
+```csharp
+public Vl53l8Motion? Motion
+```
+
+The motion-indicator output, when the motion indicator is configured; else null.
+
+### Vl53l8FrameDecoder
+
+```csharp
+public sealed class Vl53l8FrameDecoder
+```
+
+VL53L8 results-frame decoder (contract 04). Verbatim port of the verifiable parse path of the ST ULD's GetRangingData / parse_frame.
+
+Serves both ToF variants — VL53L8CX and VL53L8CH stream the identical results-frame layout; only the frame-id footer offset differs per variant (see `Vl53l8Variant` / `ForVariant`). The CH-only CNH histogram block is copied out raw (`CnhRaw`) and decoded by `DecodeHistogram`; the register-bridge init/config that produces these frames is `Vl53l8Driver`.
+
+#### Vl53l8FrameDecoder.CorruptedFrameException
+
+```csharp
+public sealed class CorruptedFrameException : Exception
+```
+
+Raised when a frame's header/footer id words disagree (corrupt frame).
+
+##### Vl53l8FrameDecoder.CorruptedFrameException.CorruptedFrameException *(constructor)*
+
+```csharp
+public CorruptedFrameException() : base("VL53L8CX CORRUPTED_FRAME (header/footer id mismatch)")
+```
+
+#### Vl53l8FrameDecoder.FooterIdOffsetCx *(constant)*
+
+```csharp
+public const int FooterIdOffsetCx = 12
+```
+
+Frame-id footer offset for VL53L8CX FW (ULD 2.1.0): 12 bytes from end.
+
+#### Vl53l8FrameDecoder.FooterIdOffsetCh *(constant)*
+
+```csharp
+public const int FooterIdOffsetCh = 4
+```
+
+Frame-id footer offset for VL53L8CH FW (VL53LMZ 2.0.16): 4 bytes from end.
+
+#### Vl53l8FrameDecoder.Vl53l8FrameDecoder *(constructor)*
+
+```csharp
+public Vl53l8FrameDecoder(int footerIdOff = FooterIdOffsetCx, bool trimToZones = false)
+```
+
+#### Vl53l8FrameDecoder.ForVariant
+
+```csharp
+public static Vl53l8FrameDecoder ForVariant(Vl53l8Variant variant)
+```
+
+Decoder tuned for a specific ToF variant (selects the frame-id footer offset). The decode body is shared — CX and CH stream the same frame.
+
+#### Vl53l8FrameDecoder.SwapBuffer
+
+```csharp
+public static byte[] SwapBuffer(ReadOnlySpan<byte> data)
+```
+
+VL53L8CX_SwapBuffer: byte-reverse every 32-bit word; trailing bytes unchanged.
+
+#### Vl53l8FrameDecoder.ParseFrame
+
+```csharp
+public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw)
+```
+
+Parse one raw results frame (the reassembled bytes read from reg 0x00). Resolution is derived from the number-of-targets block length.
+
+#### Vl53l8FrameDecoder.ParseFrame
+
+```csharp
+public Vl53l8Frame ParseFrame(ulong timestampUs, byte[] raw, int resolution)
+```
+
+Parse one raw results frame, trimming every per-zone array to `resolution` entries (16 or 64) — the resolution the host configured in `start_ranging`. Needed for VL53L5/L7 frames, whose per-target blocks carry 64 entries even in 4×4 (contract 11 §3).
+
+### Vl53l8Cmd
+
+```csharp
+public enum Vl53l8Cmd
+{
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    StartStream = 0x35,
+    StopStream = 0x36,
+}
+```
+
+VL53L8 register-bridge command opcodes (contract 04).
+
+### Vl53l8Rpt
+
+```csharp
+public enum Vl53l8Rpt
+{
+    RegData = 0x91,
+    Vl53Frame = 0x93,
+}
+```
+
+VL53L8 report opcodes.
+
+### Vl53l8Wire
+
+```csharp
+public static class Vl53l8Wire
+```
+
+Wire limits (contract 04).
+
+#### Vl53l8Wire.ChunkSize *(constant)*
+
+```csharp
+public const int ChunkSize = 2048
+```
+
+Register bytes one READ_REG / WRITE_REG moves at most (the bridge's limit).
+
+#### Vl53l8Wire.PackReadReg
+
+```csharp
+public static byte[] PackReadReg(int addr, int length)
+```
+
+VL53_READ_REG payload: addr u16 LE, length u16 LE.
+
+#### Vl53l8Wire.PackWriteReg
+
+```csharp
+public static byte[] PackWriteReg(int addr, ReadOnlySpan<byte> data)
+```
+
+VL53_WRITE_REG payload: addr u16 LE, then at least one data byte (contract 04 §2).
+
+#### Vl53l8Wire.PackStartStream
+
+```csharp
+public static byte[] PackStartStream(int frameSize)
+```
+
+VL53_START_STREAM payload: the frame size the board reads per INT, u16 LE, 1..`StreamTotalMax` (contract 04 §4 rule 4 — the firmware refuses anything else too).
+
+#### Vl53l8Wire.StreamChunkMax *(constant)*
+
+```csharp
+public const int StreamChunkMax = 1528
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### Vl53l8Wire.StreamTotalMax *(constant)*
+
+```csharp
+public const int StreamTotalMax = 8192
+```
+
+Max frame_size accepted by START_STREAM.
+
+### Vl53l8RegData
+
+```csharp
+public sealed record Vl53l8RegData(int Cmd, ulong TimestampUs, byte[] Data)
+```
+
+One RPT_VL53_FRAME chunk: device timestamp, the full frame size, this chunk's byte offset into the frame, and the chunk payload.
+
+#### Vl53l8RegData.Unpack
+
+```csharp
+public static Vl53l8RegData Unpack(ReadOnlySpan<byte> payload)
+```
+
+### FrameChunk
+
+```csharp
+public sealed record FrameChunk(ulong TimestampUs, int FullSize, int Offset, byte[] Data)
+```
+
+#### FrameChunk.Unpack
+
+```csharp
+public static FrameChunk Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_VL53_FRAME payload: ts u64 LE, full u16 LE, off u16 LE, then data.
+
+### FrameReassembler
+
+```csharp
+public sealed class FrameReassembler
+```
+
+Rebuilds full sensor frames from chunked RPT_VL53_FRAME reports.
+
+Rules (contract 04 §4): reset on offset==0; chunks must be contiguous — a gap discards the frame in progress; a frame completes when the accumulated bytes equal `FullSize`. A chunk out of the rule-4 bounds (more than `chunkMax` bytes, `FullSize` over `StreamTotalMax`, or running past `FullSize`) is damaged: dropped and counted as a lost frame like the other damaged input, never thrown. Byte-exact with the reference Python `FrameReassembler`.
+
+#### FrameReassembler.Completed *(property)*
+
+```csharp
+public int Completed
+```
+
+#### FrameReassembler.Discarded *(property)*
+
+```csharp
+public int Discarded
+```
+
+#### FrameReassembler.FrameReassembler *(constructor)*
+
+```csharp
+public FrameReassembler(int chunkMax = Vl53l8Wire.StreamChunkMax)
+```
+
+#### FrameReassembler.Feed
+
+```csharp
+public (ulong TimestampUs, byte[] Frame)? Feed(FrameChunk chunk)
+```
+
+Feed one chunk; returns (timestampUs, frameBytes) when a frame completes, else null.
+
+### Vl53l8Advanced
+
+```csharp
+public static class Vl53l8Advanced
+```
+
+VL53L8 advanced-feature DCI codecs — pure, verifiable ports of the ST ULD (BSD-3-Clause) plugin encoders: motion-indicator configuration, detection-threshold block, and xtalk-margin scaling. Shared across both ToF variants (VL53L8CX and VL53L8CH; see `Vl53l8Variant`). The DCI read/write that carries these to the sensor is `Vl53l8Driver`.
+
+#### Vl53l8Advanced.Resolution4x4 *(constant)*
+
+```csharp
+public const int Resolution4x4 = 16
+```
+
+#### Vl53l8Advanced.Resolution8x8 *(constant)*
+
+```csharp
+public const int Resolution8x8 = 64
+```
+
+#### Vl53l8Advanced.DistMm *(constant)*
+
+```csharp
+public const int DistMm = 1
+```
+
+#### Vl53l8Advanced.SignalPerSpadKcps *(constant)*
+
+```csharp
+public const int SignalPerSpadKcps = 2
+```
+
+#### Vl53l8Advanced.RangeSigmaMm *(constant)*
+
+```csharp
+public const int RangeSigmaMm = 4
+```
+
+#### Vl53l8Advanced.AmbientPerSpadKcps *(constant)*
+
+```csharp
+public const int AmbientPerSpadKcps = 8
+```
+
+#### Vl53l8Advanced.NbSpadsEnabled *(constant)*
+
+```csharp
+public const int NbSpadsEnabled = 13
+```
+
+#### Vl53l8Advanced.MotionIndicator *(constant)*
+
+```csharp
+public const int MotionIndicator = 19
+```
+
+#### Vl53l8Advanced.NbThresholds *(constant)*
+
+```csharp
+public const int NbThresholds = 64
+```
+
+#### Vl53l8Advanced.XtalkMarginMaxKcps *(constant)*
+
+```csharp
+public const int XtalkMarginMaxKcps = 10000
+```
+
+Largest xtalk margin `SetXtalkMargin` accepts, whole kcps/SPAD (as ST).
+
+#### Vl53l8Advanced.XtalkMarginRaw
+
+```csharp
+public static uint XtalkMarginRaw(int marginKcps)
+```
+
+Xtalk margin raw DCI value: kcps × 2048. As ST, the margin is a whole number of kcps/SPAD, 0..`XtalkMarginMaxKcps`; a negative or a bigger value is refused — never wrapped (contract 07 §3).
+
+#### Vl53l8Advanced.XtalkMarginKcps
+
+```csharp
+public static int XtalkMarginKcps(uint raw)
+```
+
+Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST).
+
+#### Vl53l8Advanced.DetectionThreshold
+
+```csharp
+public sealed record DetectionThreshold(int LowThresh = 0, int HighThresh = 0, int Measurement = 0, int Type = 0, int ZoneNum = 0, int Operation = 0)
+```
+
+One detection threshold (raw real-unit low/high, before scaling). Every component defaults to 0, as a missing key does in the Python reference: build one with named arguments.
+
+#### Vl53l8Advanced.ThresholdValidStatus
+
+```csharp
+public static byte[] ThresholdValidStatus()
+```
+
+The 8-byte DCI_DET_THRESH_VALID_STATUS payload written before the block.
+
+#### Vl53l8Advanced.PackDetectionThresholds
+
+```csharp
+public static byte[] PackDetectionThresholds(IReadOnlyList<DetectionThreshold> thresholds)
+```
+
+Encode the 64×12-byte DCI_DET_THRESH_START block. Each entry is packed as (i32 low, i32 high, u8 measurement, u8 type, u8 zone, u8 op) with low/high multiplied by the measurement's scale factor; missing entries are zeros. Anything out of its field's range (measurement/type/zone/operation u8, scaled low/high i32) or more than 64 entries throws, never wrapped or dropped (contract 07 §3).
+
+### MotionConfig
+
+```csharp
+public sealed class MotionConfig
+```
+
+Mirror of VL53L8CX_Motion_Configuration (156 bytes, ST ULD motion plugin). `Pack` is byte-exact with the C struct `<i 3I 12B 64b 32B 32B>`.
+
+#### MotionConfig.RefBinOffset *(field)*
+
+```csharp
+public int RefBinOffset
+```
+
+#### MotionConfig.DetectionThreshold *(field)*
+
+```csharp
+public uint DetectionThreshold
+```
+
+#### MotionConfig.ExtraNoiseSigma *(field)*
+
+```csharp
+public uint ExtraNoiseSigma
+```
+
+#### MotionConfig.NullDenClipValue *(field)*
+
+```csharp
+public uint NullDenClipValue
+```
+
+#### MotionConfig.MemUpdateMode *(field)*
+
+```csharp
+public byte MemUpdateMode
+```
+
+#### MotionConfig.MemUpdateChoice *(field)*
+
+```csharp
+public byte MemUpdateChoice
+```
+
+#### MotionConfig.SumSpan *(field)*
+
+```csharp
+public byte SumSpan
+```
+
+#### MotionConfig.FeatureLength *(field)*
+
+```csharp
+public byte FeatureLength
+```
+
+#### MotionConfig.NbOfAggregates *(field)*
+
+```csharp
+public byte NbOfAggregates
+```
+
+#### MotionConfig.NbOfTemporalAccumulations *(field)*
+
+```csharp
+public byte NbOfTemporalAccumulations
+```
+
+#### MotionConfig.MinNbForGlobalDetection *(field)*
+
+```csharp
+public byte MinNbForGlobalDetection
+```
+
+#### MotionConfig.GlobalIndicatorFormat1 *(field)*
+
+```csharp
+public byte GlobalIndicatorFormat1
+```
+
+#### MotionConfig.GlobalIndicatorFormat2 *(field)*
+
+```csharp
+public byte GlobalIndicatorFormat2
+```
+
+#### MotionConfig.Spare1 *(field)*
+
+```csharp
+public byte Spare1
+```
+
+#### MotionConfig.Spare2 *(field)*
+
+```csharp
+public byte Spare2
+```
+
+#### MotionConfig.Spare3 *(field)*
+
+```csharp
+public byte Spare3
+```
+
+#### MotionConfig.MapId *(field)*
+
+```csharp
+public readonly sbyte[] MapId = new sbyte[64]
+```
+
+#### MotionConfig.IndicatorFormat1 *(field)*
+
+```csharp
+public readonly byte[] IndicatorFormat1 = new byte[32]
+```
+
+#### MotionConfig.IndicatorFormat2 *(field)*
+
+```csharp
+public readonly byte[] IndicatorFormat2 = new byte[32]
+```
+
+#### MotionConfig.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+Serialize to the 156-byte VL53L8CX_Motion_Configuration wire form.
+
+#### MotionConfig.InitDefault
+
+```csharp
+public static MotionConfig InitDefault(int resolution)
+```
+
+The default motion configuration produced by vl53l8cx_motion_indicator_init for the given resolution (distance-window preset + zone map).
+
+#### MotionConfig.SetResolution
+
+```csharp
+public void SetResolution(int resolution)
+```
+
+vl53l8cx_motion_indicator_set_resolution: fill the per-zone map id.

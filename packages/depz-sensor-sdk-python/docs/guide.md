@@ -1,0 +1,284 @@
+# depz-sensor-sdk — guide
+
+The common guide to the Python SDK for the DEPZ USB sensor line. It covers what
+the SDK is, installation, discovery, the shared mental model, and the
+cross-sensor features (multi-device time-sync, recording & replay, firmware
+update). Each sensor then has its own **introduction** and **user guide**:
+
+- **SR04** (HC-SR04 ultrasonic) — [introduction](sr04/introduction.md) ·
+  [guide](sr04/guide.md) · [api](sr04/api.md)
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** (single-zone ToF family) —
+  [L0X](vl53l0x/introduction.md) · [L1CX](vl53l1cx/introduction.md) ·
+  [L1CB](vl53l1cb/introduction.md) · [L3CX](vl53l3cx/introduction.md) ·
+  [L4CX](vl53l4cx/introduction.md), each with its guide and api
+- **VL53L4CD** (single-zone ToF) — [introduction](vl53l4cd/introduction.md) ·
+  [guide](vl53l4cd/guide.md) · [api](vl53l4cd/api.md)
+- **VL53L5CX / VL53L7CX** (8×8 ToF on the I2C board) —
+  [L5CX](vl53l5cx/introduction.md) · [L7CX](vl53l7cx/introduction.md) ·
+  [guide](vl53l7cx/guide.md) · [api](vl53l7cx/api.md)
+- **VL53L7CH** (L7CX superset + streamed CNH) —
+  [introduction](vl53l7ch/introduction.md) · [guide](vl53l7ch/guide.md) ·
+  [api](vl53l7ch/api.md)
+- **VL53L8CX** (8×8 ToF base) — [introduction](vl53l8cx/introduction.md) ·
+  [guide](vl53l8cx/guide.md) · [api](vl53l8cx/api.md)
+- **VL53L8CH** (ToF superset + CNH histograms) —
+  [introduction](vl53l8ch/introduction.md) · [guide](vl53l8ch/guide.md) ·
+  [api](vl53l8ch/api.md)
+- **TMF8829** (dToF, 8×8 … 48×32 zones, up to 4 peaks) —
+  [introduction](tmf8829/introduction.md) · [guide](tmf8829/guide.md) ·
+  [api](tmf8829/api.md)
+- **BNO055** (9-axis IMU, on-chip fusion) — [introduction](bno055/introduction.md) ·
+  [guide](bno055/guide.md) · [api](bno055/api.md)
+- **BNO085** (9-axis IMU) — [introduction](bno085/introduction.md) ·
+  [guide](bno085/guide.md) · [api](bno085/api.md)
+- **BNO086** (9-axis IMU) — [introduction](bno086/introduction.md) ·
+  [guide](bno086/guide.md) · [api](bno086/api.md)
+
+For the exhaustive symbol-by-symbol reference see [api.md](api.md), generated
+from the source docstrings so it never drifts from the code.
+
+## Contents
+
+- [What it is](#what-it-is)
+- [Installation](#installation)
+- [Getting started](#getting-started)
+- [Discovery](#discovery)
+- [Mental model](#mental-model)
+- [Common device features](#common-device-features)
+- [Streaming: callbacks vs iterators](#streaming-callbacks-vs-iterators)
+- [Multi-sensor: one shared timeline](#multi-sensor-one-shared-timeline)
+- [Recording & replay](#recording--replay)
+- [Firmware update](#firmware-update)
+- [Testing without hardware](#testing-without-hardware)
+
+## What it is
+
+Each sensor is a USB CDC-ACM device speaking one shared framed protocol
+(`A5 C3` header + CRC). The SDK gives you a typed Python object per sensor with
+a background reader thread; you configure it and consume a stream of decoded,
+timestamped results. The sensors fall into a few firmware philosophies —
+mirrored from the firmware:
+
+- **SR04** — the device does the ranging; you get `echo_time_us` → distance.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX** — one I2C bridge firmware
+  that knows no sensor; every ST driver (ULD, ULP, the histogram Bare Driver)
+  runs **on the host** (`depz_sensor_sdk.vl53lx`).
+- **VL53L4CD** — the device is a thin I2C bridge; the full ST ULD 2.2.3 runs
+  **on the host** (`depz_sensor_sdk.vl53l4`). Single-zone ToF distance.
+- **VL53L5CX / VL53L7CX / VL53L7CH** — the same ULD family as the VL53L8 on an
+  I2C bridge (`depz_sensor_sdk.vl53l7`); the classes subclass `Vl53l8cx`.
+- **VL53L8CX / VL53L8CH** — the device is a thin SPI bridge; the full ST ULD
+  driver runs **on the host** (`depz_sensor_sdk.vl53l8`). CX is the base ToF
+  imager; CH is its superset, adding Compact-Network-Histogram output.
+- **TMF8829** — the device is a thin SPI register bridge; the host downloads
+  the sensor firmware, writes the config page and parses the frames
+  (`depz_sensor_sdk.tmf8829`).
+- **BNO055** — the device is an I2C register bridge; the sensor fuses on chip
+  and the host configures it with register writes (`depz_sensor_sdk.bno055`).
+- **BNO085 / BNO086** — the device is an SHTP pass-through; the full SH-2 stack
+  runs **on the host** (`depz_sensor_sdk.bno086`).
+
+The public surface is the union of `__all__` across the package; the API
+reference is generated from it, so it never drifts from the code.
+
+## Installation
+
+```bash
+pip install depz-sensor-sdk
+```
+
+Or, from a checkout of the repository, the same package from its sources:
+
+<!-- doc-check: skip — an install from a checkout, not from the registry -->
+```bash
+pip install ./packages/depz-sensor-sdk-python
+```
+
+Linux note: your user must be able to open the port (group `dialout`).
+
+## Getting started
+
+```python
+from depz_sensor_sdk import open_device, Sr04, Bno086
+from depz_sensor_sdk.vl53l8 import Vl53l8cx
+
+dev = open_device("/dev/ttyACM0")   # factory: returns the right subclass
+if isinstance(dev, Sr04):
+    dev.start()
+    print(next(dev.measurements()).distance_mm)
+```
+
+`open_device()` probes the port and returns the class of the connected sensor
+(`Sr04`, `Vl53l4cd`, `Vl53l8cx`/`Vl53l8ch`, `Vl53l5cx`/`Vl53l7cx`/`Vl53l7ch`,
+`Vl53l0x`…`Vl53l4cx`, `Tmf8829`, `Bno086`, `Bno055`) — each a subclass of `DepzDevice`. From there, follow the per-sensor
+guide linked above. Every device is a context manager (`with open_device(...)
+as dev:`) or you call `dev.close()`.
+
+## Discovery
+
+Selection is by **USB identity**: only ports whose USB (vid, pid) is a known
+DEPZ id are considered, ordered by USB iSerial — never "first port the OS
+enumerated". The protocol probe (`GET_NAME_ACTIVE_SOFTWARE`) then decides what
+each device actually *is*.
+
+```python
+from depz_sensor_sdk import list_depz_devices, open_device
+
+for info in list_depz_devices():       # probes DEPZ-id ports only
+    print(info.port, info.sensor_type, info.serial_number, info.usb_model_hint)
+
+dev = open_device()                    # the DEPZ port with the smallest USB serial
+dev = open_device(0)                   # by index (candidates sorted by serial)
+dev = open_device(serial="SN000042")   # by exact USB serial
+dev = open_device("/dev/ttyACM0")      # an explicit port path
+```
+
+Two identical sensors (say, two SR04) are told apart by their **USB serial**:
+they sort deterministically, so `open_device(0)` / `open_device(1)` and
+`serial=` are stable. Pass a bare port path to open an unprogrammed unit
+(you'll get a warning if its USB id isn't a known DEPZ one). Nothing DEPZ
+answering raises `NoDepzDeviceError`; a board still running its bootloader
+raises `BootloaderModeError` — flash it with `update_firmware` (below).
+
+## Mental model
+
+<!-- doc-check: skip — diagram -->
+```
+open_device(port)  ──►  Sr04 | Vl53l… | Bno086 | Bno055   (subclass of DepzDevice)
+                          │
+             background reader thread
+                          │
+        ┌─────────────────┼─────────────────┐
+   request/reply      one stream object per item kind
+  (correlated by     (dev.measurements / frames / samples / reports:
+   echoed cmd)        .on(cb) callbacks, (maxsize) bounded iterator,
+                      .next(timeout); drop-oldest)
+```
+
+- **One reader thread per device** drains the port, parses frames, dispatches.
+  Solicited replies are correlated by the **echoed command byte** (not by
+  sequence number); the default timeout is 200 ms.
+- **Streams** come three ways: register a callback (fires on the reader
+  thread — don't block it), pull from a bounded, drop-oldest iterator, or
+  wait for the next item.
+- **Timestamps** are device microseconds. Call `sync_time()` once, then
+  `to_host_time_us()` maps them onto the host clock — this is also what lets
+  multi-device recordings share one timeline.
+
+## Common device features
+
+Available on every sensor (they all subclass `DepzDevice`):
+
+```python
+dev.read_mcu_temperature()             # °C
+ts = dev.sync_time(samples=5)          # NTP-style; ts.offset_us / ts.rtt_us
+dev.to_host_time_us(frame.timestamp_us)
+dev.get_sync_pin(1); dev.set_sync_pin(cfg)   # AUX sync pins
+dev.events.on(lambda ev: print(ev))     # seq errors, hw faults, text, temperature…
+dev.stats                              # LinkStats: tx/rx, crc/seq errors, trash
+dev.reset()                            # reboots the device
+```
+
+## Streaming: callbacks vs iterators
+
+```python
+# callback — fires on the reader thread; keep it quick
+unsub = dev.frames.on(lambda f: queue.put(f))
+unsub()                                # stop
+
+# iterator — bounded, drop-oldest; subscribes immediately
+it = dev.frames(maxsize=8)
+frame = next(it)
+print("dropped so far:", it.dropped_count)
+
+# one item — DepzTimeoutError on silence, LinkClosedError after your own
+# close(), DeviceLostError (with the cause) after a loss. The iterator above
+# ends quietly either way; dev.lost then tells which.
+frame = dev.frames.next(timeout=2.0)
+print(dev.frames.dropped_counts, dev.frames.parse_errors)   # per-queue drops, undecodable reports
+```
+
+The stream object is named after its items: `measurements` (SR04, the
+VL53L0X…L4CX family, VL53L4CD and TMF8829), `frames` (VL53L5CX/L7CX/L7CH and
+VL53L8CX/CH), `samples` (BNO055), `reports` (BNO085 / BNO086); `events` on
+every device. Each drops the oldest item when full and counts drops.
+
+## Multi-sensor: one shared timeline
+
+`sync_time()` on each device maps its `to_host_time_us()` onto **one shared
+host timeline** — the basis for correlating live reads across sensors (and the
+same alignment `SessionRecorder` applies to every device it records):
+
+```python
+syncs = {dev: dev.sync_time() for dev in (sr04_a, sr04_b, imu)}   # {device: TimeSync}
+```
+
+This works across mixed sensor types and across two of the same type.
+
+## Recording & replay
+
+Two layers (see contracts 08 and 09):
+
+```python
+# decoded, multi-device, time-synced dataset
+from depz_sensor_sdk import SessionRecorder, DatasetReader
+
+with SessionRecorder("run.depzdata", note="lab run") as rec:
+    rec.add(sr04_a, device_id="left")    # runs sync_time; add several devices
+    rec.add(sr04_b, device_id="right")   # two-of-a-kind is fine
+    rec.add(vl53l8)
+    rec.start()
+    sr04_a.start(); sr04_b.start(); vl53l8.start_ranging()
+    time.sleep(10)
+
+reader = DatasetReader("run.depzdata")
+for record in reader:                  # merged by host time across all devices
+    print(record.device_id, record.kind, record.t_host_us)
+
+# interactive playback: pause / resume, seek, speed, position (contract 09)
+from depz_sensor_sdk import DatasetPlayer
+
+player = DatasetPlayer(reader, speed=2.0)   # records arrive on a player thread
+player.on_record(lambda r: print(r.kind, r.t_host_us))
+player.on_state(lambda s: print("state:", s.value))
+player.play()
+player.seek_us(5_000_000)              # jump to 5 s into the timeline
+player.speed = 0.5                     # applies at once
+player.wait()                          # until done; player.position_us / duration_us
+player.close()
+```
+
+Records from every device — including two of the same model — land on one
+timeline, merged strictly by host time. CLI equivalents:
+
+<!-- doc-check: skip — CLI usage; needs sensors attached -->
+```bash
+depz-sensor record-data /dev/ttyACM0 /dev/ttyACM1 --out two.depzdata
+depz-sensor play-data two.depzdata --speed 2
+```
+
+The raw-byte layer (`.depzrec`, `RecordingLink` / `ReplayLink`) is for protocol
+regression and hardware-free tests — the same file replays the full SDK stack
+byte-for-byte.
+
+## Firmware update
+
+Updates the **application** firmware (not the bootloader):
+
+```python
+from depz_sensor_sdk import update_firmware
+name = update_firmware("/dev/ttyACM0", "app_tof_vl53l8.fwdepz", progress=print)
+# or: depz-sensor flash /dev/ttyACM0 app_tof_vl53l8.fwdepz
+```
+
+It enters the bootloader, re-finds the device by serial, erases, writes pages
+with per-page CRC verification, checks the app CRC, boots, and waits (≤10 s)
+until the port answers with the application's software name, which it
+returns. A board that does not come back raises `ApplicationNotBackError`
+(a `DepzTimeoutError`) naming what it last saw: no port, or the bootloader.
+
+## Testing without hardware
+
+Every layer takes a `Link`, so you can drive full device classes off a loopback
+or a recorded session — no serial port required. That's how the test suite
+runs, including a real VL53L8 capture replayed end-to-end.

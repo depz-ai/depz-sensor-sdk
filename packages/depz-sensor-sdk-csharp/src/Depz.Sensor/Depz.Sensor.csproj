@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;netstandard2.1</TargetFrameworks>
+    <RootNamespace>Depz.Sensor</RootNamespace>
+    <AssemblyName>Depz.Sensor</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- the .NET code-quality analyzers at the recommended set, every finding fails the build;
+         pinned to the .NET 8 rule set: "latest" grows with whatever SDK a machine has, and another
+         machine's newer one then fails a build that passes here -->
+    <AnalysisLevel>8.0-recommended</AnalysisLevel>
+    <!-- Ship XML docs for IntelliSense; don't fail the build on undocumented members. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Off, with the reason: CA1051 — the decoded results are plain field structs, as in the other
+         six SDKs; CA1707 / CA1720 — names follow the contracts (I2C_ERR_OK, Int, Signed);
+         CA1510 / CA1513 — ArgumentNullException.ThrowIfNull and ObjectDisposedException.ThrowIf
+         are not in netstandard2.1, which this builds for too; CA1859 — read-only interfaces
+         say the lookup tables are not to be changed, and they are a few entries each. -->
+    <NoWarn>$(NoWarn);CA1051;CA1707;CA1720;CA1510;CA1513;CA1859</NoWarn>
+
+    <!-- NuGet package metadata -->
+    <PackageId>Depz.Sensor</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>DEPZ</Authors>
+    <Description>Contract-first C# SDK for the DEPZ USB sensor line (SR04, VL53L8CX/CH ToF, VL53L4CD ToF, BNO086 IMU, TMF8829 dToF) — transport, protocol codecs, and sensor decode.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/depz-ai/depz-sensor-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/depz-ai/depz-sensor-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>depz;sensor;usb;vl53l8;vl53l4cd;bno086;hc-sr04;tmf8829;tof;imu</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Depz.Sensor.Tests" />
+    <!-- the Unity communication module runs the registry enumeration and the on-link probe -->
+    <InternalsVisibleTo Include="Depz.Sensor.Unity" />
+    <InternalsVisibleTo Include="Depz.Sensor.Unity.Tests" />
+  </ItemGroup>
+
+  <!-- Serial ports on .NET 8. Unity (netstandard2.1) brings its own System.IO.Ports, or none:
+       there the host opens the port and hands the SDK an ILink. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- VL53L8 / L5 / L7 sensor firmware and configuration blobs (ST, BSD-3-Clause), embedded from
+       the Python SDK's vl53l8/data: the single source of truth the C and TS SDKs read too. -->
+  <PropertyGroup>
+    <Vl53l8Data>../../../depz-sensor-sdk-python/depz_sensor_sdk/vl53l8/data</Vl53l8Data>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.cx.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.cx.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/default_xtalk.bin" LogicalName="Depz.Sensor.Vl53l8.cx.default_xtalk.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/cx/get_nvm_cmd.bin" LogicalName="Depz.Sensor.Vl53l8.cx.get_nvm_cmd.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/ch/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.ch.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/ch/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.ch.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7cx/firmware.bin" LogicalName="Depz.Sensor.Vl53l8.l7cx.firmware.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7cx/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.l7cx.default_configuration.bin" />
+    <EmbeddedResource Include="$(Vl53l8Data)/l7ch/default_configuration.bin" LogicalName="Depz.Sensor.Vl53l8.l7ch.default_configuration.bin" />
+    <!-- ST's licence travels with the package that carries the blobs and the ported driver. -->
+    <None Include="../../licenses/vl53l8/LICENSE-BSD-3-Clause.txt" Pack="true" PackagePath="licenses/vl53l8/" />
+  </ItemGroup>
+
+  <!-- TMF8829 sensor firmware (ams, MIT): embedded in the assembly; the license
+       text is embedded too and packed next to the README. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Tmf8829/Data/tmf8829_application.bin" LogicalName="Depz.Sensor.Tmf8829.tmf8829_application.bin" />
+    <EmbeddedResource Include="Tmf8829/Data/LICENSES-MIT.TXT" LogicalName="Depz.Sensor.Tmf8829.LICENSES-MIT.TXT" />
+    <None Include="Tmf8829/Data/LICENSES-MIT.TXT" Pack="true" PackagePath="licenses/tmf8829/" />
+  </ItemGroup>
+
+</Project>

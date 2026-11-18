@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+# depz-sensor-sdk-cpp — C++17 face of the C SDK depz-sensor-sdk-c: the codecs
+# and the live-hardware layer. Exposes the imported target depz::sensor_sdk_cpp
+# (alias depz::sensor_sdk), which links depz::sensor_sdk_c publicly.
+
+include(CMakeFindDependencyMacro)
+find_dependency(depz-sensor-sdk-c)
+
+include("${CMAKE_CURRENT_LIST_DIR}/depz-sensor-sdk-cpp-targets.cmake")
+
+check_required_components(depz-sensor-sdk-cpp)

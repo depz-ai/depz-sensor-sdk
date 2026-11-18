@@ -1,0 +1,671 @@
+# VL53L4CD (ToF, single-zone) — API reference
+
+The public API for the VL53L4CD (ToF, single-zone) sensor: its codecs and its live class. Transport,
+common-protocol, identity and other cross-sensor symbols shared by
+every sensor live in the [top-level API reference](../api.md).
+
+The live class (`depz::Vl53l4cd`) derives from `depz::Device`; the
+device core it inherits (common commands, time sync, events),
+the links, streams, errors and discovery are in the
+[top-level API reference](../api.md#live-hardware-links-device-discovery).
+
+Generated from the header doc-comments — edit the doc-comments in
+the headers, not this file.
+
+## Contents
+
+- **VL53L4CD codecs and ULD math (depz/vl53l4.hpp)**: [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`MODEL_ID`](#model_id), [`CONFIG_ADDR`](#config_addr), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`pack_read_reg`](#pack_read_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`Vl53l4Result`](#vl53l4result), [`parse_result_block`](#parse_result_block), [`RangeTimingRegs`](#rangetimingregs), [`range_timing_registers`](#range_timing_registers), [`RangeTiming`](#rangetiming), [`decode_range_timing`](#decode_range_timing), [`offset_raw`](#offset_raw), [`decode_offset`](#decode_offset), [`xtalk_raw`](#xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold), [`default_configuration`](#default_configuration), [`config_block`](#config_block)
+- **VL53L4CD live class (depz/device.hpp)**: [`Vl53l4cdMeasurement`](#vl53l4cdmeasurement), [`DetectionWindow`](#detectionwindow), [`DetectionThresholds`](#detectionthresholds), [`Vl53l4cd`](#vl53l4cd), [`open_vl53l4cd`](#open_vl53l4cd)
+
+## VL53L4CD codecs and ULD math (depz/vl53l4.hpp)
+
+### Vl53l4Cmd
+
+```cpp
+enum class Vl53l4Cmd : std::uint8_t {
+    ReadReg = 0x32,      // addr u16, len u16 -> RPT_VL53_REG_DATA
+    WriteReg = 0x33,     // addr u16, data[1..253]
+    Xshut = 0x34,        // action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET)
+    StartStream = 0x35,  // addr u16, len u16, flags u8
+    StopStream = 0x36,
+    GetInfo = 0x37,      // -> RPT_VL53_INFO
+    SetI2cSpeed = 0x38,  // khz u16 (clamped to the nearest nominal step)
+};
+```
+
+Bridge commands (0x32..0x38; 0x30/0x31 are the common sync pins).
+
+### Vl53l4Rpt
+
+```cpp
+enum class Vl53l4Rpt : std::uint8_t {
+    RegData = 0x91,  // RPT_VL53_REG_DATA
+    Info = 0x92,     // RPT_VL53_INFO
+    Stream = 0x93,   // RPT_VL53_STREAM
+};
+```
+
+Bridge reports.
+
+### XFER_MAX
+
+```cpp
+inline constexpr std::uint16_t XFER_MAX = 253;
+```
+
+Max read len / write data length per transfer (STM32 I2C NBYTES is 8-bit; a
+write spends two bytes on the register address; the firmware applies the
+same limit to both directions).
+
+### XSHUT_OFF
+
+```cpp
+inline constexpr std::uint8_t XSHUT_OFF = 0;
+```
+
+VL53_XSHUT actions.
+
+### XSHUT_ON
+
+```cpp
+inline constexpr std::uint8_t XSHUT_ON = 1;
+```
+
+### XSHUT_RESET
+
+```cpp
+inline constexpr std::uint8_t XSHUT_RESET = 2;
+```
+
+answered after the boot handshake
+
+### SF_INT_ACT_HIGH
+
+```cpp
+inline constexpr std::uint8_t SF_INT_ACT_HIGH = 0x02;
+```
+
+VL53_START_STREAM flags bit 1: INT active high, mirroring bit 4 of
+GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
+
+### RESULT_BLOCK_ADDR
+
+```cpp
+inline constexpr std::uint16_t RESULT_BLOCK_ADDR = 0x0089;
+```
+
+The block the MCU streams: RESULT__RANGE_STATUS (0x0089) .. 0x0099 — every
+field of the ULD results struct in one read.
+
+### RESULT_BLOCK_LEN
+
+```cpp
+inline constexpr std::uint16_t RESULT_BLOCK_LEN = 17;
+```
+
+### MODEL_ID
+
+```cpp
+inline constexpr std::uint16_t MODEL_ID = 0xEBAA;
+```
+
+IDENTIFICATION__MODEL_ID (0x010F..0x0110) expected value.
+
+### CONFIG_ADDR
+
+```cpp
+inline constexpr std::uint16_t CONFIG_ADDR = 0x2D;
+```
+
+First register of the 91-byte init configuration block (0x2D..0x87).
+
+### CONFIG_FMP_BYTE
+
+```cpp
+inline constexpr std::uint8_t CONFIG_FMP_BYTE = 0x12;
+```
+
+config_block() forces byte 0 (register 0x2D) to this value: I2C Fast Mode
+Plus pad, set unconditionally and never cleared.
+
+### pack_read_reg
+
+```cpp
+bytes pack_read_reg(std::uint16_t addr, std::uint16_t len);
+```
+
+VL53_READ_REG payload: addr u16, len u16 (both little-endian); std::invalid_argument
+unless len is 1..XFER_MAX and addr + len <= 0x10000 (contract 10 §1).
+
+### pack_write_reg
+
+```cpp
+bytes pack_write_reg(std::uint16_t addr, byte_span data);
+```
+
+VL53_WRITE_REG payload: addr u16 then the raw register data; std::invalid_argument
+unless it is 1..XFER_MAX bytes and addr + N <= 0x10000.
+
+### pack_xshut
+
+```cpp
+bytes pack_xshut(std::uint8_t action);
+```
+
+VL53_XSHUT payload: action u8 (XSHUT_OFF / XSHUT_ON / XSHUT_RESET).
+
+### pack_start_stream
+
+```cpp
+bytes pack_start_stream(std::uint16_t addr, std::uint16_t len, std::uint8_t flags);
+```
+
+VL53_START_STREAM payload: addr u16, len u16, flags u8 (SF_INT_ACT_HIGH).
+
+### pack_set_i2c_speed
+
+```cpp
+bytes pack_set_i2c_speed(std::uint16_t khz);
+```
+
+VL53_SET_I2C_SPEED payload: khz u16 (firmware clamps to the nearest step).
+
+### RegData
+
+```cpp
+struct RegData {
+    std::uint8_t cmd = 0;
+    std::uint64_t timestamp_us = 0;
+    bytes data;
+};
+```
+
+RPT_VL53_REG_DATA — one I2C read result. `cmd` echoes 0x32; `timestamp_us`
+is MCU uptime at I2C-read completion.
+
+#### RegData.unpack
+
+```cpp
+static std::optional<RegData> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_REG_DATA payload (9+N bytes); nullopt when too short.
+
+### Vl53l4Info
+
+```cpp
+struct Vl53l4Info : depz_vl53l4_info {
+    // (no public data members)
+};
+```
+
+RPT_VL53_INFO — bridge diagnostics (21-byte little-endian payload).
+Counters wrap silently; watch increments, not absolute values. i2c_errors
+counts since the last successful XSHUT reset (the bridge clears it there),
+not since power-up. Not a data path: safe to request while streaming.
+Fields: int_edges, slots_skipped, i2c_errors, last_i2c_error (0 none, 1
+NACK, 2 TIMEOUT, 3 BUS_ERROR), model_id (expected MODEL_ID 0xEBAA), fw_status
+(expected 0x03, booted), initialized (1 = MODEL_ID read back as 0xEBAA on this
+GET_INFO), xshut_level, int_level, i2c_khz — the C SDK's depz_vl53l4_info.
+
+#### Vl53l4Info.unpack
+
+```cpp
+static std::optional<Vl53l4Info> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_INFO payload; nullopt when shorter than 21 bytes.
+
+### StreamData
+
+```cpp
+struct StreamData {
+    std::uint64_t timestamp_us = 0;
+    std::uint16_t addr = 0;
+    std::uint16_t len = 0;
+    bytes data;  // payload[12..12+len]
+};
+```
+
+RPT_VL53_STREAM — one streamed register block. `timestamp_us` is MCU uptime
+at the INT edge (the sensor event); `addr`/`len` echo the stream
+configuration so each report is self-describing.
+
+#### StreamData.unpack
+
+```cpp
+static std::optional<StreamData> unpack(byte_span payload);
+```
+
+Decode a RPT_VL53_STREAM payload (12+len bytes); nullopt when too short.
+
+### Vl53l4Result
+
+```cpp
+using Vl53l4Result = depz_vl53l4_result;
+```
+
+VL53L4CD_ResultsData_t plus the sensor's own frame counter (the C SDK's
+depz_vl53l4_result): range_status (0 = valid; raw >= 24 passes through
+unmapped), distance_mm, ambient_rate_kcps, ambient_per_spad_kcps,
+signal_rate_kcps, signal_per_spad_kcps, number_of_spad, sigma_mm,
+stream_count (sensor frame counter, wraps at 255). Rates are kcps,
+distances/sigma are millimetres; everything is integer math per the vectors.
+
+### parse_result_block
+
+```cpp
+std::optional<Vl53l4Result> parse_result_block(byte_span raw);
+```
+
+Decode the streamed RESULT_BLOCK_ADDR block exactly as VL53L4CD_GetResult()
+decodes the same registers read one by one (big-endian words, x8 rates,
+/4 sigma, per-SPAD rate x256/raw_spads with zero SPADs -> 0). Returns
+nullopt when raw is shorter than RESULT_BLOCK_LEN (17) bytes; a longer
+buffer is decoded and the tail ignored (contract 07 §3).
+
+### RangeTimingRegs
+
+```cpp
+struct RangeTimingRegs {
+    std::uint16_t range_config_a = 0;
+    std::uint16_t range_config_b = 0;
+    std::uint32_t intermeasurement_raw = 0;
+};
+```
+
+The register words SetRangeTiming programs: RANGE_CONFIG_A (0x005E),
+RANGE_CONFIG_B (0x0061) and the INTERMEASUREMENT_MS (0x006C) raw dword.
+
+### range_timing_registers
+
+```cpp
+std::optional<RangeTimingRegs> range_timing_registers(std::uint32_t budget_ms, std::uint32_t inter_ms, std::uint16_t osc_frequency, std::uint16_t clock_pll);
+```
+
+SetRangeTiming register math. `osc_frequency` is the word read from 0x0006;
+`clock_pll` the word from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
+mode). budget 10..200 ms; inter_ms == 0 selects continuous mode, a value
+greater than the budget selects autonomous low power. Returns nullopt when
+osc_frequency is 0, the budget is out of range, 0 < inter_ms <= budget, or
+the INTERMEASUREMENT_MS value would overflow u32 (never wrapped).
+Bit-exact with the ULD (32-bit truncations, 1.055 PLL factor).
+
+### RangeTiming
+
+```cpp
+struct RangeTiming {
+    std::uint32_t timing_budget_ms = 0;
+    std::uint32_t inter_measurement_ms = 0;
+};
+```
+
+GetRangeTiming result: the user-facing milliseconds.
+
+### decode_range_timing
+
+```cpp
+std::optional<RangeTiming> decode_range_timing(std::uint32_t intermeasurement_raw, std::uint16_t clock_pll, std::uint16_t osc_frequency, std::uint16_t range_config_a);
+```
+
+GetRangeTiming register math from the raw register reads (INTERMEASUREMENT_MS
+dword, RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word, RANGE_CONFIG_A word).
+Returns nullopt when osc_frequency reads 0. Bit-exact with the ULD (32-bit
+truncations, 1.065 PLL factor).
+
+### offset_raw
+
+```cpp
+std::uint16_t offset_raw(int offset_mm);
+```
+
+RANGE_OFFSET_MM (0x001E) word for SetOffset (offset x4; INNER/OUTER zeroed
+alongside). std::out_of_range outside -1024..1023 mm (contract 07 §3).
+
+### decode_offset
+
+```cpp
+int decode_offset(std::uint16_t raw_word);
+```
+
+GetOffset: RANGE_OFFSET_MM word -> signed millimetres.
+
+### xtalk_raw
+
+```cpp
+std::uint16_t xtalk_raw(int xtalk_kcps);
+```
+
+XTALK_PLANE_OFFSET_KCPS (0x0016) word for SetXtalk (kcps x512).
+std::out_of_range outside 0..127 kcps (the word would overflow).
+
+### decode_xtalk
+
+```cpp
+int decode_xtalk(std::uint16_t raw_word);
+```
+
+GetXtalk: XTALK_PLANE_OFFSET_KCPS word -> kcps (std::lround(raw / 512.0)).
+
+### signal_threshold_raw
+
+```cpp
+std::uint16_t signal_threshold_raw(int signal_kcps);
+```
+
+MIN_COUNT_RATE_RTN_LIMIT_MCPS (0x0066) word for SetSignalThreshold (kcps /8).
+std::out_of_range outside 0..65535 kcps.
+
+### decode_signal_threshold
+
+```cpp
+int decode_signal_threshold(std::uint16_t raw_word);
+```
+
+GetSignalThreshold: register word -> kcps.
+
+### sigma_threshold_raw
+
+```cpp
+std::optional<std::uint16_t> sigma_threshold_raw(int sigma_mm);
+```
+
+RANGE_CONFIG__SIGMA_THRESH (0x0064) word for SetSigmaThreshold (mm x4);
+nullopt when sigma_mm is negative or > 16383 (the word would overflow).
+
+### decode_sigma_threshold
+
+```cpp
+int decode_sigma_threshold(std::uint16_t raw_word);
+```
+
+GetSigmaThreshold: register word -> millimetres.
+
+### default_configuration
+
+```cpp
+span<const std::uint8_t> default_configuration() noexcept;
+```
+
+The stock ST VL53L4CD_DEFAULT_CONFIGURATION[] table — 91 bytes for
+registers 0x2D..0x87 (ULD 2.2.3), untouched.
+
+### config_block
+
+```cpp
+bytes config_block();
+```
+
+The 91-byte block sensor_init writes at CONFIG_ADDR: the ST default
+configuration with byte 0 forced to CONFIG_FMP_BYTE (I2C Fast Mode Plus).
+
+## VL53L4CD live class (depz/device.hpp)
+
+### Vl53l4cdMeasurement
+
+```cpp
+struct Vl53l4cdMeasurement {
+    std::uint64_t timestamp_us;  // MCU µs at the INT edge (stream) / the read (poll)
+    vl53l4::Vl53l4Result r;  // r.range_status 0 = valid, r.distance_mm, ...
+};
+```
+
+#### Vl53l4cdMeasurement.valid
+
+```cpp
+bool valid() const;
+```
+
+#### Vl53l4cdMeasurement.status_text
+
+```cpp
+std::string status_text() const;
+```
+
+UM2931 name of the range status ("valid", "sigma above threshold", ...).
+
+### DetectionWindow
+
+```cpp
+enum class DetectionWindow : std::uint8_t {
+    Below = 0, Above = 1, Out = 2, In = 3
+};
+```
+
+When INT fires relative to the window [low_mm, high_mm] (SYSTEM__INTERRUPT).
+Once programmed, only init() restores the "no window" default.
+
+### DetectionThresholds
+
+```cpp
+struct DetectionThresholds {
+    std::uint16_t low_mm, high_mm;
+    DetectionWindow window;
+};
+```
+
+The VL53L4CD distance window: INT only fires when `window` holds.
+
+### Vl53l4cd
+
+```cpp
+class Vl53l4cd : public Device {
+    // (no public data members)
+};
+```
+
+VL53L4CD single-zone ToF: the ST ULD 2.2.3 on the host over the bridge.
+
+#### Vl53l4cd.open
+
+```cpp
+static std::unique_ptr<Vl53l4cd> open(Link link);
+```
+
+A VL53L4CD on a link without an identity probe (tests, replay).
+
+#### Vl53l4cd.is_alive
+
+```cpp
+bool is_alive();
+```
+
+the sensor answers with its model id
+
+#### Vl53l4cd.init
+
+```cpp
+void init(std::uint16_t bus_khz = 1000);
+```
+
+Configuration block + VHV calibration, then the bus at `bus_khz`.
+
+#### Vl53l4cd.initialized
+
+```cpp
+bool initialized() const;
+```
+
+#### Vl53l4cd.ranging
+
+```cpp
+bool ranging() const;
+```
+
+#### Vl53l4cd.xshut
+
+```cpp
+void xshut(std::uint8_t action);
+```
+
+vl53l4::XSHUT_OFF / _ON / _RESET
+
+#### Vl53l4cd.reset_sensor
+
+```cpp
+void reset_sensor();
+```
+
+#### Vl53l4cd.bridge_info
+
+```cpp
+vl53l4::Vl53l4Info bridge_info();
+```
+
+#### Vl53l4cd.set_i2c_speed_khz
+
+```cpp
+void set_i2c_speed_khz(std::uint16_t khz);
+```
+
+#### Vl53l4cd.set_range_timing
+
+```cpp
+void set_range_timing(std::uint32_t budget_ms, std::uint32_t inter_ms = 0);
+```
+
+Budget 10..200 ms; inter 0 = continuous, > budget = autonomous.
+
+#### Vl53l4cd.range_timing
+
+```cpp
+vl53l4::RangeTiming range_timing();
+```
+
+#### Vl53l4cd.set_offset_mm
+
+```cpp
+void set_offset_mm(std::int32_t mm);
+```
+
+#### Vl53l4cd.offset_mm
+
+```cpp
+std::int32_t offset_mm();
+```
+
+#### Vl53l4cd.set_xtalk_kcps
+
+```cpp
+void set_xtalk_kcps(std::uint16_t kcps);
+```
+
+0 = off
+
+#### Vl53l4cd.xtalk_kcps
+
+```cpp
+std::uint16_t xtalk_kcps();
+```
+
+#### Vl53l4cd.set_detection_thresholds
+
+```cpp
+void set_detection_thresholds(const DetectionThresholds& t);
+```
+
+#### Vl53l4cd.detection_thresholds
+
+```cpp
+DetectionThresholds detection_thresholds();
+```
+
+#### Vl53l4cd.set_signal_threshold_kcps
+
+```cpp
+void set_signal_threshold_kcps(std::uint16_t kcps);
+```
+
+#### Vl53l4cd.signal_threshold_kcps
+
+```cpp
+std::uint16_t signal_threshold_kcps();
+```
+
+#### Vl53l4cd.set_sigma_threshold_mm
+
+```cpp
+void set_sigma_threshold_mm(std::uint16_t mm);
+```
+
+<= 16383
+
+#### Vl53l4cd.sigma_threshold_mm
+
+```cpp
+std::uint16_t sigma_threshold_mm();
+```
+
+#### Vl53l4cd.start_temperature_update
+
+```cpp
+void start_temperature_update();
+```
+
+after a > 8 °C ambient change
+
+#### Vl53l4cd.calibrate_offset
+
+```cpp
+std::int32_t calibrate_offset(std::uint16_t target_mm, std::uint8_t nb_samples = 20);
+```
+
+Against a target at `target_mm`; returns the programmed value.
+
+#### Vl53l4cd.calibrate_xtalk
+
+```cpp
+std::int32_t calibrate_xtalk(std::uint16_t target_mm, std::uint8_t nb_samples = 20);
+```
+
+#### Vl53l4cd.start_ranging
+
+```cpp
+void start_ranging();
+```
+
+#### Vl53l4cd.stop_ranging
+
+```cpp
+void stop_ranging();
+```
+
+idempotent
+
+#### Vl53l4cd.measure_once
+
+```cpp
+Vl53l4cdMeasurement measure_once(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
+```
+
+Poll mode: start, wait data-ready, read, stop. Refused while ranging.
+
+#### Vl53l4cd.measurements
+
+```cpp
+Stream<Vl53l4cdMeasurement>& measurements();
+```
+
+The streamed measurements (RPT_STREAM); subscriptions default to 64 items.
+
+#### Vl53l4cd.read_reg
+
+```cpp
+bytes read_reg(std::uint16_t addr, std::size_t len);
+```
+
+Raw register access (16-bit address, contents as the sensor has them).
+
+#### Vl53l4cd.write_reg
+
+```cpp
+void write_reg(std::uint16_t addr, byte_span data);
+```
+
+### open_vl53l4cd
+
+```cpp
+std::unique_ptr<Vl53l4cd> open_vl53l4cd(const OpenOptions& opt = {});
+```
+
+open_device, and WrongTypeError unless it is a VL53L4CD.

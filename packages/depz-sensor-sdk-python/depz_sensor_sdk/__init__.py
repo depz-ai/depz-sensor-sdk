@@ -1,0 +1,193 @@
+"""DEPZ sensor line SDK — SR04, VL53L4CD, VL53L8CX/CH, VL53L5CX/L7CX/L7CH,
+VL53L0X/L1CX/L1CB/L3CX/L4CX, TMF8829, BNO086, BNO055 over USB CDC-ACM.
+
+Public surface is defined by contracts/07_SDK_FACADE.md.
+"""
+
+from . import transport, protocol
+from .device import (
+    DepzDevice,
+    DeviceEvent,
+    DisconnectedEvent,
+    LinkCrcErrorEvent,
+    LinkStats,
+    SeqGapEvent,
+    SequenceErrorEvent,
+    TemperatureEvent,
+    TextEvent,
+    TimeSync,
+    TrashEvent,
+    UnsolicitedStatusEvent,
+    host_now_us,
+)
+from .bootloader import BootloaderDevice, find_bootloader_port, update_firmware
+from .dataset import (
+    DatasetPlayer,
+    DatasetReader,
+    DatasetRecord,
+    PlayerState,
+    SessionRecorder,
+)
+from .protocol.bootloader import FwDepzImage
+from .stream import Stream, StreamIterator
+from .discovery import (
+    SENSOR_CLASS_NAMES,
+    DeviceInfo,
+    attach_sensor_class,
+    list_depz_devices,
+    open_device,
+    open_on_link,
+    probe_port,
+    resolve_sensor_class,
+)
+from .vl53l4 import Vl53l4cd, Vl53l4Info, Vl53l4Measurement
+from .vl53l8 import CnhConfig, Vl53l8ch, Vl53l8cx, Vl53l8Frame
+from .vl53l7 import Vl53l5cx, Vl53l7ch, Vl53l7cx, Vl53l7Frame, Vl53l7Info
+from .vl53lx import (
+    Vl53l0x,
+    Vl53l1cb,
+    Vl53l1cx,
+    Vl53l3cx,
+    Vl53l4cx,
+    Vl53lx,
+    Vl53lxInfo,
+    Vl53lxMeasurement,
+)
+from .errors import (
+    BootloaderModeError,
+    BusyError,
+    DepzError,
+    DepzTimeoutError,
+    DeviceLostError,
+    InvalidReplyError,
+    InvalidStateError,
+    LinkClosedError,
+    NoDepzDeviceError,
+    ReplayMismatchError,
+    StatusError,
+)
+from .usb_ids import (
+    DEPZ_USB_VID,
+    DEPZ_PID_MODEL,
+    is_known_depz_usb,
+    usb_model_hint,
+)
+from .sr04 import Sr04, Sr04Measurement
+from .bno086 import Bno086, GyroIntegratedRV, RotationVector, SensorId
+from .bno055 import (
+    AxisRemap,
+    Bno055,
+    Bno055Info,
+    Bno055Sample,
+    CalibrationProfile,
+    CalibStatus,
+    OprMode,
+    Units,
+)
+from .tmf8829 import Tmf8829, Tmf8829Config, Tmf8829Measurement
+
+try:
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+    __version__ = _pkg_version("depz-sensor-sdk")
+except (ImportError, PackageNotFoundError):  # pragma: no cover - source checkout fallback
+    __version__ = "1.0.0"
+
+__all__ = [
+    # modules
+    "transport",
+    "protocol",
+    # discovery
+    "DeviceInfo",
+    "list_depz_devices",
+    "probe_port",
+    "open_device",
+    "open_on_link",
+    "resolve_sensor_class",
+    "attach_sensor_class",
+    "SENSOR_CLASS_NAMES",
+    # usb identity table
+    "DEPZ_USB_VID",
+    "DEPZ_PID_MODEL",
+    "is_known_depz_usb",
+    "usb_model_hint",
+    # device
+    "DepzDevice",
+    "TimeSync",
+    "LinkStats",
+    "host_now_us",
+    # events
+    "DeviceEvent",
+    "SeqGapEvent",
+    "SequenceErrorEvent",
+    "LinkCrcErrorEvent",
+    "TrashEvent",
+    "UnsolicitedStatusEvent",
+    "TextEvent",
+    "TemperatureEvent",
+    "DisconnectedEvent",
+    # sensors
+    "Sr04",
+    "Sr04Measurement",
+    "Vl53l4cd",
+    "Vl53l4Measurement",
+    "Vl53l4Info",
+    "Vl53l8cx",
+    "Vl53l8ch",
+    "Vl53l8Frame",
+    "Vl53l5cx",
+    "Vl53l7cx",
+    "Vl53l7ch",
+    "Vl53l7Frame",
+    "Vl53l7Info",
+    "Vl53lx",
+    "Vl53l0x",
+    "Vl53l1cx",
+    "Vl53l1cb",
+    "Vl53l3cx",
+    "Vl53l4cx",
+    "Vl53lxMeasurement",
+    "Vl53lxInfo",
+    "CnhConfig",
+    "Bno086",
+    "SensorId",
+    "RotationVector",
+    "GyroIntegratedRV",
+    "Bno055",
+    "Bno055Info",
+    "Bno055Sample",
+    "OprMode",
+    "Units",
+    "AxisRemap",
+    "CalibStatus",
+    "CalibrationProfile",
+    "Tmf8829",
+    "Tmf8829Config",
+    "Tmf8829Measurement",
+    "Stream",
+    "StreamIterator",
+    # datasets (contract 09)
+    "SessionRecorder",
+    "DatasetReader",
+    "DatasetRecord",
+    "DatasetPlayer",
+    "PlayerState",
+    # bootloader / firmware update (contract 06)
+    "BootloaderDevice",
+    "FwDepzImage",
+    "update_firmware",
+    "find_bootloader_port",
+    # errors
+    "DepzError",
+    "DepzTimeoutError",
+    "StatusError",
+    "BusyError",
+    "DeviceLostError",
+    "InvalidReplyError",
+    "InvalidStateError",
+    "LinkClosedError",
+    "NoDepzDeviceError",
+    "BootloaderModeError",
+    "ReplayMismatchError",
+    "__version__",
+]

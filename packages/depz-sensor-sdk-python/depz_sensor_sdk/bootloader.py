@@ -1,0 +1,356 @@
+"""Bootloader client: application firmware update over USB (contract 06).
+
+Excluded by design: ROM DFU entry and bootloader self-update.
+"""
+
+from __future__ import annotations
+
+import time
+from collections import deque
+from typing import Callable
+
+from .device import DepzDevice
+from .discovery import _depz_candidates
+from .errors import DepzError, DepzTimeoutError, DeviceLostError, InvalidReplyError
+from .protocol.bootloader import (
+    BlCmd,
+    BlRpt,
+    BlStatus,
+    FlashInfo,
+    FwDepzImage,
+    pack_write_page,
+    reply_report,
+)
+from .protocol.common import Cmd, strip_device_string
+from .transport import CrcType, Packet, PacketParser, build_packet, crc32_iso_hdlc
+from .transport.link import Link
+from .transport.serial_link import SerialLink
+
+_STATUS_NAMES = {s.value: s.name for s in BlStatus}
+
+ProgressFn = Callable[[float, str], None]
+
+
+class BootloaderError(DepzError):
+    def __init__(self, cmd: int, status: int):
+        self.cmd = cmd
+        self.status = status
+        name = _STATUS_NAMES.get(status, f"0x{status:02X}")
+        super().__init__(f"bootloader cmd 0x{cmd:02X} failed: {name}")
+
+
+class ApplicationNotBackError(DepzTimeoutError):
+    """After BOOT_APPLICATION the port never answered GET_SOFTWARE_NAME with
+    an application name before the deadline (contract 06 §3 step 6).
+    `last_seen` names the last thing the probe found: no port, a port that
+    did not answer, or the bootloader's name."""
+
+    def __init__(self, port: str, timeout: float, last_seen: str):
+        self.cmd = Cmd.GET_NAME_ACTIVE_SOFTWARE
+        self.timeout = timeout
+        self.port = port
+        self.last_seen = last_seen
+        DepzError.__init__(
+            self,
+            f"{port}: the application did not answer within {timeout:.1f}s "
+            f"after BOOT_APPLICATION (last seen: {last_seen})",
+        )
+
+
+class BootloaderDevice:
+    """Synchronous client for a device already in bootloader mode.
+
+    The bootloader protocol is strict request/response — no reader thread."""
+
+    def __init__(self, port_or_link: str | Link, *, timeout: float = 5.0):
+        if isinstance(port_or_link, str):
+            self._link: Link = SerialLink(port_or_link)
+            self.port = port_or_link
+        else:
+            self._link = port_or_link
+            self.port = getattr(port_or_link, "port", "<link>")
+        self.timeout = timeout
+        self._parser = PacketParser()
+        # Packets parsed but not yet consumed: one read can carry several
+        # frames (an ACK and the typed reply, contract 06 §1).
+        self._rx: deque[Packet] = deque()
+        self._tx_seq = 0
+
+    def close(self) -> None:
+        self._link.close()
+
+    def __enter__(self) -> "BootloaderDevice":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    # ── low level ────────────────────────────────────────────────────────────
+
+    def _send(self, cmd: int, payload: bytes = b"", crc_type: CrcType = CrcType.NONE) -> None:
+        self._link.write(build_packet(cmd, payload, self._tx_seq, crc_type))
+        self._tx_seq = (self._tx_seq + 1) & 0xFF
+
+    def _recv(self, timeout: float | None = None) -> Packet | None:
+        deadline = time.monotonic() + (timeout if timeout is not None else self.timeout)
+        while not self._rx and time.monotonic() < deadline:
+            data = self._link.read(0.05)
+            self._rx.extend(ev for ev in self._parser.feed(data) if isinstance(ev, Packet))
+        return self._rx.popleft() if self._rx else None
+
+    def transact(
+        self,
+        cmd: int,
+        payload: bytes = b"",
+        *,
+        crc_type: CrcType = CrcType.NONE,
+        timeout: float | None = None,
+        min_len: int = 2,
+    ) -> Packet:
+        """Send and wait for the reply to `cmd`: the report contract 06 §1
+        assigns to it (`reply_report`), echoing `cmd` in payload[0]."""
+        rpt = reply_report(cmd)
+        self._send(cmd, payload, crc_type)
+        deadline = time.monotonic() + (timeout if timeout is not None else self.timeout)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DepzTimeoutError(cmd, timeout if timeout is not None else self.timeout)
+            pkt = self._recv(remaining)
+            if pkt is None:
+                continue
+            if not pkt.payload or pkt.payload[0] != cmd:
+                continue
+            if pkt.cmd == BlRpt.STATUS:
+                # A failed command is always nacked with the 2-byte RPT_STATUS,
+                # whatever report its success reply uses — check it before the
+                # typed reply's min_len or the nack would be ignored until
+                # timeout. An ACK in RPT_STATUS answers only a STATUS-reply
+                # command; for a typed-reply one it is not the reply.
+                if len(pkt.payload) >= 2 and pkt.payload[1] != BlStatus.ACK:
+                    raise BootloaderError(cmd, pkt.payload[1])
+                if rpt != BlRpt.STATUS:
+                    continue
+            elif pkt.cmd != rpt:
+                continue
+            if len(pkt.payload) >= min_len:
+                return pkt
+
+    # ── info ─────────────────────────────────────────────────────────────────
+
+    def _text(self, cmd: BlCmd) -> str:
+        pkt = self.transact(cmd, timeout=2.0)
+        return strip_device_string(pkt.payload[1:])
+
+    def get_firmware_name(self) -> str:
+        return self._text(BlCmd.GET_FIRMWARE_NAME)
+
+    def get_device_name(self) -> str:
+        return self._text(BlCmd.GET_DEVICE_NAME)
+
+    def get_serial_number(self) -> str:
+        return self._text(BlCmd.GET_SERIAL)
+
+    def get_flash_info(self) -> FlashInfo:
+        pkt = self.transact(BlCmd.GET_FLASH_INFO, min_len=13)
+        return FlashInfo.unpack(pkt.payload)
+
+    def _usable_flash_info(self) -> FlashInfo:
+        """GET_FLASH_INFO whose geometry the page loop can walk: a page size
+        of 0, or an app area that is not a whole number of pages, is a reply
+        the client cannot use (contract 07 §3: invalid_reply)."""
+        info = self.get_flash_info()
+        if info.page_size == 0 or info.app_size % info.page_size:
+            raise InvalidReplyError(
+                BlCmd.GET_FLASH_INFO,
+                ValueError(
+                    f"page_size {info.page_size}, app_size {info.app_size}: "
+                    "the app area is not a whole number of pages"
+                ),
+            )
+        return info
+
+    # ── flashing primitives ──────────────────────────────────────────────────
+
+    def erase_app(self) -> None:
+        self.transact(BlCmd.ERASE_APP, timeout=15.0)  # RPT_STATUS; a nack raises
+
+    def write_page(self, addr: int, data: bytes) -> int:
+        """Write one page (payload CRC16 framing); returns the device-computed
+        page CRC32."""
+        pkt = self.transact(
+            BlCmd.WRITE_PAGE,
+            pack_write_page(addr, data),
+            crc_type=CrcType.CRC16,
+            min_len=6,
+        )
+        if pkt.payload[1] != BlStatus.ACK:
+            raise BootloaderError(BlCmd.WRITE_PAGE, pkt.payload[1])
+        return int.from_bytes(pkt.payload[2:6], "little")
+
+    def verify_app_crc(self) -> int:
+        pkt = self.transact(BlCmd.VERIFY_APP_CRC, timeout=10.0, min_len=6)
+        if pkt.payload[1] != BlStatus.ACK:
+            raise BootloaderError(BlCmd.VERIFY_APP_CRC, pkt.payload[1])
+        return int.from_bytes(pkt.payload[2:6], "little")
+
+    def boot_application(self) -> None:
+        """Fire-and-forget: the device jumps to the app and re-enumerates."""
+        self._send(BlCmd.BOOT_APPLICATION)
+        time.sleep(0.2)
+        self.close()
+
+    # ── full flow ────────────────────────────────────────────────────────────
+
+    def flash(
+        self,
+        image: FwDepzImage,
+        *,
+        progress: ProgressFn | None = None,
+        page_retries: int = 3,
+    ) -> None:
+        """ERASE → WRITE_PAGE loop (per-page CRC32 check, retries) → VERIFY.
+
+        Does not boot the app — call `boot_application()` after."""
+
+        def report(frac: float, msg: str) -> None:
+            if progress:
+                progress(frac, msg)
+
+        info = self._usable_flash_info()
+        if image.load_addr != info.app_start:
+            raise DepzError(
+                f"load_addr mismatch: file=0x{image.load_addr:08X} "
+                f"device=0x{info.app_start:08X}"
+            )
+        if image.fw_size > info.app_size:
+            raise DepzError(f"image {image.fw_size} B exceeds app area {info.app_size} B")
+
+        report(0.0, "erasing flash")
+        self.erase_app()
+
+        payload = image.payload
+        page = info.page_size
+        num_pages = (len(payload) + page - 1) // page
+        for idx in range(num_pages):
+            chunk = payload[idx * page : (idx + 1) * page]
+            addr = info.app_start + idx * page
+            expected_crc = crc32_iso_hdlc(chunk)
+            for attempt in range(1, page_retries + 1):
+                try:
+                    got = self.write_page(addr, chunk)
+                except (BootloaderError, DepzTimeoutError):
+                    if attempt == page_retries:
+                        raise
+                    continue
+                if got == expected_crc:
+                    break
+                if attempt == page_retries:
+                    raise DepzError(
+                        f"page @0x{addr:08X}: CRC mismatch after {page_retries} tries"
+                    )
+            report(0.05 + 0.85 * (idx + 1) / num_pages, f"page {idx + 1}/{num_pages}")
+
+        report(0.92, "verifying application CRC")
+        dev_crc = self.verify_app_crc()
+        if dev_crc != image.fw_crc32:
+            raise DepzError(
+                f"app CRC mismatch: device=0x{dev_crc:08X} header=0x{image.fw_crc32:08X}"
+            )
+        report(1.0, "flash complete")
+
+
+def find_bootloader_port(serial_number: str, *, timeout: float = 10.0) -> str:
+    """Poll the DEPZ candidate ports until a BOOTDEPZ device with
+    `serial_number` appears (after an app→bootloader reboot the USB serial
+    string is preserved). Only ports with a known DEPZ USB id are opened
+    (contract 02 §4.3), and of those only the ones whose USB iSerial is
+    `serial_number` or unknown to the OS."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for pi in _depz_candidates():
+            if pi.usb_serial not in (None, serial_number):
+                continue
+            try:
+                bl = BootloaderDevice(pi.port, timeout=0.5)
+            except (DeviceLostError, DepzError):
+                continue
+            try:
+                if not bl.get_firmware_name().upper().startswith("BOOTDEPZ"):
+                    continue
+                if bl.get_serial_number() == serial_number:
+                    bl.close()
+                    return pi.port
+            except (DepzTimeoutError, DeviceLostError, DepzError):
+                pass
+            finally:
+                bl.close()
+        time.sleep(0.3)
+    raise DepzTimeoutError(BlCmd.GET_FIRMWARE_NAME, timeout)
+
+
+def _wait_for_application(port: str, *, timeout: float = 10.0) -> str:
+    """Re-probe `port` until GET_SOFTWARE_NAME answers with an application
+    name; return it (contract 06 §3 step 6). The bootloader enumerates under
+    the same port name, so the port being back proves nothing: a BOOTDEPZ
+    answer keeps polling. Raises `ApplicationNotBackError` at the deadline."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            dev = DepzDevice(port, timeout=0.5)
+        except DepzError:
+            last_seen = "no port"
+        else:
+            try:
+                name = dev.get_software_name()
+            except DepzError:
+                last_seen = "a port that did not answer"
+            else:
+                if name and not name.upper().startswith("BOOTDEPZ"):
+                    return name
+                last_seen = f"the bootloader ({name})" if name else "an empty name"
+            finally:
+                dev.close()
+        if time.monotonic() >= deadline:
+            raise ApplicationNotBackError(port, timeout, last_seen)
+        time.sleep(0.1)
+
+
+def update_firmware(
+    port: str,
+    fwdepz_path: str,
+    *,
+    progress: ProgressFn | None = None,
+    app_timeout: float = 10.0,
+) -> str:
+    """Full app-mode → bootloader → flash → boot-app flow (contract 06 §3).
+
+    Returns the software name the application answers with on `port` after
+    the reboot (step 6); `ApplicationNotBackError` if it does not within
+    `app_timeout` seconds."""
+    image = FwDepzImage.load(fwdepz_path)
+
+    # The app-mode connection is released on every path, a failed probe
+    # included: pyserial can't share the port, and a retry must reopen it.
+    with DepzDevice(port, timeout=0.5) as dev:
+        try:
+            name = dev.get_software_name()
+        except DepzTimeoutError:
+            name = ""
+        in_bootloader = name.upper().startswith("BOOTDEPZ")
+        if not in_bootloader:
+            serial_number = dev.get_serial_number()
+            if progress:
+                progress(0.0, "rebooting into bootloader")
+            dev.enter_bootloader_mode()
+    if in_bootloader:
+        bl = BootloaderDevice(port)
+    else:
+        bl = BootloaderDevice(find_bootloader_port(serial_number))
+
+    try:
+        bl.flash(image, progress=progress)
+        bl.boot_application()
+    finally:
+        bl.close()
+    return _wait_for_application(port, timeout=app_timeout)

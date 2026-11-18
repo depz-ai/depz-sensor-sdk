@@ -1,0 +1,1214 @@
+# VL53L4CD (ToF) — API reference
+
+The public API for the VL53L4CD (ToF) sensor. Transport, USB identity, the common
+protocol codecs and other cross-sensor symbols shared by every sensor
+live in the [top-level API reference](../api.md).
+
+Generated from the Javadoc of the Java sources.
+
+## Contents
+
+- **VL53L4CD (ToF)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4`](#vl53l4), [`Vl53l4.Vl53l4Cmd`](#vl53l4vl53l4cmd), [`Vl53l4.Vl53l4Rpt`](#vl53l4vl53l4rpt), [`Vl53l4.RegData`](#vl53l4regdata), [`Vl53l4.Vl53l4Info`](#vl53l4vl53l4info), [`Vl53l4.StreamData`](#vl53l4streamdata), [`DetectionThresholds`](#detectionthresholds), [`RangeTiming`](#rangetiming), [`Vl53l4Platform`](#vl53l4platform), [`Vl53l4Uld`](#vl53l4uld), [`Vl53l4Uld.Vl53l4Error`](#vl53l4uldvl53l4error), [`Vl53l4Uld.Results`](#vl53l4uldresults), [`Vl53l4cdDriver`](#vl53l4cddriver)
+
+## VL53L4CD (ToF)
+
+### Vl53l4Measurement
+
+```java
+public record Vl53l4Measurement(long timestampUs, int rangeStatus, int distanceMm, int sigmaMm, int signalRateKcps, int ambientRateKcps, int signalPerSpadKcps, int ambientPerSpadKcps, int numberOfSpad, int streamCount)
+```
+
+One VL53L4CD ranging result (`VL53L4CD_ResultsData_t` plus the MCU timestamp: of the INT
+edge when streamed, of the result read when polled).
+
+#### Vl53l4Measurement.valid
+
+```java
+public boolean valid()
+```
+
+#### Vl53l4Measurement.statusText
+
+```java
+public String statusText()
+```
+
+What `rangeStatus()` means (`Vl53l4Uld#RANGE_STATUS_NAMES`).
+
+### Vl53l4cdDevice
+
+```java
+public final class Vl53l4cdDevice extends DepzDevice
+```
+
+VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs
+here (`uld()`). `init()` first, then configure and `startRanging()`: one
+result block per INT edge streams to `measurements()`. Configuration while ranging throws
+`InvalidStateException` — the stream owns the register bank.
+
+#### Vl53l4cdDevice.uld
+
+```java
+public Vl53l4cdDriver uld()
+```
+
+The ULD driver (escape hatch for raw register access).
+
+#### Vl53l4cdDevice.initialized
+
+```java
+public boolean initialized()
+```
+
+True after a successful `init()`; cleared by `xshut` — a power-cycled sensor holds none of it.
+
+#### Vl53l4cdDevice.ranging
+
+```java
+public boolean ranging()
+```
+
+#### Vl53l4cdDevice.isAlive
+
+```java
+public boolean isAlive()
+```
+
+True when the sensor answers with the VL53L4CD model id (0xEBAA).
+
+#### Vl53l4cdDevice.init
+
+```java
+public void init(int busKhz)
+```
+
+Default configuration block + VHV calibration (ULD sensor_init); the bus is left at `busKhz`.
+
+#### Vl53l4cdDevice.init
+
+```java
+public void init()
+```
+
+#### Vl53l4cdDevice.xshut
+
+```java
+public void xshut(int action)
+```
+
+Drive XSHUT: `Vl53l4#XSHUT_OFF` / `Vl53l4#XSHUT_ON` / `Vl53l4#XSHUT_RESET`.
+Off and Reset stop a stream; `init()` again after.
+
+#### Vl53l4cdDevice.resetSensor
+
+```java
+public void resetSensor()
+```
+
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); call `init()` again.
+
+#### Vl53l4cdDevice.bridgeInfo
+
+```java
+public Vl53l4.Vl53l4Info bridgeInfo()
+```
+
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2cErrors` is cleared by a successful XSHUT reset). Safe while streaming.
+
+#### Vl53l4cdDevice.setI2cSpeedKhz
+
+```java
+public void setI2cSpeedKhz(int khz)
+```
+
+Re-time the bridge's I2C bus to the step nearest `khz`. Not while ranging.
+
+#### Vl53l4cdDevice.getRangeTiming
+
+```java
+public RangeTiming getRangeTiming()
+```
+
+(timing budget ms, inter-measurement ms; 0 = continuous).
+
+#### Vl53l4cdDevice.setRangeTiming
+
+```java
+public void setRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+Timing budget 10–200 ms; inter-measurement 0 = continuous, larger than the budget = autonomous low power.
+
+#### Vl53l4cdDevice.setRangeTiming
+
+```java
+public void setRangeTiming(int timingBudgetMs)
+```
+
+#### Vl53l4cdDevice.getOffsetMm
+
+```java
+public int getOffsetMm()
+```
+
+#### Vl53l4cdDevice.setOffsetMm
+
+```java
+public void setOffsetMm(int offsetMm)
+```
+
+#### Vl53l4cdDevice.getXtalkKcps
+
+```java
+public int getXtalkKcps()
+```
+
+Crosstalk compensation, kcps (0 = off).
+
+#### Vl53l4cdDevice.setXtalkKcps
+
+```java
+public void setXtalkKcps(int xtalkKcps)
+```
+
+#### Vl53l4cdDevice.getDetectionThresholds
+
+```java
+public DetectionThresholds getDetectionThresholds()
+```
+
+#### Vl53l4cdDevice.setDetectionThresholds
+
+```java
+public void setDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt: INT only fires while the window holds. The distances are u16 registers, the
+window a u8 one: a value outside is refused before anything is written, never masked (contract 07 §3).
+
+#### Vl53l4cdDevice.getSignalThresholdKcps
+
+```java
+public int getSignalThresholdKcps()
+```
+
+#### Vl53l4cdDevice.setSignalThresholdKcps
+
+```java
+public void setSignalThresholdKcps(int signalKcps)
+```
+
+Drop measurements whose return signal is below `signalKcps`.
+
+#### Vl53l4cdDevice.getSigmaThresholdMm
+
+```java
+public int getSigmaThresholdMm()
+```
+
+#### Vl53l4cdDevice.setSigmaThresholdMm
+
+```java
+public void setSigmaThresholdMm(int sigmaMm)
+```
+
+Drop measurements whose sigma exceeds `sigmaMm` (≤ 16383).
+
+#### Vl53l4cdDevice.startTemperatureUpdate
+
+```java
+public void startTemperatureUpdate()
+```
+
+Re-run VHV calibration, recommended after a >8 °C ambient change.
+
+#### Vl53l4cdDevice.calibrateOffset
+
+```java
+public int calibrateOffset(int targetDistMm, int nbSamples)
+```
+
+Offset calibration against a target at `targetDistMm` (10–1000 mm); returns the offset now programmed.
+
+#### Vl53l4cdDevice.calibrateOffset
+
+```java
+public int calibrateOffset(int targetDistMm)
+```
+
+#### Vl53l4cdDevice.calibrateXtalk
+
+```java
+public int calibrateXtalk(int targetDistMm, int nbSamples)
+```
+
+Crosstalk calibration against a target at `targetDistMm` (10–5000 mm); returns the xtalk now programmed, kcps.
+
+#### Vl53l4cdDevice.calibrateXtalk
+
+```java
+public int calibrateXtalk(int targetDistMm)
+```
+
+#### Vl53l4cdDevice.startRanging
+
+```java
+public void startRanging()
+```
+
+Start the sensor and arm the MCU stream: one RPT_VL53_STREAM per INT edge.
+
+#### Vl53l4cdDevice.stopRanging
+
+```java
+public void stopRanging()
+```
+
+#### Vl53l4cdDevice.measureOnce
+
+```java
+public Vl53l4Measurement measureOnce(@Nullable Duration timeout)
+```
+
+One polled measurement: start, wait for data ready, read, stop. Not while streaming.
+
+#### Vl53l4cdDevice.measureOnce
+
+```java
+public Vl53l4Measurement measureOnce()
+```
+
+#### Vl53l4cdDevice.measurements
+
+```java
+public SensorStream<Vl53l4Measurement> measurements()
+```
+
+The stream of ranging measurements (contract 07 §3): `measurements().on(cb)` subscribes
+(reader thread; don't block), `measurements().subscribe(capacity)` queues (bounded,
+drop-oldest, subscribed when it returns), `measurements().next(timeout)` waits for one;
+`parseErrors()` counts the stream reports whose result block did not decode.
+
+### Vl53l4
+
+```java
+public final class Vl53l4
+```
+
+VL53L4CD register-bridge wire codecs (contract 10).
+
+#### Vl53l4.XFER_MAX *(field)*
+
+```java
+public static final int XFER_MAX = 253
+```
+
+Max read/write length per transfer. The STM32 I2C NBYTES field is 8 bit
+and a write spends two bytes on the register address; the firmware
+applies the same 253 to both directions.
+
+#### Vl53l4.XSHUT_OFF *(field)*
+
+```java
+public static final int XSHUT_OFF = 0
+```
+
+VL53_XSHUT action: drive XSHUT low (sensor powered down).
+
+#### Vl53l4.XSHUT_ON *(field)*
+
+```java
+public static final int XSHUT_ON = 1
+```
+
+VL53_XSHUT action: drive XSHUT high, no boot handshake.
+
+#### Vl53l4.XSHUT_RESET *(field)*
+
+```java
+public static final int XSHUT_RESET = 2
+```
+
+VL53_XSHUT action: pulse low then wait for the boot handshake (≤ 20 ms, typ. ~2 ms).
+
+#### Vl53l4.SF_INT_ACT_HIGH *(field)*
+
+```java
+public static final int SF_INT_ACT_HIGH = 0x02
+```
+
+VL53_START_STREAM flags bit 1: interrupt polarity, mirroring bit 4 of
+GPIO_HV_MUX__CTRL (0x0030). Clear (default): INT active low.
+
+#### Vl53l4.packReadReg
+
+```java
+public static byte[] packReadReg(int addr, int len)
+```
+
+VL53_READ_REG payload `addr u16, len u16` with the transfer limit of contract 10 §1:
+`len` 1..253 and `addr + len <= 0x10000`, else IllegalArgumentException.
+
+#### Vl53l4.packWriteReg
+
+```java
+public static byte[] packWriteReg(int addr, byte[] data)
+```
+
+VL53_WRITE_REG payload: `addr u16, data[1..253]` with `addr + N <= 0x10000`, else IllegalArgumentException.
+
+#### Vl53l4.packXshut
+
+```java
+public static byte[] packXshut(int action)
+```
+
+VL53_XSHUT payload: `action u8` (XSHUT_OFF/ON/RESET).
+
+#### Vl53l4.packStartStream
+
+```java
+public static byte[] packStartStream(int addr, int len, int flags)
+```
+
+VL53_START_STREAM payload: `addr u16, len u16, flags u8`.
+
+#### Vl53l4.packSetI2cSpeed
+
+```java
+public static byte[] packSetI2cSpeed(int khz)
+```
+
+VL53_SET_I2C_SPEED payload: `khz u16`.
+
+### Vl53l4.Vl53l4Cmd
+
+```java
+public enum Vl53l4Cmd
+```
+
+#### Vl53l4.Vl53l4Cmd — constants
+
+`READ_REG`(0x32), `WRITE_REG`(0x33), `XSHUT`(0x34), `START_STREAM`(0x35), `STOP_STREAM`(0x36), `GET_INFO`(0x37), `SET_I2C_SPEED`(0x38)
+
+#### Vl53l4.Vl53l4Cmd.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l4.Vl53l4Rpt
+
+```java
+public enum Vl53l4Rpt
+```
+
+#### Vl53l4.Vl53l4Rpt — constants
+
+`REG_DATA`(0x91), `INFO`(0x92), `STREAM`(0x93)
+
+#### Vl53l4.Vl53l4Rpt.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l4.RegData
+
+```java
+public record RegData(int cmd, long timestampUs, byte[] data)
+```
+
+RPT_VL53_REG_DATA — one register read. `cmd` echoes the READ_REG
+opcode; `timestampUs` is MCU uptime at I2C-read completion.
+
+#### Vl53l4.RegData.unpack
+
+```java
+public static RegData unpack(byte[] p)
+```
+
+### Vl53l4.Vl53l4Info
+
+```java
+public record Vl53l4Info(long intEdges, long slotsSkipped, long i2cErrors, int lastI2cError, int modelId, int fwStatus, int initialized, int xshutLevel, int intLevel, int i2cKhz)
+```
+
+RPT_VL53_INFO — bridge diagnostics (21-byte LE payload). Counters wrap
+silently; watch increments, not absolute values. `i2cErrors` counts
+since the last successful XSHUT reset (the bridge clears it there), not
+since power-up; `initialized` = 1 when MODEL_ID read back as 0xEBAA
+on this GET_INFO.
+`modelId` expected 0xEBAA, `fwStatus` expected 0x03 (booted);
+`lastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+
+#### Vl53l4.Vl53l4Info.unpack
+
+```java
+public static Vl53l4Info unpack(byte[] p)
+```
+
+### Vl53l4.StreamData
+
+```java
+public record StreamData(long timestampUs, int addr, int len, byte[] data)
+```
+
+RPT_VL53_STREAM — one streamed register block. `addr`/`len`
+echo the stream configuration so each report is self-describing;
+`timestampUs` is MCU uptime at the INT edge (the sensor event).
+
+#### Vl53l4.StreamData.unpack
+
+```java
+public static StreamData unpack(byte[] p)
+```
+
+Rejects a payload shorter than its header or than the `len` data bytes it announces.
+
+### DetectionThresholds
+
+```java
+public record DetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt: low and high distance, mm, and the window
+(`Vl53l4Uld#WINDOW_BELOW` … `Vl53l4Uld#WINDOW_IN`).
+
+#### DetectionThresholds.of
+
+```java
+public static DetectionThresholds of(int distanceLowMm, int distanceHighMm, int window)
+```
+
+Build one: the path that survives a component appended after 1.0 (contract 07 §5).
+
+### RangeTiming
+
+```java
+public record RangeTiming(int timingBudgetMs, int interMeasurementMs)
+```
+
+A ranging timing: the budget of one measurement and the period between two (0 = continuous), ms.
+
+#### RangeTiming.of
+
+```java
+public static RangeTiming of(int timingBudgetMs, int interMeasurementMs)
+```
+
+Build one: the path that survives a component appended after 1.0 (contract 07 §5).
+
+### Vl53l4Platform
+
+```java
+public interface Vl53l4Platform
+```
+
+What the ULD needs from the board: the register bridge (16-bit addresses, auto-increment), a
+delay, and the bus speed. `Vl53l4cdDevice` maps it onto the firmware bridge; a test can
+script it.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+### Vl53l4Uld
+
+```java
+public final class Vl53l4Uld
+```
+
+VL53L4CD ULD (ST STSW-IMG026 2.2.3) — the register math under the driver.
+
+Port of the pure codec/math pieces of `VL53L4CD_api.c` that are
+hardware-independent and covered by golden vectors: the 17-byte result-block
+decode (`parseResultBlock`), the SetRangeTiming/GetRangeTiming
+register math (`rangeTimingRegisters`, `decodeRangeTiming`),
+the tuning-register word codecs and the 91-byte init configuration block
+(`configBlock`). Semantics mirror the Python reference
+(`depz_sensor_sdk/vl53l4/uld.py`) 1:1 — integer widths and 32-bit
+truncations included; do not "simplify" the math.
+
+The live driver over a register bridge (sensor_init, VHV calibration,
+offset / xtalk calibration loops) is `Vl53l4cdDriver`.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l4Uld.SOFT_RESET *(field)*
+
+```java
+public static final int SOFT_RESET = 0x0000
+```
+
+#### Vl53l4Uld.I2C_SLAVE_DEVICE_ADDRESS *(field)*
+
+```java
+public static final int I2C_SLAVE_DEVICE_ADDRESS = 0x0001
+```
+
+#### Vl53l4Uld.OSC_FREQUENCY *(field)*
+
+```java
+public static final int OSC_FREQUENCY = 0x0006
+```
+
+Unnamed in the C driver; the oscillator-frequency word.
+
+#### Vl53l4Uld.VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND *(field)*
+
+```java
+public static final int VHV_CONFIG_TIMEOUT_MACROP_LOOP_BOUND = 0x0008
+```
+
+#### Vl53l4Uld.XTALK_PLANE_OFFSET_KCPS *(field)*
+
+```java
+public static final int XTALK_PLANE_OFFSET_KCPS = 0x0016
+```
+
+#### Vl53l4Uld.XTALK_X_PLANE_GRADIENT_KCPS *(field)*
+
+```java
+public static final int XTALK_X_PLANE_GRADIENT_KCPS = 0x0018
+```
+
+#### Vl53l4Uld.XTALK_Y_PLANE_GRADIENT_KCPS *(field)*
+
+```java
+public static final int XTALK_Y_PLANE_GRADIENT_KCPS = 0x001A
+```
+
+#### Vl53l4Uld.RANGE_OFFSET_MM *(field)*
+
+```java
+public static final int RANGE_OFFSET_MM = 0x001E
+```
+
+#### Vl53l4Uld.INNER_OFFSET_MM *(field)*
+
+```java
+public static final int INNER_OFFSET_MM = 0x0020
+```
+
+#### Vl53l4Uld.OUTER_OFFSET_MM *(field)*
+
+```java
+public static final int OUTER_OFFSET_MM = 0x0022
+```
+
+#### Vl53l4Uld.GPIO_HV_MUX_CTRL *(field)*
+
+```java
+public static final int GPIO_HV_MUX_CTRL = 0x0030
+```
+
+#### Vl53l4Uld.GPIO_TIO_HV_STATUS *(field)*
+
+```java
+public static final int GPIO_TIO_HV_STATUS = 0x0031
+```
+
+#### Vl53l4Uld.SYSTEM_INTERRUPT *(field)*
+
+```java
+public static final int SYSTEM_INTERRUPT = 0x0046
+```
+
+#### Vl53l4Uld.RANGE_CONFIG_A *(field)*
+
+```java
+public static final int RANGE_CONFIG_A = 0x005E
+```
+
+#### Vl53l4Uld.RANGE_CONFIG_B *(field)*
+
+```java
+public static final int RANGE_CONFIG_B = 0x0061
+```
+
+#### Vl53l4Uld.RANGE_CONFIG_SIGMA_THRESH *(field)*
+
+```java
+public static final int RANGE_CONFIG_SIGMA_THRESH = 0x0064
+```
+
+#### Vl53l4Uld.MIN_COUNT_RATE_RTN_LIMIT_MCPS *(field)*
+
+```java
+public static final int MIN_COUNT_RATE_RTN_LIMIT_MCPS = 0x0066
+```
+
+#### Vl53l4Uld.INTERMEASUREMENT_MS *(field)*
+
+```java
+public static final int INTERMEASUREMENT_MS = 0x006C
+```
+
+#### Vl53l4Uld.THRESH_HIGH *(field)*
+
+```java
+public static final int THRESH_HIGH = 0x0072
+```
+
+#### Vl53l4Uld.THRESH_LOW *(field)*
+
+```java
+public static final int THRESH_LOW = 0x0074
+```
+
+#### Vl53l4Uld.SYSTEM_INTERRUPT_CLEAR *(field)*
+
+```java
+public static final int SYSTEM_INTERRUPT_CLEAR = 0x0086
+```
+
+#### Vl53l4Uld.SYSTEM_START *(field)*
+
+```java
+public static final int SYSTEM_START = 0x0087
+```
+
+#### Vl53l4Uld.RESULT_RANGE_STATUS *(field)*
+
+```java
+public static final int RESULT_RANGE_STATUS = 0x0089
+```
+
+#### Vl53l4Uld.RESULT_SPAD_NB *(field)*
+
+```java
+public static final int RESULT_SPAD_NB = 0x008C
+```
+
+#### Vl53l4Uld.RESULT_SIGNAL_RATE *(field)*
+
+```java
+public static final int RESULT_SIGNAL_RATE = 0x008E
+```
+
+#### Vl53l4Uld.RESULT_AMBIENT_RATE *(field)*
+
+```java
+public static final int RESULT_AMBIENT_RATE = 0x0090
+```
+
+#### Vl53l4Uld.RESULT_SIGMA *(field)*
+
+```java
+public static final int RESULT_SIGMA = 0x0092
+```
+
+#### Vl53l4Uld.RESULT_DISTANCE *(field)*
+
+```java
+public static final int RESULT_DISTANCE = 0x0096
+```
+
+#### Vl53l4Uld.RESULT_OSC_CALIBRATE_VAL *(field)*
+
+```java
+public static final int RESULT_OSC_CALIBRATE_VAL = 0x00DE
+```
+
+#### Vl53l4Uld.FIRMWARE_SYSTEM_STATUS *(field)*
+
+```java
+public static final int FIRMWARE_SYSTEM_STATUS = 0x00E5
+```
+
+#### Vl53l4Uld.IDENTIFICATION_MODEL_ID *(field)*
+
+```java
+public static final int IDENTIFICATION_MODEL_ID = 0x010F
+```
+
+#### Vl53l4Uld.MODEL_ID *(field)*
+
+```java
+public static final int MODEL_ID = 0xEBAA
+```
+
+IDENTIFICATION__MODEL_ID word expected from a live VL53L4CD.
+
+#### Vl53l4Uld.I2C_KHZ_BOOT *(field)*
+
+```java
+public static final int I2C_KHZ_BOOT = 400
+```
+
+The bus speed an unconfigured sensor is specified for (sensor_init writes its block at it).
+
+#### Vl53l4Uld.I2C_KHZ_DEFAULT *(field)*
+
+```java
+public static final int I2C_KHZ_DEFAULT = 1000
+```
+
+Recommended post-init bus speed (the result-block read is ~4× faster).
+
+#### Vl53l4Uld.RANGE_STATUS_NAMES *(field)*
+
+```java
+public static final java.util.Map<Integer, String> RANGE_STATUS_NAMES
+```
+
+Range status (after the ST mapping) → its meaning; 0 is a valid measurement.
+
+#### Vl53l4Uld.WINDOW_BELOW *(field)*
+
+```java
+public static final int WINDOW_BELOW = 0
+```
+
+Detection-threshold window modes (SYSTEM__INTERRUPT).
+
+#### Vl53l4Uld.WINDOW_ABOVE *(field)*
+
+```java
+public static final int WINDOW_ABOVE = 1
+```
+
+#### Vl53l4Uld.WINDOW_OUT *(field)*
+
+```java
+public static final int WINDOW_OUT = 2
+```
+
+#### Vl53l4Uld.WINDOW_IN *(field)*
+
+```java
+public static final int WINDOW_IN = 3
+```
+
+#### Vl53l4Uld.CONFIG_ADDR *(field)*
+
+```java
+public static final int CONFIG_ADDR = 0x2D
+```
+
+First register of the init configuration block (0x2D..0x87).
+
+#### Vl53l4Uld.DEFAULT_CONFIGURATION *(field)*
+
+```java
+public static final byte[] DEFAULT_CONFIGURATION
+```
+
+VL53L4CD_DEFAULT_CONFIGURATION[] — 91 bytes, registers 0x2D..0x87.
+`configBlock()` always overrides byte 0 (register 0x2D) with
+`CONFIG_FMP_BYTE` (0x12) to put the sensor's I2C pad in Fast Mode
+Plus — exactly what VL53L4CD_I2C_FAST_MODE_PLUS does in the C ULD.
+
+#### Vl53l4Uld.CONFIG_FMP_BYTE *(field)*
+
+```java
+public static final int CONFIG_FMP_BYTE = 0x12
+```
+
+Byte forced at register 0x2D: I2C Fast Mode Plus pad, never cleared.
+
+#### Vl53l4Uld.RESULT_BLOCK_ADDR *(field)*
+
+```java
+public static final int RESULT_BLOCK_ADDR
+```
+
+The block the MCU streams: RESULT__RANGE_STATUS .. 0x0099.
+
+#### Vl53l4Uld.RESULT_BLOCK_LEN *(field)*
+
+```java
+public static final int RESULT_BLOCK_LEN = 17
+```
+
+#### Vl53l4Uld.STATUS_RTN *(field)*
+
+```java
+public static final int[] STATUS_RTN
+```
+
+GetResult() raw status → ULD status (status_rtn[24] in VL53L4CD_api.c).
+
+#### Vl53l4Uld.configBlock
+
+```java
+public static byte[] configBlock()
+```
+
+The 91-byte block sensor_init() writes at `CONFIG_ADDR`: the ST
+default configuration with byte 0 forced to `CONFIG_FMP_BYTE`
+(Fast Mode Plus).
+
+#### Vl53l4Uld.parseResultBlock
+
+```java
+public static Results parseResultBlock(byte[] raw)
+```
+
+Decode the streamed 0x0089..0x0099 block exactly as VL53L4CD_GetResult()
+decodes the same registers read one by one. Register contents are
+big-endian words (the bridge passes them through untouched). Throws
+`Vl53l4Error` when `raw` is shorter than `RESULT_BLOCK_LEN` (17) bytes
+(contract 10 §5); a longer buffer is decoded and the tail ignored.
+
+#### Vl53l4Uld.checkRangeTiming
+
+```java
+public static void checkRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+SetRangeTiming's own argument checks (ST's VL53L4CD_ERROR_INVALID_ARGUMENT),
+which need no register: budget 10..200 ms, period 0 (continuous) or above
+the budget (autonomous) and a u32 — `IllegalArgumentException`
+otherwise (contract 10 §5).
+
+#### Vl53l4Uld.rangeTimingRegisters
+
+```java
+public static int[] rangeTimingRegisters(int timingBudgetMs, long interMeasurementMs, int oscFrequency, int clockPll)
+```
+
+SetRangeTiming register math → `{RANGE_CONFIG_A, RANGE_CONFIG_B,
+INTERMEASUREMENT_MS raw dword}`.
+
+`oscFrequency` is the word read from 0x0006; `clockPll`
+is the word read from RESULT__OSC_CALIBRATE_VAL (used only in autonomous
+mode, i.e. when `interMeasurementMs > 0`). Budget 10..200 ms;
+`interMeasurementMs` 0 (continuous) or greater than the budget
+(autonomous low power) — anything else throws
+`IllegalArgumentException` (`checkRangeTiming`).
+Register words are refused out of range, never wrapped: `oscFrequency`
+1..65535 (0 reads as `Vl53l4Error`), `clockPll` 0..65535, and
+an INTERMEASUREMENT_MS dword that would overflow u32 throws
+`IllegalArgumentException` too.
+The third element (the dword) is a u32 in Java's `int` convention
+(`Integer#toUnsignedLong`).
+
+#### Vl53l4Uld.decodeRangeTiming
+
+```java
+public static int[] decodeRangeTiming(long intermeasurementRaw, int clockPll, int oscFrequency, int rangeConfigA)
+```
+
+GetRangeTiming register math → `{timing_budget_ms,
+inter_measurement_ms}`.
+
+Inputs are the raw register reads: INTERMEASUREMENT_MS dword, the
+RESULT__OSC_CALIBRATE_VAL word, the 0x0006 word and the RANGE_CONFIG_A
+word. An oscillator word of 0 throws `Vl53l4Error`; a value wider
+than its register (dword u32, words u16) `IllegalArgumentException`.
+
+#### Vl53l4Uld.offsetRaw
+
+```java
+public static int offsetRaw(int offsetMm)
+```
+
+RANGE_OFFSET_MM word for SetOffset (INNER/OUTER are zeroed alongside).
+
+#### Vl53l4Uld.decodeOffset
+
+```java
+public static int decodeOffset(int rawWord)
+```
+
+GetOffset: RANGE_OFFSET_MM word → signed millimetres.
+
+#### Vl53l4Uld.roundHalfAway
+
+```java
+public static int roundHalfAway(double x)
+```
+
+C's round(): an exact .5 goes away from zero. ST's ULD rounds xtalk this way; Java's
+`Math.round` sends a negative half up instead.
+
+#### Vl53l4Uld.xtalkRaw
+
+```java
+public static int xtalkRaw(int xtalkKcps)
+```
+
+XTALK_PLANE_OFFSET_KCPS word for SetXtalk.
+
+#### Vl53l4Uld.decodeXtalk
+
+```java
+public static int decodeXtalk(int rawWord)
+```
+
+GetXtalk: XTALK_PLANE_OFFSET_KCPS word → kcps.
+
+#### Vl53l4Uld.signalThresholdRaw
+
+```java
+public static int signalThresholdRaw(int signalKcps)
+```
+
+MIN_COUNT_RATE_RTN_LIMIT_MCPS word for SetSignalThreshold.
+
+#### Vl53l4Uld.decodeSignalThreshold
+
+```java
+public static int decodeSignalThreshold(int rawWord)
+```
+
+GetSignalThreshold: word → kcps.
+
+#### Vl53l4Uld.sigmaThresholdRaw
+
+```java
+public static int sigmaThresholdRaw(int sigmaMm)
+```
+
+RANGE_CONFIG__SIGMA_THRESH word for SetSigmaThreshold (mm ≤ 16383).
+
+#### Vl53l4Uld.decodeSigmaThreshold
+
+```java
+public static int decodeSigmaThreshold(int rawWord)
+```
+
+GetSigmaThreshold: word → mm.
+
+### Vl53l4Uld.Vl53l4Error
+
+```java
+public static final class Vl53l4Error extends RuntimeException
+```
+
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is an `IllegalArgumentException`
+(contract 07 §3).
+
+### Vl53l4Uld.Results
+
+```java
+public record Results(int rangeStatus, int distanceMm, int ambientRateKcps, int ambientPerSpadKcps, int signalRateKcps, int signalPerSpadKcps, int numberOfSpad, int sigmaMm, int streamCount)
+```
+
+VL53L4CD_ResultsData_t plus the sensor's own frame counter.
+
+### Vl53l4cdDriver
+
+```java
+public final class Vl53l4cdDriver
+```
+
+The ST VL53L4CD ULD 2.2.3 (`VL53L4CD_api.c` + `VL53L4CD_calibration.c`) on the host,
+ported from the reference Python driver: init, ranging, timing, offset, crosstalk, thresholds,
+temperature update, calibration. Every request sequence is the Python one, so captures of either
+replay in both. Register contents are big-endian.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l4cdDriver.readByte
+
+```java
+public int readByte(int addr)
+```
+
+#### Vl53l4cdDriver.readWord
+
+```java
+public int readWord(int addr)
+```
+
+#### Vl53l4cdDriver.readDword
+
+```java
+public long readDword(int addr)
+```
+
+#### Vl53l4cdDriver.writeByte
+
+```java
+public void writeByte(int addr, int value)
+```
+
+#### Vl53l4cdDriver.writeWord
+
+```java
+public void writeWord(int addr, int value)
+```
+
+#### Vl53l4cdDriver.writeDword
+
+```java
+public void writeDword(int addr, long value)
+```
+
+#### Vl53l4cdDriver.getSensorId
+
+```java
+public int getSensorId()
+```
+
+#### Vl53l4cdDriver.isAlive
+
+```java
+public boolean isAlive()
+```
+
+#### Vl53l4cdDriver.waitBoot
+
+```java
+public void waitBoot(int timeoutMs)
+```
+
+Polls FIRMWARE__SYSTEM_STATUS until the sensor has booted, once per millisecond.
+
+#### Vl53l4cdDriver.sensorInit
+
+```java
+public void sensorInit(int busKhz)
+```
+
+Initialise the sensor and leave the bus at `busKhz`. The configuration block goes at
+400 kHz, the only speed an unconfigured sensor is specified for; the bridge is re-timed after.
+
+#### Vl53l4cdDriver.sensorInit
+
+```java
+public void sensorInit()
+```
+
+#### Vl53l4cdDriver.clearInterrupt
+
+```java
+public void clearInterrupt()
+```
+
+#### Vl53l4cdDriver.startRanging
+
+```java
+public void startRanging()
+```
+
+#### Vl53l4cdDriver.stopRanging
+
+```java
+public void stopRanging()
+```
+
+#### Vl53l4cdDriver.checkForDataReady
+
+```java
+public boolean checkForDataReady()
+```
+
+#### Vl53l4cdDriver.waitDataReady
+
+```java
+public void waitDataReady(int timeoutMs)
+```
+
+Polls the data-ready flag, once per millisecond.
+
+#### Vl53l4cdDriver.getResult
+
+```java
+public Vl53l4Uld.Results getResult()
+```
+
+One block read instead of the C driver's six register reads; the decoding is identical.
+
+#### Vl53l4cdDriver.setRangeTiming
+
+```java
+public void setRangeTiming(int timingBudgetMs, long interMeasurementMs)
+```
+
+#### Vl53l4cdDriver.getRangeTiming
+
+```java
+public RangeTiming getRangeTiming()
+```
+
+(timing budget ms, inter-measurement ms; 0 = continuous).
+
+#### Vl53l4cdDriver.setOffset
+
+```java
+public void setOffset(int offsetMm)
+```
+
+#### Vl53l4cdDriver.getOffset
+
+```java
+public int getOffset()
+```
+
+#### Vl53l4cdDriver.setXtalk
+
+```java
+public void setXtalk(int xtalkKcps)
+```
+
+#### Vl53l4cdDriver.getXtalk
+
+```java
+public int getXtalk()
+```
+
+#### Vl53l4cdDriver.setDetectionThresholds
+
+```java
+public void setDetectionThresholds(int distanceLowMm, int distanceHighMm, int window)
+```
+
+The distance-window interrupt; `window` is one of `Vl53l4Uld#WINDOW_BELOW` … `Vl53l4Uld#WINDOW_IN`.
+
+#### Vl53l4cdDriver.getDetectionThresholds
+
+```java
+public DetectionThresholds getDetectionThresholds()
+```
+
+#### Vl53l4cdDriver.setSignalThreshold
+
+```java
+public void setSignalThreshold(int signalKcps)
+```
+
+#### Vl53l4cdDriver.getSignalThreshold
+
+```java
+public int getSignalThreshold()
+```
+
+#### Vl53l4cdDriver.setSigmaThreshold
+
+```java
+public void setSigmaThreshold(int sigmaMm)
+```
+
+#### Vl53l4cdDriver.getSigmaThreshold
+
+```java
+public int getSigmaThreshold()
+```
+
+#### Vl53l4cdDriver.startTemperatureUpdate
+
+```java
+public void startTemperatureUpdate()
+```
+
+Re-run VHV; recommended after a >8 °C ambient change (ST Example_3).
+
+#### Vl53l4cdDriver.calibrateOffset
+
+```java
+public int calibrateOffset(int targetDistMm, int nbSamples)
+```
+
+Offset calibration against a target at `targetDistMm` (10–1000); returns the offset now programmed, mm.
+
+#### Vl53l4cdDriver.calibrateXtalk
+
+```java
+public int calibrateXtalk(int targetDistMm, int nbSamples)
+```
+
+Crosstalk calibration against a target at `targetDistMm` (10–5000); returns the xtalk now programmed, kcps (C rounding).

@@ -1,0 +1,28 @@
+[package]
+name = "depz-sensor-sdk"
+version = "1.0.0"
+edition = "2021"
+description = "Contract-first Rust SDK for the DEPZ USB sensor line (SR04, VL53L4CD ToF, VL53L8CX/CH ToF, TMF8829 dToF, BNO086 IMU) — live devices over the USB serial port, record / replay, protocol codecs, and sensor decode."
+license = "MIT"
+repository = "https://github.com/depz-ai/depz-sensor-sdk"
+readme = "README.md"
+keywords = ["depz", "sensor", "vl53l8", "bno086", "tof"]
+categories = ["embedded", "hardware-support", "parser-implementations"]
+exclude = ["tests", "docs", "scripts"]
+
+[lib]
+name = "depz_sensor_sdk"
+path = "src/lib.rs"
+
+# The crate's three runtime dependencies (decision 2 of the pre-1.0 refactoring, 2026-10-31):
+# serialport opens the board's USB serial port; serde_json (with serde) parses and writes the
+# `.depzrec` / `.depzdata` lines — `preserve_order` keeps the contract's key order,
+# `arbitrary_precision` keeps a number as its source text, `unbounded_depth` lets contract 08's
+# 256 nesting levels through (src/json.rs refuses deeper lines itself); flate2 with its pure-Rust
+# backend is the `.depzdata.gz` container.
+[dependencies]
+serialport = "4"
+serde = "1"
+# serde_json >= 1.0.154: 1.0.151 wrote -0 back as 0 under arbitrary_precision (tests/json.rs pins "-0").
+serde_json = { version = "1.0.154", features = ["preserve_order", "arbitrary_precision", "unbounded_depth"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }

@@ -1,0 +1,215 @@
+# Depz.Sensor (C# SDK)
+
+A contract-first decode/encode SDK for the DEPZ sensor family. Every codec is a
+byte-exact port of the reference Python SDK, pinned to the golden vectors
+shared by all DEPZ SDKs.
+
+Builds for .NET 8 and .NET Standard 2.1 — the latter is the shared library
+**Unity** reads; the Windows communication module for Unity (port discovery,
+serial link, `DepzDevicesUnity`) is the UPM package [`unity/`](unity/README.md)
+(see [Installation › Unity](docs/guide.md#unity)).
+
+## Install
+
+Published on NuGet as `Depz.Sensor`:
+
+```bash
+dotnet add package Depz.Sensor
+```
+
+Or, from a checkout of the repository, reference the project (the .NET 8 SDK
+builds it with yours):
+
+<!-- doc-check: skip — a reference to a checkout, not an install from the registry -->
+```bash
+dotnet add reference /path/to/packages/depz-sensor-sdk-csharp/src/Depz.Sensor/Depz.Sensor.csproj
+```
+
+## Quick start
+
+`Program.cs` of a console project (`dotnet new console`), run with `dotnet run`:
+
+```csharp
+using Depz.Sensor.Devices;
+
+try
+{
+    using DepzDevice dev = DepzDevices.OpenDevice();   // the DEPZ board with the smallest USB serial
+    Console.WriteLine(dev.GetSoftwareName());
+}
+catch (NoDepzDeviceException e)                        // no board: "no DEPZ device found (…)"
+{
+    Console.Error.WriteLine(e.Message);
+    Environment.Exit(1);
+}
+```
+
+`DepzDevices.ListDepzDevices()` lists the boards without opening one; the
+[guide](docs/guide.md#live-devices) goes on from there.
+
+## Documentation
+
+Full docs live under [`docs/`](docs/):
+
+- **[Common guide](docs/guide.md)** — what it is, install, discovery, the mental
+  model, transport/CRC, datasets, firmware parse, testing, extension points.
+- **[Unity package](unity/README.md)** — `ai.depz.sensor`: the Windows
+  communication module and the sample `MonoBehaviour`; install by git URL or by
+  copying; limits.
+- **[API reference](docs/api.md)** — every public type, generated from the `///`
+  summaries (per-sensor: [SR04](docs/sr04/api.md) ·
+  [VL53L0X](docs/vl53l0x/api.md) · [VL53L1CX](docs/vl53l1cx/api.md) ·
+  [VL53L1CB](docs/vl53l1cb/api.md) · [VL53L3CX](docs/vl53l3cx/api.md) ·
+  [VL53L4CD](docs/vl53l4cd/api.md) · [VL53L4CX](docs/vl53l4cx/api.md) ·
+  [VL53L5CX](docs/vl53l5cx/api.md) · [VL53L7CX](docs/vl53l7cx/api.md) ·
+  [VL53L7CH](docs/vl53l7ch/api.md) · [VL53L8CX](docs/vl53l8cx/api.md) ·
+  [VL53L8CH](docs/vl53l8ch/api.md) · [TMF8829](docs/tmf8829/api.md) ·
+  [BNO055](docs/bno055/api.md) ·
+  [BNO085](docs/bno085/api.md) · [BNO086](docs/bno086/api.md)).
+- **Per sensor** — SR04 ([intro](docs/sr04/introduction.md) ·
+  [guide](docs/sr04/guide.md)), VL53L0X ([intro](docs/vl53l0x/introduction.md) ·
+  [guide](docs/vl53l0x/guide.md)), VL53L1CX ([intro](docs/vl53l1cx/introduction.md) ·
+  [guide](docs/vl53l1cx/guide.md)), VL53L1CB ([intro](docs/vl53l1cb/introduction.md) ·
+  [guide](docs/vl53l1cb/guide.md)), VL53L3CX ([intro](docs/vl53l3cx/introduction.md) ·
+  [guide](docs/vl53l3cx/guide.md)), VL53L4CD ([intro](docs/vl53l4cd/introduction.md) ·
+  [guide](docs/vl53l4cd/guide.md)), VL53L4CX ([intro](docs/vl53l4cx/introduction.md) ·
+  [guide](docs/vl53l4cx/guide.md)), VL53L5CX ([intro](docs/vl53l5cx/introduction.md) ·
+  [guide](docs/vl53l5cx/guide.md)), VL53L7CX ([intro](docs/vl53l7cx/introduction.md) ·
+  [guide](docs/vl53l7cx/guide.md)), VL53L7CH ([intro](docs/vl53l7ch/introduction.md) ·
+  [guide](docs/vl53l7ch/guide.md)), VL53L8CX ([intro](docs/vl53l8cx/introduction.md) ·
+  [guide](docs/vl53l8cx/guide.md)), VL53L8CH ([intro](docs/vl53l8ch/introduction.md) ·
+  [guide](docs/vl53l8ch/guide.md)), TMF8829 ([intro](docs/tmf8829/introduction.md) ·
+  [guide](docs/tmf8829/guide.md)), BNO055 ([intro](docs/bno055/introduction.md) ·
+  [guide](docs/bno055/guide.md)), BNO085 ([intro](docs/bno085/introduction.md) ·
+  [guide](docs/bno085/guide.md)), BNO086 ([intro](docs/bno086/introduction.md) ·
+  [guide](docs/bno086/guide.md)).
+
+## Sensors
+
+The DEPZ line exposes these user-facing sensor types. The VL53L8 ToF is two
+separate silicon variants that share one wire/frame layout:
+
+| Sensor        | What it is                              | USB product id            | SDK surface |
+|---------------|-----------------------------------------|---------------------------|-------------|
+| **SR04**      | HC-SR04 ultrasonic ranger               | `0xEC78`                  | `Depz.Sensor.Protocol.Sr04` |
+| **VL53L0X / L1CX / L1CB / L3CX / L4CX** | The 1D ToF family on one I2C register-bridge firmware | `0xED41` / `0xED43` / `0xED42` / `0xED44` / `0xED46` | `Depz.Sensor.Vl53lx` |
+| **VL53L5CX / VL53L7CX / VL53L7CH** | 8×8 multizone ToF on one I2C board firmware (63° / 90° / 90° + CNH) | `0xED48` / `0xED49` / `0xED4A` | `Depz.Sensor.Vl53l7` |
+| **VL53L8CX**  | Base ToF multizone ranger               | dev-default (ST `0483:56DC`) | `Depz.Sensor.Vl53l8` |
+| **VL53L8CH**  | CX **plus** CNH histograms; own PID      | `0xED40`                  | `Depz.Sensor.Vl53l8` |
+| **TMF8829**   | ams-OSRAM dToF, 8×8 … 48×32 zones, up to 4 peaks, SPI register bridge | `0xED4C` | `Depz.Sensor.Tmf8829` |
+| **BNO055**    | 9-axis IMU, fusion on the chip, I2C register bridge | `0xEE0A`          | `Depz.Sensor.Bno055` |
+| **BNO085 / BNO086** | 9-axis IMU / sensor-hub (SH-2 over SHTP) | `0xEE09` / `0xEE08` | `Depz.Sensor.Bno086` |
+
+### VL53L8CX vs VL53L8CH
+
+`VL53L8CX` is the **base** ToF and the development default (it enumerates under
+the raw ST VID/PID until reprogrammed). `VL53L8CH` is a **superset**: same
+ranging engine plus **CNH** (compact new histograms), and it ships with its own
+production USB PID (`0xED40`, hinted `vl53l8ch`).
+
+Because both variants stream the **same ULD results-frame layout**, a single
+decode path serves both:
+
+- `Vl53l8FrameDecoder` — results-frame decode (distance/status/signal/…), shared
+  by CX and CH. The only variant-visible difference is the frame-id footer
+  offset (CX FW / ULD 2.1.0 = 12 bytes from end; CH FW / VL53LMZ 2.0.16 = 4).
+  Select with `Vl53l8FrameDecoder.ForVariant(Vl53l8Variant.Cx | .Ch)`.
+- `Vl53l8Advanced` / `MotionConfig` — advanced DCI codecs (motion-indicator
+  config, detection thresholds, xtalk margin). Shared by CX and CH.
+
+## Coverage today
+
+**Live device layer** (contract 07) — connection and reader thread, requests,
+streams (callbacks and drop-oldest queues), events, time sync, `.depzrec`
+record/replay and port discovery — with the **SR04**, **VL53L4CD** (the ST
+ULD 2.2.3 on the host), the **VL53L 1D family** (VL53L0X / L1CX / L1CB / L3CX / L4CX:
+the PAL, the ULDs, the ULP and the histogram BareDriver on the host), **VL53L8CX / VL53L8CH** and **VL53L5CX / VL53L7CX / VL53L7CH** (the ST ULD with the
+sensor firmware download, CNH) **BNO055**, **BNO085 / BNO086** and **TMF8829** (the sensor sequence with the firmware download) classes — every sensor of the line; the shared device scenarios (contract 15)
+run against them. In Unity on Windows the same classes open through the
+communication module `unity/` (`DepzDevicesUnity`, `WindowsSerialLink`).
+
+Verifiable, golden-vector-backed codecs are implemented for every sensor:
+
+- **SR04** — command encode + data/period/decay decode.
+- **VL53L0X / L1CX / L1CB / L3CX / L4CX** — v2.00 codecs, the product table and
+  class resolution, die-block / VL53L0X raw / histogram-block decode; the live
+  drivers (VL53L0X PAL, VL53L1X / L4CD ULDs, L3CX ULP, the histogram
+  BareDriver with up to four targets per frame).
+- **VL53L4CD** — register-bridge codecs, result decode, timing/tuning math and init block;
+  the live ULD driver (init, ranging, calibration).
+- **VL53L5CX / VL53L7CX / VL53L7CH** — pin control / bus speed / info codecs,
+  class resolution, and the L5/L7 frame decoder (footer at size − 4, per-zone
+  trim), replayed against live-board captures.
+- **VL53L8CX / VL53L8CH** — framing → chunk reassembly → results-frame decode
+  (shared), plus the advanced DCI codecs (shared). Exercised end-to-end by a
+  recorded `.depzrec` replay.
+- **VL53L7CH / VL53L8CH CNH** — `Vl53l8Cnh.DecodeHistogram` unpacks the raw CNH
+  block into per-aggregate histograms.
+- **TMF8829** — wire codecs, chunk reassembly, frame / pixel decode and the
+  half-frame merge, clock model and capture time, config-page fields, the
+  embedded ams sensor firmware (MIT); the live sensor sequence.
+- **BNO055** — wire codecs, units / calibration status and profile / axis remap
+  + placements / page-1 configs, register-window decode.
+- **BNO085 / BNO086** — SHTP framing/reassembly, SH-2 control encode and response decode
+  (features, product id, commands, FRS sessions, metadata), input-report and
+  gyro-integrated-RV decode; the live SH-2 hub session.
+
+Plus the shared foundation: CRC KATs, DEPZ framing encode/decode, USB identity
+table + discovery ordering, common commands (time-sync, sync-pin), `.fwdepz`
+image parse, and `.depzdata` datasets: the multi-device recorder, the reader and
+the timeline player.
+
+## Tests
+
+The SDK is tested without hardware against golden vectors and recorded sessions
+of real boards shared by all seven SDKs. The test suite is kept in DEPZ's
+development repository and is not part of this one.
+
+**On real boards:** `dotnet run --project examples/LiveCheck -- [seconds] [port ...]` opens every DEPZ board on the machine, streams 10 s and
+prints its rate and a plausibility value — the centre distance of a ToF sensor,
+|gravity| of a BNO055 (`no DEPZ board found (…)`, exit code 1, on a machine with none). The Python, Rust, Java and C# SDKs carry the same check;
+on 2026-10-26 all four agreed on ten boards.
+
+## Compatibility after 1.0
+
+From 1.0 a minor release only adds (contract 07 §5): a component on a record
+the SDK *produces* (`DeviceInfo`, `TimeSync`, the `DeviceEvent` records, every
+measurement / frame / sample / report, `Identity`, `Tmf8829AppliedConfig`, the
+SH-2 replies, the wire reports under `Protocol`, `DatasetRecord`), a component
+on a record *you* build, a member of an open set (`SensorType`, `Status`,
+`PlayerState`, the `DeviceEvent` and `ParserEvent` subclasses, the BNO086
+`BnoReport` subclasses). A new component is always a **trailing optional
+parameter with a default** — never inserted in the middle — so three rules keep
+your code building across those additions:
+
+- Build a record with **named arguments** (`new SyncPinConfig(Pin: 1, Mode:
+  SyncPinMode.In, Polarity: SyncPinPolarity.IdleLow)`) or from an existing value
+  with `with { }` (`Bno055AccelConfig.Default with { Range = 2 }`). A positional
+  list of every component still compiles after an addition — the new component
+  takes its default — but names say what each value is. The records you build:
+  `SyncPinConfig`, `CalibrationConfig`, `Vl53l8Advanced.DetectionThreshold`,
+  `Vl53l8CnhConfig`, `Bno055Units`, `Bno055AxisRemap`,
+  `Bno055CalibrationProfile`, `Bno055AccelConfig` / `GyroConfig` / `MagConfig`,
+  `ShtpHeader`, `UsbIds.PortCandidate`.
+- Read a produced record through its properties. Do not deconstruct it
+  positionally: `var (port, mode, …) = info` names every component and stops
+  compiling when one is appended.
+- A `switch` on an SDK enum or on `DeviceEvent` / `BnoReport` keeps a `default`
+  (statement) or `_ =>` (expression) arm: a new member or subclass is a minor
+  release.
+
+```csharp
+dev.SetSyncPin(new SyncPinConfig(Pin: 3, Mode: SyncPinMode.OutBoth, Polarity: SyncPinPolarity.IdleHigh)); // right
+var (pin, mode, polarity) = cfg;                                                                 // wrong: positional deconstruction
+```
+
+## License
+
+MIT. The bundled VL53L5 / VL53L7 / VL53L8 sensor firmware, configuration
+data and the driver code ported from ST's Ultra Lite Driver are
+© STMicroelectronics (BSD-3-Clause,
+[`licenses/vl53l8/LICENSE-BSD-3-Clause.txt`](licenses/vl53l8/LICENSE-BSD-3-Clause.txt)); the bundled TMF8829 sensor firmware is
+© ams-OSRAM (MIT, `licenses/tmf8829/` of the NuGet package).
+
+Open source — source and issue tracker:
+<https://github.com/depz-ai/depz-sensor-sdk>.

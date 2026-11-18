@@ -1,0 +1,26 @@
+# depz_sensors example: three boards with names of their own.
+#
+#   ros2 launch depz_sensors sensors.launch.py config:=/path/to/this/file.yaml
+#
+# Replace the serial numbers with your boards' (the node prints them at
+# startup: "... (USB serial UEXAMPLE01) -> ..."). Topics and frames then are
+#   /depz/front/range   frame "front"   (an HC-SR04 or a VL53L4CD, ...)
+#   /depz/depth/depth   frame "depth"   (a VL53L8CH or a TMF8829, ...)
+#   /depz/imu/imu, /depz/imu/mag   frame "imu"   (a BNO055 / BNO085 / BNO086)
+# — the names rviz/depz_sensors.rviz shows and launch/example_robot.launch.py
+# mounts on base_link. A board without an alias keeps
+# its automatic name, "<model>_<serial>". Parameters left out keep their
+# defaults (config/sensors.yaml lists every one).
+/**:
+  ros__parameters:
+    aliases:
+      - "UEXAMPLE01=front"
+      - "TEXAMPLE04=depth"
+      - "IEXAMPLE01=imu"
+    # Boards plugged in later (or unplugged and plugged back) are picked up.
+    hot_plug: true
+    # Slower ranging, steadier values: 100 ms per measurement.
+    range_budget_ms: 100
+    # The multizone sensor at 4x4 zones, 30 frames per second.
+    tof_resolution: 16
+    tof_frequency_hz: 30

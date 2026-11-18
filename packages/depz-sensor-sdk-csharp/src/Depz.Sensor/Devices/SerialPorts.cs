@@ -1,0 +1,251 @@
+#if NET
+using System.Globalization;
+using System.IO.Ports;
+using Microsoft.Win32;
+#endif
+
+namespace Depz.Sensor.Devices;
+
+/// <summary>One serial port and its USB identity, where the OS tells it.</summary>
+public sealed record SerialPortInfo(string Port, int? Vid, int? Pid, string? UsbSerial);
+
+/// <summary>
+/// Serial port enumeration with USB ids: Linux (sysfs) and Windows (the
+/// registry, <see cref="WindowsSerialPorts"/>). On macOS the ports are listed
+/// without USB ids, so discovery finds no DEPZ candidate there: open a port
+/// path explicitly. Enumeration needs .NET 8; the netstandard2.1 build keeps
+/// the ordering and <see cref="WindowsSerialPorts"/>, which the Unity module
+/// (<c>unity/</c>) runs over its own registry reader.
+/// </summary>
+public static class SerialPorts
+{
+    /// <summary>Sorted by USB serial (none last), then by port path (contract 02 §4.3).</summary>
+    public static IEnumerable<SerialPortInfo> BySerial(IEnumerable<SerialPortInfo> ports) =>
+        ports.OrderBy(p => string.IsNullOrEmpty(p.UsbSerial) ? 1 : 0)
+            .ThenBy(p => p.UsbSerial ?? "", StringComparer.Ordinal)
+            .ThenBy(p => p.Port, StringComparer.Ordinal);
+
+#if NET
+    /// <summary>Every serial port the OS lists.</summary>
+    public static IReadOnlyList<SerialPortInfo> List()
+    {
+        if (OperatingSystem.IsLinux())
+            return ListLinux();
+        if (OperatingSystem.IsWindows())
+            return ListWindows(new LocalMachineRegistry());
+        return SerialPort.GetPortNames().Select(p => new SerialPortInfo(p, null, null, null)).ToList();
+    }
+
+    private static List<SerialPortInfo> ListLinux()
+    {
+        var result = new List<SerialPortInfo>();
+        const string root = "/sys/class/tty";
+        if (!Directory.Exists(root))
+            return result;
+        foreach (string tty in Directory.GetDirectories(root).OrderBy(d => d, StringComparer.Ordinal))
+        {
+            string name = Path.GetFileName(tty);
+            if (!name.StartsWith("ttyACM", StringComparison.Ordinal) && !name.StartsWith("ttyUSB", StringComparison.Ordinal))
+                continue;
+            int? vid = null, pid = null;
+            string? serial = null;
+            // device → the USB interface; its parent holds the USB device's descriptors.
+            string? dir = ResolveDir(Path.Combine(tty, "device"));
+            for (int up = 0; dir != null && up < 3; up++, dir = Path.GetDirectoryName(dir))
+            {
+                string v = Path.Combine(dir, "idVendor");
+                if (!File.Exists(v))
+                    continue;
+                vid = ParseHex(File.ReadAllText(v));
+                pid = ParseHex(File.ReadAllText(Path.Combine(dir, "idProduct")));
+                string s = Path.Combine(dir, "serial");
+                serial = File.Exists(s) ? File.ReadAllText(s).Trim() : null;
+                break;
+            }
+            result.Add(new SerialPortInfo("/dev/" + name, vid, pid, serial));
+        }
+        return result;
+    }
+
+    /// <summary>The enumerated port <paramref name="port"/> names, under any alias (contract 02 §4.3,
+    /// ERRATA A5): the one whose path is the same string, else — on POSIX — the one whose resolved path
+    /// is the same (<c>/dev/serial/by-id/…</c> is a symlink to the node). On Windows a COM name is
+    /// matched by string only: a COM port is not a file, and resolving one opens it — a DTR pulse on
+    /// every board of the bench. Null when the OS does not list the port. (The reference SDK also
+    /// matches two names of one device node; .NET cannot read a device number.)</summary>
+    public static SerialPortInfo? Find(IEnumerable<SerialPortInfo> ports, string port)
+    {
+        var list = ports as IReadOnlyList<SerialPortInfo> ?? ports.ToList();
+        var exact = list.FirstOrDefault(p => p.Port == port);
+        if (exact != null || OperatingSystem.IsWindows())
+            return exact;
+        string? real = TryRealPath(port);
+        return real is null ? null : list.FirstOrDefault(p => TryRealPath(p.Port) == real);
+    }
+
+    private static string? TryRealPath(string path)
+    {
+        try
+        {
+            return RealPath(Path.GetFullPath(path), 0);
+        }
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ResolveDir(string path)
+    {
+        try
+        {
+            string real = RealPath(path, 0);
+            return Directory.Exists(real) ? real : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    // realpath(3): sysfs links are relative to the directory that really holds them
+    // (/sys/class/tty/ttyACM0/device → ../../../1-2:1.0), so resolve one component at a time.
+    private static readonly char[] PathSeparator = { '/' };
+
+    private static string RealPath(string path, int depth)
+    {
+        if (depth > 40)
+            throw new IOException($"too many levels of symbolic links: {path}");
+        string cur = "/";
+        foreach (string part in path.Split(PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string next = Path.Combine(cur, part);
+            string? target = new FileInfo(next).LinkTarget;
+            cur = target is null ? next : RealPath(Path.GetFullPath(Path.Combine(cur, target)), depth + 1);
+        }
+        return cur;
+    }
+
+    private static int? ParseHex(string s) =>
+        int.TryParse(s.Trim(), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out int v) ? v : null;
+
+    // The ports present now, with the owning USB device's ids: the Unity module's code, over the
+    // registry of this process.
+    internal static IReadOnlyList<SerialPortInfo> ListWindows(IRegistry registry) => WindowsSerialPorts.List(registry);
+
+    /// <summary>HKEY_LOCAL_MACHINE through Microsoft.Win32.Registry; a missing or unreadable key is null.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private sealed class LocalMachineRegistry : IRegistry
+    {
+        public IReadOnlyList<string>? SubKeyNames(string path) => Read(path, k => k.GetSubKeyNames());
+
+        public IReadOnlyList<string>? ValueNames(string path) => Read(path, k => k.GetValueNames());
+
+        public string? GetString(string path, string name) => Read(path, k => k.GetValue(name) as string);
+
+        private static T? Read<T>(string path, Func<RegistryKey, T?> read) where T : class
+        {
+            try
+            {
+                using RegistryKey? key = Registry.LocalMachine.OpenSubKey(path);
+                return key is null ? null : read(key);
+            }
+            catch (Exception e) when (e is System.Security.SecurityException || e is UnauthorizedAccessException
+                                      || e is IOException || e is ObjectDisposedException)
+            {
+                return null;
+            }
+        }
+    }
+#endif
+}
+
+#if NET
+/// <summary>
+/// A serial port as an <see cref="ILink"/> (System.IO.Ports). DTR and RTS are
+/// raised on open, as the reference SDK's pyserial does: a CDC device may hold
+/// its output until the host asserts DTR.
+/// </summary>
+public sealed class SerialPortLink : ILink, IDisposable
+{
+    private readonly SerialPort _port;
+    private readonly byte[] _buf = new byte[16384];
+    private volatile bool _closed;
+
+    public SerialPortLink(string port, int baudRate = 115200)
+    {
+        _port = new SerialPort(port, baudRate) { DtrEnable = true, RtsEnable = true, ReadTimeout = 50, WriteTimeout = 1000 };
+        try
+        {
+            _port.Open();
+        }
+        // ArgumentException: on Windows a name that is not a COM port (/dev/tty…) fails Open() so
+        catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is InvalidOperationException
+                                  || e is ArgumentException)
+        {
+            throw new DeviceLostException($"cannot open {port}: {e.Message}", e);
+        }
+        Name = port;
+    }
+
+    public string Name { get; }
+
+    public bool IsClosed => _closed || !_port.IsOpen;
+
+    public byte[] Read(TimeSpan timeout)
+    {
+        if (_closed)
+            throw new LinkClosedException($"{Name} closed");
+        try
+        {
+            _port.ReadTimeout = Math.Max(1, (int)timeout.TotalMilliseconds);
+            int n = _port.BaseStream.Read(_buf, 0, _buf.Length);
+            if (n <= 0)
+                return Array.Empty<byte>();
+            var data = new byte[n];
+            Array.Copy(_buf, data, n);
+            return data;
+        }
+        catch (TimeoutException)
+        {
+            return Array.Empty<byte>();
+        }
+        catch (Exception e) when (e is IOException || e is InvalidOperationException || e is ObjectDisposedException)
+        {
+            if (_closed)
+                throw new LinkClosedException($"{Name} closed");
+            throw new DeviceLostException($"{Name}: {e.Message}", e);
+        }
+    }
+
+    public void Write(byte[] data)
+    {
+        if (_closed)
+            throw new LinkClosedException($"{Name} closed");
+        try
+        {
+            _port.BaseStream.Write(data, 0, data.Length);
+        }
+        catch (Exception e) when (e is IOException || e is InvalidOperationException || e is ObjectDisposedException
+                                  || e is TimeoutException)
+        {
+            throw new DeviceLostException($"{Name}: {e.Message}", e);
+        }
+    }
+
+    public void Dispose() => Close();
+
+    public void Close()
+    {
+        _closed = true;
+        try
+        {
+            _port.Close();
+        }
+        catch (IOException)
+        {
+            // already gone (unplugged)
+        }
+    }
+}
+#endif

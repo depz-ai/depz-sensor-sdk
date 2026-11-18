@@ -1,0 +1,617 @@
+# VL53L5CX (ToF) — API reference
+
+The public API for the VL53L5CX (ToF) sensor. Transport, USB identity, the common
+protocol codecs and other cross-sensor symbols shared by every sensor
+live in the [top-level API reference](../api.md).
+
+One package serves the VL53L5CX, VL53L7CX and VL53L7CH boards (one
+`APP_VL53L7` firmware), so this page lists the whole L5/L7 surface
+and is the same on all three. The live devices extend
+`Vl53l8cxDevice` and frames decode through the VL53L8 decoder with
+the L5/L7 geometry; the driver and the advanced-DCI codecs are
+documented in the [VL53L8CX API reference](../vl53l8cx/api.md).
+
+Generated from the Javadoc of the Java sources.
+
+## Contents
+
+- **VL53L5CX (ToF)**: [`Vl53l5cxDevice`](#vl53l5cxdevice), [`Vl53l7chDevice`](#vl53l7chdevice), [`Vl53l7cxDevice`](#vl53l7cxdevice), [`Vl53l7`](#vl53l7), [`Vl53l7.Vl53l7Cmd`](#vl53l7vl53l7cmd), [`Vl53l7.Vl53l7Rpt`](#vl53l7vl53l7rpt), [`Vl53l7.PinAction`](#vl53l7pinaction), [`Vl53l7.Vl53l7Info`](#vl53l7vl53l7info), [`Vl53l7Uld`](#vl53l7uld), [`Vl53l7Uld.Model`](#vl53l7uldmodel)
+- **Shared with VL53L8 (frame decode)**: [`FrameReassembler`](#framereassembler), [`Vl53l8Uld.Results`](#vl53l8uldresults), [`Vl53l8Frame`](#vl53l8frame)
+
+## VL53L5CX (ToF)
+
+### Vl53l5cxDevice
+
+```java
+public class Vl53l5cxDevice extends Vl53l7cxDevice
+```
+
+VL53L5CX ToF (8×8 zones, 63° field of view): the board, firmware and API of `Vl53l7cxDevice`; the sensor reports module type MZ.
+
+### Vl53l7chDevice
+
+```java
+public class Vl53l7chDevice extends Vl53l7cxDevice
+```
+
+VL53L7CH: the VL53L7CX superset with CNH histograms. `init()` downloads the CH firmware
+(VL53LMZ ULD 2.0.16, the VL53L8CH one); CNH frames up to ~7.6 KB stream in chunks.
+
+#### Vl53l7chDevice.cnhSetup
+
+```java
+public @Nullable Vl53l8CnhSetup cnhSetup()
+```
+
+The CNH setup armed by `configureCnh`, or null.
+
+#### Vl53l7chDevice.configureCnh
+
+```java
+public void configureCnh(Vl53l8CnhSetup setup)
+```
+
+Arm CNH for the next start (as `Vl53l8chDevice#configureCnh`); disarms the motion indicator.
+
+### Vl53l7cxDevice
+
+```java
+public class Vl53l7cxDevice extends Vl53l8cxDevice
+```
+
+VL53L7CX multizone ToF (8×8 zones, 90° field of view) on the I2C bridge board (contract 11). The
+board speaks the VL53L8 protocol plus three commands, and the sensor runs the same ST ULD family,
+so this is a `Vl53l8cxDevice` with the L5/L7 firmware set (ULD 2.0.1), smaller register
+reads, ranging from 1 Hz, and the board commands `getBridgeInfo()`,
+`setI2cSpeedKhz`, `pinCtrl`. L5CX / L7CX have no deep sleep and no threshold
+auto-stop.
+
+#### Vl53l7cxDevice.expectedModuleType
+
+```java
+protected int expectedModuleType()
+```
+
+The module type this class expects after `init()` (L5 and L7 share a firmware).
+
+#### Vl53l7cxDevice.moduleType
+
+```java
+public @Nullable Integer moduleType()
+```
+
+The sensor's module type read at `init()`: `Vl53l8Driver#MODULE_TYPE_MZ` (VL53L5CX)
+or `Vl53l8Driver#MODULE_TYPE_MZEVO` (VL53L7CX / CH); null before.
+
+#### Vl53l7cxDevice.xtalkCalibrationFailed
+
+```java
+public boolean xtalkCalibrationFailed()
+```
+
+The last `calibrateXtalk` found nothing to calibrate ("coverglass too good").
+
+#### Vl53l7cxDevice.getBridgeInfo
+
+```java
+public Vl53l7.Vl53l7Info getBridgeInfo()
+```
+
+Bridge counters and pin levels (the sensor is not touched). Read it before and after a run:
+during one each call takes the bus from the stream and can cost a frame.
+
+#### Vl53l7cxDevice.setI2cSpeedKhz
+
+```java
+public int setI2cSpeedKhz(int khz)
+```
+
+Sensor bus SCL; the board takes the nearest of 100, 200, 400, 500 … 1000 kHz. Returns the value
+in effect. `BusyException` mid-transfer: stop ranging first.
+
+#### Vl53l7cxDevice.pinCtrl
+
+```java
+public void pinCtrl(Vl53l7.PinAction action)
+```
+
+Drive the sensor's LPn / I2C_RST pins. LPN_OFF and SOFT_CYCLE drop the sensor's state: `init()` again afterwards.
+
+### Vl53l7
+
+```java
+public final class Vl53l7
+```
+
+VL53L5CX / VL53L7CX / VL53L7CH I2C register-bridge wire codecs
+(contract 11, a delta against contract 04).
+
+Commands 0x32/0x33/0x35/0x36 and reports 0x91/0x93 are bit-for-bit the
+VL53L8 bridge; RPT_VL53_FRAME (0x93) chunks are decoded and reassembled by
+`ai.depz.sensor.sensors.vl53l8.FrameReassembler`. This class adds what
+the I2C board brings: PIN_CTRL, GET_INFO, SET_I2C_SPEED, RPT_VL53_INFO and its
+tighter transfer limits. The register encoders are included here because the
+Java SDK has no separate VL53L8 protocol class (its VL53L8 support is
+decode-only).
+
+#### Vl53l7.I2C_ERR_OK *(field)*
+
+```java
+public static final int I2C_ERR_OK = 0
+```
+
+RPT_VL53_INFO.lastI2cError values.
+
+#### Vl53l7.I2C_ERR_NACK *(field)*
+
+```java
+public static final int I2C_ERR_NACK = 1
+```
+
+#### Vl53l7.I2C_ERR_TIMEOUT *(field)*
+
+```java
+public static final int I2C_ERR_TIMEOUT = 2
+```
+
+#### Vl53l7.I2C_ERR_BUS_ERROR *(field)*
+
+```java
+public static final int I2C_ERR_BUS_ERROR = 3
+```
+
+#### Vl53l7.READ_MAX_LEN *(field)*
+
+```java
+public static final int READ_MAX_LEN = 1536
+```
+
+VL53LMZ_READ_MAX: READ_REG len 1..1536 (the VL53L8 host's 2048 fails here).
+
+#### Vl53l7.WRITE_MAX_LEN *(field)*
+
+```java
+public static final int WRITE_MAX_LEN = 2048
+```
+
+VL53LMZ_XFER_MAX: WRITE_REG N 1..2048.
+
+#### Vl53l7.STREAM_CHUNK_MAX *(field)*
+
+```java
+public static final int STREAM_CHUNK_MAX = 1536
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk (VL53L8: 1528).
+
+#### Vl53l7.INFO_SIZE *(field)*
+
+```java
+public static final int INFO_SIZE = 20
+```
+
+RPT_VL53_INFO payload size.
+
+#### Vl53l7.I2C_SPEED_STEPS_KHZ *(field)*
+
+```java
+public static final List<Integer> I2C_SPEED_STEPS_KHZ
+```
+
+Nominal SCL steps the firmware carries a timing for; others snap to nearest.
+
+#### Vl53l7.packReadReg
+
+```java
+public static byte[] packReadReg(int addr, int len)
+```
+
+VL53_READ_REG payload: `addr u16, len u16` little-endian, with
+`len` 1..`READ_MAX_LEN` and `addr+len <= 0x10000`
+(contract 11 §2), else IllegalArgumentException.
+
+#### Vl53l7.packWriteReg
+
+```java
+public static byte[] packWriteReg(int addr, byte[] data)
+```
+
+VL53_WRITE_REG payload: `addr u16, data[1..2048]` with
+`addr+N <= 0x10000` (contract 11 §2), else IllegalArgumentException.
+
+#### Vl53l7.packStartStream
+
+```java
+public static byte[] packStartStream(int frameSize)
+```
+
+VL53_START_STREAM payload: `frame_size u16`, 1..8192 (the VL53L8 command, contract 04 §2).
+
+#### Vl53l7.packPinCtrl
+
+```java
+public static byte[] packPinCtrl(int action)
+```
+
+VL53_PIN_CTRL payload: `action u8` (see `PinAction`).
+
+#### Vl53l7.packPinCtrl
+
+```java
+public static byte[] packPinCtrl(PinAction action)
+```
+
+VL53_PIN_CTRL payload for a `PinAction`.
+
+#### Vl53l7.packSetI2cSpeed
+
+```java
+public static byte[] packSetI2cSpeed(int khz)
+```
+
+VL53_SET_I2C_SPEED payload: `khz u16`.
+
+### Vl53l7.Vl53l7Cmd
+
+```java
+public enum Vl53l7Cmd
+```
+
+#### Vl53l7.Vl53l7Cmd — constants
+
+`READ_REG`(0x32), `WRITE_REG`(0x33), `PIN_CTRL`(0x34), `START_STREAM`(0x35), `STOP_STREAM`(0x36), `GET_INFO`(0x37), `SET_I2C_SPEED`(0x38)
+
+#### Vl53l7.Vl53l7Cmd.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l7.Vl53l7Rpt
+
+```java
+public enum Vl53l7Rpt
+```
+
+#### Vl53l7.Vl53l7Rpt — constants
+
+`REG_DATA`(0x91), `VL53_INFO`(0x92), `VL53_FRAME`(0x93)
+
+#### Vl53l7.Vl53l7Rpt.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l7.PinAction
+
+```java
+public enum PinAction
+```
+
+VL53_PIN_CTRL actions. None is a true sensor reset (the board has no power
+GPIO): after LPN_OFF or SOFT_CYCLE the host must re-run init().
+
+#### Vl53l7.PinAction — constants
+
+`LPN_OFF`(0), `LPN_ON`(1), `I2C_RST`(2), `SOFT_CYCLE`(3)
+
+#### Vl53l7.PinAction.value *(field)*
+
+```java
+public final int value
+```
+
+### Vl53l7.Vl53l7Info
+
+```java
+public record Vl53l7Info(long intEdges, long framesDropped, long i2cErrors, int lastI2cError, int lpnLevel, int intLevel, int i2cKhz, int frameSize, boolean streaming)
+```
+
+RPT_VL53_INFO — bridge state only (the sensor is never probed), 20-byte LE
+payload `<IIIBBBHHB`. All counters run from power-up / DEVICE_RESET;
+SOFT_CYCLE clears the I2C ones. The report carries no echoed command byte.
+
+#### Vl53l7.Vl53l7Info.unpack
+
+```java
+public static Vl53l7Info unpack(byte[] p)
+```
+
+### Vl53l7Uld
+
+```java
+public final class Vl53l7Uld
+```
+
+VL53L5CX / VL53L7CX / VL53L7CH ULD — the host-verifiable decode layer only
+(contract 11, a delta against contract 04).
+
+One firmware app (`APP_VL53L7_*`) serves three boards: VL53L7CX
+(base), VL53L5CX (same API, different optics) and VL53L7CH (CX plus
+CNH, exactly as VL53L8CH). Frames, CNH decode and the chunk transport are the
+VL53L8 ones (`Vl53l8Uld`, `ai.depz.sensor.sensors.vl53l8.FrameReassembler`);
+the L5/L7 differences in the decode path are:
+- footer id at `size - 4` for every L5/L7 part (like L8 CH);
+- per-target blocks (and CNH) keep their 64-entry size even in 4x4, so
+every per-zone array is trimmed to the frame's resolution.
+
+The live driver over the I2C bridge is `Vl53l8Driver` with the L5/L7
+firmware sets (`Vl53l7cxDevice`). Power modes, xtalk calibration,
+detection thresholds and the motion indicator are the VL53L8 features with the
+per-part deltas of contract 11 §4 (L5CX / L7CX: no threshold auto-stop, no
+DEEP_SLEEP), checked against the ST sources and verified on hardware (L5CX and
+L7CH, 2026-09-24); they run through that live driver.
+
+ST driver port: unstable — not covered by the 1.0 freeze.
+
+#### Vl53l7Uld.RESOLUTION_4X4 *(field)*
+
+```java
+public static final int RESOLUTION_4X4
+```
+
+#### Vl53l7Uld.RESOLUTION_8X8 *(field)*
+
+```java
+public static final int RESOLUTION_8X8
+```
+
+#### Vl53l7Uld.FOOTER_ID_OFF *(field)*
+
+```java
+public static final int FOOTER_ID_OFF = 4
+```
+
+Footer-id offset from the frame end: `size - 4` for L5CX, L7CX and L7CH.
+
+#### Vl53l7Uld.MIN_RANGING_FREQUENCY_HZ *(field)*
+
+```java
+public static final int MIN_RANGING_FREQUENCY_HZ = 1
+```
+
+L5/L7 range and stream at 1 Hz (VL53L8: 2 Hz).
+
+#### Vl53l7Uld.resolveModel
+
+```java
+public static Model resolveModel(@Nullable String usbModel, @Nullable String deviceName)
+```
+
+Resolve the sensor class of an `APP_VL53L7` board (contract 11 §1,
+normative): the production USB PID model first (`usbModel`, e.g.
+from `ai.depz.sensor.usb.UsbIds#usbModelHint`; may be `null`),
+else the first `VL53L<5|7><CX|CH>` in `GET_DEVICE_NAME`, else
+`Model#VL53L7CX` (its blob runs on every L5/L7 part).
+
+#### Vl53l7Uld.parseFrame
+
+```java
+public static Vl53l8Uld.Results parseFrame(byte[] raw, int dataReadSize, int resolution)
+```
+
+Parse one raw L5/L7 results frame for a known resolution (the one
+`start_ranging` used: 16 or 64). Footer at `size - 4`;
+per-zone arrays trimmed to `resolution`. CNH (L7CH) lands in
+`Vl53l8Uld.Results#cnhRaw`. Throws on a header/footer id mismatch.
+
+#### Vl53l7Uld.parseFrame
+
+```java
+public static Vl53l8Uld.Results parseFrame(byte[] raw, int dataReadSize)
+```
+
+Parse one raw L5/L7 results frame, taking the resolution from the frame
+itself: the zone-scaled ambient block (index 0x54D0) is always sized to the
+resolution (contract 11 §3), so its entry count is the zone count.
+
+### Vl53l7Uld.Model
+
+```java
+public enum Model
+```
+
+The three sensor classes an `APP_VL53L7` board opens as.
+
+#### Vl53l7Uld.Model — constants
+
+`VL53L5CX`, `VL53L7CX`, `VL53L7CH`
+
+#### Vl53l7Uld.Model.label *(field)*
+
+```java
+public final String label
+```
+
+#### Vl53l7Uld.Model.fromLabel
+
+```java
+public static @Nullable Model fromLabel(String label)
+```
+
+Model for a lowercase label (`"vl53l7ch"`), or `null`.
+
+## Shared with VL53L8 (frame decode)
+
+### FrameReassembler
+
+```java
+public final class FrameReassembler
+```
+
+Rebuilds full VL53L8 sensor frames from chunked RPT_VL53_FRAME reports
+(contract 04). Shared by both VL53L8CX and VL53L8CH — the
+chunk transport is identical across the two parts.
+
+Rules: reset on `offset == 0`; chunks must be contiguous — a gap
+discards the frame in progress; a frame completes when the accumulated bytes
+equal `fullSize`. A chunk out of the rule-4 bounds (more than
+`chunkMax` bytes, `fullSize` over `STREAM_TOTAL_MAX`, or
+running past `fullSize`) is damaged: dropped and counted as a lost
+frame like the other damaged input, never thrown. Mirror of the TS/Python
+`FrameReassembler`.
+
+#### FrameReassembler.STREAM_CHUNK_MAX *(field)*
+
+```java
+public static final int STREAM_CHUNK_MAX = 1528
+```
+
+Bytes of frame data per RPT_VL53_FRAME chunk.
+
+#### FrameReassembler.STREAM_TOTAL_MAX *(field)*
+
+```java
+public static final int STREAM_TOTAL_MAX = 8192
+```
+
+Largest frame_size START_STREAM accepts (contract 04 §4 rule 4).
+
+#### FrameReassembler.completed *(field)*
+
+```java
+public int completed = 0
+```
+
+#### FrameReassembler.discarded *(field)*
+
+```java
+public int discarded = 0
+```
+
+#### FrameReassembler.unpackFrameChunk
+
+```java
+public static FrameChunk unpackFrameChunk(byte[] payload)
+```
+
+Decode a RPT_VL53_FRAME payload: ts u64 LE, fullSize u16, offset u16, data.
+
+#### FrameReassembler.feed
+
+```java
+public @Nullable CompletedFrame feed(FrameChunk chunk)
+```
+
+Returns a completed frame or `null`.
+
+### Vl53l8Uld.Results
+
+```java
+public static final class Results
+```
+
+Parsed results frame, in the real units ST's GetRangingData gives (contract
+04 §5). ST divides integers; the scaled values here keep their fraction.
+
+#### Vl53l8Uld.Results.distanceMm *(field)*
+
+```java
+public int[] distanceMm
+```
+
+mm: raw / 4 floored, a negative distance clamped to 0 (as ST).
+
+#### Vl53l8Uld.Results.targetStatus *(field)*
+
+```java
+public int[] targetStatus
+```
+
+5 or 9 = valid measurement; 255 = no target detected.
+
+#### Vl53l8Uld.Results.nbTargetDetected *(field)*
+
+```java
+public int[] nbTargetDetected
+```
+
+Targets found per zone.
+
+#### Vl53l8Uld.Results.signalPerSpad *(field)*
+
+```java
+public double[] signalPerSpad
+```
+
+Signal rate, kcps/SPAD (raw / 2048).
+
+#### Vl53l8Uld.Results.ambientPerSpad *(field)*
+
+```java
+public double[] ambientPerSpad
+```
+
+Ambient rate, kcps/SPAD (raw / 2048), one per zone.
+
+#### Vl53l8Uld.Results.nbSpadsEnabled *(field)*
+
+```java
+public long[] nbSpadsEnabled
+```
+
+Active SPAD count per zone.
+
+#### Vl53l8Uld.Results.rangeSigmaMm *(field)*
+
+```java
+public double[] rangeSigmaMm
+```
+
+Measurement noise, mm (raw / 128).
+
+#### Vl53l8Uld.Results.reflectance *(field)*
+
+```java
+public double[] reflectance
+```
+
+Estimated target reflectance, % (raw / 2).
+
+#### Vl53l8Uld.Results.siliconTempDegc *(field)*
+
+```java
+public int siliconTempDegc = 0
+```
+
+#### Vl53l8Uld.Results.cnhRaw *(field)*
+
+```java
+public byte @Nullable [] cnhRaw
+```
+
+Raw CNH (compact-histogram) block bytes (VL53L8CH / VL53L7CH, block
+`CNH_DATA_IDX`, word-swapped like every block); `null`
+when absent (always on CX). Decode with `decodeCnh`.
+
+#### Vl53l8Uld.Results.resolution
+
+```java
+public int resolution()
+```
+
+Zones actually present this frame (16 for 4x4, 64 for 8x8).
+
+### Vl53l8Frame
+
+```java
+public record Vl53l8Frame(long timestampUs, int resolution, int siliconTempDegc, int[] distanceMm, int[] targetStatus, int[] nbTargetDetected, double[] signalPerSpad, double[] ambientPerSpad, long[] nbSpadsEnabled, double[] rangeSigmaMm, double[] reflectance, byte @Nullable [] cnhRaw, @Nullable Vl53l8Motion motion)
+```
+
+One decoded ranging frame. Per-zone arrays are sized to the active resolution (16 for 4×4, 64
+for 8×8); zone index runs row-major. Values are in the real units ST's GetRangingData gives
+(contract 04 §5); ST divides integers, here the scaled values keep their fraction:
+`distanceMm` mm (raw ÷4 floored, a negative distance clamped to 0, as ST),
+`signalPerSpad` / `ambientPerSpad` kcps/SPAD (raw ÷2048), `rangeSigmaMm` mm
+(raw ÷128), `reflectance` % (raw ÷2). `targetStatus` 5 or 9 = valid, 255 = no
+target. `cnhRaw` is the raw CNH data block (VL53L8CH / VL53L7CH with CNH armed), else
+null; `motion` the motion-indicator output when it is configured, else null.
+
+#### Vl53l8Frame.withResolution
+
+```java
+public Vl53l8Frame withResolution(int zones)
+```
+
+This frame with `resolution` replaced (the device's own count of zones in use).

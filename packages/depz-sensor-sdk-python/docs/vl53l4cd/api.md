@@ -1,0 +1,592 @@
+# VL53L4CD (ToF) — API reference
+
+The public API for the VL53L4CD (ToF) sensor. Discovery, device-base,
+transport and other cross-sensor symbols shared by every sensor
+live in the [top-level API reference](../api.md).
+
+Generated from the docstrings — edit them in the source, not
+this file.
+
+## Contents
+
+- **VL53L4CD (ToF)**: [`Vl53l4cd`](#vl53l4cd), [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdError`](#vl53l4cderror), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`RANGE_STATUS_NAMES`](#range_status_names), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`I2C_KHZ_STEPS`](#i2c_khz_steps)
+
+## VL53L4CD (ToF)
+
+### Vl53l4cd
+
+```python
+class Vl53l4cd(port_or_link: str | depz_sensor_sdk.transport.link.Link, *, timeout: float = 0.2, tx_crc_type: depz_sensor_sdk.transport.framing.CrcType = <CrcType.NONE: 0>) -> None
+```
+
+VL53L4CD single-zone ToF device.
+
+`init()` runs the ULD boot sequence (no firmware blob — the sensor carries
+its own), then configure and `start_ranging()`. Configuration methods must
+not be called while ranging: the INT-driven stream owns the register bank
+(contract 10). Measurements stream through `measurements`.
+
+#### Vl53l4cd.measurements *(attribute)*
+
+```python
+measurements: Stream[Vl53l4Measurement]
+```
+
+The measurement stream: `measurements.on(cb)` subscribes (reader-thread
+context; don't block), `measurements(maxsize)` iterates (bounded,
+drop-oldest, subscribes immediately), `measurements.next(timeout)` waits
+for one; `dropped_counts` and `parse_errors` (result blocks that failed
+to decode: short block from a reconfigured stream, corrupt read) are its
+counters.
+
+#### Vl53l4cd.events *(attribute)*
+
+```python
+events: Stream[DeviceEvent]
+```
+
+The unsolicited / diagnostic events (contract 07 §2): `events.on(cb)`
+subscribes (reader-thread context; do not block) and returns an
+unsubscribe function, `events(maxsize)` is a bounded drop-oldest iterator
+that subscribes immediately, `events.dropped_counts` its queues' drops.
+
+#### Vl53l4cd.uld *(property)*
+
+The underlying ULD driver (escape hatch for raw register access).
+
+unstable — not covered by the 1.0 freeze.
+
+#### Vl53l4cd.initialized *(property)*
+
+True after a successful init(). Cleared by reset_sensor() and
+xshut() — a power-cycled sensor holds none of the ULD configuration.
+
+#### Vl53l4cd.is_alive
+
+```python
+is_alive(self) -> bool
+```
+
+True when the sensor answers with the VL53L4CD model id (0xEBAA).
+
+#### Vl53l4cd.init
+
+```python
+init(self, bus_khz: int = 1000) -> None
+```
+
+Initialise the sensor: default configuration block + VHV calibration
+(ULD sensor_init). Takes well under a second; the bus is left at
+`bus_khz` (one of I2C_KHZ_STEPS).
+
+#### Vl53l4cd.xshut
+
+```python
+xshut(self, action: int) -> None
+```
+
+Drive the XSHUT pin: XSHUT_OFF / XSHUT_ON / XSHUT_RESET. OFF and
+RESET stop any active stream on the bridge; a power-cycled sensor
+needs init() again.
+
+#### Vl53l4cd.reset_sensor
+
+```python
+reset_sensor(self) -> None
+```
+
+Hardware sensor reset via XSHUT (blocks ≤ 20 ms on the MCU, typ.
+~2 ms; the reply is awaited up to 2 s). The ULD
+configuration is wiped — call init() again.
+
+#### Vl53l4cd.bridge_info
+
+```python
+bridge_info(self) -> depz_sensor_sdk.protocol.vl53l4.Vl53l4Info
+```
+
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters.
+Counters wrap silently — watch increments; `i2c_errors` is cleared by
+a successful XSHUT reset. Safe to call while streaming.
+
+#### Vl53l4cd.set_i2c_speed_khz
+
+```python
+set_i2c_speed_khz(self, khz: int) -> None
+```
+
+Re-time the bridge's I2C bus to the nominal step nearest `khz`
+(I2C_KHZ_STEPS). Not while ranging — re-timing refuses a transfer in
+flight (ERR_BUSY). Read back the programmed step via bridge_info().
+
+#### Vl53l4cd.get_range_timing
+
+```python
+get_range_timing(self) -> tuple[int, int]
+```
+
+→ (timing_budget_ms, inter_measurement_ms). inter_measurement 0
+means continuous mode.
+
+#### Vl53l4cd.set_range_timing
+
+```python
+set_range_timing(self, timing_budget_ms: int, inter_measurement_ms: int = 0) -> None
+```
+
+Set the timing budget (10–200 ms) and inter-measurement period.
+`inter_measurement_ms=0` selects continuous ranging; a value larger
+than the budget selects autonomous low-power mode. Not while ranging.
+
+#### Vl53l4cd.get_offset_mm
+
+```python
+get_offset_mm(self) -> int
+```
+
+Configured ranging offset in mm (signed).
+
+#### Vl53l4cd.set_offset_mm
+
+```python
+set_offset_mm(self, offset_mm: int) -> None
+```
+
+Set the ranging offset correction in mm. Not while ranging.
+
+#### Vl53l4cd.get_xtalk_kcps
+
+```python
+get_xtalk_kcps(self) -> int
+```
+
+Configured crosstalk compensation in kcps (0 = disabled).
+
+#### Vl53l4cd.set_xtalk_kcps
+
+```python
+set_xtalk_kcps(self, xtalk_kcps: int) -> None
+```
+
+Set the crosstalk compensation in kcps. Not while ranging.
+
+#### Vl53l4cd.get_detection_thresholds
+
+```python
+get_detection_thresholds(self) -> tuple[int, int, int]
+```
+
+→ (distance_low_mm, distance_high_mm, window). Window is one of
+WINDOW_BELOW / WINDOW_ABOVE / WINDOW_OUT / WINDOW_IN.
+
+#### Vl53l4cd.set_detection_thresholds
+
+```python
+set_detection_thresholds(self, distance_low_mm: int, distance_high_mm: int, window: int) -> None
+```
+
+Program the distance-window interrupt (INT only fires when the
+window condition holds). Not while ranging. The distances are u16
+registers, the window a u8 one: a value outside is refused before
+anything is written, never masked (contract 07 §3).
+
+#### Vl53l4cd.get_signal_threshold_kcps
+
+```python
+get_signal_threshold_kcps(self) -> int
+```
+
+#### Vl53l4cd.set_signal_threshold_kcps
+
+```python
+set_signal_threshold_kcps(self, signal_kcps: int) -> None
+```
+
+Discard measurements whose return signal is below `signal_kcps`.
+Not while ranging.
+
+#### Vl53l4cd.get_sigma_threshold_mm
+
+```python
+get_sigma_threshold_mm(self) -> int
+```
+
+#### Vl53l4cd.set_sigma_threshold_mm
+
+```python
+set_sigma_threshold_mm(self, sigma_mm: int) -> None
+```
+
+Discard measurements whose sigma exceeds `sigma_mm` (≤ 16383).
+Not while ranging.
+
+#### Vl53l4cd.start_temperature_update
+
+```python
+start_temperature_update(self) -> None
+```
+
+Re-run VHV calibration; recommended after a >8 °C ambient change.
+Not while ranging (runs a short ranging burst internally).
+
+#### Vl53l4cd.calibrate_offset
+
+```python
+calibrate_offset(self, target_dist_mm: int, nb_samples: int = 20) -> int
+```
+
+Offset calibration against a target at `target_dist_mm` (10–1000).
+Blocks for the sample burst; returns the offset now programmed.
+
+#### Vl53l4cd.calibrate_xtalk
+
+```python
+calibrate_xtalk(self, target_dist_mm: int, nb_samples: int = 20) -> int
+```
+
+Crosstalk calibration against a target at `target_dist_mm` (10–5000).
+Blocks for the sample burst; returns the xtalk now programmed (kcps).
+
+#### Vl53l4cd.start_ranging
+
+```python
+start_ranging(self) -> None
+```
+
+Start the sensor's ranging loop and arm the MCU stream: one
+RPT_VL53_STREAM per INT edge carrying the 17-byte result block.
+
+#### Vl53l4cd.stop_ranging
+
+```python
+stop_ranging(self) -> None
+```
+
+#### Vl53l4cd.ranging *(property)*
+
+#### Vl53l4cd.measure_once
+
+```python
+measure_once(self, timeout: float = 1.0) -> depz_sensor_sdk.vl53l4.Vl53l4Measurement
+```
+
+Single poll-mode measurement: start ranging, wait for data-ready,
+read the result block, stop. Raises while the stream is running.
+
+#### Vl53l4cd.close
+
+```python
+close(self) -> None
+```
+
+#### Vl53l4cd.port *(property)*
+
+#### Vl53l4cd.closed *(property)*
+
+#### Vl53l4cd.lost *(property)*
+
+The loss that ended this device (its `__cause__` is what the link
+raised), or None: still open, or ended by the program's own `close()`.
+Set before `closed` shows the loss, so a pull iterator that has just
+ended quietly tells a loss from its own close here (contract 07 §3).
+
+#### Vl53l4cd.send
+
+```python
+send(self, cmd: int, payload: bytes = b'', *, crc_type: depz_sensor_sdk.transport.framing.CrcType | None = None) -> None
+```
+
+Fire-and-forget packet (escape hatch; prefer `request`).
+
+#### Vl53l4cd.request
+
+```python
+request(self, cmd: int, payload: bytes = b'', *, matcher: Optional[Callable[[depz_sensor_sdk.transport.framing.Packet], Union[Any, depz_sensor_sdk.device._NoMatch]]] = None, ok_completes: bool = False, timeout: float | None = None) -> Any
+```
+
+Send `cmd` and wait for its correlated completion.
+
+Exactly one of the completion paths must be configured:
+- `ok_completes=True` — RPT_STATUS(cmd, OK) finishes with None;
+- `matcher` — first packet for which `matcher(pkt) is not
+  request.NO_MATCH` finishes with the matcher's return value.
+Non-OK RPT_STATUS echoing `cmd` always raises (BusyError for
+ERR_BUSY, StatusError otherwise); a matcher that raises on the packet
+it claims (a reply shorter than its fields) raises InvalidReplyError
+here, and the device stays usable. One in-flight request per opcode.
+
+#### Vl53l4cd.expect_report
+
+```python
+expect_report(report_id: int, unpack: Callable[[bytes], ~T]) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[~T, depz_sensor_sdk.device._NoMatch]]
+```
+
+Matcher for a typed report identified by its report ID alone.
+
+#### Vl53l4cd.expect_text
+
+```python
+expect_text(request_cmd: int) -> Callable[[depz_sensor_sdk.transport.framing.Packet], Union[str, depz_sensor_sdk.device._NoMatch]]
+```
+
+Matcher for RPT_TEXT echoing `request_cmd`.
+
+#### Vl53l4cd.get_device_name
+
+```python
+get_device_name(self) -> str
+```
+
+#### Vl53l4cd.get_software_name
+
+```python
+get_software_name(self) -> str
+```
+
+#### Vl53l4cd.get_serial_number
+
+```python
+get_serial_number(self) -> str
+```
+
+#### Vl53l4cd.identify
+
+```python
+identify(self) -> depz_sensor_sdk.protocol.identity.Identity
+```
+
+Classify the running firmware (contract 02 §4): the software name
+parsed into mode, sensor type and version.
+
+#### Vl53l4cd.read_mcu_temperature
+
+```python
+read_mcu_temperature(self) -> float
+```
+
+Last cached MCU temperature in °C (device refreshes ~2 Hz).
+
+#### Vl53l4cd.sync_time
+
+```python
+sync_time(self, samples: int = 5) -> depz_sensor_sdk.device.TimeSync
+```
+
+NTP-style sync; keeps the lowest-RTT sample (contract 02 §5).
+
+#### Vl53l4cd.time_sync *(property)*
+
+#### Vl53l4cd.to_host_time_us
+
+```python
+to_host_time_us(self, device_timestamp_us: int) -> int
+```
+
+Device µs → host monotonic µs (requires a prior `sync_time`).
+
+#### Vl53l4cd.get_report_payload_crc
+
+```python
+get_report_payload_crc(self) -> depz_sensor_sdk.transport.framing.CrcType
+```
+
+#### Vl53l4cd.set_report_payload_crc
+
+```python
+set_report_payload_crc(self, crc_type: depz_sensor_sdk.transport.framing.CrcType) -> None
+```
+
+Set the device→host payload CRC mode (host→device is per-packet).
+
+#### Vl53l4cd.get_sync_pin
+
+```python
+get_sync_pin(self, pin: int) -> depz_sensor_sdk.protocol.common.SyncPinConfig
+```
+
+#### Vl53l4cd.set_sync_pin
+
+```python
+set_sync_pin(self, config: depz_sensor_sdk.protocol.common.SyncPinConfig) -> None
+```
+
+#### Vl53l4cd.reset
+
+```python
+reset(self) -> None
+```
+
+DEVICE_RESET: device ACKs then reboots; the link will drop.
+
+#### Vl53l4cd.enter_bootloader_mode
+
+```python
+enter_bootloader_mode(self) -> None
+```
+
+Ask the device to reboot into the resident bootloader and close
+this connection. Re-discovery/flash flow lives in the bootloader
+module (contract 06).
+
+### Vl53l4Measurement
+
+```python
+class Vl53l4Measurement(*, timestamp_us: int, range_status: int, distance_mm: int, sigma_mm: int, signal_rate_kcps: int, ambient_rate_kcps: int, signal_per_spad_kcps: int, ambient_per_spad_kcps: int, number_of_spad: int, stream_count: int) -> None
+```
+
+One decoded ranging result (VL53L4CD_ResultsData_t + MCU timestamp).
+
+#### Vl53l4Measurement.valid *(property)*
+
+#### Vl53l4Measurement.status_text *(property)*
+
+### Vl53l4cdError
+
+```python
+class Vl53l4cdError
+```
+
+What the sensor did, not what the caller asked: a boot or data-ready
+timeout, a short result block, an oscillator word of 0, a failed xtalk
+calibration. A refused argument is a ValueError (contract 07 §3).
+
+#### Vl53l4cdError.with_traceback
+
+```python
+with_traceback
+```
+
+Exception.with_traceback(tb) --
+set self.__traceback__ to tb and return self.
+
+#### Vl53l4cdError.add_note
+
+```python
+add_note
+```
+
+Exception.add_note(note) --
+add a note to the exception
+
+### MODEL_ID_VL53L4CD
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### RANGE_STATUS_NAMES
+
+`mappingproxy` constant.
+
+### WINDOW_ABOVE
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### WINDOW_OUT
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### WINDOW_IN
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### I2C_KHZ_BOOT
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### I2C_KHZ_DEFAULT
+
+`int` constant.
+
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating-point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+
+### I2C_KHZ_STEPS
+
+`tuple` constant.
+
+Built-in immutable sequence.
+
+If no argument is given, the constructor returns an empty tuple.
+If iterable is specified the tuple is initialized from iterable's items.
+
+If the argument is a tuple, the return value is the same object.

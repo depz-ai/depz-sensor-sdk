@@ -1,0 +1,273 @@
+# SR04 — API reference
+
+The public API for the SR04 sensor. Transport, framing,
+identity/discovery, firmware-container and dataset symbols shared
+across sensors live in the [top-level API reference](../api.md).
+
+Generated from the `///` doc-comments in the source — edit them,
+not this file.
+
+## Contents
+
+- **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
+
+## SR04
+
+### Sr04Measurement
+
+```rust
+#[non_exhaustive]
+pub struct Sr04Measurement {
+    pub timestamp_us: u64,
+    pub echo_time_us: u16,
+    pub source: &'static str,
+}
+```
+
+One SR04 ranging result. `source` is `"once"` (a host command or a SYNC_IN edge) or `"loop"`;
+[`Sr04Measurement::valid`] is false for the no-echo timeout.
+
+#### Sr04Measurement::valid
+
+```rust
+pub fn valid(&self) -> bool
+```
+
+#### Sr04Measurement::distance_mm
+
+```rust
+pub fn distance_mm(&self) -> Option<f64>
+```
+
+Distance at 343 m/s, or `None` when no echo came back.
+
+#### Sr04Measurement::distance_mm_at
+
+```rust
+pub fn distance_mm_at(&self, air_temp_c: f64) -> Option<f64>
+```
+
+Distance with the speed of sound for `air_temp_c` °C.
+
+### Sr04Device
+
+```rust
+pub struct Sr04Device {
+    dev: DepzDevice,
+    streams: Arc<Streams>,
+}
+```
+
+HC-SR04 ultrasonic ranger (contract 03). Measurements stream through
+[`Sr04Device::measurements`]: loop samples and the single shots an AUX SYNC_IN edge triggers.
+Derefs to [`DepzDevice`] for the common commands.
+
+#### Sr04Device::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Sr04Device
+```
+
+Continue the open connection `dev` as an SR04 (or open one on a link with [`DepzDevice::new`]).
+
+#### Sr04Device::device
+
+```rust
+pub fn device(&self) -> &DepzDevice
+```
+
+The underlying connection.
+
+#### Sr04Device::get_sample_period_us
+
+```rust
+pub fn get_sample_period_us(&self) -> Result<u32>
+```
+
+The stored minimum interval between measurement starts, µs (default 50000) — not the
+effective rate, which the echo window throttles (contract 03 §3).
+
+#### Sr04Device::set_sample_period_us
+
+```rust
+pub fn set_sample_period_us(&self, period_us: u32) -> Result<()>
+```
+
+Set the minimum interval between measurement starts, µs (u32 wire field).
+
+#### Sr04Device::get_echo_decay_us
+
+```rust
+pub fn get_echo_decay_us(&self) -> Result<u16>
+```
+
+The post-echo settle pause, µs (4000–65000).
+
+#### Sr04Device::set_echo_decay_us
+
+```rust
+pub fn set_echo_decay_us(&self, decay_us: u16) -> Result<u16>
+```
+
+Set the settle pause. The device clamps it to 4000–65000 µs silently, so this reads it back and
+returns the value in effect.
+
+#### Sr04Device::measure_once
+
+```rust
+pub fn measure_once(&self, timeout: Option<Duration>) -> Result<Sr04Measurement>
+```
+
+One shot. The reply comes when the echo completes (or times out at ~65.5 ms), hence the 1 s
+default. Busy while the loop runs.
+
+#### Sr04Device::start
+
+```rust
+pub fn start(&self) -> Result<()>
+```
+
+Start the measurement loop (idempotent).
+
+#### Sr04Device::stop
+
+```rust
+pub fn stop(&self) -> Result<()>
+```
+
+Stop the measurement loop (idempotent).
+
+#### Sr04Device::measurements
+
+```rust
+pub fn measurements(&self) -> &Stream<Sr04Measurement>
+```
+
+The measurement stream (contract 07 §3): `measurements().on(cb)` calls back on the reader
+thread (don't block), `measurements().subscribe(capacity)` is a bounded drop-oldest queue
+subscribed at the call, `measurements().next(timeout)` waits for one; `dropped_counts()`
+and `parse_errors()` (RPT_DATA shorter than its 11 bytes) are its counters.
+
+### Sr04Cmd
+
+```rust
+#[non_exhaustive]
+pub enum Sr04Cmd {
+    GetSamplePeriod = 0x32,
+    SetSamplePeriod = 0x33,
+    GetEchoDecay = 0x34,
+    SetEchoDecay = 0x35,
+    MeasureOnce = 0x36,
+    StartMeasurementLoop = 0x37,
+    StopMeasurementLoop = 0x38,
+}
+```
+
+SR04 host→device command opcodes.
+
+### Sr04Rpt
+
+```rust
+#[non_exhaustive]
+pub enum Sr04Rpt {
+    Data = 0x91,
+    SamplePeriod = 0x92,
+    EchoDecay = 0x93,
+}
+```
+
+SR04 device→host report opcodes.
+
+### ECHO_TIMEOUT
+
+```rust
+pub const ECHO_TIMEOUT: u16 = 0xFFFF;
+```
+
+`echo_time_us` sentinel: no echo received.
+
+### SAMPLE_PERIOD_DEFAULT_US
+
+```rust
+pub const SAMPLE_PERIOD_DEFAULT_US: u32 = 50_000;
+```
+
+### ECHO_DECAY_DEFAULT_US
+
+```rust
+pub const ECHO_DECAY_DEFAULT_US: u16 = 5_000;
+```
+
+### ECHO_DECAY_MIN_US
+
+```rust
+pub const ECHO_DECAY_MIN_US: u16 = 4_000;
+```
+
+### ECHO_DECAY_MAX_US
+
+```rust
+pub const ECHO_DECAY_MAX_US: u16 = 65_000;
+```
+
+### Sr04Data
+
+```rust
+#[non_exhaustive]
+pub struct Sr04Data {
+    /// 0x36 single shot (host or SYNC_IN), 0x37 loop sample (ERRATA E3).
+    pub source_cmd: u8,
+    pub timestamp_us: u64,
+    pub echo_time_us: u16,
+}
+```
+
+A decoded `RPT_DATA` sample.
+
+#### Sr04Data::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<Sr04Data, CodecError>
+```
+
+#### Sr04Data::is_timeout
+
+```rust
+pub fn is_timeout(&self) -> bool
+```
+
+`true` when the sample is the timeout sentinel (no echo).
+
+### pack_sample_period
+
+```rust
+pub fn pack_sample_period(period_us: u32) -> [u8; 4]
+```
+
+### unpack_sample_period
+
+```rust
+pub fn unpack_sample_period(payload: &[u8]) -> Result<u32, CodecError>
+```
+
+### pack_echo_decay
+
+```rust
+pub fn pack_echo_decay(decay_us: u16) -> [u8; 2]
+```
+
+### unpack_echo_decay
+
+```rust
+pub fn unpack_echo_decay(payload: &[u8]) -> Result<u16, CodecError>
+```
+
+### distance_mm_from_echo
+
+```rust
+pub fn distance_mm_from_echo(echo_time_us: u16, air_temp_c: Option<f64>) -> Option<f64>
+```
+
+Round-trip echo time → distance in mm; `None` for the timeout sentinel.
+
+Default speed of sound 343 m/s; with `air_temp_c` uses `c = 331.3 + 0.606·T`.

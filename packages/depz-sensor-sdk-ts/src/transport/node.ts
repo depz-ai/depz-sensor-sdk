@@ -1,0 +1,233 @@
+/**
+ * Node.js transport over the optional `serialport` peer dependency.
+ * Import via `@depz/sensor-sdk/node` only — never from the root export, so
+ * browser bundles stay serialport-free.
+ */
+
+import { realpathSync, statSync } from "node:fs";
+
+import {
+  listDepzDevicesFrom,
+  openDeviceFrom,
+  type DeviceInfo,
+  type DepzPortInfo,
+  type ListOptions,
+  type OpenDeviceOptions,
+  type OpenTarget,
+} from "../discovery.js";
+import type { DepzDevice } from "../device/device.js";
+import { DepzError } from "../errors.js";
+import type { SerialTransport, SerialTransportInfo } from "./types.js";
+
+interface SerialPortLike {
+  on(event: "data", cb: (data: Uint8Array) => void): void;
+  on(event: "close" | "error", cb: (err?: unknown) => void): void;
+  off(event: string, cb: (...args: never[]) => void): void;
+  write(data: Uint8Array, cb: (err?: Error | null) => void): void;
+  drain(cb: (err?: Error | null) => void): void;
+  close(cb: (err?: Error | null) => void): void;
+  open(cb: (err?: Error | null) => void): void;
+  readonly isOpen: boolean;
+}
+
+async function loadSerialport(): Promise<{
+  SerialPort: new (opts: { path: string; baudRate: number; autoOpen: boolean }) => SerialPortLike;
+  list: () => Promise<Array<{ path: string; serialNumber?: string; vendorId?: string; productId?: string }>>;
+}> {
+  try {
+    const mod = (await import("serialport")) as unknown as {
+      SerialPort: {
+        new (opts: { path: string; baudRate: number; autoOpen: boolean }): SerialPortLike;
+        list(): Promise<Array<{ path: string; serialNumber?: string; vendorId?: string; productId?: string }>>;
+      };
+    };
+    return { SerialPort: mod.SerialPort, list: async () => mod.SerialPort.list() };
+  } catch (err) {
+    throw new Error(
+      "the optional peer dependency 'serialport' is required for NodeSerialTransport " +
+        "(npm i serialport)",
+      { cause: err },
+    );
+  }
+}
+
+/** Enumerate system serial ports (Node only). On Linux `serialport` lists them
+ * by running `udevadm`; a machine without it (a minimal container) gets a
+ * `DepzError` that says so, in place of `spawn udevadm ENOENT`. */
+export async function listSerialPorts(): Promise<
+  Array<{ path: string; serialNumber?: string; vendorId?: string; productId?: string }>
+> {
+  const { list } = await loadSerialport();
+  try {
+    return await list();
+  } catch (err) {
+    const e = err as { code?: unknown; path?: unknown };
+    if (e.code === "ENOENT" && e.path === "udevadm") {
+      const missing = new DepzError(
+        "cannot list the serial ports: `udevadm` is not on this machine, and the 'serialport' " +
+          "package lists the ports through it on Linux (Debian / Ubuntu: apt-get install udev)",
+      );
+      missing.cause = err;
+      throw missing;
+    }
+    throw err;
+  }
+}
+
+export class NodeSerialTransport implements SerialTransport {
+  readonly info: SerialTransportInfo;
+  private port: SerialPortLike | null = null;
+  private queue: Uint8Array[] = [];
+  private waiter: (() => void) | null = null;
+  private ended = false;
+  private disconnectCbs: Array<() => void> = [];
+
+  constructor(private path: string, serialNumber?: string) {
+    this.info = { path, serialNumber };
+  }
+
+  async open(opts?: { baudRate?: number }): Promise<void> {
+    const { SerialPort } = await loadSerialport();
+    const port = new SerialPort({
+      path: this.path,
+      baudRate: opts?.baudRate ?? 115200,
+      autoOpen: false,
+    });
+    await new Promise<void>((resolve, reject) =>
+      port.open((err) => (err ? reject(err) : resolve())),
+    );
+    port.on("data", (data) => {
+      this.queue.push(new Uint8Array(data));
+      this.waiter?.();
+    });
+    port.on("close", () => this.end());
+    port.on("error", () => this.end());
+    this.port = port;
+  }
+
+  private end(): void {
+    if (this.ended) return;
+    this.ended = true;
+    this.waiter?.();
+    const cbs = this.disconnectCbs;
+    this.disconnectCbs = [];
+    cbs.forEach((cb) => cb());
+  }
+
+  async write(data: Uint8Array): Promise<void> {
+    const port = this.port;
+    if (!port || !port.isOpen) throw new Error("port not open");
+    await new Promise<void>((resolve, reject) =>
+      port.write(data, (err) => (err ? reject(err) : resolve())),
+    );
+  }
+
+  async *readable(): AsyncIterableIterator<Uint8Array> {
+    for (;;) {
+      while (this.queue.length === 0) {
+        if (this.ended) return;
+        await new Promise<void>((resolve) => (this.waiter = resolve));
+        this.waiter = null;
+      }
+      yield this.queue.shift()!;
+    }
+  }
+
+  async close(): Promise<void> {
+    const port = this.port;
+    if (port && port.isOpen) {
+      await new Promise<void>((resolve) => port.close(() => resolve()));
+    }
+    this.end();
+  }
+
+  onDisconnect(cb: () => void): () => void {
+    this.disconnectCbs.push(cb);
+    return () => {
+      this.disconnectCbs = this.disconnectCbs.filter((c) => c !== cb);
+    };
+  }
+}
+
+// ── discovery (Node / serialport — full behavior) ─────────────────────────────
+
+function toPortInfo(p: {
+  path: string;
+  serialNumber?: string;
+  vendorId?: string;
+  productId?: string;
+}): DepzPortInfo {
+  return {
+    path: p.path,
+    serialNumber: p.serialNumber,
+    usbVid: p.vendorId !== undefined ? parseInt(p.vendorId, 16) : undefined,
+    usbPid: p.productId !== undefined ? parseInt(p.productId, 16) : undefined,
+  };
+}
+
+const nodeFactory = (port: DepzPortInfo): SerialTransport =>
+  new NodeSerialTransport(port.path, port.serialNumber);
+
+/**
+ * Enumerate DEPZ devices on the system's serial ports (Node only).
+ *
+ * With `matchUsb` (default) only ports carrying a known DEPZ (vid,pid) are
+ * probed — fast, and it never pokes unrelated ports. Set `matchUsb: false`
+ * for a legacy probe-everything scan.
+ */
+export async function listDepzDevices(opts: ListOptions = {}): Promise<DeviceInfo[]> {
+  const ports = (await listSerialPorts()).map(toPortInfo);
+  return listDepzDevicesFrom(ports, nodeFactory, opts);
+}
+
+/** `a` and `b` name the same port: the same resolved path (`/dev/serial/by-id/…`
+ * is a symlink to the node), or the same character device under two names (a
+ * zero device number is no node). POSIX only: a COM port is not a file, and
+ * resolving one (realpath, stat) opens it — a DTR pulse on every board of the
+ * bench — so on Windows a COM name is matched by string only. */
+function samePort(a: string, b: string): boolean {
+  if (process.platform === "win32") return false;
+  try {
+    if (realpathSync(a) === realpathSync(b)) return true;
+  } catch {
+    // not a path the OS resolves (a COM name, a port that is gone)
+  }
+  try {
+    const sa = statSync(a);
+    const sb = statSync(b);
+    return sa.isCharacterDevice() && sb.isCharacterDevice() && sa.rdev !== 0 && sa.rdev === sb.rdev;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The enumerated ports, plus `path` with the USB identity of the enumerated
+ * port it is an alias of (contract 02 §4.3, ERRATA A5) — so `openDeviceFrom`
+ * resolves the class of `/dev/serial/by-id/…` as it does of `/dev/ttyACM0`.
+ * A path listed verbatim, or an alias of nothing listed, leaves `ports` as is;
+ * on Windows a COM name is matched by string only.
+ */
+export function withAlias(ports: DepzPortInfo[], path: string): DepzPortInfo[] {
+  if (ports.some((p) => p.path === path)) return ports;
+  const port = ports.find((p) => samePort(path, p.path));
+  return port === undefined ? ports : [...ports, { ...port, path }];
+}
+
+/**
+ * Open the right sensor class for `target` over `serialport` (Node only).
+ *
+ * `target` is a port path (string, under any alias of the enumerated port:
+ * `/dev/serial/by-id/…`), a candidate index (number, sorted by USB iSerial),
+ * a `DeviceInfo` from `listDepzDevices()`, or omitted for the lowest-serial
+ * candidate. Throws `NoDepzDeviceError` when nothing matches — it never
+ * grabs an arbitrary system port. See {@link openDeviceFrom}.
+ */
+export async function openDevice(
+  target?: OpenTarget,
+  opts: OpenDeviceOptions = {},
+): Promise<DepzDevice> {
+  let ports = (await listSerialPorts()).map(toPortInfo);
+  if (typeof target === "string") ports = withAlias(ports, target);
+  return openDeviceFrom(ports, nodeFactory, target, opts);
+}

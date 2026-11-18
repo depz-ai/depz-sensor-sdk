@@ -1,0 +1,993 @@
+<!-- generated from ../bno086/ — edit those pages -->
+# BNO085 (IMU) — API reference
+
+The public API for the BNO085 (IMU) sensor: its codecs and its live class. Transport,
+common-protocol, identity and other cross-sensor symbols shared by
+every sensor live in the [top-level API reference](../api.md).
+
+The live class (`depz::Bno086`) derives from `depz::Device`; the
+device core it inherits (common commands, time sync, events),
+the links, streams, errors and discovery are in the
+[top-level API reference](../api.md#live-hardware-links-device-discovery).
+
+The value types next to it (`SensorId`, `Feature`, `ProductId`,
+...) live in `namespace depz::bno086`; one class serves the
+BNO085 and the BNO086.
+
+Generated from the header doc-comments — edit the doc-comments in
+the headers, not this file.
+
+## Contents
+
+- **BNO085 codecs (depz/bno086.hpp)**: [`SHTP_HEADER_SIZE`](#shtp_header_size), [`LENGTH_MASK`](#length_mask), [`CONTINUATION_BIT`](#continuation_bit), [`NUM_CHANNELS`](#num_channels), [`MAX_TX_FRAME`](#max_tx_frame), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`shtp_build_frame`](#shtp_build_frame), [`shtp_fragment_cargo`](#shtp_fragment_cargo), [`ShtpLayer`](#shtplayer), [`sh2_build_set_feature`](#sh2_build_set_feature), [`sh2_build_get_feature_request`](#sh2_build_get_feature_request), [`sh2_build_product_id_request`](#sh2_build_product_id_request), [`sh2_build_command_request`](#sh2_build_command_request), [`sh2_build_frs_read_request`](#sh2_build_frs_read_request), [`sh2_build_frs_write_request`](#sh2_build_frs_write_request), [`sh2_build_frs_write_data`](#sh2_build_frs_write_data), [`MotionIntent`](#motionintent), [`CMD_INTERACTIVE_CALIBRATION`](#cmd_interactive_calibration), [`sh2_build_interactive_calibration`](#sh2_build_interactive_calibration), [`FORCE_SENSOR_FLUSH`](#force_sensor_flush), [`sh2_build_force_flush`](#sh2_build_force_flush), [`SH2_COMMAND_RESPONSE`](#sh2_command_response), [`SH2_FRS_READ_RESPONSE`](#sh2_frs_read_response), [`SH2_FRS_WRITE_RESPONSE`](#sh2_frs_write_response), [`SH2_PRODUCT_ID_RESPONSE`](#sh2_product_id_response), [`SH2_GET_FEATURE_RESPONSE`](#sh2_get_feature_response), [`Feature`](#feature), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`BASE_TIMESTAMP_REF`](#base_timestamp_ref), [`TIMESTAMP_REBASE`](#timestamp_rebase), [`FLUSH_COMPLETED`](#flush_completed), [`RV_ACCURACY_Q`](#rv_accuracy_q), [`GYRO_RV_ANGVEL_Q`](#gyro_rv_angvel_q), [`ReportType`](#reporttype), [`Report`](#report), [`parse_input_cargo`](#parse_input_cargo), [`parse_gyro_rv_cargo`](#parse_gyro_rv_cargo)
+- **BNO085 / BNO086 live class (depz/device.hpp)**: [`SensorId`](#sensorid), [`TareBasis`](#tarebasis), [`TARE_X`](#tare_x), [`FeatureRequest`](#featurerequest), [`CalibrationConfig`](#calibrationconfig), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`SensorMetadata`](#sensormetadata), [`q_point`](#q_point), [`Bno086Report`](#bno086report), [`Bno086`](#bno086), [`open_bno086`](#open_bno086)
+
+## BNO085 codecs (depz/bno086.hpp)
+
+### SHTP_HEADER_SIZE
+
+```cpp
+inline constexpr std::size_t SHTP_HEADER_SIZE = DEPZ_SHTP_HEADER_SIZE;
+```
+
+### LENGTH_MASK
+
+```cpp
+inline constexpr std::uint16_t LENGTH_MASK = DEPZ_SHTP_LENGTH_MASK;
+```
+
+### CONTINUATION_BIT
+
+```cpp
+inline constexpr std::uint16_t CONTINUATION_BIT = DEPZ_SHTP_CONTINUATION;
+```
+
+### NUM_CHANNELS
+
+```cpp
+inline constexpr int NUM_CHANNELS = DEPZ_SHTP_NUM_CHANNELS;
+```
+
+### MAX_TX_FRAME
+
+```cpp
+inline constexpr std::size_t MAX_TX_FRAME = DEPZ_SHTP_MAX_TX_FRAME;
+```
+
+ERRATA E2 MCU slot
+
+### ShtpChannel
+
+```cpp
+enum class ShtpChannel : std::uint8_t {
+    Command = 0,
+    Executable = 1,
+    Control = 2,
+    InputNormal = 3,
+    InputWake = 4,
+    GyroRv = 5,
+};
+```
+
+### ExecutableCommand
+
+```cpp
+enum class ExecutableCommand : std::uint8_t {
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+};
+```
+
+One-byte host writes on the executable channel (contract 05 §6a); the hub
+answers none of them. Reset restarts the hub (the 0x01 reset-complete
+follows on the same channel); Sleep stops every report except those enabled
+with FEATURE_WAKEUP | FEATURE_ALWAYS_ON, keeping the configuration; On ends
+Sleep and every report resumes at its rate. Bno086::sleep() / power_on().
+
+### ShtpHeader
+
+```cpp
+struct ShtpHeader {
+    std::uint16_t length = 0;  // bits 14:0 — cargo length incl. this 4-byte header
+    std::uint8_t channel = 0;
+    std::uint8_t seq = 0;
+    bool continuation = false;
+};
+```
+
+#### ShtpHeader.pack
+
+```cpp
+bytes pack() const;
+```
+
+std::invalid_argument when length > 0x7FFF (never masked, contract 07 §3).
+
+#### ShtpHeader.unpack
+
+```cpp
+static ShtpHeader unpack(byte_span data);
+```
+
+### ShtpCargo
+
+```cpp
+struct ShtpCargo {
+    int channel = 0;
+    int seq = 0;  // seq of the first fragment
+    bytes payload;
+    std::uint64_t capture_us = 0;  // capture time of the first fragment (contract 05 §3)
+};
+```
+
+One reassembled cargo: `payload` excludes all SHTP headers.
+
+### shtp_build_frame
+
+```cpp
+bytes shtp_build_frame(int channel, byte_span payload, std::uint8_t seq);
+```
+
+Single-fragment frame: length = header + payload. std::out_of_range for a
+channel outside a byte, std::invalid_argument for a length over 15 bits.
+
+### shtp_fragment_cargo
+
+```cpp
+std::vector<bytes> shtp_fragment_cargo(int channel, byte_span payload, std::uint8_t seq_start, std::size_t max_frame = MAX_TX_FRAME);
+```
+
+Split a cargo into wire frames of at most `max_frame` bytes (ShtpHeader::pack
+per frame). The first fragment advertises the TOTAL cargo length;
+continuations carry the remaining length with the continuation bit set; seq
+increments per frame. std::invalid_argument when max_frame does not exceed
+the 4-byte header or the cargo length is over 15 bits, std::out_of_range for
+a channel outside a byte.
+
+### ShtpLayer
+
+```cpp
+class ShtpLayer {
+    // (no public data members)
+};
+```
+
+Per-channel TX sequence counters + RX cargo reassembly (§3): depz_shtp_layer.
+
+#### ShtpLayer.ShtpLayer
+
+```cpp
+ShtpLayer();
+```
+
+#### ShtpLayer.next_frame
+
+```cpp
+bytes next_frame(int channel, byte_span payload);
+```
+
+Build a single-fragment frame, consuming the channel's TX seq.
+std::out_of_range for a channel outside 0..5, std::invalid_argument for
+a payload past the 64-byte MCU slot.
+
+#### ShtpLayer.tx_seq
+
+```cpp
+int tx_seq(int channel) const;
+```
+
+std::out_of_range for a channel outside 0..5.
+
+#### ShtpLayer.feed
+
+```cpp
+std::optional<ShtpCargo> feed(byte_span frame, std::uint64_t capture_us = 0);
+```
+
+Consume one inbound frame; return the cargo when complete, else nullopt.
+`capture_us` is the frame's RPT_DATA capture time; the cargo carries the
+FIRST fragment's — the base its 0xFB timestamps refer to (§3, §5).
+std::bad_alloc when a cargo buffer cannot grow.
+
+#### ShtpLayer.reset
+
+```cpp
+void reset();
+```
+
+Forget all TX seq counters and partial cargos (sensor reset).
+
+#### ShtpLayer.discarded
+
+```cpp
+std::uint64_t discarded() const noexcept;
+```
+
+Incomplete / orphan cargos and junk-channel (>= 6) frames thrown away.
+
+### sh2_build_set_feature
+
+```cpp
+bytes sh2_build_set_feature(std::uint8_t sensor_id, std::uint32_t interval_us, std::uint32_t batch_us = 0, std::uint16_t sensitivity = 0, std::uint8_t flags = 0, std::uint32_t cfg_word = 0);
+```
+
+Set Feature Command (0xFD), 17 bytes. interval_us = 0 disables the sensor.
+
+### sh2_build_get_feature_request
+
+```cpp
+bytes sh2_build_get_feature_request(std::uint8_t sensor_id);
+```
+
+Get Feature Request (0xFE), 2 bytes.
+
+### sh2_build_product_id_request
+
+```cpp
+bytes sh2_build_product_id_request();
+```
+
+Product ID Request (0xF9), 2 bytes.
+
+### sh2_build_command_request
+
+```cpp
+bytes sh2_build_command_request(std::uint8_t seq, std::uint8_t command, byte_span params = {});
+```
+
+Command Request (0xF2), 12 bytes: id, seq, command, P0..P8 (params, <=9 bytes).
+
+### sh2_build_frs_read_request
+
+```cpp
+bytes sh2_build_frs_read_request(std::uint16_t frs_type, std::uint16_t offset_words = 0, std::uint16_t block_words = 0);
+```
+
+FRS Read Request (0xF4), 8 bytes. block_words = 0 reads the record.
+
+### sh2_build_frs_write_request
+
+```cpp
+bytes sh2_build_frs_write_request(std::uint16_t frs_type, std::uint16_t length_words);
+```
+
+FRS Write Request (0xF7), 6 bytes. length_words = 0 erases the record.
+
+### sh2_build_frs_write_data
+
+```cpp
+bytes sh2_build_frs_write_data(std::uint16_t offset_words, const std::vector<std::uint32_t>& words);
+```
+
+FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
+
+### MotionIntent
+
+```cpp
+enum class MotionIntent : std::uint8_t {
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+};
+```
+
+P0 of the Interactive Calibration command (0x0E, SH-2 §6.4.12.1): what the
+host knows about the device's motion. Unknown is the hub's initial state.
+
+### CMD_INTERACTIVE_CALIBRATION
+
+```cpp
+inline constexpr std::uint8_t CMD_INTERACTIVE_CALIBRATION = 0x0E;
+```
+
+BNO085 only; no response
+
+### sh2_build_interactive_calibration
+
+```cpp
+bytes sh2_build_interactive_calibration(std::uint8_t seq, MotionIntent intent);
+```
+
+Interactive Calibration: a Command Request (0xF2) with command 0x0E and
+P0 = intent, 12 bytes. BNO086 only, no response; a BNO085 ignores it.
+
+### FORCE_SENSOR_FLUSH
+
+```cpp
+inline constexpr std::uint8_t FORCE_SENSOR_FLUSH = 0xF0;
+```
+
+Force Sensor Flush (0xF0) + sensor id, 2 bytes (SH-2 §6.5.6): the hub sends
+the sensor's batched reports now and answers with the header-less Flush
+Completed (FLUSH_COMPLETED) on the input channel.
+
+### sh2_build_force_flush
+
+```cpp
+bytes sh2_build_force_flush(std::uint8_t sensor_id);
+```
+
+### SH2_COMMAND_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_COMMAND_RESPONSE = DEPZ_SH2_COMMAND_RESPONSE;
+```
+
+### SH2_FRS_READ_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_READ_RESPONSE = DEPZ_SH2_FRS_READ_RESPONSE;
+```
+
+### SH2_FRS_WRITE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_FRS_WRITE_RESPONSE = DEPZ_SH2_FRS_WRITE_RESPONSE;
+```
+
+### SH2_PRODUCT_ID_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_PRODUCT_ID_RESPONSE = DEPZ_SH2_PRODUCT_ID_RESPONSE;
+```
+
+### SH2_GET_FEATURE_RESPONSE
+
+```cpp
+inline constexpr std::uint8_t SH2_GET_FEATURE_RESPONSE = DEPZ_SH2_GET_FEATURE_RESPONSE;
+```
+
+### Feature
+
+```cpp
+struct Feature : depz_bno_feature {
+    // (no public data members)
+};
+```
+
+Get Feature Response: the rates in effect (the C SDK's depz_bno_feature:
+sensor_id, flags, sensitivity, interval_us — granted interval, 0 = disabled
+—, batch_us, cfg_word).
+
+#### Feature.unpack
+
+```cpp
+static std::optional<Feature> unpack(byte_span payload);
+```
+
+### ProductId
+
+```cpp
+struct ProductId : depz_bno_product_id {
+    // (no public data members)
+};
+```
+
+Product ID Response (the C SDK's depz_bno_product_id: reset_cause,
+sw_version_major, sw_version_minor, sw_part_number — 10004148 = BNO085,
+10004563 = BNO085 —, sw_build_number, sw_version_patch).
+
+#### ProductId.unpack
+
+```cpp
+static std::optional<ProductId> unpack(byte_span payload);
+```
+
+### CommandResponse
+
+```cpp
+struct CommandResponse : depz_bno_command_response {
+    // (no public data members)
+};
+```
+
+Command Response (the C SDK's depz_bno_command_response: seq, command,
+command_seq, response_seq, r[11] — r[0] the status for most commands).
+
+#### CommandResponse.unpack
+
+```cpp
+static std::optional<CommandResponse> unpack(byte_span payload);
+```
+
+### FrsReadResponse
+
+```cpp
+struct FrsReadResponse : depz_bno_frs_read_response {
+    // (no public data members)
+};
+```
+
+FRS Read Response (the C SDK's depz_bno_frs_read_response): `status` the low
+nibble of byte 1, `data_length` (0..2 words valid) its high nibble,
+offset_words, data0, data1, frs_type.
+
+#### FrsReadResponse.unpack
+
+```cpp
+static std::optional<FrsReadResponse> unpack(byte_span payload);
+```
+
+### FrsWriteResponse
+
+```cpp
+struct FrsWriteResponse : depz_bno_frs_write_response {
+    // (no public data members)
+};
+```
+
+FRS Write Response (the C SDK's depz_bno_frs_write_response: status,
+offset_words).
+
+#### FrsWriteResponse.unpack
+
+```cpp
+static std::optional<FrsWriteResponse> unpack(byte_span payload);
+```
+
+### BASE_TIMESTAMP_REF
+
+```cpp
+inline constexpr std::uint8_t BASE_TIMESTAMP_REF = DEPZ_BNO_BASE_TIMESTAMP_REF;
+```
+
+In-cargo control IDs on the input channels.
+
+### TIMESTAMP_REBASE
+
+```cpp
+inline constexpr std::uint8_t TIMESTAMP_REBASE = DEPZ_BNO_TIMESTAMP_REBASE;
+```
+
+### FLUSH_COMPLETED
+
+```cpp
+inline constexpr std::uint8_t FLUSH_COMPLETED = DEPZ_BNO_FLUSH_COMPLETED;
+```
+
++ u8 sensor id, no SH-2 header: the answer to Force Sensor Flush (0xF0).
+
+### RV_ACCURACY_Q
+
+```cpp
+inline constexpr int RV_ACCURACY_Q = DEPZ_BNO_RV_ACCURACY_Q;
+```
+
+### GYRO_RV_ANGVEL_Q
+
+```cpp
+inline constexpr int GYRO_RV_ANGVEL_Q = DEPZ_BNO_GYRO_RV_ANGVEL_Q;
+```
+
+### ReportType
+
+```cpp
+enum class ReportType {
+    Acceleration,
+    Gyroscope,
+    Magnetometer,
+    UncalibratedGyroscope,
+    UncalibratedMagnetometer,
+    RotationVector,
+    ScalarReport,
+    TapDetector,
+    StepCounter,
+    StepDetector,
+    SignificantMotion,
+    StabilityClassifier,
+    ShakeDetector,
+    GenericEvent,
+    PersonalActivityClassifier,
+    RawSensor,
+    GyroIntegratedRV,
+    UnknownReport,
+    MotionRequest,   // 0x2B, BNO086 interactive calibration: intent, request
+    FlushCompleted,  // 0xEF: flushed_sensor; no seq / accuracy / delay
+};
+```
+
+### Report
+
+```cpp
+struct Report {
+    ReportType type = ReportType::UnknownReport;
+    int sensor_id = 0;
+    std::int64_t timestamp_us = 0;
+    int seq = 0;
+    int accuracy = 0;
+    std::int64_t delay_us = 0;
+    std::int64_t x_raw = 0, y_raw = 0, z_raw = 0;
+    std::int64_t bias_x_raw = 0, bias_y_raw = 0, bias_z_raw = 0;
+    std::int64_t i_raw = 0, j_raw = 0, k_raw = 0, real_raw = 0;
+    bool has_accuracy_raw = false;
+    std::int64_t accuracy_raw = 0;
+    std::int64_t value_raw = 0;
+    int flags = 0;
+    std::int64_t latency_us = 0;
+    int steps = 0;
+    int motion = 0;
+    int classification = 0;
+    int page_number = 0;
+    bool end_of_sequence = false;
+    int most_likely_state = 0;
+    std::vector<int> confidences;
+    int intent = 0;
+    int request = 0;
+    int flushed_sensor = 0;
+    std::int64_t sensor_timestamp_us = 0;
+    std::int64_t temperature_raw = 0;
+    std::int64_t vx_raw = 0, vy_raw = 0, vz_raw = 0;
+    bytes data;
+};
+```
+
+Flat tagged report. Only the fields relevant to `type` are populated; the
+rest keep their zero defaults. Raw integers are authoritative.
+
+### parse_input_cargo
+
+```cpp
+std::vector<Report> parse_input_cargo(byte_span payload, std::int64_t capture_timestamp_us);
+```
+
+Parse a channel-3/4 cargo into typed reports. Handles 0xFB base timestamp
+references and 0xFA rebases; every report's timestamp is base + delay where
+base = capture − base_delta·100 µs. A bare 0xEF Flush Completed (2 bytes, no
+SH-2 header) is stamped with the current base. A negative capture_timestamp_us (the MCU
+uptime) is std::invalid_argument.
+
+### parse_gyro_rv_cargo
+
+```cpp
+std::optional<Report> parse_gyro_rv_cargo(byte_span payload, std::int64_t capture_timestamp_us);
+```
+
+Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes: 7×i16
+bare, or prefixed with 0xFB + i32 base delta + u16 delay (100 µs ticks). A
+negative capture_timestamp_us is std::invalid_argument.
+
+## BNO085 / BNO086 live class (depz/device.hpp)
+
+### SensorId
+
+```cpp
+enum class SensorId : std::uint8_t {
+    Accelerometer = 0x01, Gyroscope = 0x02, Magnetometer = 0x03, LinearAcceleration = 0x04,
+    RotationVector = 0x05, Gravity = 0x06, UncalibratedGyroscope = 0x07, GameRotationVector = 0x08,
+    GeomagneticRotationVector = 0x09, UncalibratedMagnetometer = 0x0F, TapDetector = 0x10,
+    StepCounter = 0x11, SignificantMotion = 0x12, StabilityClassifier = 0x13, RawAccelerometer = 0x14,
+    RawGyroscope = 0x15, RawMagnetometer = 0x16, StepDetector = 0x18, ShakeDetector = 0x19,
+    FlipDetector = 0x1A, PickupDetector = 0x1B, StabilityDetector = 0x1C,
+    PersonalActivityClassifier = 0x1E, SleepDetector = 0x1F, TiltDetector = 0x20, PocketDetector = 0x21,
+    CircleDetector = 0x22, HeartRateMonitor = 0x23, ArvrStabilizedRv = 0x28,
+    ArvrStabilizedGameRv = 0x29, GyroIntegratedRv = 0x2A,
+    MotionRequest = 0x2B,  // interactive calibration, BNO086 only
+};
+```
+
+SH-2 sensor ids — also a report's `sensor_id`.
+
+### TareBasis
+
+```cpp
+enum class TareBasis : std::uint8_t {
+    RotationVector = 0, GameRotationVector = 1, GeomagneticRotationVector = 2,
+    GyroIntegratedRv = 3, ArvrStabilizedRv = 4, ArvrStabilizedGameRv = 5,
+};
+```
+
+### TARE_X
+
+```cpp
+inline constexpr std::uint8_t TARE_X = 1, TARE_Y = 2, TARE_Z = 4, TARE_ALL = 7;
+```
+
+### FeatureRequest
+
+```cpp
+struct FeatureRequest {
+    std::uint32_t interval_us = 0;
+    std::uint32_t batch_us = 0;
+    std::uint16_t sensitivity = 0;
+    std::uint8_t flags = 0;
+    std::uint32_t cfg_word = 0;
+};
+```
+
+Everything Set Feature carries.
+
+### CalibrationConfig
+
+```cpp
+struct CalibrationConfig {
+    bool accel = false, gyro = false, mag = false, planar = false;
+};
+```
+
+### ErrorRecord
+
+```cpp
+struct ErrorRecord {
+    std::uint8_t severity, seq, source, error, module, code;
+};
+```
+
+### Counts
+
+```cpp
+struct Counts {
+    std::uint8_t sensor_id;
+    std::uint32_t offered, accepted, on, attempted;
+};
+```
+
+### SensorMetadata
+
+```cpp
+struct SensorMetadata {
+    std::uint8_t me_version = 0, mh_version = 0, sh_version = 0;
+    std::uint32_t range_raw = 0, resolution_raw = 0;
+    std::uint16_t revision = 0;
+    std::uint16_t power_ma_q10 = 0;  // mA, Q10
+    std::uint32_t min_period_us = 0, max_period_us = 0;
+    std::uint16_t fifo_max = 0, fifo_reserved = 0, batch_buffer_bytes = 0;
+    std::uint16_t q_point_1 = 0, q_point_2 = 0, q_point_3 = 0;
+    std::vector<std::uint32_t> raw_words;  // the FRS record as read; authoritative
+};
+```
+
+A sensor's metadata FRS record; revision-gated fields are 0 when older.
+
+#### SensorMetadata.power_ma
+
+```cpp
+double power_ma() const;
+```
+
+### q_point
+
+```cpp
+std::optional<int> q_point(std::uint8_t sensor_id);
+```
+
+Q point of a sensor's primary fields; nullopt for event reports.
+
+### Bno086Report
+
+```cpp
+struct Bno086Report : bno086::Report {
+    // (no public data members)
+};
+```
+
+A decoded report (codec fields, raw integers authoritative) plus scaling.
+
+#### Bno086Report.xyz
+
+```cpp
+std::array<double, 3> xyz() const;
+```
+
+x, y, z in m/s², rad/s or µT (raw counts for the raw sensors).
+
+#### Bno086Report.bias
+
+```cpp
+std::array<double, 3> bias() const;
+```
+
+uncalibrated gyro / mag
+
+#### Bno086Report.quaternion
+
+```cpp
+std::array<double, 4> quaternion() const;
+```
+
+i, j, k, real
+
+#### Bno086Report.accuracy_rad
+
+```cpp
+std::optional<double> accuracy_rad() const;
+```
+
+nullopt for game variants
+
+#### Bno086Report.angular_velocity
+
+```cpp
+std::array<double, 3> angular_velocity() const;
+```
+
+gyro-integrated RV, rad/s
+
+#### Bno086Report.scalar
+
+```cpp
+double scalar() const;
+```
+
+environment reports
+
+### Bno086
+
+```cpp
+class Bno086 : public Device {
+    // (no public data members)
+};
+```
+
+#### Bno086.open
+
+```cpp
+static std::unique_ptr<Bno086> open(Link link);
+```
+
+A BNO085 / BNO086 on a link without an identity probe (tests, replay).
+
+#### Bno086.hardware_reset
+
+```cpp
+void hardware_reset(std::chrono::milliseconds timeout = std::chrono::milliseconds(2000));
+```
+
+nRST: SHTP state, the advertisement and every enabled sensor restart.
+
+#### Bno086.wake
+
+```cpp
+void wake();
+```
+
+WAKE (PS0) pulse: the board's hardware pin pulse (bridge 0x33), not an
+SH-2 command — the SH-2 "On" that ends sleep() is power_on().
+
+#### Bno086.sleep
+
+```cpp
+void sleep();
+```
+
+SH-2 "Sleep" (0x03 on SHTP channel 1, contract 05 §6a): every report
+stops except those enabled with FEATURE_WAKEUP | FEATURE_ALWAYS_ON,
+which keep their rate; the configuration is kept. No SH-2 answer. On a
+DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) all reports stopped within one
+sample; a WAKEUP|ALWAYS_ON report kept streaming at full rate on channel 4.
+
+#### Bno086.power_on
+
+```cpp
+void power_on();
+```
+
+SH-2 "On" (0x02 on SHTP channel 1): ends sleep() — every report that was
+enabled comes back at its rate without re-enabling. No SH-2 answer.
+
+#### Bno086.advertisement
+
+```cpp
+bytes advertisement();
+```
+
+#### Bno086.product_id
+
+```cpp
+bno086::ProductId product_id();
+```
+
+The SH-2 application's Product ID — the first of product_ids().
+
+#### Bno086.product_ids
+
+```cpp
+std::vector<bno086::ProductId> product_ids();
+```
+
+Every software component's answer, in the sensor's order (the SH-2
+application first; a BNO085 sends four). Waits until no answer came for
+150 ms, so the late ones can't answer the next request.
+
+#### Bno086.enable
+
+```cpp
+bno086::Feature enable(bno086::SensorId sensor, double hz);
+```
+
+Set Feature, then the granted rate read back (Get Feature).
+
+#### Bno086.enable
+
+```cpp
+std::optional<bno086::Feature> enable(bno086::SensorId sensor, const bno086::FeatureRequest& req, bool verify = true);
+```
+
+No read-back when `verify` is false (then the result is nullopt).
+
+#### Bno086.rate_ok
+
+```cpp
+static bool rate_ok(std::uint32_t requested_interval_us, const bno086::Feature& granted);
+```
+
+Within [0.9, 2.1] x the requested rate (contract 05 §7)?
+
+#### Bno086.disable
+
+```cpp
+void disable(bno086::SensorId sensor);
+```
+
+#### Bno086.feature
+
+```cpp
+bno086::Feature feature(bno086::SensorId sensor);
+```
+
+#### Bno086.reports
+
+```cpp
+Stream<Bno086Report>& reports();
+```
+
+Every decoded input report (RPT_DATA); subscriptions default to 1024
+items. A `where` on on() is the sensor filter:
+`reports().on(cb, [](const Bno086Report& r) { return r.sensor_id == 0x05; })`.
+
+#### Bno086.shtp_discarded
+
+```cpp
+std::uint64_t shtp_discarded() const;
+```
+
+#### Bno086.tare_now
+
+```cpp
+void tare_now(std::uint8_t axes = bno086::TARE_ALL, bno086::TareBasis basis = bno086::TareBasis::RotationVector);
+```
+
+#### Bno086.persist_tare
+
+```cpp
+void persist_tare();
+```
+
+#### Bno086.set_reorientation
+
+```cpp
+void set_reorientation(double x, double y, double z, double w);
+```
+
+zeros clear
+
+#### Bno086.set_calibration
+
+```cpp
+void set_calibration(bool accel = true, bool gyro = true, bool mag = true, bool planar = false);
+```
+
+#### Bno086.calibration
+
+```cpp
+bno086::CalibrationConfig calibration();
+```
+
+#### Bno086.save_dcd
+
+```cpp
+void save_dcd();
+```
+
+#### Bno086.configure_periodic_dcd
+
+```cpp
+void configure_periodic_dcd(bool enable);
+```
+
+#### Bno086.set_motion_intent
+
+```cpp
+void set_motion_intent(bno086::MotionIntent intent);
+```
+
+Interactive calibration (BNO086 only; a BNO085 ignores it): tell the hub
+how the device is about to move (command 0x0E), so it can refine the gyro
+zero-rate offset while the device is still. No SH-2 answer. The hub's own
+request — hold still, or go on — arrives as a MotionRequest report once
+SensorId::MotionRequest is enabled.
+
+#### Bno086.enable_motion_request
+
+```cpp
+void enable_motion_request(double hz = 1);
+```
+
+Enable MotionRequest (0x2B) reports. The hub sends one when its request
+changes, not at `hz`, and reads the rate back late: no read-back.
+
+#### Bno086.flush
+
+```cpp
+void flush(bno086::SensorId sensor);
+```
+
+Batching: Force Sensor Flush (0xF0) — the hub sends `sensor`'s batched
+reports now instead of when its batch interval runs out. Returns once the
+hub's Flush Completed (0xEF, ReportType::FlushCompleted) for `sensor`
+arrived — every report batched before the call has been emitted by then;
+TimeoutError after the device timeout (at least 1 s).
+
+#### Bno086.frs_read
+
+```cpp
+std::vector<std::uint32_t> frs_read(std::uint16_t record);
+```
+
+#### Bno086.frs_write
+
+```cpp
+void frs_write(std::uint16_t record, const std::vector<std::uint32_t>& words);
+```
+
+#### Bno086.metadata
+
+```cpp
+bno086::SensorMetadata metadata(bno086::SensorId sensor);
+```
+
+#### Bno086.oscillator_type
+
+```cpp
+std::uint8_t oscillator_type();
+```
+
+0 internal, 1 crystal, 2 external clock
+
+#### Bno086.clear_dcd_and_reset
+
+```cpp
+void clear_dcd_and_reset(std::chrono::milliseconds timeout = std::chrono::milliseconds(2000));
+```
+
+#### Bno086.errors
+
+```cpp
+std::vector<bno086::ErrorRecord> errors(std::uint8_t severity = 0);
+```
+
+#### Bno086.counts
+
+```cpp
+bno086::Counts counts(bno086::SensorId sensor);
+```
+
+#### Bno086.clear_counts
+
+```cpp
+void clear_counts(bno086::SensorId sensor);
+```
+
+#### Bno086.command
+
+```cpp
+std::optional<bno086::CommandResponse> command(std::uint8_t command, byte_span params = {}, bool wait_response = true);
+```
+
+Escape hatches: a Command Request (nullopt: no answer awaited), a raw cargo.
+
+#### Bno086.send_shtp
+
+```cpp
+void send_shtp(std::uint8_t channel, byte_span payload);
+```
+
+### open_bno086
+
+```cpp
+std::unique_ptr<Bno086> open_bno086(const OpenOptions& opt = {});
+```
+
+open_device, and WrongTypeError unless it is a BNO085 / BNO086.

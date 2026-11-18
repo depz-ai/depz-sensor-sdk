@@ -1,0 +1,77 @@
+"""SR04 wire codecs (contracts/03_SENSOR_SR04.md)."""
+
+from __future__ import annotations
+
+import struct
+from dataclasses import dataclass
+from enum import IntEnum
+
+from ._wire import check_uint, need_bytes
+
+
+class Sr04Cmd(IntEnum):
+    GET_SAMPLE_PERIOD = 0x32
+    SET_SAMPLE_PERIOD = 0x33
+    GET_ECHO_DECAY = 0x34
+    SET_ECHO_DECAY = 0x35
+    MEASURE_ONCE = 0x36
+    START_MEASUREMENT_LOOP = 0x37
+    STOP_MEASUREMENT_LOOP = 0x38
+
+
+class Sr04Rpt(IntEnum):
+    DATA = 0x91
+    SAMPLE_PERIOD = 0x92
+    ECHO_DECAY = 0x93
+
+
+ECHO_TIMEOUT = 0xFFFF  # echo_time_us sentinel: no echo received
+
+SAMPLE_PERIOD_DEFAULT_US = 50_000
+ECHO_DECAY_DEFAULT_US = 5_000
+#: Window the *device* silently clamps SET_ECHO_DECAY into (contract 03 §3).
+ECHO_DECAY_MIN_US = 4_000
+ECHO_DECAY_MAX_US = 65_000
+
+
+@dataclass(frozen=True, kw_only=True)
+class Sr04Data:
+    source_cmd: int  # 0x36 single shot (host or SYNC_IN), 0x37 loop sample
+    timestamp_us: int
+    echo_time_us: int
+
+    @classmethod
+    def unpack(cls, payload: bytes) -> "Sr04Data":
+        need_bytes("RPT_SR04_DATA", payload, 11)
+        cmd, ts, echo = struct.unpack_from("<BQH", payload)
+        return cls(source_cmd=cmd, timestamp_us=ts, echo_time_us=echo)
+
+
+def pack_sample_period(period_us: int) -> bytes:
+    return struct.pack("<I", check_uint("period_us", period_us, 32))
+
+
+def unpack_sample_period(payload: bytes) -> int:
+    need_bytes("RPT_SAMPLE_PERIOD", payload, 4)
+    return int(struct.unpack_from("<I", payload)[0])
+
+
+def pack_echo_decay(decay_us: int) -> bytes:
+    return struct.pack("<H", check_uint("decay_us", decay_us, 16))
+
+
+def unpack_echo_decay(payload: bytes) -> int:
+    need_bytes("RPT_ECHO_DECAY", payload, 2)
+    return int(struct.unpack_from("<H", payload)[0])
+
+
+def distance_mm_from_echo(echo_time_us: int, air_temp_c: float | None = None) -> float | None:
+    """Round-trip echo time → distance in mm; None for the timeout sentinel.
+
+    Default speed of sound 343 m/s; with `air_temp_c` uses
+    c = 331.3 + 0.606·T (m/s).
+    """
+    if echo_time_us == ECHO_TIMEOUT:
+        return None
+    c_m_s = 343.0 if air_temp_c is None else 331.3 + 0.606 * air_temp_c
+    return echo_time_us * c_m_s / 2000.0

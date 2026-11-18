@@ -1,0 +1,1513 @@
+# BNO055 (IMU) — API reference
+
+The public API for the BNO055 (IMU) sensor. The shared foundation —
+transport framing, common protocol codecs, firmware image parse,
+dataset reader and USB identity — lives in the
+[top-level API reference](../api.md).
+
+Auto-generated from the source — edit the `///` summaries
+in the source, not this file.
+
+## Contents
+
+- **BNO055 (IMU)**: [`Bno055Cmd`](#bno055cmd), [`Bno055Rpt`](#bno055rpt), [`Bno055Trigger`](#bno055trigger), [`Bno055Wire`](#bno055wire), [`Bno055RegData`](#bno055regdata), [`Bno055StreamData`](#bno055streamdata), [`Bno055Info`](#bno055info), [`Bno055OprMode`](#bno055oprmode), [`Bno055PwrMode`](#bno055pwrmode), [`Bno055TempSource`](#bno055tempsource), [`Bno055Vec3`](#bno055vec3), [`Bno055Euler`](#bno055euler), [`Bno055Quat`](#bno055quat), [`Bno055Units`](#bno055units), [`Bno055CalibStatus`](#bno055calibstatus), [`Bno055CalibrationProfile`](#bno055calibrationprofile), [`Bno055Axis`](#bno055axis), [`Bno055AxisRemap`](#bno055axisremap), [`Bno055AccelConfig`](#bno055accelconfig), [`Bno055GyroConfig`](#bno055gyroconfig), [`Bno055MagConfig`](#bno055magconfig), [`Bno055SystemStatus`](#bno055systemstatus), [`Bno055RawBlock`](#bno055rawblock), [`Bno055Regs`](#bno055regs), [`Bno055Sample`](#bno055sample), [`Bno055Device`](#bno055device)
+
+## BNO055 (IMU)
+
+### Bno055Cmd
+
+```csharp
+public enum Bno055Cmd
+{
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    Reset = 0x34,
+    StartStream = 0x35,
+    StopStream = 0x36,
+    GetInfo = 0x37,
+}
+```
+
+BNO055 register-bridge command opcodes, protocol v0.10 (contract 13 §2). 0x30/0x31 are the common sync pins.
+
+### Bno055Rpt
+
+```csharp
+public enum Bno055Rpt
+{
+    RegData = 0x91,
+    Info = 0x92,
+    Stream = 0x93,
+}
+```
+
+BNO055 report opcodes (contract 13 §3).
+
+### Bno055Trigger
+
+```csharp
+public enum Bno055Trigger : byte
+{
+    Timer = 0,
+    Int = 1,
+}
+```
+
+BNO_START_STREAM trigger.
+
+### Bno055Wire
+
+```csharp
+public static class Bno055Wire
+```
+
+Wire codecs of the BNO055 bridge (`APP_BNO055`). The firmware is a thin register bridge: the MCU owns the I2C bus (sensor at 7-bit 0x28, 400 kHz fixed), the nRESET/INT pins and one streaming loop; operating mode, units, axis remap, calibration and decoding are host logic expressed as register access (`Bno055Regs`). Mirrors `depz_sensor_sdk/protocol/bno055.py` 1:1. BNO_RESET, BNO_STOP_STREAM and BNO_GET_INFO carry an empty payload.
+
+#### Bno055Wire.XferMax *(constant)*
+
+```csharp
+public const int XferMax = 128
+```
+
+Max bytes per READ_REG / WRITE_REG / streamed block; addr + len ≤ 0x100.
+
+#### Bno055Wire.InfoSize *(constant)*
+
+```csharp
+public const int InfoSize = 38
+```
+
+RPT_BNO_INFO payload size.
+
+#### Bno055Wire.ResetTimeout *(field)*
+
+```csharp
+public static readonly TimeSpan ResetTimeout = TimeSpan.FromSeconds(3)
+```
+
+BNO_RESET answers after the sensor's ~0.5 s boot handshake.
+
+#### Bno055Wire.ExpectedChipId *(constant)*
+
+```csharp
+public const byte ExpectedChipId = 0xA0
+```
+
+Identity registers 0x00..0x03 of a healthy BNO055.
+
+#### Bno055Wire.ExpectedAccId *(constant)*
+
+```csharp
+public const byte ExpectedAccId = 0xFB
+```
+
+#### Bno055Wire.ExpectedMagId *(constant)*
+
+```csharp
+public const byte ExpectedMagId = 0x32
+```
+
+#### Bno055Wire.ExpectedGyrId *(constant)*
+
+```csharp
+public const byte ExpectedGyrId = 0x0F
+```
+
+#### Bno055Wire.PackReadReg
+
+```csharp
+public static byte[] PackReadReg(byte addr, byte len)
+```
+
+BNO_READ_REG payload: addr u8, len u8, with the transfer limit of contract 13 §1 — len 1..`XferMax` and addr + len ≤ 0x100.
+
+#### Bno055Wire.TimerPeriodMinMs *(constant)*
+
+```csharp
+public const int TimerPeriodMinMs = 1
+```
+
+BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+
+#### Bno055Wire.TimerPeriodMaxMs *(constant)*
+
+```csharp
+public const int TimerPeriodMaxMs = 60000
+```
+
+#### Bno055Wire.PackWriteReg
+
+```csharp
+public static byte[] PackWriteReg(byte addr, ReadOnlySpan<byte> data)
+```
+
+BNO_WRITE_REG payload: addr u8, then data[1..`XferMax`] with addr + N ≤ 0x100.
+
+#### Bno055Wire.PackStartStream
+
+```csharp
+public static byte[] PackStartStream(Bno055Trigger trigger, byte addr, byte len, ushort periodMs)
+```
+
+BNO_START_STREAM payload (5 bytes): trigger u8, addr u8, len u8, period_ms u16 LE. Replaces any running stream.
+
+### Bno055RegData
+
+```csharp
+public sealed record Bno055RegData(byte Cmd, ulong TimestampUs, byte[] Data)
+```
+
+RPT_BNO_REG_DATA: echoed READ_REG opcode, MCU uptime at I2C-read completion, register bytes.
+
+#### Bno055RegData.Unpack
+
+```csharp
+public static Bno055RegData Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_BNO_REG_DATA payload: cmd u8, timestamp u64 LE, then data.
+
+### Bno055StreamData
+
+```csharp
+public sealed record Bno055StreamData(ulong TimestampUs, byte Addr, byte Length, byte[] Data)
+```
+
+RPT_BNO_REG_STREAM — one streamed register block. `Addr` / `Length` echo the stream configuration so each report is self-describing; `TimestampUs` is the trigger time (timer expiry or INT edge), not the I2C completion.
+
+#### Bno055StreamData.Unpack
+
+```csharp
+public static Bno055StreamData Unpack(ReadOnlySpan<byte> payload)
+```
+
+Parse a RPT_BNO_REG_STREAM payload: timestamp u64 LE, addr u8, len u8, data[len].
+
+### Bno055Info
+
+```csharp
+public sealed record Bno055Info(byte I2cAddr, byte ChipId, byte AccId, byte MagId, byte GyrId, ushort SwRev, byte BlRev, byte Initialized, byte IntLevel, uint IntEdges, ushort ReadMinUs, ushort ReadMaxUs, ushort ReadAvgUs, uint TxDropped, uint I2cErrors, uint SlotsSkipped, ushort BusRecoveries, byte LastI2cError, byte SensorResets, ushort LoopMaxUs)
+```
+
+RPT_BNO_INFO (38 bytes) — sensor identity (registers 0x00..0x06) plus bridge diagnostics. Counters wrap silently: watch increments. Read*Us, `SlotsSkipped` and `LoopMaxUs` reset at START_STREAM, `I2cErrors` at every successful reset handshake. A rising `SensorResets` means the bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG and the host must restore its configuration. `SwRev` is BCD (0x0311 = 03.11). `LastI2cError`: 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR.
+
+#### Bno055Info.Unpack
+
+```csharp
+public static Bno055Info Unpack(ReadOnlySpan<byte> p)
+```
+
+Parse a RPT_BNO_INFO payload (`<BBBBBHBBBIHHHIIIHBBH`, 38 bytes LE).
+
+#### Bno055Info.IdsOk *(property)*
+
+```csharp
+public bool IdsOk
+```
+
+All four identity registers hold the healthy BNO055 values.
+
+#### Bno055Info.SwRevText *(property)*
+
+```csharp
+public string SwRevText
+```
+
+Sensor firmware revision as Bosch writes it: 0x0311 → "03.11".
+
+### Bno055OprMode
+
+```csharp
+public enum Bno055OprMode : byte
+{
+    Config = 0x00,
+    AccOnly = 0x01,
+    MagOnly = 0x02,
+    GyroOnly = 0x03,
+    AccMag = 0x04,
+    AccGyro = 0x05,
+    MagGyro = 0x06,
+    Amg = 0x07,
+    Imu = 0x08,
+    Compass = 0x09,
+    M4g = 0x0A,
+    NdofFmcOff = 0x0B,
+    Ndof = 0x0C,
+}
+```
+
+OPR_MODE (0x3D) bits 3:0 (the register reads back 0x10 after reset — mask).
+
+### Bno055PwrMode
+
+```csharp
+public enum Bno055PwrMode : byte
+{
+    Normal = 0x00,
+    LowPower = 0x01,
+    Suspend = 0x02,
+}
+```
+
+PWR_MODE (0x3E) bits 1:0.
+
+### Bno055TempSource
+
+```csharp
+public enum Bno055TempSource : byte
+{
+    Accel = 0x00,
+    Gyro = 0x01,
+}
+```
+
+TEMP_SOURCE (0x40) bits 1:0.
+
+### Bno055Vec3
+
+```csharp
+public readonly record struct Bno055Vec3(short X, short Y, short Z)
+```
+
+Three raw i16 words in register order (x, y, z).
+
+### Bno055Euler
+
+```csharp
+public readonly record struct Bno055Euler(short Heading, short Roll, short Pitch)
+```
+
+Raw Euler angles in register order: heading, roll, pitch.
+
+### Bno055Quat
+
+```csharp
+public readonly record struct Bno055Quat(short W, short X, short Y, short Z)
+```
+
+Raw quaternion in register order: w, x, y, z (1.0 = 2^14).
+
+### Bno055Units
+
+```csharp
+public sealed record Bno055Units(bool AccelMg = false, bool GyroRps = false, bool EulerRad = false, bool TempF = false, bool Android = false)
+```
+
+Output units (UNIT_SEL 0x3B). The SDK default (`Default`, UNIT_SEL = 0x00) is m/s², dps, degrees, °C, Windows orientation. The sensor's own power-on value is 0x80 (Android), so a fresh sensor must be told. Bits as the silicon implements them (contract 13 §4.2; the datasheet §4.3.60 bit table is off by one); unknown bits are dropped on unpack. Physical value = raw / LSB.
+
+#### Bno055Units.AccMg *(constant)*
+
+```csharp
+public const byte AccMg = 0x01
+```
+
+#### Bno055Units.GyrRps *(constant)*
+
+```csharp
+public const byte GyrRps = 0x02
+```
+
+#### Bno055Units.EulRad *(constant)*
+
+```csharp
+public const byte EulRad = 0x04
+```
+
+#### Bno055Units.TempFahrenheit *(constant)*
+
+```csharp
+public const byte TempFahrenheit = 0x10
+```
+
+#### Bno055Units.OriAndroid *(constant)*
+
+```csharp
+public const byte OriAndroid = 0x80
+```
+
+#### Bno055Units.Default *(field)*
+
+```csharp
+public static readonly Bno055Units Default = new()
+```
+
+#### Bno055Units.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055Units.Unpack
+
+```csharp
+public static Bno055Units Unpack(byte value)
+```
+
+#### Bno055Units.AccelLsb *(property)*
+
+```csharp
+public double AccelLsb
+```
+
+ACC_DATA LSB: 1 per mg, else 100 per m/s² (LIA/GRV: `FusionAccelLsb`).
+
+#### Bno055Units.GyroLsb *(property)*
+
+```csharp
+public double GyroLsb
+```
+
+Angular-rate LSB: 900 per rad/s, else 16 per dps.
+
+#### Bno055Units.EulerLsb *(property)*
+
+```csharp
+public double EulerLsb
+```
+
+Euler LSB: 900 per radian, else 16 per degree.
+
+#### Bno055Units.TempLsb *(property)*
+
+```csharp
+public double TempLsb
+```
+
+Temperature LSB: 1 LSB = 2 °F (0.5 LSB/°F), else 1 LSB = 1 °C.
+
+### Bno055CalibStatus
+
+```csharp
+public readonly record struct Bno055CalibStatus(int System, int Gyro, int Accel, int Mag)
+```
+
+CALIB_STAT (0x35) `sys<7:6> gyr<5:4> acc<3:2> mag<1:0>`: 0 = not calibrated … 3 = fully.
+
+#### Bno055CalibStatus.Unpack
+
+```csharp
+public static Bno055CalibStatus Unpack(byte value)
+```
+
+#### Bno055CalibStatus.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055CalibStatus.FullyCalibrated *(property)*
+
+```csharp
+public bool FullyCalibrated
+```
+
+### Bno055CalibrationProfile
+
+```csharp
+public sealed record Bno055CalibrationProfile(Bno055Vec3 AccelOffset, Bno055Vec3 MagOffset, Bno055Vec3 GyroOffset, short AccelRadius, short MagRadius)
+```
+
+Sensor offsets and radii, registers 0x55..0x6A (22 bytes, 11 × i16 LE: acc_offset xyz, mag_offset xyz, gyr_offset xyz, acc_radius, mag_radius). Readable and writable only in CONFIG; write all 22 bytes in one transfer (the sensor latches each group on its MSB). Offsets are in sensor LSB and do not depend on UNIT_SEL.
+
+#### Bno055CalibrationProfile.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+#### Bno055CalibrationProfile.Unpack
+
+```csharp
+public static Bno055CalibrationProfile Unpack(ReadOnlySpan<byte> data)
+```
+
+### Bno055Axis
+
+```csharp
+public enum Bno055Axis : byte
+{
+    X = 0,
+    Y = 1,
+    Z = 2,
+}
+```
+
+Source axis codes of `Bno055AxisRemap`.
+
+### Bno055AxisRemap
+
+```csharp
+public sealed record Bno055AxisRemap(Bno055Axis X = Bno055Axis.X, Bno055Axis Y = Bno055Axis.Y, Bno055Axis Z = Bno055Axis.Z, bool XNegative = false, bool YNegative = false, bool ZNegative = false)
+```
+
+Which chip axis feeds each output axis, and its sign (AXIS_MAP_CONFIG 0x41 = `z<5:4> y<3:2> x<1:0>`, AXIS_MAP_SIGN 0x42 = `x 2, y 1, z 0`, 1 = negative). `X = Bno055Axis.Y` means "output X is the chip's Y axis". The default is P1.
+
+#### Bno055AxisRemap.Pack
+
+```csharp
+public (byte Config, byte Sign) Pack()
+```
+
+→ (AXIS_MAP_CONFIG, AXIS_MAP_SIGN). The sensor keeps its old mapping when given one that uses an axis twice, so this refuses it up front.
+
+#### Bno055AxisRemap.Unpack
+
+```csharp
+public static Bno055AxisRemap Unpack(byte config, byte sign)
+```
+
+#### Bno055AxisRemap.Placements
+
+```csharp
+public static readonly IReadOnlyList<(string Name, byte Config, byte Sign)> Placements = Array.AsReadOnly(new[] { ("P0", (byte)0x21, (byte)0x04), ("P1", (byte)0x24, (byte)0x00), ("P2", (byte)0x24, (byte)0x06), ("P3", (byte)0x21, (byte)0x02), ("P4", (byte)0x24, (byte)0x03), ("P5", (byte)0x21, (byte)0x01), ("P6", (byte)0x21, (byte)0x07), ("P7", (byte)0x24, (byte)0x05), })
+```
+
+Datasheet §3.4: placement → (AXIS_MAP_CONFIG, AXIS_MAP_SIGN), P0..P7 in order.
+
+#### Bno055AxisRemap.Placement
+
+```csharp
+public static Bno055AxisRemap Placement(string name)
+```
+
+Datasheet §3.4 mounting preset P0..P7 (case-insensitive; P1 is the default).
+
+### Bno055AccelConfig
+
+```csharp
+public readonly record struct Bno055AccelConfig(int Range, int Bandwidth, int Power)
+```
+
+ACC_CONFIG (page 1, 0x08) as register codes `range<1:0> bandwidth<4:2> power<7:5>`: indexes into `AccRangeG`, `AccBandwidthHz`, `AccPowerNames`. Power-on value 0x0D = ±4 g, 62.5 Hz, normal. Effective in non-fusion modes only.
+
+#### Bno055AccelConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055AccelConfig Default = new(1, 3, 0)
+```
+
+#### Bno055AccelConfig.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055AccelConfig.Unpack
+
+```csharp
+public static Bno055AccelConfig Unpack(byte value)
+```
+
+### Bno055GyroConfig
+
+```csharp
+public readonly record struct Bno055GyroConfig(int Range, int Bandwidth, int Power)
+```
+
+GYR_CONFIG_0/1 (page 1, 0x0A/0x0B), 2 bytes: byte0 = `range<2:0> bandwidth<5:3>`, byte1 = `power<2:0>`. Indexes into `GyrRangeDps`, `GyrBandwidthHz`, `GyrPowerNames`. Power-on 0x38/0x00 = 2000 dps, 32 Hz, normal.
+
+#### Bno055GyroConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055GyroConfig Default = new(0, 7, 0)
+```
+
+#### Bno055GyroConfig.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+#### Bno055GyroConfig.Unpack
+
+```csharp
+public static Bno055GyroConfig Unpack(ReadOnlySpan<byte> data)
+```
+
+### Bno055MagConfig
+
+```csharp
+public readonly record struct Bno055MagConfig(int Rate, int Mode, int Power)
+```
+
+MAG_CONFIG (page 1, 0x09) `rate<2:0> mode<4:3> power<6:5>`: indexes into `MagRateHz`, `MagOprNames`, `MagPowerNames`. Bit 7 is not a field: `Unpack(v).Pack() == (v & 0x7F)`. Power-on 0x0B = 10 Hz, regular, normal.
+
+#### Bno055MagConfig.Default *(field)*
+
+```csharp
+public static readonly Bno055MagConfig Default = new(3, 1, 0)
+```
+
+#### Bno055MagConfig.Pack
+
+```csharp
+public byte Pack()
+```
+
+#### Bno055MagConfig.Unpack
+
+```csharp
+public static Bno055MagConfig Unpack(byte value)
+```
+
+### Bno055SystemStatus
+
+```csharp
+public sealed record Bno055SystemStatus(int SelfTest, int ClkStatus, int Status, int Error)
+```
+
+ST_RESULT (0x36) + SYS_CLK_STATUS / SYS_STATUS / SYS_ERR (0x38..0x3A); INT_STA (0x37) sits in between and clears on read, so it is not read.
+
+#### Bno055SystemStatus.StatusText *(property)*
+
+```csharp
+public string StatusText
+```
+
+#### Bno055SystemStatus.ErrorText *(property)*
+
+```csharp
+public string ErrorText
+```
+
+Meaningful when `Status` is 1 (system error).
+
+#### Bno055SystemStatus.SelfTestPassed *(property)*
+
+```csharp
+public bool SelfTestPassed
+```
+
+### Bno055RawBlock
+
+```csharp
+public sealed record Bno055RawBlock(Bno055Vec3? Accel, Bno055Vec3? Mag, Bno055Vec3? Gyro, Bno055Euler? Euler, Bno055Quat? Quaternion, Bno055Vec3? LinearAccel, Bno055Vec3? Gravity, sbyte? Temperature, byte? CalibStat)
+```
+
+Raw register values found in one block read. A channel is null when the window addr..addr+len does not cover all of its bytes.
+
+### Bno055Regs
+
+```csharp
+public static class Bno055Regs
+```
+
+BNO055 register map and the pure codecs every SDK shares (contract 13 §4, Bosch BST-BNO055-DS000 rev 1.8) — the "base" layer. Mirrors `depz_sensor_sdk/bno055/regs.py` 1:1. Nothing here touches the wire; a shared golden vector pins it. Scaling is raw / LSB with `Bno055Units` and the fixed LSB constants below. The live driver over the bridge (mode switching, boot / fusion-start polls, page discipline, self-test) is `Bno055Device`.
+
+#### Bno055Regs.ModeSwitchFromConfig *(field)*
+
+```csharp
+public static readonly TimeSpan ModeSwitchFromConfig = TimeSpan.FromMilliseconds(10)
+```
+
+Settle time after an OPR_MODE write out of CONFIG (datasheet: 7 ms).
+
+#### Bno055Regs.ModeSwitchToConfig *(field)*
+
+```csharp
+public static readonly TimeSpan ModeSwitchToConfig = TimeSpan.FromMilliseconds(25)
+```
+
+Settle time after an OPR_MODE write into CONFIG (datasheet: 19 ms).
+
+#### Bno055Regs.SelfTestTime *(field)*
+
+```csharp
+public static readonly TimeSpan SelfTestTime = TimeSpan.FromMilliseconds(450)
+```
+
+The built-in self-test runs ~400 ms (datasheet §3.9.2).
+
+#### Bno055Regs.SysStatusBooting *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> SysStatusBooting = Array.AsReadOnly(new[] { 2, 3, 4 })
+```
+
+SYS_STATUS values of a sensor still booting (initializing, self-test).
+
+#### Bno055Regs.BootSettleTimeout *(field)*
+
+```csharp
+public static readonly TimeSpan BootSettleTimeout = TimeSpan.FromSeconds(1)
+```
+
+#### Bno055Regs.StuckSelfTestPolls *(constant)*
+
+```csharp
+public const int StuckSelfTestPolls = 20
+```
+
+SYS_STATUS 4 polls in a row taken as the leftover of a self-test run in CONFIG, not POST.
+
+#### Bno055Regs.FusionStartTimeout *(field)*
+
+```csharp
+public static readonly TimeSpan FusionStartTimeout = TimeSpan.FromSeconds(1)
+```
+
+After CONFIG → a fusion mode the fusion outputs read zero for ~70 ms.
+
+#### Bno055Regs.IsInterruptSettingReg
+
+```csharp
+public static bool IsInterruptSettingReg(int register)
+```
+
+Page-1 motion-interrupt setting registers (thresholds, durations, axis selects).
+
+#### Bno055Regs.SysStatusNames *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<int, string> SysStatusNames = …
+```
+
+#### Bno055Regs.SysErrNames *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<int, string> SysErrNames = …
+```
+
+#### Bno055Regs.ChipId *(constant)*
+
+```csharp
+public const byte ChipId = 0x00
+```
+
+#### Bno055Regs.PageId *(constant)*
+
+```csharp
+public const byte PageId = 0x07
+```
+
+#### Bno055Regs.AccData *(constant)*
+
+```csharp
+public const byte AccData = 0x08
+```
+
+#### Bno055Regs.MagData *(constant)*
+
+```csharp
+public const byte MagData = 0x0E
+```
+
+#### Bno055Regs.GyrData *(constant)*
+
+```csharp
+public const byte GyrData = 0x14
+```
+
+#### Bno055Regs.EulData *(constant)*
+
+```csharp
+public const byte EulData = 0x1A
+```
+
+#### Bno055Regs.QuaData *(constant)*
+
+```csharp
+public const byte QuaData = 0x20
+```
+
+#### Bno055Regs.LiaData *(constant)*
+
+```csharp
+public const byte LiaData = 0x28
+```
+
+#### Bno055Regs.GrvData *(constant)*
+
+```csharp
+public const byte GrvData = 0x2E
+```
+
+#### Bno055Regs.Temp *(constant)*
+
+```csharp
+public const byte Temp = 0x34
+```
+
+#### Bno055Regs.CalibStat *(constant)*
+
+```csharp
+public const byte CalibStat = 0x35
+```
+
+#### Bno055Regs.StResult *(constant)*
+
+```csharp
+public const byte StResult = 0x36
+```
+
+#### Bno055Regs.IntSta *(constant)*
+
+```csharp
+public const byte IntSta = 0x37
+```
+
+Clear-on-read — never part of a routine block read.
+
+#### Bno055Regs.SysClkStatus *(constant)*
+
+```csharp
+public const byte SysClkStatus = 0x38
+```
+
+#### Bno055Regs.SysStatus *(constant)*
+
+```csharp
+public const byte SysStatus = 0x39
+```
+
+#### Bno055Regs.SysErr *(constant)*
+
+```csharp
+public const byte SysErr = 0x3A
+```
+
+#### Bno055Regs.UnitSel *(constant)*
+
+```csharp
+public const byte UnitSel = 0x3B
+```
+
+#### Bno055Regs.OprMode *(constant)*
+
+```csharp
+public const byte OprMode = 0x3D
+```
+
+#### Bno055Regs.PwrMode *(constant)*
+
+```csharp
+public const byte PwrMode = 0x3E
+```
+
+#### Bno055Regs.SysTrigger *(constant)*
+
+```csharp
+public const byte SysTrigger = 0x3F
+```
+
+#### Bno055Regs.TempSource *(constant)*
+
+```csharp
+public const byte TempSource = 0x40
+```
+
+#### Bno055Regs.AxisMapConfig *(constant)*
+
+```csharp
+public const byte AxisMapConfig = 0x41
+```
+
+#### Bno055Regs.AxisMapSign *(constant)*
+
+```csharp
+public const byte AxisMapSign = 0x42
+```
+
+#### Bno055Regs.SicMatrix *(constant)*
+
+```csharp
+public const byte SicMatrix = 0x43
+```
+
+9 × i16, row-major, 1.0 = 16384.
+
+#### Bno055Regs.CalibProfile *(constant)*
+
+```csharp
+public const byte CalibProfile = 0x55
+```
+
+acc/mag/gyr offsets + acc/mag radius, `CalibProfileLen` bytes.
+
+#### Bno055Regs.CalibProfileLen *(constant)*
+
+```csharp
+public const int CalibProfileLen = 22
+```
+
+#### Bno055Regs.P1AccConfig *(constant)*
+
+```csharp
+public const byte P1AccConfig = 0x08
+```
+
+#### Bno055Regs.P1MagConfig *(constant)*
+
+```csharp
+public const byte P1MagConfig = 0x09
+```
+
+#### Bno055Regs.P1GyrConfig0 *(constant)*
+
+```csharp
+public const byte P1GyrConfig0 = 0x0A
+```
+
+#### Bno055Regs.P1GyrConfig1 *(constant)*
+
+```csharp
+public const byte P1GyrConfig1 = 0x0B
+```
+
+#### Bno055Regs.P1AccSleepConfig *(constant)*
+
+```csharp
+public const byte P1AccSleepConfig = 0x0C
+```
+
+#### Bno055Regs.P1GyrSleepConfig *(constant)*
+
+```csharp
+public const byte P1GyrSleepConfig = 0x0D
+```
+
+#### Bno055Regs.P1IntMsk *(constant)*
+
+```csharp
+public const byte P1IntMsk = 0x0F
+```
+
+#### Bno055Regs.P1IntEn *(constant)*
+
+```csharp
+public const byte P1IntEn = 0x10
+```
+
+#### Bno055Regs.P1AccAmThres *(constant)*
+
+```csharp
+public const byte P1AccAmThres = 0x11
+```
+
+Page-1 0x11..0x1F are the motion-interrupt settings, written raw.
+
+#### Bno055Regs.P1GyrAmSet *(constant)*
+
+```csharp
+public const byte P1GyrAmSet = 0x1F
+```
+
+#### Bno055Regs.P1UniqueId *(constant)*
+
+```csharp
+public const byte P1UniqueId = 0x50
+```
+
+#### Bno055Regs.UniqueIdLen *(constant)*
+
+```csharp
+public const int UniqueIdLen = 16
+```
+
+#### Bno055Regs.FullBlockAddr *(constant)*
+
+```csharp
+public const byte FullBlockAddr = AccData
+```
+
+The block that carries every output channel: 0x08 (ACC_DATA_X_LSB) … 0x35 (CALIB_STAT).
+
+#### Bno055Regs.FullBlockLen *(constant)*
+
+```csharp
+public const byte FullBlockLen = CalibStat - AccData + 1
+```
+
+#### Bno055Regs.QuatBlockAddr *(constant)*
+
+```csharp
+public const byte QuatBlockAddr = QuaData
+```
+
+Quaternion only — the cheapest orientation read (8 bytes, ~1.2 ms of bus).
+
+#### Bno055Regs.QuatBlockLen *(constant)*
+
+```csharp
+public const byte QuatBlockLen = 8
+```
+
+#### Bno055Regs.SysTriggerSelfTest *(constant)*
+
+```csharp
+public const byte SysTriggerSelfTest = 0x01
+```
+
+#### Bno055Regs.SysTriggerRstSys *(constant)*
+
+```csharp
+public const byte SysTriggerRstSys = 0x20
+```
+
+#### Bno055Regs.SysTriggerRstInt *(constant)*
+
+```csharp
+public const byte SysTriggerRstInt = 0x40
+```
+
+#### Bno055Regs.SysTriggerClkSel *(constant)*
+
+```csharp
+public const byte SysTriggerClkSel = 0x80
+```
+
+#### Bno055Regs.IntAccBsxDrdy *(constant)*
+
+```csharp
+public const byte IntAccBsxDrdy = 0x01
+```
+
+#### Bno055Regs.IntMagDrdy *(constant)*
+
+```csharp
+public const byte IntMagDrdy = 0x02
+```
+
+#### Bno055Regs.IntGyrAm *(constant)*
+
+```csharp
+public const byte IntGyrAm = 0x04
+```
+
+#### Bno055Regs.IntGyrHighRate *(constant)*
+
+```csharp
+public const byte IntGyrHighRate = 0x08
+```
+
+#### Bno055Regs.IntGyrDrdy *(constant)*
+
+```csharp
+public const byte IntGyrDrdy = 0x10
+```
+
+#### Bno055Regs.IntAccHighG *(constant)*
+
+```csharp
+public const byte IntAccHighG = 0x20
+```
+
+#### Bno055Regs.IntAccAm *(constant)*
+
+```csharp
+public const byte IntAccAm = 0x40
+```
+
+#### Bno055Regs.IntAccNm *(constant)*
+
+```csharp
+public const byte IntAccNm = 0x80
+```
+
+#### Bno055Regs.StAcc *(constant)*
+
+```csharp
+public const byte StAcc = 0x01
+```
+
+#### Bno055Regs.StMag *(constant)*
+
+```csharp
+public const byte StMag = 0x02
+```
+
+#### Bno055Regs.StGyr *(constant)*
+
+```csharp
+public const byte StGyr = 0x04
+```
+
+#### Bno055Regs.StMcu *(constant)*
+
+```csharp
+public const byte StMcu = 0x08
+```
+
+#### Bno055Regs.ExpectedSelfTest *(constant)*
+
+```csharp
+public const byte ExpectedSelfTest = StAcc | StMag | StGyr | StMcu
+```
+
+#### Bno055Regs.MagLsb *(constant)*
+
+```csharp
+public const double MagLsb = 16.0
+```
+
+MAG_DATA LSB per µT, not selectable.
+
+#### Bno055Regs.QuatLsb *(constant)*
+
+```csharp
+public const double QuatLsb = 16384.0
+```
+
+Quaternion LSB, 2^14, unit-less.
+
+#### Bno055Regs.FusionAccelLsb *(constant)*
+
+```csharp
+public const double FusionAccelLsb = 100.0
+```
+
+Linear acceleration and gravity ignore the ACC_Unit bit: always m/s² at 100 LSB — measured on SW rev 03.11 (datasheet Tables 3-33/3-35 claim mg).
+
+#### Bno055Regs.IsFusion
+
+```csharp
+public static bool IsFusion(Bno055OprMode mode)
+```
+
+True for the fusion operating modes (IMU and above).
+
+#### Bno055Regs.AccRangeG *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> AccRangeG = Array.AsReadOnly(new[] { 2, 4, 8, 16 })
+```
+
+#### Bno055Regs.AccBandwidthHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<double> AccBandwidthHz = …
+```
+
+#### Bno055Regs.AccPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> AccPowerNames = …
+```
+
+#### Bno055Regs.GyrRangeDps *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> GyrRangeDps = Array.AsReadOnly(new[] { 2000, 1000, 500, 250, 125 })
+```
+
+#### Bno055Regs.GyrBandwidthHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> GyrBandwidthHz = …
+```
+
+#### Bno055Regs.GyrPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> GyrPowerNames = …
+```
+
+#### Bno055Regs.MagRateHz *(field)*
+
+```csharp
+public static readonly IReadOnlyList<int> MagRateHz = Array.AsReadOnly(new[] { 2, 6, 8, 10, 15, 20, 25, 30 })
+```
+
+#### Bno055Regs.MagOprNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> MagOprNames = …
+```
+
+#### Bno055Regs.MagPowerNames *(field)*
+
+```csharp
+public static readonly IReadOnlyList<string> MagPowerNames = …
+```
+
+#### Bno055Regs.SicIdentity *(field)*
+
+```csharp
+public static readonly IReadOnlyList<short> SicIdentity = …
+```
+
+Soft-iron matrix identity, 1.0 = 16384.
+
+#### Bno055Regs.PackSicMatrix
+
+```csharp
+public static byte[] PackSicMatrix(IReadOnlyList<short> m)
+```
+
+Soft-iron matrix, 9 × i16 LE row-major, 1.0 = 16384 (datasheet §3.11.4).
+
+#### Bno055Regs.UnpackSicMatrix
+
+```csharp
+public static short[] UnpackSicMatrix(ReadOnlySpan<byte> data)
+```
+
+#### Bno055Regs.DecodeBlock
+
+```csharp
+public static Bno055RawBlock DecodeBlock(byte addr, ReadOnlySpan<byte> data)
+```
+
+Unpack whatever channels the register window starting at `addr` holds.
+
+### Bno055Sample
+
+```csharp
+public sealed record Bno055Sample(ulong TimestampUs, int Addr, byte[] Raw, Bno055Units Units, double[]? Accel, double[]? Mag, double[]? Gyro, double[]? Euler, double[]? Quaternion, double[]? LinearAccel, double[]? Gravity, double? Temperature, Bno055CalibStatus? Calibration)
+```
+
+One decoded BNO055 register block (streamed or polled). A channel is null when the block did not cover it; values are scaled by `Units`, the units in effect when the stream started. Euler is (heading, roll, pitch), the quaternion (w, x, y, z); linear acceleration and gravity are always m/s². In non-fusion modes the fusion outputs read zero; in CONFIG everything does.
+
+#### Bno055Sample.Decode
+
+```csharp
+public static Bno055Sample Decode(ulong timestampUs, int addr, byte[] data, Bno055Units units)
+```
+
+Decode `data` read at `addr` with `units`.
+
+### Bno055Device
+
+```csharp
+public sealed class Bno055Device : DepzDevice
+```
+
+BNO055 absolute-orientation IMU (contract 13). The board is a thin I2C register bridge: mode, units, axis remap and calibration are register access here; the sensor fuses on chip at 100 Hz. Typical use: `Configure`, then `StartStream` and read `Samples`, or poll `ReadSample`. Page 1 (sensor configs, interrupts, unique id) is reached through PAGE_ID and refused while streaming.
+
+#### Bno055Device.Bno055Device *(constructor)*
+
+```csharp
+public Bno055Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Bno055Device.Samples *(property)*
+
+```csharp
+public SensorStream<Bno055Sample> Samples
+```
+
+The streamed samples (contract 07 §3): `Samples.On(cb)`, `Samples.Subscribe()` (256 by default), `Samples.Next()`; `ParseErrors` counts stream reports dropped because they did not decode (a short block — contract 07 §2).
+
+#### Bno055Device.BridgeInfo
+
+```csharp
+public Bno055Info BridgeInfo()
+```
+
+RPT_BNO_INFO: chip ids, sensor firmware revision, bridge counters. Safe while streaming.
+
+#### Bno055Device.IsAlive
+
+```csharp
+public bool IsAlive()
+```
+
+True when the bridge passed the chip-id handshake and the sensor answers with the BNO055 ids.
+
+#### Bno055Device.ResetSensor
+
+```csharp
+public void ResetSensor()
+```
+
+Hardware reset through nRESET (the bridge answers after the ~0.5 s boot handshake). Stops a stream; the sensor returns in CONFIG with power-on units and no calibration — `Configure` again, or `RestoreConfiguration`.
+
+#### Bno055Device.ReadRegisters
+
+```csharp
+public byte[] ReadRegisters(int addr, int length, int page = 0)
+```
+
+Read `length` bytes at `addr` on `page` (128-byte transfers). Page 1 is refused while streaming.
+
+#### Bno055Device.WriteRegisters
+
+```csharp
+public void WriteRegisters(int addr, byte[] data, int page = 0)
+```
+
+Write at `addr` on `page`. Most configuration registers only take writes in CONFIG mode (the sensor ignores the rest); the typed setters handle that.
+
+#### Bno055Device.ReadRegister
+
+```csharp
+public int ReadRegister(int addr, int page = 0)
+```
+
+#### Bno055Device.WriteRegister
+
+```csharp
+public void WriteRegister(int addr, int value, int page = 0)
+```
+
+Write one register; a `value` outside 0..255 is an `ArgumentOutOfRangeException`.
+
+#### Bno055Device.GetOperationMode
+
+```csharp
+public Bno055OprMode GetOperationMode()
+```
+
+#### Bno055Device.SetOperationMode
+
+```csharp
+public void SetOperationMode(Bno055OprMode mode)
+```
+
+Switch OPR_MODE and wait out the switching time; into a fusion mode also wait (up to 1 s) for the fusion outputs. The sensor only switches between CONFIG and another mode, so a switch between two operating modes goes through CONFIG.
+
+#### Bno055Device.GetPowerMode
+
+```csharp
+public Bno055PwrMode GetPowerMode()
+```
+
+#### Bno055Device.SetPowerMode
+
+```csharp
+public void SetPowerMode(Bno055PwrMode mode)
+```
+
+Normal / low power / suspend, written in CONFIG with the operating mode restored after. A suspended chip ignores OPR_MODE writes, so the mode is kept here and put back on wake-up (NDOF when the chip was already asleep at connect, contract 13 §4.6).
+
+#### Bno055Device.GetUnits
+
+```csharp
+public Bno055Units GetUnits()
+```
+
+#### Bno055Device.SetUnits
+
+```csharp
+public void SetUnits(Bno055Units units)
+```
+
+#### Bno055Device.GetAxisRemap
+
+```csharp
+public Bno055AxisRemap GetAxisRemap()
+```
+
+#### Bno055Device.SetAxisRemap
+
+```csharp
+public void SetAxisRemap(Bno055AxisRemap remap)
+```
+
+Remap the output axes for the board's mounting (`Placement` gives the datasheet placements P0..P7; P1 is the default).
+
+#### Bno055Device.GetTemperatureSource
+
+```csharp
+public Bno055TempSource GetTemperatureSource()
+```
+
+#### Bno055Device.SetTemperatureSource
+
+```csharp
+public void SetTemperatureSource(Bno055TempSource source)
+```
+
+#### Bno055Device.Configure
+
+```csharp
+public void Configure(Bno055OprMode mode = Bno055OprMode.Ndof, Bno055Units? units = null, Bno055AxisRemap? axisRemap = null, Bno055CalibrationProfile? calibration = null)
+```
+
+The usual session setup: CONFIG → units → axis remap → calibration profile → `mode`; in a fusion mode it returns once the fusion outputs are live (~70 ms). Remembered for `RestoreConfiguration`.
+
+#### Bno055Device.RestoreConfiguration
+
+```csharp
+public void RestoreConfiguration()
+```
+
+Re-apply the last `Configure` — after `ResetSensor`, or when `BridgeInfo().SensorResets` rose (bus recovery pulses nRESET). A running stream keeps running.
+
+#### Bno055Device.SystemStatus
+
+```csharp
+public Bno055SystemStatus SystemStatus()
+```
+
+ST_RESULT, SYS_CLK_STATUS, SYS_STATUS, SYS_ERR.
+
+#### Bno055Device.SelfTest
+
+```csharp
+public Bno055SystemStatus SelfTest()
+```
+
+The built-in self-test (datasheet §3.9.2), in CONFIG, ~400 ms; the operating mode is restored after. Not while streaming.
+
+#### Bno055Device.CalibrationStatus
+
+```csharp
+public Bno055CalibStatus CalibrationStatus()
+```
+
+CALIB_STAT: 0..3 per sensor; in NDOF the sensor calibrates in the background.
+
+#### Bno055Device.ReadCalibrationProfile
+
+```csharp
+public Bno055CalibrationProfile ReadCalibrationProfile()
+```
+
+Offsets and radii (0x55..0x6A), only readable in CONFIG: the driver switches there and back.
+
+#### Bno055Device.WriteCalibrationProfile
+
+```csharp
+public void WriteCalibrationProfile(Bno055CalibrationProfile profile)
+```
+
+Restore a stored profile (datasheet §3.11.5). A starting point, not a lock: the background calibration refines it once fusion resumes.
+
+#### Bno055Device.GetSicMatrix
+
+```csharp
+public short[] GetSicMatrix()
+```
+
+Soft-iron compensation matrix, 9 × i16 row-major, 1.0 = 16384.
+
+#### Bno055Device.SetSicMatrix
+
+```csharp
+public void SetSicMatrix(IReadOnlyList<short>? matrix = null)
+```
+
+#### Bno055Device.GetAccelConfig
+
+```csharp
+public Bno055AccelConfig GetAccelConfig()
+```
+
+#### Bno055Device.SetAccelConfig
+
+```csharp
+public void SetAccelConfig(Bno055AccelConfig config)
+```
+
+Accelerometer range / bandwidth / power; fusion modes override it.
+
+#### Bno055Device.GetGyroConfig
+
+```csharp
+public Bno055GyroConfig GetGyroConfig()
+```
+
+#### Bno055Device.SetGyroConfig
+
+```csharp
+public void SetGyroConfig(Bno055GyroConfig config)
+```
+
+#### Bno055Device.GetMagConfig
+
+```csharp
+public Bno055MagConfig GetMagConfig()
+```
+
+#### Bno055Device.SetMagConfig
+
+```csharp
+public void SetMagConfig(Bno055MagConfig config)
+```
+
+#### Bno055Device.UniqueId
+
+```csharp
+public byte[] UniqueId()
+```
+
+The chip's 16-byte unique id (page 1, 0x50..0x5F).
+
+#### Bno055Device.GetInterruptEnable
+
+```csharp
+public int GetInterruptEnable()
+```
+
+#### Bno055Device.SetInterruptEnable
+
+```csharp
+public void SetInterruptEnable(int mask)
+```
+
+INT_EN: which interrupt engines run.
+
+#### Bno055Device.GetInterruptMask
+
+```csharp
+public int GetInterruptMask()
+```
+
+#### Bno055Device.SetInterruptMask
+
+```csharp
+public void SetInterruptMask(int mask)
+```
+
+INT_MSK: which enabled interrupts drive the INT pin.
+
+#### Bno055Device.SetInterruptSetting
+
+```csharp
+public void SetInterruptSetting(int register, int value)
+```
+
+One motion-interrupt setting register (page 1, 0x11..0x1F), as a raw byte. Not while streaming.
+
+#### Bno055Device.ReadInterruptStatus
+
+```csharp
+public int ReadInterruptStatus()
+```
+
+INT_STA — which interrupts fired. Clears on read.
+
+#### Bno055Device.ClearInterrupt
+
+```csharp
+public void ClearInterrupt()
+```
+
+SYS_TRIGGER RST_INT: reset the interrupt status bits and the INT pin.
+
+#### Bno055Device.ReadSample
+
+```csharp
+public Bno055Sample ReadSample((byte Addr, byte Length)? block = null)
+```
+
+Poll one register block (default the full 46 bytes 0x08..0x35) and decode it. Works alongside a stream.
+
+#### Bno055Device.ReadQuaternion
+
+```csharp
+public double[] ReadQuaternion()
+```
+
+(w, x, y, z) — the cheapest orientation read (8 bytes).
+
+#### Bno055Device.StartStream
+
+```csharp
+public void StartStream(int periodMs = 10, (byte Addr, byte Length)? block = null, Bno055Trigger trigger = Bno055Trigger.Timer)
+```
+
+Arm the bridge to read `block` (default the full block) every `periodMs` and push it. Fusion runs at 100 Hz, so 10 ms is the useful floor. `Int` reads on the INT edge, `periodMs` then a missed-edge watchdog (0 = none). Replaces a running stream.
+
+#### Bno055Device.StopStream
+
+```csharp
+public void StopStream()
+```
+
+#### Bno055Device.Streaming *(property)*
+
+```csharp
+public bool Streaming
+```

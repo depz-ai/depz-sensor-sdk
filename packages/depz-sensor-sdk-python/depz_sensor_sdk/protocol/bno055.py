@@ -1,0 +1,202 @@
+"""BNO055 register-bridge wire codecs (contracts/13_SENSOR_BNO055.md)."""
+
+from __future__ import annotations
+
+import struct
+from dataclasses import dataclass
+from enum import IntEnum
+from types import MappingProxyType
+
+from ._wire import BridgeCmds, checked_pack, need_bytes
+
+
+class Bno055Cmd(IntEnum):
+    READ_REG = 0x32
+    WRITE_REG = 0x33
+    RESET = 0x34
+    START_STREAM = 0x35
+    STOP_STREAM = 0x36
+    GET_INFO = 0x37
+
+
+class Bno055Rpt(IntEnum):
+    REG_DATA = 0x91
+    INFO = 0x92
+    STREAM = 0x93
+
+
+#: Max bytes per READ_REG / WRITE_REG / streamed block; `addr + len` ≤ 0x100.
+XFER_MAX = 128
+
+# BNO_START_STREAM trigger.
+TRIGGER_TIMER = 0  # read every period_ms (the only data trigger on SW rev 03.11)
+TRIGGER_INT = 1  # read on the INT rising edge; period_ms is a missed-edge watchdog
+
+#: BNO_RESET answers after the sensor's ~0.5 s boot handshake.
+RESET_TIMEOUT_S = 3.0
+
+
+_REG_SPACE = 0x100  # 8-bit register addresses: a transfer never runs past 0xFF
+
+#: BNO_START_STREAM TIMER period limits, ms (contract 13 §2).
+TIMER_PERIOD_MIN_MS = 1
+TIMER_PERIOD_MAX_MS = 60000
+
+
+def pack_read_reg(addr: int, length: int) -> bytes:
+    """BNO_READ_REG payload `addr u8, len u8` with the transfer limit of
+    contract 13 §1: `len` 1..128 and `addr + len <= 0x100`, else ValueError."""
+    payload = checked_pack("<BB", addr=addr, length=length)
+    if not 1 <= length <= XFER_MAX or addr + length > _REG_SPACE:
+        raise ValueError(f"READ_REG length must be 1..{XFER_MAX} and addr+length <= 0x100")
+    return payload
+
+
+WRITE_MAX = XFER_MAX  # BNO_WRITE_REG data length limit (contract 13 §2: 1..128 bytes)
+
+
+def pack_write_reg(addr: int, data: bytes) -> bytes:
+    """BNO_WRITE_REG payload `addr u8, data[N]` with the same limit:
+    N 1..128 and `addr + N <= 0x100`, else ValueError."""
+    head = checked_pack("<B", addr=addr)
+    if not 1 <= len(data) <= WRITE_MAX or addr + len(data) > _REG_SPACE:
+        raise ValueError(f"WRITE_REG data must be 1..{WRITE_MAX} bytes and addr+N <= 0x100")
+    return head + bytes(data)
+
+
+def pack_start_stream(trigger: int, addr: int, length: int, period_ms: int) -> bytes:
+    """BNO_START_STREAM payload `trigger u8, addr u8, len u8, period_ms u16`.
+    With `trigger` TIMER the period is 1..60000 ms (contract 13 §2), else
+    ValueError; with INT it is the missed-edge watchdog and 0 disables it."""
+    payload = checked_pack("<BBBH", trigger=trigger, addr=addr, length=length, period_ms=period_ms)
+    if trigger == TRIGGER_TIMER and not TIMER_PERIOD_MIN_MS <= period_ms <= TIMER_PERIOD_MAX_MS:
+        raise ValueError(
+            f"period_ms: {period_ms} outside {TIMER_PERIOD_MIN_MS}..{TIMER_PERIOD_MAX_MS} for the TIMER trigger"
+        )
+    return payload
+
+
+@dataclass(frozen=True, kw_only=True)
+class RegData:
+    cmd: int  # echoed READ_REG opcode
+    timestamp_us: int  # MCU uptime at I2C-read completion
+    data: bytes
+
+    @classmethod
+    def unpack(cls, payload: bytes) -> "RegData":
+        cmd, ts = struct.unpack_from("<BQ", payload)
+        return cls(cmd=cmd, timestamp_us=ts, data=payload[9:])
+
+
+#: The register-bridge opcodes (contract 13 §2) for `RegisterBridge`.
+BNO055_BRIDGE = BridgeCmds(
+    read_cmd=Bno055Cmd.READ_REG,
+    write_cmd=Bno055Cmd.WRITE_REG,
+    reg_data_rpt=Bno055Rpt.REG_DATA,
+    unpack=RegData.unpack,
+    pack_read=pack_read_reg,
+    pack_write=pack_write_reg,
+    addr_bytes=1,
+)
+
+
+_INFO_FORMAT = "<BBBBBHBBBIHHHIIIHBBH"  # rpt_bno_info_t, 38 bytes
+
+#: last_i2c_error values in RPT_BNO_INFO.
+I2C_ERROR_NAMES = MappingProxyType({0: "none", 1: "NACK", 2: "TIMEOUT", 3: "BUS_ERROR"})
+
+#: Identity registers 0x00..0x03 of a healthy BNO055.
+EXPECTED_CHIP_ID = 0xA0
+EXPECTED_ACC_ID = 0xFB
+EXPECTED_MAG_ID = 0x32
+EXPECTED_GYR_ID = 0x0F
+
+
+@dataclass(frozen=True, kw_only=True)
+class Bno055Info:
+    """RPT_BNO_INFO — sensor identity (registers 0x00..0x06) plus bridge
+    diagnostics. Counters wrap silently; watch increments, not absolute
+    values. `i2c_errors` is cleared by every successful reset handshake, the
+    read timings and `slots_skipped` at START_STREAM. A rising `sensor_resets` means the
+    bridge pulsed nRESET to recover the bus: the sensor is back in CONFIG
+    mode and the host must restore its configuration."""
+
+    i2c_addr: int  # 7-bit sensor address in use (0x28)
+    chip_id: int  # expected 0xA0
+    acc_id: int  # expected 0xFB
+    mag_id: int  # expected 0x32
+    gyr_id: int  # expected 0x0F
+    sw_rev: int  # sensor firmware, e.g. 0x0311 = 03.11
+    bl_rev: int
+    initialized: int  # 1 = chip-ID handshake passed
+    int_level: int  # current INT pin level
+    int_edges: int  # EXTI rising edges (counted only while an INT stream is armed)
+    read_min_us: int  # streamed block read, since the last START_STREAM
+    read_max_us: int
+    read_avg_us: int
+    tx_dropped: int  # packets refused by a full USB TX ring
+    i2c_errors: int  # failed transfers since the last reset handshake
+    slots_skipped: int  # stream slots dropped: bus still busy
+    bus_recoveries: int  # rung-2 bit-bang bus releases
+    last_i2c_error: int  # I2C_ERROR_NAMES
+    sensor_resets: int  # rung-3 nRESET recoveries (sensor back in CONFIG)
+    loop_max_us: int  # longest main-loop iteration since START_STREAM
+
+    @classmethod
+    def unpack(cls, payload: bytes) -> "Bno055Info":
+        v = struct.unpack_from(_INFO_FORMAT, payload)
+        return cls(
+            i2c_addr=v[0],
+            chip_id=v[1],
+            acc_id=v[2],
+            mag_id=v[3],
+            gyr_id=v[4],
+            sw_rev=v[5],
+            bl_rev=v[6],
+            initialized=v[7],
+            int_level=v[8],
+            int_edges=v[9],
+            read_min_us=v[10],
+            read_max_us=v[11],
+            read_avg_us=v[12],
+            tx_dropped=v[13],
+            i2c_errors=v[14],
+            slots_skipped=v[15],
+            bus_recoveries=v[16],
+            last_i2c_error=v[17],
+            sensor_resets=v[18],
+            loop_max_us=v[19],
+        )
+
+    @property
+    def ids_ok(self) -> bool:
+        return (self.chip_id, self.acc_id, self.mag_id, self.gyr_id) == (
+            EXPECTED_CHIP_ID,
+            EXPECTED_ACC_ID,
+            EXPECTED_MAG_ID,
+            EXPECTED_GYR_ID,
+        )
+
+    @property
+    def sw_rev_text(self) -> str:
+        """Sensor firmware revision as Bosch writes it: 0x0311 → "03.11"."""
+        return f"{self.sw_rev >> 8:02X}.{self.sw_rev & 0xFF:02X}"
+
+
+@dataclass(frozen=True, kw_only=True)
+class StreamData:
+    """RPT_BNO_REG_STREAM — one streamed register block. `addr`/`length`
+    echo the stream configuration so each report is self-describing."""
+
+    timestamp_us: int  # MCU uptime at the trigger (timer expiry or INT edge)
+    addr: int
+    length: int
+    data: bytes
+
+    @classmethod
+    def unpack(cls, payload: bytes) -> "StreamData":
+        need_bytes("RPT_BNO_REG_STREAM", payload, 10)
+        ts, addr, length = struct.unpack_from("<QBB", payload)
+        # contract 07 §3: checked against its own length field; trailing bytes ignored
+        need_bytes("RPT_BNO_REG_STREAM data", payload, 10 + length)
+        return cls(timestamp_us=ts, addr=addr, length=length, data=payload[10 : 10 + length])

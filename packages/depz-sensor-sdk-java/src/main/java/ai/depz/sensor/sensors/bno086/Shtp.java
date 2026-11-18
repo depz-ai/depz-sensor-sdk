@@ -1,0 +1,225 @@
+package ai.depz.sensor.sensors.bno086;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+import ai.depz.sensor.protocol.Wire;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * SHTP framing layer for the BNO086 (contract 05 §3).
+ *
+ * <p>Header: length u16 LE (bits 14:0 = cargo length incl. the 4-byte header;
+ * bit 15 = continuation), channel u8, seq u8. A first fragment advertises the
+ * TOTAL cargo length; continuations carry the remaining length with bit 15 set.
+ * TX seq counters are per channel. Mirror of the TS/Python references.
+ */
+public final class Shtp {
+    private Shtp() {}
+
+    public static final int SHTP_HEADER_SIZE = 4;
+    public static final int LENGTH_MASK = 0x7fff;
+    public static final int CONTINUATION_BIT = 0x8000;
+    public static final int NUM_CHANNELS = 6;
+    /** Host->sensor frames must fit one MCU transmit slot (ERRATA E2). */
+    public static final int MAX_TX_FRAME = 64;
+
+    /** SHTP channel 1: device executable (reset / on / sleep; RX 0x01 = reset done). */
+    public static final int CHANNEL_EXECUTABLE = 1;
+
+    /**
+     * One-byte host writes on the executable channel (contract 05 §6a); the hub
+     * answers none of them. RESET restarts the hub (the 0x01 reset-complete
+     * follows on the same channel); SLEEP stops every report except those
+     * enabled with {@link Sh2#FEATURE_FLAG_WAKEUP} | {@link Sh2#FEATURE_FLAG_ALWAYS_ON},
+     * keeping the configuration; ON ends SLEEP and every report resumes at its
+     * rate. See {@link Sh2#buildSleep()} / {@link Sh2#buildPowerOn()}.
+     */
+    public static final int EXECUTABLE_RESET = 0x01;
+    public static final int EXECUTABLE_ON = 0x02;
+    public static final int EXECUTABLE_SLEEP = 0x03;
+
+    public record ShtpHeader(int length, int channel, int seq, boolean continuation) {
+        /** Build one: the path that survives a component appended after 1.0 (contract 07 §5). */
+        public static ShtpHeader of(int length, int channel, int seq, boolean continuation) {
+            return new ShtpHeader(length, channel, seq, continuation);
+        }
+    }
+
+    /** Fields out of their widths (length u15, channel u8, seq u8) → IllegalArgumentException. */
+    public static byte[] packShtpHeader(ShtpHeader hdr) {
+        Wire.checkUint("length", hdr.length(), 15);
+        Wire.checkUint("channel", hdr.channel(), 8);
+        Wire.checkUint("seq", hdr.seq(), 8);
+        int word = (hdr.length() & LENGTH_MASK) | (hdr.continuation() ? CONTINUATION_BIT : 0);
+        return new byte[] {
+            (byte) word, (byte) (word >>> 8), (byte) hdr.channel(), (byte) hdr.seq()
+        };
+    }
+
+    public static ShtpHeader unpackShtpHeader(byte[] data) {
+        Wire.needBytes("SHTP header", data, SHTP_HEADER_SIZE);
+        int word = (data[0] & 0xFF) | ((data[1] & 0xFF) << 8);
+        return ShtpHeader.of(
+                word & LENGTH_MASK, data[2] & 0xFF, data[3] & 0xFF, (word & CONTINUATION_BIT) != 0);
+    }
+
+    /**
+     * One reassembled cargo: {@code payload} excludes all SHTP headers; {@code seq}
+     * and {@code captureUs} are the FIRST fragment's — {@code captureUs} is its
+     * {@code RPT_DATA.timestamp_us}, the capture the cargo's 0xFB base delta
+     * refers to (contract 05 §3).
+     */
+    public record ShtpCargo(int channel, int seq, byte[] payload, long captureUs) {
+        /** A cargo without a capture time ({@code captureUs} = 0). */
+        public ShtpCargo(int channel, int seq, byte[] payload) {
+            this(channel, seq, payload, 0);
+        }
+    }
+
+    /** Single-fragment frame: length = header + payload. */
+    public static byte[] buildFrame(int channel, byte[] payload, int seq) {
+        byte[] hdr =
+                packShtpHeader(ShtpHeader.of(SHTP_HEADER_SIZE + payload.length, channel, seq & 0xff, false));
+        byte[] out = new byte[hdr.length + payload.length];
+        System.arraycopy(hdr, 0, out, 0, hdr.length);
+        System.arraycopy(payload, 0, out, hdr.length, payload.length);
+        return out;
+    }
+
+    private static final class ChannelRx {
+        final ByteArrayOutputStream chunks = new ByteArrayOutputStream();
+        int received = 0;
+        int expected = 0;
+        int seq = 0;
+        long captureUs = 0;
+
+        void clear() {
+            chunks.reset();
+            received = 0;
+            expected = 0;
+        }
+    }
+
+    /** Per-channel TX sequence counters + RX cargo reassembly. */
+    public static final class ShtpLayer {
+        /** Incomplete cargos and junk-channel (≥ 6) frames thrown away. */
+        public int discarded = 0;
+
+        private final int[] txSeqs = new int[NUM_CHANNELS];
+        private final ChannelRx[] rx = new ChannelRx[NUM_CHANNELS];
+
+        public ShtpLayer() {
+            for (int i = 0; i < NUM_CHANNELS; i++) {
+                rx[i] = new ChannelRx();
+            }
+        }
+
+        /** Build a single-fragment frame, consuming the channel's TX seq. */
+        public byte[] nextFrame(int channel, byte[] payload) {
+            if (SHTP_HEADER_SIZE + payload.length > MAX_TX_FRAME) {
+                throw new IllegalArgumentException(
+                        "TX cargo " + payload.length + "B exceeds the " + MAX_TX_FRAME + "B MCU slot");
+            }
+            if (channel < 0 || channel >= NUM_CHANNELS) {
+                throw new IllegalArgumentException(
+                        "SHTP channel " + channel + " out of range 0.." + (NUM_CHANNELS - 1));
+            }
+            int seq = txSeqs[channel];
+            txSeqs[channel] = (seq + 1) & 0xff;
+            return buildFrame(channel, payload, seq);
+        }
+
+        public int txSeq(int channel) {
+            return txSeqs[channel];
+        }
+
+        /** {@link #feed(byte[], long)} with capture 0 (cargo {@code captureUs} = 0). */
+        public @Nullable ShtpCargo feed(byte[] frame) {
+            return feed(frame, 0);
+        }
+
+        /**
+         * Consume one inbound frame; return the cargo when complete, else null.
+         * {@code captureUs} is the frame's {@code RPT_DATA.timestamp_us}; the cargo
+         * carries the FIRST fragment's — the base its 0xFB timestamps refer to
+         * (contract 05 §3), not the fragment that completed it.
+         */
+        public @Nullable ShtpCargo feed(byte[] frame, long captureUs) {
+            if (frame.length < SHTP_HEADER_SIZE) {
+                return null;
+            }
+            ShtpHeader hdr = unpackShtpHeader(frame);
+            if (hdr.length() < SHTP_HEADER_SIZE) {
+                return null; // empty/padding header ("no data" read)
+            }
+            if (hdr.channel() >= NUM_CHANNELS) {
+                discarded += 1; // junk channel
+                return null;
+            }
+            int chunkLen = frame.length - SHTP_HEADER_SIZE;
+            ChannelRx r = rx[hdr.channel()];
+            if (!hdr.continuation()) {
+                if (r.expected != 0) { // a partial, even one with no bytes yet
+                    discarded += 1;
+                }
+                r.clear();
+                r.chunks.write(frame, SHTP_HEADER_SIZE, chunkLen);
+                r.received = chunkLen;
+                r.expected = hdr.length() - SHTP_HEADER_SIZE;
+                r.seq = hdr.seq();
+                r.captureUs = captureUs;
+            } else {
+                if (r.expected == 0) {
+                    discarded += 1;
+                    return null;
+                }
+                r.chunks.write(frame, SHTP_HEADER_SIZE, chunkLen);
+                r.received += chunkLen;
+            }
+            if (r.received < r.expected) {
+                return null;
+            }
+            if (r.received > r.expected) {
+                discarded += 1;
+                r.clear();
+                return null;
+            }
+            ShtpCargo cargo = new ShtpCargo(hdr.channel(), r.seq, r.chunks.toByteArray(), r.captureUs);
+            r.clear();
+            return cargo;
+        }
+
+        /** Restart the TX seq counters only; partial inbound cargos stay. */
+        public void resetTx() {
+            java.util.Arrays.fill(txSeqs, 0);
+        }
+
+        /** Forget all TX seq counters and partial cargos (sensor reset). */
+        public void reset() {
+            for (int i = 0; i < NUM_CHANNELS; i++) {
+                txSeqs[i] = 0;
+                rx[i].clear();
+                rx[i].seq = 0;
+            }
+            discarded = 0;
+        }
+    }
+
+    /** Convenience: reassemble a list of frames. */
+    public static List<ShtpCargo> reassemble(List<byte[]> frames, int @Nullable [] discardedOut) {
+        ShtpLayer layer = new ShtpLayer();
+        List<ShtpCargo> cargos = new ArrayList<>();
+        for (byte[] f : frames) {
+            ShtpCargo c = layer.feed(f);
+            if (c != null) {
+                cargos.add(c);
+            }
+        }
+        if (discardedOut != null && discardedOut.length > 0) {
+            discardedOut[0] = layer.discarded;
+        }
+        return cargos;
+    }
+}

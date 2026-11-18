@@ -1,0 +1,1204 @@
+/* bno086_device.c — the BNO085 / BNO086 class (contract 05): SHTP framing and
+ * the SH-2 sensor-hub protocol over the bridge's pass-through, as the Python
+ * SDK's bno086/__init__.py does it — same requests in the same order, so a
+ * capture made by either SDK replays in the other byte for byte.
+ *
+ * The bridge acknowledges SEND_SHTP_PACKET with RPT_STATUS at once and hands
+ * every inbound SHTP frame over as RPT_DATA(cmd 0) (ERRATA E2): answers are
+ * matched on their SH-2 content only. Control-channel cargos go to the
+ * waiters registered for their report id; input cargos become reports. */
+#include "io_internal.h"
+
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define CMD_SENSOR_RESET     DEPZ_BNO086_CMD_SENSOR_RESET
+#define CMD_SENSOR_WAKE_UP   DEPZ_BNO086_CMD_SENSOR_WAKE_UP
+#define CMD_SEND_SHTP_PACKET DEPZ_BNO086_CMD_SEND_SHTP_PACKET
+
+#define CONTROL_TIMEOUT_MS   1000
+#define FRS_TIMEOUT_MS       2000
+#define RESET_TIMEOUT_MS     2000
+/* The executable reset-complete is waited for this long at most, best effort
+ * (ERRATA E9: firmware <= v0.95 never sends it). */
+#define RESET_COMPLETE_WAIT_MS 500
+/* Re-reads allowed while enable()'s read-back is outside the band of the rate
+ * asked for (contract 05 §7): a stale "disabled" answer left in flight by a
+ * preceding disable() (the hub answers every state-changing Set Feature
+ * unsolicited, and Get Feature Response carries no correlation token), or the
+ * hub answering before it runs the new rate — interval 0 for one or two
+ * read-backs on the lab BNO085, and for up to 95 ms (0, or a slower rate) on
+ * a hub just reset (bench 2026-11-12). A pause before each: about 0.4 s in
+ * all, four times the longest seen. */
+#define VERIFY_REREADS  15
+#define VERIFY_PAUSE_MS 20
+#define EXECUTABLE_RESET_COMPLETE 0x01
+
+/* Control answers are at most 17 bytes; a waiter keeps the first CTRL_MAX of
+ * each unread one, in order, in a ring that grows as answers arrive (a
+ * burst — the 32 answers of a 64-word FRS record, the error queue — may land
+ * in one read, far ahead of the consumer; nothing is dropped, as Python's
+ * unbounded queue drops nothing). */
+#define CTRL_MAX     32
+#define WAITER_FIRST 16
+#define ADV_MAX      1024
+#define UNKNOWN_MAX  256
+
+typedef struct waiter {
+    uint8_t rid;
+    uint8_t (*msg)[CTRL_MAX];
+    size_t  *len;
+    unsigned head, count, cap;
+    bool     lost;              /* an answer could not be kept (out of memory) */
+    struct waiter *next;
+} waiter;
+
+typedef struct {
+    depz_mutex op;             /* serialises the public operations */
+    depz_mutex lock;           /* everything below; `cond` signals it */
+    depz_cond  cond;
+    depz_shtp_layer shtp;
+    waiter *waiters;
+    int  flush_sensor;         /* the sensor depz_bno086_flush() waits for, -1 = none */
+    bool flush_seen;           /* its Flush Completed (0xEF) arrived */
+    bool reset_seen;
+    uint8_t cmd_seq;
+    uint8_t adv[ADV_MAX];
+    size_t adv_len;
+} bno_state;
+
+static bno_state *st(depz_device *dev) { return (bno_state *)dev->sensor; }
+
+#define TRY(expr) do { int rc_ = (expr); if (rc_) return rc_; } while (0)
+
+static void put_u16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static uint32_t rd_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+/* ── RX path (reader thread) ──────────────────────────────────────────── */
+
+static void emit(depz_device *dev, depz_bno_report *reps, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n; i++) {
+        /* A queued copy outlives the cargo it points into. */
+        depz_bno_report queued = reps[i];
+        queued.data = NULL;
+        depz_stream_emit_as(&dev->stream, &reps[i], &queued);
+    }
+}
+
+/* Under `lock`: room for one more answer in `w` (the ring is rebuilt in
+ * order when it grows). */
+static bool waiter_reserve(waiter *w)
+{
+    unsigned cap, i;
+    uint8_t (*msg)[CTRL_MAX];
+    size_t *len;
+    if (w->count < w->cap) return true;
+    cap = w->cap ? w->cap * 2 : WAITER_FIRST;
+    msg = (uint8_t (*)[CTRL_MAX])malloc((size_t)cap * sizeof *msg);
+    len = (size_t *)malloc((size_t)cap * sizeof *len);
+    if (!msg || !len) {
+        free(msg);
+        free(len);
+        return false;
+    }
+    for (i = 0; i < w->count; i++) {
+        unsigned from = (w->head + i) % w->cap;
+        memcpy(msg[i], w->msg[from], w->len[from]);
+        len[i] = w->len[from];
+    }
+    free(w->msg);
+    free(w->len);
+    w->msg = msg;
+    w->len = len;
+    w->head = 0;
+    w->cap = cap;
+    return true;
+}
+
+/* Under `lock`: hand one control report to every waiter of its report id. */
+static void deliver_report(bno_state *s, const uint8_t *p, size_t len)
+{
+    waiter *w;
+    bool any = false;
+    for (w = s->waiters; w; w = w->next) {
+        unsigned slot;
+        if (w->rid != p[0]) continue;
+        if (!waiter_reserve(w)) { /* never silently: the waiter fails its request */
+            w->lost = true;
+            any = true;
+            continue;
+        }
+        slot = (w->head + w->count) % w->cap;
+        w->len[slot] = len < CTRL_MAX ? len : CTRL_MAX;
+        memcpy(w->msg[slot], p, w->len[slot]);
+        w->count++;
+        any = true;
+    }
+    if (any) depz_cond_broadcast(&s->cond);
+}
+
+/* Under `lock`: one cargo may hold several reports back to back. An unknown
+ * id (or a short tail) ends the walk: its length is unknowable, the rest goes
+ * out as one piece. */
+static void deliver_control(bno_state *s, const uint8_t *p, size_t len)
+{
+    size_t pos = 0;
+    while (pos < len) {
+        size_t n = depz_bno_control_report_len(p[pos]);
+        if (!n || pos + n > len) n = len - pos;
+        deliver_report(s, p + pos, n);
+        pos += n;
+    }
+}
+
+static bool bno_report(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t len)
+{
+    bno_state *s = st(dev);
+    depz_shtp_cargo cargo;
+    depz_bno_report local[32], *reps = local;
+    uint8_t unknown[UNKNOWN_MAX];
+    const uint8_t *frame;
+    size_t frame_len, n = 0;
+    uint64_t capture;
+    int got;
+    if (cmd != DEPZ_BNO086_RPT_DATA) return false;
+    if (depz_bno086_unpack_data(p, len, &capture, &frame, &frame_len)) {
+        /* short header: the stream's, counted and dropped — contract 07 §2 */
+        depz_stream_count_parse_error(&dev->stream);
+        return true;
+    }
+    depz_mutex_lock(&s->lock);
+    got = depz_shtp_feed_ex(&s->shtp, frame, frame_len, capture, &cargo);
+    if (got != 1) {
+        depz_mutex_unlock(&s->lock);
+        return true;
+    }
+    capture = cargo.capture_us; /* the first fragment's: 0xFB base deltas refer to it */
+    switch (cargo.channel) {
+    case DEPZ_SHTP_CH_COMMAND: {
+        size_t room = ADV_MAX - s->adv_len;
+        size_t take = cargo.payload_len < room ? cargo.payload_len : room;
+        memcpy(s->adv + s->adv_len, cargo.payload, take);
+        s->adv_len += take;
+        break;
+    }
+    case DEPZ_SHTP_CH_EXECUTABLE:
+        if (cargo.payload_len && cargo.payload[0] == EXECUTABLE_RESET_COMPLETE) {
+            s->reset_seen = true;
+            depz_cond_broadcast(&s->cond);
+        }
+        break;
+    case DEPZ_SHTP_CH_CONTROL:
+        if (cargo.payload_len) deliver_control(s, cargo.payload, cargo.payload_len);
+        break;
+    case DEPZ_SHTP_CH_INPUT_NORMAL:
+    case DEPZ_SHTP_CH_INPUT_WAKE: {
+        /* The shortest report, Flush Completed, is 2 bytes; parse into a big enough array. */
+        size_t cap = cargo.payload_len / 2 + 1;
+        if (cap > sizeof local / sizeof local[0]) {
+            reps = (depz_bno_report *)malloc(cap * sizeof *reps);
+            if (!reps) break;
+        } else {
+            cap = sizeof local / sizeof local[0];
+        }
+        n = depz_bno_parse_input_cargo(cargo.payload, cargo.payload_len, capture, reps, cap);
+        if (s->flush_sensor >= 0) {
+            size_t k;
+            for (k = 0; k < n; k++) {
+                if (reps[k].type == DEPZ_BNO_FLUSH_COMPLETED_REPORT && reps[k].flushed_sensor == s->flush_sensor) {
+                    s->flush_seen = true;
+                    depz_cond_broadcast(&s->cond);
+                }
+            }
+        }
+        /* The cargo buffer is the layer's: copy an unknown tail out. */
+        if (n && reps[n - 1].type == DEPZ_BNO_UNKNOWN_REPORT) {
+            depz_bno_report *u = &reps[n - 1];
+            if (u->data_len > UNKNOWN_MAX) u->data_len = UNKNOWN_MAX;
+            memcpy(unknown, u->data, u->data_len);
+            u->data = unknown;
+        }
+        break;
+    }
+    case DEPZ_SHTP_CH_GYRO_RV:
+        if (depz_bno_parse_gyro_rv(cargo.payload, cargo.payload_len, capture, &local[0]) == 0) n = 1;
+        break;
+    default:
+        break;
+    }
+    depz_mutex_unlock(&s->lock);
+    emit(dev, reps, n);
+    if (reps != local) free(reps);
+    return true;
+}
+
+/* ── class plumbing ────────────────────────────────────────────────────── */
+
+static void bno_closed(depz_device *dev)
+{
+    bno_state *s = st(dev);
+    depz_mutex_lock(&s->lock);
+    depz_cond_broadcast(&s->cond);
+    depz_mutex_unlock(&s->lock);
+}
+
+static void bno_destroy(depz_device *dev)
+{
+    bno_state *s = st(dev);
+    if (!s) return;
+    depz_shtp_free(&s->shtp);
+    depz_cond_destroy(&s->cond);
+    depz_mutex_destroy(&s->lock);
+    depz_mutex_destroy(&s->op);
+    free(s);
+    dev->sensor = NULL;
+}
+
+static const depz_sensor_ops bno_ops = {
+    DEPZ_SENSOR_BNO086, {"bno086 reports", sizeof(depz_bno_report), 1024, DEPZ_BNO086_RPT_DATA, NULL, NULL},
+    bno_report, bno_closed, bno_destroy, NULL};
+
+static bno_state *bno_new(void)
+{
+    bno_state *s = (bno_state *)calloc(1, sizeof *s);
+    if (!s) return NULL;
+    if (depz_mutex_init(&s->op)) goto fail0;
+    if (depz_mutex_init(&s->lock)) goto fail1;
+    if (depz_cond_init(&s->cond)) goto fail2;
+    depz_shtp_init(&s->shtp);
+    s->flush_sensor = -1;
+    return s;
+fail2:
+    depz_mutex_destroy(&s->lock);
+fail1:
+    depz_mutex_destroy(&s->op);
+fail0:
+    free(s);
+    return NULL;
+}
+
+int depz_bno086_attach(depz_device *dev)
+{
+    bno_state *s;
+    if (dev->ops == &bno_ops) return DEPZ_OK;
+    s = bno_new();
+    if (!s) return depz_fail(DEPZ_E_NOMEM, "bno086: out of memory");
+    return depz_device_attach(dev, &bno_ops, s);
+}
+
+int depz_bno086_open_link(depz_link *link, depz_device **out)
+{
+    bno_state *s = bno_new();
+    if (!s) {
+        depz_link_free(link);
+        return depz_fail(DEPZ_E_NOMEM, "bno086: out of memory");
+    }
+    return depz_device_create(link, &bno_ops, s, out);
+}
+
+bool depz_is_bno086(const depz_device *dev)
+{
+    bool yes;
+    if (!dev) return false;
+    depz_mutex_lock((depz_mutex *)&dev->lock);
+    yes = dev->ops == &bno_ops;
+    depz_mutex_unlock((depz_mutex *)&dev->lock);
+    return yes;
+}
+
+static int need(const depz_device *dev)
+{
+    if (!dev) return depz_fail(DEPZ_E_ARG, "bno086: NULL device");
+    if (!depz_is_bno086(dev)) return depz_fail(DEPZ_E_WRONG_TYPE, "%s is not a BNO085 / BNO086", dev->port);
+    return DEPZ_OK;
+}
+
+/* Public entry: the device counts this thread until the call returns, so
+ * depz_device_close() on another thread frees nothing under it. */
+#define ENTERED(body) DEPZ_ENTERED(dev, need(dev), body)
+
+/* Public entry: serialise the whole sequence. */
+#define LOCKED(body)                          \
+    do {                                      \
+        int locked_rc_;                       \
+        if (!dev) return need(dev);           \
+        TRY(depz_device_enter(dev));          \
+        locked_rc_ = need(dev);               \
+        if (!locked_rc_) {                    \
+            depz_mutex_lock(&st(dev)->op);  \
+            locked_rc_ = (body);              \
+            depz_mutex_unlock(&st(dev)->op);\
+        }                                     \
+        depz_device_leave(dev);               \
+        return locked_rc_;                    \
+    } while (0)
+
+static int timeout_at_least(depz_device *dev, int floor_ms)
+{
+    int t = depz_device_timeout_ms(dev);
+    return t > floor_ms ? t : floor_ms;
+}
+
+/* ── TX path ───────────────────────────────────────────────────────────── */
+
+/* Frame `payload` and push it through SEND_SHTP_PACKET; ERR_BUSY (both MCU
+ * TX slots full) backs off and retransmits the same frame (contract 05 §2). */
+static int send_shtp(depz_device *dev, uint8_t channel, const uint8_t *payload, size_t len)
+{
+    bno_state *s = st(dev);
+    uint8_t frame[DEPZ_SHTP_MAX_TX_FRAME];
+    size_t n;
+    int attempt, rc = DEPZ_OK;
+    depz_mutex_lock(&s->lock);
+    n = depz_shtp_next_frame(&s->shtp, channel, payload, len, frame, sizeof frame);
+    depz_mutex_unlock(&s->lock);
+    if (!n) return depz_fail(DEPZ_E_ARG, "bno086: %zu-byte cargo on channel %u does not fit one %d-byte frame",
+                             len, channel, DEPZ_SHTP_MAX_TX_FRAME);
+    for (attempt = 0; attempt < DEPZ_BNO086_BUSY_RETRIES; attempt++) {
+        rc = depz_device_request(dev, CMD_SEND_SHTP_PACKET, frame, n, NULL, NULL, true, -1);
+        if (rc != DEPZ_E_BUSY) return rc;
+        if (attempt < DEPZ_BNO086_BUSY_RETRIES - 1) depz_sleep_ms(DEPZ_BNO086_BUSY_BACKOFF_MS);
+    }
+    return rc;
+}
+
+static void waiter_add(bno_state *s, waiter *w, uint8_t rid)
+{
+    memset(w, 0, sizeof *w);
+    w->rid = rid;
+    depz_mutex_lock(&s->lock);
+    w->next = s->waiters;
+    s->waiters = w;
+    depz_mutex_unlock(&s->lock);
+}
+
+static void waiter_remove(bno_state *s, waiter *w)
+{
+    waiter **pp;
+    depz_mutex_lock(&s->lock);
+    for (pp = &s->waiters; *pp; pp = &(*pp)->next) {
+        if (*pp == w) {
+            *pp = w->next;
+            break;
+        }
+    }
+    depz_mutex_unlock(&s->lock);
+    free(w->msg);
+    free(w->len);
+    w->msg = NULL;
+    w->len = NULL;
+    w->cap = w->count = w->head = 0;
+}
+
+/* The next answer for `w` (copied into msg/len) before `deadline_us`. A
+ * `quiet` timeout returns DEPZ_E_TIMEOUT without recording an error (an
+ * expected end, not a failure). */
+static int waiter_next_q(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_t msg[CTRL_MAX], size_t *len,
+                         bool quiet)
+{
+    bno_state *s = st(dev);
+    depz_mutex_lock(&s->lock);
+    while (!w->count) {
+        int left = depz_ms_until(deadline_us);
+        if (w->lost) {
+            depz_mutex_unlock(&s->lock);
+            return depz_fail(DEPZ_E_NOMEM, "bno086: out of memory keeping an SH-2 report 0x%02X", w->rid);
+        }
+        if (depz_device_closed(dev)) {
+            depz_mutex_unlock(&s->lock);
+            return depz_device_fail_ended(dev);
+        }
+        if (left <= 0) {
+            depz_mutex_unlock(&s->lock);
+            if (quiet) return DEPZ_E_TIMEOUT;
+            return depz_fail(DEPZ_E_TIMEOUT, "bno086: no SH-2 report 0x%02X within the timeout", w->rid);
+        }
+        depz_cond_wait_ms(&s->cond, &s->lock, left);
+    }
+    *len = w->len[w->head];
+    memcpy(msg, w->msg[w->head], *len);
+    w->head = (w->head + 1) % w->cap;
+    w->count--;
+    depz_mutex_unlock(&s->lock);
+    return DEPZ_OK;
+}
+
+static int waiter_next(depz_device *dev, waiter *w, uint64_t deadline_us, uint8_t msg[CTRL_MAX], size_t *len)
+{
+    return waiter_next_q(dev, w, deadline_us, msg, len, false);
+}
+
+/* A control answer with the right report id but shorter than its fields
+ * (contract 05 §4 table): the request it answers fails as invalid_reply
+ * (contract 07 §3) — never a timeout, never a record with zero fields. */
+static int short_reply(uint8_t rid, size_t len)
+{
+    return depz_fail(DEPZ_E_INVALID_REPLY, "bno086: SH-2 report 0x%02X shorter than its fields (%zu bytes)", rid, len);
+}
+
+/* Send a control cargo and wait for the first answer with report id `rid`
+ * that `accept` takes (NULL = any): 1 = this one, 0 = not ours (keep
+ * waiting), a negative depz_err = the answer fails the request. */
+typedef int (*accept_fn)(const uint8_t *msg, size_t len, void *ctx);
+
+static int control_request(depz_device *dev, const uint8_t *payload, size_t len, uint8_t rid,
+                           accept_fn accept, void *ctx, int timeout_ms, uint8_t msg[CTRL_MAX], size_t *mlen)
+{
+    bno_state *s = st(dev);
+    waiter w;
+    uint64_t deadline;
+    int rc;
+    waiter_add(s, &w, rid);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, payload, len);
+    deadline = depz_now_us() + (uint64_t)timeout_ms * 1000u;
+    while (rc == DEPZ_OK) {
+        int take;
+        rc = waiter_next(dev, &w, deadline, msg, mlen);
+        if (rc) break;
+        take = accept ? accept(msg, *mlen, ctx) : 1;
+        if (take < 0) { rc = take; break; }
+        if (take) break;
+    }
+    waiter_remove(s, &w);
+    return rc;
+}
+
+static uint8_t next_cmd_seq(bno_state *s)
+{
+    uint8_t seq;
+    depz_mutex_lock(&s->lock);
+    seq = s->cmd_seq++;
+    depz_mutex_unlock(&s->lock);
+    return seq;
+}
+
+typedef struct { uint8_t command, seq; } cmd_key;
+
+static int accept_command(const uint8_t *msg, size_t len, void *ctx)
+{
+    const cmd_key *k = (const cmd_key *)ctx;
+    depz_bno_command_response r;
+    if (depz_bno_unpack_command_response(msg, len, &r)) return short_reply(DEPZ_SH2_COMMAND_RESPONSE, len);
+    return r.command == k->command && r.command_seq == k->seq;
+}
+
+/* SH-2 Command Request; with `resp`, waits for the answer correlated on
+ * (command, command sequence). */
+static int command(depz_device *dev, uint8_t cmd, const uint8_t *params, size_t n,
+                   depz_bno_command_response *resp)
+{
+    uint8_t payload[12], msg[CTRL_MAX];
+    size_t mlen;
+    cmd_key key;
+    if (n > 9) return depz_fail(DEPZ_E_ARG, "bno086: a command carries at most 9 parameter bytes");
+    key.command = cmd;
+    key.seq = next_cmd_seq(st(dev));
+    depz_bno_pack_command_request(key.seq, cmd, params, n, payload);
+    if (!resp) return send_shtp(dev, DEPZ_SHTP_CH_CONTROL, payload, sizeof payload);
+    TRY(control_request(dev, payload, sizeof payload, DEPZ_SH2_COMMAND_RESPONSE, accept_command, &key,
+                        timeout_at_least(dev, CONTROL_TIMEOUT_MS), msg, &mlen));
+    depz_bno_unpack_command_response(msg, mlen, resp);
+    return DEPZ_OK;
+}
+
+/* A Command Request answered by several responses: gather those correlated on
+ * (command, sequence) until `done` says the set is complete. */
+typedef bool (*collect_fn)(const depz_bno_command_response *r, void *ctx);
+
+static int command_collect(depz_device *dev, uint8_t cmd, const uint8_t *params, size_t n,
+                           collect_fn done, void *ctx)
+{
+    bno_state *s = st(dev);
+    uint8_t payload[12], msg[CTRL_MAX];
+    size_t mlen;
+    waiter w;
+    uint64_t deadline;
+    uint8_t seq = next_cmd_seq(s);
+    int rc;
+    depz_bno_pack_command_request(seq, cmd, params, n, payload);
+    waiter_add(s, &w, DEPZ_SH2_COMMAND_RESPONSE);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, payload, sizeof payload);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, CONTROL_TIMEOUT_MS) * 1000u;
+    while (rc == DEPZ_OK) {
+        depz_bno_command_response r;
+        rc = waiter_next(dev, &w, deadline, msg, &mlen);
+        if (rc) break;
+        if (depz_bno_unpack_command_response(msg, mlen, &r)) {
+            rc = short_reply(DEPZ_SH2_COMMAND_RESPONSE, mlen);
+            break;
+        }
+        if (r.command != cmd || r.command_seq != seq) continue;
+        if (done(&r, ctx)) break;
+    }
+    waiter_remove(s, &w);
+    return rc;
+}
+
+static int sh2_status(const char *what, uint8_t status)
+{
+    if (status) return depz_fail(DEPZ_E_STATUS, "bno086: %s failed: SH-2 status %u", what, status);
+    return DEPZ_OK;
+}
+
+/* ── lifecycle ─────────────────────────────────────────────────────────── */
+
+/* Forget the SHTP state and the advertisement (the sensor restarts its
+ * sequence counters on reset). */
+static void forget_link_state(bno_state *s)
+{
+    depz_mutex_lock(&s->lock);
+    depz_shtp_free(&s->shtp);
+    depz_shtp_init(&s->shtp);
+    s->reset_seen = false;
+    s->adv_len = 0;
+    depz_mutex_unlock(&s->lock);
+}
+
+/* Wait until the executable reset-complete arrived (false on timeout). */
+static bool wait_reset_seen(depz_device *dev, int timeout_ms)
+{
+    bno_state *s = st(dev);
+    uint64_t deadline = depz_now_us() + (uint64_t)timeout_ms * 1000u;
+    bool seen;
+    depz_mutex_lock(&s->lock);
+    while (!s->reset_seen && !depz_device_closed(dev)) {
+        int left = depz_ms_until(deadline);
+        if (left <= 0) break;
+        depz_cond_wait_ms(&s->cond, &s->lock, left);
+    }
+    seen = s->reset_seen;
+    depz_mutex_unlock(&s->lock);
+    return seen;
+}
+
+static int do_hardware_reset(depz_device *dev, int timeout_ms)
+{
+    if (timeout_ms < 0) timeout_ms = RESET_TIMEOUT_MS;
+    forget_link_state(st(dev));
+    TRY(depz_device_request(dev, CMD_SENSOR_RESET, NULL, 0, NULL, NULL, true, timeout_ms));
+    wait_reset_seen(dev, timeout_ms < RESET_COMPLETE_WAIT_MS ? timeout_ms : RESET_COMPLETE_WAIT_MS);
+    return DEPZ_OK;
+}
+
+int depz_bno086_hardware_reset(depz_device *dev, int timeout_ms) { LOCKED(do_hardware_reset(dev, timeout_ms)); }
+
+int depz_bno086_wake(depz_device *dev)
+{
+    LOCKED(depz_device_request(dev, CMD_SENSOR_WAKE_UP, NULL, 0, NULL, NULL, true, -1));
+}
+
+int depz_bno086_sleep(depz_device *dev)
+{
+    static const uint8_t p[1] = {DEPZ_SHTP_EXEC_SLEEP};
+    LOCKED(send_shtp(dev, DEPZ_SHTP_CH_EXECUTABLE, p, sizeof p));
+}
+
+int depz_bno086_power_on(depz_device *dev)
+{
+    static const uint8_t p[1] = {DEPZ_SHTP_EXEC_ON};
+    LOCKED(send_shtp(dev, DEPZ_SHTP_CH_EXECUTABLE, p, sizeof p));
+}
+
+static int do_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
+{
+    bno_state *s;
+    s = st(dev);
+    depz_mutex_lock(&s->lock);
+    if (buf) memcpy(buf, s->adv, s->adv_len < cap ? s->adv_len : cap);
+    if (len) *len = s->adv_len;
+    depz_mutex_unlock(&s->lock);
+    return DEPZ_OK;
+}
+
+int depz_bno086_advertisement(depz_device *dev, uint8_t *buf, size_t cap, size_t *len)
+{
+    ENTERED(do_advertisement(dev, buf, cap, len));
+}
+
+/* ── identification and features ───────────────────────────────────────── */
+
+/* Every component answers a Product ID Request; the late ones come in a
+ * second cargo. Collect until PRODUCT_ID_SETTLE_MS pass with none, so they
+ * can't answer the next request (taking only the first once returned the
+ * bootloader's version on a back-to-back call). */
+#define PRODUCT_ID_SETTLE_MS 150
+
+static int do_product_ids(depz_device *dev, depz_bno_product_id *out, size_t cap, size_t *count)
+{
+    bno_state *s = st(dev);
+    uint8_t req[2], msg[CTRL_MAX];
+    size_t mlen = 0, n = 0;
+    waiter w;
+    uint64_t deadline;
+    int rc;
+    depz_bno_pack_product_id_request(req);
+    waiter_add(s, &w, DEPZ_SH2_PRODUCT_ID_RESPONSE);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, req, sizeof req);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, CONTROL_TIMEOUT_MS) * 1000u;
+    while (rc == DEPZ_OK) {
+        depz_bno_product_id pid;
+        rc = waiter_next_q(dev, &w, deadline, msg, &mlen, n > 0);
+        if (rc == DEPZ_E_TIMEOUT && n > 0) {
+            rc = DEPZ_OK;
+            break;
+        }
+        if (rc != DEPZ_OK) break;
+        if (depz_bno_unpack_product_id(msg, mlen, &pid)) {
+            rc = short_reply(DEPZ_SH2_PRODUCT_ID_RESPONSE, mlen);
+            break;
+        }
+        if (n < cap) out[n] = pid;
+        n++;
+        deadline = depz_now_us() + (uint64_t)PRODUCT_ID_SETTLE_MS * 1000u;
+    }
+    waiter_remove(s, &w);
+    if (count) *count = n < cap ? n : cap;
+    return rc;
+}
+
+int depz_bno086_product_ids(depz_device *dev, depz_bno_product_id *out, size_t cap, size_t *count)
+{
+    if (!out || !cap) return depz_fail(DEPZ_E_ARG, "bno086: NULL or empty output");
+    LOCKED(do_product_ids(dev, out, cap, count));
+}
+
+int depz_bno086_product_id(depz_device *dev, depz_bno_product_id *out)
+{
+    depz_bno_product_id all[8];
+    size_t n = 0;
+    if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    TRY(depz_bno086_product_ids(dev, all, sizeof all / sizeof all[0], &n));
+    *out = all[0];
+    return DEPZ_OK;
+}
+
+static int accept_feature(const uint8_t *msg, size_t len, void *ctx)
+{
+    depz_bno_feature f;
+    if (depz_bno_unpack_feature_response(msg, len, &f)) return short_reply(DEPZ_SH2_GET_FEATURE_RESPONSE, len);
+    return f.sensor_id == *(const uint8_t *)ctx;
+}
+
+static int do_get_feature(depz_device *dev, uint8_t sensor, depz_bno_feature *out)
+{
+    uint8_t req[2], msg[CTRL_MAX];
+    size_t mlen;
+    depz_bno_pack_get_feature_request(sensor, req);
+    TRY(control_request(dev, req, sizeof req, DEPZ_SH2_GET_FEATURE_RESPONSE, accept_feature, &sensor,
+                        timeout_at_least(dev, CONTROL_TIMEOUT_MS), msg, &mlen));
+    depz_bno_unpack_feature_response(msg, mlen, out);
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_feature(depz_device *dev, uint8_t sensor, depz_bno_feature *out)
+{
+    if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    LOCKED(do_get_feature(dev, sensor, out));
+}
+
+static int do_enable(depz_device *dev, uint8_t sensor, const depz_bno086_feature_request *req,
+                     depz_bno_feature *granted)
+{
+    uint8_t p[17];
+    int k;
+    if (!req->interval_us) return depz_fail(DEPZ_E_ARG, "bno086: interval 0 disables — use disable()");
+    depz_bno_pack_set_feature(sensor, req->flags, req->sensitivity, req->interval_us, req->batch_us,
+                              req->cfg_word, p);
+    TRY(send_shtp(dev, DEPZ_SHTP_CH_CONTROL, p, sizeof p));
+    if (!granted) return DEPZ_OK;
+    /* An answer outside the band for a sensor just enabled is stale, early or
+     * a refusal: the real answer follows, a refusal outlasts the re-reads. */
+    TRY(do_get_feature(dev, sensor, granted));
+    for (k = 0; k < VERIFY_REREADS && !depz_bno086_rate_ok(req->interval_us, granted); k++) {
+        depz_sleep_ms(VERIFY_PAUSE_MS);
+        TRY(do_get_feature(dev, sensor, granted));
+    }
+    return DEPZ_OK;
+}
+
+/* A plain rate as a Set Feature request: interval = 1e6 / hz, rounded half to
+ * even as the Python SDK does. DEPZ_E_ARG for a rate that is not positive. */
+static int request_from_hz(double hz, depz_bno086_feature_request *req)
+{
+    double us;
+    if (!(hz > 0)) return depz_fail(DEPZ_E_ARG, "bno086: rate must be positive — use disable()");
+    memset(req, 0, sizeof *req);
+    us = nearbyint(1e6 / hz);
+    /* The interval is a u32 of microseconds (contract 05 §4): a rate below
+     * 1 / 4295 s is refused, never clamped (contract 07 §3), as Python's
+     * checked pack refuses it. */
+    if (us > 4294967295.0)
+        return depz_fail(DEPZ_E_ARG, "bno086: rate %g Hz: the report interval %.0f us does not fit 32 bits", hz, us);
+    req->interval_us = us < 1 ? 1u : (uint32_t)us;
+    return DEPZ_OK;
+}
+
+int depz_bno086_enable(depz_device *dev, uint8_t sensor, double hz, depz_bno_feature *granted)
+{
+    depz_bno086_feature_request req;
+    depz_bno_feature scratch;
+    TRY(request_from_hz(hz, &req));
+    LOCKED(do_enable(dev, sensor, &req, granted ? granted : &scratch));
+}
+
+int depz_bno086_enable_ex(depz_device *dev, uint8_t sensor, const depz_bno086_feature_request *req,
+                          depz_bno_feature *granted)
+{
+    if (!req) return depz_fail(DEPZ_E_ARG, "bno086: NULL feature request");
+    LOCKED(do_enable(dev, sensor, req, granted));
+}
+
+bool depz_bno086_rate_ok(uint32_t requested_interval_us, const depz_bno_feature *granted)
+{
+    double want, got;
+    if (!requested_interval_us || !granted) return false;
+    want = 1e6 / requested_interval_us;
+    got = granted->interval_us ? 1e6 / granted->interval_us : 0.0;
+    return DEPZ_BNO086_RATE_LOW_FACTOR * want <= got && got <= DEPZ_BNO086_RATE_HIGH_FACTOR * want;
+}
+
+static int do_disable(depz_device *dev, uint8_t sensor)
+{
+    uint8_t p[17];
+    depz_bno_pack_set_feature(sensor, 0, 0, 0, 0, 0, p);
+    return send_shtp(dev, DEPZ_SHTP_CH_CONTROL, p, sizeof p);
+}
+
+int depz_bno086_disable(depz_device *dev, uint8_t sensor) { LOCKED(do_disable(dev, sensor)); }
+
+/* ── reports ───────────────────────────────────────────────────────────── */
+
+depz_stream *depz_bno086_reports(depz_device *dev) { return need(dev) ? NULL : &dev->stream; }
+
+/* A const getter enters like every other call: depz_device_close() on
+ * another thread then frees nothing under it. */
+uint64_t depz_bno086_shtp_discarded(const depz_device *dev)
+{
+    bno_state *s;
+    uint64_t n;
+    if (!depz_is_bno086(dev) || !depz_device_enter_const(dev)) return 0;
+    s = st((depz_device *)dev);
+    depz_mutex_lock(&s->lock);
+    n = s->shtp.discarded;
+    depz_mutex_unlock(&s->lock);
+    depz_device_leave((depz_device *)dev);
+    return n;
+}
+
+/* ── tare and calibration ──────────────────────────────────────────────── */
+
+int depz_bno086_tare_now(depz_device *dev, uint8_t axes, uint8_t basis)
+{
+    uint8_t p[3];
+    p[0] = 0x00;
+    p[1] = axes;
+    p[2] = basis;
+    LOCKED(command(dev, DEPZ_SH2_CMD_TARE, p, sizeof p, NULL));
+}
+
+int depz_bno086_persist_tare(depz_device *dev)
+{
+    static const uint8_t p[1] = {0x01};
+    LOCKED(command(dev, DEPZ_SH2_CMD_TARE, p, sizeof p, NULL));
+}
+
+int depz_bno086_set_reorientation(depz_device *dev, double x, double y, double z, double w)
+{
+    const double v[4] = {x, y, z, w};
+    uint8_t p[9];
+    int k;
+    p[0] = 0x02;
+    for (k = 0; k < 4; k++) {
+        double q14 = nearbyint(v[k] * 16384.0);
+        if (!(q14 >= -32768.0 && q14 <= 32767.0))
+            return depz_fail(DEPZ_E_ARG, "bno086: quaternion component out of the Q14 int16 range");
+        put_u16(p + 1 + 2 * k, (uint16_t)(int16_t)q14);
+    }
+    LOCKED(command(dev, DEPZ_SH2_CMD_TARE, p, sizeof p, NULL));
+}
+
+static int do_status_command(depz_device *dev, uint8_t cmd, const uint8_t *p, size_t n, const char *what,
+                             depz_bno_command_response *r)
+{
+    TRY(command(dev, cmd, p, n, r));
+    return sh2_status(what, r->r[0]);
+}
+
+int depz_bno086_set_calibration(depz_device *dev, bool accel, bool gyro, bool mag, bool planar)
+{
+    uint8_t p[5];
+    depz_bno_command_response r;
+    p[0] = accel;
+    p[1] = gyro;
+    p[2] = mag;
+    p[3] = 0x00; /* configure */
+    p[4] = planar;
+    LOCKED(do_status_command(dev, DEPZ_SH2_CMD_ME_CALIBRATE, p, sizeof p, "ME calibration configure", &r));
+}
+
+static int do_get_calibration(depz_device *dev, depz_bno086_calibration *out)
+{
+    static const uint8_t p[5] = {0, 0, 0, 0x01 /* get */, 0};
+    depz_bno_command_response r;
+    TRY(do_status_command(dev, DEPZ_SH2_CMD_ME_CALIBRATE, p, sizeof p, "ME calibration get", &r));
+    out->accel = r.r[1] != 0;
+    out->gyro = r.r[2] != 0;
+    out->mag = r.r[3] != 0;
+    out->planar = r.r[4] != 0;
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_calibration(depz_device *dev, depz_bno086_calibration *out)
+{
+    if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    LOCKED(do_get_calibration(dev, out));
+}
+
+int depz_bno086_save_dcd(depz_device *dev)
+{
+    depz_bno_command_response r;
+    LOCKED(do_status_command(dev, DEPZ_SH2_CMD_SAVE_DCD, NULL, 0, "DCD save", &r));
+}
+
+int depz_bno086_configure_periodic_dcd(depz_device *dev, bool enable)
+{
+    uint8_t p[1];
+    p[0] = enable ? 0x00 : 0x01;
+    LOCKED(command(dev, DEPZ_SH2_CMD_PERIODIC_DCD_CONFIG, p, sizeof p, NULL));
+}
+
+/* ── interactive calibration (BNO086 only) ─────────────────────────────── */
+
+int depz_bno086_set_motion_intent(depz_device *dev, uint8_t intent)
+{
+    uint8_t p[1];
+    p[0] = intent;
+    LOCKED(command(dev, DEPZ_SH2_CMD_INTERACTIVE_CALIBRATION, p, sizeof p, NULL));
+}
+
+int depz_bno086_enable_motion_request(depz_device *dev, double hz)
+{
+    depz_bno086_feature_request req;
+    TRY(request_from_hz(hz, &req));
+    LOCKED(do_enable(dev, DEPZ_BNO_SENSOR_MOTION_REQUEST, &req, NULL));
+}
+
+/* ── batching ──────────────────────────────────────────────────────────── */
+
+/* Send Force Sensor Flush and wait for the sensor's Flush Completed, which
+ * comes as an input report (header-less `ef <sensor>`), not a control answer:
+ * bno_report() flags it under `lock`. One flush at a time: `op` serialises. */
+static int do_flush(depz_device *dev, uint8_t sensor)
+{
+    bno_state *s = st(dev);
+    uint8_t p[2];
+    uint64_t deadline;
+    int rc = DEPZ_OK;
+    depz_bno_pack_force_flush(sensor, p);
+    depz_mutex_lock(&s->lock);
+    s->flush_sensor = sensor;
+    s->flush_seen = false;
+    depz_mutex_unlock(&s->lock);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, p, sizeof p);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, CONTROL_TIMEOUT_MS) * 1000u;
+    depz_mutex_lock(&s->lock);
+    while (rc == DEPZ_OK && !s->flush_seen) {
+        int left = depz_ms_until(deadline);
+        if (depz_device_closed(dev)) {
+            rc = DEPZ_E_CLOSED;
+            break;
+        }
+        if (left <= 0) {
+            rc = DEPZ_E_TIMEOUT;
+            break;
+        }
+        depz_cond_wait_ms(&s->cond, &s->lock, left);
+    }
+    s->flush_sensor = -1;
+    depz_mutex_unlock(&s->lock);
+    if (rc == DEPZ_E_CLOSED) return depz_device_fail_ended(dev);
+    if (rc == DEPZ_E_TIMEOUT)
+        return depz_fail(rc, "bno086: no Flush Completed (0xEF) for sensor 0x%02X within the timeout", sensor);
+    return rc;
+}
+
+int depz_bno086_flush(depz_device *dev, uint8_t sensor) { LOCKED(do_flush(dev, sensor)); }
+
+/* ── FRS ───────────────────────────────────────────────────────────────── */
+
+static int do_frs_read(depz_device *dev, uint16_t record, uint32_t *words, size_t cap, size_t *n)
+{
+    bno_state *s = st(dev);
+    uint8_t req[8], msg[CTRL_MAX];
+    size_t mlen, count = 0;
+    waiter w;
+    uint64_t deadline;
+    bool done = false;
+    int rc;
+    depz_bno_pack_frs_read_request(record, 0, 0, req);
+    waiter_add(s, &w, DEPZ_SH2_FRS_READ_RESPONSE);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, req, sizeof req);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, FRS_TIMEOUT_MS) * 1000u;
+    while (rc == DEPZ_OK && !done) {
+        depz_bno_frs_read_response r;
+        uint32_t d[2];
+        unsigned k, valid;
+        rc = waiter_next(dev, &w, deadline, msg, &mlen);
+        if (rc) break;
+        if (depz_bno_unpack_frs_read_response(msg, mlen, &r)) {
+            rc = short_reply(DEPZ_SH2_FRS_READ_RESPONSE, mlen);
+            break;
+        }
+        if (r.frs_type != record) continue;
+        switch (r.status) {
+        case DEPZ_BNO_FRS_READ_UNRECOGNIZED_TYPE:
+        case DEPZ_BNO_FRS_READ_BUSY:
+        case DEPZ_BNO_FRS_READ_OFFSET_OUT_OF_RANGE:
+        case DEPZ_BNO_FRS_READ_RECORD_EMPTY:
+        case DEPZ_BNO_FRS_READ_DEVICE_ERROR:
+            rc = depz_fail(DEPZ_E_STATUS, "bno086: FRS read 0x%04X failed: status %u", record, r.status);
+            continue;
+        default:
+            break;
+        }
+        d[0] = r.data0;
+        d[1] = r.data1;
+        valid = r.data_length < 2 ? r.data_length : 2;
+        for (k = 0; k < valid; k++, count++)
+            if (words && count < cap) words[count] = d[k];
+        done = r.status == DEPZ_BNO_FRS_READ_COMPLETED || r.status == DEPZ_BNO_FRS_READ_BLOCK_AND_READ_COMPLETED;
+    }
+    waiter_remove(s, &w);
+    if (rc) return rc;
+    if (n) *n = count;
+    if (count > cap) return depz_fail(DEPZ_E_ARG, "bno086: FRS record 0x%04X has %zu words, room for %zu",
+                                      record, count, cap);
+    return DEPZ_OK;
+}
+
+int depz_bno086_frs_read(depz_device *dev, uint16_t record, uint32_t *words, size_t cap, size_t *n)
+{
+    LOCKED(do_frs_read(dev, record, words, cap, n));
+}
+
+static int do_frs_write(depz_device *dev, uint16_t record, const uint32_t *words, size_t n)
+{
+    bno_state *s = st(dev);
+    uint8_t req[12], msg[CTRL_MAX];
+    size_t mlen, offset = 0;
+    waiter w;
+    uint64_t deadline;
+    bool done = false;
+    int rc;
+    if (n > 0xFFFF) return depz_fail(DEPZ_E_ARG, "bno086: FRS record too long");
+    depz_bno_pack_frs_write_request(record, (uint16_t)n, req);
+    waiter_add(s, &w, DEPZ_SH2_FRS_WRITE_RESPONSE);
+    rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, req, 6);
+    deadline = depz_now_us() + (uint64_t)timeout_at_least(dev, FRS_TIMEOUT_MS) * 1000u;
+    while (rc == DEPZ_OK && !done) {
+        depz_bno_frs_write_response r;
+        rc = waiter_next(dev, &w, deadline, msg, &mlen);
+        if (rc) break;
+        if (depz_bno_unpack_frs_write_response(msg, mlen, &r)) {
+            rc = short_reply(DEPZ_SH2_FRS_WRITE_RESPONSE, mlen);
+            break;
+        }
+        switch (r.status) {
+        case DEPZ_BNO_FRS_WRITE_UNRECOGNIZED_TYPE:
+        case DEPZ_BNO_FRS_WRITE_BUSY:
+        case DEPZ_BNO_FRS_WRITE_FAILED:
+        case DEPZ_BNO_FRS_WRITE_NOT_IN_WRITE_MODE:
+        case DEPZ_BNO_FRS_WRITE_INVALID_LENGTH:
+        case DEPZ_BNO_FRS_WRITE_RECORD_INVALID:
+            rc = depz_fail(DEPZ_E_STATUS, "bno086: FRS write 0x%04X failed: status %u", record, r.status);
+            break;
+        case DEPZ_BNO_FRS_WRITE_COMPLETED:
+            done = true;
+            break;
+        case DEPZ_BNO_FRS_WRITE_MODE_READY:
+        case DEPZ_BNO_FRS_WRITE_WORDS_RECEIVED:
+            if (offset < n) {
+                size_t chunk = n - offset < 2 ? n - offset : 2;
+                size_t len = depz_bno_pack_frs_write_data((uint16_t)offset, words + offset, chunk, req, sizeof req);
+                offset += chunk;
+                rc = send_shtp(dev, DEPZ_SHTP_CH_CONTROL, req, len);
+            }
+            break;
+        default: /* RECORD_VALID and friends: informational */
+            break;
+        }
+    }
+    waiter_remove(s, &w);
+    return rc;
+}
+
+int depz_bno086_frs_write(depz_device *dev, uint16_t record, const uint32_t *words, size_t n)
+{
+    if (n && !words) return depz_fail(DEPZ_E_ARG, "bno086: NULL words");
+    LOCKED(do_frs_write(dev, record, words, n));
+}
+
+static int do_get_metadata(depz_device *dev, uint8_t sensor, depz_bno_metadata *out)
+{
+    uint32_t words[64];
+    size_t n = 0;
+    uint16_t record = depz_bno_metadata_record(sensor);
+    if (!record) return depz_fail(DEPZ_E_ARG, "bno086: no metadata FRS record known for sensor 0x%02X", sensor);
+    TRY(do_frs_read(dev, record, words, sizeof words / sizeof words[0], &n));
+    depz_bno_metadata_from_words(words, n, out);
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_metadata(depz_device *dev, uint8_t sensor, depz_bno_metadata *out)
+{
+    if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    LOCKED(do_get_metadata(dev, sensor, out));
+}
+
+/* ── diagnostics and housekeeping ──────────────────────────────────────── */
+
+static int do_oscillator(depz_device *dev, uint8_t *type)
+{
+    depz_bno_command_response r;
+    TRY(command(dev, DEPZ_SH2_CMD_GET_OSCILLATOR_TYPE, NULL, 0, &r));
+    *type = r.r[0];
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_oscillator_type(depz_device *dev, uint8_t *type)
+{
+    if (!type) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    LOCKED(do_oscillator(dev, type));
+}
+
+static int do_clear_dcd_and_reset(depz_device *dev, int timeout_ms)
+{
+    if (timeout_ms < 0) timeout_ms = RESET_TIMEOUT_MS;
+    forget_link_state(st(dev));
+    TRY(command(dev, DEPZ_SH2_CMD_CLEAR_DCD_AND_RESET, NULL, 0, NULL));
+    if (!wait_reset_seen(dev, timeout_ms)) {
+        /* closed or lost meanwhile: that is the error, not a timeout (07 §3) */
+        if (depz_device_closed(dev)) return depz_device_fail_ended(dev);
+        return depz_fail(DEPZ_E_TIMEOUT, "bno086: no reset-complete after clear-DCD-and-reset");
+    }
+    /* The command consumed a host TX sequence number; the sensor restarted
+     * its counters on reset. TX only: what the hub sent since the reset is in
+     * the reassembly (bug hunt 2026-11-03 JAVA-12). The advertisement stays. */
+    depz_mutex_lock(&st(dev)->lock);
+    depz_shtp_reset_tx(&st(dev)->shtp);
+    depz_mutex_unlock(&st(dev)->lock);
+    return DEPZ_OK;
+}
+
+int depz_bno086_clear_dcd_and_reset(depz_device *dev, int timeout_ms)
+{
+    LOCKED(do_clear_dcd_and_reset(dev, timeout_ms));
+}
+
+typedef struct {
+    depz_bno086_error_record *out;
+    size_t cap, n;
+} errors_ctx;
+
+static bool collect_error(const depz_bno_command_response *r, void *ctx)
+{
+    errors_ctx *c = (errors_ctx *)ctx;
+    if (r->r[2] == DEPZ_BNO_ERR_SOURCE_NO_MORE) return true;
+    if (c->out && c->n < c->cap) {
+        depz_bno086_error_record *e = &c->out[c->n];
+        e->severity = r->r[0];
+        e->seq = r->r[1];
+        e->source = r->r[2];
+        e->error = r->r[3];
+        e->module = r->r[4];
+        e->code = r->r[5];
+    }
+    c->n++;
+    return false;
+}
+
+static int do_get_errors(depz_device *dev, uint8_t severity, depz_bno086_error_record *out, size_t cap, size_t *n)
+{
+    errors_ctx c;
+    c.out = out;
+    c.cap = cap;
+    c.n = 0;
+    TRY(command_collect(dev, DEPZ_SH2_CMD_ERRORS, &severity, 1, collect_error, &c));
+    if (n) *n = c.n < cap ? c.n : cap;
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_errors(depz_device *dev, uint8_t severity, depz_bno086_error_record *out, size_t cap,
+                           size_t *n)
+{
+    LOCKED(do_get_errors(dev, severity, out, cap, n));
+}
+
+typedef struct {
+    depz_bno_command_response r[2];
+    bool have[2];
+} counts_ctx;
+
+static bool collect_counts(const depz_bno_command_response *r, void *ctx)
+{
+    counts_ctx *c = (counts_ctx *)ctx;
+    if (r->response_seq < 2) {
+        c->r[r->response_seq] = *r;
+        c->have[r->response_seq] = true;
+    }
+    /* both halves, whatever their order: without one the exchange is not
+     * complete (a timeout, contract 07 §3 — bug hunt 2026-11-03 PY-6) */
+    return c->have[0] && c->have[1];
+}
+
+static int do_get_counts(depz_device *dev, uint8_t sensor, depz_bno086_counts *out)
+{
+    counts_ctx c;
+    uint8_t p[2];
+    p[0] = 0x00; /* get */
+    p[1] = sensor;
+    memset(&c, 0, sizeof c);
+    TRY(command_collect(dev, DEPZ_SH2_CMD_COUNTER, p, sizeof p, collect_counts, &c));
+    if (!c.have[0]) return depz_fail(DEPZ_E_INVALID_REPLY, "bno086: counts answer without its first part");
+    out->sensor_id = sensor;
+    out->offered = rd_u32(c.r[0].r + 3);
+    out->accepted = rd_u32(c.r[0].r + 7);
+    out->on = rd_u32(c.r[1].r + 3);
+    out->attempted = rd_u32(c.r[1].r + 7);
+    return DEPZ_OK;
+}
+
+int depz_bno086_get_counts(depz_device *dev, uint8_t sensor, depz_bno086_counts *out)
+{
+    if (!out) return depz_fail(DEPZ_E_ARG, "bno086: NULL output");
+    LOCKED(do_get_counts(dev, sensor, out));
+}
+
+int depz_bno086_clear_counts(depz_device *dev, uint8_t sensor)
+{
+    uint8_t p[2];
+    depz_bno_command_response r;
+    p[0] = 0x01; /* clear */
+    p[1] = sensor;
+    LOCKED(do_status_command(dev, DEPZ_SH2_CMD_COUNTER, p, sizeof p, "clear counts", &r));
+}
+
+int depz_bno086_command(depz_device *dev, uint8_t cmd, const uint8_t *params, size_t n,
+                        depz_bno_command_response *resp)
+{
+    if (n && !params) return depz_fail(DEPZ_E_ARG, "bno086: NULL params");
+    LOCKED(command(dev, cmd, params, n, resp));
+}
+
+int depz_bno086_send_shtp(depz_device *dev, uint8_t channel, const uint8_t *payload, size_t len)
+{
+    if (len && !payload) return depz_fail(DEPZ_E_ARG, "bno086: NULL payload");
+    if (channel >= DEPZ_SHTP_NUM_CHANNELS) return depz_fail(DEPZ_E_ARG, "bno086: no SHTP channel %u", channel);
+    LOCKED(send_shtp(dev, channel, payload, len));
+}

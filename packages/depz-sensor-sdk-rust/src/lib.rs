@@ -1,0 +1,95 @@
+//! Contract-first Rust SDK for the DEPZ USB sensor line.
+//!
+//! Transport + protocol foundation (CRCs, packet framing/parsing, the USB id
+//! table, common/identity/SR04 payload codecs, `.fwdepz` container parsing)
+//! plus the verifiable sensor-decode layer:
+//!
+//! - [`vl53l8`] — one decode layer for BOTH ToF variants (VL53L8CX base and
+//!   VL53L8CH = CX + CNH + PID 0xED40): frame reassembly, raw-frame decode,
+//!   advanced DCI codecs, and CH-only CNH histogram decode. The live ULD
+//!   register-bridge init/config is a documented extension point, out of scope.
+//! - [`vl53l7`] — VL53L5CX / VL53L7CX / VL53L7CH (one `APP_VL53L7` I2C bridge,
+//!   contract 11): the bridge's extra codecs and class resolution; frames
+//!   decode through [`vl53l8`] with [`vl53l8::Variant::L7`].
+//! - [`vl53l4`] — VL53L4CD single-zone ToF: register-bridge wire codecs,
+//!   result-block decode, ULD timing/tuning register math, init config block.
+//! - [`vl53lx`] — VL53L0X / L1CX / L1CB / L3CX / L4CD / L4CX (one
+//!   `APP_VL53L0_4` register bridge, contract 12, protocol v2.00): the v2.00
+//!   codecs, the product table and class resolution, and the stateless decode
+//!   of the three streamed blocks (die result, VL53L0X raw, histogram raw).
+//! - [`bno055`] — BNO055 9-axis IMU (one `APP_BNO055` register bridge,
+//!   contract 13): the bridge wire codecs, the §4 register codecs (units,
+//!   calibration, axis remap, page-1 configs) and register-window decode.
+//! - [`tmf8829`] — TMF8829 multizone dToF (one `APP_TMF8829` SPI register
+//!   bridge, contract 14): the bridge wire codecs and chunk reassembler,
+//!   frame / results-pixel decode and half-frame merge, the integer clock
+//!   model and capture time, measurement assembly, config-page fields and
+//!   the embedded ams sensor-firmware image (MIT).
+//! - [`bno086`] — SHTP framing, SH-2 report parsers, control request builders.
+//! - [`dataset`] — `.depzdata` decoded multi-device dataset reader (contract 09).
+//! - [`discovery`] — class resolution from probe answers + USB id
+//!   (contract 02 §4.4): [`resolve_sensor_class`], [`SENSOR_CLASS_NAMES`].
+//! - [`devices`] — the live layer (contract 07): the board's USB serial port
+//!   opened through the `serialport` crate ([`devices::open_device`],
+//!   [`devices::list_depz_devices`]), or any [`devices::Link`] of the host's
+//!   (a `.depzrec` replay, a socket); one device class per sensor family.
+//!
+//! Everything here is byte-exact with the golden vectors in
+//! `contracts/vectors/` and the Python/Java/C/C++ reference SDKs.
+
+pub mod bno055;
+pub mod bno086;
+pub mod crc;
+pub mod dataset;
+pub mod devices;
+pub mod discovery;
+pub mod framing;
+pub mod fwdepz;
+pub mod json;
+pub mod protocol;
+pub mod tmf8829;
+pub mod usb_ids;
+pub mod vl53l4;
+pub mod vl53l7;
+pub mod vl53l8;
+pub mod vl53lx;
+
+pub use devices::Stream;
+pub use discovery::{resolve_sensor_class, SENSOR_CLASS_NAMES};
+pub use framing::{
+    build_packet, CrcType, Event, FramingError, Packet, PacketParser, HEADER_SIZE, MAGIC,
+    MAX_PAYLOAD,
+};
+pub use usb_ids::{is_known_depz_usb, usb_model_hint};
+
+/// The seam for the crate's own integration tests (`tests/`), not for users: the ST ULD ports
+/// (`vl53lx::bare`, `vl53lx::uld`, `vl53lx::driver`, `vl53l8::driver`, `vl53l4::driver`) and the
+/// report-routing plumbing are `pub(crate)` — not public API, not covered by the 1.0 freeze — but
+/// the tests drive them directly. Hidden from the reference; may change in any release.
+#[doc(hidden)]
+pub mod __test_support {
+    pub mod vl53l4_driver {
+        pub use crate::vl53l4::driver::*;
+    }
+    pub mod vl53l8_driver {
+        pub use crate::vl53l8::driver::*;
+    }
+    pub mod vl53lx_bare {
+        pub use crate::vl53lx::bare::*;
+    }
+    pub mod vl53lx_driver {
+        pub use crate::vl53lx::driver::*;
+    }
+    pub mod vl53lx_uld {
+        pub use crate::vl53lx::uld::*;
+    }
+    pub use crate::devices::device::ReportHandler;
+
+    /// `DepzDevice::set_report_handler` for a test's own handler.
+    pub fn set_report_handler(
+        dev: &crate::devices::DepzDevice,
+        handler: std::sync::Arc<dyn ReportHandler>,
+    ) {
+        dev.set_report_handler(handler)
+    }
+}

@@ -1,0 +1,2355 @@
+<!-- generated from ../bno086/ — edit those pages -->
+# BNO085 (IMU) — API reference
+
+The public API for the BNO085 (IMU) sensor. Transport, USB identity, the common
+protocol codecs and other cross-sensor symbols shared by every sensor
+live in the [top-level API reference](../api.md).
+
+Generated from the Javadoc of the Java sources.
+
+## Contents
+
+- **BNO085 (IMU)**: [`Bno086Device`](#bno086device), [`Bno086`](#bno086), [`Bno086.Bno086Cmd`](#bno086bno086cmd), [`Bno086.Bno086Rpt`](#bno086bno086rpt), [`Bno086.Data`](#bno086data), [`Reports`](#reports), [`Reports.Report`](#reportsreport), [`Reports.InputReport`](#reportsinputreport), [`Reports.Acceleration`](#reportsacceleration), [`Reports.Gyroscope`](#reportsgyroscope), [`Reports.Magnetometer`](#reportsmagnetometer), [`Reports.UncalibratedGyroscope`](#reportsuncalibratedgyroscope), [`Reports.UncalibratedMagnetometer`](#reportsuncalibratedmagnetometer), [`Reports.RotationVector`](#reportsrotationvector), [`Reports.ScalarReport`](#reportsscalarreport), [`Reports.TapDetector`](#reportstapdetector), [`Reports.StepCounter`](#reportsstepcounter), [`Reports.StepDetector`](#reportsstepdetector), [`Reports.SignificantMotion`](#reportssignificantmotion), [`Reports.StabilityClassifier`](#reportsstabilityclassifier), [`Reports.MotionRequest`](#reportsmotionrequest), [`Reports.ShakeDetector`](#reportsshakedetector), [`Reports.GenericEvent`](#reportsgenericevent), [`Reports.PersonalActivityClassifier`](#reportspersonalactivityclassifier), [`Reports.RawSensor`](#reportsrawsensor), [`Reports.GyroIntegratedRV`](#reportsgyrointegratedrv), [`Reports.FlushCompleted`](#reportsflushcompleted), [`Reports.UnknownReport`](#reportsunknownreport), [`Sh2`](#sh2), [`Sh2Hub`](#sh2hub), [`Sh2Hub.TareBasis`](#sh2hubtarebasis), [`Sh2Hub.MotionIntent`](#sh2hubmotionintent), [`Sh2Hub.Sh2Exception`](#sh2hubsh2exception), [`Sh2Hub.FeatureResponse`](#sh2hubfeatureresponse), [`Sh2Hub.ProductId`](#sh2hubproductid), [`Sh2Hub.CommandResponse`](#sh2hubcommandresponse), [`Sh2Hub.FrsReadResponse`](#sh2hubfrsreadresponse), [`Sh2Hub.FrsWriteResponse`](#sh2hubfrswriteresponse), [`Sh2Hub.ErrorRecord`](#sh2huberrorrecord), [`Sh2Hub.Counts`](#sh2hubcounts), [`Sh2Hub.CalibrationConfig`](#sh2hubcalibrationconfig), [`Sh2Hub.SensorMetadata`](#sh2hubsensormetadata), [`Sh2Hub.FrsReadSession`](#sh2hubfrsreadsession), [`Sh2Hub.FrsWriteSession`](#sh2hubfrswritesession), [`Shtp`](#shtp), [`Shtp.ShtpHeader`](#shtpshtpheader), [`Shtp.ShtpCargo`](#shtpshtpcargo), [`Shtp.ShtpLayer`](#shtpshtplayer)
+
+## BNO085 (IMU)
+
+### Bno086Device
+
+```java
+public final class Bno086Device extends DepzDevice
+```
+
+BNO085 / BNO086 9-axis IMU (contract 05). The board only shuttles raw SHTP frames
+(SEND_SHTP_PACKET / RPT_DATA); the SH-2 hub protocol runs here, ported from the reference SDK.
+Every send is acknowledged by the bridge at once and every inbound frame arrives as
+RPT_DATA(cmd 0x00), so replies are correlated at the SH-2 layer only.
+<pre>{@code
+imu.hardwareReset();
+try (Subscription<Reports.Report> reports = imu.reports().subscribe(256)) {
+imu.enable(Reports.ROTATION_VECTOR, 100);
+if (reports.take(Duration.ofSeconds(1)) instanceof Reports.RotationVector rv) {
+double i = rv.i(); // the Q14 quaternion, scaled
+}
+}
+}</pre>
+Never call a blocking device method (`enable`, `tareNow`, …) from a
+`reports().on(cb)` callback.
+
+#### Bno086Device.RATE_LOW_FACTOR *(field)*
+
+```java
+public static final double RATE_LOW_FACTOR
+```
+
+Granted rates outside [0.9, 2.1] × the requested one are worth a warning, never an error (contract 05 §7).
+
+#### Bno086Device.RATE_HIGH_FACTOR *(field)*
+
+```java
+public static final double RATE_HIGH_FACTOR
+```
+
+#### Bno086Device.busyRetries
+
+```java
+public int busyRetries()
+```
+
+SEND_SHTP_PACKET attempts on ERR_BUSY before giving up.
+
+#### Bno086Device.setBusyRetries
+
+```java
+public void setBusyRetries(int retries)
+```
+
+#### Bno086Device.busyBackoff
+
+```java
+public Duration busyBackoff()
+```
+
+The back-off between busy retries (at least 200 ms per the bridge spec).
+
+#### Bno086Device.setBusyBackoff
+
+```java
+public void setBusyBackoff(Duration backoff)
+```
+
+#### Bno086Device.advertisement
+
+```java
+public byte[] advertisement()
+```
+
+The raw SHTP channel-0 advertisement seen since open or reset.
+
+#### Bno086Device.hardwareReset
+
+```java
+public void hardwareReset(@Nullable Duration timeout)
+```
+
+Hard-reset the sensor through nRST. The bridge's OK confirms it; the SH-2 executable
+reset-complete is waited for best-effort (firmware ≤ 0.95 never sent it, ERRATA E9). SHTP
+state and cached features restart from zero.
+
+#### Bno086Device.hardwareReset
+
+```java
+public void hardwareReset()
+```
+
+#### Bno086Device.wake
+
+```java
+public void wake()
+```
+
+Pulse WAKE (PS0) — the board's pin, not the SH-2 "On" that ends `sleep()` (that is `powerOn()`).
+
+#### Bno086Device.sleep
+
+```java
+public void sleep()
+```
+
+SH-2 "Sleep": every report stops except those enabled with
+`Sh2.FEATURE_FLAG_WAKEUP | Sh2.FEATURE_FLAG_ALWAYS_ON`; the configuration is kept. No response.
+
+#### Bno086Device.powerOn
+
+```java
+public void powerOn()
+```
+
+SH-2 "On": ends `sleep()`; every enabled report comes back. No response.
+
+#### Bno086Device.productId
+
+```java
+public ProductId productId(@Nullable Duration timeout)
+```
+
+The SH-2 application's Product ID — the first of `productIds`.
+
+#### Bno086Device.productId
+
+```java
+public ProductId productId()
+```
+
+#### Bno086Device.productIds
+
+```java
+public List<ProductId> productIds(@Nullable Duration timeout, @Nullable Duration settle)
+```
+
+Every component's Product ID Response, the SH-2 application first. Collects until no response
+came for `settle` (default 150 ms), so late ones cannot answer the next request.
+
+#### Bno086Device.productIds
+
+```java
+public List<ProductId> productIds()
+```
+
+#### Bno086Device.enableInterval
+
+```java
+public @Nullable FeatureResponse enableInterval(int sensor, long intervalUs, long batchUs, int sensitivity, int flags, long cfgWord, boolean verify, @Nullable Duration timeout)
+```
+
+Enable `sensor` through Set Feature (0xFD) every `intervalUs`. The hub rounds to
+its grid; with `verify` the granted rate is read back through Get Feature and a rate
+outside 0.9–2.1 × the request is logged as a warning (contract 05 §7). Returns that read-back
+(null without verify).
+
+#### Bno086Device.enableInterval
+
+```java
+public FeatureResponse enableInterval(int sensor, long intervalUs)
+```
+
+#### Bno086Device.enable
+
+```java
+public @Nullable FeatureResponse enable(int sensor, double hz, long batchUs, int sensitivity, int flags, long cfgWord, boolean verify, @Nullable Duration timeout)
+```
+
+`enableInterval` at `hz`.
+
+#### Bno086Device.enable
+
+```java
+public FeatureResponse enable(int sensor, double hz)
+```
+
+#### Bno086Device.disable
+
+```java
+public void disable(int sensor)
+```
+
+Disable `sensor` (Set Feature with interval 0).
+
+#### Bno086Device.getFeature
+
+```java
+public FeatureResponse getFeature(int sensor, @Nullable Duration timeout)
+```
+
+Get Feature round trip: the rates in effect for `sensor`.
+
+#### Bno086Device.getFeature
+
+```java
+public FeatureResponse getFeature(int sensor)
+```
+
+#### Bno086Device.reports
+
+```java
+public SensorStream<Reports.Report> reports()
+```
+
+The typed-report stream (contract 07 §3): `reports().on(cb, where)` subscribes (reader
+thread; don't block), `reports().subscribe(capacity, where)` queues (bounded, drop-oldest,
+subscribed when it returns — reports emitted after the call are never missed), `reports().next(timeout)` waits for one. `where` keeps the reports it accepts, e.g. one
+sensor's: `r -> r.sensorId() == Reports.ROTATION_VECTOR`. A report is one of the
+`Reports.Report` records (`Reports.RotationVector`, `Reports.Acceleration`, …);
+`parseErrors()` counts the RPT_DATA reports shorter than their 9-byte header (contract 07 §2).
+
+#### Bno086Device.tareNow
+
+```java
+public void tareNow(int axes, TareBasis basis)
+```
+
+Tare `axes` (a `Sh2Hub.TARE_*` bitmap) against `basis` (no response).
+
+#### Bno086Device.tareNow
+
+```java
+public void tareNow()
+```
+
+All axes against the rotation vector.
+
+#### Bno086Device.persistTare
+
+```java
+public void persistTare()
+```
+
+Persist the current tare into FRS (no response).
+
+#### Bno086Device.setReorientation
+
+```java
+public void setReorientation(double x, double y, double z, double w)
+```
+
+The runtime reorientation quaternion (Q14 on the wire; all zeros clears; no response). It is
+applied on the hub's side, in the hub's own axes: x and y swapped and z negated relative to the
+reports.
+
+#### Bno086Device.setCalibration
+
+```java
+public void setCalibration(boolean accel, boolean gyro, boolean mag, boolean planar, @Nullable Duration timeout)
+```
+
+Configure the motion-engine calibration; `Sh2Exception` on a non-zero status.
+
+#### Bno086Device.setCalibration
+
+```java
+public void setCalibration(boolean accel, boolean gyro, boolean mag)
+```
+
+#### Bno086Device.getCalibration
+
+```java
+public CalibrationConfig getCalibration(@Nullable Duration timeout)
+```
+
+Which motion-engine calibrations run.
+
+#### Bno086Device.getCalibration
+
+```java
+public CalibrationConfig getCalibration()
+```
+
+#### Bno086Device.saveDcd
+
+```java
+public void saveDcd(@Nullable Duration timeout)
+```
+
+Save the dynamic calibration data to flash (DCD Save Now).
+
+#### Bno086Device.saveDcd
+
+```java
+public void saveDcd()
+```
+
+#### Bno086Device.configurePeriodicDcd
+
+```java
+public void configurePeriodicDcd(boolean enable)
+```
+
+The hub's periodic DCD autosave (no response).
+
+#### Bno086Device.setMotionIntent
+
+```java
+public void setMotionIntent(MotionIntent intent)
+```
+
+Interactive Calibration (0x0E, BNO085 only): how the device is about to move, so the hub can
+refine the gyro zero-rate offset while it is still. No response; a BNO085 ignores it. The
+hub's answer, if it wants the device to stop, is a MotionRequest report.
+
+#### Bno086Device.enableMotionRequest
+
+```java
+public @Nullable FeatureResponse enableMotionRequest(double hz)
+```
+
+Enable MotionRequest (0x2B) reports; the hub sends one when its request changes, and reads
+the rate back late, so the granted rate is not checked.
+
+#### Bno086Device.flush
+
+```java
+public void flush(int sensor, @Nullable Duration timeout)
+```
+
+Force Sensor Flush (0xF0): the hub sends `sensor`'s batched reports now; returns once its
+Flush Completed (0xEF) arrives.
+
+#### Bno086Device.flush
+
+```java
+public void flush(int sensor)
+```
+
+#### Bno086Device.frsRead
+
+```java
+public long[] frsRead(int recordId, @Nullable Duration timeout)
+```
+
+Read a whole FRS record: its 32-bit words.
+
+#### Bno086Device.frsRead
+
+```java
+public long[] frsRead(int recordId)
+```
+
+#### Bno086Device.frsWrite
+
+```java
+public void frsWrite(int recordId, long[] words, @Nullable Duration timeout)
+```
+
+Write a whole FRS record; `Sh2Exception` on failure.
+
+#### Bno086Device.frsWrite
+
+```java
+public void frsWrite(int recordId, long[] words)
+```
+
+#### Bno086Device.getMetadata
+
+```java
+public SensorMetadata getMetadata(int sensor, @Nullable Duration timeout)
+```
+
+Read and parse `sensor`'s metadata FRS record.
+
+#### Bno086Device.getMetadata
+
+```java
+public SensorMetadata getMetadata(int sensor)
+```
+
+#### Bno086Device.getOscillatorType
+
+```java
+public int getOscillatorType(@Nullable Duration timeout)
+```
+
+Get Oscillator Type (0x0A): R0, one of `Sh2Hub.OSC_*` (an unknown value comes back as is).
+
+#### Bno086Device.getOscillatorType
+
+```java
+public int getOscillatorType()
+```
+
+#### Bno086Device.clearDcdAndReset
+
+```java
+public void clearDcdAndReset(@Nullable Duration timeout)
+```
+
+Clear the in-RAM dynamic calibration and reset (0x0B). The hub resets instead of answering,
+so this waits for the executable reset-complete.
+
+#### Bno086Device.clearDcdAndReset
+
+```java
+public void clearDcdAndReset()
+```
+
+#### Bno086Device.getErrors
+
+```java
+public List<ErrorRecord> getErrors(int severity, @Nullable Duration timeout)
+```
+
+The error queue (0x01), `severity` or greater; records stream until one with source 255 (no more).
+
+#### Bno086Device.getErrors
+
+```java
+public List<ErrorRecord> getErrors()
+```
+
+#### Bno086Device.getCounts
+
+```java
+public Counts getCounts(int sensor, @Nullable Duration timeout)
+```
+
+A sensor's event counts (0x02): two responses, response_seq 0 then 1.
+
+#### Bno086Device.getCounts
+
+```java
+public Counts getCounts(int sensor)
+```
+
+#### Bno086Device.clearCounts
+
+```java
+public void clearCounts(int sensor, @Nullable Duration timeout)
+```
+
+Clear a sensor's event counts (0x02, subcommand 1).
+
+#### Bno086Device.clearCounts
+
+```java
+public void clearCounts(int sensor)
+```
+
+### Bno086
+
+```java
+public final class Bno086
+```
+
+BNO085 / BNO086 bridge wire codecs (contract 05 §2): the MCU only shuttles
+raw SHTP frames; the SH-2 hub protocol runs on the host
+(`ai.depz.sensor.sensors.bno086.Sh2Hub`, `ai.depz.sensor.devices.Bno086Device`).
+
+#### Bno086.BUSY_BACKOFF_MS *(field)*
+
+```java
+public static final int BUSY_BACKOFF_MS = 200
+```
+
+Two 64-byte SHTP transmit slots on the MCU (ERRATA E2); a third send gets ERR_BUSY, to back
+off at least this long.
+
+### Bno086.Bno086Cmd
+
+```java
+public enum Bno086Cmd
+```
+
+#### Bno086.Bno086Cmd — constants
+
+`SENSOR_RESET`(0x32), `SENSOR_WAKE_UP`(0x33), `SEND_SHTP_PACKET`(0x34)
+
+#### Bno086.Bno086Cmd.value *(field)*
+
+```java
+public final int value
+```
+
+### Bno086.Bno086Rpt
+
+```java
+public enum Bno086Rpt
+```
+
+#### Bno086.Bno086Rpt — constants
+
+`DATA`(0x91)
+
+#### Bno086.Bno086Rpt.value *(field)*
+
+```java
+public final int value
+```
+
+### Bno086.Data
+
+```java
+public record Data(int cmd, long timestampUs, byte[] shtp)
+```
+
+One RPT_DATA report: an SHTP frame captured from the sensor bus, with the MCU uptime.
+
+#### Bno086.Data.unpack
+
+```java
+public static Data unpack(byte[] p)
+```
+
+### Reports
+
+```java
+public final class Reports
+```
+
+SH-2 input-report catalog and parsers (contract 05 §5).
+
+Raw wire integers are authoritative (every record keeps them as its
+`*Raw` components); the records derive the physical values with the
+Q points of `Q_POINTS` (`x()`, `i()`, `value()`, …).
+Timestamps:
+channel-3/4 cargos start with a Base Timestamp Reference (0xFB, i32 base
+delta in 100 µs ticks, subtracted from the bridge capture time), 0xFA
+rebases add; each report adds its own 14-bit delay (status bits 7:2 upper,
+byte 3 lower; 100 µs). timestampUs = capture − baseDelta·100 + delay·100.
+
+Mirror of the TS/Python `reports` references.
+
+#### Reports.ACCELEROMETER *(field)*
+
+```java
+public static final int ACCELEROMETER = 0x01
+```
+
+#### Reports.GYROSCOPE *(field)*
+
+```java
+public static final int GYROSCOPE = 0x02
+```
+
+#### Reports.MAGNETOMETER *(field)*
+
+```java
+public static final int MAGNETOMETER = 0x03
+```
+
+#### Reports.LINEAR_ACCELERATION *(field)*
+
+```java
+public static final int LINEAR_ACCELERATION = 0x04
+```
+
+#### Reports.ROTATION_VECTOR *(field)*
+
+```java
+public static final int ROTATION_VECTOR = 0x05
+```
+
+#### Reports.GRAVITY *(field)*
+
+```java
+public static final int GRAVITY = 0x06
+```
+
+#### Reports.UNCAL_GYROSCOPE *(field)*
+
+```java
+public static final int UNCAL_GYROSCOPE = 0x07
+```
+
+#### Reports.GAME_ROTATION_VECTOR *(field)*
+
+```java
+public static final int GAME_ROTATION_VECTOR = 0x08
+```
+
+#### Reports.GEOMAG_ROTATION_VECTOR *(field)*
+
+```java
+public static final int GEOMAG_ROTATION_VECTOR = 0x09
+```
+
+#### Reports.PRESSURE *(field)*
+
+```java
+public static final int PRESSURE = 0x0a
+```
+
+#### Reports.AMBIENT_LIGHT *(field)*
+
+```java
+public static final int AMBIENT_LIGHT = 0x0b
+```
+
+#### Reports.HUMIDITY *(field)*
+
+```java
+public static final int HUMIDITY = 0x0c
+```
+
+#### Reports.PROXIMITY *(field)*
+
+```java
+public static final int PROXIMITY = 0x0d
+```
+
+#### Reports.TEMPERATURE *(field)*
+
+```java
+public static final int TEMPERATURE = 0x0e
+```
+
+#### Reports.UNCAL_MAGNETOMETER *(field)*
+
+```java
+public static final int UNCAL_MAGNETOMETER = 0x0f
+```
+
+#### Reports.TAP_DETECTOR *(field)*
+
+```java
+public static final int TAP_DETECTOR = 0x10
+```
+
+#### Reports.STEP_COUNTER *(field)*
+
+```java
+public static final int STEP_COUNTER = 0x11
+```
+
+#### Reports.SIGNIFICANT_MOTION *(field)*
+
+```java
+public static final int SIGNIFICANT_MOTION = 0x12
+```
+
+#### Reports.STABILITY_CLASSIFIER *(field)*
+
+```java
+public static final int STABILITY_CLASSIFIER = 0x13
+```
+
+#### Reports.RAW_ACCELEROMETER *(field)*
+
+```java
+public static final int RAW_ACCELEROMETER = 0x14
+```
+
+#### Reports.RAW_GYROSCOPE *(field)*
+
+```java
+public static final int RAW_GYROSCOPE = 0x15
+```
+
+#### Reports.RAW_MAGNETOMETER *(field)*
+
+```java
+public static final int RAW_MAGNETOMETER = 0x16
+```
+
+#### Reports.STEP_DETECTOR *(field)*
+
+```java
+public static final int STEP_DETECTOR = 0x18
+```
+
+#### Reports.SHAKE_DETECTOR *(field)*
+
+```java
+public static final int SHAKE_DETECTOR = 0x19
+```
+
+#### Reports.PERSONAL_ACTIVITY_CLASSIFIER *(field)*
+
+```java
+public static final int PERSONAL_ACTIVITY_CLASSIFIER = 0x1e
+```
+
+#### Reports.ARVR_STABILIZED_RV *(field)*
+
+```java
+public static final int ARVR_STABILIZED_RV = 0x28
+```
+
+#### Reports.ARVR_STABILIZED_GAME_RV *(field)*
+
+```java
+public static final int ARVR_STABILIZED_GAME_RV = 0x29
+```
+
+#### Reports.GYRO_INTEGRATED_RV *(field)*
+
+```java
+public static final int GYRO_INTEGRATED_RV = 0x2a
+```
+
+#### Reports.MOTION_REQUEST *(field)*
+
+```java
+public static final int MOTION_REQUEST = 0x2b
+```
+
+Interactive calibration, BNO085 only.
+
+#### Reports.BASE_TIMESTAMP_REF *(field)*
+
+```java
+public static final int BASE_TIMESTAMP_REF = 0xfb
+```
+
+#### Reports.TIMESTAMP_REBASE *(field)*
+
+```java
+public static final int TIMESTAMP_REBASE = 0xfa
+```
+
+#### Reports.FLUSH_COMPLETED *(field)*
+
+```java
+public static final int FLUSH_COMPLETED = 0xef
+```
+
++ u8 sensor ID, no SH-2 header; the answer to Force Sensor Flush (0xF0).
+
+#### Reports.Q_POINTS *(field)*
+
+```java
+public static final Map<Integer, Integer> Q_POINTS
+```
+
+The Q points of the primary fields by sensor id (value = raw / 2^Q), SH-2 reference driver.
+
+#### Reports.RV_ACCURACY_Q *(field)*
+
+```java
+public static final int RV_ACCURACY_Q = 12
+```
+
+The rotation-vector accuracy estimate, radians.
+
+#### Reports.GYRO_RV_ANGVEL_Q *(field)*
+
+```java
+public static final int GYRO_RV_ANGVEL_Q = 10
+```
+
+The gyro-integrated rotation vector's angular velocity, rad/s.
+
+#### Reports.scale
+
+```java
+public static double scale(long raw, int q)
+```
+
+raw / 2^q (exact in a double).
+
+#### Reports.parseInputCargo
+
+```java
+public static List<Report> parseInputCargo(byte[] payload, long captureTimestampUs)
+```
+
+Parse a channel-3/4 cargo into typed reports. `captureTimestampUs`
+is the bridge RPT_DATA capture time (MCU uptime, a u64: a negative one
+is an IllegalArgumentException).
+
+#### Reports.parseGyroRvCargo
+
+```java
+public static @Nullable GyroIntegratedRV parseGyroRvCargo(byte[] payload, long captureTimestampUs)
+```
+
+Parse a channel-5 cargo (gyro-integrated RV, dense format). Two shapes:
+7×i16 bare, or prefixed with 0xFB + i32 base delta + u16 delay. Returns
+`null` on a too-short buffer; a negative `captureTimestampUs`
+is an IllegalArgumentException.
+
+### Reports.Report
+
+```java
+public sealed interface Report
+```
+
+Base of every decoded report. `timestampUs` is absolute in the MCU clock domain (the
+bridge capture time corrected by the timebase reference and the report delay); `sensorId`
+is the SH-2 report id (0xEF for a `FlushCompleted`). Raw wire integers are authoritative:
+every record keeps them (`xRaw`, `iRaw`, …) and derives the physical values with the
+Q points of `Q_POINTS` (`x()`, `i()`, …). One record per report kind, the
+reference SDK's class names; a `switch` or `instanceof` pattern picks the kind.
+
+### Reports.InputReport
+
+```java
+public sealed interface InputReport extends Report
+```
+
+Channel-3/4 report with the common SH-2 header fields: `seq` (8-bit rolling sample counter),
+`accuracy` (status bits 1:0 — 0 unreliable … 3 high) and `delayUs` (already folded into
+`timestampUs`).
+
+### Reports.Acceleration
+
+```java
+public record Acceleration(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw) implements InputReport
+```
+
+0x01 accelerometer / 0x04 linear acceleration / 0x06 gravity (Q8, m/s²).
+
+#### Reports.Acceleration.x
+
+```java
+public double x()
+```
+
+#### Reports.Acceleration.y
+
+```java
+public double y()
+```
+
+#### Reports.Acceleration.z
+
+```java
+public double z()
+```
+
+### Reports.Gyroscope
+
+```java
+public record Gyroscope(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw) implements InputReport
+```
+
+0x02 calibrated gyroscope (Q9, rad/s).
+
+#### Reports.Gyroscope.x
+
+```java
+public double x()
+```
+
+#### Reports.Gyroscope.y
+
+```java
+public double y()
+```
+
+#### Reports.Gyroscope.z
+
+```java
+public double z()
+```
+
+### Reports.Magnetometer
+
+```java
+public record Magnetometer(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw) implements InputReport
+```
+
+0x03 calibrated magnetic field (Q4, µT).
+
+#### Reports.Magnetometer.x
+
+```java
+public double x()
+```
+
+#### Reports.Magnetometer.y
+
+```java
+public double y()
+```
+
+#### Reports.Magnetometer.z
+
+```java
+public double z()
+```
+
+### Reports.UncalibratedGyroscope
+
+```java
+public record UncalibratedGyroscope(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw, int biasXRaw, int biasYRaw, int biasZRaw) implements InputReport
+```
+
+0x07 uncalibrated gyroscope + bias estimate (all Q9, rad/s).
+
+#### Reports.UncalibratedGyroscope.x
+
+```java
+public double x()
+```
+
+#### Reports.UncalibratedGyroscope.y
+
+```java
+public double y()
+```
+
+#### Reports.UncalibratedGyroscope.z
+
+```java
+public double z()
+```
+
+#### Reports.UncalibratedGyroscope.bias
+
+```java
+public double[] bias()
+```
+
+The bias estimate, rad/s.
+
+### Reports.UncalibratedMagnetometer
+
+```java
+public record UncalibratedMagnetometer(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw, int biasXRaw, int biasYRaw, int biasZRaw) implements InputReport
+```
+
+0x0F uncalibrated magnetic field + hard-iron bias (all Q4, µT).
+
+#### Reports.UncalibratedMagnetometer.x
+
+```java
+public double x()
+```
+
+#### Reports.UncalibratedMagnetometer.y
+
+```java
+public double y()
+```
+
+#### Reports.UncalibratedMagnetometer.z
+
+```java
+public double z()
+```
+
+#### Reports.UncalibratedMagnetometer.bias
+
+```java
+public double[] bias()
+```
+
+The hard-iron bias, µT.
+
+### Reports.RotationVector
+
+```java
+public record RotationVector(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int iRaw, int jRaw, int kRaw, int realRaw, @Nullable Integer accuracyRaw) implements InputReport
+```
+
+Quaternion reports 0x05 / 0x08 / 0x09 / 0x28 / 0x29 (unit quaternion, Q14). `accuracyRaw`
+(Q12, radians) is present only for 0x05 / 0x09 / 0x28 — `null` for the game variants.
+
+#### Reports.RotationVector.i
+
+```java
+public double i()
+```
+
+#### Reports.RotationVector.j
+
+```java
+public double j()
+```
+
+#### Reports.RotationVector.k
+
+```java
+public double k()
+```
+
+#### Reports.RotationVector.real
+
+```java
+public double real()
+```
+
+#### Reports.RotationVector.accuracyRad
+
+```java
+public @Nullable Double accuracyRad()
+```
+
+Estimated heading accuracy, radians (`null` for the game variants).
+
+### Reports.ScalarReport
+
+```java
+public record ScalarReport(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, long valueRaw) implements InputReport
+```
+
+Environment reports 0x0A–0x0E: one value, Q from `Q_POINTS` (hPa, lux, %, cm, °C).
+
+#### Reports.ScalarReport.value
+
+```java
+public double value()
+```
+
+### Reports.TapDetector
+
+```java
+public record TapDetector(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int flags) implements InputReport
+```
+
+0x10 tap detector; `flags` bit 6 = double tap, bits 0–5 axis / sign.
+
+#### Reports.TapDetector.doubleTap
+
+```java
+public boolean doubleTap()
+```
+
+### Reports.StepCounter
+
+```java
+public record StepCounter(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, long latencyUs, int steps) implements InputReport
+```
+
+0x11 step counter: the latency from the step to the report (µs) and the count.
+
+### Reports.StepDetector
+
+```java
+public record StepDetector(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, long latencyUs) implements InputReport
+```
+
+0x18 step detector; the latency from the step event to the report, µs.
+
+### Reports.SignificantMotion
+
+```java
+public record SignificantMotion(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int motion) implements InputReport
+```
+
+0x12 significant motion (1 = motion detected; the sensor disables itself).
+
+### Reports.StabilityClassifier
+
+```java
+public record StabilityClassifier(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int classification) implements InputReport
+```
+
+0x13 stability classification (0 unknown, 1 on table, 2 stationary, 3 stable, 4 motion).
+
+### Reports.MotionRequest
+
+```java
+public record MotionRequest(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int intent, int request) implements InputReport
+```
+
+0x2B motion request (BNO085 interactive calibration): the motion `intent` the hub was last
+told, and what it asks of the device (SH-2 §6.5.45.2; `request` 1, 3, 4 = stay still). Sent
+when the request changes, not periodically, whatever the granted rate.
+
+#### Reports.MotionRequest.wantsStillness
+
+```java
+public boolean wantsStillness()
+```
+
+True when the hub asks the device to stop (the deprecated optional request 2 does not count).
+
+### Reports.ShakeDetector
+
+```java
+public record ShakeDetector(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int flags) implements InputReport
+```
+
+0x19 shake detector; `flags` bits 0 / 1 / 2 = X / Y / Z shake.
+
+### Reports.GenericEvent
+
+```java
+public record GenericEvent(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int valueRaw) implements InputReport
+```
+
+The simple u16-value detectors: 0x1A flip, 0x1B pickup, 0x1C stability detector, 0x1F sleep,
+0x20 tilt, 0x21 pocket, 0x22 circle, 0x23 heart rate.
+
+### Reports.PersonalActivityClassifier
+
+```java
+public record PersonalActivityClassifier(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int pageNumber, boolean endOfSequence, int mostLikelyState, int[] confidences) implements InputReport
+```
+
+0x1E personal activity classifier: `confidences` are 0–100 per state, states 0–9 of the
+current page; `endOfSequence` is the page byte's bit 7.
+
+### Reports.RawSensor
+
+```java
+public record RawSensor(int sensorId, long timestampUs, int seq, int accuracy, long delayUs, int xRaw, int yRaw, int zRaw, long sensorTimestampUs, int temperatureRaw) implements InputReport
+```
+
+0x14 / 0x15 / 0x16 raw ADC samples + the sensor-clock timestamp (u32 µs). `temperatureRaw`
+is populated only for the raw gyroscope (0 otherwise).
+
+### Reports.GyroIntegratedRV
+
+```java
+public record GyroIntegratedRV(int sensorId, long timestampUs, int iRaw, int jRaw, int kRaw, int realRaw, int vxRaw, int vyRaw, int vzRaw) implements Report
+```
+
+0x2A gyro-integrated rotation vector (channel 5, dense — no SH-2 header). Quaternion Q14, angular
+velocity Q10 rad/s.
+
+#### Reports.GyroIntegratedRV.i
+
+```java
+public double i()
+```
+
+#### Reports.GyroIntegratedRV.j
+
+```java
+public double j()
+```
+
+#### Reports.GyroIntegratedRV.k
+
+```java
+public double k()
+```
+
+#### Reports.GyroIntegratedRV.real
+
+```java
+public double real()
+```
+
+#### Reports.GyroIntegratedRV.angularVelocity
+
+```java
+public double[] angularVelocity()
+```
+
+Angular velocity, rad/s.
+
+### Reports.FlushCompleted
+
+```java
+public record FlushCompleted(int sensorId, long timestampUs, int flushedSensor) implements Report
+```
+
+0xEF Flush Completed: every batched report of `flushedSensor` as of the matching Force
+Sensor Flush has been sent. `sensorId` is 0xEF; no SH-2 header, so the timestamp is the
+cargo's current base.
+
+### Reports.UnknownReport
+
+```java
+public record UnknownReport(int sensorId, long timestampUs, byte[] data) implements Report
+```
+
+An unrecognised or truncated report id: the raw bytes from the id to the end of the cargo (the
+length is unknowable, so parsing stops here).
+
+### Sh2
+
+```java
+public final class Sh2
+```
+
+SH-2 control-channel encoders (contract 05 §6). Pure
+codecs; mirror of the TS/Python `sh2` references. The response
+decoders and the hub session helpers are `Sh2Hub`.
+
+#### Sh2.SET_FEATURE_COMMAND *(field)*
+
+```java
+public static final int SET_FEATURE_COMMAND = 0xfd
+```
+
+#### Sh2.GET_FEATURE_REQUEST *(field)*
+
+```java
+public static final int GET_FEATURE_REQUEST = 0xfe
+```
+
+#### Sh2.GET_FEATURE_RESPONSE *(field)*
+
+```java
+public static final int GET_FEATURE_RESPONSE = 0xfc
+```
+
+#### Sh2.PRODUCT_ID_REQUEST *(field)*
+
+```java
+public static final int PRODUCT_ID_REQUEST = 0xf9
+```
+
+#### Sh2.PRODUCT_ID_RESPONSE *(field)*
+
+```java
+public static final int PRODUCT_ID_RESPONSE = 0xf8
+```
+
+#### Sh2.COMMAND_REQUEST *(field)*
+
+```java
+public static final int COMMAND_REQUEST = 0xf2
+```
+
+#### Sh2.COMMAND_RESPONSE *(field)*
+
+```java
+public static final int COMMAND_RESPONSE = 0xf1
+```
+
+#### Sh2.FRS_READ_REQUEST *(field)*
+
+```java
+public static final int FRS_READ_REQUEST = 0xf4
+```
+
+#### Sh2.FRS_READ_RESPONSE *(field)*
+
+```java
+public static final int FRS_READ_RESPONSE = 0xf3
+```
+
+#### Sh2.FRS_WRITE_REQUEST *(field)*
+
+```java
+public static final int FRS_WRITE_REQUEST = 0xf7
+```
+
+#### Sh2.FRS_WRITE_DATA *(field)*
+
+```java
+public static final int FRS_WRITE_DATA = 0xf6
+```
+
+#### Sh2.FRS_WRITE_RESPONSE *(field)*
+
+```java
+public static final int FRS_WRITE_RESPONSE = 0xf5
+```
+
+#### Sh2.FEATURE_FLAG_WAKEUP *(field)*
+
+```java
+public static final int FEATURE_FLAG_WAKEUP = 0x04
+```
+
+Set Feature `flags` bit 2 (SH-2 §6.5.4): wake-up enabled — the
+sensor reports on SHTP channel 4 (wake input).
+
+#### Sh2.FEATURE_FLAG_ALWAYS_ON *(field)*
+
+```java
+public static final int FEATURE_FLAG_ALWAYS_ON = 0x08
+```
+
+Set Feature `flags` bit 3 (SH-2 §6.5.4): always-on — the sensor
+keeps running while the hub sleeps. With `FEATURE_FLAG_WAKEUP` a
+report kept its full rate through `buildSleep()` on a DEPZ BNO085
+(SH-2 3.12.6, 2026-10-16), on channel 4, while every other report stopped.
+
+#### Sh2.buildSetFeature
+
+```java
+public static byte[] buildSetFeature(int sensorId, long intervalUs, long batchUs, int sensitivity, int flags, long cfgWord)
+```
+
+Set Feature Command (0xFD), 17 bytes. intervalUs = 0 disables.
+
+#### Sh2.buildGetFeatureRequest
+
+```java
+public static byte[] buildGetFeatureRequest(int sensorId)
+```
+
+Get Feature Request (0xFE), 2 bytes.
+
+#### Sh2.buildProductIdRequest
+
+```java
+public static byte[] buildProductIdRequest()
+```
+
+Product ID Request (0xF9), 2 bytes.
+
+#### Sh2.buildSleep
+
+```java
+public static byte[] buildSleep()
+```
+
+SH-2 "Sleep" for the executable channel (channel 1, not control):
+`[0x03]`. Frame it with
+`nextFrame(Shtp.CHANNEL_EXECUTABLE, Sh2.buildSleep())` and send it
+through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no response.
+Every report stops, except those enabled with
+`FEATURE_FLAG_WAKEUP` | `FEATURE_FLAG_ALWAYS_ON`, which keep
+their rate; the configuration (enabled sensors, rates) is kept.
+`buildPowerOn()` ends it. On a DEPZ BNO085 (SH-2 3.12.6,
+2026-10-16) all reports stopped within one sample; a WAKEUP|ALWAYS_ON
+report kept streaming at full rate on channel 4.
+
+#### Sh2.buildPowerOn
+
+```java
+public static byte[] buildPowerOn()
+```
+
+SH-2 "On" for the executable channel (channel 1): `[0x02]` —
+ends `buildSleep()`'s sleep. Every report that was enabled comes
+back at its rate, without re-enabling; the hub sends no response. Not the
+bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware
+signal, not an SH-2 command.
+
+#### Sh2.buildCommandRequest
+
+```java
+public static byte[] buildCommandRequest(int seq, int command, byte[] params)
+```
+
+Command Request (0xF2), 12 bytes: id, seq, command, P0..P8.
+
+#### Sh2.buildFrsReadRequest
+
+```java
+public static byte[] buildFrsReadRequest(int frsType, int offsetWords, int blockWords)
+```
+
+FRS Read Request (0xF4), 8 bytes. blockWords = 0 reads the record.
+
+#### Sh2.buildFrsWriteRequest
+
+```java
+public static byte[] buildFrsWriteRequest(int frsType, int lengthWords)
+```
+
+FRS Write Request (0xF7), 6 bytes. lengthWords = 0 erases the record.
+
+#### Sh2.buildFrsWriteData
+
+```java
+public static byte[] buildFrsWriteData(int offsetWords, long[] words)
+```
+
+FRS Write Data (0xF6), 12 bytes; 1 or 2 words per packet.
+
+### Sh2Hub
+
+```java
+public final class Sh2Hub
+```
+
+SH-2 hub protocol (contract 05 §6): the control-response decoders, the request parameters, the
+FRS sessions and the control-cargo walk the device layer needs on top of `Sh2`. Ported from
+the reference `sh2.py`.
+
+#### Sh2Hub.FORCE_SENSOR_FLUSH *(field)*
+
+```java
+public static final int FORCE_SENSOR_FLUSH = 0xF0
+```
+
+Host → hub on the control channel; answered by Flush Completed (0xEF) on the input channel.
+
+#### Sh2Hub.CHANNEL_COMMAND *(field)*
+
+```java
+public static final int CHANNEL_COMMAND = 0
+```
+
+#### Sh2Hub.CHANNEL_CONTROL *(field)*
+
+```java
+public static final int CHANNEL_CONTROL = 2
+```
+
+#### Sh2Hub.CHANNEL_INPUT_NORMAL *(field)*
+
+```java
+public static final int CHANNEL_INPUT_NORMAL = 3
+```
+
+#### Sh2Hub.CHANNEL_INPUT_WAKE *(field)*
+
+```java
+public static final int CHANNEL_INPUT_WAKE = 4
+```
+
+#### Sh2Hub.CHANNEL_GYRO_RV *(field)*
+
+```java
+public static final int CHANNEL_GYRO_RV = 5
+```
+
+#### Sh2Hub.EXECUTABLE_RESET_COMPLETE *(field)*
+
+```java
+public static final int EXECUTABLE_RESET_COMPLETE = 0x01
+```
+
+Inbound on the executable channel: the hub finished a reset.
+
+#### Sh2Hub.CMD_ERRORS *(field)*
+
+```java
+public static final int CMD_ERRORS = 0x01
+```
+
+#### Sh2Hub.CMD_COUNTER *(field)*
+
+```java
+public static final int CMD_COUNTER = 0x02
+```
+
+#### Sh2Hub.CMD_TARE *(field)*
+
+```java
+public static final int CMD_TARE = 0x03
+```
+
+#### Sh2Hub.CMD_INITIALIZE *(field)*
+
+```java
+public static final int CMD_INITIALIZE = 0x04
+```
+
+#### Sh2Hub.CMD_SAVE_DCD *(field)*
+
+```java
+public static final int CMD_SAVE_DCD = 0x06
+```
+
+#### Sh2Hub.CMD_ME_CALIBRATE *(field)*
+
+```java
+public static final int CMD_ME_CALIBRATE = 0x07
+```
+
+#### Sh2Hub.CMD_PERIODIC_DCD_CONFIG *(field)*
+
+```java
+public static final int CMD_PERIODIC_DCD_CONFIG = 0x09
+```
+
+#### Sh2Hub.CMD_GET_OSCILLATOR_TYPE *(field)*
+
+```java
+public static final int CMD_GET_OSCILLATOR_TYPE = 0x0A
+```
+
+#### Sh2Hub.CMD_CLEAR_DCD_AND_RESET *(field)*
+
+```java
+public static final int CMD_CLEAR_DCD_AND_RESET = 0x0B
+```
+
+#### Sh2Hub.CMD_INTERACTIVE_CALIBRATION *(field)*
+
+```java
+public static final int CMD_INTERACTIVE_CALIBRATION = 0x0E
+```
+
+BNO085 only; no response.
+
+#### Sh2Hub.OSC_INTERNAL *(field)*
+
+```java
+public static final int OSC_INTERNAL = 0
+```
+
+#### Sh2Hub.OSC_EXT_CRYSTAL *(field)*
+
+```java
+public static final int OSC_EXT_CRYSTAL = 1
+```
+
+#### Sh2Hub.OSC_EXT_CLOCK *(field)*
+
+```java
+public static final int OSC_EXT_CLOCK = 2
+```
+
+#### Sh2Hub.ERROR_SOURCE_MOTION_ENGINE *(field)*
+
+```java
+public static final int ERROR_SOURCE_MOTION_ENGINE = 1
+```
+
+#### Sh2Hub.ERROR_SOURCE_MOTION_HUB *(field)*
+
+```java
+public static final int ERROR_SOURCE_MOTION_HUB = 2
+```
+
+#### Sh2Hub.ERROR_SOURCE_SENSOR_HUB *(field)*
+
+```java
+public static final int ERROR_SOURCE_SENSOR_HUB = 3
+```
+
+#### Sh2Hub.ERROR_SOURCE_CHIP *(field)*
+
+```java
+public static final int ERROR_SOURCE_CHIP = 4
+```
+
+#### Sh2Hub.ERROR_SOURCE_NO_MORE_ERRORS *(field)*
+
+```java
+public static final int ERROR_SOURCE_NO_MORE_ERRORS = 255
+```
+
+The end of the error queue.
+
+#### Sh2Hub.TARE_X *(field)*
+
+```java
+public static final int TARE_X = 1
+```
+
+#### Sh2Hub.TARE_Y *(field)*
+
+```java
+public static final int TARE_Y = 2
+```
+
+#### Sh2Hub.TARE_Z *(field)*
+
+```java
+public static final int TARE_Z = 4
+```
+
+#### Sh2Hub.TARE_ALL *(field)*
+
+```java
+public static final int TARE_ALL = 7
+```
+
+#### Sh2Hub.FRS_STATIC_CALIBRATION_AGM *(field)*
+
+```java
+public static final int FRS_STATIC_CALIBRATION_AGM = 0x7979
+```
+
+FRS record ids (SH-2 figure 28).
+
+#### Sh2Hub.FRS_NOMINAL_CALIBRATION *(field)*
+
+```java
+public static final int FRS_NOMINAL_CALIBRATION = 0x4D4D
+```
+
+#### Sh2Hub.FRS_DYNAMIC_CALIBRATION *(field)*
+
+```java
+public static final int FRS_DYNAMIC_CALIBRATION = 0x1F1F
+```
+
+#### Sh2Hub.FRS_ME_POWER_MGMT *(field)*
+
+```java
+public static final int FRS_ME_POWER_MGMT = 0xD3E2
+```
+
+#### Sh2Hub.FRS_SYSTEM_ORIENTATION *(field)*
+
+```java
+public static final int FRS_SYSTEM_ORIENTATION = 0x2D3E
+```
+
+Mounting quaternion, 4 × Q30 words.
+
+#### Sh2Hub.FRS_ACCEL_ORIENTATION *(field)*
+
+```java
+public static final int FRS_ACCEL_ORIENTATION = 0x2D41
+```
+
+#### Sh2Hub.FRS_GYROSCOPE_ORIENTATION *(field)*
+
+```java
+public static final int FRS_GYROSCOPE_ORIENTATION = 0x2D46
+```
+
+#### Sh2Hub.FRS_MAGNETOMETER_ORIENTATION *(field)*
+
+```java
+public static final int FRS_MAGNETOMETER_ORIENTATION = 0x2D4C
+```
+
+#### Sh2Hub.FRS_ARVR_STABILIZATION_RV *(field)*
+
+```java
+public static final int FRS_ARVR_STABILIZATION_RV = 0x3E2D
+```
+
+#### Sh2Hub.FRS_ARVR_STABILIZATION_GRV *(field)*
+
+```java
+public static final int FRS_ARVR_STABILIZATION_GRV = 0x3E2E
+```
+
+#### Sh2Hub.FRS_SERIAL_NUMBER *(field)*
+
+```java
+public static final int FRS_SERIAL_NUMBER = 0x4B4B
+```
+
+One 32-bit word; empty unless programmed.
+
+#### Sh2Hub.FRS_USER_RECORD *(field)*
+
+```java
+public static final int FRS_USER_RECORD = 0x74B4
+```
+
+Free for the user, up to 64 words.
+
+#### Sh2Hub.FRS_SIG_MOTION_DETECT_CONFIG *(field)*
+
+```java
+public static final int FRS_SIG_MOTION_DETECT_CONFIG = 0xC274
+```
+
+#### Sh2Hub.FRS_SHAKE_DETECT_CONFIG *(field)*
+
+```java
+public static final int FRS_SHAKE_DETECT_CONFIG = 0x7D7D
+```
+
+#### Sh2Hub.FRS_STABILITY_DETECTOR_CONFIG *(field)*
+
+```java
+public static final int FRS_STABILITY_DETECTOR_CONFIG = 0xED85
+```
+
+#### Sh2Hub.FRS_ACTIVITY_TRACKER_CONFIG *(field)*
+
+```java
+public static final int FRS_ACTIVITY_TRACKER_CONFIG = 0xED88
+```
+
+#### Sh2Hub.FRS_GYRO_INTEGRATED_RV_CONFIG *(field)*
+
+```java
+public static final int FRS_GYRO_INTEGRATED_RV_CONFIG = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
+#### Sh2Hub.METADATA_RECORDS *(field)*
+
+```java
+public static final Map<Integer, Integer> METADATA_RECORDS
+```
+
+Sensor id → its metadata FRS record.
+
+#### Sh2Hub.FRS_NO_ERROR *(field)*
+
+```java
+public static final int FRS_NO_ERROR = 0
+```
+
+#### Sh2Hub.FRS_UNRECOGNIZED_FRS_TYPE *(field)*
+
+```java
+public static final int FRS_UNRECOGNIZED_FRS_TYPE = 1
+```
+
+#### Sh2Hub.FRS_BUSY *(field)*
+
+```java
+public static final int FRS_BUSY = 2
+```
+
+#### Sh2Hub.FRS_READ_COMPLETED *(field)*
+
+```java
+public static final int FRS_READ_COMPLETED = 3
+```
+
+#### Sh2Hub.FRS_OFFSET_OUT_OF_RANGE *(field)*
+
+```java
+public static final int FRS_OFFSET_OUT_OF_RANGE = 4
+```
+
+#### Sh2Hub.FRS_RECORD_EMPTY *(field)*
+
+```java
+public static final int FRS_RECORD_EMPTY = 5
+```
+
+#### Sh2Hub.FRS_BLOCK_COMPLETED *(field)*
+
+```java
+public static final int FRS_BLOCK_COMPLETED = 6
+```
+
+#### Sh2Hub.FRS_BLOCK_AND_READ_COMPLETED *(field)*
+
+```java
+public static final int FRS_BLOCK_AND_READ_COMPLETED = 7
+```
+
+#### Sh2Hub.FRS_DEVICE_ERROR *(field)*
+
+```java
+public static final int FRS_DEVICE_ERROR = 8
+```
+
+#### Sh2Hub.FRS_WRITE_WORDS_RECEIVED *(field)*
+
+```java
+public static final int FRS_WRITE_WORDS_RECEIVED = 0
+```
+
+#### Sh2Hub.FRS_WRITE_UNRECOGNIZED_FRS_TYPE *(field)*
+
+```java
+public static final int FRS_WRITE_UNRECOGNIZED_FRS_TYPE = 1
+```
+
+#### Sh2Hub.FRS_WRITE_BUSY *(field)*
+
+```java
+public static final int FRS_WRITE_BUSY = 2
+```
+
+#### Sh2Hub.FRS_WRITE_COMPLETED *(field)*
+
+```java
+public static final int FRS_WRITE_COMPLETED = 3
+```
+
+#### Sh2Hub.FRS_WRITE_MODE_READY *(field)*
+
+```java
+public static final int FRS_WRITE_MODE_READY = 4
+```
+
+#### Sh2Hub.FRS_WRITE_FAILED *(field)*
+
+```java
+public static final int FRS_WRITE_FAILED = 5
+```
+
+#### Sh2Hub.FRS_WRITE_NOT_IN_WRITE_MODE *(field)*
+
+```java
+public static final int FRS_WRITE_NOT_IN_WRITE_MODE = 6
+```
+
+#### Sh2Hub.FRS_WRITE_INVALID_LENGTH *(field)*
+
+```java
+public static final int FRS_WRITE_INVALID_LENGTH = 7
+```
+
+#### Sh2Hub.FRS_WRITE_RECORD_VALID *(field)*
+
+```java
+public static final int FRS_WRITE_RECORD_VALID = 8
+```
+
+#### Sh2Hub.FRS_WRITE_RECORD_INVALID *(field)*
+
+```java
+public static final int FRS_WRITE_RECORD_INVALID = 9
+```
+
+#### Sh2Hub.COUNTS_GET *(field)*
+
+```java
+public static final int COUNTS_GET = 0
+```
+
+#### Sh2Hub.COUNTS_CLEAR *(field)*
+
+```java
+public static final int COUNTS_CLEAR = 1
+```
+
+#### Sh2Hub.ME_CAL_GET *(field)*
+
+```java
+public static final int ME_CAL_GET = 0x01
+```
+
+ME Calibration subcommand: report the current configuration.
+
+#### Sh2Hub.splitControlCargo
+
+```java
+public static List<byte[]> splitControlCargo(byte[] payload)
+```
+
+Split a control cargo into its reports; an unknown id or a short tail ends the walk (the rest
+is one piece: its length is unknowable).
+
+#### Sh2Hub.countsGetParams
+
+```java
+public static byte[] countsGetParams(int sensorId)
+```
+
+#### Sh2Hub.countsClearParams
+
+```java
+public static byte[] countsClearParams(int sensorId)
+```
+
+#### Sh2Hub.errorsParams
+
+```java
+public static byte[] errorsParams(int severity)
+```
+
+Errors of `severity` or greater (0 = all).
+
+#### Sh2Hub.tareNowParams
+
+```java
+public static byte[] tareNowParams(int axes, TareBasis basis)
+```
+
+`axes`: a `TARE_*` bitmap.
+
+#### Sh2Hub.persistTareParams
+
+```java
+public static byte[] persistTareParams()
+```
+
+#### Sh2Hub.setReorientationParams
+
+```java
+public static byte[] setReorientationParams(double x, double y, double z, double w)
+```
+
+Tare subcommand 2: the reorientation quaternion as four Q14 int16 (all zero clears).
+
+#### Sh2Hub.meCalibrationParams
+
+```java
+public static byte[] meCalibrationParams(boolean accel, boolean gyro, boolean mag, boolean planar, int subcommand)
+```
+
+ME Calibration (0x07): subcommand 0 configures, 1 (`ME_CAL_GET`) reads back.
+
+#### Sh2Hub.interactiveCalibrationParams
+
+```java
+public static byte[] interactiveCalibrationParams(int intent)
+```
+
+Interactive Calibration (0x0E, BNO085 only): P0 = motion intent; no response.
+
+#### Sh2Hub.forceFlush
+
+```java
+public static byte[] forceFlush(int sensorId)
+```
+
+Force Sensor Flush (0xF0, SH-2 §6.5.6); the hub answers with Flush Completed (0xEF).
+
+#### Sh2Hub.periodicDcdParams
+
+```java
+public static byte[] periodicDcdParams(boolean enable)
+```
+
+Periodic DCD save (0x09): P0 0 = enable, 1 = disable; no response.
+
+### Sh2Hub.TareBasis
+
+```java
+public enum TareBasis
+```
+
+The rotation vector a tare refers to (Tare Now P2).
+
+#### Sh2Hub.TareBasis — constants
+
+`ROTATION_VECTOR`(0), `GAME_ROTATION_VECTOR`(1), `GEOMAGNETIC_ROTATION_VECTOR`(2), `GYRO_INTEGRATED_RV`(3), `ARVR_STABILIZED_RV`(4), `ARVR_STABILIZED_GAME_RV`(5)
+
+#### Sh2Hub.TareBasis.value *(field)*
+
+```java
+public final int value
+```
+
+### Sh2Hub.MotionIntent
+
+```java
+public enum MotionIntent
+```
+
+P0 of Interactive Calibration (0x0E, SH-2 §6.4.12.1): what the host knows about the device's
+motion. UNKNOWN is the hub's initial state.
+
+#### Sh2Hub.MotionIntent — constants
+
+`UNKNOWN`(0), `STATIONARY_NO_VIBRATION`(1), `STATIONARY_WITH_VIBRATION`(2), `IN_MOTION`(3), `IN_MOTION_ACCELERATING`(4)
+
+#### Sh2Hub.MotionIntent.value *(field)*
+
+```java
+public final int value
+```
+
+### Sh2Hub.Sh2Exception
+
+```java
+public static final class Sh2Exception extends DepzException
+```
+
+A SH-2 level failure: a non-zero command status, an FRS error (a `DepzException`, contract 07 §3).
+
+### Sh2Hub.FeatureResponse
+
+```java
+public record FeatureResponse(int sensorId, int flags, int sensitivity, long intervalUs, long batchUs, long cfgWord)
+```
+
+Get Feature Response (0xFC), 17 bytes: the rates in effect.
+
+#### Sh2Hub.FeatureResponse.unpack
+
+```java
+public static FeatureResponse unpack(byte[] p)
+```
+
+### Sh2Hub.ProductId
+
+```java
+public record ProductId(int resetCause, int swVersionMajor, int swVersionMinor, long swPartNumber, long swBuildNumber, int swVersionPatch)
+```
+
+Product ID Response (0xF8), 16 bytes, one per software component (the SH-2 application
+first); the reset cause (SH-2 §6.4.5.2) is set on the first only.
+
+#### Sh2Hub.ProductId.version
+
+```java
+public String version()
+```
+
+#### Sh2Hub.ProductId.unpack
+
+```java
+public static ProductId unpack(byte[] p)
+```
+
+### Sh2Hub.CommandResponse
+
+```java
+public record CommandResponse(int seq, int command, int commandSeq, int responseSeq, byte[] r)
+```
+
+Command Response (0xF1), 16 bytes. `commandSeq` echoes the request (correlate on it plus
+`command`); `responseSeq` counts responses to one request; R0 is the status of most
+commands (0 = success).
+
+#### Sh2Hub.CommandResponse.status
+
+```java
+public int status()
+```
+
+#### Sh2Hub.CommandResponse.r
+
+```java
+public int r(int i)
+```
+
+R`i` as an unsigned byte.
+
+#### Sh2Hub.CommandResponse.unpack
+
+```java
+public static CommandResponse unpack(byte[] p)
+```
+
+### Sh2Hub.FrsReadResponse
+
+```java
+public record FrsReadResponse(int status, int dataLength, int offsetWords, long data0, long data1, int frsType)
+```
+
+FRS Read Response (0xF3), 16 bytes, up to two data words.
+
+#### Sh2Hub.FrsReadResponse.unpack
+
+```java
+public static FrsReadResponse unpack(byte[] p)
+```
+
+### Sh2Hub.FrsWriteResponse
+
+```java
+public record FrsWriteResponse(int status, int offsetWords)
+```
+
+FRS Write Response (0xF5), 4 bytes.
+
+#### Sh2Hub.FrsWriteResponse.unpack
+
+```java
+public static FrsWriteResponse unpack(byte[] p)
+```
+
+### Sh2Hub.ErrorRecord
+
+```java
+public record ErrorRecord(int severity, int seq, int source, int error, int module, int code)
+```
+
+One error-queue entry (command 0x01 response, R0..R5).
+
+#### Sh2Hub.ErrorRecord.from
+
+```java
+public static ErrorRecord from(CommandResponse r)
+```
+
+### Sh2Hub.Counts
+
+```java
+public record Counts(int sensorId, long offered, long accepted, long on, long attempted)
+```
+
+Per-sensor event counts (command 0x02, two responses).
+
+### Sh2Hub.CalibrationConfig
+
+```java
+public record CalibrationConfig(boolean accel, boolean gyro, boolean mag, boolean planar)
+```
+
+ME calibration enables as the sensor reports them.
+
+#### Sh2Hub.CalibrationConfig.of
+
+```java
+public static CalibrationConfig of(boolean accel, boolean gyro, boolean mag, boolean planar)
+```
+
+Build one: the path that survives a component appended after 1.0 (contract 07 §5).
+
+### Sh2Hub.SensorMetadata
+
+```java
+public record SensorMetadata(int meVersion, int mhVersion, int shVersion, long rangeRaw, long resolutionRaw, int revision, int powerMaQ10, long minPeriodUs, long maxPeriodUs, int fifoMax, int fifoReserved, int batchBufferBytes, int qPoint1, int qPoint2, int qPoint3, long[] rawWords)
+```
+
+A sensor's metadata FRS record (revision-gated fields are 0 on older records);
+`rawWords` is authoritative.
+
+#### Sh2Hub.SensorMetadata.fromWords
+
+```java
+public static SensorMetadata fromWords(long[] words)
+```
+
+#### Sh2Hub.SensorMetadata.fields
+
+```java
+public Map<String, Object> fields()
+```
+
+The fields under the reference SDK's names.
+
+### Sh2Hub.FrsReadSession
+
+```java
+public static final class FrsReadSession
+```
+
+A multi-packet FRS read: send `request()`, `feed` every 0xF3 of the record until
+it returns true; `words()` holds the record. Error statuses throw `Sh2Exception`.
+
+#### Sh2Hub.FrsReadSession.frsType
+
+```java
+public int frsType()
+```
+
+#### Sh2Hub.FrsReadSession.done
+
+```java
+public boolean done()
+```
+
+#### Sh2Hub.FrsReadSession.words
+
+```java
+public long[] words()
+```
+
+#### Sh2Hub.FrsReadSession.request
+
+```java
+public byte[] request()
+```
+
+#### Sh2Hub.FrsReadSession.feed
+
+```java
+public boolean feed(FrsReadResponse r)
+```
+
+### Sh2Hub.FrsWriteSession
+
+```java
+public static final class FrsWriteSession
+```
+
+A multi-packet FRS write: send `request()`; for every 0xF5 `feed` returns the
+next Write Data payload, or null; `done()` on WRITE_COMPLETED. Error statuses throw
+`Sh2Exception`.
+
+#### Sh2Hub.FrsWriteSession.frsType
+
+```java
+public int frsType()
+```
+
+#### Sh2Hub.FrsWriteSession.done
+
+```java
+public boolean done()
+```
+
+#### Sh2Hub.FrsWriteSession.request
+
+```java
+public byte[] request()
+```
+
+#### Sh2Hub.FrsWriteSession.feed
+
+```java
+public byte @Nullable [] feed(FrsWriteResponse r)
+```
+
+### Shtp
+
+```java
+public final class Shtp
+```
+
+SHTP framing layer for the BNO085 (contract 05 §3).
+
+Header: length u16 LE (bits 14:0 = cargo length incl. the 4-byte header;
+bit 15 = continuation), channel u8, seq u8. A first fragment advertises the
+TOTAL cargo length; continuations carry the remaining length with bit 15 set.
+TX seq counters are per channel. Mirror of the TS/Python references.
+
+#### Shtp.SHTP_HEADER_SIZE *(field)*
+
+```java
+public static final int SHTP_HEADER_SIZE = 4
+```
+
+#### Shtp.LENGTH_MASK *(field)*
+
+```java
+public static final int LENGTH_MASK = 0x7fff
+```
+
+#### Shtp.CONTINUATION_BIT *(field)*
+
+```java
+public static final int CONTINUATION_BIT = 0x8000
+```
+
+#### Shtp.NUM_CHANNELS *(field)*
+
+```java
+public static final int NUM_CHANNELS = 6
+```
+
+#### Shtp.MAX_TX_FRAME *(field)*
+
+```java
+public static final int MAX_TX_FRAME = 64
+```
+
+Host->sensor frames must fit one MCU transmit slot (ERRATA E2).
+
+#### Shtp.CHANNEL_EXECUTABLE *(field)*
+
+```java
+public static final int CHANNEL_EXECUTABLE = 1
+```
+
+SHTP channel 1: device executable (reset / on / sleep; RX 0x01 = reset done).
+
+#### Shtp.EXECUTABLE_RESET *(field)*
+
+```java
+public static final int EXECUTABLE_RESET = 0x01
+```
+
+One-byte host writes on the executable channel (contract 05 §6a); the hub
+answers none of them. RESET restarts the hub (the 0x01 reset-complete
+follows on the same channel); SLEEP stops every report except those
+enabled with `Sh2#FEATURE_FLAG_WAKEUP` | `Sh2#FEATURE_FLAG_ALWAYS_ON`,
+keeping the configuration; ON ends SLEEP and every report resumes at its
+rate. See `Sh2#buildSleep()` / `Sh2#buildPowerOn()`.
+
+#### Shtp.EXECUTABLE_ON *(field)*
+
+```java
+public static final int EXECUTABLE_ON = 0x02
+```
+
+#### Shtp.EXECUTABLE_SLEEP *(field)*
+
+```java
+public static final int EXECUTABLE_SLEEP = 0x03
+```
+
+#### Shtp.packShtpHeader
+
+```java
+public static byte[] packShtpHeader(ShtpHeader hdr)
+```
+
+Fields out of their widths (length u15, channel u8, seq u8) → IllegalArgumentException.
+
+#### Shtp.unpackShtpHeader
+
+```java
+public static ShtpHeader unpackShtpHeader(byte[] data)
+```
+
+#### Shtp.buildFrame
+
+```java
+public static byte[] buildFrame(int channel, byte[] payload, int seq)
+```
+
+Single-fragment frame: length = header + payload.
+
+#### Shtp.reassemble
+
+```java
+public static List<ShtpCargo> reassemble(List<byte[]> frames, int @Nullable [] discardedOut)
+```
+
+Convenience: reassemble a list of frames.
+
+### Shtp.ShtpHeader
+
+```java
+public record ShtpHeader(int length, int channel, int seq, boolean continuation)
+```
+
+#### Shtp.ShtpHeader.of
+
+```java
+public static ShtpHeader of(int length, int channel, int seq, boolean continuation)
+```
+
+Build one: the path that survives a component appended after 1.0 (contract 07 §5).
+
+### Shtp.ShtpCargo
+
+```java
+public record ShtpCargo(int channel, int seq, byte[] payload, long captureUs)
+```
+
+One reassembled cargo: `payload` excludes all SHTP headers; `seq`
+and `captureUs` are the FIRST fragment's — `captureUs` is its
+`RPT_DATA.timestamp_us`, the capture the cargo's 0xFB base delta
+refers to (contract 05 §3).
+
+### Shtp.ShtpLayer
+
+```java
+public static final class ShtpLayer
+```
+
+Per-channel TX sequence counters + RX cargo reassembly.
+
+#### Shtp.ShtpLayer.discarded *(field)*
+
+```java
+public int discarded = 0
+```
+
+Incomplete cargos and junk-channel (≥ 6) frames thrown away.
+
+#### Shtp.ShtpLayer.nextFrame
+
+```java
+public byte[] nextFrame(int channel, byte[] payload)
+```
+
+Build a single-fragment frame, consuming the channel's TX seq.
+
+#### Shtp.ShtpLayer.txSeq
+
+```java
+public int txSeq(int channel)
+```
+
+#### Shtp.ShtpLayer.feed
+
+```java
+public @Nullable ShtpCargo feed(byte[] frame)
+```
+
+`feed(byte[], long)` with capture 0 (cargo `captureUs` = 0).
+
+#### Shtp.ShtpLayer.feed
+
+```java
+public @Nullable ShtpCargo feed(byte[] frame, long captureUs)
+```
+
+Consume one inbound frame; return the cargo when complete, else null.
+`captureUs` is the frame's `RPT_DATA.timestamp_us`; the cargo
+carries the FIRST fragment's — the base its 0xFB timestamps refer to
+(contract 05 §3), not the fragment that completed it.
+
+#### Shtp.ShtpLayer.resetTx
+
+```java
+public void resetTx()
+```
+
+Restart the TX seq counters only; partial inbound cargos stay.
+
+#### Shtp.ShtpLayer.reset
+
+```java
+public void reset()
+```
+
+Forget all TX seq counters and partial cargos (sensor reset).

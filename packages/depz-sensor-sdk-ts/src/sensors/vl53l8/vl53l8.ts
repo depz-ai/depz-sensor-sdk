@@ -1,0 +1,555 @@
+/**
+ * VL53L8CX/CH ToF sensor: host-side ULD over the firmware register bridge.
+ *
+ * The MCU is a thin SPI bridge (contracts/04): the full ST ULD driver runs
+ * here on the host (`uld.ts`). Frame streaming is INT-driven push from the
+ * device, reassembled from ≤1528-byte chunks.
+ *
+ * Mirrors the Python reference `depz_sensor_sdk.vl53l8.Vl53l8cx`.
+ */
+
+import { frozen } from "../../frozen.js";
+import { DepzDevice, type DeviceOptions } from "../../device/device.js";
+import { DepzError, InvalidStateError } from "../../errors.js";
+import { chunkedRead, chunkedWrite } from "../reg-bridge.js";
+import type { PacketEvent } from "../../protocol/framing.js";
+import {
+  CHUNK_SIZE,
+  FrameReassembler,
+  STREAM_CHUNK_MAX,
+  Vl53l8Cmd,
+  Vl53l8Rpt,
+  packReadReg,
+  packStartStream,
+  packWriteReg,
+  unpackFrameChunk,
+  unpackRegData,
+  type RegData,
+} from "../../protocol/vl53l8.js";
+import type { SerialTransport } from "../../transport/types.js";
+import { loadAssets, type Vl53l8Variant } from "./assets/index.js";
+import { MI_CFG_DEV_IDX, type CnhConfig } from "./cnh.js";
+import {
+  I2C_VARIANTS,
+  RESOLUTION_4X4,
+  RESOLUTION_8X8,
+  VL53L8CX,
+  Vl53l8cxError,
+  readDeviceRevisionId,
+  siliconIdMatches,
+  type DetectionThreshold,
+  type MotionConfig,
+  type MotionResult,
+  type Vl53l8Platform,
+  type Vl53l8Results,
+} from "./uld.js";
+
+/** Below this the sensor never streams (contract 04). */
+export const MIN_RANGING_FREQUENCY_HZ = 2;
+/**
+ * Highest ranging frequency per resolution (contract 11 §3; the same silicon
+ * limit on VL53L8): 60 Hz at 4×4, 15 Hz at 8×8.
+ */
+export const MAX_RANGING_FREQUENCY_HZ: Readonly<Record<number, number>> = frozen({
+  [RESOLUTION_4X4]: 60,
+  [RESOLUTION_8X8]: 15,
+});
+
+/**
+ * One parsed ranging frame. Arrays are sized to the active resolution
+ * (16 or 64 zones); zone index runs row-major (see datasheet zone maps).
+ */
+export interface Vl53l8Frame {
+  timestampUs: bigint;
+  /** 16 | 64 */
+  resolution: number;
+  /** Integer mm, as ST: a negative distance is clamped to 0. */
+  distanceMm: Int32Array;
+  /** 5/9 = valid, 255 = no target. */
+  targetStatus: Uint8Array;
+  nbTargetDetected: Uint8Array;
+  /** kcps/SPAD (raw / 2048, fraction kept). */
+  signalPerSpad: Float64Array;
+  /** kcps/SPAD (raw / 2048, fraction kept). */
+  ambientPerSpad: Float64Array;
+  nbSpadsEnabled: Int32Array;
+  /** Measurement noise, mm (raw / 128). */
+  rangeSigmaMm: Float64Array;
+  /** Estimated target reflectance, % (raw / 2, fraction kept). */
+  reflectance: Float64Array;
+  siliconTempDegc: number;
+  /** CH variant: raw CNH block (decode via cnh). */
+  cnhRaw: Uint8Array | null;
+  /** Motion-indicator output when `configureMotionIndicator()` is active. */
+  motion: MotionResult | null;
+}
+
+/** Zone array reshaped to (4,4) or (8,8) — mirror of Vl53l8Frame.grid(). */
+export function zoneGrid(arr: ArrayLike<number>, resolution: number): number[][] {
+  const side = resolution === RESOLUTION_4X4 ? 4 : 8;
+  const rows: number[][] = [];
+  for (let r = 0; r < side; r++) {
+    const row: number[] = [];
+    for (let c = 0; c < side; c++) row.push(arr[r * side + c] ?? 0);
+    rows.push(row);
+  }
+  return rows;
+}
+
+export interface Vl53l8Options extends DeviceOptions {
+  /** ULD sleep implementation (tests inject an instant one). */
+  sleepImpl?: (ms: number) => Promise<void>;
+}
+
+export interface Vl53l8InitOptions {
+  /** Receives phase strings. */
+  progress?: (text: string) => void;
+  /** Tracks the big blob writes: (done, total) bytes. */
+  writeProgress?: (done: number, total: number) => void;
+}
+
+/**
+ * VL53L8CX ToF device: `init()` downloads the ~84 KB sensor firmware (takes a
+ * few seconds over CDC), then configure and `startRanging()`.
+ *
+ * This is the base class for both silicon variants. The VL53L8CH superset
+ * (compact-network-histogram output) lives in `Vl53l8ch`, which inherits every
+ * method here. All configuration methods require `init()` first and must not
+ * be called while ranging (the ULD talks to the current register bank; the
+ * stream owns it — contract 04).
+ */
+export class Vl53l8cx extends DepzDevice {
+  /** Sensor-firmware blob variant this class loads. */
+  protected readonly variantId: Vl53l8Variant = "cx";
+  /** Register-bridge transfer limits (the I2C L5/L7 board reads less per call). */
+  protected readonly readChunk: number = CHUNK_SIZE;
+  protected readonly writeChunk: number = CHUNK_SIZE;
+  /** Largest RPT_VL53_FRAME chunk the board emits (contract 04 §4 rule 4). */
+  protected readonly streamChunk: number = STREAM_CHUNK_MAX;
+  /** Lowest ranging frequency that actually streams on this sensor. */
+  protected readonly minRangingHz: number = MIN_RANGING_FREQUENCY_HZ;
+
+  /**
+   * The parsed frames (contract 07 §3): `on(cb)` subscribes, `subscribe(maxsize)`
+   * iterates (call before or after `startRanging()`), `next(timeoutMs)` waits
+   * for one; `droppedCounts` and `parseErrors` (frames the ULD could not
+   * parse — corrupt frame, bad size — or chunks shorter than their header;
+   * distinct from reassembly gaps) are its counters.
+   */
+  readonly frames = this.stream<Vl53l8Frame>(8, Vl53l8Rpt.Vl53Frame);
+
+  protected uldDriver: VL53L8CX | null = null;
+  private reassembler = new FrameReassembler();
+  protected rangingFlag = false;
+  protected cnhConfig: CnhConfig | null = null;
+
+  /** The CNH config armed by `configureCnh()` (CH), or null. Recorders read
+   *  this to persist the decode parameters next to raw CNH blocks. */
+  get activeCnhConfig(): CnhConfig | null {
+    return this.cnhConfig;
+  }
+
+  private writeProgressCb: ((done: number, total: number) => void) | null = null;
+  // Firmware is written in three separate banks (see uld.ts), each its own
+  // wrMulti with its own byte count — reporting per-bank made the progress bar
+  // jump back to 0 twice. These make writeProgress cumulative over the whole
+  // ~84 KB download so it only moves forward. Active only during init().
+  private fwWriteBase = 0;
+  private fwWriteTotal = 0;
+  private resolution = RESOLUTION_4X4; // ULD default after init
+  private readonly sleepImpl: (ms: number) => Promise<void>;
+
+  /** ULD `platform` object mapped onto the firmware register bridge. */
+  private readonly platform: Vl53l8Platform = {
+    rdMulti: async (addr: number, size: number): Promise<Uint8Array> =>
+      chunkedRead(addr, size, {
+        chunkSize: this.readChunk,
+        readChunk: async (a, n) => {
+          const rep = await this.request<RegData>(Vl53l8Cmd.ReadReg, packReadReg(a, n), {
+            matcher: DepzDevice.expectReport(Vl53l8Rpt.RegData, unpackRegData),
+            timeoutMs: 2000,
+          });
+          return { data: rep.data };
+        },
+      }),
+    wrMulti: async (addr: number, data: Uint8Array): Promise<void> => {
+      await chunkedWrite(addr, data, {
+        chunkSize: this.writeChunk,
+        writeChunk: async (a, chunk) =>
+          this.request(Vl53l8Cmd.WriteReg, packWriteReg(a, chunk), {
+            okCompletes: true,
+            timeoutMs: 2000,
+          }),
+        onProgress: (done, total) => {
+          if (this.writeProgressCb !== null && total > this.writeChunk) {
+            // Report cumulatively across the multi-bank firmware download so the
+            // bar only advances; fall back to per-write when no campaign is set.
+            const campaignTotal = this.fwWriteTotal > 0 ? this.fwWriteTotal : total;
+            const base = this.fwWriteTotal > 0 ? this.fwWriteBase : 0;
+            this.writeProgressCb(base + done, campaignTotal);
+          }
+        },
+      });
+      if (this.fwWriteTotal > 0 && data.length > this.writeChunk) {
+        this.fwWriteBase += data.length;
+      }
+    },
+    sleepMs: async (ms: number): Promise<void> => this.sleepImpl(ms),
+  };
+
+  constructor(transport: SerialTransport, opts?: Vl53l8Options) {
+    super(transport, opts);
+    this.sleepImpl = opts?.sleepImpl ?? (async (ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  // ── lifecycle ──────────────────────────────────────────────────────────────
+
+  /**
+   * The underlying ULD driver (escape hatch for advanced DCI access).
+   * Unstable — not covered by the 1.0 freeze: the driver class and its
+   * methods follow the ST ULD release the SDK ports, and the class is not
+   * exported from the package root.
+   */
+  get uld(): VL53L8CX {
+    if (this.uldDriver === null) throw new InvalidStateError("call init() first");
+    return this.uldDriver;
+  }
+
+  /** 'cx' | 'ch' | 'l7cx' | 'l7ch' (valid after init()). */
+  get variant(): Vl53l8Variant {
+    return this.uld.variant;
+  }
+
+  /** True when the sensor answers with its own silicon ids (a bus error or a foreign id: false). */
+  async isAlive(): Promise<boolean> {
+    try {
+      const [deviceId, revisionId] = await readDeviceRevisionId(this.platform);
+      return siliconIdMatches(deviceId, revisionId, I2C_VARIANTS.includes(this.variantId));
+    } catch (err) {
+      if (err instanceof Vl53l8cxError || err instanceof DepzError) return false;
+      throw err;
+    }
+  }
+
+  /**
+   * Initialize the sensor: firmware blob download + default config.
+   *
+   * The blob is the class's (`Vl53l8cx` → 'cx', `Vl53l8ch` → 'ch', the L5/L7
+   * classes theirs). Assets are loaded lazily (dynamic import) so the blobs
+   * stay out of bundles that never init the ToF.
+   */
+  async init(opts?: Vl53l8InitOptions): Promise<void> {
+    const assets = await loadAssets(this.variantId);
+    this.writeProgressCb = opts?.writeProgress ?? null;
+    // Span the whole firmware across its three banks for a monotonic bar.
+    this.fwWriteBase = 0;
+    this.fwWriteTotal = assets.firmware.length;
+    try {
+      const driver = new VL53L8CX(this.platform, assets, this.variantId);
+      await driver.init(opts?.progress);
+      this.uldDriver = driver;
+      this.resolution = RESOLUTION_4X4; // what the sensor holds now, whatever was set before
+      // A fresh driver has no motion indicator armed; the CNH setup is gone
+      // from the sensor too (ERRATA B4).
+      this.cnhConfig = null;
+    } finally {
+      this.writeProgressCb = null;
+      this.fwWriteTotal = 0;
+      this.fwWriteBase = 0;
+    }
+  }
+
+  // ── configuration (init() first; not while ranging) ─────────────────────────
+
+  async getResolution(): Promise<number> {
+    this.resolution = await this.uld.getResolution();
+    return this.resolution;
+  }
+
+  async setResolution(zones: number): Promise<void> {
+    if (zones !== RESOLUTION_4X4 && zones !== RESOLUTION_8X8) {
+      throw new DepzError("resolution is 16 (4x4) or 64 (8x8) zones");
+    }
+    this.requireNotRanging();
+    await this.uld.setResolution(zones);
+    this.resolution = zones;
+  }
+
+  async getRangingFrequencyHz(): Promise<number> {
+    return this.uld.getRangingFrequencyHz();
+  }
+
+  /**
+   * Set the ranging frequency in Hz. Not while ranging. At least 2 Hz on the
+   * VL53L8 (1 Hz on L5/L7); at most 60 Hz at 4×4 and 15 Hz at 8×8 (contract
+   * 11 §3) — judged by the resolution last set or read through this class
+   * (4×4 after init). Refused host-side, nothing reaches the bus.
+   */
+  async setRangingFrequencyHz(hz: number): Promise<void> {
+    if (!Number.isInteger(hz) || hz < this.minRangingHz) {
+      throw new DepzError(
+        `ranging frequency must be >= ${this.minRangingHz} Hz: below that ` +
+          "the sensor never enters its ranging loop and streams nothing (contract 04)",
+      );
+    }
+    const maxHz = MAX_RANGING_FREQUENCY_HZ[this.resolution]!;
+    if (hz > maxHz) {
+      throw new DepzError(
+        `ranging frequency must be <= ${maxHz} Hz at ${this.resolution} zones ` +
+          `(60 Hz at 4x4, 15 Hz at 8x8, contract 11 §3), got ${hz}`,
+      );
+    }
+    this.requireNotRanging();
+    await this.uld.setRangingFrequencyHz(hz);
+  }
+
+  async getRangingMode(): Promise<number> {
+    return this.uld.getRangingMode();
+  }
+
+  async setRangingMode(mode: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setRangingMode(mode);
+  }
+
+  async getIntegrationTimeMs(): Promise<number> {
+    return this.uld.getIntegrationTimeMs();
+  }
+
+  async setIntegrationTimeMs(ms: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setIntegrationTimeMs(ms);
+  }
+
+  async getSharpenerPercent(): Promise<number> {
+    return this.uld.getSharpenerPercent();
+  }
+
+  async setSharpenerPercent(pct: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setSharpenerPercent(pct);
+  }
+
+  async getTargetOrder(): Promise<number> {
+    return this.uld.getTargetOrder();
+  }
+
+  async setTargetOrder(order: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setTargetOrder(order);
+  }
+
+  // ── advanced features (UM3109; init() first, not while ranging) ─────────────
+
+  /** POWER_MODE_SLEEP/WAKEUP/DEEP_SLEEP (uld constants). */
+  async getPowerMode(): Promise<number> {
+    return this.uld.getPowerMode();
+  }
+
+  /**
+   * Enter sleep / wake / deep-sleep. Not while ranging. Waking from
+   * DEEP_SLEEP re-downloads the firmware blob (init()).
+   */
+  async setPowerMode(mode: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setPowerMode(mode);
+  }
+
+  /** Xtalk margin, whole kcps/SPAD (as ST). */
+  async getXtalkMargin(): Promise<number> {
+    return this.uld.getXtalkMargin();
+  }
+
+  /** Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); anything else is refused. */
+  async setXtalkMargin(marginKcps: number): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setXtalkMargin(marginKcps);
+  }
+
+  /**
+   * Run on-device crosstalk calibration against a flat target at
+   * `distanceMm` with the given `reflectancePercent` (1..99) averaging
+   * `nbSamples` (1..16). The result is captured into the xtalk buffer; read
+   * it back with getCaldataXtalk(). Blocks several seconds.
+   */
+  async calibrateXtalk(
+    reflectancePercent: number,
+    nbSamples: number,
+    distanceMm: number,
+  ): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.calibrateXtalk(reflectancePercent, nbSamples, distanceMm);
+  }
+
+  /** Read back the 776-byte xtalk calibration blob (save/restore). */
+  async getCaldataXtalk(): Promise<Uint8Array> {
+    this.requireNotRanging();
+    return this.uld.getCaldataXtalk();
+  }
+
+  /** Restore a previously saved 776-byte xtalk calibration blob. */
+  async setCaldataXtalk(blob: Uint8Array): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setCaldataXtalk(blob);
+  }
+
+  async getDetectionThresholdsEnable(): Promise<number> {
+    return this.uld.getDetectionThresholdsEnable();
+  }
+
+  async setDetectionThresholdsEnable(enabled: boolean): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setDetectionThresholdsEnable(enabled);
+  }
+
+  async getDetectionThresholds(): Promise<DetectionThreshold[]> {
+    return this.uld.getDetectionThresholds();
+  }
+
+  /**
+   * Program the 64 detection thresholds (interrupt-on-threshold). Each entry
+   * carries lowThresh, highThresh, measurement, type, zoneNum, operation (see
+   * uld THRESH_* constants).
+   */
+  async setDetectionThresholds(thresholds: Partial<DetectionThreshold>[]): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setDetectionThresholds(thresholds);
+  }
+
+  async setDetectionThresholdsAutoStop(autoStop: boolean): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.setDetectionThresholdsAutoStop(autoStop);
+  }
+
+  /**
+   * Enable the motion indicator over [distanceMinMm, distanceMaxMm] and
+   * surface motion output in each frame's `.motion`. Returns the underlying
+   * uld MotionConfig for advanced tuning.
+   *
+   * On CH firmware the motion indicator and CNH share one DCI struct
+   * (0xBFAC): this disarms CNH (`activeCnhConfig` → null, no `cnhRaw`).
+   */
+  async configureMotionIndicator(distanceMinMm = 400, distanceMaxMm = 1500): Promise<MotionConfig> {
+    this.requireNotRanging();
+    const resolution = await this.getResolution();
+    const cfg = await this.uld.motionIndicatorInit(resolution);
+    this.cnhConfig = null;
+    await this.uld.motionIndicatorSetDistanceMotion(cfg, distanceMinMm, distanceMaxMm);
+    return cfg;
+  }
+
+  // ── ranging ──────────────────────────────────────────────────────────────────
+
+  /** Configure the output list, start the sensor and the MCU stream. */
+  async startRanging(): Promise<void> {
+    this.requireNotRanging();
+    const cnhSize = this.cnhConfig !== null ? this.cnhConfig.requiredMemory() : null;
+    await this.getResolution(); // refresh the cache used for frame shaping
+    await this.uld.startRanging(cnhSize);
+    const frameSize = this.uld.dataReadSize;
+    this.reassembler = new FrameReassembler(this.streamChunk);
+    try {
+      await this.request(Vl53l8Cmd.StartStream, packStartStream(frameSize), {
+        okCompletes: true,
+      });
+    } catch (e) {
+      // The sensor ranges but the host will say it does not: stop it again,
+      // or stopRanging() could never reach it. The START_STREAM error is the
+      // one the caller gets, even if this stop fails too.
+      await this.uld.stopRanging().catch(() => undefined);
+      throw e;
+    }
+    this.rangingFlag = true;
+  }
+
+  async stopRanging(): Promise<void> {
+    if (!this.rangingFlag) return;
+    // Clear host state and stop the sensor even if the MCU STOP_STREAM ack fails
+    // (link hiccup): otherwise the device is wedged "ranging" and no
+    // reconfiguration is possible (mirrors Vl53l4cd.stopRanging).
+    try {
+      await this.request(Vl53l8Cmd.StopStream, undefined, { okCompletes: true });
+    } finally {
+      this.rangingFlag = false;
+      await this.uld.stopRanging();
+    }
+  }
+
+  get ranging(): boolean {
+    return this.rangingFlag;
+  }
+
+  // ── internal ─────────────────────────────────────────────────────────────────
+
+  protected requireNotRanging(): void {
+    this.requireOpen();
+    if (this.rangingFlag) {
+      throw new InvalidStateError("stopRanging() first — the stream owns the register bank");
+    }
+  }
+
+  protected override handleReport(pkt: PacketEvent): boolean {
+    if (pkt.cmd !== Vl53l8Rpt.Vl53Frame) return false;
+    let done: ReturnType<FrameReassembler["feed"]>;
+    try {
+      // short chunk header: refused (RangeError) and counted — contract 07 §2
+      done = this.reassembler.feed(unpackFrameChunk(pkt.payload));
+    } catch {
+      this.frames.parseErrors += 1;
+      return true;
+    }
+    if (done === null) return true;
+    if (this.uldDriver === null) return true;
+    let parsed: Vl53l8Results;
+    try {
+      parsed = this.uldDriver.parseFrame(done.frame);
+    } catch {
+      this.frames.parseErrors += 1;
+      return true;
+    }
+    this.frames.emit(this.toFrame(done.timestampUs, parsed));
+    return true;
+  }
+
+  private toFrame(timestampUs: bigint, parsed: Vl53l8Results): Vl53l8Frame {
+    return {
+      timestampUs,
+      resolution: this.resolution,
+      distanceMm: Int32Array.from(parsed.distanceMm),
+      targetStatus: Uint8Array.from(parsed.targetStatus),
+      nbTargetDetected: Uint8Array.from(parsed.nbTargetDetected),
+      signalPerSpad: Float64Array.from(parsed.signalPerSpad),
+      ambientPerSpad: Float64Array.from(parsed.ambientPerSpad),
+      nbSpadsEnabled: Int32Array.from(parsed.nbSpadsEnabled),
+      rangeSigmaMm: Float64Array.from(parsed.rangeSigmaMm),
+      reflectance: Float64Array.from(parsed.reflectance),
+      siliconTempDegc: parsed.siliconTempDegc,
+      cnhRaw: parsed.cnhRaw,
+      motion: parsed.motion,
+    };
+  }
+}
+
+/**
+ * VL53L8CH device: the VL53L8CX superset. Inherits every CX method and adds
+ * Compact-Network-Histogram (CNH) output. `init()` downloads the CH firmware
+ * blob (VL53LMZ ULD 2.0.16). CNH is the reason to run CH firmware: each frame
+ * can additionally carry a per-aggregate distance histogram.
+ */
+export class Vl53l8ch extends Vl53l8cx {
+  protected override readonly variantId: Vl53l8Variant = "ch";
+
+  /**
+   * Arm the CNH histogram block for the next startRanging(). CH only — this
+   * method does not exist on Vl53l8cx.
+   *
+   * CNH and the motion indicator share one DCI struct (0xBFAC): this disarms
+   * the motion indicator (frames carry `motion` null).
+   */
+  async configureCnh(config: CnhConfig): Promise<void> {
+    this.requireNotRanging();
+    await this.uld.dciWriteData(MI_CFG_DEV_IDX, config.pack());
+    this.uld.motionIndicatorDisarm();
+    this.cnhConfig = config;
+  }
+}

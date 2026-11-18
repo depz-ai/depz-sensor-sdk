@@ -1,0 +1,27 @@
+# DEPZ USB sensor boards (depz_sensors, the DEPZ Sensor SDK).
+#
+# A board is a USB serial port (/dev/ttyACM*). These rules
+#   - give it to the user logged in at the machine (uaccess) and to the group
+#     `dialout` (for ssh sessions and services), so no sudo is needed;
+#   - keep ModemManager off it: it would open a new port and send modem
+#     commands, and the first requests of a program then time out.
+#
+# Install:
+#   sudo cp 60-depz-sensors.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+# Remove:
+#   sudo rm /etc/udev/rules.d/60-depz-sensors.rules && sudo udevadm control --reload-rules
+#
+# The ids are the SDK's USB table (contract 02 §4.2, depz/usb_ids.hpp): vendor
+# 1bcf with the product block ec78–ffff reserved for DEPZ sensors, and
+# 0483:56dc, the STMicroelectronics default a development unit carries.
+
+ACTION=="remove", GOTO="depz_sensors_end"
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="1bcf", ATTR{idProduct}=="ec7[89a-f]|ec[89a-f]?|e[d-f]??|f???", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0483", ATTR{idProduct}=="56dc", ENV{ID_MM_DEVICE_IGNORE}="1"
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1bcf", ATTRS{idProduct}=="ec7[89a-f]|ec[89a-f]?|e[d-f]??|f???", ENV{ID_MM_DEVICE_IGNORE}="1", MODE="0660", GROUP="dialout", TAG+="uaccess"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="56dc", ENV{ID_MM_DEVICE_IGNORE}="1", MODE="0660", GROUP="dialout", TAG+="uaccess"
+
+LABEL="depz_sensors_end"

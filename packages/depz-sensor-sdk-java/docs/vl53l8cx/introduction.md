@@ -1,0 +1,100 @@
+# VL53L8CX — introduction
+
+The **VL53L8CX** is a STMicroelectronics multizone Time-of-Flight ranging
+sensor: a tiny laser depth **imager** that returns a 4×4 or 8×8 grid of
+distances up to ~4 m. On the DEPZ sensor line the MCU is a thin SPI **register
+bridge** — the full ST ULD (Ultra-Lite Driver) runs on the host. The Java SDK
+runs it: the live device `ai.depz.sensor.devices.Vl53l8cxDevice` with the ULD
+port (`ai.depz.sensor.sensors.vl53l8.Vl53l8Driver`: firmware download, DCI,
+configuration, calibration), over the pure decode layer
+`ai.depz.sensor.sensors.vl53l8.Vl53l8Uld` (results-frame parsing +
+advanced-DCI codecs) and `FrameReassembler` (chunk transport).
+
+This is the base ToF sensor. Its superset — the **VL53L8CH**, which adds Compact
+Network Histograms — has its own [introduction](../vl53l8ch/introduction.md) and
+[guide](../vl53l8ch/guide.md); the decode surface here applies to it unchanged.
+
+## What it does
+
+- Per-zone distance over a **16-zone (4×4)** or **64-zone (8×8)** grid, at up to
+  60 Hz (4×4) / 15 Hz (8×8).
+- Each frame carries far more than distance: per-zone target status, number of
+  targets, signal and ambient rate, range sigma, reflectance, plus a per-frame
+  silicon temperature — all surfaced in ST's real units (mm, kcps/SPAD, %) on
+  `Vl53l8Uld.Results`.
+- INT-driven **push streaming**: the MCU ships each frame to the host in
+  ≤`FrameReassembler.STREAM_CHUNK_MAX` (1528) byte chunks; `FrameReassembler`
+  rebuilds the full frame.
+- Advanced ST features are exposed as pure DCI codecs: crosstalk margin
+  (`xtalkMarginToRaw`), per-zone detection thresholds
+  (`packDetectionThresholds`), and the motion indicator (`MotionConfig`,
+  `defaultMotionConfig`).
+
+## CX vs CH
+
+Two silicon/firmware variants share the same results-frame wire layout, so
+**one decoder serves both** — `Vl53l8Uld.parseFrame` is shared. The only decode
+difference is the footer-id offset, selected by `Vl53l8Uld.Variant`:
+
+- **`Variant.CX`** — the base ranging sensor (this page), footer-id offset 12
+  (ULD 2.1.0). Also the dev/unprogrammed default (ST dev USB id).
+- **`Variant.CH`** — the superset that additionally emits **Compact Network
+  Histograms (CNH)** and carries its own production USB PID `0xED40`,
+  footer-id offset 4. See the [VL53L8CH docs](../vl53l8ch/introduction.md).
+
+## The live driver
+
+`Vl53l8Driver` is ST's ULD 2.1.0 (CX) / VL53LMZ 2.0.16 (CH) ported to Java over
+a small `Vl53l8Platform` interface (register read / write and a delay):
+`init()` downloads the ~84 KB sensor firmware and uploads the NVM, offset,
+xtalk and default configuration; the rest of ST's API — resolution,
+frequency, ranging mode, integration time, sharpener, target order, power
+modes, xtalk calibration and save / restore, detection thresholds, the motion
+indicator — follows it. `Vl53l8cxDevice` maps the platform onto the board's
+register bridge and turns the pushed frames into `Vl53l8Frame`s. The firmware
+blobs ship inside the jar.
+
+## When to use it
+
+Use the VL53L8 when you need a **depth image** — gesture/zone occupancy, small
+obstacle maps, people counting, hand tracking — in a package far smaller and
+cheaper than a stereo camera, indoors or in the dark. For a single distance the
+SR04 is simpler; for orientation use the BNO086. Reach for **CH/CNH** only when
+you need raw return histograms.
+
+## Key concepts
+
+- **Host-side decode** — frame parsing is pure Java (`Vl53l8Uld.parseFrame`), a
+  faithful port of the ST driver's `GetRangingData`. The device is just a
+  register bridge.
+- **Two-step frame path** — `FrameReassembler.unpackFrameChunk` decodes each
+  chunk report; `feed` rebuilds the frame; `parseFrame` decodes it. Reset on
+  `offset == 0`; a gap discards the frame in progress.
+- **`Vl53l8Uld.Results`** — one parsed frame. Arrays are sized to the active
+  resolution (16 or 64 zones), row-major; `resolution()` reports which. Values
+  are in ST's real units (distance mm with a negative one clamped to 0; signal
+  and ambient kcps/SPAD; range sigma mm; reflectance %). `targetStatus == 255`
+  = no target.
+- **Variant footer** — pass `Variant.CX` or `Variant.CH` to `parseFrame`; a
+  header/footer id mismatch throws `Vl53l8Uld.Vl53l8Error`.
+
+## Grid orientation
+
+The zone arrays keep the sensor's own order: zone 0 first, row by row. On a
+DEPZ board that grid is turned against the scene. Held with its USB connector
+down and seen from behind (looking where the sensor looks), the grid's
+**column** index runs top → bottom and its **row** index right → left. To
+show the field as the sensor sees it — row 0 the top, column 0 the left —
+turn the grid a quarter turn clockwise: pixel (row, column) of the picture is
+zone `(side - 1 - column) * side + row`. The DEPZ viewer and the ROS 2
+node draw it so. This was measured on the boards (a VL53L5CX, a VL53L7CH and a
+VL53L8CH, a hand over one half of the field); the datasheets' zone maps show
+the bare chip, not how it sits on the board.
+
+## See also
+
+- [VL53L8CX user guide](guide.md) — reassemble, parse, the frame fields, the
+  advanced-DCI codecs, gotchas.
+- [VL53L8CH docs](../vl53l8ch/introduction.md) — the CNH superset.
+- [API reference](api.md) — `Vl53l8Uld`, `FrameReassembler`, and the ToF
+  constants.

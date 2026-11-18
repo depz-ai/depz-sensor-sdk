@@ -1,0 +1,216 @@
+# depz_sensors: the default configuration (every value here is the default).
+# Copy this file, change what you need, and pass it: config:=/path/to/it.yaml
+# "/**" gives the parameters to the node whatever its name and namespace are
+# (the launch file's namespace:=robot1 included).
+# The parameters are read when the node starts: `ros2 param set` is refused
+# while it runs (change the file and start again). A parameter the node does
+# not have — a mistyped name — is named in a warning at the start.
+/**:
+  ros__parameters:
+    # The node is also an rclcpp component, depz_sensors::SensorsNode: with
+    #   ros2 launch depz_sensors sensors_composed.launch.py
+    # (the same config:= and namespace:=) it runs in a component container —
+    # one process shared with other nodes — with intra-process communication
+    # on, so a subscriber loaded into the same container, with intra-process
+    # communication on too, gets each message inside the process, without the
+    # middleware; every other subscriber gets it as before. Into a container
+    # of your own that already runs:
+    #   ... sensors_composed.launch.py container:=/my_container start_container:=false
+    # The parameters, topics and messages are the same in both. The node finds
+    # and starts its boards while it is loaded: the container answers the load
+    # once they stream, and refuses it with the node's message on a parameter
+    # the node cannot run with. With hot_plug the node probes new ports from
+    # its 1 Hz timer, on the container's thread: a container that must not
+    # wait for it is component_container_mt or component_container_isolated.
+
+    # Find and open every DEPZ board on USB at startup. A board that does not
+    # answer — the probe, or a request while it starts — is asked once more
+    # after half a second (a warning says so); one that stays silent is left
+    # out with its port and the reason in the log, and the others go on. The
+    # start-up ends with "started N of M boards found". The boards are started
+    # one after another, those that start fast (0.03 .. 0.3 s each) before a
+    # VL53L5CX / L7 / L8 and a BNO085 / BNO086 (over a second each: the
+    # sensor's firmware is loaded, the sensor hub restarts).
+    auto_discover: true
+    # With auto_discover: false, open only this board (its USB serial number,
+    # as `ros2 run depz_sensors sensors_node` prints it) ...
+    serial_number: ""
+    # ... or the board on this port (/dev/ttyACM0, or a udev symlink): the
+    # only port the node then opens.
+    device_path: ""
+    # Pick up boards plugged in while the node runs.
+    hot_plug: false
+    # Milliseconds a port is given to answer when the node asks who is on it
+    # (1..60000).
+    probe_timeout_ms: 300
+    # Testing / demo, no hardware: run on .depzrec captures instead of USB
+    # boards — each file is one board, named and published as a live one
+    # (without a serial in the capture: "<model>_<file name>"). A capture's
+    # stream starts when each of its topics has a subscriber, runs at the
+    # capture's pace and ends as an unplugged board does. The capture must hold
+    # the session this node runs with the parameters below (replay is causal).
+    replay: [""]
+
+    # Topics: /<topic_prefix>/<board name>/{range,depth,imu,mag} (and the extra
+    # topics below, when switched on). A board's
+    # name is "<model>_<USB serial>" (vl53l8ch_texample01) unless you give it
+    # an alias here: "SERIAL=name" (the name as ROS takes it: lower case, what
+    # is not a letter or a digit becomes "_"). "" = no prefix.
+    topic_prefix: "depz"
+    aliases: [""]
+    # frame_id = frame_prefix + board name.
+    frame_prefix: ""
+    # "sensor_data" (best effort, the ROS default for sensors) or "reliable".
+    qos: "sensor_data"
+    # Messages kept for a slow subscriber; 0 = the profile's own depth (5 for
+    # sensor_data, 10 for reliable).
+    qos_depth: 0
+    # Stamp samples with the board's clock mapped to the host's (true), or
+    # with their arrival time (false). Either way a stamp is never after the
+    # arrival and never before the previous one of its topic (the clock
+    # mapping is taken again every 2 s and may move a little: a stamp that
+    # would step back repeats the previous one; only the node's own clock
+    # set back takes the stamps back with it).
+    time_sync: true
+    # Publish each board's health once a second on /diagnostics
+    # (diagnostic_msgs/DiagnosticArray, one status per board, named
+    # "depz_sensors: <board name>"). See it with
+    #   ros2 topic echo /diagnostics
+    #   ros2 run rqt_runtime_monitor rqt_runtime_monitor
+    # OK: the board streams. WARN: it is silent and the node restarts it
+    # (silent_restart_after_s below), or it publishes less than half of the
+    # configured rate, or since the previous status samples were dropped,
+    # reports did not parse, the link saw CRC errors or sequence gaps, or the
+    # time sync is over 35 s old. ERROR: the board is lost (unplugged) — the
+    # message is the cause; the status then goes with the board —, or it is
+    # silent and three restarts in a row did not bring it back. The values:
+    # model, port, topics, measured and configured publish rate, messages
+    # published, samples dropped, parse errors, the link's counters, the time
+    # sync (offset, round trip, age), the restarts of a silent board (after
+    # how long it is restarted, restarts made, recoveries, the last restart
+    # and how it went), the MCU temperature (read every 10 s), a BNO055's
+    # calibration status.
+    diagnostics: true
+
+    # ---- sensor parameters: one value for every board of a family ----------
+    # A value a board cannot take stops that board only; the log names the
+    # board and the parameter.
+
+    # HC-SR04: time between measurements.
+    sr04_period_ms: 50
+    # VL53L5CX / L7CX / L7CH / L8CX / L8CH: 16 (4x4) or 64 (8x8) zones, and
+    # frames per second (up to 60 at 4x4, 15 at 8x8; from 2 on a VL53L8).
+    tof_resolution: 64
+    tof_frequency_hz: 15
+    # ... ranging mode "continuous" or "autonomous", and the integration time
+    # of the autonomous mode (2..1000 ms); order of the targets, "closest" or
+    # "strongest"; sharpener, 0..99 % (0 = off). As given here — "", 0, "", -1 —
+    # each is left as the sensor starts with it. A frame takes four
+    # integration times at 8x8 (one at 4x4) plus about 10 ms: longer than the
+    # frame period, and the sensor publishes fewer frames than
+    # tof_frequency_hz (8x8 at 15 Hz: 13 ms keeps 15, 20 ms gives 11, 50 ms
+    # 4.7). A high sharpener takes valid zones away on a flat surface (99 %:
+    # nearly all of a wall 1 m away).
+    tof_ranging_mode: ""
+    tof_integration_time_ms: 0
+    tof_target_order: ""
+    tof_sharpener_percent: -1
+    # VL53L4CD, VL53L0X / L1 / L3CX / L4CX: time per measurement, within the
+    # sensor's own limits (10..200 on a VL53L4CD and a VL53L3CX, 20..200 on a
+    # VL53L0X, 2..200 on a VL53L4CX; a VL53L1 takes 20, 33, 50, 100, 200, 500,
+    # and 15 in its "short" mode).
+    range_budget_ms: 50
+    # VL53L0X / L1 / L3CX / L4CX: distance mode — one the sensor's driver has
+    # ("short" / "long" on a VL53L1, "medium" / "long" on a VL53L4CX,
+    # "long-range" ... on a VL53L0X; the error for a wrong one lists them).
+    # "" = the driver's own. A VL53L3CX has no distance modes (a mode set for
+    # it stops it), nor has a VL53L4CD: the mode set here passes it by.
+    range_mode: ""
+    # BNO055, BNO085 / BNO086: samples per second (BNO055 up to 100).
+    imu_rate_hz: 100.0
+    # BNO055: fusion mode — "ndof", "ndof_fmc_off", "m4g", "compass", or "imu"
+    # (no magnetometer: no mag topic). "compass" and "m4g" run without the
+    # gyroscope and slower: about 61 and 77..92 samples per second at
+    # imu_rate_hz 100; 50 holds in both.
+    bno055_mode: "ndof"
+    # BNO085 / BNO086: where the Imu's orientation comes from —
+    # "rotation_vector" (with the magnetometer: absolute heading) or
+    # "game_rotation_vector" (without: no jumps near magnets, heading drifts) —
+    # and magnetometer samples per second (0 = no mag topic; the sensor hub
+    # runs rates of its own grid: 20 asked gives 25).
+    bno086_orientation: "rotation_vector"
+    bno086_mag_rate_hz: 100.0
+    # TMF8829: zone layout ("8x8", "16x16", "32x32", "48x32", ...) and period.
+    tmf8829_preset: "8x8"
+    tmf8829_period_ms: 33
+    # Every board: a board that stays on USB and publishes nothing on its main
+    # topic (range / depth / imu) for this many seconds — and for five of its
+    # periods, when those are longer: 2.5 s at 2 Hz — is restarted by the node:
+    # closed, opened and started again with its parameters, its topics kept;
+    # the other boards go on. Again 1, 2, 4, 8, 16, then every 30 s after the
+    # restart before, for as long as it stays silent; after a minute of
+    # messages the waits start at 1 s again. /diagnostics shows the board at
+    # WARN while silent (ERROR after three restarts in a row without a
+    # message) and counts the restarts. 0 = never restarted. Not for a
+    # replayed board.
+    silent_restart_after_s: 1.0
+
+    # ---- extra topics: all off by default ------------------------------------
+    # Standard messages, under the board's name beside its family's topics,
+    # with the frame and (but for the MCU's) the stamp of the sample they come
+    # from. Each is a sensor parameter: for a family here, for one board under
+    # boards.<name>.
+    #
+    #   parameter                 boards                     topic                    message
+    #   mcu_temperature           every board                mcu_temperature          sensor_msgs/Temperature
+    #   sensor_temperature        VL53L5CX/L7/L8, TMF8829,   temperature              sensor_msgs/Temperature
+    #                             BNO055
+    #   tof_signal                VL53L5CX/L7/L8             depth/signal             sensor_msgs/Image 32FC1
+    #   tof_status                VL53L5CX/L7/L8             depth/status             sensor_msgs/Image mono8
+    #   tmf8829_peaks: 2..4       TMF8829                    depth/peak_2 ... peak_4  sensor_msgs/Image 32FC1
+    #   point_cloud               VL53L5CX/L7/L8, TMF8829    points                   sensor_msgs/PointCloud2
+    #   imu_linear_acceleration   BNO055, BNO085/086         linear_acceleration      geometry_msgs/Vector3Stamped
+    #   imu_gravity               BNO055, BNO085/086         gravity                  geometry_msgs/Vector3Stamped
+    #
+    # The board's MCU temperature, °C, once a second (the board refreshes it
+    # about twice a second; stamped on arrival). Not for a replayed board: a
+    # capture does not answer the request.
+    mcu_temperature: false
+    # The sensor's own temperature, °C, with each sample: the silicon of a
+    # VL53L5CX / L7 / L8, the die of a TMF8829, the chip of a BNO055 (whole
+    # degrees each).
+    sensor_temperature: false
+    # VL53L5CX / L7 / L8: with each depth image, laid out as it is (zone 0
+    # first), the signal per zone in kcps/SPAD — also of a zone the depth image
+    # marks NaN — and ST's target status per zone (5 and 9 are valid, 255 is no
+    # target).
+    tof_signal: false
+    tof_status: false
+    # TMF8829: peaks (targets) per zone the sensor reports, 1..4. The depth
+    # image is the first; each further one is an image of its own, in metres,
+    # NaN where the zone has no such peak.
+    tmf8829_peaks: 1
+    # VL53L5CX / L7 / L8, TMF8829: with each depth image, its zones as points
+    # in space (x, y, z float32, metres; one point per zone in the image's
+    # order, NaN where the image is NaN). x is forward out of the sensor, y to
+    # its left, z up; where a zone looks comes from the manufacturer's field of
+    # view of the model (README, "Point cloud").
+    point_cloud: false
+    # BNO055, BNO085 / BNO086: the fusion's acceleration without gravity and
+    # its gravity vector, m/s², in the sensor's frame. A BNO085 / BNO086 sends
+    # each as a report of its own at imu_rate_hz; a BNO055 has them in every
+    # sample.
+    imu_linear_acceleration: false
+    imu_gravity: false
+
+    # ---- one board's own parameters -----------------------------------------
+    # Any sensor parameter above, and frame_id, under the board's name (its
+    # alias when it has one):
+    #
+    # boards:
+    #   front_tof:                  # aliases: ["TEXAMPLE01=front_tof"]
+    #     tof_resolution: 16
+    #     tof_frequency_hz: 30
+    #     frame_id: "front_tof_link"
+    #   bno086_iexample01:
+    #     imu_rate_hz: 200.0

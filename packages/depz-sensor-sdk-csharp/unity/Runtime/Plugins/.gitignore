@@ -1,0 +1,4 @@
+# Depz.Sensor.dll (the shared library, netstandard2.1) is copied here, not committed:
+# see ../../README.md "Install by copying".
+*.dll
+*.dll.meta

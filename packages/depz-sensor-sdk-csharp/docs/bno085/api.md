@@ -1,0 +1,1971 @@
+<!-- generated from ../bno086/ — edit those pages -->
+# BNO085 (IMU) — API reference
+
+The public API for the BNO085 (IMU) sensor. The shared foundation —
+transport framing, common protocol codecs, firmware image parse,
+dataset reader and USB identity — lives in the
+[top-level API reference](../api.md).
+
+Auto-generated from the source — edit the `///` summaries
+in the source, not this file.
+
+## Contents
+
+- **BNO085 (IMU)**: [`Bno086Device`](#bno086device), [`SensorId`](#sensorid), [`Bno086Q`](#bno086q), [`BnoReport`](#bnoreport), [`InputReport`](#inputreport), [`Acceleration`](#acceleration), [`Gyroscope`](#gyroscope), [`Magnetometer`](#magnetometer), [`UncalibratedGyroscope`](#uncalibratedgyroscope), [`UncalibratedMagnetometer`](#uncalibratedmagnetometer), [`RotationVector`](#rotationvector), [`ScalarReport`](#scalarreport), [`TapDetector`](#tapdetector), [`StepCounter`](#stepcounter), [`StepDetector`](#stepdetector), [`SignificantMotion`](#significantmotion), [`StabilityClassifier`](#stabilityclassifier), [`MotionRequest`](#motionrequest), [`ShakeDetector`](#shakedetector), [`GenericEvent`](#genericevent), [`PersonalActivityClassifier`](#personalactivityclassifier), [`RawSensor`](#rawsensor), [`GyroIntegratedRV`](#gyrointegratedrv), [`FlushCompleted`](#flushcompleted), [`UnknownReport`](#unknownreport), [`Sh2Reports`](#sh2reports), [`FeatureFlags`](#featureflags), [`Sh2Control`](#sh2control), [`Bno086Cmd`](#bno086cmd), [`Bno086Rpt`](#bno086rpt), [`Bno086Data`](#bno086data), [`Sh2Exception`](#sh2exception), [`ControlReport`](#controlreport), [`Sh2Command`](#sh2command), [`OscillatorType`](#oscillatortype), [`ErrorSource`](#errorsource), [`TareBasis`](#tarebasis), [`TareAxis`](#tareaxis), [`MotionIntent`](#motionintent), [`FrsRecordId`](#frsrecordid), [`FrsStatus`](#frsstatus), [`FrsWriteStatus`](#frswritestatus), [`FeatureResponse`](#featureresponse), [`ProductId`](#productid), [`CommandResponse`](#commandresponse), [`FrsReadResponse`](#frsreadresponse), [`FrsWriteResponse`](#frswriteresponse), [`ErrorRecord`](#errorrecord), [`Counts`](#counts), [`CalibrationConfig`](#calibrationconfig), [`SensorMetadata`](#sensormetadata), [`Sh2Hub`](#sh2hub), [`FrsReadSession`](#frsreadsession), [`FrsWriteSession`](#frswritesession), [`ShtpChannel`](#shtpchannel), [`ExecutableCommand`](#executablecommand), [`ShtpHeader`](#shtpheader), [`ShtpCargo`](#shtpcargo), [`ShtpLayer`](#shtplayer)
+
+## BNO085 (IMU)
+
+### Bno086Device
+
+```csharp
+public sealed class Bno086Device : DepzDevice
+```
+
+BNO085 / BNO086 9-axis IMU (contract 05). The board only shuttles raw SHTP frames (SEND_SHTP_PACKET / RPT_DATA); the SH-2 hub protocol runs here, ported from the reference SDK. Every send is acknowledged by the bridge at once and every inbound frame arrives as RPT_DATA(cmd 0x00), so replies are correlated at the SH-2 layer only.
+
+imu.HardwareReset(); using var reports = imu.Reports.Subscribe(); imu.Enable(SensorId.RotationVector, hz: 100);
+
+Never call a blocking device method (Enable, Tare, …) from a `Reports` callback. A wait for the hub ends with the device: the closed error after `Close()`, the device-lost error on a lost link, at once, and an answer already queued still wins (contract 07 §3).
+
+#### Bno086Device.RateLowFactor *(constant)*
+
+```csharp
+public const double RateLowFactor = 0.9
+```
+
+Granted rates outside [0.9, 2.1] × the requested one are worth a warning, never an error (contract 05 §7).
+
+#### Bno086Device.RateHighFactor *(constant)*
+
+```csharp
+public const double RateHighFactor = 2.1
+```
+
+#### Bno086Device.Bno086Device *(constructor)*
+
+```csharp
+public Bno086Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Bno086Device.Reports *(property)*
+
+```csharp
+public SensorStream<BnoReport> Reports
+```
+
+The reports of every enabled sensor (contract 07 §3): `Reports.On(cb)`, `Reports.Subscribe()` (1024 by default), `Reports.Next()`; a `where` predicate keeps the sensors wanted (`r => r.SensorIdValue == (int)SensorId.Accelerometer`). `ParseErrors` counts RPT_DATA reports shorter than their 9-byte header, dropped (contract 07 §2).
+
+#### Bno086Device.BusyRetries *(property)*
+
+```csharp
+public int BusyRetries
+```
+
+SEND_SHTP_PACKET attempts on ERR_BUSY before giving up.
+
+#### Bno086Device.BusyBackoff *(property)*
+
+```csharp
+public TimeSpan BusyBackoff
+```
+
+The back-off between busy retries (at least 200 ms per the bridge spec).
+
+#### Bno086Device.Advertisement *(property)*
+
+```csharp
+public byte[] Advertisement
+```
+
+The raw SHTP channel-0 advertisement seen since open or reset.
+
+#### Bno086Device.HardwareReset
+
+```csharp
+public void HardwareReset(TimeSpan? timeout = null)
+```
+
+Hard-reset the sensor through nRST. The bridge's OK confirms it; the SH-2 executable reset-complete is waited for best-effort (firmware ≤ 0.95 never sent it, ERRATA E9). SHTP state and cached features restart from zero.
+
+#### Bno086Device.Wake
+
+```csharp
+public void Wake()
+```
+
+Pulse WAKE (PS0) — the board's pin, not the SH-2 "On" that ends `Sleep` (that is `PowerOn`).
+
+#### Bno086Device.Sleep
+
+```csharp
+public void Sleep()
+```
+
+SH-2 "Sleep": every report stops except those enabled with `FeatureFlags.Wakeup | FeatureFlags.AlwaysOn`; the configuration is kept. No response.
+
+#### Bno086Device.PowerOn
+
+```csharp
+public void PowerOn()
+```
+
+SH-2 "On": ends `Sleep`; every enabled report comes back. No response.
+
+#### Bno086Device.ProductId
+
+```csharp
+public ProductId ProductId(TimeSpan? timeout = null)
+```
+
+The SH-2 application's Product ID — the first of `ProductIds`.
+
+#### Bno086Device.ProductIds
+
+```csharp
+public List<ProductId> ProductIds(TimeSpan? timeout = null, TimeSpan? settle = null)
+```
+
+Every component's Product ID Response, the SH-2 application first. Collects until no response came for `settle` (default 150 ms), so late ones cannot answer the next request.
+
+#### Bno086Device.Enable
+
+```csharp
+public FeatureResponse? Enable(int sensor, double? hz = null, uint? intervalUs = null, uint batchUs = 0, int sensitivity = 0, int flags = 0, uint cfgWord = 0, bool verify = true, TimeSpan? timeout = null)
+```
+
+Enable `sensor` through Set Feature (0xFD), at `hz` or every `intervalUs` (give exactly one). The hub rounds to its grid; with `verify` the granted rate is read back through Get Feature and a rate outside 0.9–2.1 × the request is traced as a warning (contract 05 §7). Returns that read-back (null without verify).
+
+#### Bno086Device.Disable
+
+```csharp
+public void Disable(int sensor)
+```
+
+Disable `sensor` (Set Feature with interval 0).
+
+#### Bno086Device.GetFeature
+
+```csharp
+public FeatureResponse GetFeature(int sensor, TimeSpan? timeout = null)
+```
+
+Get Feature round trip: the rates in effect for `sensor`.
+
+#### Bno086Device.TareNow
+
+```csharp
+public void TareNow(TareAxis axes = TareAxis.All, TareBasis basis = TareBasis.RotationVector)
+```
+
+Tare `axes` against `basis` (no response).
+
+#### Bno086Device.PersistTare
+
+```csharp
+public void PersistTare()
+```
+
+Persist the current tare into FRS (no response).
+
+#### Bno086Device.SetReorientation
+
+```csharp
+public void SetReorientation(double x, double y, double z, double w)
+```
+
+The runtime reorientation quaternion (Q14 on the wire; all zeros clears; no response). It is applied on the hub's side, in the hub's own axes: x and y swapped and z negated relative to the reports.
+
+#### Bno086Device.SetCalibration
+
+```csharp
+public void SetCalibration(bool accel = true, bool gyro = true, bool mag = true, bool planar = false, TimeSpan? timeout = null)
+```
+
+Configure the motion-engine calibration; `Sh2Exception` on a non-zero status.
+
+#### Bno086Device.GetCalibration
+
+```csharp
+public CalibrationConfig GetCalibration(TimeSpan? timeout = null)
+```
+
+Which motion-engine calibrations run.
+
+#### Bno086Device.SaveDcd
+
+```csharp
+public void SaveDcd(TimeSpan? timeout = null)
+```
+
+Save the dynamic calibration data to flash (DCD Save Now).
+
+#### Bno086Device.ConfigurePeriodicDcd
+
+```csharp
+public void ConfigurePeriodicDcd(bool enable)
+```
+
+The hub's periodic DCD autosave (no response).
+
+#### Bno086Device.SetMotionIntent
+
+```csharp
+public void SetMotionIntent(MotionIntent intent)
+```
+
+Interactive Calibration (0x0E, BNO086 only): how the device is about to move, so the hub can refine the gyro zero-rate offset while it is still. No response; a BNO085 ignores it. The hub's answer, if it wants the device to stop, is a `MotionRequest` report.
+
+#### Bno086Device.EnableMotionRequest
+
+```csharp
+public FeatureResponse? EnableMotionRequest(double hz = 1)
+```
+
+Enable MotionRequest (0x2B) reports; the hub sends one when its request changes, and reads the rate back late, so the granted rate is not checked.
+
+#### Bno086Device.Flush
+
+```csharp
+public void Flush(int sensor, TimeSpan? timeout = null)
+```
+
+Force Sensor Flush (0xF0): the hub sends `sensor`'s batched reports now; returns once its Flush Completed (0xEF) arrives.
+
+#### Bno086Device.FrsRead
+
+```csharp
+public uint[] FrsRead(int recordId, TimeSpan? timeout = null)
+```
+
+Read a whole FRS record: its 32-bit words.
+
+#### Bno086Device.FrsWrite
+
+```csharp
+public void FrsWrite(int recordId, IReadOnlyList<uint> words, TimeSpan? timeout = null)
+```
+
+Write a whole FRS record; `Sh2Exception` on failure.
+
+#### Bno086Device.GetMetadata
+
+```csharp
+public SensorMetadata GetMetadata(int sensor, TimeSpan? timeout = null)
+```
+
+Read and parse `sensor`'s metadata FRS record.
+
+#### Bno086Device.GetOscillatorType
+
+```csharp
+public OscillatorType GetOscillatorType(TimeSpan? timeout = null)
+```
+
+Get Oscillator Type (0x0A): R0 is the type (an unknown value comes back as its number).
+
+#### Bno086Device.ClearDcdAndReset
+
+```csharp
+public void ClearDcdAndReset(TimeSpan? timeout = null)
+```
+
+Clear the in-RAM dynamic calibration and reset (0x0B). The hub resets instead of answering, so this waits for the executable reset-complete.
+
+#### Bno086Device.GetErrors
+
+```csharp
+public List<ErrorRecord> GetErrors(int severity = 0, TimeSpan? timeout = null)
+```
+
+The error queue (0x01), `severity` or greater; records stream until one with source 255 (no more).
+
+#### Bno086Device.GetCounts
+
+```csharp
+public Counts GetCounts(int sensor, TimeSpan? timeout = null)
+```
+
+A sensor's event counts (0x02): two responses, response_seq 0 then 1.
+
+#### Bno086Device.ClearCounts
+
+```csharp
+public void ClearCounts(int sensor, TimeSpan? timeout = null)
+```
+
+Clear a sensor's event counts (0x02, subcommand 1).
+
+### SensorId
+
+```csharp
+public enum SensorId
+{
+    Accelerometer = 0x01,
+    Gyroscope = 0x02,
+    Magnetometer = 0x03,
+    LinearAcceleration = 0x04,
+    RotationVector = 0x05,
+    Gravity = 0x06,
+    UncalibratedGyroscope = 0x07,
+    GameRotationVector = 0x08,
+    GeomagneticRotationVector = 0x09,
+    Pressure = 0x0A,
+    AmbientLight = 0x0B,
+    Humidity = 0x0C,
+    Proximity = 0x0D,
+    Temperature = 0x0E,
+    UncalibratedMagnetometer = 0x0F,
+    TapDetector = 0x10,
+    StepCounter = 0x11,
+    SignificantMotion = 0x12,
+    StabilityClassifier = 0x13,
+    RawAccelerometer = 0x14,
+    RawGyroscope = 0x15,
+    RawMagnetometer = 0x16,
+    StepDetector = 0x18,
+    ShakeDetector = 0x19,
+    FlipDetector = 0x1A,
+    PickupDetector = 0x1B,
+    StabilityDetector = 0x1C,
+    PersonalActivityClassifier = 0x1E,
+    SleepDetector = 0x1F,
+    TiltDetector = 0x20,
+    PocketDetector = 0x21,
+    CircleDetector = 0x22,
+    HeartRateMonitor = 0x23,
+    ArvrStabilizedRv = 0x28,
+    ArvrStabilizedGameRv = 0x29,
+    GyroIntegratedRv = 0x2A,
+    MotionRequest = 0x2B,
+}
+```
+
+SH-2 input report IDs (contract 05 §5).
+
+### Bno086Q
+
+```csharp
+public static class Bno086Q
+```
+
+The Q points of the report values (value = raw / 2^Q), SH-2 reference driver.
+
+#### Bno086Q.Points *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<int, int> Points = …
+```
+
+Q of the primary fields, by sensor id.
+
+#### Bno086Q.RvAccuracyQ *(constant)*
+
+```csharp
+public const int RvAccuracyQ = 12
+```
+
+The rotation-vector accuracy estimate, radians.
+
+#### Bno086Q.GyroRvAngvelQ *(constant)*
+
+```csharp
+public const int GyroRvAngvelQ = 10
+```
+
+The gyro-integrated rotation vector's angular velocity, rad/s.
+
+#### Bno086Q.Scale
+
+```csharp
+public static double Scale(long raw, int q)
+```
+
+raw / 2^`q` (exact in a double).
+
+### BnoReport
+
+```csharp
+public abstract record BnoReport(int SensorIdValue, long TimestampUs)
+```
+
+Base for a decoded report. Raw wire integers are authoritative.
+
+#### BnoReport.Kind *(property)*
+
+```csharp
+public abstract string Kind
+```
+
+Vector "type" tag (matches the concrete record name).
+
+#### BnoReport.Fields
+
+```csharp
+public abstract IReadOnlyDictionary<string, object?> Fields()
+```
+
+Field name → value (long, null, int[] or string), matching the golden vector fields.
+
+### InputReport
+
+```csharp
+public abstract record InputReport(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs) : BnoReport(SensorIdValue, TimestampUs)
+```
+
+Channel-3/4 report with the common SH-2 header fields.
+
+### Acceleration
+
+```csharp
+public sealed record Acceleration(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### Acceleration.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### Acceleration.X *(property)*
+
+```csharp
+public double X
+```
+
+m/s², Q8 (also linear acceleration and gravity). Scaled values (raw / 2^8).
+
+#### Acceleration.Y *(property)*
+
+```csharp
+public double Y
+```
+
+#### Acceleration.Z *(property)*
+
+```csharp
+public double Z
+```
+
+#### Acceleration.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### Gyroscope
+
+```csharp
+public sealed record Gyroscope(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### Gyroscope.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### Gyroscope.X *(property)*
+
+```csharp
+public double X
+```
+
+rad/s, Q9. Scaled values (raw / 2^9).
+
+#### Gyroscope.Y *(property)*
+
+```csharp
+public double Y
+```
+
+#### Gyroscope.Z *(property)*
+
+```csharp
+public double Z
+```
+
+#### Gyroscope.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### Magnetometer
+
+```csharp
+public sealed record Magnetometer(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### Magnetometer.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### Magnetometer.X *(property)*
+
+```csharp
+public double X
+```
+
+µT, Q4. Scaled values (raw / 2^4).
+
+#### Magnetometer.Y *(property)*
+
+```csharp
+public double Y
+```
+
+#### Magnetometer.Z *(property)*
+
+```csharp
+public double Z
+```
+
+#### Magnetometer.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### UncalibratedGyroscope
+
+```csharp
+public sealed record UncalibratedGyroscope(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw, int BiasXRaw, int BiasYRaw, int BiasZRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### UncalibratedGyroscope.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### UncalibratedGyroscope.X *(property)*
+
+```csharp
+public double X
+```
+
+Scaled values (raw / 2^9).
+
+#### UncalibratedGyroscope.Y *(property)*
+
+```csharp
+public double Y
+```
+
+#### UncalibratedGyroscope.Z *(property)*
+
+```csharp
+public double Z
+```
+
+#### UncalibratedGyroscope.Bias *(property)*
+
+```csharp
+public double[] Bias
+```
+
+The bias estimate, rad/s.
+
+#### UncalibratedGyroscope.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### UncalibratedMagnetometer
+
+```csharp
+public sealed record UncalibratedMagnetometer(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw, int BiasXRaw, int BiasYRaw, int BiasZRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### UncalibratedMagnetometer.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### UncalibratedMagnetometer.X *(property)*
+
+```csharp
+public double X
+```
+
+Scaled values (raw / 2^4).
+
+#### UncalibratedMagnetometer.Y *(property)*
+
+```csharp
+public double Y
+```
+
+#### UncalibratedMagnetometer.Z *(property)*
+
+```csharp
+public double Z
+```
+
+#### UncalibratedMagnetometer.Bias *(property)*
+
+```csharp
+public double[] Bias
+```
+
+The hard-iron bias, µT.
+
+#### UncalibratedMagnetometer.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### RotationVector
+
+```csharp
+public sealed record RotationVector(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int IRaw, int JRaw, int KRaw, int RealRaw, int? AccuracyRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### RotationVector.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### RotationVector.I *(property)*
+
+```csharp
+public double I
+```
+
+The unit quaternion, Q14.
+
+#### RotationVector.J *(property)*
+
+```csharp
+public double J
+```
+
+#### RotationVector.K *(property)*
+
+```csharp
+public double K
+```
+
+#### RotationVector.Real *(property)*
+
+```csharp
+public double Real
+```
+
+#### RotationVector.AccuracyRad *(property)*
+
+```csharp
+public double? AccuracyRad
+```
+
+Estimated heading accuracy, radians (null for the game variants).
+
+#### RotationVector.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### ScalarReport
+
+```csharp
+public sealed record ScalarReport(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, long ValueRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### ScalarReport.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### ScalarReport.Value *(property)*
+
+```csharp
+public double Value
+```
+
+The value, Q from `Points` by sensor (hPa, lux, %, cm, °C).
+
+#### ScalarReport.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### TapDetector
+
+```csharp
+public sealed record TapDetector(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Flags) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### TapDetector.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### TapDetector.DoubleTap *(property)*
+
+```csharp
+public bool DoubleTap
+```
+
+Bit 6: a double tap.
+
+#### TapDetector.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### StepCounter
+
+```csharp
+public sealed record StepCounter(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, long LatencyUs, long Steps) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### StepCounter.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### StepCounter.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### StepDetector
+
+```csharp
+public sealed record StepDetector(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, long LatencyUs) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### StepDetector.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### StepDetector.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### SignificantMotion
+
+```csharp
+public sealed record SignificantMotion(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Motion) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### SignificantMotion.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### SignificantMotion.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### StabilityClassifier
+
+```csharp
+public sealed record StabilityClassifier(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Classification) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### StabilityClassifier.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### StabilityClassifier.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### MotionRequest
+
+```csharp
+public sealed record MotionRequest(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Intent, int Request) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+0x2B motion request (BNO085 interactive calibration): the motion intent the hub was last told, and what it asks of the device (SH-2 §6.5.45.2; 1, 3, 4 = stay still). Sent when the request changes, not periodically.
+
+#### MotionRequest.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### MotionRequest.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### ShakeDetector
+
+```csharp
+public sealed record ShakeDetector(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int Flags) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### ShakeDetector.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### ShakeDetector.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### GenericEvent
+
+```csharp
+public sealed record GenericEvent(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, long ValueRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### GenericEvent.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### GenericEvent.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### PersonalActivityClassifier
+
+```csharp
+public sealed record PersonalActivityClassifier(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int PageNumber, int EndOfSequence, int MostLikelyState, int[] Confidences) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### PersonalActivityClassifier.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### PersonalActivityClassifier.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### RawSensor
+
+```csharp
+public sealed record RawSensor(int SensorIdValue, long TimestampUs, int Seq, int Accuracy, long DelayUs, int XRaw, int YRaw, int ZRaw, long SensorTimestampUs, int TemperatureRaw) : InputReport(SensorIdValue, TimestampUs, Seq, Accuracy, DelayUs)
+```
+
+#### RawSensor.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### RawSensor.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### GyroIntegratedRV
+
+```csharp
+public sealed record GyroIntegratedRV(int SensorIdValue, long TimestampUs, int IRaw, int JRaw, int KRaw, int RealRaw, int VxRaw, int VyRaw, int VzRaw) : BnoReport(SensorIdValue, TimestampUs)
+```
+
+#### GyroIntegratedRV.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### GyroIntegratedRV.I *(property)*
+
+```csharp
+public double I
+```
+
+The unit quaternion, Q14.
+
+#### GyroIntegratedRV.J *(property)*
+
+```csharp
+public double J
+```
+
+#### GyroIntegratedRV.K *(property)*
+
+```csharp
+public double K
+```
+
+#### GyroIntegratedRV.Real *(property)*
+
+```csharp
+public double Real
+```
+
+#### GyroIntegratedRV.AngularVelocity *(property)*
+
+```csharp
+public double[] AngularVelocity
+```
+
+Angular velocity, rad/s (Q10).
+
+#### GyroIntegratedRV.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### FlushCompleted
+
+```csharp
+public sealed record FlushCompleted(int SensorIdValue, long TimestampUs, int FlushedSensor) : BnoReport(SensorIdValue, TimestampUs)
+```
+
+0xEF Flush Completed: every batched report of `FlushedSensor` as of the matching Force Sensor Flush has been sent. `SensorIdValue` is 0xEF; no SH-2 header, so the timestamp is the cargo's current base.
+
+#### FlushCompleted.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### FlushCompleted.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### UnknownReport
+
+```csharp
+public sealed record UnknownReport(int SensorIdValue, long TimestampUs, byte[] Data) : BnoReport(SensorIdValue, TimestampUs)
+```
+
+#### UnknownReport.Kind *(property)*
+
+```csharp
+public override string Kind
+```
+
+#### UnknownReport.Fields
+
+```csharp
+public override IReadOnlyDictionary<string, object?> Fields()
+```
+
+### Sh2Reports
+
+```csharp
+public static class Sh2Reports
+```
+
+SH-2 input-report parsers (contract 05 §5). Byte-exact with the reference Python `reports.py`. Raw wire integers preserved; the report records scale them (`Bno086Q`).
+
+#### Sh2Reports.FlushCompletedId *(constant)*
+
+```csharp
+public const int FlushCompletedId = 0xEF
+```
+
+Flush Completed: + u8 sensor ID, no SH-2 header; the answer to Force Sensor Flush (0xF0).
+
+#### Sh2Reports.GyroIntegratedRvId *(constant)*
+
+```csharp
+public const int GyroIntegratedRvId = 0x2A
+```
+
+#### Sh2Reports.ParseInputCargo
+
+```csharp
+public static List<BnoReport> ParseInputCargo(byte[] payload, long captureTimestampUs)
+```
+
+Parse a channel-3/4 cargo into typed reports. `captureTimestampUs` is the bridge RPT_DATA capture time (MCU uptime, never negative); 0xFB base and 0xFA rebase adjust it.
+
+#### Sh2Reports.ParseGyroRvCargo
+
+```csharp
+public static GyroIntegratedRV? ParseGyroRvCargo(byte[] payload, long captureTimestampUs)
+```
+
+Parse a channel-5 cargo (gyro-integrated RV, dense). Two shapes: bare 7×i16, or prefixed with 0xFB + i32 base delta + u16 delay. Returns null when the cargo is too short.
+
+### FeatureFlags
+
+```csharp
+public static class FeatureFlags
+```
+
+Set Feature `flags` bits (SH-2 §6.5.4) for `SetFeature`. `Wakeup | AlwaysOn` keeps a sensor reporting through `Sleep`: on a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) such a report kept its full rate during sleep, delivered on SHTP channel 4 (wake input), while every other report stopped.
+
+#### FeatureFlags.Wakeup *(constant)*
+
+```csharp
+public const byte Wakeup = 0x04
+```
+
+Bit 2: wake-up enabled — the sensor reports on channel 4.
+
+#### FeatureFlags.AlwaysOn *(constant)*
+
+```csharp
+public const byte AlwaysOn = 0x08
+```
+
+Bit 3: always-on — the sensor keeps running while the hub sleeps.
+
+### Sh2Control
+
+```csharp
+public static class Sh2Control
+```
+
+SH-2 control-report encoders (contract 05 §6). Each method returns the header-less cargo payload for the control channel (channel 2); wrap it with `NextFrame` to frame it. Byte-exact with the golden vectors.
+
+#### Sh2Control.SetFeatureCommand *(constant)*
+
+```csharp
+public const byte SetFeatureCommand = 0xFD
+```
+
+#### Sh2Control.GetFeatureRequest *(constant)*
+
+```csharp
+public const byte GetFeatureRequest = 0xFE
+```
+
+#### Sh2Control.ProductIdRequest *(constant)*
+
+```csharp
+public const byte ProductIdRequest = 0xF9
+```
+
+#### Sh2Control.CommandRequest *(constant)*
+
+```csharp
+public const byte CommandRequest = 0xF2
+```
+
+#### Sh2Control.FrsReadRequest *(constant)*
+
+```csharp
+public const byte FrsReadRequest = 0xF4
+```
+
+#### Sh2Control.FrsWriteRequest *(constant)*
+
+```csharp
+public const byte FrsWriteRequest = 0xF7
+```
+
+#### Sh2Control.FrsWriteData *(constant)*
+
+```csharp
+public const byte FrsWriteData = 0xF6
+```
+
+#### Sh2Control.SetFeature
+
+```csharp
+public static byte[] SetFeature(int sensorId, uint intervalUs, uint batchUs = 0, int sensitivity = 0, int flags = 0, uint cfgWord = 0)
+```
+
+0xFD Set Feature Command: enable/configure a sensor. 17-byte payload — id, flags, u16 change-sensitivity, u32 report interval µs, u32 batch interval µs, u32 sensor-specific config.
+
+#### Sh2Control.GetFeature
+
+```csharp
+public static byte[] GetFeature(int sensorId)
+```
+
+0xFE Get Feature Request.
+
+#### Sh2Control.ProductId
+
+```csharp
+public static byte[] ProductId()
+```
+
+0xF9 Product ID Request.
+
+#### Sh2Control.Sleep
+
+```csharp
+public static byte[] Sleep()
+```
+
+SH-2 "Sleep" for the executable channel (channel 1, not control): `[0x03]`. Frame it with `NextFrame((int)ShtpChannel.Executable, Sh2Control.Sleep())` and send it through the bridge's SEND_SHTP_PACKET (0x34); the hub sends no response. Every report stops, except those enabled with `Wakeup` | `AlwaysOn`, which keep their rate; the configuration (enabled sensors, rates) is kept. `PowerOn` ends it. On a DEPZ BNO085 (SH-2 3.12.6, 2026-10-16) all reports stopped within one sample; a Wakeup|AlwaysOn report kept streaming at full rate on channel 4.
+
+#### Sh2Control.PowerOn
+
+```csharp
+public static byte[] PowerOn()
+```
+
+SH-2 "On" for the executable channel (channel 1): `[0x02]` — ends `Sleep`. Every report that was enabled comes back at its rate, without re-enabling; the hub sends no response. Not the bridge's SENSOR_WAKE_UP (0x33), which pulses the WAKE/PS0 pin — a hardware signal, not an SH-2 command.
+
+#### Sh2Control.Command
+
+```csharp
+public static byte[] Command(int seq, int command, ReadOnlySpan<byte> parameters)
+```
+
+0xF2 Command Request: [id, seq, command] + params, zero-padded to 12 bytes (9 param slots).
+
+#### Sh2Control.FrsRead
+
+```csharp
+public static byte[] FrsRead(int frsType, int offsetWords = 0, int blockWords = 0)
+```
+
+0xF4 FRS Read Request: reserved, u16 read offset (words), u16 FRS type, u16 block size (words). 8-byte payload.
+
+#### Sh2Control.FrsWrite
+
+```csharp
+public static byte[] FrsWrite(int frsType, int lengthWords)
+```
+
+0xF7 FRS Write Request: reserved, u16 length (words), u16 FRS type. 6-byte payload.
+
+#### Sh2Control.FrsWriteDataReport
+
+```csharp
+public static byte[] FrsWriteDataReport(int offsetWords, IReadOnlyList<uint> words)
+```
+
+0xF6 FRS Write Data: reserved, u16 word offset, then two u32 data words — always 12 bytes (contract 05 §6); one word leaves the second slot zero.
+
+### Bno086Cmd
+
+```csharp
+public enum Bno086Cmd
+{
+    SensorReset = 0x32,
+    SensorWakeUp = 0x33,
+    SendShtpPacket = 0x34,
+}
+```
+
+Bridge commands of the BNO085 board (contract 05 §2): the MCU only shuttles raw SHTP frames.
+
+### Bno086Rpt
+
+```csharp
+public enum Bno086Rpt
+{
+    Data = 0x91,
+}
+```
+
+### Bno086Data
+
+```csharp
+public sealed record Bno086Data(int Cmd, ulong TimestampUs, byte[] Shtp)
+```
+
+One RPT_DATA report: an SHTP frame captured from the sensor bus, with the MCU uptime.
+
+#### Bno086Data.BusyBackoff *(field)*
+
+```csharp
+public static readonly TimeSpan BusyBackoff = TimeSpan.FromMilliseconds(200)
+```
+
+Two 64-byte SHTP transmit slots on the MCU (ERRATA E2); a third send gets ERR_BUSY, to back off at least this long.
+
+#### Bno086Data.Unpack
+
+```csharp
+public static Bno086Data Unpack(ReadOnlySpan<byte> payload)
+```
+
+### Sh2Exception
+
+```csharp
+public sealed class Sh2Exception : DepzException
+```
+
+A SH-2 level failure: a non-zero command status, an FRS error (a `DepzException`, contract 07 §3).
+
+#### Sh2Exception.Sh2Exception *(constructor)*
+
+```csharp
+public Sh2Exception(string message) : base(message)
+```
+
+### ControlReport
+
+```csharp
+public enum ControlReport
+{
+    CommandResponse = 0xF1,
+    CommandRequest = 0xF2,
+    FrsReadResponse = 0xF3,
+    FrsReadRequest = 0xF4,
+    FrsWriteResponse = 0xF5,
+    FrsWriteData = 0xF6,
+    FrsWriteRequest = 0xF7,
+    ProductIdResponse = 0xF8,
+    ProductIdRequest = 0xF9,
+    GetFeatureResponse = 0xFC,
+    SetFeatureCommand = 0xFD,
+    GetFeatureRequest = 0xFE,
+    ForceSensorFlush = 0xF0,
+}
+```
+
+Report ids on SHTP channel 2 (control).
+
+### Sh2Command
+
+```csharp
+public enum Sh2Command
+{
+    Errors = 0x01,
+    Counter = 0x02,
+    Tare = 0x03,
+    Initialize = 0x04,
+    SaveDcd = 0x06,
+    MeCalibrate = 0x07,
+    PeriodicDcdConfig = 0x09,
+    GetOscillatorType = 0x0A,
+    ClearDcdAndReset = 0x0B,
+    InteractiveCalibration = 0x0E,
+}
+```
+
+The `command` of a Command Request / Response (0xF2 / 0xF1).
+
+### OscillatorType
+
+```csharp
+public enum OscillatorType
+{
+    Internal = 0,
+    ExtCrystal = 1,
+    ExtClock = 2,
+}
+```
+
+### ErrorSource
+
+```csharp
+public enum ErrorSource
+{
+    MotionEngine = 1,
+    MotionHub = 2,
+    SensorHub = 3,
+    Chip = 4,
+    NoMoreErrors = 255,
+}
+```
+
+The `source` of an error record (SH-2 §6.4.1).
+
+### TareBasis
+
+```csharp
+public enum TareBasis
+{
+    RotationVector = 0,
+    GameRotationVector = 1,
+    GeomagneticRotationVector = 2,
+    GyroIntegratedRv = 3,
+    ArvrStabilizedRv = 4,
+    ArvrStabilizedGameRv = 5,
+}
+```
+
+The rotation vector a tare refers to (Tare Now P2).
+
+### TareAxis
+
+```csharp
+public enum TareAxis
+{
+    X = 1,
+    Y = 2,
+    Z = 4,
+    All = 7,
+}
+```
+
+Tare axes, a bitmap.
+
+### MotionIntent
+
+```csharp
+public enum MotionIntent
+{
+    Unknown = 0,
+    StationaryNoVibration = 1,
+    StationaryWithVibration = 2,
+    InMotion = 3,
+    InMotionAccelerating = 4,
+}
+```
+
+P0 of Interactive Calibration (0x0E, SH-2 §6.4.12.1): what the host knows about the device's motion. Unknown is the hub's initial state.
+
+### FrsRecordId
+
+```csharp
+public static class FrsRecordId
+```
+
+FRS record ids (SH-2 figure 28).
+
+#### FrsRecordId.StaticCalibrationAgm *(constant)*
+
+```csharp
+public const int StaticCalibrationAgm = 0x7979
+```
+
+#### FrsRecordId.NominalCalibration *(constant)*
+
+```csharp
+public const int NominalCalibration = 0x4D4D
+```
+
+#### FrsRecordId.DynamicCalibration *(constant)*
+
+```csharp
+public const int DynamicCalibration = 0x1F1F
+```
+
+#### FrsRecordId.MePowerMgmt *(constant)*
+
+```csharp
+public const int MePowerMgmt = 0xD3E2
+```
+
+#### FrsRecordId.SystemOrientation *(constant)*
+
+```csharp
+public const int SystemOrientation = 0x2D3E
+```
+
+Mounting quaternion, 4 × Q30 words.
+
+#### FrsRecordId.AccelOrientation *(constant)*
+
+```csharp
+public const int AccelOrientation = 0x2D41
+```
+
+#### FrsRecordId.GyroscopeOrientation *(constant)*
+
+```csharp
+public const int GyroscopeOrientation = 0x2D46
+```
+
+#### FrsRecordId.MagnetometerOrientation *(constant)*
+
+```csharp
+public const int MagnetometerOrientation = 0x2D4C
+```
+
+#### FrsRecordId.ArvrStabilizationRv *(constant)*
+
+```csharp
+public const int ArvrStabilizationRv = 0x3E2D
+```
+
+#### FrsRecordId.ArvrStabilizationGrv *(constant)*
+
+```csharp
+public const int ArvrStabilizationGrv = 0x3E2E
+```
+
+#### FrsRecordId.SerialNumber *(constant)*
+
+```csharp
+public const int SerialNumber = 0x4B4B
+```
+
+One 32-bit word; empty unless programmed.
+
+#### FrsRecordId.UserRecord *(constant)*
+
+```csharp
+public const int UserRecord = 0x74B4
+```
+
+Free for the user, up to 64 words.
+
+#### FrsRecordId.SigMotionDetectConfig *(constant)*
+
+```csharp
+public const int SigMotionDetectConfig = 0xC274
+```
+
+#### FrsRecordId.ShakeDetectConfig *(constant)*
+
+```csharp
+public const int ShakeDetectConfig = 0x7D7D
+```
+
+#### FrsRecordId.StabilityDetectorConfig *(constant)*
+
+```csharp
+public const int StabilityDetectorConfig = 0xED85
+```
+
+#### FrsRecordId.ActivityTrackerConfig *(constant)*
+
+```csharp
+public const int ActivityTrackerConfig = 0xED88
+```
+
+#### FrsRecordId.GyroIntegratedRvConfig *(constant)*
+
+```csharp
+public const int GyroIntegratedRvConfig = 0xA1A2
+```
+
+Reference, sync interval, max error, prediction (SH-2 §4.3.24).
+
+#### FrsRecordId.MetadataRecords *(field)*
+
+```csharp
+public static readonly IReadOnlyDictionary<int, int> MetadataRecords = …
+```
+
+Sensor id → its metadata FRS record.
+
+### FrsStatus
+
+```csharp
+public enum FrsStatus
+{
+    NoError = 0,
+    UnrecognizedFrsType = 1,
+    Busy = 2,
+    ReadCompleted = 3,
+    OffsetOutOfRange = 4,
+    RecordEmpty = 5,
+    BlockCompleted = 6,
+    BlockAndReadCompleted = 7,
+    DeviceError = 8,
+}
+```
+
+### FrsWriteStatus
+
+```csharp
+public enum FrsWriteStatus
+{
+    WordsReceived = 0,
+    UnrecognizedFrsType = 1,
+    Busy = 2,
+    WriteCompleted = 3,
+    WriteModeReady = 4,
+    WriteFailed = 5,
+    NotInWriteMode = 6,
+    InvalidLength = 7,
+    RecordValid = 8,
+    RecordInvalid = 9,
+}
+```
+
+### FeatureResponse
+
+```csharp
+public sealed record FeatureResponse(int SensorId, int Flags, int Sensitivity, uint IntervalUs, uint BatchUs, uint CfgWord)
+```
+
+Get Feature Response (0xFC), 17 bytes: the rates in effect.
+
+#### FeatureResponse.Unpack
+
+```csharp
+public static FeatureResponse Unpack(ReadOnlySpan<byte> p)
+```
+
+### ProductId
+
+```csharp
+public sealed record ProductId(int ResetCause, int SwVersionMajor, int SwVersionMinor, uint SwPartNumber, uint SwBuildNumber, int SwVersionPatch)
+```
+
+Product ID Response (0xF8), 16 bytes, one per software component (the SH-2 application first); the reset cause (SH-2 §6.4.5.2) is set on the first only.
+
+#### ProductId.Version *(property)*
+
+```csharp
+public string Version
+```
+
+#### ProductId.Unpack
+
+```csharp
+public static ProductId Unpack(ReadOnlySpan<byte> p)
+```
+
+### CommandResponse
+
+```csharp
+public sealed record CommandResponse(int Seq, int Command, int CommandSeq, int ResponseSeq, byte[] R)
+```
+
+Command Response (0xF1), 16 bytes. `CommandSeq` echoes the request (correlate on it plus `Command`); `ResponseSeq` counts responses to one request; R0 is the status of most commands (0 = success).
+
+#### CommandResponse.Status *(property)*
+
+```csharp
+public int Status
+```
+
+#### CommandResponse.Unpack
+
+```csharp
+public static CommandResponse Unpack(ReadOnlySpan<byte> p)
+```
+
+### FrsReadResponse
+
+```csharp
+public sealed record FrsReadResponse(int Status, int DataLength, int OffsetWords, uint Data0, uint Data1, int FrsType)
+```
+
+FRS Read Response (0xF3), 16 bytes, up to two data words.
+
+#### FrsReadResponse.Unpack
+
+```csharp
+public static FrsReadResponse Unpack(ReadOnlySpan<byte> p)
+```
+
+### FrsWriteResponse
+
+```csharp
+public sealed record FrsWriteResponse(int Status, int OffsetWords)
+```
+
+FRS Write Response (0xF5), 4 bytes.
+
+#### FrsWriteResponse.Unpack
+
+```csharp
+public static FrsWriteResponse Unpack(ReadOnlySpan<byte> p)
+```
+
+### ErrorRecord
+
+```csharp
+public sealed record ErrorRecord(int Severity, int Seq, int Source, int Error, int Module, int Code)
+```
+
+One error-queue entry (command 0x01 response, R0..R5).
+
+#### ErrorRecord.From
+
+```csharp
+public static ErrorRecord From(CommandResponse r)
+```
+
+### Counts
+
+```csharp
+public sealed record Counts(int SensorId, uint Offered, uint Accepted, uint On, uint Attempted)
+```
+
+Per-sensor event counts (command 0x02, two responses).
+
+### CalibrationConfig
+
+```csharp
+public sealed record CalibrationConfig(bool Accel, bool Gyro, bool Mag, bool Planar)
+```
+
+ME calibration enables as the sensor reports them.
+
+### SensorMetadata
+
+```csharp
+public sealed record SensorMetadata(int MeVersion, int MhVersion, int ShVersion, uint RangeRaw, uint ResolutionRaw, int Revision, int PowerMaQ10, uint MinPeriodUs, uint MaxPeriodUs, int FifoMax, int FifoReserved, int BatchBufferBytes, int QPoint1, int QPoint2, int QPoint3, uint[] RawWords)
+```
+
+A sensor's metadata FRS record (revision-gated fields are 0 on older records); `RawWords` is authoritative.
+
+#### SensorMetadata.FromWords
+
+```csharp
+public static SensorMetadata FromWords(IReadOnlyList<uint> words)
+```
+
+### Sh2Hub
+
+```csharp
+public static class Sh2Hub
+```
+
+SH-2 hub protocol: the request parameters and the control-cargo walk the device layer needs on top of `Sh2Control` (contract 05 §6). Ported from the reference sh2.py.
+
+#### Sh2Hub.CountsGet *(constant)*
+
+```csharp
+public const int CountsGet = 0
+```
+
+#### Sh2Hub.CountsClear *(constant)*
+
+```csharp
+public const int CountsClear = 1
+```
+
+#### Sh2Hub.MeCalGet *(constant)*
+
+```csharp
+public const int MeCalGet = 0x01
+```
+
+ME Calibration subcommand: report the current configuration.
+
+#### Sh2Hub.SplitControlCargo
+
+```csharp
+public static List<byte[]> SplitControlCargo(byte[] payload)
+```
+
+Split a control cargo into its reports; an unknown id or a short tail ends the walk (the rest is one piece: its length is unknowable).
+
+#### Sh2Hub.CountsGetParams
+
+```csharp
+public static byte[] CountsGetParams(int sensorId)
+```
+
+#### Sh2Hub.CountsClearParams
+
+```csharp
+public static byte[] CountsClearParams(int sensorId)
+```
+
+#### Sh2Hub.ErrorsParams
+
+```csharp
+public static byte[] ErrorsParams(int severity = 0)
+```
+
+Errors of `severity` or greater (0 = all).
+
+#### Sh2Hub.TareNowParams
+
+```csharp
+public static byte[] TareNowParams(TareAxis axes = TareAxis.All, TareBasis basis = TareBasis.RotationVector)
+```
+
+#### Sh2Hub.PersistTareParams
+
+```csharp
+public static byte[] PersistTareParams()
+```
+
+#### Sh2Hub.SetReorientationParams
+
+```csharp
+public static byte[] SetReorientationParams(double x, double y, double z, double w)
+```
+
+Tare subcommand 2: the reorientation quaternion as four Q14 int16 (all zero clears).
+
+#### Sh2Hub.MeCalibrationParams
+
+```csharp
+public static byte[] MeCalibrationParams(bool accel, bool gyro, bool mag, bool planar = false, int subcommand = 0)
+```
+
+ME Calibration (0x07): subcommand 0 configures, 1 (`MeCalGet`) reads back.
+
+#### Sh2Hub.InteractiveCalibrationParams
+
+```csharp
+public static byte[] InteractiveCalibrationParams(int intent)
+```
+
+Interactive Calibration (0x0E, BNO085 only): P0 = motion intent; no response.
+
+#### Sh2Hub.ForceFlush
+
+```csharp
+public static byte[] ForceFlush(int sensorId)
+```
+
+Force Sensor Flush (0xF0, SH-2 §6.5.6); the hub answers with Flush Completed (0xEF).
+
+#### Sh2Hub.PeriodicDcdParams
+
+```csharp
+public static byte[] PeriodicDcdParams(bool enable)
+```
+
+Periodic DCD save (0x09): P0 0 = enable, 1 = disable; no response.
+
+### FrsReadSession
+
+```csharp
+public sealed class FrsReadSession
+```
+
+A multi-packet FRS read: send `Request`, `Feed` every 0xF3 of the record until it returns true; `Words` holds the record. Error statuses throw.
+
+#### FrsReadSession.FrsReadSession *(constructor)*
+
+```csharp
+public FrsReadSession(int frsType)
+```
+
+#### FrsReadSession.FrsType *(property)*
+
+```csharp
+public int FrsType
+```
+
+#### FrsReadSession.Words *(property)*
+
+```csharp
+public List<uint> Words
+```
+
+#### FrsReadSession.Done *(property)*
+
+```csharp
+public bool Done
+```
+
+#### FrsReadSession.Request
+
+```csharp
+public byte[] Request()
+```
+
+#### FrsReadSession.Feed
+
+```csharp
+public bool Feed(FrsReadResponse r)
+```
+
+### FrsWriteSession
+
+```csharp
+public sealed class FrsWriteSession
+```
+
+A multi-packet FRS write: send `Request`; for every 0xF5 `Feed` returns the next Write Data payload, or null; `Done` on WRITE_COMPLETED. Error statuses throw.
+
+#### FrsWriteSession.FrsWriteSession *(constructor)*
+
+```csharp
+public FrsWriteSession(int frsType, IReadOnlyList<uint> words)
+```
+
+#### FrsWriteSession.FrsType *(property)*
+
+```csharp
+public int FrsType
+```
+
+#### FrsWriteSession.Words *(property)*
+
+```csharp
+public uint[] Words
+```
+
+#### FrsWriteSession.Done *(property)*
+
+```csharp
+public bool Done
+```
+
+#### FrsWriteSession.Request
+
+```csharp
+public byte[] Request()
+```
+
+#### FrsWriteSession.Feed
+
+```csharp
+public byte[]? Feed(FrsWriteResponse r)
+```
+
+### ShtpChannel
+
+```csharp
+public enum ShtpChannel
+{
+    Command = 0,
+    Executable = 1,
+    Control = 2,
+    InputNormal = 3,
+    InputWake = 4,
+    GyroRv = 5,
+}
+```
+
+SHTP channels (contract 05 §3).
+
+### ExecutableCommand
+
+```csharp
+public enum ExecutableCommand : byte
+{
+    Reset = 1,
+    On = 2,
+    Sleep = 3,
+}
+```
+
+One-byte host writes on the executable channel (SHTP channel 1, contract 05 §6a). The hub answers none of them. `Reset` restarts the hub (answered later by the 0x01 reset-complete on the same channel); `Sleep` stops every report except those enabled with `Wakeup` | `AlwaysOn`, keeping the configuration; `On` ends `Sleep` and every report resumes at its rate.
+
+### ShtpHeader
+
+```csharp
+public sealed record ShtpHeader(int Length, int Channel, int Seq, bool Continuation = false)
+```
+
+SHTP frame header: length (bits 14:0 = cargo length incl. this 4-byte header; bit 15 = continuation), channel, per-channel/per-direction seq.
+
+#### ShtpHeader.Size *(constant)*
+
+```csharp
+public const int Size = 4
+```
+
+#### ShtpHeader.LengthMask *(constant)*
+
+```csharp
+public const int LengthMask = 0x7FFF
+```
+
+#### ShtpHeader.ContinuationBit *(constant)*
+
+```csharp
+public const int ContinuationBit = 0x8000
+```
+
+#### ShtpHeader.Pack
+
+```csharp
+public byte[] Pack()
+```
+
+#### ShtpHeader.Unpack
+
+```csharp
+public static ShtpHeader Unpack(ReadOnlySpan<byte> data)
+```
+
+### ShtpCargo
+
+```csharp
+public sealed record ShtpCargo(int Channel, int Seq, byte[] Payload, long CaptureUs = 0)
+```
+
+One reassembled cargo: `Payload` excludes all SHTP headers; `Seq` and `CaptureUs` are the FIRST fragment's — `CaptureUs` is its `RPT_DATA.timestamp_us`, the capture the cargo's 0xFB base delta refers to (contract 05 §3).
+
+### ShtpLayer
+
+```csharp
+public sealed class ShtpLayer
+```
+
+SHTP codec: per-channel TX sequence counters and RX cargo reassembly (continuation-bit fragments). Byte-exact with the reference Python `ShtpLayer`. Not thread-safe.
+
+#### ShtpLayer.NumChannels *(constant)*
+
+```csharp
+public const int NumChannels = 6
+```
+
+#### ShtpLayer.MaxTxFrame *(constant)*
+
+```csharp
+public const int MaxTxFrame = 64
+```
+
+#### ShtpLayer.Discarded *(property)*
+
+```csharp
+public int Discarded
+```
+
+#### ShtpLayer.ShtpLayer *(constructor)*
+
+```csharp
+public ShtpLayer()
+```
+
+#### ShtpLayer.BuildFrame
+
+```csharp
+public static byte[] BuildFrame(int channel, ReadOnlySpan<byte> payload, int seq)
+```
+
+Single-fragment frame: length = header + payload.
+
+#### ShtpLayer.FragmentCargo
+
+```csharp
+public static List<byte[]> FragmentCargo(int channel, byte[] payload, int seqStart, int maxFrame = MaxTxFrame)
+```
+
+Split a cargo into wire frames of at most `maxFrame` bytes. The first fragment advertises the TOTAL cargo length; each continuation carries the remaining length with the continuation bit set. seq increments per frame.
+
+#### ShtpLayer.NextFrame
+
+```csharp
+public byte[] NextFrame(int channel, ReadOnlySpan<byte> payload)
+```
+
+Build a single-fragment frame, consuming the channel's TX seq.
+
+#### ShtpLayer.TxSeq
+
+```csharp
+public int TxSeq(int channel)
+```
+
+#### ShtpLayer.Feed
+
+```csharp
+public ShtpCargo? Feed(byte[] frame, long captureUs = 0)
+```
+
+Consume one inbound frame; return the cargo when complete, else null. `captureUs` is the frame's `RPT_DATA.timestamp_us`; the cargo carries the FIRST fragment's — the base its 0xFB timestamps refer to (contract 05 §3), not the fragment that completed it. It is the MCU uptime (a u64 µs): a negative one throws `ArgumentOutOfRangeException`.
+
+#### ShtpLayer.Reset
+
+```csharp
+public void Reset()
+```
+
+Forget all TX seq counters and partial cargos (sensor reset).

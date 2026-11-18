@@ -1,0 +1,1103 @@
+# VL53L4CD (ToF, single-zone) — API reference
+
+The public API for the VL53L4CD (ToF, single-zone) sensor. Transport, framing,
+identity/discovery, firmware-container and dataset symbols shared
+across sensors live in the [top-level API reference](../api.md).
+
+Generated from the `///` doc-comments in the source — edit them,
+not this file.
+
+## Contents
+
+- **VL53L4CD (ToF, single-zone)**: [`Vl53l4Measurement`](#vl53l4measurement), [`Vl53l4cdDevice`](#vl53l4cddevice), [`Vl53l4Cmd`](#vl53l4cmd), [`Vl53l4Rpt`](#vl53l4rpt), [`XFER_MAX`](#xfer_max), [`XSHUT_OFF`](#xshut_off), [`XSHUT_ON`](#xshut_on), [`XSHUT_RESET`](#xshut_reset), [`SF_INT_ACT_HIGH`](#sf_int_act_high), [`I2C_KHZ_STEPS`](#i2c_khz_steps), [`i2c_error_name`](#i2c_error_name), [`try_pack_read_reg`](#try_pack_read_reg), [`pack_read_reg`](#pack_read_reg), [`try_pack_write_reg`](#try_pack_write_reg), [`pack_write_reg`](#pack_write_reg), [`pack_xshut`](#pack_xshut), [`pack_start_stream`](#pack_start_stream), [`pack_set_i2c_speed`](#pack_set_i2c_speed), [`RegData`](#regdata), [`Vl53l4Info`](#vl53l4info), [`StreamData`](#streamdata), [`DetectionThresholds`](#detectionthresholds), [`SOFT_RESET`](#soft_reset), [`I2C_SLAVE__DEVICE_ADDRESS`](#i2c_slave__device_address), [`OSC_FREQUENCY`](#osc_frequency), [`VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND`](#vhv_config__timeout_macrop_loop_bound), [`XTALK_PLANE_OFFSET_KCPS`](#xtalk_plane_offset_kcps), [`XTALK_X_PLANE_GRADIENT_KCPS`](#xtalk_x_plane_gradient_kcps), [`XTALK_Y_PLANE_GRADIENT_KCPS`](#xtalk_y_plane_gradient_kcps), [`RANGE_OFFSET_MM`](#range_offset_mm), [`INNER_OFFSET_MM`](#inner_offset_mm), [`OUTER_OFFSET_MM`](#outer_offset_mm), [`GPIO_HV_MUX__CTRL`](#gpio_hv_mux__ctrl), [`GPIO__TIO_HV_STATUS`](#gpio__tio_hv_status), [`SYSTEM__INTERRUPT`](#system__interrupt), [`RANGE_CONFIG_A`](#range_config_a), [`RANGE_CONFIG_B`](#range_config_b), [`RANGE_CONFIG__SIGMA_THRESH`](#range_config__sigma_thresh), [`MIN_COUNT_RATE_RTN_LIMIT_MCPS`](#min_count_rate_rtn_limit_mcps), [`INTERMEASUREMENT_MS`](#intermeasurement_ms), [`THRESH_HIGH`](#thresh_high), [`THRESH_LOW`](#thresh_low), [`SYSTEM__INTERRUPT_CLEAR`](#system__interrupt_clear), [`SYSTEM_START`](#system_start), [`RESULT__RANGE_STATUS`](#result__range_status), [`RESULT__SPAD_NB`](#result__spad_nb), [`RESULT__SIGNAL_RATE`](#result__signal_rate), [`RESULT__AMBIENT_RATE`](#result__ambient_rate), [`RESULT__SIGMA`](#result__sigma), [`RESULT__DISTANCE`](#result__distance), [`RESULT__OSC_CALIBRATE_VAL`](#result__osc_calibrate_val), [`FIRMWARE__SYSTEM_STATUS`](#firmware__system_status), [`IDENTIFICATION__MODEL_ID`](#identification__model_id), [`MODEL_ID_VL53L4CD`](#model_id_vl53l4cd), [`WINDOW_BELOW`](#window_below), [`WINDOW_ABOVE`](#window_above), [`WINDOW_OUT`](#window_out), [`WINDOW_IN`](#window_in), [`CONFIG_ADDR`](#config_addr), [`CONFIG_END`](#config_end), [`DEFAULT_CONFIGURATION`](#default_configuration), [`CONFIG_FMP_BYTE`](#config_fmp_byte), [`config_block`](#config_block), [`RESULT_BLOCK_ADDR`](#result_block_addr), [`RESULT_BLOCK_LEN`](#result_block_len), [`I2C_KHZ_BOOT`](#i2c_khz_boot), [`I2C_KHZ_DEFAULT`](#i2c_khz_default), [`STATUS_RTN`](#status_rtn), [`range_status_name`](#range_status_name), [`Vl53l4Error`](#vl53l4error), [`Vl53l4Results`](#vl53l4results), [`parse_result_block`](#parse_result_block), [`check_range_timing`](#check_range_timing), [`range_timing_registers`](#range_timing_registers), [`decode_range_timing`](#decode_range_timing), [`try_offset_raw`](#try_offset_raw), [`decode_offset`](#decode_offset), [`try_xtalk_raw`](#try_xtalk_raw), [`decode_xtalk`](#decode_xtalk), [`signal_threshold_raw`](#signal_threshold_raw), [`decode_signal_threshold`](#decode_signal_threshold), [`sigma_threshold_raw`](#sigma_threshold_raw), [`decode_sigma_threshold`](#decode_sigma_threshold)
+
+## VL53L4CD (ToF, single-zone)
+
+### Vl53l4Measurement
+
+```rust
+#[non_exhaustive]
+pub struct Vl53l4Measurement {
+    pub timestamp_us: u64,
+    pub range_status: u8,
+    pub distance_mm: u16,
+    pub sigma_mm: u16,
+    pub signal_rate_kcps: u32,
+    pub ambient_rate_kcps: u32,
+    pub signal_per_spad_kcps: u32,
+    pub ambient_per_spad_kcps: u32,
+    pub number_of_spad: u16,
+    pub stream_count: u8,
+}
+```
+
+One VL53L4CD result block with the MCU timestamp of the read or the INT edge.
+
+#### Vl53l4Measurement::valid
+
+```rust
+pub fn valid(&self) -> bool
+```
+
+#### Vl53l4Measurement::status_text
+
+```rust
+pub fn status_text(&self) -> String
+```
+
+What `range_status` means ("unknown (N)" for a code the table lacks).
+
+### Vl53l4cdDevice
+
+```rust
+pub struct Vl53l4cdDevice {
+    dev: DepzDevice,
+    streams: Arc<Streams>,
+    platform: Arc<BridgePlatform>,
+    uld: Vl53l4cdDriver,
+    ranging: AtomicBool,
+    initialized: AtomicBool,
+}
+```
+
+VL53L4CD single-zone ToF (contract 10). The board is a thin I2C bridge; the ST ULD 2.2.3 runs here
+([`Vl53l4cdDevice::uld`]). [`Vl53l4cdDevice::init`] first, then configure and
+[`Vl53l4cdDevice::start_ranging`]: one result block per INT edge streams to
+[`Vl53l4cdDevice::measurements`]. Configuration while ranging fails with
+[`DepzError::InvalidState`] — the stream owns the register bank.
+
+#### Vl53l4cdDevice::attach
+
+```rust
+pub fn attach(dev: DepzDevice) -> Vl53l4cdDevice
+```
+
+Continue the open connection `dev` as a VL53L4CD.
+
+#### Vl53l4cdDevice::uld
+
+```rust
+pub fn uld(&self) -> &Vl53l4cdDriver
+```
+
+The ULD driver (escape hatch for raw register access).
+
+unstable — not covered by the 1.0 freeze.
+
+#### Vl53l4cdDevice::initialized
+
+```rust
+pub fn initialized(&self) -> bool
+```
+
+True after a successful [`Vl53l4cdDevice::init`]; cleared by [`Vl53l4cdDevice::xshut`].
+
+#### Vl53l4cdDevice::ranging
+
+```rust
+pub fn ranging(&self) -> bool
+```
+
+#### Vl53l4cdDevice::is_alive
+
+```rust
+pub fn is_alive(&self) -> bool
+```
+
+True when the sensor answers with the VL53L4CD model id (0xEBAA).
+
+#### Vl53l4cdDevice::init
+
+```rust
+pub fn init(&self, bus_khz: Option<u16>) -> Result<()>
+```
+
+Default configuration block + VHV calibration (ULD sensor_init); the bus is left at `bus_khz`
+(`None`: 1000).
+
+#### Vl53l4cdDevice::xshut
+
+```rust
+pub fn xshut(&self, action: u8) -> Result<()>
+```
+
+Drive XSHUT: off (0) / on (1) / reset (2). Off and reset stop a stream; init again after.
+
+#### Vl53l4cdDevice::reset_sensor
+
+```rust
+pub fn reset_sensor(&self) -> Result<()>
+```
+
+Hardware reset through XSHUT (≤ 20 ms on the MCU, typ. ~2 ms); init again.
+
+#### Vl53l4cdDevice::bridge_info
+
+```rust
+pub fn bridge_info(&self) -> Result<Vl53l4Info>
+```
+
+RPT_VL53_INFO: sensor identity, pin levels and bridge counters (`i2c_errors` is cleared by a successful XSHUT reset). Safe while streaming.
+
+#### Vl53l4cdDevice::set_i2c_speed_khz
+
+```rust
+pub fn set_i2c_speed_khz(&self, khz: u16) -> Result<()>
+```
+
+Re-time the bridge's I2C bus to the step nearest `khz`. Not while ranging.
+
+#### Vl53l4cdDevice::get_range_timing
+
+```rust
+pub fn get_range_timing(&self) -> Result<(u32, u32)>
+```
+
+(timing budget ms, inter-measurement ms; 0 = continuous).
+
+#### Vl53l4cdDevice::set_range_timing
+
+```rust
+pub fn set_range_timing(&self, timing_budget_ms: u32, inter_measurement_ms: u32) -> Result<()>
+```
+
+Timing budget 10–200 ms; inter-measurement 0 = continuous, larger than the budget = autonomous
+low power.
+
+#### Vl53l4cdDevice::get_offset_mm
+
+```rust
+pub fn get_offset_mm(&self) -> Result<i32>
+```
+
+#### Vl53l4cdDevice::set_offset_mm
+
+```rust
+pub fn set_offset_mm(&self, offset_mm: i32) -> Result<()>
+```
+
+#### Vl53l4cdDevice::get_xtalk_kcps
+
+```rust
+pub fn get_xtalk_kcps(&self) -> Result<u16>
+```
+
+Crosstalk compensation, kcps (0 = off).
+
+#### Vl53l4cdDevice::set_xtalk_kcps
+
+```rust
+pub fn set_xtalk_kcps(&self, xtalk_kcps: u16) -> Result<()>
+```
+
+#### Vl53l4cdDevice::get_detection_thresholds
+
+```rust
+pub fn get_detection_thresholds(&self) -> Result<DetectionThresholds>
+```
+
+#### Vl53l4cdDevice::set_detection_thresholds
+
+```rust
+pub fn set_detection_thresholds(
+    &self,
+    distance_low_mm: u16,
+    distance_high_mm: u16,
+    window: u8,
+) -> Result<()>
+```
+
+The distance-window interrupt: INT only fires while the window holds.
+
+#### Vl53l4cdDevice::get_signal_threshold_kcps
+
+```rust
+pub fn get_signal_threshold_kcps(&self) -> Result<u16>
+```
+
+#### Vl53l4cdDevice::set_signal_threshold_kcps
+
+```rust
+pub fn set_signal_threshold_kcps(&self, signal_kcps: u16) -> Result<()>
+```
+
+Drop measurements whose return signal is below `signal_kcps`.
+
+#### Vl53l4cdDevice::get_sigma_threshold_mm
+
+```rust
+pub fn get_sigma_threshold_mm(&self) -> Result<u16>
+```
+
+#### Vl53l4cdDevice::set_sigma_threshold_mm
+
+```rust
+pub fn set_sigma_threshold_mm(&self, sigma_mm: u16) -> Result<()>
+```
+
+Drop measurements whose sigma exceeds `sigma_mm` (≤ 16383).
+
+#### Vl53l4cdDevice::start_temperature_update
+
+```rust
+pub fn start_temperature_update(&self) -> Result<()>
+```
+
+Re-run VHV calibration, recommended after a >8 °C ambient change.
+
+#### Vl53l4cdDevice::calibrate_offset
+
+```rust
+pub fn calibrate_offset(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32>
+```
+
+Offset calibration against a target at `target_dist_mm` (10–1000 mm); returns the offset now
+programmed. `nb_samples` `None`: 20.
+
+#### Vl53l4cdDevice::calibrate_xtalk
+
+```rust
+pub fn calibrate_xtalk(&self, target_dist_mm: i32, nb_samples: Option<u32>) -> Result<i32>
+```
+
+Crosstalk calibration against a target at `target_dist_mm` (10–5000 mm); returns the xtalk now
+programmed, kcps. `nb_samples` `None`: 20.
+
+#### Vl53l4cdDevice::start_ranging
+
+```rust
+pub fn start_ranging(&self) -> Result<()>
+```
+
+Start the sensor and arm the MCU stream: one RPT_VL53_STREAM per INT edge.
+
+#### Vl53l4cdDevice::stop_ranging
+
+```rust
+pub fn stop_ranging(&self) -> Result<()>
+```
+
+#### Vl53l4cdDevice::measure_once
+
+```rust
+pub fn measure_once(&self, timeout: Option<Duration>) -> Result<Vl53l4Measurement>
+```
+
+One polled measurement: start, wait for data ready, read, stop. Not while streaming. `timeout`
+`None`: 1 s.
+
+#### Vl53l4cdDevice::measurements
+
+```rust
+pub fn measurements(&self) -> &Stream<Vl53l4Measurement>
+```
+
+The measurement stream (contract 07 §3): `measurements().on(cb)` calls back on the reader
+thread, `measurements().subscribe(capacity)` is a bounded drop-oldest queue subscribed at
+the call, `measurements().next(timeout)` waits for one; `dropped_counts()` and
+`parse_errors()` (a result block that did not decode) are its counters.
+
+### Vl53l4Cmd
+
+```rust
+#[non_exhaustive]
+pub enum Vl53l4Cmd {
+    ReadReg = 0x32,
+    WriteReg = 0x33,
+    Xshut = 0x34,
+    StartStream = 0x35,
+    StopStream = 0x36,
+    GetInfo = 0x37,
+    SetI2cSpeed = 0x38,
+}
+```
+
+VL53L4 host→device command opcodes.
+
+### Vl53l4Rpt
+
+```rust
+#[non_exhaustive]
+pub enum Vl53l4Rpt {
+    RegData = 0x91,
+    Info = 0x92,
+    Stream = 0x93,
+}
+```
+
+VL53L4 device→host report opcodes.
+
+### XFER_MAX
+
+```rust
+pub const XFER_MAX: usize = 253;
+```
+
+Largest `len` (read) / data length (write) per transfer. The STM32 I2C
+NBYTES field is 8-bit and a write spends two bytes on the register address;
+the firmware applies the same 253 to both directions.
+
+### XSHUT_OFF
+
+```rust
+pub const XSHUT_OFF: u8 = 0;
+```
+
+`VL53_XSHUT` action: drive XSHUT low (sensor powered down).
+
+### XSHUT_ON
+
+```rust
+pub const XSHUT_ON: u8 = 1;
+```
+
+`VL53_XSHUT` action: drive XSHUT high, no boot handshake.
+
+### XSHUT_RESET
+
+```rust
+pub const XSHUT_RESET: u8 = 2;
+```
+
+`VL53_XSHUT` action: pulse low then poll the boot handshake (answered after
+it completes — allow ≥ 1.5 s).
+
+### SF_INT_ACT_HIGH
+
+```rust
+pub const SF_INT_ACT_HIGH: u8 = 0x02;
+```
+
+`VL53_START_STREAM` flag: INT active high, mirroring bit 4 of
+`GPIO_HV_MUX__CTRL` (0x0030). Clear (default): INT active low.
+
+### I2C_KHZ_STEPS
+
+```rust
+pub const I2C_KHZ_STEPS: [u16; 9] = [100, 200, 400, 500, 600, 700, 800, 900, 1000];
+```
+
+Nominal SCL steps the firmware carries a TIMINGR for (`VL53_SET_I2C_SPEED`
+clamps to the nearest one).
+
+### i2c_error_name
+
+```rust
+pub fn i2c_error_name(code: u8) -> &'static str
+```
+
+`last_i2c_error` code in [`Vl53l4Info`] → human-readable name.
+
+### try_pack_read_reg
+
+```rust
+pub fn try_pack_read_reg(addr: u16, len: u16) -> Result<[u8; 4], CodecError>
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` with the transfer limit of
+contract 10 §1 — `len` 1..=[`XFER_MAX`] and `addr + len <= 0x10000` —
+refused before anything is written (contract 07 §3).
+
+### pack_read_reg
+
+```rust
+pub fn pack_read_reg(addr: u16, len: u16) -> [u8; 4]
+```
+
+`VL53_READ_REG` payload: `addr u16, len u16` (little-endian), unchecked —
+prefer [`try_pack_read_reg`].
+
+### try_pack_write_reg
+
+```rust
+pub fn try_pack_write_reg(addr: u16, data: &[u8]) -> Result<Vec<u8>, CodecError>
+```
+
+`VL53_WRITE_REG` payload: `addr u16` followed by 1..=[`XFER_MAX`] raw
+register bytes with `addr + N <= 0x10000`; anything else is refused
+(contract 07 §3).
+
+### pack_write_reg
+
+```rust
+pub fn pack_write_reg(addr: u16, data: &[u8]) -> Vec<u8>
+```
+
+`VL53_WRITE_REG` payload: `addr u16` followed by the raw register bytes,
+unchecked — prefer [`try_pack_write_reg`].
+
+### pack_xshut
+
+```rust
+pub fn pack_xshut(action: u8) -> [u8; 1]
+```
+
+`VL53_XSHUT` payload: `action u8` ([`XSHUT_OFF`] / [`XSHUT_ON`] /
+[`XSHUT_RESET`]).
+
+### pack_start_stream
+
+```rust
+pub fn pack_start_stream(addr: u16, len: u16, flags: u8) -> [u8; 5]
+```
+
+`VL53_START_STREAM` payload: `addr u16, len u16, flags u8`.
+
+### pack_set_i2c_speed
+
+```rust
+pub fn pack_set_i2c_speed(khz: u16) -> [u8; 2]
+```
+
+`VL53_SET_I2C_SPEED` payload: `khz u16`.
+
+### RegData
+
+```rust
+#[non_exhaustive]
+pub struct RegData {
+    /// Echoed `VL53_READ_REG` opcode (0x32).
+    pub cmd: u8,
+    /// MCU uptime at I2C-read completion.
+    pub timestamp_us: u64,
+    /// Raw register bytes (big-endian sensor contents, passed through).
+    pub data: Vec<u8>,
+}
+```
+
+A decoded `RPT_VL53_REG_DATA` report (one register read).
+
+#### RegData::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<RegData, CodecError>
+```
+
+### Vl53l4Info
+
+```rust
+#[non_exhaustive]
+pub struct Vl53l4Info {
+    pub int_edges: u32,
+    pub slots_skipped: u32,
+    pub i2c_errors: u32,
+    /// 0 none, 1 NACK, 2 TIMEOUT, 3 BUS_ERROR ([`i2c_error_name`]).
+    pub last_i2c_error: u8,
+    /// 0x010F..0x0110 — expected [`super::MODEL_ID_VL53L4CD`] (0xEBAA).
+    pub model_id: u16,
+    /// 0x00E5 — expected 0x03 (booted).
+    pub fw_status: u8,
+    /// 1 = MODEL_ID read back as 0xEBAA on this GET_INFO.
+    pub initialized: u8,
+    pub xshut_level: u8,
+    pub int_level: u8,
+    pub i2c_khz: u16,
+}
+```
+
+A decoded `RPT_VL53_INFO` report — bridge diagnostics. Counters wrap
+silently; watch increments, not absolute values. `i2c_errors` counts since
+the last successful XSHUT reset (the bridge clears it there), not since
+power-up.
+
+#### Vl53l4Info::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<Vl53l4Info, CodecError>
+```
+
+### StreamData
+
+```rust
+#[non_exhaustive]
+pub struct StreamData {
+    /// MCU uptime at the INT edge (the sensor event, not the I2C completion).
+    pub timestamp_us: u64,
+    pub addr: u16,
+    pub len: u16,
+    /// Raw register bytes (big-endian sensor contents, passed through).
+    pub data: Vec<u8>,
+}
+```
+
+A decoded `RPT_VL53_STREAM` report — one streamed register block.
+`addr`/`len` echo the stream configuration so each report is
+self-describing.
+
+#### StreamData::unpack
+
+```rust
+pub fn unpack(payload: &[u8]) -> Result<StreamData, CodecError>
+```
+
+### DetectionThresholds
+
+```rust
+#[non_exhaustive]
+pub struct DetectionThresholds {
+    pub distance_low_mm: u16,
+    pub distance_high_mm: u16,
+    pub window: u8,
+}
+```
+
+The distance-window interrupt: low and high distance, mm, and the window
+([`uld::WINDOW_BELOW`] … [`uld::WINDOW_IN`]).
+
+#### DetectionThresholds::new
+
+```rust
+pub fn new(distance_low_mm: u16, distance_high_mm: u16, window: u8) -> DetectionThresholds
+```
+
+A window from its three fields.
+
+### SOFT_RESET
+
+```rust
+pub const SOFT_RESET: u16 = 0x0000;
+```
+
+### I2C_SLAVE__DEVICE_ADDRESS
+
+```rust
+pub const I2C_SLAVE__DEVICE_ADDRESS: u16 = 0x0001;
+```
+
+### OSC_FREQUENCY
+
+```rust
+pub const OSC_FREQUENCY: u16 = 0x0006;
+```
+
+Oscillator-frequency word (unnamed in the C driver).
+
+### VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND
+
+```rust
+pub const VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND: u16 = 0x0008;
+```
+
+### XTALK_PLANE_OFFSET_KCPS
+
+```rust
+pub const XTALK_PLANE_OFFSET_KCPS: u16 = 0x0016;
+```
+
+### XTALK_X_PLANE_GRADIENT_KCPS
+
+```rust
+pub const XTALK_X_PLANE_GRADIENT_KCPS: u16 = 0x0018;
+```
+
+### XTALK_Y_PLANE_GRADIENT_KCPS
+
+```rust
+pub const XTALK_Y_PLANE_GRADIENT_KCPS: u16 = 0x001A;
+```
+
+### RANGE_OFFSET_MM
+
+```rust
+pub const RANGE_OFFSET_MM: u16 = 0x001E;
+```
+
+### INNER_OFFSET_MM
+
+```rust
+pub const INNER_OFFSET_MM: u16 = 0x0020;
+```
+
+### OUTER_OFFSET_MM
+
+```rust
+pub const OUTER_OFFSET_MM: u16 = 0x0022;
+```
+
+### GPIO_HV_MUX__CTRL
+
+```rust
+pub const GPIO_HV_MUX__CTRL: u16 = 0x0030;
+```
+
+### GPIO__TIO_HV_STATUS
+
+```rust
+pub const GPIO__TIO_HV_STATUS: u16 = 0x0031;
+```
+
+### SYSTEM__INTERRUPT
+
+```rust
+pub const SYSTEM__INTERRUPT: u16 = 0x0046;
+```
+
+### RANGE_CONFIG_A
+
+```rust
+pub const RANGE_CONFIG_A: u16 = 0x005E;
+```
+
+### RANGE_CONFIG_B
+
+```rust
+pub const RANGE_CONFIG_B: u16 = 0x0061;
+```
+
+### RANGE_CONFIG__SIGMA_THRESH
+
+```rust
+pub const RANGE_CONFIG__SIGMA_THRESH: u16 = 0x0064;
+```
+
+### MIN_COUNT_RATE_RTN_LIMIT_MCPS
+
+```rust
+pub const MIN_COUNT_RATE_RTN_LIMIT_MCPS: u16 = 0x0066;
+```
+
+### INTERMEASUREMENT_MS
+
+```rust
+pub const INTERMEASUREMENT_MS: u16 = 0x006C;
+```
+
+### THRESH_HIGH
+
+```rust
+pub const THRESH_HIGH: u16 = 0x0072;
+```
+
+### THRESH_LOW
+
+```rust
+pub const THRESH_LOW: u16 = 0x0074;
+```
+
+### SYSTEM__INTERRUPT_CLEAR
+
+```rust
+pub const SYSTEM__INTERRUPT_CLEAR: u16 = 0x0086;
+```
+
+### SYSTEM_START
+
+```rust
+pub const SYSTEM_START: u16 = 0x0087;
+```
+
+### RESULT__RANGE_STATUS
+
+```rust
+pub const RESULT__RANGE_STATUS: u16 = 0x0089;
+```
+
+### RESULT__SPAD_NB
+
+```rust
+pub const RESULT__SPAD_NB: u16 = 0x008C;
+```
+
+### RESULT__SIGNAL_RATE
+
+```rust
+pub const RESULT__SIGNAL_RATE: u16 = 0x008E;
+```
+
+### RESULT__AMBIENT_RATE
+
+```rust
+pub const RESULT__AMBIENT_RATE: u16 = 0x0090;
+```
+
+### RESULT__SIGMA
+
+```rust
+pub const RESULT__SIGMA: u16 = 0x0092;
+```
+
+### RESULT__DISTANCE
+
+```rust
+pub const RESULT__DISTANCE: u16 = 0x0096;
+```
+
+### RESULT__OSC_CALIBRATE_VAL
+
+```rust
+pub const RESULT__OSC_CALIBRATE_VAL: u16 = 0x00DE;
+```
+
+### FIRMWARE__SYSTEM_STATUS
+
+```rust
+pub const FIRMWARE__SYSTEM_STATUS: u16 = 0x00E5;
+```
+
+### IDENTIFICATION__MODEL_ID
+
+```rust
+pub const IDENTIFICATION__MODEL_ID: u16 = 0x010F;
+```
+
+### MODEL_ID_VL53L4CD
+
+```rust
+pub const MODEL_ID_VL53L4CD: u16 = 0xEBAA;
+```
+
+Expected `IDENTIFICATION__MODEL_ID` word for a VL53L4CD.
+
+### WINDOW_BELOW
+
+```rust
+pub const WINDOW_BELOW: u8 = 0;
+```
+
+Detection-threshold window mode (`SYSTEM__INTERRUPT`): below.
+
+### WINDOW_ABOVE
+
+```rust
+pub const WINDOW_ABOVE: u8 = 1;
+```
+
+Detection-threshold window mode (`SYSTEM__INTERRUPT`): above.
+
+### WINDOW_OUT
+
+```rust
+pub const WINDOW_OUT: u8 = 2;
+```
+
+Detection-threshold window mode (`SYSTEM__INTERRUPT`): out of window.
+
+### WINDOW_IN
+
+```rust
+pub const WINDOW_IN: u8 = 3;
+```
+
+Detection-threshold window mode (`SYSTEM__INTERRUPT`): in window.
+
+### CONFIG_ADDR
+
+```rust
+pub const CONFIG_ADDR: u16 = 0x002D;
+```
+
+First register of the init configuration block (0x2D).
+
+### CONFIG_END
+
+```rust
+pub const CONFIG_END: u16 = 0x0087;
+```
+
+Last register of the init configuration block (0x87).
+
+### DEFAULT_CONFIGURATION
+
+```rust
+pub const DEFAULT_CONFIGURATION: [u8; 91] = [
+    0x00, 0x00, 0x00, 0x11, 0x02, 0x00, 0x02, 0x08, // 0x2D..0x34
+    0x00, 0x08, 0x10, 0x01, 0x01, 0x00, 0x00, 0x00, // 0x35..0x3C
+    0x00, 0xff, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, // 0x3D..0x44
+    0x00, 0x20, 0x0b, 0x00, 0x00, 0x02, 0x14, 0x21, // 0x45..0x4C
+    0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0xc8, // 0x4D..0x54
+    0x00, 0x00, 0x38, 0xff, 0x01, 0x00, 0x08, 0x00, // 0x55..0x5C
+    0x00, 0x01, 0xcc, 0x07, 0x01, 0xf1, 0x05, 0x00, // 0x5D..0x64
+    0xa0, 0x00, 0x80, 0x08, 0x38, 0x00, 0x00, 0x00, // 0x65..0x6C
+    0x00, 0x0f, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x6D..0x74
+    0x00, 0x00, 0x01, 0x07, 0x05, 0x06, 0x06, 0x00, // 0x75..0x7C
+    0x00, 0x02, 0xc7, 0xff, 0x9B, 0x00, 0x00, 0x00, // 0x7D..0x84
+    0x01, 0x00, 0x00, // 0x85..0x87
+];
+```
+
+`VL53L4CD_DEFAULT_CONFIGURATION[]` — 91 bytes, registers 0x2D..0x87.
+[`config_block`] always overrides byte 0 (register 0x2D) with
+[`CONFIG_FMP_BYTE`].
+
+### CONFIG_FMP_BYTE
+
+```rust
+pub const CONFIG_FMP_BYTE: u8 = 0x12;
+```
+
+Value forced into byte 0 of the config block (register 0x2D): I2C Fast Mode
+Plus pad, set unconditionally and never cleared (FM+ pads work at every bus
+step down to 100 kHz; clearing it mid-block NACKs and truncates the write).
+
+### config_block
+
+```rust
+pub fn config_block() -> [u8; 91]
+```
+
+The 91-byte block `sensor_init` writes at [`CONFIG_ADDR`]: the ST default
+configuration with byte 0 forced to [`CONFIG_FMP_BYTE`] (Fast Mode Plus).
+
+### RESULT_BLOCK_ADDR
+
+```rust
+pub const RESULT_BLOCK_ADDR: u16 = RESULT__RANGE_STATUS;
+```
+
+The block the MCU streams: `RESULT__RANGE_STATUS` .. 0x0099 — every field of
+`VL53L4CD_ResultsData_t` in one read.
+
+### RESULT_BLOCK_LEN
+
+```rust
+pub const RESULT_BLOCK_LEN: u16 = 17;
+```
+
+Length of the streamed result block in bytes.
+
+### I2C_KHZ_BOOT
+
+```rust
+pub const I2C_KHZ_BOOT: u16 = 400;
+```
+
+The bridge boots at 400 kHz; an unconfigured sensor is only specified for
+that speed, so init always runs its configuration block there.
+
+### I2C_KHZ_DEFAULT
+
+```rust
+pub const I2C_KHZ_DEFAULT: u16 = 1000;
+```
+
+The bus speed the bridge is left at after init (the result-block read is
+~4x faster than at boot speed).
+
+### STATUS_RTN
+
+```rust
+pub const STATUS_RTN: [u8; 24] = [
+    255, 255, 255, 5, 2, 4, 1, 7, 3, 0, 255, 255, 9, 13, 255, 255, 255, 255, 10, 6, 255, 255, 11,
+    12,
+];
+```
+
+`GetResult()` raw status → ULD status (`status_rtn[24]` in
+`VL53L4CD_api.c`); raw ≥ 24 passes through unmapped.
+
+### range_status_name
+
+```rust
+pub fn range_status_name(status: u8) -> &'static str
+```
+
+Range-status → human-readable description (UM2931, "Range status
+description"). Unknown codes map to `"unknown"`.
+
+### Vl53l4Error
+
+```rust
+#[non_exhaustive]
+pub enum Vl53l4Error {
+    /// Result block shorter than `RESULT_BLOCK_LEN` (17) bytes (contract 10 §5).
+    ShortResultBlock,
+    /// `osc_frequency` register reads 0.
+    OscFrequencyZero,
+    /// `timing_budget_ms` outside 10..=200.
+    TimingBudgetOutOfRange,
+    /// `inter_measurement_ms` must be 0 (continuous) or greater than the
+    /// timing budget (autonomous).
+    InterMeasurementInvalid,
+    /// `sigma_mm` exceeds the 16383 mm register ceiling.
+    SigmaTooLarge,
+    /// Autonomous mode: `1.055 × inter_measurement_ms × clock_pll` does not
+    /// fit the u32 `INTERMEASUREMENT_MS` register.
+    InterMeasurementOverflow,
+    /// `osc_frequency` so small that the macro period truncates to 0 (the
+    /// ULD would divide by it).
+    MacroPeriodZero,
+    /// `offset_mm` outside the register's 11-bit signed range -1024..=1023.
+    OffsetOutOfRange,
+    /// `xtalk_kcps` outside the register's 7-bit range 0..=127.
+    XtalkOutOfRange,
+}
+```
+
+VL53L4 codec/math failure.
+
+#### Vl53l4Error::is_argument
+
+```rust
+pub fn is_argument(&self) -> bool
+```
+
+A refused argument (contract 07 §3 `invalid_argument`), not a value the
+sensor produced: the budget, the period, the tuning values.
+
+### Vl53l4Results
+
+```rust
+#[non_exhaustive]
+pub struct Vl53l4Results {
+    /// 0 = valid ([`range_status_name`]); raw ≥ 24 passes through unmapped.
+    pub range_status: u8,
+    pub distance_mm: u16,
+    pub ambient_rate_kcps: u32,
+    pub ambient_per_spad_kcps: u32,
+    pub signal_rate_kcps: u32,
+    pub signal_per_spad_kcps: u32,
+    pub number_of_spad: u16,
+    pub sigma_mm: u16,
+    /// 0x008B `RESULT__STREAM_COUNT`: wraps at 255. The C ULD ignores it; it
+    /// tells a frame the host never received from one the sensor never
+    /// produced.
+    pub stream_count: u8,
+}
+```
+
+`VL53L4CD_ResultsData_t` plus the sensor's own frame counter.
+
+#### Vl53l4Results::status_text
+
+```rust
+pub fn status_text(&self) -> &'static str
+```
+
+Human-readable [`Self::range_status`] ([`range_status_name`]).
+
+### parse_result_block
+
+```rust
+pub fn parse_result_block(raw: &[u8]) -> Result<Vl53l4Results, Vl53l4Error>
+```
+
+Decode the streamed 0x0089..0x0099 block exactly as `VL53L4CD_GetResult()`
+decodes the same registers read one by one. Register contents are
+big-endian words (the bridge passes them through untouched).
+
+### check_range_timing
+
+```rust
+pub fn check_range_timing(
+    timing_budget_ms: u32,
+    inter_measurement_ms: u32,
+) -> Result<(), Vl53l4Error>
+```
+
+`SetRangeTiming`'s own argument checks (ST's `VL53L4CD_ERROR_INVALID_ARGUMENT`),
+which need no register: budget 10..=200 ms
+([`Vl53l4Error::TimingBudgetOutOfRange`]), period 0 (continuous) or above
+the budget (autonomous; [`Vl53l4Error::InterMeasurementInvalid`]) —
+contract 10 §5.
+
+### range_timing_registers
+
+```rust
+pub fn range_timing_registers(
+    timing_budget_ms: u32,
+    inter_measurement_ms: u32,
+    osc_frequency: u16,
+    clock_pll: u16,
+) -> Result<(u16, u16, u32), Vl53l4Error>
+```
+
+`SetRangeTiming` register math → `(RANGE_CONFIG_A, RANGE_CONFIG_B,
+INTERMEASUREMENT_MS raw dword)`.
+
+`osc_frequency` is the word read from 0x0006; `clock_pll` is the word read
+from `RESULT__OSC_CALIBRATE_VAL` (used only in autonomous mode, i.e. when
+`inter_measurement_ms > 0`). `inter_measurement_ms == 0` selects continuous
+mode; a value greater than the budget selects autonomous low power.
+
+Rejected (contract 07 §3, never wrapped): the arguments
+[`check_range_timing`] refuses, an `osc_frequency` of 0 or so
+small that the macro period truncates to 0
+([`Vl53l4Error::MacroPeriodZero`]), and an autonomous period whose
+register value overflows u32 ([`Vl53l4Error::InterMeasurementOverflow`]).
+
+### decode_range_timing
+
+```rust
+pub fn decode_range_timing(
+    intermeasurement_raw: u32,
+    clock_pll: u16,
+    osc_frequency: u16,
+    range_config_a: u16,
+) -> Result<(u32, u32), Vl53l4Error>
+```
+
+`GetRangeTiming` register math → `(timing_budget_ms, inter_measurement_ms)`.
+
+Inputs are the raw register reads: the `INTERMEASUREMENT_MS` dword, the
+`RESULT__OSC_CALIBRATE_VAL` word, the 0x0006 word and the `RANGE_CONFIG_A`
+word.
+
+### try_offset_raw
+
+```rust
+pub fn try_offset_raw(offset_mm: i32) -> Result<u16, Vl53l4Error>
+```
+
+`RANGE_OFFSET_MM` word for `SetOffset` (`INNER`/`OUTER` are zeroed
+alongside); `offset_mm` must fit the register's 11-bit signed range
+-1024..=1023 ([`Vl53l4Error::OffsetOutOfRange`] otherwise).
+
+### decode_offset
+
+```rust
+pub fn decode_offset(raw_word: u16) -> i32
+```
+
+`GetOffset`: `RANGE_OFFSET_MM` word → signed millimetres.
+
+### try_xtalk_raw
+
+```rust
+pub fn try_xtalk_raw(xtalk_kcps: u16) -> Result<u16, Vl53l4Error>
+```
+
+`XTALK_PLANE_OFFSET_KCPS` word for `SetXtalk`; `xtalk_kcps` must be
+0..=127 — the value the 16-bit word holds at 9 fractional bits
+([`Vl53l4Error::XtalkOutOfRange`] otherwise).
+
+### decode_xtalk
+
+```rust
+pub fn decode_xtalk(raw_word: u16) -> u16
+```
+
+`GetXtalk`: `XTALK_PLANE_OFFSET_KCPS` word → kcps (an exact .5 goes away
+from zero, as C's `round()` in ST's ULD).
+
+### signal_threshold_raw
+
+```rust
+pub fn signal_threshold_raw(signal_kcps: u16) -> u16
+```
+
+`MIN_COUNT_RATE_RTN_LIMIT_MCPS` word for `SetSignalThreshold`.
+
+### decode_signal_threshold
+
+```rust
+pub fn decode_signal_threshold(raw_word: u16) -> u16
+```
+
+`GetSignalThreshold`: register word → kcps.
+
+### sigma_threshold_raw
+
+```rust
+pub fn sigma_threshold_raw(sigma_mm: u16) -> Result<u16, Vl53l4Error>
+```
+
+`RANGE_CONFIG__SIGMA_THRESH` word for `SetSigmaThreshold`;
+[`Vl53l4Error::SigmaTooLarge`] above 16383 mm.
+
+### decode_sigma_threshold
+
+```rust
+pub fn decode_sigma_threshold(raw_word: u16) -> u16
+```
+
+`GetSigmaThreshold`: register word → millimetres.

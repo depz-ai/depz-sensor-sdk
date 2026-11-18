@@ -1,0 +1,237 @@
+# SR04 — API reference
+
+The public API for the SR04 sensor. The shared foundation —
+transport framing, common protocol codecs, firmware image parse,
+dataset reader and USB identity — lives in the
+[top-level API reference](../api.md).
+
+Auto-generated from the source — edit the `///` summaries
+in the source, not this file.
+
+## Contents
+
+- **SR04**: [`Sr04Measurement`](#sr04measurement), [`Sr04Device`](#sr04device), [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`Sr04Data`](#sr04data), [`Sr04`](#sr04)
+
+## SR04
+
+### Sr04Measurement
+
+```csharp
+public sealed record Sr04Measurement(ulong TimestampUs, int EchoTimeUs, string Source)
+```
+
+One SR04 ranging result. `Source` is `"once"` (a host command or a SYNC_IN edge) or `"loop"`; `Valid` is false for the no-echo timeout.
+
+#### Sr04Measurement.Valid *(property)*
+
+```csharp
+public bool Valid
+```
+
+#### Sr04Measurement.DistanceMm *(property)*
+
+```csharp
+public double? DistanceMm
+```
+
+Distance at 343 m/s, or null when no echo came back.
+
+#### Sr04Measurement.DistanceMmAt
+
+```csharp
+public double? DistanceMmAt(double airTempC)
+```
+
+Distance with the speed of sound for `airTempC` °C.
+
+### Sr04Device
+
+```csharp
+public sealed class Sr04Device : DepzDevice
+```
+
+HC-SR04 ultrasonic ranger (contract 03). Measurements stream to `Measurements`: loop samples and the single shots an AUX SYNC_IN edge triggers.
+
+#### Sr04Device.Sr04Device *(constructor)*
+
+```csharp
+public Sr04Device(ILink link, TimeSpan? timeout = null) : base(link, timeout)
+```
+
+#### Sr04Device.Measurements *(property)*
+
+```csharp
+public SensorStream<Sr04Measurement> Measurements
+```
+
+The measurement stream (contract 07 §3): `Measurements.On(cb)`, `Measurements.Subscribe()` (256 by default), `Measurements.Next()`; `ParseErrors` counts RPT_DATA reports shorter than their 11 bytes, dropped (contract 07 §2).
+
+#### Sr04Device.GetSamplePeriodUs
+
+```csharp
+public long GetSamplePeriodUs()
+```
+
+The stored minimum interval between measurement starts, µs (default 50000) — not the effective rate, which the echo window throttles (contract 03 §3).
+
+#### Sr04Device.SetSamplePeriodUs
+
+```csharp
+public void SetSamplePeriodUs(long periodUs)
+```
+
+Set the minimum interval between measurement starts, µs (u32 wire field).
+
+#### Sr04Device.GetEchoDecayUs
+
+```csharp
+public int GetEchoDecayUs()
+```
+
+The post-echo settle pause, µs (4000–65000).
+
+#### Sr04Device.SetEchoDecayUs
+
+```csharp
+public int SetEchoDecayUs(int decayUs)
+```
+
+Set the settle pause. The device clamps it to 4000–65000 µs silently, so this reads it back and returns the value in effect. Must fit the u16 wire field.
+
+#### Sr04Device.MeasureOnce
+
+```csharp
+public Sr04Measurement MeasureOnce(TimeSpan? timeout = null)
+```
+
+One shot. The reply comes when the echo completes (or times out at ~65.5 ms), hence the 1 s default. `BusyException` while the loop runs.
+
+#### Sr04Device.Start
+
+```csharp
+public void Start()
+```
+
+Start the measurement loop (idempotent).
+
+#### Sr04Device.Stop
+
+```csharp
+public void Stop()
+```
+
+Stop the measurement loop (idempotent).
+
+### Sr04Cmd
+
+```csharp
+public enum Sr04Cmd
+{
+    GetSamplePeriod = 0x32,
+    SetSamplePeriod = 0x33,
+    GetEchoDecay = 0x34,
+    SetEchoDecay = 0x35,
+    MeasureOnce = 0x36,
+    StartMeasurementLoop = 0x37,
+    StopMeasurementLoop = 0x38,
+}
+```
+
+SR04 command opcodes (contract 03).
+
+### Sr04Rpt
+
+```csharp
+public enum Sr04Rpt
+{
+    Data = 0x91,
+    SamplePeriod = 0x92,
+    EchoDecay = 0x93,
+}
+```
+
+SR04 report opcodes.
+
+### Sr04Data
+
+```csharp
+public sealed record Sr04Data(int SourceCmd, ulong TimestampUs, int EchoTimeUs)
+```
+
+SR04 measurement sample: source cmd (0x36 single / 0x37 loop), timestamp, echo time.
+
+#### Sr04Data.Unpack
+
+```csharp
+public static Sr04Data Unpack(ReadOnlySpan<byte> payload)
+```
+
+### Sr04
+
+```csharp
+public static class Sr04
+```
+
+#### Sr04.EchoTimeout *(constant)*
+
+```csharp
+public const int EchoTimeout = 0xFFFF
+```
+
+echo_time_us sentinel: no echo received.
+
+#### Sr04.SamplePeriodDefaultUs *(constant)*
+
+```csharp
+public const int SamplePeriodDefaultUs = 50_000
+```
+
+#### Sr04.EchoDecayDefaultUs *(constant)*
+
+```csharp
+public const int EchoDecayDefaultUs = 5_000
+```
+
+#### Sr04.EchoDecayMinUs *(constant)*
+
+```csharp
+public const int EchoDecayMinUs = 4_000
+```
+
+#### Sr04.EchoDecayMaxUs *(constant)*
+
+```csharp
+public const int EchoDecayMaxUs = 65_000
+```
+
+#### Sr04.PackSamplePeriod
+
+```csharp
+public static byte[] PackSamplePeriod(uint periodUs)
+```
+
+#### Sr04.UnpackSamplePeriod
+
+```csharp
+public static uint UnpackSamplePeriod(ReadOnlySpan<byte> payload)
+```
+
+#### Sr04.PackEchoDecay
+
+```csharp
+public static byte[] PackEchoDecay(ushort decayUs)
+```
+
+#### Sr04.UnpackEchoDecay
+
+```csharp
+public static ushort UnpackEchoDecay(ReadOnlySpan<byte> payload)
+```
+
+#### Sr04.DistanceMmFromEcho
+
+```csharp
+public static double? DistanceMmFromEcho(int echoTimeUs, double? airTempC = null)
+```
+
+Round-trip echo time → distance in mm; null for the timeout sentinel. Default speed of sound 343 m/s; with `airTempC` uses c = 331.3 + 0.606·T (m/s).

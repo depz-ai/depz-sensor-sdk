@@ -1,0 +1,4 @@
+out/
+lib/
+target/
+pom-android-gate.xml

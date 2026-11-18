@@ -1,0 +1,46 @@
+package ai.depz.sensor.devices;
+
+import ai.depz.sensor.sensors.vl53l8.Vl53l8CnhSetup;
+import ai.depz.sensor.sensors.vl53l8.Vl53l8Firmware;
+import ai.depz.sensor.sensors.vl53l8.Vl53l8Frame;
+import java.time.Duration;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * VL53L8CH: the VL53L8CX superset (every CX method) plus CNH, compact network histograms — each
+ * frame can carry a per-aggregate distance histogram. {@link #init()} downloads the CH firmware
+ * (VL53LMZ ULD 2.0.16).
+ */
+public class Vl53l8chDevice extends Vl53l8cxDevice {
+    public Vl53l8chDevice(Link link, @Nullable Duration timeout) {
+        super(link, timeout);
+    }
+
+    public Vl53l8chDevice(Link link) {
+        super(link);
+    }
+
+    Vl53l8chDevice(DepzDevice from) {
+        super(from);
+    }
+
+    @Override
+    protected Vl53l8Firmware firmwareSet() {
+        return Vl53l8Firmware.CH;
+    }
+
+    /** The CNH setup armed by {@link #configureCnh}, or null; recorders keep it next to the raw blocks to decode them later. */
+    public @Nullable Vl53l8CnhSetup cnhSetup() {
+        return armedCnh();
+    }
+
+    /**
+     * Arm CNH for the next {@link #startRanging()}: every frame then carries
+     * {@link Vl53l8Frame#cnhRaw()}, decoded with {@code Vl53l8Uld.decodeCnh}. CNH and the motion
+     * indicator share one DCI struct (0xBFAC): this disarms the motion indicator (frames carry no
+     * {@link Vl53l8Frame#motion()}).
+     */
+    public void configureCnh(Vl53l8CnhSetup setup) {
+        armCnh(setup);
+    }
+}

@@ -1,0 +1,167 @@
+/*
+ * VL53L8 advanced-feature DCI codecs (ST ULD, UM3109), pure encode/decode:
+ * xtalk margin, detection thresholds, default motion-indicator configuration.
+ * Ported verbatim from the ST ULD plugin sources (BSD-3) via the TS/Python
+ * references. These codecs are SHARED by both ToF variants — VL53L8CX and
+ * VL53L8CH. The live DCI read/write bridge is out of scope.
+ */
+#include "depz_sensor_sdk.h"
+#include <string.h>
+
+static void put_u32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+}
+static void put_i32(uint8_t *p, int32_t v) { put_u32(p, (uint32_t)v); }
+
+int depz_vl53l8_xtalk_margin_to_raw(uint32_t margin_kcps, uint32_t *raw)
+{
+    if (margin_kcps > DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS)
+        return -1; /* as ST: at most 10000 kcps, nothing written */
+    *raw = margin_kcps * 2048u;
+    return 0;
+}
+
+uint32_t depz_vl53l8_xtalk_margin_from_raw(uint32_t raw)
+{
+    return raw / 2048u;
+}
+
+/* Detection-threshold measurement -> scale factor (get divides / set mult). */
+static int32_t thresh_scale(uint8_t measurement)
+{
+    switch (measurement) {
+    case DEPZ_VL53L8_DIST_MM:               return 4;
+    case DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS:  return 2048;
+    case DEPZ_VL53L8_RANGE_SIGMA_MM:        return 128;
+    case DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS: return 2048;
+    case DEPZ_VL53L8_NB_SPADS_ENABLED:      return 256;
+    case DEPZ_VL53L8_MOTION_INDICATOR:      return 65535;
+    default:                                return 1;
+    }
+}
+
+/* Pack; with `strict`, -1 (nothing written) when a scaled low/high does not
+ * fit the i32 DCI field. Without, the scaled value wraps to 32 bits. */
+static int pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
+                           uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                           uint8_t valid[8], bool strict)
+{
+    if (strict) {
+        if (n > DEPZ_VL53L8_NB_THRESHOLDS)
+            return -1; /* never silently dropped */
+        for (size_t k = 0; th != NULL && k < n && k < DEPZ_VL53L8_NB_THRESHOLDS; k++) {
+            int64_t scale = thresh_scale(th[k].measurement);
+            int64_t lo = (int64_t)th[k].low_thresh * scale, hi = (int64_t)th[k].high_thresh * scale;
+            if (lo < INT32_MIN || lo > INT32_MAX || hi < INT32_MIN || hi > INT32_MAX)
+                return -1;
+        }
+    }
+    memset(valid, 0x05, 8);
+    memset(start, 0, DEPZ_VL53L8_THRESH_START_SIZE);
+    for (int k = 0; k < DEPZ_VL53L8_NB_THRESHOLDS; k++) {
+        depz_vl53l8_threshold t;
+        if (th != NULL && (size_t)k < n) {
+            t = th[k];
+        } else {
+            memset(&t, 0, sizeof(t));
+        }
+        int64_t scale = thresh_scale(t.measurement);
+        int32_t low = (int32_t)(uint32_t)((int64_t)t.low_thresh * scale);
+        int32_t high = (int32_t)(uint32_t)((int64_t)t.high_thresh * scale);
+        uint8_t *e = start + k * 12;
+        put_i32(e, low);
+        put_i32(e + 4, high);
+        e[8] = t.measurement;
+        e[9] = t.type;
+        e[10] = t.zone_num;
+        e[11] = t.operation;
+    }
+    return 0;
+}
+
+void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n,
+                                 uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                                 uint8_t valid[8])
+{
+    (void)pack_thresholds(th, n, start, valid, false);
+}
+
+int depz_vl53l8_pack_thresholds_checked(const depz_vl53l8_threshold *th, size_t n,
+                                        uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE],
+                                        uint8_t valid[8])
+{
+    return pack_thresholds(th, n, start, valid, true);
+}
+
+/*
+ * VL53L8CX_Motion_Configuration: the constants motion_indicator_init programs
+ * (plugin source); map_id depends on the resolution.
+ */
+int depz_vl53l8_motion_cfg_default(int resolution, depz_vl53l8_motion_cfg *out)
+{
+    if (resolution != DEPZ_VL53L8_RES_4X4 && resolution != DEPZ_VL53L8_RES_8X8)
+        return -1;
+
+    memset(out, 0, sizeof(*out));
+    out->ref_bin_offset = 13633;
+    out->detection_threshold = 2883584;
+    out->extra_noise_sigma = 0;
+    out->null_den_clip_value = 0;
+    out->mem_update_mode = 6;
+    out->mem_update_choice = 2;
+    out->sum_span = 4;
+    out->feature_length = 9;
+    out->nb_of_aggregates = 16;
+    out->nb_of_temporal_accumulations = 16;
+    out->min_nb_for_global_detection = 1;
+    out->global_indicator_format_1 = 8;
+    out->global_indicator_format_2 = 0;
+    if (resolution == DEPZ_VL53L8_RES_4X4) {
+        for (int k = 0; k < 16; k++) out->map_id[k] = (int8_t)k;
+        for (int k = 16; k < 64; k++) out->map_id[k] = -1;
+    } else {
+        for (int k = 0; k < 64; k++)
+            out->map_id[k] = (int8_t)(((k % 8) >> 1) + 4 * (k / 16));
+    }
+    /* indicator_format_1[32] + indicator_format_2[32] are zero (already). */
+    return 0;
+}
+
+/* The 156-byte block, packed as the C struct `<i 3I 12B 64b 32B 32B`. */
+void depz_vl53l8_motion_cfg_pack(const depz_vl53l8_motion_cfg *cfg,
+                                 uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE])
+{
+    size_t o = 0;
+    put_i32(out + o, cfg->ref_bin_offset);       o += 4;
+    put_u32(out + o, cfg->detection_threshold);  o += 4;
+    put_u32(out + o, cfg->extra_noise_sigma);    o += 4;
+    put_u32(out + o, cfg->null_den_clip_value);  o += 4;
+    out[o++] = cfg->mem_update_mode;
+    out[o++] = cfg->mem_update_choice;
+    out[o++] = cfg->sum_span;
+    out[o++] = cfg->feature_length;
+    out[o++] = cfg->nb_of_aggregates;
+    out[o++] = cfg->nb_of_temporal_accumulations;
+    out[o++] = cfg->min_nb_for_global_detection;
+    out[o++] = cfg->global_indicator_format_1;
+    out[o++] = cfg->global_indicator_format_2;
+    out[o++] = cfg->spare_1;
+    out[o++] = cfg->spare_2;
+    out[o++] = cfg->spare_3;
+    for (int k = 0; k < 64; k++) out[o++] = (uint8_t)cfg->map_id[k];
+    memcpy(out + o, cfg->indicator_format_1, 32); o += 32;
+    memcpy(out + o, cfg->indicator_format_2, 32); o += 32;
+    (void)o;
+}
+
+int depz_vl53l8_motion_cfg_default_pack(int resolution,
+                                        uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE])
+{
+    depz_vl53l8_motion_cfg cfg;
+    if (depz_vl53l8_motion_cfg_default(resolution, &cfg) != 0)
+        return -1;
+    depz_vl53l8_motion_cfg_pack(&cfg, out);
+    return 0;
+}

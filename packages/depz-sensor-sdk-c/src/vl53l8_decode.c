@@ -1,0 +1,428 @@
+/*
+ * VL53L8 register-bridge streaming: frame reassembly + raw-results decode
+ * (contract 04). Byte-exact port of the reference decode path in the TS/Python
+ * ULD `parseFrame` (block-header walk over a 32-bit-word-swapped buffer).
+ *
+ * SHARED CX/CH: this ranging-frame decoder serves BOTH ToF variants —
+ * VL53L8CX (base) and VL53L8CH (CX + CNH). They emit the same ranging-results
+ * layout, so there is a single decode path (no per-variant duplication).
+ * The VL53L5CX / VL53L7CX / VL53L7CH frames (contract 11) go through the same
+ * walk via depz_vl53l7_decode_frame (footer at size-4, per-zone trim, CNH
+ * block extraction).
+ *
+ * OUT OF SCOPE (hardware-dependent extension points, not implemented):
+ *   - the live ULD init/config register-bridge driver (firmware download +
+ *     DCI register sequences) — see the TS/Python `uld` reference;
+ *   - CNH compact-network-histogram decode — the CH-specific extension point
+ *     (see the DEPZ_VL53L8_CNH_* stub note below).
+ * Only the verifiable, shared decode path lives here.
+ */
+#include "depz_sensor_sdk.h"
+#include <string.h>
+
+/* ---- little-endian readers -------------------------------------------------*/
+static uint16_t rd_u16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); }
+static uint32_t rd_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+static uint64_t rd_u64(const uint8_t *p)
+{
+    uint64_t v = 0;
+    for (int i = 7; i >= 0; i--) v = (v << 8) | p[i];
+    return v;
+}
+static int16_t rd_i16(const uint8_t *p) { return (int16_t)rd_u16(p); }
+
+static void put_u16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+
+/* ---- encoders --------------------------------------------------------------*/
+size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out)
+{
+    /* contract 04 §4 rule 4: the firmware refuses 0 and > 8192; so does the host */
+    if (frame_size < 1 || frame_size > DEPZ_VL53L8_STREAM_TOTAL_MAX)
+        return 0;
+    put_u16(out, frame_size);
+    return 2;
+}
+
+/* ---- chunk / reg-data unpack -----------------------------------------------*/
+int depz_vl53l8_unpack_chunk(const uint8_t *payload, size_t len,
+                             depz_vl53l8_chunk *out)
+{
+    if (len < 12)
+        return -1;
+    out->timestamp_us = rd_u64(payload);
+    out->full_size = rd_u16(payload + 8);
+    out->offset = rd_u16(payload + 10);
+    out->data = payload + 12;
+    out->data_len = len - 12;
+    return 0;
+}
+
+/* ---- reassembler -----------------------------------------------------------*/
+void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r, size_t chunk_max)
+{
+    memset(r, 0, sizeof(*r));
+    r->chunk_max = chunk_max;
+}
+
+static void reasm_reset(depz_vl53l8_reassembler *r)
+{
+    r->len = 0;
+    r->full_size = 0;
+}
+
+int depz_vl53l8_reasm_feed(depz_vl53l8_reassembler *r, const depz_vl53l8_chunk *c,
+                           const uint8_t **frame, size_t *frame_len, uint64_t *ts)
+{
+    /* Rule 4 first: past it, offset + data_len <= full_size <= sizeof(r->buf),
+     * so neither copy below can overrun the buffer. */
+    if (c->data_len > r->chunk_max || c->full_size > DEPZ_VL53L8_STREAM_TOTAL_MAX ||
+        (size_t)c->offset + c->data_len > c->full_size) {
+        /* damaged: the frame in progress is lost (counted, rules 1-2) and so
+         * is the frame an offset-0 chunk starts (counted); a damaged orphan
+         * with nothing in progress is dropped like any orphan */
+        if (r->len > 0)
+            r->discarded++;
+        if (c->offset == 0)
+            r->discarded++;
+        reasm_reset(r);
+        return 0;
+    }
+    if (c->offset == 0) {
+        if (r->len > 0 && r->len != r->full_size)
+            r->discarded++;
+        memcpy(r->buf, c->data, c->data_len);
+        r->len = c->data_len;
+        r->full_size = c->full_size;
+        r->timestamp_us = c->timestamp_us;
+    } else if (c->offset == r->len && r->full_size == c->full_size && r->len > 0) {
+        memcpy(r->buf + r->len, c->data, c->data_len);
+        r->len += c->data_len;
+    } else {
+        if (r->len > 0)
+            r->discarded++;
+        reasm_reset(r);
+        return 0;
+    }
+
+    if (r->len == r->full_size && r->full_size > 0) {
+        *frame = r->buf;
+        *frame_len = r->len;
+        *ts = r->timestamp_us;
+        r->completed++;
+        reasm_reset(r);
+        return 1;
+    }
+    return 0;
+}
+
+/* ---- frame decode ----------------------------------------------------------*/
+
+/* VL53L8CX_SwapBuffer: byte-reverse every complete 32-bit word (tail as-is). */
+void depz_vl53l8_swap_buffer(uint8_t *d, size_t n)
+{
+    size_t n4 = (n >> 2) << 2;
+    for (size_t i = 0; i < n4; i += 4) {
+        uint8_t t0 = d[i], t1 = d[i + 1];
+        d[i] = d[i + 3];
+        d[i + 1] = d[i + 2];
+        d[i + 2] = t1;
+        d[i + 3] = t0;
+    }
+}
+
+/* Block-header index constants (NB_TARGET_PER_ZONE == 1). */
+#define BH_METADATA_IDX 0x54b4u
+#define BH_SPAD_IDX     0x55d0u
+#define BH_AMBIENT_IDX  0x54d0u
+#define BH_NBT_IDX      0xdb84u
+#define BH_SIGNAL_IDX   0xdbc4u
+#define BH_SIGMA_IDX    0xdec4u
+#define BH_DISTANCE_IDX 0xdf44u
+#define BH_REFL_IDX     0xe044u
+#define BH_STATUS_IDX   0xe084u
+
+/* ST GetRangingData distance: raw / 4 floored, a negative result clamped to 0
+ * (contract 04 §5). Flooring a negative raw gives a negative result, so the
+ * whole negative range is 0. */
+static int32_t distance_mm_from_raw(int32_t v)
+{
+    return (v <= 0) ? 0 : (v / 4);
+}
+
+#define BH_CNH_IDX      0xc048u /* VL53LMZ_CNH_DATA_IDX (CH-only output block) */
+
+/*
+ * Shared block-header walk behind depz_vl53l8_decode_frame (VL53L8, footer at
+ * size-12) and depz_vl53l7_decode_frame (VL53L5/L7, footer at size-4, contract
+ * 11 §3). `l7_trim` = the L5/L7 output-list rule: per-target blocks keep 64
+ * entries even in 4x4, so every per-zone array is trimmed to the resolution,
+ * which is taken from the zone-sized ambient block (index 0x54D0; falls back
+ * to the SPAD block, then to nb_target_detected). `cnh_out` (may be NULL)
+ * receives the CNH_DATA block bytes in decode order.
+ */
+static int decode_frame_impl(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out,
+                             size_t footer_id_offset, bool l7_trim,
+                             uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
+{
+    if (cnh_len)
+        *cnh_len = 0;
+    if (raw_len < 24 || raw_len > DEPZ_VL53L8_STREAM_TOTAL_MAX)
+        return -2;
+
+    uint8_t buf[DEPZ_VL53L8_STREAM_TOTAL_MAX];
+    memcpy(buf, raw, raw_len);
+    depz_vl53l8_swap_buffer(buf, raw_len);
+
+    memset(out, 0, sizeof(*out));
+    out->timestamp_us = timestamp_us;
+
+    /* zone counts we actually decoded (for arrays sized differently) */
+    int dist_n = 0, status_n = 0, nbt_n = 0;
+    int sig_n = 0, amb_n = 0, spad_n = 0, sigma_n = 0, refl_n = 0;
+    bool amb_seen = false, spad_seen = false;
+
+    size_t i = 16;
+    while (i + 4 <= raw_len) {
+        uint32_t bh = rd_u32(buf + i);
+        uint32_t type = bh & 0xf;
+        uint32_t size = (bh >> 4) & 0xfff;
+        uint32_t idx = (bh >> 16) & 0xffff;
+        size_t msize = (type > 0x1 && type < 0xd) ? (size_t)type * size : size;
+        if (i + 4 + msize > raw_len)
+            break; /* reached the footer; all data blocks precede it */
+
+        const uint8_t *body = buf + i + 4;
+        if (idx == BH_METADATA_IDX) {
+            /* the temperature is body byte 8 (the real block has 12); a
+             * shorter block leaves it at 0 */
+            if (msize >= 9)
+                out->silicon_temp_degc = (int8_t)buf[i + 12];
+        } else if (idx == BH_DISTANCE_IDX) {
+            dist_n = (int)(msize / 2);
+            if (dist_n > DEPZ_VL53L8_MAX_ZONES) dist_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < dist_n; k++)
+                out->distance_mm[k] = rd_i16(body + 2 * k);
+        } else if (idx == BH_STATUS_IDX) {
+            status_n = (int)msize;
+            if (status_n > DEPZ_VL53L8_MAX_ZONES) status_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < status_n; k++) out->target_status[k] = body[k];
+        } else if (idx == BH_NBT_IDX) {
+            nbt_n = (int)msize;
+            if (nbt_n > DEPZ_VL53L8_MAX_ZONES) nbt_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < nbt_n; k++) out->nb_target_detected[k] = body[k];
+        } else if (idx == BH_SIGNAL_IDX) {
+            sig_n = (int)(msize / 4);
+            if (sig_n > DEPZ_VL53L8_MAX_ZONES) sig_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < sig_n; k++) out->signal_per_spad[k] = rd_u32(body + 4 * k) / 2048.0;
+        } else if (idx == BH_AMBIENT_IDX) {
+            amb_n = (int)(msize / 4);
+            amb_seen = true;
+            if (amb_n > DEPZ_VL53L8_MAX_ZONES) amb_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < amb_n; k++) out->ambient_per_spad[k] = rd_u32(body + 4 * k) / 2048.0;
+        } else if (idx == BH_SPAD_IDX) {
+            spad_n = (int)(msize / 4);
+            spad_seen = true;
+            if (spad_n > DEPZ_VL53L8_MAX_ZONES) spad_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < spad_n; k++) out->nb_spads_enabled[k] = rd_u32(body + 4 * k);
+        } else if (idx == BH_SIGMA_IDX) {
+            sigma_n = (int)(msize / 2);
+            if (sigma_n > DEPZ_VL53L8_MAX_ZONES) sigma_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < sigma_n; k++) out->range_sigma_mm[k] = rd_u16(body + 2 * k) / 128.0;
+        } else if (idx == BH_REFL_IDX) {
+            refl_n = (int)msize;
+            if (refl_n > DEPZ_VL53L8_MAX_ZONES) refl_n = DEPZ_VL53L8_MAX_ZONES;
+            for (int k = 0; k < refl_n; k++) out->reflectance[k] = body[k] / 2.0;
+        } else if (idx == BH_CNH_IDX && cnh_out) {
+            if (msize > cnh_cap)
+                return -3;
+            memcpy(cnh_out, body, msize);
+            if (cnh_len)
+                *cnh_len = msize;
+        }
+
+        i += msize + 4;
+    }
+
+    if (l7_trim) {
+        /* L5/L7 (contract 11 §3): blocks 0x54D0 <= idx < 0x5890 (ambient,
+         * SPAD count) are sized to the resolution; per-target blocks keep 64
+         * entries and are zero-padded past it. Trim them all to the zones
+         * that exist. */
+        int res = amb_seen ? amb_n : (spad_seen ? spad_n : nbt_n);
+        int *counts[] = { &dist_n, &status_n, &nbt_n, &sig_n, &amb_n,
+                          &spad_n, &sigma_n, &refl_n };
+        for (size_t c = 0; c < sizeof(counts) / sizeof(counts[0]); c++)
+            if (*counts[c] > res) *counts[c] = res;
+        for (int k = res; k < DEPZ_VL53L8_MAX_ZONES; k++) {
+            out->distance_mm[k] = 0;
+            out->target_status[k] = 0;
+            out->nb_target_detected[k] = 0;
+            out->signal_per_spad[k] = 0;
+            out->ambient_per_spad[k] = 0;
+            out->nb_spads_enabled[k] = 0;
+            out->range_sigma_mm[k] = 0;
+            out->reflectance[k] = 0;
+        }
+    }
+
+    /* Real units, as ST GetRangingData (contract 04 §5): distance raw / 4
+     * floored, negative -> 0. Signal, ambient, sigma and reflectance were
+     * scaled as they were read (/2048, /2048, /128, /2), keeping the fraction
+     * that ST's integer division drops. */
+    for (int k = 0; k < dist_n; k++)
+        out->distance_mm[k] = distance_mm_from_raw(out->distance_mm[k]);
+
+    /* Zone count = nb_target_detected block length (16 for 4x4, 64 for 8x8;
+     * on L5/L7 after the trim above). */
+    int nzones = nbt_n;
+    out->resolution = nzones;
+
+    /* No target detected -> status 255. */
+    for (int z = 0; z < nzones; z++) {
+        if (out->nb_target_detected[z] == 0 && z < status_n)
+            out->target_status[z] = 255;
+    }
+    (void)dist_n; (void)sig_n; (void)amb_n; (void)spad_n; (void)sigma_n; (void)refl_n;
+
+    /* Header/footer id match check. The footer id sits at raw_len - N:
+     * N = DEPZ_VL53L8CX_FOOTER_ID_OFFSET (12) for the VL53L8 ranging frame,
+     * DEPZ_VL53L7_FOOTER_ID_OFFSET (4) for VL53L5CX/L7CX/L7CH. */
+    if (buf[0x8] != buf[raw_len - footer_id_offset] ||
+        buf[0x9] != buf[raw_len - footer_id_offset + 1])
+        return -1;
+
+    return 0;
+}
+
+int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out)
+{
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L8CX_FOOTER_ID_OFFSET, false, NULL, 0, NULL);
+}
+
+int depz_vl53l8ch_decode_frame(const uint8_t *raw, size_t raw_len,
+                               uint64_t timestamp_us, depz_vl53l8_frame *out,
+                               uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
+{
+    /* VL53LMZ 2.0.16 (the CH blob): footer id at size-4, like the L5/L7 ULD
+     * 2.0.x — only the VL53L8CX's ULD 2.1.0 puts it at size-12. */
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L7_FOOTER_ID_OFFSET, false,
+                             cnh_out, cnh_cap, cnh_len);
+}
+
+int depz_vl53l7_decode_frame(const uint8_t *raw, size_t raw_len,
+                             uint64_t timestamp_us, depz_vl53l8_frame *out,
+                             uint8_t *cnh_out, size_t cnh_cap, size_t *cnh_len)
+{
+    return decode_frame_impl(raw, raw_len, timestamp_us, out,
+                             DEPZ_VL53L7_FOOTER_ID_OFFSET, true,
+                             cnh_out, cnh_cap, cnh_len);
+}
+
+/* ---- CNH (compact-network-histograms) — CH-specific decode -----------------
+ *
+ * VL53L8CH (DEPZ_VL53L8_VARIANT_CH) adds compact-network-histogram output on
+ * top of the shared ranging frame decoded above. depz_vl53l8ch_decode_cnh()
+ * is a byte-exact port of the ST ULD CNH plugin block-address math
+ * (vl53lmz_cnh_get_block_addresses / _cnh_get_mem_block_addresses, ULD 2.0.16)
+ * for the fixed cnh_cfg the DEPZ firmware uses (DISABLE_PING_PONG |
+ * DISABLE_VARIANCE + ambient/xtalk/zero-invalid/ref-residual). It mirrors the
+ * Python reference depz_sensor_sdk/vl53l8/cnh.py decode()/_decode_aggregate().
+ *
+ * Persistent-data header layout (32-bit words, buffer already in decode order):
+ *   word[0] = buffer state (MI_STATE_PING == 0 for the active/ping buffer)
+ *   word[1] = buffer info: bits[15:0] = ping-pong buffer size in words
+ *   word[2] = ref-residual word (u32; float value = word / 2048.0)
+ *   word[3] = flags (bit4 = 0x10 selects the second buffer)
+ * The persistent header is CNH_PER_HEADER_WORDS (5) words; each ping/pong
+ * buffer starts with a CNH_PER_BUFFER_HEADER_WORDS (2) word header
+ * (state, nb_accumulated), then the data blocks:
+ *   FEAT_INT   : int32[nb_agg*feat]            (histogram raw)
+ *   FEAT_FRAC  : int8 [nb_agg*feat] (4-byte pad) (per-bin scaler)
+ *   AMBIENT_INT: int32[nb_agg]
+ *   AMBIENT_FRAC:int8 [nb_agg]      (4-byte pad)
+ * With DISABLE_VARIANCE set there are no VARIANCE_* blocks. Aggregate `a`'s
+ * histogram starts at element a*feat within FEAT_INT / FEAT_FRAC.
+ * -------------------------------------------------------------------------- */
+
+/* plugin_cnh.c / plugin_motion_indicator.h layout constants. */
+#define CNH_PER_HEADER_WORDS            5
+#define CNH_PER_BUFFER_HEADER_WORDS     2
+#define CNH_PER_HEADER_BUFFER_INFO_IDX  1
+#define CNH_PER_HEADER_FLAGS_IDX        3
+#define CNH_BUFFER_INFO_WORDS_MASK      0xFFFFu
+#define CNH_MI_STATE_PING               0
+#define CNH_FLAGS_SELECT_BUFFER_BIT     0x10u
+
+static int32_t rd_i32(const uint8_t *p) { return (int32_t)rd_u32(p); }
+
+int depz_vl53l8ch_decode_cnh(const depz_vl53l8ch_cnh_config *cfg,
+                             const uint8_t *raw, size_t raw_len,
+                             depz_vl53l8ch_cnh_frame *out)
+{
+    int nb_agg = cfg->nb_of_aggregates;
+    int feat = cfg->feature_length;
+    if (nb_agg <= 0 || nb_agg > DEPZ_VL53L8_CNH_MAX_AGGREGATES ||
+        feat < 0 || feat > DEPZ_VL53L8_CNH_MAX_FEATURE)
+        return -1;
+
+    /* Need at least the 5-word persistent-data header. */
+    if (raw_len < (size_t)CNH_PER_HEADER_WORDS * 4)
+        return -2;
+
+    int32_t agg_x_feat = nb_agg * feat;
+
+    /* Persistent-data header words. */
+    int32_t  state      = rd_i32(raw + 0 * 4);                              /* words[0] */
+    uint32_t info       = rd_u32(raw + CNH_PER_HEADER_BUFFER_INFO_IDX * 4); /* words[1] */
+    uint32_t flags_word = rd_u32(raw + CNH_PER_HEADER_FLAGS_IDX * 4);       /* words[3] */
+
+    /* vl53lmz_cnh_get_ref_residual: raw u32 at word[2]. */
+    out->ref_residual_word = rd_u32(raw + 2 * 4);
+
+    uint32_t pp_size = info & CNH_BUFFER_INFO_WORDS_MASK;
+
+    /* Select ping or pong buffer exactly as the C plugin does. With ping-pong
+     * disabled the device reports a single buffer and this resolves to ping
+     * (local_pp == 0 -> base does not skip the ping-pong region). */
+    int local_pp = 1;
+    if ((flags_word & CNH_FLAGS_SELECT_BUFFER_BIT) == CNH_FLAGS_SELECT_BUFFER_BIT)
+        local_pp = 1;
+    if (state == CNH_MI_STATE_PING)
+        local_pp = 1 - local_pp;
+
+    size_t base = CNH_PER_HEADER_WORDS;            /* in words */
+    if (local_pp == 1)
+        base += pp_size;
+    /* Byte offset of the buffer data (after the 2-word buffer header). */
+    size_t feat_int_off  = (base + CNH_PER_BUFFER_HEADER_WORDS) * 4;
+    size_t feat_frac_off = feat_int_off + (size_t)agg_x_feat * 4;
+    size_t feat_frac_pad = ((size_t)(3 + agg_x_feat) / 4) * 4;
+    size_t amb_int_off   = feat_frac_off + feat_frac_pad;
+    size_t amb_frac_off  = amb_int_off + (size_t)nb_agg * 4;
+    /* Everything through the last AMBIENT_FRAC byte must fit the raw block. */
+    if (amb_frac_off + (size_t)nb_agg > raw_len)
+        return -3;
+
+    out->nb_aggregates = nb_agg;
+    out->feature_length = feat;
+    for (int agg = 0; agg < nb_agg; agg++) {
+        int agg_off = agg * feat;
+        for (int f = 0; f < feat; f++) {
+            out->hist_raw[agg][f] =
+                rd_i32(raw + feat_int_off + (size_t)(agg_off + f) * 4);
+            out->hist_scaler[agg][f] =
+                (int8_t)raw[feat_frac_off + (size_t)(agg_off + f)];
+        }
+        out->ambient_raw[agg] = rd_i32(raw + amb_int_off + (size_t)agg * 4);
+        out->ambient_scaler[agg] = (int8_t)raw[amb_frac_off + (size_t)agg];
+    }
+    return 0;
+}

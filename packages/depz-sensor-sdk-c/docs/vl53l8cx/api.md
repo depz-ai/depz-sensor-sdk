@@ -1,0 +1,990 @@
+# VL53L8CX (ToF) — API reference
+
+The public API for the VL53L8CX (ToF) sensor. Transport, discovery,
+the common command/report codecs and other cross-sensor symbols
+live in the [top-level API reference](../api.md).
+
+The sensor class below is one implementation for every
+multizone model: the VL53L8CH uses every call of it too, plus
+the CNH setup, and so do the VL53L5CX / L7CX / L7CH boards,
+plus their board commands (on their own pages).
+
+Auto-generated from the header's doc-comments — edit them in the
+header, not this file.
+
+## Contents
+
+- **VL53L8CX (ToF)**: [`DEPZ_VL53L8CX_FOOTER_ID_OFFSET`](#depz_vl53l8cx_footer_id_offset), [`DEPZ_VL53L8_CMD_READ_REG`](#depz_vl53l8_cmd_read_reg), [`DEPZ_VL53L8_CMD_WRITE_REG`](#depz_vl53l8_cmd_write_reg), [`DEPZ_VL53L8_CMD_START_STREAM`](#depz_vl53l8_cmd_start_stream), [`DEPZ_VL53L8_CMD_STOP_STREAM`](#depz_vl53l8_cmd_stop_stream), [`DEPZ_VL53L8_RPT_REG_DATA`](#depz_vl53l8_rpt_reg_data), [`DEPZ_VL53L8_RPT_FRAME`](#depz_vl53l8_rpt_frame), [`DEPZ_VL53L8_STREAM_CHUNK_MAX`](#depz_vl53l8_stream_chunk_max), [`DEPZ_VL53L8_STREAM_TOTAL_MAX`](#depz_vl53l8_stream_total_max), [`DEPZ_VL53L8_RES_4X4`](#depz_vl53l8_res_4x4), [`DEPZ_VL53L8_RES_8X8`](#depz_vl53l8_res_8x8), [`DEPZ_VL53L8_MAX_ZONES`](#depz_vl53l8_max_zones), [`depz_vl53l8_pack_start_stream`](#depz_vl53l8_pack_start_stream), [`depz_vl53l8_chunk`](#depz_vl53l8_chunk), [`depz_vl53l8_unpack_chunk`](#depz_vl53l8_unpack_chunk), [`depz_vl53l8_reassembler`](#depz_vl53l8_reassembler), [`depz_vl53l8_reasm_init`](#depz_vl53l8_reasm_init), [`depz_vl53l8_reasm_feed`](#depz_vl53l8_reasm_feed), [`depz_vl53l8_frame`](#depz_vl53l8_frame), [`depz_vl53l8_swap_buffer`](#depz_vl53l8_swap_buffer), [`depz_vl53l8_decode_frame`](#depz_vl53l8_decode_frame), [`DEPZ_VL53L8CH_CNH_CONFIG_INIT`](#depz_vl53l8ch_cnh_config_init), [`DEPZ_VL53L8_DIST_MM`](#depz_vl53l8_dist_mm), [`DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS`](#depz_vl53l8_signal_per_spad_kcps), [`DEPZ_VL53L8_RANGE_SIGMA_MM`](#depz_vl53l8_range_sigma_mm), [`DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS`](#depz_vl53l8_ambient_per_spad_kcps), [`DEPZ_VL53L8_NB_TARGET_DETECTED`](#depz_vl53l8_nb_target_detected), [`DEPZ_VL53L8_TAR_STATUS`](#depz_vl53l8_tar_status), [`DEPZ_VL53L8_NB_SPADS_ENABLED`](#depz_vl53l8_nb_spads_enabled), [`DEPZ_VL53L8_MOTION_INDICATOR`](#depz_vl53l8_motion_indicator), [`DEPZ_VL53L8_POWER_MODE_SLEEP`](#depz_vl53l8_power_mode_sleep), [`DEPZ_VL53L8_POWER_MODE_WAKEUP`](#depz_vl53l8_power_mode_wakeup), [`DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP`](#depz_vl53l8_power_mode_deep_sleep), [`DEPZ_VL53L8_NB_THRESHOLDS`](#depz_vl53l8_nb_thresholds), [`DEPZ_VL53L8_THRESH_START_SIZE`](#depz_vl53l8_thresh_start_size), [`DEPZ_VL53L8_MOTION_CFG_SIZE`](#depz_vl53l8_motion_cfg_size), [`DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS`](#depz_vl53l8_xtalk_margin_max_kcps), [`depz_vl53l8_xtalk_margin_to_raw`](#depz_vl53l8_xtalk_margin_to_raw), [`depz_vl53l8_xtalk_margin_from_raw`](#depz_vl53l8_xtalk_margin_from_raw), [`depz_vl53l8_threshold`](#depz_vl53l8_threshold), [`DEPZ_VL53L8_THRESHOLD_INIT`](#depz_vl53l8_threshold_init), [`depz_vl53l8_pack_thresholds`](#depz_vl53l8_pack_thresholds), [`depz_vl53l8_pack_thresholds_checked`](#depz_vl53l8_pack_thresholds_checked), [`depz_vl53l8_motion_cfg`](#depz_vl53l8_motion_cfg), [`DEPZ_VL53L8_MOTION_CFG_INIT`](#depz_vl53l8_motion_cfg_init), [`depz_vl53l8_motion_cfg_default`](#depz_vl53l8_motion_cfg_default), [`depz_vl53l8_motion_cfg_pack`](#depz_vl53l8_motion_cfg_pack), [`depz_vl53l8_motion_cfg_default_pack`](#depz_vl53l8_motion_cfg_default_pack)
+- **VL53L8 multizone sensor class (live layer)**: [`depz_vl53l8_model`](#depz_vl53l8_model), [`DEPZ_VL53L8_RANGING_MODE_CONTINUOUS`](#depz_vl53l8_ranging_mode_continuous), [`DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS`](#depz_vl53l8_ranging_mode_autonomous), [`DEPZ_VL53L8_TARGET_ORDER_CLOSEST`](#depz_vl53l8_target_order_closest), [`DEPZ_VL53L8_TARGET_ORDER_STRONGEST`](#depz_vl53l8_target_order_strongest), [`DEPZ_VL53L8_XTALK_BUFFER_SIZE`](#depz_vl53l8_xtalk_buffer_size), [`DEPZ_VL53L8_CNH_MAX_BYTES`](#depz_vl53l8_cnh_max_bytes), [`DEPZ_VL53L8_THRESH_IN_WINDOW`](#depz_vl53l8_thresh_in_window), [`DEPZ_VL53L8_THRESH_OUT_OF_WINDOW`](#depz_vl53l8_thresh_out_of_window), [`DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN`](#depz_vl53l8_thresh_less_than_equal_min), [`DEPZ_VL53L8_THRESH_GREATER_THAN_MAX`](#depz_vl53l8_thresh_greater_than_max), [`DEPZ_VL53L8_THRESH_EQUAL_MIN`](#depz_vl53l8_thresh_equal_min), [`DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN`](#depz_vl53l8_thresh_not_equal_min), [`DEPZ_VL53L8_THRESH_OP_OR`](#depz_vl53l8_thresh_op_or), [`DEPZ_VL53L8_THRESH_OP_AND`](#depz_vl53l8_thresh_op_and), [`DEPZ_VL53L8_THRESH_LAST`](#depz_vl53l8_thresh_last), [`depz_vl53l8_motion`](#depz_vl53l8_motion), [`depz_vl53l8_live_frame`](#depz_vl53l8_live_frame), [`depz_vl53l8_progress_cb`](#depz_vl53l8_progress_cb), [`depz_vl53l8_cnh_setup`](#depz_vl53l8_cnh_setup), [`DEPZ_VL53L8_CNH_SETUP_INIT`](#depz_vl53l8_cnh_setup_init), [`depz_vl53l8_cnh_init_config`](#depz_vl53l8_cnh_init_config), [`depz_vl53l8_cnh_init_config_checked`](#depz_vl53l8_cnh_init_config_checked), [`depz_vl53l8_cnh_create_agg_map`](#depz_vl53l8_cnh_create_agg_map), [`depz_vl53l8_cnh_required_memory`](#depz_vl53l8_cnh_required_memory), [`depz_vl53l8_cnh_pack`](#depz_vl53l8_cnh_pack), [`depz_vl53l8_cnh_decode_config`](#depz_vl53l8_cnh_decode_config), [`depz_vl53l8_open_link`](#depz_vl53l8_open_link), [`depz_is_vl53l8`](#depz_is_vl53l8), [`depz_vl53l8_get_model`](#depz_vl53l8_get_model), [`depz_vl53l8_is_alive`](#depz_vl53l8_is_alive), [`depz_vl53l8_init`](#depz_vl53l8_init), [`depz_vl53l8_initialized`](#depz_vl53l8_initialized), [`depz_vl53l8_ranging`](#depz_vl53l8_ranging), [`depz_vl53l8_get_resolution`](#depz_vl53l8_get_resolution), [`depz_vl53l8_set_resolution`](#depz_vl53l8_set_resolution), [`depz_vl53l8_max_ranging_frequency_hz`](#depz_vl53l8_max_ranging_frequency_hz), [`depz_vl53l8_get_ranging_frequency_hz`](#depz_vl53l8_get_ranging_frequency_hz), [`depz_vl53l8_set_ranging_frequency_hz`](#depz_vl53l8_set_ranging_frequency_hz), [`depz_vl53l8_get_ranging_mode`](#depz_vl53l8_get_ranging_mode), [`depz_vl53l8_set_ranging_mode`](#depz_vl53l8_set_ranging_mode), [`depz_vl53l8_get_integration_time_ms`](#depz_vl53l8_get_integration_time_ms), [`depz_vl53l8_set_integration_time_ms`](#depz_vl53l8_set_integration_time_ms), [`depz_vl53l8_get_sharpener_percent`](#depz_vl53l8_get_sharpener_percent), [`depz_vl53l8_set_sharpener_percent`](#depz_vl53l8_set_sharpener_percent), [`depz_vl53l8_get_target_order`](#depz_vl53l8_get_target_order), [`depz_vl53l8_set_target_order`](#depz_vl53l8_set_target_order), [`depz_vl53l8_get_power_mode`](#depz_vl53l8_get_power_mode), [`depz_vl53l8_set_power_mode`](#depz_vl53l8_set_power_mode), [`depz_vl53l8_get_xtalk_margin`](#depz_vl53l8_get_xtalk_margin), [`depz_vl53l8_set_xtalk_margin`](#depz_vl53l8_set_xtalk_margin), [`depz_vl53l8_calibrate_xtalk`](#depz_vl53l8_calibrate_xtalk), [`depz_vl53l8_get_caldata_xtalk`](#depz_vl53l8_get_caldata_xtalk), [`depz_vl53l8_set_caldata_xtalk`](#depz_vl53l8_set_caldata_xtalk), [`depz_vl53l8_get_detection_thresholds_enable`](#depz_vl53l8_get_detection_thresholds_enable), [`depz_vl53l8_set_detection_thresholds_enable`](#depz_vl53l8_set_detection_thresholds_enable), [`depz_vl53l8_get_detection_thresholds`](#depz_vl53l8_get_detection_thresholds), [`depz_vl53l8_set_detection_thresholds`](#depz_vl53l8_set_detection_thresholds), [`depz_vl53l8_set_detection_thresholds_auto_stop`](#depz_vl53l8_set_detection_thresholds_auto_stop), [`depz_vl53l8_configure_motion_indicator`](#depz_vl53l8_configure_motion_indicator), [`depz_vl53l8_configure_cnh`](#depz_vl53l8_configure_cnh), [`depz_vl53l8_cnh_armed`](#depz_vl53l8_cnh_armed), [`depz_vl53l8_start_ranging`](#depz_vl53l8_start_ranging), [`depz_vl53l8_stop_ranging`](#depz_vl53l8_stop_ranging), [`depz_vl53l8_frames`](#depz_vl53l8_frames), [`depz_vl53l8_reassembler_discards`](#depz_vl53l8_reassembler_discards), [`depz_vl53l8_read_reg`](#depz_vl53l8_read_reg), [`depz_vl53l8_write_reg`](#depz_vl53l8_write_reg), [`depz_vl53l8_dci_read`](#depz_vl53l8_dci_read), [`depz_vl53l8_dci_write`](#depz_vl53l8_dci_write)
+
+## VL53L8CX (ToF)
+
+### DEPZ_VL53L8CX_FOOTER_ID_OFFSET
+
+```c
+#define DEPZ_VL53L8CX_FOOTER_ID_OFFSET 12
+```
+
+Footer-id offset in a decoded frame: the header id at [8..9] must equal
+the footer id at [raw_len - N]. N = 12 for the VL53L8CX ULD 2.1.0 frame;
+the CH (VL53LMZ) frame uses 4 — depz_vl53l8ch_decode_frame, which also
+hands out the CNH block for depz_vl53l8ch_decode_cnh().
+
+### DEPZ_VL53L8_CMD_READ_REG
+
+```c
+#define DEPZ_VL53L8_CMD_READ_REG     0x32
+```
+
+### DEPZ_VL53L8_CMD_WRITE_REG
+
+```c
+#define DEPZ_VL53L8_CMD_WRITE_REG    0x33
+```
+
+### DEPZ_VL53L8_CMD_START_STREAM
+
+```c
+#define DEPZ_VL53L8_CMD_START_STREAM 0x35
+```
+
+### DEPZ_VL53L8_CMD_STOP_STREAM
+
+```c
+#define DEPZ_VL53L8_CMD_STOP_STREAM  0x36
+```
+
+### DEPZ_VL53L8_RPT_REG_DATA
+
+```c
+#define DEPZ_VL53L8_RPT_REG_DATA     0x91
+```
+
+### DEPZ_VL53L8_RPT_FRAME
+
+```c
+#define DEPZ_VL53L8_RPT_FRAME        0x93
+```
+
+### DEPZ_VL53L8_STREAM_CHUNK_MAX
+
+```c
+#define DEPZ_VL53L8_STREAM_CHUNK_MAX 1528u
+```
+
+### DEPZ_VL53L8_STREAM_TOTAL_MAX
+
+```c
+#define DEPZ_VL53L8_STREAM_TOTAL_MAX 8192u
+```
+
+### DEPZ_VL53L8_RES_4X4
+
+```c
+#define DEPZ_VL53L8_RES_4X4          16
+```
+
+### DEPZ_VL53L8_RES_8X8
+
+```c
+#define DEPZ_VL53L8_RES_8X8          64
+```
+
+### DEPZ_VL53L8_MAX_ZONES
+
+```c
+#define DEPZ_VL53L8_MAX_ZONES        64
+```
+
+### depz_vl53l8_pack_start_stream
+
+```c
+size_t depz_vl53l8_pack_start_stream(uint16_t frame_size, uint8_t *out);
+```
+
+Encoders (return payload length written).
+2 B; 0 (nothing written) when frame_size is outside 1..8192 (contract 04 §4
+rule 4 — the firmware refuses it too).
+
+### depz_vl53l8_chunk
+
+```c
+typedef struct {
+    uint64_t timestamp_us;
+    uint16_t full_size;
+    uint16_t offset;
+    const uint8_t *data;  /* points into the report payload */
+    size_t   data_len;
+} depz_vl53l8_chunk;
+```
+
+One RPT_VL53_FRAME chunk of a (possibly multi-chunk) sensor frame.
+
+### depz_vl53l8_unpack_chunk
+
+```c
+int depz_vl53l8_unpack_chunk(const uint8_t *payload, size_t len, depz_vl53l8_chunk *out);
+```
+
+Parse a RPT_VL53_FRAME payload (>=12 B). Returns 0 on success, -1 on short.
+
+### depz_vl53l8_reassembler
+
+```c
+typedef struct {
+    uint8_t  buf[DEPZ_VL53L8_STREAM_TOTAL_MAX];
+    size_t   chunk_max;
+    size_t   len;
+    uint16_t full_size;
+    uint64_t timestamp_us;
+    uint64_t completed;
+    uint64_t discarded;
+} depz_vl53l8_reassembler;
+```
+
+Frame reassembler (contract 04 §4): reset on offset==0; chunks must be
+contiguous (offset == accumulated length) and agree on full_size; a gap
+discards the frame in progress; completes when accumulated == full_size.
+A chunk out of the rule-4 bounds (more than chunk_max bytes, full_size over
+DEPZ_VL53L8_STREAM_TOTAL_MAX, or running past full_size) is damaged: dropped
+and counted as a lost frame like the other damaged input.
+
+### depz_vl53l8_reasm_init
+
+```c
+void depz_vl53l8_reasm_init(depz_vl53l8_reassembler *r, size_t chunk_max);
+```
+
+chunk_max: the device's VL53_STREAM_FRAME_MAX — DEPZ_VL53L8_STREAM_CHUNK_MAX,
+or DEPZ_VL53L7_STREAM_CHUNK_MAX on the I2C board (contract 11 §3).
+
+### depz_vl53l8_reasm_feed
+
+```c
+int depz_vl53l8_reasm_feed(depz_vl53l8_reassembler *r, const depz_vl53l8_chunk *c, const uint8_t **frame, size_t *frame_len, uint64_t *ts);
+```
+
+Feed one chunk. Returns 1 when a frame completes (sets *frame -> the
+internal buffer, *frame_len, *ts), 0 otherwise. The frame pointer stays
+valid until the next feed.
+
+### depz_vl53l8_frame
+
+```c
+typedef struct {
+    uint64_t timestamp_us;
+    int      resolution;                 /* 16 | 64 (zone count present)      */
+    int8_t   silicon_temp_degc;
+    int32_t  distance_mm[DEPZ_VL53L8_MAX_ZONES];       /* mm, >= 0            */
+    uint8_t  target_status[DEPZ_VL53L8_MAX_ZONES];
+    uint8_t  nb_target_detected[DEPZ_VL53L8_MAX_ZONES];
+    double   signal_per_spad[DEPZ_VL53L8_MAX_ZONES];   /* kcps/SPAD           */
+    double   ambient_per_spad[DEPZ_VL53L8_MAX_ZONES];  /* kcps/SPAD           */
+    uint32_t nb_spads_enabled[DEPZ_VL53L8_MAX_ZONES];
+    double   range_sigma_mm[DEPZ_VL53L8_MAX_ZONES];    /* mm                  */
+    double   reflectance[DEPZ_VL53L8_MAX_ZONES];       /* %                   */
+} depz_vl53l8_frame;
+```
+
+One decoded ranging frame. Arrays are valid for [0, resolution); zone index
+runs row-major. Values are in the real units ST's GetRangingData gives
+(contract 04 §5): distance_mm = raw/4 floored, a negative result clamped to
+0; signal/ambient = raw/2048 kcps/SPAD; range_sigma_mm = raw/128 mm;
+reflectance = raw/2 %. ST divides integers; the floating-point fields here
+keep the fraction.
+
+### depz_vl53l8_swap_buffer
+
+```c
+void depz_vl53l8_swap_buffer(uint8_t *data, size_t len);
+```
+
+VL53L8CX_SwapBuffer: byte-reverse every complete 32-bit word of `data` in
+place (a tail of 1..3 bytes stays as it is). The frame decoders below do
+this themselves; it is the step between the sensor's big-endian words and
+the little-endian layout the ULD reads.
+
+### depz_vl53l8_decode_frame
+
+```c
+int depz_vl53l8_decode_frame(const uint8_t *raw, size_t raw_len, uint64_t timestamp_us, depz_vl53l8_frame *out);
+```
+
+Decode a reassembled raw VL53L8CX ranging frame (ULD 2.1.0 layout: the
+footer id sits at raw_len - DEPZ_VL53L8CX_FOOTER_ID_OFFSET, 12). Returns 0
+on success, -1 on corrupted frame (header/footer id mismatch), -2 on bad
+length. `timestamp_us` is carried through from the reassembler.
+
+VL53L8CH frames come from the VL53LMZ firmware, whose footer id sits at
+raw_len - 4: this function rejects them (-1). Decode them with
+depz_vl53l8ch_decode_frame().
+
+### DEPZ_VL53L8CH_CNH_CONFIG_INIT
+
+```c
+#define DEPZ_VL53L8CH_CNH_CONFIG_INIT { 0, 0 }
+```
+
+### DEPZ_VL53L8_DIST_MM
+
+```c
+#define DEPZ_VL53L8_DIST_MM               1
+```
+
+Detection-threshold measurement selectors (get divides / set multiplies).
+
+### DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS
+
+```c
+#define DEPZ_VL53L8_SIGNAL_PER_SPAD_KCPS  2
+```
+
+### DEPZ_VL53L8_RANGE_SIGMA_MM
+
+```c
+#define DEPZ_VL53L8_RANGE_SIGMA_MM        4
+```
+
+### DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS
+
+```c
+#define DEPZ_VL53L8_AMBIENT_PER_SPAD_KCPS 8
+```
+
+### DEPZ_VL53L8_NB_TARGET_DETECTED
+
+```c
+#define DEPZ_VL53L8_NB_TARGET_DETECTED    9
+```
+
+### DEPZ_VL53L8_TAR_STATUS
+
+```c
+#define DEPZ_VL53L8_TAR_STATUS            12
+```
+
+### DEPZ_VL53L8_NB_SPADS_ENABLED
+
+```c
+#define DEPZ_VL53L8_NB_SPADS_ENABLED      13
+```
+
+### DEPZ_VL53L8_MOTION_INDICATOR
+
+```c
+#define DEPZ_VL53L8_MOTION_INDICATOR      19
+```
+
+### DEPZ_VL53L8_POWER_MODE_SLEEP
+
+```c
+#define DEPZ_VL53L8_POWER_MODE_SLEEP      0
+```
+
+### DEPZ_VL53L8_POWER_MODE_WAKEUP
+
+```c
+#define DEPZ_VL53L8_POWER_MODE_WAKEUP     1
+```
+
+### DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP
+
+```c
+#define DEPZ_VL53L8_POWER_MODE_DEEP_SLEEP 2
+```
+
+### DEPZ_VL53L8_NB_THRESHOLDS
+
+```c
+#define DEPZ_VL53L8_NB_THRESHOLDS         64
+```
+
+### DEPZ_VL53L8_THRESH_START_SIZE
+
+```c
+#define DEPZ_VL53L8_THRESH_START_SIZE     (DEPZ_VL53L8_NB_THRESHOLDS * 12)
+```
+
+768
+
+### DEPZ_VL53L8_MOTION_CFG_SIZE
+
+```c
+#define DEPZ_VL53L8_MOTION_CFG_SIZE       156
+```
+
+### DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS
+
+```c
+#define DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS 10000u
+```
+
+Largest xtalk margin depz_vl53l8_set_xtalk_margin accepts, kcps/SPAD (as ST).
+
+### depz_vl53l8_xtalk_margin_to_raw
+
+```c
+int depz_vl53l8_xtalk_margin_to_raw(uint32_t margin_kcps, uint32_t *raw);
+```
+
+Xtalk margin, a whole number of kcps/SPAD (as ST) -> raw DCI value
+(kcps * 2048). Refuses (-1, *raw untouched) a margin above
+DEPZ_VL53L8_XTALK_MARGIN_MAX_KCPS, else 0.
+
+### depz_vl53l8_xtalk_margin_from_raw
+
+```c
+uint32_t depz_vl53l8_xtalk_margin_from_raw(uint32_t raw);
+```
+
+Inverse: raw DCI -> whole kcps/SPAD (raw / 2048, integer division as ST).
+
+### depz_vl53l8_threshold
+
+```c
+typedef struct {
+    int32_t low_thresh;
+    int32_t high_thresh;
+    uint8_t measurement;
+    uint8_t type;
+    uint8_t zone_num;
+    uint8_t operation;
+} depz_vl53l8_threshold;
+```
+
+One detection-threshold entry in real units (mirror of DetectionThreshold).
+
+### DEPZ_VL53L8_THRESHOLD_INIT
+
+```c
+#define DEPZ_VL53L8_THRESHOLD_INIT { 0, 0, 0, 0, 0, 0 }
+```
+
+### depz_vl53l8_pack_thresholds
+
+```c
+void depz_vl53l8_pack_thresholds(const depz_vl53l8_threshold *th, size_t n, uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE], uint8_t valid[8]);
+```
+
+Pack up to 64 detection thresholds into the DCI_DET_THRESH_START payload
+(768 B) plus the 8-byte valid-status block (all 0x05). Missing entries are
+zero-filled. low/high are scaled by the entry's measurement selector.
+
+### depz_vl53l8_pack_thresholds_checked
+
+```c
+int depz_vl53l8_pack_thresholds_checked(const depz_vl53l8_threshold *th, size_t n, uint8_t start[DEPZ_VL53L8_THRESH_START_SIZE], uint8_t valid[8]);
+```
+
+The same, refusing (-1, nothing written) more than 64 entries or an entry
+whose scaled low/high does not fit the i32 DCI field (contract 07 §3); 0
+on success. The
+unchecked form above wraps such a value to 32 bits.
+
+### depz_vl53l8_motion_cfg
+
+```c
+typedef struct {
+    int32_t  ref_bin_offset;
+    uint32_t detection_threshold;
+    uint32_t extra_noise_sigma;
+    uint32_t null_den_clip_value;
+    uint8_t  mem_update_mode;
+    uint8_t  mem_update_choice;
+    uint8_t  sum_span;
+    uint8_t  feature_length;
+    uint8_t  nb_of_aggregates;
+    uint8_t  nb_of_temporal_accumulations;
+    uint8_t  min_nb_for_global_detection;
+    uint8_t  global_indicator_format_1;
+    uint8_t  global_indicator_format_2;
+    uint8_t  spare_1;
+    uint8_t  spare_2;
+    uint8_t  spare_3;
+    int8_t   map_id[64];
+    uint8_t  indicator_format_1[32];
+    uint8_t  indicator_format_2[32];
+} depz_vl53l8_motion_cfg;
+```
+
+Mirror of VL53L8CX_Motion_Configuration (156 bytes packed, plugin source).
+
+### DEPZ_VL53L8_MOTION_CFG_INIT
+
+```c
+#define DEPZ_VL53L8_MOTION_CFG_INIT \
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, { 0 }, { 0 }, { 0 } }
+```
+
+All zero; depz_vl53l8_motion_cfg_default() fills the defaults of a resolution.
+
+### depz_vl53l8_motion_cfg_default
+
+```c
+int depz_vl53l8_motion_cfg_default(int resolution, depz_vl53l8_motion_cfg *out);
+```
+
+The default motion-indicator configuration motion_indicator_init programs
+for the given resolution (16 | 64): the pure codec half of the motion
+indicator (the live DCI write is depz_vl53l8_configure_motion_indicator).
+Returns 0 on success, -1 (*out untouched) on bad resolution.
+
+### depz_vl53l8_motion_cfg_pack
+
+```c
+void depz_vl53l8_motion_cfg_pack(const depz_vl53l8_motion_cfg *cfg, uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE]);
+```
+
+Pack a configuration into the 156-byte DCI block, little-endian fields in
+declaration order (`<i 3I 12B 64b 32B 32B`).
+
+### depz_vl53l8_motion_cfg_default_pack
+
+```c
+int depz_vl53l8_motion_cfg_default_pack(int resolution, uint8_t out[DEPZ_VL53L8_MOTION_CFG_SIZE]);
+```
+
+depz_vl53l8_motion_cfg_default + depz_vl53l8_motion_cfg_pack in one call:
+0 on success, -1 on bad resolution.
+
+## VL53L8 multizone sensor class (live layer)
+
+### depz_vl53l8_model
+
+```c
+typedef enum {
+    DEPZ_VL53L8_MODEL_L8CX = 0, /* VL53L8CX ULD 2.1.0 blob, SPI bridge        */
+    DEPZ_VL53L8_MODEL_L8CH = 1, /* VL53LMZ ULD 2.0.16 blob, adds CNH output   */
+    DEPZ_VL53L8_MODEL_L5CX = 2, /* I2C bridge (APP_VL53L7), ULD 2.0.1 blob     */
+    DEPZ_VL53L8_MODEL_L7CX = 3, /* same blob and API as L5CX, 90° optics       */
+    DEPZ_VL53L8_MODEL_L7CH = 4  /* VL53LMZ 2.0.16 blob (as L8CH), adds CNH     */
+} depz_vl53l8_model;
+```
+
+The board model: fixes the sensor-firmware blob and the bridge.
+
+### DEPZ_VL53L8_RANGING_MODE_CONTINUOUS
+
+```c
+#define DEPZ_VL53L8_RANGING_MODE_CONTINUOUS 1u
+```
+
+### DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS
+
+```c
+#define DEPZ_VL53L8_RANGING_MODE_AUTONOMOUS 3u
+```
+
+### DEPZ_VL53L8_TARGET_ORDER_CLOSEST
+
+```c
+#define DEPZ_VL53L8_TARGET_ORDER_CLOSEST    1u
+```
+
+### DEPZ_VL53L8_TARGET_ORDER_STRONGEST
+
+```c
+#define DEPZ_VL53L8_TARGET_ORDER_STRONGEST  2u
+```
+
+### DEPZ_VL53L8_XTALK_BUFFER_SIZE
+
+```c
+#define DEPZ_VL53L8_XTALK_BUFFER_SIZE       776u
+```
+
+### DEPZ_VL53L8_CNH_MAX_BYTES
+
+```c
+#define DEPZ_VL53L8_CNH_MAX_BYTES           6160u
+```
+
+on-device CNH buffer cap
+
+### DEPZ_VL53L8_THRESH_IN_WINDOW
+
+```c
+#define DEPZ_VL53L8_THRESH_IN_WINDOW           0u
+```
+
+Detection-threshold windows and combine operations (plugin constants).
+
+### DEPZ_VL53L8_THRESH_OUT_OF_WINDOW
+
+```c
+#define DEPZ_VL53L8_THRESH_OUT_OF_WINDOW       1u
+```
+
+### DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN
+
+```c
+#define DEPZ_VL53L8_THRESH_LESS_THAN_EQUAL_MIN 2u
+```
+
+### DEPZ_VL53L8_THRESH_GREATER_THAN_MAX
+
+```c
+#define DEPZ_VL53L8_THRESH_GREATER_THAN_MAX    3u
+```
+
+### DEPZ_VL53L8_THRESH_EQUAL_MIN
+
+```c
+#define DEPZ_VL53L8_THRESH_EQUAL_MIN           4u
+```
+
+### DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN
+
+```c
+#define DEPZ_VL53L8_THRESH_NOT_EQUAL_MIN       5u
+```
+
+### DEPZ_VL53L8_THRESH_OP_OR
+
+```c
+#define DEPZ_VL53L8_THRESH_OP_OR               0u
+```
+
+### DEPZ_VL53L8_THRESH_OP_AND
+
+```c
+#define DEPZ_VL53L8_THRESH_OP_AND              2u
+```
+
+### DEPZ_VL53L8_THRESH_LAST
+
+```c
+#define DEPZ_VL53L8_THRESH_LAST                128u
+```
+
+OR into the zone_num of the last threshold programmed (ST LAST_THRESHOLD).
+
+### depz_vl53l8_motion
+
+```c
+typedef struct {
+    uint32_t global_indicator_1, global_indicator_2;
+    uint8_t  status, nb_of_detected_aggregates, nb_of_aggregates;
+    uint32_t motion[32];
+} depz_vl53l8_motion;
+```
+
+The motion-indicator output of a frame (configure_motion_indicator).
+
+### depz_vl53l8_live_frame
+
+```c
+typedef struct {
+    depz_vl53l8_frame  f;
+    bool               has_motion;
+    depz_vl53l8_motion motion;
+    size_t             cnh_len;
+    uint8_t            cnh[DEPZ_VL53L8_CNH_MAX_BYTES];
+} depz_vl53l8_live_frame;
+```
+
+One streamed frame. `f` holds the zone arrays (distance_mm in mm, sigma
+raw/128, ...; `f.resolution` zones, row-major). CH with CNH armed: the raw
+CNH block in cnh[0..cnh_len) — decode it with depz_vl53l8ch_decode_cnh().
+
+### depz_vl53l8_progress_cb
+
+```c
+typedef void (*depz_vl53l8_progress_cb)(const char *phase, size_t done, size_t total, void *user);
+```
+
+init() progress: a phase text, and for the big blob writes done/total bytes
+(both 0 otherwise). Runs on the calling thread.
+
+### depz_vl53l8_cnh_setup
+
+```c
+typedef struct {
+    int32_t  ref_bin_offset;
+    uint32_t detection_threshold, extra_noise_sigma, null_den_clip_value;
+    uint8_t  mem_update_mode, mem_update_choice, sum_span, feature_length;
+    uint8_t  nb_of_aggregates, nb_of_temporal_accumulations, min_nb_for_global_detection;
+    uint8_t  global_indicator_format_1, global_indicator_format_2;
+    uint8_t  cnh_cfg, cnh_flex_shift, spare_3;
+    int8_t   map_id[64];
+    uint8_t  indicator_format_1[32], indicator_format_2[32];
+} depz_vl53l8_cnh_setup;
+```
+
+CNH (compact network histograms, CH only): VL53LMZ_Motion_Configuration and
+the plugin helpers that fill it (vl53lmz_plugin_cnh.c).
+
+### DEPZ_VL53L8_CNH_SETUP_INIT
+
+```c
+#define DEPZ_VL53L8_CNH_SETUP_INIT \
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, { 0 }, { 0 }, { 0 } }
+```
+
+All zero; depz_vl53l8_cnh_init_config() fills the plugin defaults.
+
+### depz_vl53l8_cnh_init_config
+
+```c
+void depz_vl53l8_cnh_init_config(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins, int sub_sample);
+```
+
+vl53lmz_cnh_init_config: histogram start bin, CNH bins, device bins per CNH
+bin. num_bins / sub_sample are u8 fields: this form masks them to 8 bits;
+the _checked form (preferred, contract 07 §3) answers DEPZ_E_ARG outside
+0..255 and leaves `s` untouched.
+
+### depz_vl53l8_cnh_init_config_checked
+
+```c
+int depz_vl53l8_cnh_init_config_checked(depz_vl53l8_cnh_setup *s, int start_bin, int num_bins, int sub_sample);
+```
+
+### depz_vl53l8_cnh_create_agg_map
+
+```c
+int depz_vl53l8_cnh_create_agg_map(depz_vl53l8_cnh_setup *s, int resolution, int start_x, int start_y, int merge_x, int merge_y, int cols, int rows);
+```
+
+vl53lmz_cnh_create_agg_map: map zones (resolution 16 | 64) to aggregates.
+DEPZ_E_ARG for another resolution, start_x / start_y < 0, merge_x /
+merge_y / cols / rows < 1, or a map past the zone grid.
+
+### depz_vl53l8_cnh_required_memory
+
+```c
+int depz_vl53l8_cnh_required_memory(const depz_vl53l8_cnh_setup *s, size_t *bytes);
+```
+
+On-device CNH buffer bytes; DEPZ_E_ARG when blank or above the cap.
+
+### depz_vl53l8_cnh_pack
+
+```c
+void depz_vl53l8_cnh_pack(const depz_vl53l8_cnh_setup *s, uint8_t out[156]);
+```
+
+The 156-byte struct cnh_send_config writes.
+
+### depz_vl53l8_cnh_decode_config
+
+```c
+void depz_vl53l8_cnh_decode_config(const depz_vl53l8_cnh_setup *s, depz_vl53l8ch_cnh_config *out);
+```
+
+The decode parameters of a setup, for depz_vl53l8ch_decode_cnh().
+
+### depz_vl53l8_open_link
+
+```c
+int depz_vl53l8_open_link(depz_link *link, depz_vl53l8_model model, depz_device **out);
+```
+
+A multizone ToF on a link without an identity probe (tests, replay).
+
+### depz_is_vl53l8
+
+```c
+bool depz_is_vl53l8(const depz_device *dev);
+```
+
+### depz_vl53l8_get_model
+
+```c
+depz_vl53l8_model depz_vl53l8_get_model(const depz_device *dev);
+```
+
+### depz_vl53l8_is_alive
+
+```c
+int depz_vl53l8_is_alive(depz_device *dev, bool *alive, uint8_t *device_id, uint8_t *revision_id);
+```
+
+Probe: device id / revision (0xF0 / 0x0C on VL53L8, revision 0x02 on L5/L7).
+It and get_power_mode switch the register bank: not while ranging.
+
+### depz_vl53l8_init
+
+```c
+int depz_vl53l8_init(depz_device *dev, depz_vl53l8_progress_cb progress, void *user);
+```
+
+Boot the sensor MCU, download its firmware, upload NVM offset data, the
+default xtalk and configuration. `progress` may be NULL.
+
+### depz_vl53l8_initialized
+
+```c
+bool depz_vl53l8_initialized(const depz_device *dev);
+```
+
+### depz_vl53l8_ranging
+
+```c
+bool depz_vl53l8_ranging(const depz_device *dev);
+```
+
+### depz_vl53l8_get_resolution
+
+```c
+int depz_vl53l8_get_resolution(depz_device *dev, int *zones);
+```
+
+Configuration — init() first, never while ranging.
+/* 16 | 64 */
+
+### depz_vl53l8_set_resolution
+
+```c
+int depz_vl53l8_set_resolution(depz_device *dev, int zones);
+```
+
+### depz_vl53l8_max_ranging_frequency_hz
+
+```c
+int depz_vl53l8_max_ranging_frequency_hz(int resolution);
+```
+
+>= 2 Hz on VL53L8 (below that it never ranges), >= 1 Hz on L5/L7; at most
+depz_vl53l8_max_ranging_frequency_hz() of the resolution last set or read
+through this API (16 after open) — 60 Hz at 4x4, 15 Hz at 8x8 (contract 11
+§3). Refused with DEPZ_E_ARG before anything reaches the bus.
+
+### depz_vl53l8_get_ranging_frequency_hz
+
+```c
+int depz_vl53l8_get_ranging_frequency_hz(depz_device *dev, uint8_t *hz);
+```
+
+### depz_vl53l8_set_ranging_frequency_hz
+
+```c
+int depz_vl53l8_set_ranging_frequency_hz(depz_device *dev, uint8_t hz);
+```
+
+### depz_vl53l8_get_ranging_mode
+
+```c
+int depz_vl53l8_get_ranging_mode(depz_device *dev, uint8_t *mode);
+```
+
+### depz_vl53l8_set_ranging_mode
+
+```c
+int depz_vl53l8_set_ranging_mode(depz_device *dev, uint8_t mode);
+```
+
+### depz_vl53l8_get_integration_time_ms
+
+```c
+int depz_vl53l8_get_integration_time_ms(depz_device *dev, uint32_t *ms);
+```
+
+2..1000 ms; autonomous mode only.
+
+### depz_vl53l8_set_integration_time_ms
+
+```c
+int depz_vl53l8_set_integration_time_ms(depz_device *dev, uint32_t ms);
+```
+
+### depz_vl53l8_get_sharpener_percent
+
+```c
+int depz_vl53l8_get_sharpener_percent(depz_device *dev, uint8_t *pct);
+```
+
+0..99 % (0 = off); read back rounded to nearest, like the Python SDK.
+
+### depz_vl53l8_set_sharpener_percent
+
+```c
+int depz_vl53l8_set_sharpener_percent(depz_device *dev, uint8_t pct);
+```
+
+### depz_vl53l8_get_target_order
+
+```c
+int depz_vl53l8_get_target_order(depz_device *dev, uint8_t *order);
+```
+
+### depz_vl53l8_set_target_order
+
+```c
+int depz_vl53l8_set_target_order(depz_device *dev, uint8_t order);
+```
+
+### depz_vl53l8_get_power_mode
+
+```c
+int depz_vl53l8_get_power_mode(depz_device *dev, uint8_t *mode);
+```
+
+DEPZ_VL53L8_POWER_MODE_*; waking from deep sleep re-runs init().
+
+### depz_vl53l8_set_power_mode
+
+```c
+int depz_vl53l8_set_power_mode(depz_device *dev, uint8_t mode);
+```
+
+### depz_vl53l8_get_xtalk_margin
+
+```c
+int depz_vl53l8_get_xtalk_margin(depz_device *dev, uint32_t *kcps_per_spad);
+```
+
+Xtalk margin, a whole number of kcps/SPAD, 0..10000 (as ST); above is
+refused, nothing written. get: raw / 2048 rounded down.
+
+### depz_vl53l8_set_xtalk_margin
+
+```c
+int depz_vl53l8_set_xtalk_margin(depz_device *dev, uint32_t kcps_per_spad);
+```
+
+### depz_vl53l8_calibrate_xtalk
+
+```c
+int depz_vl53l8_calibrate_xtalk(depz_device *dev, uint8_t reflectance_percent, uint8_t nb_samples, uint16_t distance_mm, bool *failed);
+```
+
+Crosstalk calibration against a flat target (reflectance 1..99 %,
+nb_samples 1..16, distance 600..3000 mm); blocks several seconds. With no
+cover glass the firmware answers "nothing to calibrate": *failed (optional)
+is then true and the default xtalk data stays.
+
+### depz_vl53l8_get_caldata_xtalk
+
+```c
+int depz_vl53l8_get_caldata_xtalk(depz_device *dev, uint8_t out[776]);
+```
+
+The 776-byte xtalk calibration blob (save / restore).
+
+### depz_vl53l8_set_caldata_xtalk
+
+```c
+int depz_vl53l8_set_caldata_xtalk(depz_device *dev, const uint8_t blob[776]);
+```
+
+### depz_vl53l8_get_detection_thresholds_enable
+
+```c
+int depz_vl53l8_get_detection_thresholds_enable(depz_device *dev, bool *enabled);
+```
+
+### depz_vl53l8_set_detection_thresholds_enable
+
+```c
+int depz_vl53l8_set_detection_thresholds_enable(depz_device *dev, bool enabled);
+```
+
+### depz_vl53l8_get_detection_thresholds
+
+```c
+int depz_vl53l8_get_detection_thresholds(depz_device *dev, depz_vl53l8_threshold out[64]);
+```
+
+All 64 thresholds, low/high in real units of their measurement.
+
+### depz_vl53l8_set_detection_thresholds
+
+```c
+int depz_vl53l8_set_detection_thresholds(depz_device *dev, const depz_vl53l8_threshold *th, size_t n);
+```
+
+### depz_vl53l8_set_detection_thresholds_auto_stop
+
+```c
+int depz_vl53l8_set_detection_thresholds_auto_stop(depz_device *dev, bool auto_stop);
+```
+
+### depz_vl53l8_configure_motion_indicator
+
+```c
+int depz_vl53l8_configure_motion_indicator(depz_device *dev, uint16_t min_mm, uint16_t max_mm);
+```
+
+Motion indicator over [min, max] mm (400..4000, span <= 1500); frames then
+carry `motion`. It shares DCI 0xBFAC with CNH: this disarms CNH.
+
+### depz_vl53l8_configure_cnh
+
+```c
+int depz_vl53l8_configure_cnh(depz_device *dev, const depz_vl53l8_cnh_setup *setup);
+```
+
+CH only: arm the CNH block for the next start_ranging(); this disarms the
+motion indicator (one DCI block: frames carry no `motion`). init() disarms
+both (the fresh sensor holds neither configuration).
+
+### depz_vl53l8_cnh_armed
+
+```c
+bool depz_vl53l8_cnh_armed(const depz_device *dev, depz_vl53l8_cnh_setup *setup);
+```
+
+The CNH setup armed by configure_cnh() (copied to *setup, which may be
+NULL); false when none is armed.
+
+### depz_vl53l8_start_ranging
+
+```c
+int depz_vl53l8_start_ranging(depz_device *dev);
+```
+
+Ranging.
+
+### depz_vl53l8_stop_ranging
+
+```c
+int depz_vl53l8_stop_ranging(depz_device *dev);
+```
+
+/* idempotent */
+
+### depz_vl53l8_frames
+
+```c
+depz_stream *depz_vl53l8_frames(depz_device *dev);
+```
+
+The frames stream: depz_vl53l8_live_frame items (~7.5 KB each: keep a
+subscription small, the default is 8; next() names RPT_FRAME;
+parse_errors counts the chunks shorter than their header and the frames
+that did not decode). NULL + DEPZ_E_WRONG_TYPE on a device of another class.
+
+### depz_vl53l8_reassembler_discards
+
+```c
+uint64_t depz_vl53l8_reassembler_discards(const depz_device *dev);
+```
+
+Chunked frames the reassembler discarded (gaps) — not the stream's.
+
+### depz_vl53l8_read_reg
+
+```c
+int depz_vl53l8_read_reg(depz_device *dev, uint16_t addr, uint8_t *buf, size_t len);
+```
+
+Escape hatches: raw registers (16-bit address) and DCI indices.
+
+### depz_vl53l8_write_reg
+
+```c
+int depz_vl53l8_write_reg(depz_device *dev, uint16_t addr, const uint8_t *data, size_t len);
+```
+
+### depz_vl53l8_dci_read
+
+```c
+int depz_vl53l8_dci_read(depz_device *dev, uint16_t index, uint8_t *buf, size_t len);
+```
+
+### depz_vl53l8_dci_write
+
+```c
+int depz_vl53l8_dci_write(depz_device *dev, uint16_t index, const uint8_t *data, size_t len);
+```

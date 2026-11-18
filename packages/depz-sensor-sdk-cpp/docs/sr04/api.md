@@ -1,0 +1,245 @@
+# SR04 — API reference
+
+The public API for the SR04 sensor: its codecs and its live class. Transport,
+common-protocol, identity and other cross-sensor symbols shared by
+every sensor live in the [top-level API reference](../api.md).
+
+The live class (`depz::Sr04`) derives from `depz::Device`; the
+device core it inherits (common commands, time sync, events),
+the links, streams, errors and discovery are in the
+[top-level API reference](../api.md#live-hardware-links-device-discovery).
+
+Generated from the header doc-comments — edit the doc-comments in
+the headers, not this file.
+
+## Contents
+
+- **SR04 codecs (depz/sr04.hpp)**: [`Sr04Cmd`](#sr04cmd), [`Sr04Rpt`](#sr04rpt), [`ECHO_TIMEOUT`](#echo_timeout), [`SAMPLE_PERIOD_DEFAULT_US`](#sample_period_default_us), [`ECHO_DECAY_DEFAULT_US`](#echo_decay_default_us), [`ECHO_DECAY_MIN_US`](#echo_decay_min_us), [`ECHO_DECAY_MAX_US`](#echo_decay_max_us), [`Sr04Data`](#sr04data), [`pack_sample_period`](#pack_sample_period), [`unpack_sample_period`](#unpack_sample_period), [`pack_echo_decay`](#pack_echo_decay), [`unpack_echo_decay`](#unpack_echo_decay), [`distance_mm_from_echo`](#distance_mm_from_echo)
+- **SR04 live class (depz/device.hpp)**: [`Sr04Measurement`](#sr04measurement), [`Sr04`](#sr04), [`open_sr04`](#open_sr04)
+
+## SR04 codecs (depz/sr04.hpp)
+
+### Sr04Cmd
+
+```cpp
+enum class Sr04Cmd : std::uint8_t {
+    GetSamplePeriod = 0x32,
+    SetSamplePeriod = 0x33,
+    GetEchoDecay = 0x34,
+    SetEchoDecay = 0x35,
+    MeasureOnce = 0x36,
+    StartMeasurementLoop = 0x37,
+    StopMeasurementLoop = 0x38,
+};
+```
+
+### Sr04Rpt
+
+```cpp
+enum class Sr04Rpt : std::uint8_t {
+    Data = 0x91,
+    SamplePeriod = 0x92,
+    EchoDecay = 0x93,
+};
+```
+
+### ECHO_TIMEOUT
+
+```cpp
+inline constexpr std::uint16_t ECHO_TIMEOUT = 0xFFFF;
+```
+
+echo_time_us sentinel: no echo received.
+
+### SAMPLE_PERIOD_DEFAULT_US
+
+```cpp
+inline constexpr std::uint32_t SAMPLE_PERIOD_DEFAULT_US = 50000;
+```
+
+### ECHO_DECAY_DEFAULT_US
+
+```cpp
+inline constexpr std::uint16_t ECHO_DECAY_DEFAULT_US = 5000;
+```
+
+### ECHO_DECAY_MIN_US
+
+```cpp
+inline constexpr std::uint16_t ECHO_DECAY_MIN_US = 4000;
+```
+
+### ECHO_DECAY_MAX_US
+
+```cpp
+inline constexpr std::uint16_t ECHO_DECAY_MAX_US = 65000;
+```
+
+### Sr04Data
+
+```cpp
+struct Sr04Data {
+    std::uint8_t source_cmd;  // 0x36 single shot (host or SYNC_IN), 0x37 loop sample
+    std::uint64_t timestamp_us;
+    std::uint16_t echo_time_us;
+};
+```
+
+#### Sr04Data.unpack
+
+```cpp
+static Sr04Data unpack(byte_span payload);
+```
+
+### pack_sample_period
+
+```cpp
+bytes pack_sample_period(std::uint32_t period_us);
+```
+
+### unpack_sample_period
+
+```cpp
+std::uint32_t unpack_sample_period(byte_span payload);
+```
+
+### pack_echo_decay
+
+```cpp
+bytes pack_echo_decay(std::uint16_t decay_us);
+```
+
+### unpack_echo_decay
+
+```cpp
+std::uint16_t unpack_echo_decay(byte_span payload);
+```
+
+### distance_mm_from_echo
+
+```cpp
+std::optional<double> distance_mm_from_echo(std::uint16_t echo_time_us, std::optional<double> air_temp_c = std::nullopt);
+```
+
+Round-trip echo time -> distance in mm; nullopt for the timeout sentinel.
+Default speed of sound 343 m/s; with air_temp_c uses c = 331.3 + 0.606*T.
+
+## SR04 live class (depz/device.hpp)
+
+### Sr04Measurement
+
+```cpp
+struct Sr04Measurement {
+    std::uint64_t timestamp_us;  // device µs
+    std::uint16_t echo_time_us;  // ECHO_TIMEOUT = no echo
+    bool from_loop;  // false: MEASURE_ONCE or a SYNC_IN edge
+};
+```
+
+#### Sr04Measurement.valid
+
+```cpp
+bool valid() const;
+```
+
+#### Sr04Measurement.distance_mm
+
+```cpp
+std::optional<double> distance_mm() const;
+```
+
+Distance at 343 m/s; nullopt without an echo.
+
+#### Sr04Measurement.distance_mm_at
+
+```cpp
+std::optional<double> distance_mm_at(double air_temp_c) const;
+```
+
+Temperature-compensated speed of sound (331.3 + 0.606·T m/s).
+
+### Sr04
+
+```cpp
+class Sr04 : public Device {
+    // (no public data members)
+};
+```
+
+#### Sr04.open
+
+```cpp
+static std::unique_ptr<Sr04> open(Link link);
+```
+
+An SR04 on a link without an identity probe (tests, replay).
+
+#### Sr04.sample_period_us
+
+```cpp
+std::uint32_t sample_period_us();
+```
+
+Stored minimum interval between measurement starts (default 50000 µs);
+the effective rate is also limited by the echo window (contract 03 §3).
+
+#### Sr04.set_sample_period_us
+
+```cpp
+void set_sample_period_us(std::uint32_t period_us);
+```
+
+#### Sr04.echo_decay_us
+
+```cpp
+std::uint16_t echo_decay_us();
+```
+
+#### Sr04.set_echo_decay_us
+
+```cpp
+std::uint16_t set_echo_decay_us(std::uint32_t decay_us);
+```
+
+The device clamps to 4000..65000 µs; returns the value in effect.
+ArgumentError above 65535 (the u16 wire field).
+
+#### Sr04.measure_once
+
+```cpp
+Sr04Measurement measure_once(std::chrono::milliseconds timeout = std::chrono::milliseconds(1000));
+```
+
+Single shot; BusyError while the loop runs. A reply shorter than its
+11 bytes is InvalidReplyError (contract 07 §3).
+
+#### Sr04.start
+
+```cpp
+void start();
+```
+
+measurement loop; idempotent
+
+#### Sr04.stop
+
+```cpp
+void stop();
+```
+
+#### Sr04.measurements
+
+```cpp
+Stream<Sr04Measurement>& measurements();
+```
+
+Loop samples and SYNC_IN single shots (RPT_DATA); subscriptions default
+to 256 items, next() names RPT_DATA.
+
+### open_sr04
+
+```cpp
+std::unique_ptr<Sr04> open_sr04(const OpenOptions& opt = {});
+```
+
+open_device, and WrongTypeError unless it is an SR04.

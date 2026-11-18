@@ -1,0 +1,208 @@
+using System.Buffers.Binary;
+
+namespace Depz.Sensor.Vl53l8;
+
+/// <summary>
+/// VL53L8 advanced-feature DCI codecs — pure, verifiable ports of the ST ULD
+/// (BSD-3-Clause) plugin encoders: motion-indicator configuration,
+/// detection-threshold block, and xtalk-margin scaling. Shared across both ToF
+/// variants (VL53L8CX and VL53L8CH; see <see cref="Vl53l8Variant"/>). The DCI
+/// read/write that carries these to the sensor is <see cref="Vl53l8Driver"/>.
+/// </summary>
+public static class Vl53l8Advanced
+{
+    public const int Resolution4x4 = 16;
+    public const int Resolution8x8 = 64;
+
+    // Detection-threshold measurement selectors + scale factors (plugin source):
+    // get divides, set multiplies by these.
+    public const int DistMm = 1;
+    public const int SignalPerSpadKcps = 2;
+    public const int RangeSigmaMm = 4;
+    public const int AmbientPerSpadKcps = 8;
+    public const int NbSpadsEnabled = 13;
+    public const int MotionIndicator = 19;
+
+    private static readonly IReadOnlyDictionary<int, int> ThreshScale = new Dictionary<int, int>
+    {
+        [DistMm] = 4,
+        [SignalPerSpadKcps] = 2048,
+        [RangeSigmaMm] = 128,
+        [AmbientPerSpadKcps] = 2048,
+        [NbSpadsEnabled] = 256,
+        [MotionIndicator] = 65535,
+    };
+
+    public const int NbThresholds = 64;
+
+    /// <summary>Largest xtalk margin <c>SetXtalkMargin</c> accepts, whole kcps/SPAD (as ST).</summary>
+    public const int XtalkMarginMaxKcps = 10000;
+
+    /// <summary>
+    /// Xtalk margin raw DCI value: kcps × 2048. As ST, the margin is a whole
+    /// number of kcps/SPAD, 0..<see cref="XtalkMarginMaxKcps"/>; a negative or a
+    /// bigger value is refused — never wrapped (contract 07 §3).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">margin outside 0..10000.</exception>
+    public static uint XtalkMarginRaw(int marginKcps) =>
+        marginKcps >= 0 && marginKcps <= XtalkMarginMaxKcps
+            ? (uint)marginKcps * 2048u
+            : throw new ArgumentOutOfRangeException(nameof(marginKcps), marginKcps,
+                "VL53L8CX INVALID_PARAM set_xtalk_margin: margin must be a whole 0..10000 kcps");
+
+    /// <summary>Inverse: raw DCI value → whole kcps/SPAD (raw / 2048, integer division as ST).</summary>
+    public static int XtalkMarginKcps(uint raw) => (int)(raw / 2048u);
+
+    /// <summary>One detection threshold (raw real-unit low/high, before scaling). Every
+    /// component defaults to 0, as a missing key does in the Python reference: build one
+    /// with named arguments.</summary>
+    public sealed record DetectionThreshold(
+        int LowThresh = 0, int HighThresh = 0, int Measurement = 0, int Type = 0, int ZoneNum = 0,
+        int Operation = 0);
+
+    /// <summary>The 8-byte DCI_DET_THRESH_VALID_STATUS payload written before the block.</summary>
+    public static byte[] ThresholdValidStatus() => new byte[] { 5, 5, 5, 5, 5, 5, 5, 5 };
+
+    /// <summary>
+    /// Encode the 64×12-byte DCI_DET_THRESH_START block. Each entry is packed as
+    /// (i32 low, i32 high, u8 measurement, u8 type, u8 zone, u8 op) with low/high
+    /// multiplied by the measurement's scale factor; missing entries are zeros.
+    /// Anything out of its field's range (measurement/type/zone/operation u8,
+    /// scaled low/high i32) or more than 64 entries throws, never wrapped or
+    /// dropped (contract 07 §3).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">a field out of range — nothing is returned.</exception>
+    public static byte[] PackDetectionThresholds(IReadOnlyList<DetectionThreshold> thresholds)
+    {
+        if (thresholds.Count > NbThresholds)
+            throw new ArgumentOutOfRangeException(nameof(thresholds), thresholds.Count,
+                $"thresholds: {thresholds.Count} entries, at most {NbThresholds}");
+        var packed = new byte[NbThresholds * 12];
+        for (int k = 0; k < NbThresholds; k++)
+        {
+            if (k >= thresholds.Count)
+                continue;
+            DetectionThreshold t = thresholds[k];
+            string at = $"thresholds[{k}].";
+            Protocol.Wire.CheckUint(at + "measurement", t.Measurement, 8);
+            long scale = ThreshScale.TryGetValue(t.Measurement, out int sc) ? sc : 1;
+            int lo = Protocol.Wire.CheckInt(at + "lowThresh", t.LowThresh * scale, 32);
+            int hi = Protocol.Wire.CheckInt(at + "highThresh", t.HighThresh * scale, 32);
+            Protocol.Wire.CheckUint(at + "type", t.Type, 8);
+            Protocol.Wire.CheckUint(at + "zoneNum", t.ZoneNum, 8);
+            Protocol.Wire.CheckUint(at + "operation", t.Operation, 8);
+            int b = k * 12;
+            BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(b), lo);
+            BinaryPrimitives.WriteInt32LittleEndian(packed.AsSpan(b + 4), hi);
+            packed[b + 8] = (byte)t.Measurement;
+            packed[b + 9] = (byte)t.Type;
+            packed[b + 10] = (byte)t.ZoneNum;
+            packed[b + 11] = (byte)t.Operation;
+        }
+        return packed;
+    }
+}
+
+/// <summary>
+/// Mirror of VL53L8CX_Motion_Configuration (156 bytes, ST ULD motion plugin).
+/// <see cref="Pack"/> is byte-exact with the C struct
+/// <c>&lt;i 3I 12B 64b 32B 32B&gt;</c>.
+/// </summary>
+public sealed class MotionConfig
+{
+    public int RefBinOffset;
+    public uint DetectionThreshold;
+    public uint ExtraNoiseSigma;
+    public uint NullDenClipValue;
+    public byte MemUpdateMode;
+    public byte MemUpdateChoice;
+    public byte SumSpan;
+    public byte FeatureLength;
+    public byte NbOfAggregates;
+    public byte NbOfTemporalAccumulations;
+    public byte MinNbForGlobalDetection;
+    public byte GlobalIndicatorFormat1;
+    public byte GlobalIndicatorFormat2;
+    public byte Spare1;
+    public byte Spare2;
+    public byte Spare3;
+    public readonly sbyte[] MapId = new sbyte[64];
+    public readonly byte[] IndicatorFormat1 = new byte[32];
+    public readonly byte[] IndicatorFormat2 = new byte[32];
+
+    /// <summary>Serialize to the 156-byte VL53L8CX_Motion_Configuration wire form.</summary>
+    public byte[] Pack()
+    {
+        var buf = new byte[156];
+        BinaryPrimitives.WriteInt32LittleEndian(buf.AsSpan(0), RefBinOffset);
+        BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(4), DetectionThreshold);
+        BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(8), ExtraNoiseSigma);
+        BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(12), NullDenClipValue);
+        buf[16] = MemUpdateMode;
+        buf[17] = MemUpdateChoice;
+        buf[18] = SumSpan;
+        buf[19] = FeatureLength;
+        buf[20] = NbOfAggregates;
+        buf[21] = NbOfTemporalAccumulations;
+        buf[22] = MinNbForGlobalDetection;
+        buf[23] = GlobalIndicatorFormat1;
+        buf[24] = GlobalIndicatorFormat2;
+        buf[25] = Spare1;
+        buf[26] = Spare2;
+        buf[27] = Spare3;
+        for (int k = 0; k < 64; k++)
+            buf[28 + k] = (byte)MapId[k];
+        for (int k = 0; k < 32; k++)
+            buf[92 + k] = IndicatorFormat1[k];
+        for (int k = 0; k < 32; k++)
+            buf[124 + k] = IndicatorFormat2[k];
+        return buf;
+    }
+
+    /// <summary>
+    /// The default motion configuration produced by vl53l8cx_motion_indicator_init
+    /// for the given resolution (distance-window preset + zone map).
+    /// </summary>
+    public static MotionConfig InitDefault(int resolution)
+    {
+        var cfg = new MotionConfig
+        {
+            RefBinOffset = 13633,
+            DetectionThreshold = 2883584,
+            ExtraNoiseSigma = 0,
+            NullDenClipValue = 0,
+            MemUpdateMode = 6,
+            MemUpdateChoice = 2,
+            SumSpan = 4,
+            FeatureLength = 9,
+            NbOfAggregates = 16,
+            NbOfTemporalAccumulations = 16,
+            MinNbForGlobalDetection = 1,
+            GlobalIndicatorFormat1 = 8,
+            GlobalIndicatorFormat2 = 0,
+        };
+        cfg.SetResolution(resolution);
+        return cfg;
+    }
+
+    /// <summary>vl53l8cx_motion_indicator_set_resolution: fill the per-zone map id.</summary>
+    public void SetResolution(int resolution)
+    {
+        if (resolution == Vl53l8Advanced.Resolution4x4)
+        {
+            for (int i = 0; i < 16; i++)
+                MapId[i] = (sbyte)i;
+            for (int i = 16; i < 64; i++)
+                MapId[i] = -1;
+        }
+        else if (resolution == Vl53l8Advanced.Resolution8x8)
+        {
+            for (int i = 0; i < 64; i++)
+                MapId[i] = (sbyte)(((i % 8) / 2) + (4 * (i / 16)));
+        }
+        else
+        {
+            throw new ArgumentException($"resolution must be 16 or 64, got {resolution}", nameof(resolution));
+        }
+    }
+}
